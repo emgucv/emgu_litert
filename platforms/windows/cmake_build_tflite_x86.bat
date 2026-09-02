@@ -168,9 +168,7 @@ IF %DEVENV%==%VS2017% SET CMAKE_CONF="Visual Studio 15%OS_MODE%"
 IF %DEVENV%==%VS2019% SET CMAKE_CONF="Visual Studio 16" %BUILD_ARCH%
 IF %DEVENV%==%VS2022% SET CMAKE_CONF="Visual Studio 17" %BUILD_ARCH%
 
-REM call tensorflow\tensorflow\contrib\cmake\make.bat
-
-cd tensorflow\tensorflow\tfliteextern
+cd litertextern\tfliteextern
 
 mkdir %BUILD_FOLDER%
 cd %BUILD_FOLDER%
@@ -192,9 +190,9 @@ REM need to clean the project to for the rebuild of protobuf
 REM call %DEVENV% %CLEAN_TYPE% tensorflow.sln /project protobuf
 REM build tfextern
 
-call %DEVENV% %BUILD_TYPE% tfliteextern.sln 
+call %DEVENV% %BUILD_TYPE% tfliteextern.sln
 
-cd ..\..\..\..
+cd ..\..\..
 
 
 popd

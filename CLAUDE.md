@@ -11,7 +11,9 @@ The native C++ layer is exposed through P/Invoke via the `tfliteextern` extern l
 ## Architecture
 
 ### Layer structure
-1. **Native layer** — C/C++ wrapper DLL built from the `tensorflow/` submodule (which also provides the `tfliteextern` build target) using CMake or Bazel. The DLL (`tfliteextern`) must be present in `lib/runtimes/<rid>/native/` before building .NET code.
+1. **Native layer** — C/C++ wrapper DLL (`tfliteextern`) built with CMake or Bazel; must be present in `lib/runtimes/<rid>/native/` before building .NET code.
+   - **Windows x64** builds from `litertextern/tfliteextern/` (wrapper source) against `litert/tflite` (the `google-ai-edge/LiteRT` submodule), reusing the `tensorflow/` submodule only as `TENSORFLOW_SOURCE_DIR` for LiteRT's own CMake build.
+   - All other platforms (macOS, Linux, Android, iOS) and the Bazel build path still build from `tensorflow/tensorflow/tfliteextern/` inside the `tensorflow/` submodule — not yet migrated.
 2. **P/Invoke layer** — `TfLiteInvoke` (in `Emgu.TF.Lite/`) is a partial static class that exposes the native DLL entry points via `[DllImport]`.
 3. **Managed wrappers** — `Interpreter`, `Tensor`, etc. inherit `UnmanagedObject` (from `Emgu.TF.Util/`) and wrap native handles with proper lifetime management.
 4. **Models layer** — `Emgu.TF.Lite.Models/` provides high-level pre-built model helpers (MobileNet, COCO SSD, etc.) that download weights and run inference.
@@ -78,3 +80,5 @@ Test assets (e.g., `grace_hopper.jpg`) must be present in the working directory 
 - **Boolean marshaling**: `UnmanagedType.U1` for `bool`, `UnmanagedType.Bool` for `int`-as-bool.
 - **Error handling**: native errors are redirected via a callback delegate (`TfLiteErrorCallback`) and thrown as managed exceptions.
 - The `tensorflow/` directory is a submodule pinned to the version declared in `cmake/modules/TensorflowVersion.cmake`. Do not modify files inside it directly.
+- The `litert/` directory is a submodule of `google-ai-edge/LiteRT`, tracking that repo's `main` branch (no fixed pin). Do not modify files inside it directly.
+- `litertextern/` holds the Emgu-authored native wrapper (`tfliteextern`, `imgproc`) that Windows x64 builds against `litert/tflite` — this is the one place native wrapper changes should be made for that platform going forward.
