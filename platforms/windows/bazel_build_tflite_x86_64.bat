@@ -23,9 +23,12 @@ GOTO ENV_END
 
 :ENV_x64
 REM SET BUILD_FOLDER=%BUILD_FOLDER%_x64
-ECHO "BUILDING 64bit solution in %BUILD_FOLDER%" 
+ECHO "BUILDING 64bit solution in %BUILD_FOLDER%"
 IF EXIST "%BUILD_TOOLS_FOLDER%\vc\Auxiliary\Build\vcvars64.bat" SET ENV_SETUP_SCRIPT=%BUILD_TOOLS_FOLDER%\vc\Auxiliary\Build\vcvars64.bat
-SET CPU_FLAGS=--config=win_clang 
+REM litert's .bazelrc has no win_clang config (only build:windows, targeting MSVC directly,
+REM auto-applied via --enable_platform_specific_config). --config=windows is passed explicitly
+REM for clarity even though Bazel would select it automatically on this host.
+SET CPU_FLAGS=--config=windows
 GOTO ENV_END
 
 :ENV_ARM
@@ -139,27 +142,33 @@ IF EXIST "C:\Program Files\LLVM\bin" SET BAZEL_LLVM="C:\Program Files\LLVM"
 IF NOT "%BAZEL_VC%"=="" SET BAZEL_LLVM=%BAZEL_VC%\Tools\Llvm\x64
 ECHO Using BAZEL_LLVM=%BAZEL_LLVM%
 
-cd tensorflow
+REM litert is a pristine third-party submodule (we don't own/patch it upstream), so the
+REM tfliteextern Bazel package can't live there in git. Stage our tracked source into it
+REM here instead, each run, mirroring what litertextern/tfliteextern/CMakeLists.txt does
+REM for the CMake path without needing a copy step.
+IF NOT EXIST litert\tfliteextern mkdir litert\tfliteextern
+copy /Y litertextern\tfliteextern\bazel\BUILD litert\tfliteextern\BUILD
+copy /Y litertextern\tfliteextern\bazel\tfliteextern.def litert\tfliteextern\tfliteextern.def
+copy /Y litertextern\tfliteextern\tfliteextern.cc litert\tfliteextern\tfliteextern.cc
+copy /Y litertextern\tfliteextern\tfliteextern.h litert\tfliteextern\tfliteextern.h
+copy /Y litertextern\imgproc\imgproc.cc litert\tfliteextern\imgproc.cc
+copy /Y litertextern\imgproc\imgproc.h litert\tfliteextern\imgproc.h
+
+cd litert
 
 SET BAZEL_COMMAND=bazel.exe
 SET MSYS_PATH=C:\msys64
 SET MSYS_BIN=%MSYS_PATH%\usr\bin
 IF EXIST "%MSYS_BIN%\bazel.exe" SET BAZEL_COMMAND=%MSYS_BIN%\bazel.exe
 
-call %BAZEL_COMMAND% --output_base=%OUTPUT_BASE_DIR% --output_user_root=%OUTPUT_USER_ROOT_DIR% build --repo_env=BAZEL_LLVM="%BAZEL_LLVM%"  %CPU_FLAGS% %BAZEL_XNN_FLAGS% %DOCKER_FLAGS% -c opt //tensorflow/lite:version --verbose_failures
+call %BAZEL_COMMAND% --output_base=%OUTPUT_BASE_DIR% --output_user_root=%OUTPUT_USER_ROOT_DIR% build --repo_env=BAZEL_LLVM="%BAZEL_LLVM%"  %CPU_FLAGS% %BAZEL_XNN_FLAGS% %DOCKER_FLAGS% -c opt //tflite:version --verbose_failures
 
-REM Patch pthreadpool bazel build script
-REM cp ../platforms/windows/pthreadpool.BUILD.bazel ../platforms/windows/output_base/external/pthreadpool/BUILD.bazel
+call %BAZEL_COMMAND% --output_base=%OUTPUT_BASE_DIR% --output_user_root=%OUTPUT_USER_ROOT_DIR% build --repo_env=BAZEL_LLVM="%BAZEL_LLVM%"  %CPU_FLAGS% %BAZEL_XNN_FLAGS% %DOCKER_FLAGS% -c opt //tfliteextern:tfliteextern --verbose_failures
 
-call %BAZEL_COMMAND% --output_base=%OUTPUT_BASE_DIR% --output_user_root=%OUTPUT_USER_ROOT_DIR% build --repo_env=BAZEL_LLVM="%BAZEL_LLVM%"  %CPU_FLAGS% %BAZEL_XNN_FLAGS% %DOCKER_FLAGS% -c opt //tensorflow/tfliteextern:libtfliteextern.so --verbose_failures
-REM call %BAZEL_COMMAND% --output_base=%OUTPUT_BASE_DIR% --output_user_root=%OUTPUT_USER_ROOT_DIR% build --config=win_clang %BAZEL_XNN_FLAGS% %DOCKER_FLAGS% -c opt //tensorflow/lite/c:c_api //tensorflow/tfliteextern:libtfliteextern.so --verbose_failures
-REM call %BAZEL_COMMAND% --output_base=%OUTPUT_BASE_DIR% --output_user_root=%OUTPUT_USER_ROOT_DIR% build  --copt="-O2" --cxxopt="-O2" %BAZEL_XNN_FLAGS% %DOCKER_FLAGS% -c opt //tensorflow/tfliteextern:libtfliteextern.so --verbose_failures
-REM call %BAZEL_COMMAND% --output_base=%OUTPUT_BASE_DIR% --output_user_root=%OUTPUT_USER_ROOT_DIR% build  --copt="-O2" --cxxopt="-O2" --conlyopt=/std:c11 --conlyopt=/experimental:c11atomics %BAZEL_XNN_FLAGS% %DOCKER_FLAGS% -c opt //tensorflow/tfliteextern:libtfliteextern.so --verbose_failures
-      
 cd ..
 
 IF NOT EXIST lib\runtimes\win-x64\native mkdir lib\runtimes\win-x64\native
-copy /Y "tensorflow\bazel-bin\tensorflow\tfliteextern\libtfliteextern.so" lib\runtimes\win-x64\native\tfliteextern.dll
+copy /Y "litert\bazel-bin\tfliteextern\tfliteextern.dll" lib\runtimes\win-x64\native\tfliteextern.dll
 
 :START_OF_MSVC_DEPENDENCY
 IF "%BAZEL_VC%"=="" GOTO END_OF_MSVC_DEPENDENCY

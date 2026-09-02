@@ -12,8 +12,10 @@ The native C++ layer is exposed through P/Invoke via the `tfliteextern` extern l
 
 ### Layer structure
 1. **Native layer** — C/C++ wrapper DLL (`tfliteextern`) built with CMake or Bazel; must be present in `lib/runtimes/<rid>/native/` before building .NET code.
-   - **Windows x64** builds from `litertextern/tfliteextern/` (wrapper source) against `litert/tflite` (the `google-ai-edge/LiteRT` submodule). There is no `tensorflow/` submodule in this repo — `litert/tflite`'s own CMake project downloads the extra TF source it needs (e.g. MLIR/compiler files) itself via `FetchContent` at configure time.
-   - **Broken / not yet migrated**: macOS, Linux, Android, iOS, and the Windows *Bazel* path (as opposed to the Windows CMake path above) all still `cd` into `tensorflow/tensorflow/tfliteextern` to build — a path that no longer exists in this repo. Fixing these means porting each to `litertextern/` the way the Windows CMake path was, which hasn't been done.
+   - **Windows x64 (both CMake and Bazel)** build against `litert/tflite` (the `google-ai-edge/LiteRT` submodule). There is no `tensorflow/` submodule in this repo.
+     - CMake builds directly from `litertextern/tfliteextern/`; `litert/tflite`'s own CMake project downloads the extra TF source it needs (e.g. MLIR/compiler files) itself via `FetchContent` at configure time.
+     - Bazel needs the wrapper package to live *inside* the `litert` workspace (a pristine submodule we don't patch upstream), so `bazel_build_tflite_x86_64.bat` copies `litertextern/tfliteextern/bazel/{BUILD,tfliteextern.def}` plus the shared `litertextern/tfliteextern/*.cc/.h` and `litertextern/imgproc/*.cc/.h` sources into `litert/tfliteextern/` fresh on every run, then builds `//tfliteextern:tfliteextern` from there. Bazel always fetches its own pinned TF archive (no local-submodule-reuse option — see the copied `BUILD`'s comments for why).
+   - **Broken / not yet migrated**: macOS, Linux, Android, and iOS all still `cd` into `tensorflow/tensorflow/tfliteextern` to build — a path that no longer exists in this repo. Fixing these means porting each to `litertextern/` the way both Windows paths were.
 2. **P/Invoke layer** — `TfLiteInvoke` (in `Emgu.TF.Lite/`) is a partial static class that exposes the native DLL entry points via `[DllImport]`.
 3. **Managed wrappers** — `Interpreter`, `Tensor`, etc. inherit `UnmanagedObject` (from `Emgu.TF.Util/`) and wrap native handles with proper lifetime management.
 4. **Models layer** — `Emgu.TF.Lite.Models/` provides high-level pre-built model helpers (MobileNet, COCO SSD, etc.) that download weights and run inference.
@@ -35,6 +37,11 @@ The native C++ layer is exposed through P/Invoke via the `tfliteextern` extern l
 ```bat
 cd platforms/windows
 cmake_build_tflite_x86_64.bat
+```
+Or via Bazel (also produces `lib/runtimes/win-x64/native/tfliteextern.dll`):
+```bat
+cd platforms/windows
+bazel_build_tflite_x86_64.bat 64 xnn
 ```
 
 ### Build the .NET solution (Windows)
@@ -81,5 +88,4 @@ Test assets (e.g., `grace_hopper.jpg`) must be present in the working directory 
 - **Error handling**: native errors are redirected via a callback delegate (`TfLiteErrorCallback`) and thrown as managed exceptions.
 - There is no `tensorflow/` submodule — it was removed once the Windows CMake path was proven to work without it (LiteRT downloads the TF source it needs itself). The overall package version (`CPACK_PACKAGE_VERSION_*` in the top-level `CMakeLists.txt`, and `litertextern/tfliteextern/CMakeLists.txt`'s own version) is read from `litert/version.bzl` via `cmake/modules/LitertVersion.cmake`, not from a TF version file.
 - The `litert/` directory is a submodule of `google-ai-edge/LiteRT`, pinned to the `v2.2.0` tag (not `main` — the bleeding-edge commit this was originally added at hit a WORKSPACE bug under Bazel; see `litertextern/tfliteextern/bazel/BUILD`'s comments). Do not modify files inside it directly.
-- `litertextern/` holds the Emgu-authored native wrapper (`tfliteextern`, `imgproc`) that Windows x64 builds against `litert/tflite` — this is the one place native wrapper changes should be made for that platform going forward.
-- `litertextern/tfliteextern/bazel/` is a validated-but-unwired reference Bazel BUILD (see comments at its top for exact setup steps/caveats — it needs Bazel to fetch its own TF archive; unlike the CMake path, `litert` v2.2.0's patches don't cleanly apply against arbitrary TF snapshots, so there's no local-submodule-reuse option here even in principle). Not used by any build script; CMake remains the only Bazel-or-CMake choice actually wired in for Windows.
+- `litertextern/` holds the Emgu-authored native wrapper (`tfliteextern`, `imgproc`) that both Windows build paths use — this is the one place native wrapper source changes should be made for that platform going forward. `litertextern/tfliteextern/bazel/{BUILD,tfliteextern.def}` is the Bazel-specific counterpart to `litertextern/tfliteextern/CMakeLists.txt`, staged into `litert/tfliteextern/` at build time (see above) since it can't live there in git.
