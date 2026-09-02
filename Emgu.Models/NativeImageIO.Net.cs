@@ -8,6 +8,10 @@ using System.Text;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Drawing;
+using Emgu.CV;
+using Emgu.CV.CvEnum;
+using Emgu.CV.Structure;
+using Emgu.CV.Util;
 using Emgu.TF;
 
 
@@ -18,6 +22,70 @@ namespace Emgu.Models
     /// </summary>
     public partial class NativeImageIO
     {
+        /// <summary>
+        /// System.Drawing.Common only works on Windows on .NET 6+. On other OSes (this "plain .NET"
+        /// target also covers running on Linux/macOS, unlike the __IOS__/__MACOS__/Unity targets
+        /// above, which are separate compile-time platforms with their own NativeImageIO.*.cs), image
+        /// loading is done through Emgu.CV instead, whose BGR-in-memory Mat layout matches GDI+'s
+        /// Format24bppRgb layout closely enough that the swapBR pass-through below stays correct either way.
+        /// </summary>
+        private static readonly bool _isWindows =
+            RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+
+        private static int WritePixel24ToTensor<T>(
+            IntPtr pixels,
+            int width,
+            int height,
+            float inputMean,
+            float scale,
+            bool flipUpSideDown,
+            bool swapBR,
+            IntPtr dest)
+            where T : struct
+        {
+            if (typeof(T) == typeof(float))
+            {
+                return Emgu.TF.Util.Toolbox.Pixel24ToPixelFloat(
+                    pixels, width, height, inputMean, scale, flipUpSideDown, swapBR, dest);
+            }
+            else if (typeof(T) == typeof(byte))
+            {
+                return Emgu.TF.Util.Toolbox.Pixel24ToPixelByte(
+                    pixels, width, height, inputMean, scale, flipUpSideDown, swapBR, dest);
+            }
+            else
+            {
+                throw new NotImplementedException(String.Format("Destination data type {0} is not supported.",
+                    typeof(T).ToString()));
+            }
+        }
+
+        private static int ReadMatToTensor<T>(
+            Mat mat,
+            IntPtr dest,
+            int inputHeight,
+            int inputWidth,
+            float inputMean,
+            float scale,
+            bool flipUpSideDown,
+            bool swapBR)
+            where T : struct
+        {
+            if (inputHeight > 0 && inputWidth > 0 &&
+                ((inputHeight != mat.Height) || (inputWidth != mat.Width)))
+            {
+                Mat resized = new Mat();
+                CvInvoke.Resize(mat, resized, new System.Drawing.Size(inputWidth, inputHeight));
+                mat.Dispose();
+                mat = resized;
+            }
+
+            using (mat)
+            {
+                return WritePixel24ToTensor<T>(mat.DataPointer, mat.Width, mat.Height, inputMean, scale,
+                    flipUpSideDown, swapBR, dest);
+            }
+        }
         /// <summary>
         /// Covert the Bitmap data and save it to the native pointer
         /// </summary>
@@ -60,37 +128,8 @@ namespace Emgu.Models
 
             try
             {
-                if (typeof(T) == typeof(float))
-                {
-                    return Emgu.TF.Util.Toolbox.Pixel24ToPixelFloat(
-                        bd.Scan0,
-                        bmpWidth,
-                        bmpHeight,
-                        inputMean,
-                        scale,
-                        flipUpSideDown,
-                        swapBR,
-                        dest
-                    );
-                }
-                else if (typeof(T) == typeof(byte))
-                {
-                    return Emgu.TF.Util.Toolbox.Pixel24ToPixelByte(
-                        bd.Scan0,
-                        bmpWidth,
-                        bmpHeight,
-                        inputMean,
-                        scale,
-                        flipUpSideDown,
-                        swapBR,
-                        dest
-                    );
-                }
-                else
-                {
-                    throw new NotImplementedException(String.Format("Destination data type {0} is not supported.",
-                        typeof(T).ToString()));
-                }
+                return WritePixel24ToTensor<T>(bd.Scan0, bmpWidth, bmpHeight, inputMean, scale, flipUpSideDown,
+                    swapBR, dest);
             }
             finally
             {
@@ -128,14 +167,24 @@ namespace Emgu.Models
                 if (!File.Exists(fileName))
                     throw new FileNotFoundException(String.Format("File {0} do not exist.", fileName));
 
-                //Read the file using Bitmap class
-                System.Drawing.Bitmap bmp = new Bitmap(fileName);
-
-                int step = ReadBitmapToTensor<T>(bmp, dataPtr, inputHeight, inputWidth, inputMean, scale,
-                    flipUpSideDown, swapBR);
+                int step;
+                if (_isWindows)
+                {
+                    //Read the file using Bitmap class
+                    System.Drawing.Bitmap bmp = new Bitmap(fileName);
+                    step = ReadBitmapToTensor<T>(bmp, dataPtr, inputHeight, inputWidth, inputMean, scale,
+                        flipUpSideDown, swapBR);
+                }
+                else
+                {
+                    //Bitmap/System.Drawing.Common is Windows-only on .NET 6+; use Emgu.CV instead.
+                    Mat mat = CvInvoke.Imread(fileName, ImreadModes.ColorBgr);
+                    step = ReadMatToTensor<T>(mat, dataPtr, inputHeight, inputWidth, inputMean, scale,
+                        flipUpSideDown, swapBR);
+                }
 
                 dataPtr = new IntPtr(dataPtr.ToInt64() + step);
-                
+
             }
         }
         
@@ -194,6 +243,14 @@ namespace Emgu.Models
         /// <returns>The image in Jpeg stream format</returns>
         public static JpegData ImageFileToJpeg(String fileName, Annotation[] annotations = null)
         {
+            if (_isWindows)
+                return ImageFileToJpegWindows(fileName, annotations);
+            else
+                return ImageFileToJpegEmguCV(fileName, annotations);
+        }
+
+        private static JpegData ImageFileToJpegWindows(String fileName, Annotation[] annotations)
+        {
             Bitmap img = new Bitmap(fileName);
 
             if (annotations != null)
@@ -231,6 +288,47 @@ namespace Emgu.Models
                 result.Width = img.Size.Width;
                 result.Height = img.Size.Height;
                 return result;
+            }
+        }
+
+        //Bitmap/Graphics (System.Drawing.Common) is Windows-only on .NET 6+; use Emgu.CV instead.
+        //Mat's BGR channel order is why annotation colors are specified as (B, G, R) MCvScalars below.
+        private static JpegData ImageFileToJpegEmguCV(String fileName, Annotation[] annotations)
+        {
+            using (Mat img = CvInvoke.Imread(fileName, ImreadModes.ColorBgr))
+            {
+                if (annotations != null)
+                {
+                    MCvScalar red = new MCvScalar(0, 0, 255);
+                    for (int i = 0; i < annotations.Length; i++)
+                    {
+                        if (annotations[i].Rectangle != null)
+                        {
+                            float[] rects = ScaleLocation(annotations[i].Rectangle, img.Width, img.Height);
+                            System.Drawing.Point origin = new System.Drawing.Point((int)rects[0], (int)rects[1]);
+                            System.Drawing.Rectangle rect = new System.Drawing.Rectangle(
+                                origin.X, origin.Y,
+                                (int)(rects[2] - rects[0]), (int)(rects[3] - rects[1]));
+                            CvInvoke.Rectangle(img, rect, red, 3);
+
+                            String label = annotations[i].Label;
+                            if (label != null)
+                            {
+                                CvInvoke.PutText(img, label, origin, FontFace.HersheySimplex, 1.0, red, 2);
+                            }
+                        }
+                    }
+                }
+
+                using (VectorOfByte jpeg = new VectorOfByte())
+                {
+                    CvInvoke.Imencode(".jpg", img, jpeg);
+                    JpegData result = new JpegData();
+                    result.Raw = jpeg.ToArray();
+                    result.Width = img.Width;
+                    result.Height = img.Height;
+                    return result;
+                }
             }
         }
     }

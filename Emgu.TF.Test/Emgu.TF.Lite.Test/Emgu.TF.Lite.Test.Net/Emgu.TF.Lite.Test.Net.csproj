@@ -19,7 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Emgu.CV.runtime.windows" Version="4.10.0.5680" />
+    <PackageReference Include="Emgu.CV.runtime.mini.windows" Version="4.13.0.5924" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
+    <PackageReference Include="Emgu.CV.runtime.mini.macos" Version="4.13.0.5924" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
     <PackageReference Include="NUnit" Version="4.3.2" />
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
@@ -34,6 +35,7 @@
     <ProjectReference Include="..\..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
   </ItemGroup>
 
-  <Import Project="..\..\..\Emgu.TF.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" />
+  <Import Project="..\..\..\Emgu.TF.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
+  <Import Project="..\..\..\Emgu.TF.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
 
 </Project>
