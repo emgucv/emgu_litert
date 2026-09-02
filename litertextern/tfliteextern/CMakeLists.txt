@@ -4,12 +4,12 @@
 #
 # ----------------------------------------------------------------------------
 #
-# LiteRT-backed build of tfliteextern (audit/spike build for Windows x64).
-# Links against Google's google-ai-edge/LiteRT `tflite/` tree (litert/ submodule)
-# instead of the classic tensorflow/tensorflow/tfliteextern build. The
-# tensorflow/ submodule is reused as TENSORFLOW_SOURCE_DIR for litert/tflite's
-# own CMake project, which still needs some TF source (e.g. MLIR/compiler
-# files) alongside the tflite/ tree itself.
+# LiteRT-backed build of tfliteextern (Windows x64).
+# Links against Google's google-ai-edge/LiteRT `tflite/` tree (litert/
+# submodule). No tensorflow/ submodule is used or required: litert/tflite's
+# own CMakeLists.txt downloads the TF source it additionally needs (e.g.
+# MLIR/compiler files) itself via FetchContent when TENSORFLOW_SOURCE_DIR
+# isn't set, which is the case here.
 
 cmake_minimum_required(VERSION 3.16)
 
@@ -17,15 +17,14 @@ SET(CMAKE_CXX_STANDARD 20)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/modules")
 
-GET_FILENAME_COMPONENT(TENSORFLOW_SOURCE_DIR_ABS "${CMAKE_CURRENT_SOURCE_DIR}/../../tensorflow" ABSOLUTE)
-SET(TENSORFLOW_SOURCE_DIR "${TENSORFLOW_SOURCE_DIR_ABS}" CACHE PATH "Directory that contains the TensorFlow project" FORCE)
-SET(CPACK_PACKAGE_VENDOR "Emgu Corporation")
-INCLUDE (TensorflowVersion)
-SET(CPACK_PACKAGE_VERSION_MAJOR ${TENSORFLOW_VERSION_MAJOR})
-SET(CPACK_PACKAGE_VERSION_MINOR ${TENSORFLOW_VERSION_MINOR})
-SET(CPACK_PACKAGE_VERSION_PATCH ${TENSORFLOW_VERSION_PATCH})
-
 GET_FILENAME_COMPONENT(LITERT_SOURCE_DIR_ABS "${CMAKE_CURRENT_SOURCE_DIR}/../../litert" ABSOLUTE)
+SET(LITERT_SOURCE_DIR "${LITERT_SOURCE_DIR_ABS}")
+SET(CPACK_PACKAGE_VENDOR "Emgu Corporation")
+INCLUDE (LitertVersion)
+SET(CPACK_PACKAGE_VERSION_MAJOR ${LITERT_VERSION_MAJOR})
+SET(CPACK_PACKAGE_VERSION_MINOR ${LITERT_VERSION_MINOR})
+SET(CPACK_PACKAGE_VERSION_PATCH ${LITERT_VERSION_PATCH})
+
 ADD_SUBDIRECTORY(${LITERT_SOURCE_DIR_ABS}/tflite ${CMAKE_CURRENT_BINARY_DIR}/tflite)
 
 INCLUDE(Today)
@@ -80,10 +79,10 @@ ENDIF()
 add_library(tfliteextern SHARED ${TFLITEEXTERN_HDRS} ${TFLITEEXTERN_SOURCES} ${TFLITEEXTERN_VER_RC})
 
 
-ADD_DEFINITIONS(-DTF_MAJOR_VERSION=${TENSORFLOW_VERSION_MAJOR})
-ADD_DEFINITIONS(-DTF_MINOR_VERSION=${TENSORFLOW_VERSION_MINOR})
-ADD_DEFINITIONS(-DTF_PATCH_VERSION=${TENSORFLOW_VERSION_PATCH})
-ADD_DEFINITIONS(-DTF_VERSION_SUFFIX=${TENSORFLOW_VERSION_SUFFIX})
+ADD_DEFINITIONS(-DTF_MAJOR_VERSION=${LITERT_VERSION_MAJOR})
+ADD_DEFINITIONS(-DTF_MINOR_VERSION=${LITERT_VERSION_MINOR})
+ADD_DEFINITIONS(-DTF_PATCH_VERSION=${LITERT_VERSION_PATCH})
+ADD_DEFINITIONS(-DTF_VERSION_SUFFIX="")
 
 target_link_libraries(tfliteextern
   tensorflow-lite

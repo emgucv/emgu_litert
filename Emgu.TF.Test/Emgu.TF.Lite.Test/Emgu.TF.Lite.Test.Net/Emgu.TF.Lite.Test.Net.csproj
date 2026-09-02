@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\..\tensorflow\tensorflow\examples\label_image\data\grace_hopper.jpg" Link="grace_hopper.jpg">
+    <Content Include="..\grace_hopper.jpg" Link="grace_hopper.jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
