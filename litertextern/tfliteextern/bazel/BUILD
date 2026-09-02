@@ -47,15 +47,38 @@ load(
     "//tflite:build_def.bzl",
     "tflite_copts",
 )
+load(
+    # tflite/ios/ has no BUILD file of its own (only BUILD.apple) so it isn't a package -
+    # ios.bzl is addressed as a file within the parent //tflite package instead.
+    "//tflite:ios/ios.bzl",
+    "TFL_MINIMUM_OS_VERSION",
+)
+load(
+    "@build_bazel_rules_apple//apple:ios.bzl",
+    "ios_static_framework",
+)
+
+_TFLITEEXTERN_SRCS = [
+    "tfliteextern.cc",
+    "tfliteextern.h",
+    "imgproc.cc",
+    "imgproc.h",
+]
+
+_TFLITEEXTERN_DEPS = [
+    "//tflite:framework",
+    "//tflite:context",
+    "//tflite:string",
+    "//tflite:string_util",
+    "//tflite:schema_fbs_version",
+    "//tflite/kernels:builtin_ops",
+    "//tflite/nnapi:nnapi_lib",
+    "//tflite/delegates/nnapi:nnapi_delegate",
+]
 
 cc_binary(
     name = "tfliteextern",
-    srcs = [
-        "tfliteextern.cc",
-        "tfliteextern.h",
-        "imgproc.cc",
-        "imgproc.h",
-    ],
+    srcs = _TFLITEEXTERN_SRCS,
     copts = tflite_copts() + ["-DWITHOUT_XNNPACK"],
     additional_linker_inputs = select({
         "@bazel_tools//src/conditions:windows": ["tfliteextern.def"],
@@ -67,14 +90,36 @@ cc_binary(
     }),
     linkshared = 1,
     linkstatic = 1,
-    deps = [
-        "//tflite:framework",
-        "//tflite:context",
-        "//tflite:string",
-        "//tflite:string_util",
-        "//tflite:schema_fbs_version",
-        "//tflite/kernels:builtin_ops",
-        "//tflite/nnapi:nnapi_lib",
-        "//tflite/delegates/nnapi:nnapi_delegate",
-    ],
+    deps = _TFLITEEXTERN_DEPS,
+)
+
+# Static-library counterpart of the ":tfliteextern" shared library above, for platforms
+# (iOS device/simulator, Mac Catalyst) where the C# side statically links tfliteextern
+# into the app instead of loading a shared object - DllImport("tfliteextern") resolves to
+# "__Internal" there (see Emgu.TF.Runtime/Maui/iOS's NativeReference), so the exported tfe*
+# symbols just need to be present in the final linked binary, not in a standalone .dylib/.so.
+cc_library(
+    name = "tfliteextern_lib",
+    srcs = _TFLITEEXTERN_SRCS,
+    copts = tflite_copts() + ["-DWITHOUT_XNNPACK"],
+    deps = _TFLITEEXTERN_DEPS,
+)
+
+# bazel build --config=ios_arm64 //tfliteextern:tfliteextern_ios_framework      # device
+# bazel build --config=ios_sim_arm64 //tfliteextern:tfliteextern_ios_framework  # simulator (Apple Silicon)
+# bazel build --apple_platform_type=macos --cpu=darwin_arm64 //tfliteextern:tfliteextern_ios_framework  # Mac Catalyst
+#
+# No symbol-hiding/allowlist step (unlike litert's own TensorFlowLiteC_framework, which
+# wraps this in extract_object_files/hide_symbols_with_allowlist) - the tfe* symbols must
+# stay visible since they're exactly what TfLiteInvoke's DllImport resolves against.
+#
+# No hdrs either: the C# side only ever needs the raw static binary's exported tfe*
+# symbols (via DllImport("tfliteextern") -> "__Internal"), never an Objective-C-visible
+# public header - and ios_static_framework's umbrella header (named "<bundle_name>.h",
+# i.e. "tfliteextern.h") collides with our own tfliteextern.h if it's listed as a header.
+ios_static_framework(
+    name = "tfliteextern_ios_framework",
+    bundle_name = "tfliteextern",
+    minimum_os_version = TFL_MINIMUM_OS_VERSION,
+    deps = [":tfliteextern_lib"],
 )

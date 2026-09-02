@@ -9,7 +9,7 @@ fi
 
 if [ "$1" = "darwin_x86_64" ] || [ "$1" = "darwin_arm64" ]; then
     echo "Building for Mac Catlyst"
-    BAZEL_BUILD_OPTION="--apple_platform_type=macos --cpu=$1" 
+    BAZEL_BUILD_OPTION="--apple_platform_type=macos --cpu=$1 --platforms=@build_bazel_apple_support//platforms:$1"
 else
     echo "Building for iOS"
     BAZEL_BUILD_OPTION="--config=$1"
@@ -18,50 +18,6 @@ fi
 cd "$(dirname "$0")"
 cd ../../
 mkdir -p lib/ios
-cd tensorflow
-
-
-PYTHON_VERSION=3.12
-#check for x86_64 version of python3 from homebew
-if test -f "/usr/local/bin/python$PYTHON_VERSION"; then
-    if test -d "/usr/local/lib/python$PYTHON_VERSION/site-packages"; then
-        export PYTHON_BIN_PATH="/usr/local/bin/python$PYTHON_VERSION"
-        export PYTHON_LIB_PATH="/usr/local/lib/python$PYTHON_VERSION/site-packages"
-	export HERMETIC_PYTHON_VERSION=$PYTHON_VERSION
-    fi
-fi
-
-#check for arm64 version of python3, if it is available, use this instead.
-if test -f "/opt/homebrew/bin/python$PYTHON_VERSION"; then
-    if test -d "/opt/homebrew/lib/python$PYTHON_VERSION/site-packages"; then
-        export PYTHON_BIN_PATH="/opt/homebrew/bin/python$PYTHON_VERSION"
-        export PYTHON_LIB_PATH="/opt/homebrew/lib/python$PYTHON_VERSION/site-packages"
-	export HERMETIC_PYTHON_VERSION=$PYTHON_VERSION
-    fi
-fi
-
-#The python3 comes with Xcode seems to have issues when compiling for tflite using bazel, will disable it now.
-
-#if test -f "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/Current/bin/python3"; then
-#    if test -d "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/Current/lib/python3.8/site-packages"; then
-#        export PYTHON_BIN_PATH="/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/Current/bin/python3"
-#        export PYTHON_LIB_PATH="/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/Current/lib/python3.8/site-packages"
-#    fi
-#fi
-
-echo PYTHON_BIN_PATH=$PYTHON_BIN_PATH
-echo PYTHON_LIB_PATH=$PYTHON_LIB_PATH
-
-export TF_CONFIGURE_IOS='1'
-export TF_ENABLE_XLA=1
-export TF_NEED_CUDA=0
-export TF_NEED_ROCM=0
-export TF_NEED_OPENCL_SYCL=0
-export TF_DOWNLOAD_CLANG=0
-export CC_OPT_FLAGS="-match=native -Wno-sign-compare"
-export TF_SET_ANDROID_WORKSPACE=0
-
-BAZEL_OUTPUT_USER_ROOT="$(pwd)/../bazel_output_$1"
 
 # If Xcode is installed outside /Applications (e.g. on a separate volume),
 # Bazel's sandbox won't mount it by default — add it explicitly.
@@ -76,14 +32,16 @@ if [ -n "$XCODE_DEVELOPER_DIR" ]; then
             ;;
     esac
 fi
+
 # Map target architecture to Apple SDK platform name (used by XcodeLocalEnvProvider to compute SDKROOT).
 case "$1" in
-    ios_sim_arm64|ios_x86_64) APPLE_SDK_PLATFORM="iPhoneSimulator" ;;
-    ios_arm64)                 APPLE_SDK_PLATFORM="iPhoneOS" ;;
+    ios_sim_arm64|ios_x86_64)   APPLE_SDK_PLATFORM="iPhoneSimulator" ;;
+    ios_arm64|ios_arm64e|ios_armv7) APPLE_SDK_PLATFORM="iPhoneOS" ;;
     darwin_x86_64|darwin_arm64) APPLE_SDK_PLATFORM="MacOSX" ;;
-    *)                         APPLE_SDK_PLATFORM="iPhoneSimulator" ;;
+    *)                          APPLE_SDK_PLATFORM="iPhoneSimulator" ;;
 esac
 
+BAZEL_XCODE_OPTS=""
 if [ -n "$XCODE_MOUNT_POINT" ] && [ "$XCODE_MOUNT_POINT" != "/" ]; then
     echo "Xcode is on non-root volume: $XCODE_MOUNT_POINT — setting BAZEL_ALLOW_NON_APPLICATIONS_XCODE=1 and DEVELOPER_DIR"
     export BAZEL_ALLOW_NON_APPLICATIONS_XCODE=1
@@ -95,53 +53,31 @@ if [ -n "$XCODE_MOUNT_POINT" ] && [ "$XCODE_MOUNT_POINT" != "/" ]; then
     XCRUN_SDK=$(echo "$APPLE_SDK_PLATFORM" | tr '[:upper:]' '[:lower:]')
     APPLE_SDK_VERSION=$(xcrun --sdk "$XCRUN_SDK" --show-sdk-version 2>/dev/null)
     BAZEL_XCODE_OPTS="--action_env=DEVELOPER_DIR=$XCODE_DEVELOPER_DIR --action_env=APPLE_SDK_VERSION_OVERRIDE=$APPLE_SDK_VERSION --action_env=APPLE_SDK_PLATFORM=$APPLE_SDK_PLATFORM"
-else
-    BAZEL_XCODE_OPTS=""
 fi
 
-# Shut down any stale Bazel server so the fresh server starts with the current
-# environment (including DEVELOPER_DIR / BAZEL_ALLOW_NON_APPLICATIONS_XCODE).
-# XcodeLocalEnvProvider uses the server environment to call xcrun and inject
-# SDKROOT into ObjC compile actions; a stale server may fail to do this.
-bazel \
-    --output_user_root=$BAZEL_OUTPUT_USER_ROOT \
-    --bazelrc=/dev/null \
-    shutdown 2>/dev/null || true
+# litert is a pristine third-party submodule (we don't own/patch it upstream), so the
+# tfliteextern Bazel package can't live there in git. Stage our tracked source into it
+# here instead, each run, mirroring what the Windows/macOS Bazel build scripts do.
+mkdir -p litert/tfliteextern
+cp -f litertextern/tfliteextern/bazel/BUILD litert/tfliteextern/BUILD
+cp -f litertextern/tfliteextern/bazel/tfliteextern.def litert/tfliteextern/tfliteextern.def
+cp -f litertextern/tfliteextern/tfliteextern.cc litert/tfliteextern/tfliteextern.cc
+cp -f litertextern/tfliteextern/tfliteextern.h litert/tfliteextern/tfliteextern.h
+cp -f litertextern/imgproc/imgproc.cc litert/tfliteextern/imgproc.cc
+cp -f litertextern/imgproc/imgproc.h litert/tfliteextern/imgproc.h
 
-cp -f tensorflow/lite/ios/BUILD.apple tensorflow/lite/ios/BUILD
-# Work around Bazel 7.7.0 bug: objc_library non_arc_srcs ObjcCompile actions omit the
-# source file from command args.  Replace the profiling BUILD with a cc_library variant.
-# TODO: Remove this workaround once Bazel is upgraded past 7.7.0.
-# Bazel 7.7.0 bug: ObjcCompile actions for objc_library (both srcs and non_arc_srcs)
-# do not include the source file in the compiler command arguments, causing
-# "clang++: error: no input files". The patched BUILD replaces objc_library with a
-# genrule+cc_library stub. Check whether the bug is fixed before removing.
-cp -f ../platforms/ios/tflite_profiling_BUILD tensorflow/lite/profiling/BUILD
+cd litert
 
-rm -rf bazel-bin/tensorflow/lite/ios/TensorFlowLiteC_framework.zip
-
-./configure
-
-# bazel clean --expunge
-
-bazel \
-    --output_user_root=$BAZEL_OUTPUT_USER_ROOT \
-    --bazelrc=/dev/null \
-    build \
-    --noenable_bzlmod \
+bazel build \
     --verbose_failures \
-    --incompatible_run_shell_command_string=false \
     $BAZEL_BUILD_OPTION \
-    --platforms=@build_bazel_apple_support//platforms:$1 \
     $BAZEL_XCODE_OPTS \
-    --copt="-DCL_DELEGATE_NO_GL" \
-    --copt="-D__IOS__" \
     -c opt ${@:2} \
-    //tensorflow/lite/ios:TensorFlowLiteC_framework
+    //tfliteextern:tfliteextern_ios_framework
 
-unzip -o bazel-bin/tensorflow/lite/ios/TensorFlowLiteC_framework.zip TensorFlowLiteC.framework/TensorFlowLiteC -d ../lib/ios
-mv ../lib/ios/TensorFlowLiteC.framework/TensorFlowLiteC ../lib/ios/libtfliteextern_$1.a
-#cp -r TensorFlowLiteC.framework/TensorFlowLiteC ../lib/ios/libtfliteextern.a
 cd ..
 
-
+rm -rf lib/ios/tfliteextern.framework
+unzip -o litert/bazel-bin/tfliteextern/tfliteextern_ios_framework.zip tfliteextern.framework/tfliteextern -d lib/ios
+mv lib/ios/tfliteextern.framework/tfliteextern lib/ios/libtfliteextern_$1.a
+rm -rf lib/ios/tfliteextern.framework
