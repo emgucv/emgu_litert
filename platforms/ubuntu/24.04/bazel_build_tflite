@@ -1,26 +1,46 @@
-#!/usr/bin/env bash 
+#!/bin/bash -v
 
 SYSTEM_ARCH=$(uname -m)
 echo System is $SYSTEM_ARCH
 
-if [ $SYSTEM_ARCH == "x86_64" ]
-then
+if [ $SYSTEM_ARCH == "x86_64" ]; then
     OUT_FOLDER="runtimes/ubuntu-x64/native"
-elif [ $SYSTEM_ARCH == "aarch64" ]
-then
+    BAZEL_CONFIG_FLAGS="--config=linux"
+elif [ $SYSTEM_ARCH == "aarch64" ]; then
     OUT_FOLDER="runtimes/ubuntu-arm64/native"
+    BAZEL_CONFIG_FLAGS="--config=linux --config=linux_arm64"
+else
+    echo "Unsupported architecture: $SYSTEM_ARCH"
+    exit 1
 fi
 
 echo Output folder is $OUT_FOLDER
 
 cd "$(dirname "$0")"
 cd ../../..
-BAZEL_TMP_FOLDER=$PWD/bazel_tmp
-cd tensorflow
+mkdir -p lib/$OUT_FOLDER
 
-bazel --output_user_root=$BAZEL_TMP_FOLDER build --verbose_failures ${@:1} //tensorflow/tfliteextern:libtfliteextern.so 
+# litert is a pristine third-party submodule (we don't own/patch it upstream), so the
+# tfliteextern Bazel package can't live there in git. Stage our tracked source into it
+# here instead, each run, mirroring what the Windows/macOS/iOS/Android Bazel build
+# scripts do.
+mkdir -p litert/tfliteextern
+cp -f litertextern/tfliteextern/bazel/BUILD litert/tfliteextern/BUILD
+cp -f litertextern/tfliteextern/bazel/tfliteextern.def litert/tfliteextern/tfliteextern.def
+cp -f litertextern/tfliteextern/tfliteextern.cc litert/tfliteextern/tfliteextern.cc
+cp -f litertextern/tfliteextern/tfliteextern.h litert/tfliteextern/tfliteextern.h
+cp -f litertextern/imgproc/imgproc.cc litert/tfliteextern/imgproc.cc
+cp -f litertextern/imgproc/imgproc.h litert/tfliteextern/imgproc.h
+
+cd litert
+
+# litert's .bazelrc auto-applies build:linux via --enable_platform_specific_config on this
+# host, but --config=linux is passed explicitly for clarity, same as the other platforms'
+# Bazel build scripts do for their own host config.
+bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS "${@:1}" //tfliteextern:tfliteextern
+
 cd ..
-mkdir -p lib/${OUT_FOLDER}
-cp -f tensorflow/bazel-bin/tensorflow/tfliteextern/*.so lib/${OUT_FOLDER}
+
+cp -f litert/bazel-bin/tfliteextern/libtfliteextern.so lib/$OUT_FOLDER/libtfliteextern.so
 
 echo Files copied to lib/$OUT_FOLDER
