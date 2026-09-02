@@ -1,0 +1,77 @@
+#!/bin/bash -v
+
+extra_flags=
+if [ \( -n "$1" \) ]; then
+    if [ "$1" = "x86" ]; then
+	arch="x86"
+	config="android_x86"
+	extra_flags="--define=xnn_enable_avxvnni=false --define=xnn_enable_avx512amx=false --define=xnn_enable_avx512fp16=false"
+    elif [ "$1" = "x86_64" ]; then
+	arch="x86_64"
+	config="android_x86_64"
+	extra_flags="--define=xnn_enable_avxvnni=false --define=xnn_enable_avx512amx=false --define=xnn_enable_avx512fp16=false"
+    elif [ "$1" = "arm" ]; then
+	arch="armeabi-v7a"
+	config="android_arm"
+	extra_flags="--define=xnn_enable_arm_i8mm=false"
+    elif [ "$1" = "arm64" ]; then
+	arch="arm64-v8a"
+	config="android_arm64"
+	extra_flags="--define xnn_enable_assembly=false --define=xnn_enable_arm_i8mm=false --copt=-DXNN_ENABLE_ARM_DOTPROD=0 --copt=-DXNN_ENABLE_ARM_I8MM=0"
+    else
+	echo "Unknown android arch '$1'. Use one of: x86, x86_64, arm, arm64"
+	exit 1
+    fi
+    echo "Building with config $config for $arch architecture"
+else
+    echo "Please specify the android architecture to build. e.g. $0 x86; $0 x86_64; $0 arm; $0 arm64;"
+    exit 1
+fi
+
+# android_sdk_repository/android_ndk_repository (in litert/WORKSPACE) read these from the
+# real process environment at repository-loading time -- not overridable via --action_env,
+# which only affects build actions. Default to the SDK/NDK actually installed in this image,
+# picking the newest NDK under $ANDROID_HOME/ndk unless ANDROID_NDK_HOME is already set.
+export ANDROID_HOME="${ANDROID_HOME:-/usr/lib/android-sdk}"
+if [ -z "$ANDROID_NDK_HOME" ]; then
+    export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$(ls "$ANDROID_HOME/ndk" | sort -V | tail -1)"
+fi
+echo "Using ANDROID_HOME=$ANDROID_HOME ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+
+cd "$(dirname "$0")"
+cd ../../
+mkdir -p lib/android/$arch
+
+# litert is a pristine third-party submodule (we don't own/patch it upstream), so the
+# tfliteextern Bazel package can't live there in git. Stage our tracked source into it
+# here instead, each run, mirroring what the Windows/macOS/iOS Bazel build scripts do.
+mkdir -p litert/tfliteextern
+cp -f litertextern/tfliteextern/bazel/BUILD litert/tfliteextern/BUILD
+cp -f litertextern/tfliteextern/bazel/tfliteextern.def litert/tfliteextern/tfliteextern.def
+cp -f litertextern/tfliteextern/tfliteextern.cc litert/tfliteextern/tfliteextern.cc
+cp -f litertextern/tfliteextern/tfliteextern.h litert/tfliteextern/tfliteextern.h
+cp -f litertextern/imgproc/imgproc.cc litert/tfliteextern/imgproc.cc
+cp -f litertextern/imgproc/imgproc.h litert/tfliteextern/imgproc.h
+
+cd litert
+
+set -x
+build_with_bazel() {
+  bazel build -c opt \
+      --config=$config \
+      --incompatible_enable_cc_toolchain_resolution \
+      --incompatible_enable_android_toolchain_resolution \
+      --copt=-fPIC --cxxopt=-fPIC \
+      --linkopt=-fuse-ld=lld \
+      --linkopt=-Wl,-z,max-page-size=16384 \
+      --verbose_failures $extra_flags "$@" \
+      //tfliteextern:tfliteextern
+}
+
+build_with_bazel "${@:2}"
+bazel --version
+set +x
+
+cd ..
+
+cp -f litert/bazel-bin/tfliteextern/libtfliteextern.so lib/android/$arch/libtfliteextern.so

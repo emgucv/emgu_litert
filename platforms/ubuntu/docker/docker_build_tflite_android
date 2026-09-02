@@ -28,5 +28,5 @@ docker run \
   -v /etc/passwd:/etc/passwd \
   -w /src/workspace/platforms/android/ \
   emgu/bazel-android:ubuntu-24.04-dotnet-8-bazelisk \
-  ./build_tflite_android $1
+  ./bazel_build_tflite_android $1
 

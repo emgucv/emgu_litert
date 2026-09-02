@@ -74,7 +74,16 @@ _TFLITEEXTERN_DEPS = [
     "//tflite/kernels:builtin_ops",
     "//tflite/nnapi:nnapi_lib",
     "//tflite/delegates/nnapi:nnapi_delegate",
-]
+] + select({
+    # tfliteextern.cc only includes tflite/delegates/gpu/{delegate,delegate_options}.h under
+    # #ifdef __ANDROID__ - the GPU delegate itself is Android-only (needs EGL; see the
+    # "supports_gpu_delegate" comment in tflite/delegates/gpu/BUILD), so these deps are too.
+    "@org_tensorflow//tensorflow:android": [
+        "//tflite/delegates/gpu:delegate",
+        "//tflite/delegates/gpu:delegate_options",
+    ],
+    "//conditions:default": [],
+})
 
 cc_binary(
     name = "tfliteextern",
