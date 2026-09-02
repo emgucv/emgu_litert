@@ -3,5 +3,4 @@
 # --------------------------------------------------------
 
 ADD_SUBDIRECTORY(Lite)
-ADD_SUBDIRECTORY(Full)
 

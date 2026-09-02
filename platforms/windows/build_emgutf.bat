@@ -14,7 +14,6 @@ cd ..\..
 
 IF EXIST "lib\runtimes\win-x86\native\tfliteextern.dll" SET HAS_TF_LITE=Y
 IF EXIST "lib\runtimes\win-x64\native\tfliteextern.dll" SET HAS_TF_LITE=Y
-IF EXIST "lib\runtimes\win-x64\native\tfextern.dll" SET HAS_TF_FULL=Y
 
 REM If we're a 32-bit process on 64-bit Windows, PROCESSOR_ARCHITEW6432 is set.
 set "arch=%PROCESSOR_ARCHITECTURE%"
@@ -105,17 +104,6 @@ SET MOVE_ZIP_SCRIPT=copy *.zip ..\package
 SET MOVE_EXE_SCRIPT=copy *.exe ..\package
 
 :CHECK_BUILD_TYPE
-REM IF "%TF_TYPE%"=="LITE" goto BUILD_TF_LITE
-
-:BUILD_TF_FULL
-IF NOT "%1%"=="doc" GOTO BUILD_TF_FULL_NUGET
-IF "%HAS_TF_FULL%"=="Y" SET CMAKE_BUILD_TARGET=%CMAKE_BUILD_TARGET% Emgu.TF.Document.Html
-
-:BUILD_TF_FULL_NUGET
-IF NOT "%2%"=="nuget" GOTO BUILD_TF_LITE
-IF "%HAS_TF_FULL%"=="Y" SET CMAKE_BUILD_TARGET=%CMAKE_BUILD_TARGET% Emgu.TF.runtime.windows.nuget
-IF "%HAS_TF_FULL%"=="Y" SET MOVE_NUGET_SCRIPT=copy ..\platforms\nuget\*.nupkg ..\package
-REM GOTO BUILD
 
 :BUILD_TF_LITE
 IF NOT "%1%"=="doc" GOTO BUILD_TF_LITE_NUGET
