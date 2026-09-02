@@ -2,11 +2,11 @@
 
 cd "$(dirname "$0")"
 cd ..
-git clean -d -fx "."
-git submodule foreach --recursive git clean -fx "."
+git clean -d -fx "." -e .claude -e .codex
+git submodule foreach --recursive git clean -fx "." -e .claude -e .codex
 
-#If the submodule approach above doesn't work, (e.g. not working on Mac) 
+#If the submodule approach above doesn't work, (e.g. not working on Mac)
 #the code below will have a second attempt to clean up tensorflow folder
 cd tensorflow
-git clean -d -fx "."
+git clean -d -fx "." -e .claude -e .codex
 cd ..

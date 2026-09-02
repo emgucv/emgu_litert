@@ -4,8 +4,8 @@ cd ..
 cd tensorflow
 rm -rf bazel-*
 rm -rf tensorflow/contrib/cmake/build
-git clean -d -fx "."
+git clean -d -fx "." -e .claude -e .codex
 cd ..
 
-git clean -d -fx "." 
+git clean -d -fx "." -e .claude -e .codex
 popd
