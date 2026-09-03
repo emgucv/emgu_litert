@@ -1,0 +1,32 @@
+#!/bin/bash -v
+
+JOB_COUNT=$(sysctl -n hw.ncpu)
+echo Building with $JOB_COUNT parallel jobs
+
+cd "$(dirname "$0")"
+cd ../../
+
+# litertextern/tfliteextern's CMakeLists.txt links directly against litert/tflite (the
+# google-ai-edge/LiteRT submodule) - there is no tensorflow/ submodule to build from
+# anymore. It auto-detects osx/arm64 vs osx/x64 from the compiler's predefined __aarch64__
+# macro and writes libtfliteextern.dylib straight into lib/runtimes/osx/native/<arch>
+# itself, so no copy step is needed here (matching the Windows/Debian CMake build scripts).
+# This only builds for the host's own architecture - unlike bazel_build_tflite_macos_fat,
+# there's no per-arch-build-then-lipo step here to produce a universal binary. Setting
+# CMAKE_OSX_ARCHITECTURES to build both arm64 and x86_64 in one pass was tried and
+# rejected: it breaks the same __aarch64__ check_symbol_exists() detection used above,
+# since that check only compiles for a single architecture at a time.
+cd litertextern/tfliteextern
+mkdir -p build
+cd build
+
+cmake -DTFLITE_ENABLE_XNNPACK:BOOL=OFF ..    #-DCMAKE_VERBOSE_MAKEFILE=ON
+
+# Build the tfliteextern target specifically, not the default "all" target: litert's own
+# tflite/profiling/proto/CMakeLists.txt passes protoc a --proto_path that doesn't
+# encompass profiling_info.proto, so "all" (which also builds litert's unrelated
+# benchmark/example/proto targets) fails there even though tfliteextern itself - which
+# doesn't depend on that target - builds and links fine on its own.
+cmake --build . --config Release --target tfliteextern --parallel $JOB_COUNT
+
+echo Output written to lib/runtimes/osx/native/

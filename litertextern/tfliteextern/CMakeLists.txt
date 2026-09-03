@@ -126,7 +126,11 @@ IF(WIN32)
     SET(BINARY_OUTPUT_SUBFOLDER "runtimes/win-x86/native")
   ENDIF()
 ELSEIF(APPLE AND NOT IOS)
-  IF ("${EMGUCV_ARCH}" STREQUAL "arm64")
+  # EMGUCV_ARCH (Emgu.CV's own convention) is never set when building tfliteextern
+  # standalone - unlike the WIN32/Linux branches above/below, this used to always fall
+  # into the ELSE() below, mislabeling arm64 Macs as "x64". Use the same self-detected
+  # IS_ARM64 (via check_symbol_exists("__aarch64__", ...) above) they already use instead.
+  IF (IS_ARM64)
     SET(BINARY_OUTPUT_SUBFOLDER "/runtimes/osx/native/arm64")
   ELSE()
     SET(BINARY_OUTPUT_SUBFOLDER "/runtimes/osx/native/x64")
