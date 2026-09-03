@@ -3,24 +3,61 @@
 SYSTEM_ARCH=$(getconf LONG_BIT)
 echo System is $SYSTEM_ARCH bit
 
-if [ $SYSTEM_ARCH == "64" ]
-then
+if [ $SYSTEM_ARCH == "64" ]; then
     OUT_FOLDER="runtimes/linux-arm64/native"
-    BAZEL_XNN_FLAGS=true
-    JOB_COUNT=2
+    # litert's .bazelrc only adds arch-specific copts (-march=armv8-a etc.) via
+    # linux_arm64 on top of the generic linux config; there's no separate "native
+    # 64-bit ARM host" config, so this is the same pair the Ubuntu aarch64 build
+    # script passes.
+    BAZEL_CONFIG_FLAGS="--config=linux --config=linux_arm64"
 else
     OUT_FOLDER="runtimes/linux-arm/native"
-    BAZEL_XNN_FLAGS=false
-    JOB_COUNT=1
+    # litert's .bazelrc has no native 32-bit ARM config - only android_arm (NDK
+    # cross-toolchain) and elinux_armhf (an embedded cross-toolchain that isn't
+    # defined in this WORKSPACE, see CLAUDE.md's Android toolchain-resolution
+    # note for the same class of issue). Neither applies to a native build on
+    # armhf hardware: with no --platforms/--crosstool_top override, Bazel
+    # autoconfigures local_config_cc from the host's own gcc, which already
+    # targets armhf here, so plain --config=linux is enough (same reasoning as
+    # the x86_64/aarch64 case needing no extra flags beyond their own config).
+    BAZEL_CONFIG_FLAGS="--config=linux"
 fi
-echo Compiled binary will be copied to lib/$OUT_FOLDER
 
+echo Output folder is $OUT_FOLDER
 
 cd "$(dirname "$0")"
 cd ../../..
-cd tensorflow
-
-bazel build --jobs=$JOB_COUNT --define tflite_with_xnnpack=$BAZEL_XNN_FLAGS //tensorflow/tfliteextern:libtfliteextern.so  
-cd ..
 mkdir -p lib/$OUT_FOLDER
-cp -f tensorflow/bazel-bin/tensorflow/tfliteextern/*.so lib/$OUT_FOLDER
+
+# litert is a pristine third-party submodule (we don't own/patch it upstream), so the
+# tfliteextern Bazel package can't live there in git. Stage our tracked source into it
+# here instead, each run, mirroring what the Windows/macOS/iOS/Android/Ubuntu Bazel build
+# scripts do.
+mkdir -p litert/tfliteextern
+cp -f litertextern/tfliteextern/bazel/BUILD litert/tfliteextern/BUILD
+cp -f litertextern/tfliteextern/bazel/tfliteextern.def litert/tfliteextern/tfliteextern.def
+cp -f litertextern/tfliteextern/tfliteextern.cc litert/tfliteextern/tfliteextern.cc
+cp -f litertextern/tfliteextern/tfliteextern.h litert/tfliteextern/tfliteextern.h
+cp -f litertextern/imgproc/imgproc.cc litert/tfliteextern/imgproc.cc
+cp -f litertextern/imgproc/imgproc.h litert/tfliteextern/imgproc.h
+
+cd litert
+
+# litert's .bazelrc auto-applies build:linux via --enable_platform_specific_config on this
+# host, but --config=linux is passed explicitly for clarity, same as the other platforms'
+# Bazel build scripts do for their own host config.
+#
+# Force clang instead of the default gcc toolchain: tflite/kernels/internal/optimized/4bit/
+# neon_fully_connected_{aarch64,arm32}_sdot.cc use __attribute__((target("dotprod"))) (no
+# leading '+'), which gcc >=14 (Debian trixie's default) hard-errors on ("arch extension
+# 'dotprod' should be prefixed by '+'") - verified on real arm64 hardware. clang accepts the
+# bare form. This file lives inside the litert submodule, which we don't patch, so the
+# toolchain is swapped instead. --repo_env (not just an env var) is required so Bazel's
+# autoconfigured local_config_cc repository picks it up.
+bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS --repo_env=CC=/usr/bin/clang --repo_env=CXX=/usr/bin/clang++ "${@:1}" //tfliteextern:tfliteextern
+
+cd ..
+
+cp -f litert/bazel-bin/tfliteextern/libtfliteextern.so lib/$OUT_FOLDER/libtfliteextern.so
+
+echo Files copied to lib/$OUT_FOLDER

@@ -6,29 +6,31 @@ echo System is $SYSTEM_ARCH bit
 if [ $SYSTEM_ARCH == "64" ]
 then
     OUT_FOLDER="runtimes/linux-arm64/native"
-    BAZEL_XNN_FLAGS=-DTFLITE_ENABLE_XNNPACK:BOOL=ON
+    CMAKE_XNN_FLAGS=-DTFLITE_ENABLE_XNNPACK:BOOL=ON
     EXTRA_CMAKE_FLAGS=
     JOB_COUNT=2
 else
     OUT_FOLDER="runtimes/linux-arm/native"
-    BAZEL_XNN_FLAGS=-DTFLITE_ENABLE_XNNPACK:BOOL=OFF
+    CMAKE_XNN_FLAGS=-DTFLITE_ENABLE_XNNPACK:BOOL=OFF
     #EXTRA_CMAKE_FLAGS=-DCMAKE_C_FLAGS="-mfloat-abi=soft"
     #EXTRA_CMAKE_FLAGS=-DXNNPACK_TARGET_PROCESSOR=arm
     JOB_COUNT=1
 fi
+echo Compiled binary will be placed in lib/$OUT_FOLDER
 
 cd "$(dirname "$0")"
+cd ../../..
 
-mkdir -p build
-
-CURRENT_FOLDER=$PWD
-TOP_FOLDER=$PWD/../../../
-
-cd $TOP_FOLDER
-
-cd tensorflow/tensorflow/tfliteextern
+# litertextern/tfliteextern's CMakeLists.txt links directly against litert/tflite (the
+# google-ai-edge/LiteRT submodule) - there is no tensorflow/ submodule to build from
+# anymore. It auto-detects linux-arm vs linux-arm64 from the compiler's predefined
+# __arm__/__aarch64__ macros and writes libtfliteextern.so straight into lib/$OUT_FOLDER
+# itself, so no copy step is needed here (matching the Windows CMake build script).
+cd litertextern/tfliteextern
 mkdir -p build
 cd build
 
-cmake  $BAZEL_XNN_FLAGS $EXTRA_CMAKE_FLAGS ..    #-DCMAKE_VERBOSE_MAKEFILE=ON
-cmake --build . --config Release --parallel $JOB_COUNT 
+cmake $CMAKE_XNN_FLAGS $EXTRA_CMAKE_FLAGS ..    #-DCMAKE_VERBOSE_MAKEFILE=ON
+cmake --build . --config Release --parallel $JOB_COUNT
+
+echo Output written to lib/$OUT_FOLDER
