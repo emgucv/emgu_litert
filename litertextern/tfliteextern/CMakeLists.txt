@@ -27,6 +27,24 @@ SET(CPACK_PACKAGE_VERSION_PATCH ${LITERT_VERSION_PATCH})
 
 ADD_SUBDIRECTORY(${LITERT_SOURCE_DIR_ABS}/tflite ${CMAKE_CURRENT_BINARY_DIR}/tflite)
 
+# litert/tflite/CMakeLists.txt unconditionally add_subdirectory()s profiling/proto and
+# tools/benchmark/proto, whose add_custom_command()s pass protoc a
+# --proto_path=${TENSORFLOW_SOURCE_DIR} - the root of the tensorflow source tree litert's
+# own CMake FetchContent downloads for unrelated needs (see the file header above) - even
+# though the .proto files they're compiling actually live under litert/tflite/, a different
+# tree entirely. protoc requires --proto_path to be an exact prefix of the file being
+# compiled, so this always fails: "File does not reside within any path specified using
+# --proto_path". litert is a pristine submodule we don't patch upstream, and none of these
+# targets are a dependency of tfliteextern (verified: `cmake --build . --target tfliteextern`
+# succeeds without them), so exclude them from the default `all` target instead - that's
+# what actually breaks a plain `cmake --build .` otherwise, even though our own target
+# already builds fine either way.
+FOREACH(BROKEN_PROTO_TARGET profiling_info_proto model_runtime_info_proto benchmark_result_proto)
+  IF(TARGET ${BROKEN_PROTO_TARGET})
+    SET_TARGET_PROPERTIES(${BROKEN_PROTO_TARGET} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+  ENDIF()
+ENDFOREACH()
+
 INCLUDE(Today)
 TODAY() #set the variable CURRENT_YEAR
 

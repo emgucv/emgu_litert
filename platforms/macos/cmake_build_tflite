@@ -22,11 +22,11 @@ cd build
 
 cmake -DTFLITE_ENABLE_XNNPACK:BOOL=OFF ..    #-DCMAKE_VERBOSE_MAKEFILE=ON
 
-# Build the tfliteextern target specifically, not the default "all" target: litert's own
-# tflite/profiling/proto/CMakeLists.txt passes protoc a --proto_path that doesn't
-# encompass profiling_info.proto, so "all" (which also builds litert's unrelated
-# benchmark/example/proto targets) fails there even though tfliteextern itself - which
-# doesn't depend on that target - builds and links fine on its own.
+# Build the tfliteextern target specifically rather than the default "all" target -
+# litertextern/tfliteextern/CMakeLists.txt now excludes the handful of litert proto
+# targets that used to break "all" outright (see its EXCLUDE_FROM_ALL comment for why),
+# so "all" would work too, but targeting tfliteextern directly still skips litert's
+# unrelated benchmark/example targets we don't need, same as the Windows/Debian scripts.
 cmake --build . --config Release --target tfliteextern --parallel $JOB_COUNT
 
 echo Output written to lib/runtimes/osx/native/
