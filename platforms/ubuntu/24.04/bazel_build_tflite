@@ -16,6 +16,17 @@ fi
 
 echo Output folder is $OUT_FOLDER
 
+# LiteRT applies the XNNPACK delegate by default unless the build passes
+# --define tflite_with_xnnpack=false, so follow whatever define was passed in.
+TFLITE_WITH_XNNPACK=true
+for arg in "$@"; do
+    case "$arg" in
+        *tflite_with_xnnpack=false) TFLITE_WITH_XNNPACK=false ;;
+        *tflite_with_xnnpack=true) TFLITE_WITH_XNNPACK=true ;;
+    esac
+done
+echo tflite_with_xnnpack is $TFLITE_WITH_XNNPACK
+
 cd "$(dirname "$0")"
 cd ../../..
 mkdir -p lib/$OUT_FOLDER
@@ -42,5 +53,8 @@ bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS "${@:1}" //tfliteexter
 cd ..
 
 cp -f litert/bazel-bin/tfliteextern/libtfliteextern.so lib/$OUT_FOLDER/libtfliteextern.so
+# Record the tflite_with_xnnpack define next to the library. The top level CMakeLists.txt reads it
+# to set EMGU_TF_LITE_UBUNTU_XNNPACK, and it travels with the binary in the zip package.
+echo $TFLITE_WITH_XNNPACK > lib/$OUT_FOLDER/tflite_with_xnnpack.txt
 
 echo Files copied to lib/$OUT_FOLDER
