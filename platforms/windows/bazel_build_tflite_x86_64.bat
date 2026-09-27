@@ -52,10 +52,9 @@ call %ENV_SETUP_SCRIPT%
 
 :ENV_SETUP_END
 
-SET BAZEL_XNN_FLAGS=--define tflite_with_xnnpack=false
-IF NOT "%2%"=="xnn" GOTO END_OF_XNN
-SET BAZEL_XNN_FLAGS=--define tflite_with_xnnpack=true
-:END_OF_XNN
+SET TFLITE_WITH_XNNPACK=false
+IF "%2%"=="xnn" SET TFLITE_WITH_XNNPACK=true
+SET BAZEL_XNN_FLAGS=--define tflite_with_xnnpack=%TFLITE_WITH_XNNPACK%
 
 IF NOT "%3%"=="docker" GOTO ENV_NOT_DOCKER
 
@@ -169,6 +168,9 @@ cd ..
 
 IF NOT EXIST lib\runtimes\win-x64\native mkdir lib\runtimes\win-x64\native
 copy /Y "litert\bazel-bin\tfliteextern\tfliteextern.dll" lib\runtimes\win-x64\native\tfliteextern.dll
+REM Record the tflite_with_xnnpack define next to the dll. The top level CMakeLists.txt reads it
+REM to set EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK, and it travels with the binary in the zip package.
+(echo %TFLITE_WITH_XNNPACK%)> lib\runtimes\win-x64\native\tflite_with_xnnpack.txt
 
 :START_OF_MSVC_DEPENDENCY
 IF "%BAZEL_VC%"=="" GOTO END_OF_MSVC_DEPENDENCY

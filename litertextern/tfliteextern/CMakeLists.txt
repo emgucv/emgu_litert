@@ -188,6 +188,16 @@ set_target_properties( tfliteextern PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE 
 
 MESSAGE(STATUS "TFLITEEXTERN_OUTPUT_DIRECTORY ${TFLITEEXTERN_OUTPUT_DIRECTORY}")
 
+IF(WIN32)
+  # Same marker bazel_build_tflite_x86_64.bat writes from the tflite_with_xnnpack define,
+  # read by the top level CMakeLists.txt to set EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK.
+  IF(TFLITE_ENABLE_XNNPACK)
+    FILE(WRITE "${TFLITEEXTERN_OUTPUT_DIRECTORY}/tflite_with_xnnpack.txt" "true\n")
+  ELSE()
+    FILE(WRITE "${TFLITEEXTERN_OUTPUT_DIRECTORY}/tflite_with_xnnpack.txt" "false\n")
+  ENDIF()
+ENDIF()
+
 IF (MSVC)
 
   IF(DEFINED TFLITEEXTERN_DEPENDENCY_DLLS)
