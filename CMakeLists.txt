@@ -355,7 +355,7 @@ SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Emgu TF Lite is a cross platform .Net wra
 SET(LITE_BUILD_LABEL "")
 IF(HAVE_LITE_BUILD)
   SET(LITE_BUILD_LABEL "${IOS_LITE_LABEL}${ANDROID_LITE_LABEL}${WINDESKTOP_LITE_LABEL}${OSX_LITE_LABEL}")
-  IF("${LITE_BUILD_LABEL}" STREQUAL "-ios-android-windesktop_xnn-macos")
+  IF(("${LITE_BUILD_LABEL}" STREQUAL "-ios-android-windesktop-macos") OR ("${LITE_BUILD_LABEL}" STREQUAL "-ios-android-windesktop_xnn-macos"))
     SET(LITE_BUILD_LABEL "-pro")
   ENDIF()
   SET(LITE_BUILD_LABEL "tflite${LITE_BUILD_LABEL}")
