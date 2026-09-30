@@ -34,6 +34,24 @@ echo Compiled binary will be placed in lib/$OUT_FOLDER
 
 cd "$(dirname "$0")"
 cd ../../..
+REPO_ROOT=$(pwd)
+
+if [ $SYSTEM_ARCH != "64" ]
+then
+    # Forcing CMAKE_SYSTEM_NAME above puts the whole configure into cross-compiling
+    # mode, which makes litert/tflite/CMakeLists.txt refuse to build without a
+    # natively-runnable flatc (it can't assume a "cross-compiled" one would run on
+    # the host, even though here host and target are the same machine). Build one
+    # via LiteRT's own native_tools/flatbuffers helper project - documented in
+    # litert/tflite/g3doc/guide/build_cmake.md - and point TFLITE_HOST_TOOLS_DIR at
+    # it. Rebuilt fresh every run since it lives inside the git-cleaned checkout,
+    # but it's a small, fast build (just flatc, no tensorflow/xnnpack involved).
+    rm -rf "$REPO_ROOT/flatc-native-build"
+    cmake -S "$REPO_ROOT/litert/tflite/tools/cmake/native_tools/flatbuffers" -B "$REPO_ROOT/flatc-native-build"
+    cmake --build "$REPO_ROOT/flatc-native-build"
+    FLATC_DIR="$REPO_ROOT/flatc-native-build/flatbuffers-flatc/src/flatbuffers-flatc-build"
+    EXTRA_CMAKE_FLAGS="$EXTRA_CMAKE_FLAGS -DTFLITE_HOST_TOOLS_DIR=$FLATC_DIR"
+fi
 
 # litertextern/tfliteextern's CMakeLists.txt links directly against litert/tflite (the
 # google-ai-edge/LiteRT submodule) - there is no tensorflow/ submodule to build from
