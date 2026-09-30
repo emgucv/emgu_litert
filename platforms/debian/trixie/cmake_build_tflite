@@ -19,9 +19,15 @@ else
     # CMAKE_SYSTEM_PROCESSOR (uname-based) misleads cpuinfo's CMakeLists.txt into
     # compiling src/arm/linux/aarch64-isa.c against headers built for the real,
     # 32-bit compiler target - fails with "struct cpuinfo_arm_isa has no member
-    # named 'sme_f16f16'" etc. Force the correct 32-bit processor string so
-    # cpuinfo (and XNNPACK) pick their 32-bit ARM source files instead.
-    EXTRA_CMAKE_FLAGS=-DCMAKE_SYSTEM_PROCESSOR=armv7l
+    # named 'sme_f16f16'" etc. Passing -DCMAKE_SYSTEM_PROCESSOR alone is silently
+    # ignored by CMake for a native (non-cross) build - it always re-derives the
+    # value from uname at the first project()/enable_language() call. CMake only
+    # honors an explicit CMAKE_SYSTEM_PROCESSOR once CMAKE_SYSTEM_NAME is also set,
+    # which is the standard (if slightly heavy-handed) way to fix this exact
+    # Raspberry-Pi-32-on-64-bit-kernel mismatch. This does flip
+    # CMAKE_CROSSCOMPILING to TRUE for the whole configure even though we're not
+    # really cross-compiling.
+    EXTRA_CMAKE_FLAGS="-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=armv7l"
     JOB_COUNT=1
 fi
 echo Compiled binary will be placed in lib/$OUT_FOLDER
