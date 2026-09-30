@@ -1,4 +1,5 @@
 #!/bin/bash -v
+set -e
 
 SYSTEM_ARCH=$(getconf LONG_BIT)
 echo System is $SYSTEM_ARCH bit
