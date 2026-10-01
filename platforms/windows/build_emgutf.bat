@@ -100,15 +100,14 @@ cd b
 -G %CMAKE_CONF% ^
 %CMAKE_CONF_FLAGS% 
 
-REM ALL_BUILD (which includes the Emgu.TF.Lite.Documentation.chm custom target,
-REM marked ALL) is built in its own separate cmake --build invocation below,
-REM rather than being bundled into one multi-target call together with PACKAGE.
-REM MSBuild gives no ordering guarantee between unrelated top-level targets
-REM requested in a single invocation, and PACKAGE's CPack script installs the
-REM .chm by its exact file path with no CMake-level dependency forcing it to
-REM wait for the doc target - letting them run as one combined build caused an
-REM intermittent "file INSTALL cannot find ...Documentation.chm: File exists"
-REM CPack error when PACKAGE's install raced the doc target's SHFB compile.
+REM ALL_BUILD (which includes the Emgu.TF.Lite.Document custom target, marked ALL) is built
+REM in its own separate cmake --build invocation below, rather than being bundled into one
+REM multi-target call together with PACKAGE. MSBuild gives no ordering guarantee between
+REM unrelated top-level targets requested in a single invocation, and PACKAGE's CPack script
+REM installs the .chm by its exact file path with no CMake-level dependency forcing it to
+REM wait for the doc target - letting them run as one combined build caused an intermittent
+REM "file INSTALL cannot find ...Documentation.chm: File exists" CPack error when PACKAGE's
+REM install raced the doc target's SHFB compile.
 SET CMAKE_BUILD_TARGET_2=
 IF NOT "%3%"=="package" GOTO CHECK_BUILD_TYPE
 SET CMAKE_BUILD_TARGET_2=%CMAKE_BUILD_TARGET_2% PACKAGE
@@ -119,11 +118,10 @@ SET MOVE_EXE_SCRIPT=copy *.exe ..\package
 
 :BUILD_TF_LITE
 IF NOT "%1%"=="doc" GOTO BUILD_TF_LITE_NUGET
-REM Emgu.TF.Lite.Document.Html is already built as a dependency of the
-REM Emgu.TF.Lite.Documentation.chm ALL target during the ALL_BUILD step above.
-REM Requesting it again here, alongside PACKAGE, would rebuild it in the same
-REM MSBuild invocation as CPack's install of the .chm - reintroducing the same
-REM race the ALL_BUILD/PACKAGE split above was meant to fix (see comment there).
+REM Emgu.TF.Lite.Document is already built (marked ALL) during the ALL_BUILD step above.
+REM Requesting it again here, alongside PACKAGE, would rebuild it in the same MSBuild
+REM invocation as CPack's install of the .chm - reintroducing the same race the
+REM ALL_BUILD/PACKAGE split above was meant to fix (see comment there).
 IF "%HAS_TF_LITE%"=="Y" SET ZIP_HELP_SCRIPT=zip package\Help.zip -r Help
 
 :BUILD_TF_LITE_NUGET

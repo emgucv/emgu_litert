@@ -15,38 +15,31 @@ IF("${MSBUILD_EXECUTABLE}" STREQUAL "")
   MESSAGE(STATUS "MSBUILD_EXECUTABLE NOT FOUND, skipping documentation projects.")
 ELSE()
   IF(HAVE_WINDESKTOP_LITE)
-    PROJECT(Emgu.TF.Lite.Document.Html)
-    ADD_CUSTOM_TARGET(
-       ${PROJECT_NAME}
-       COMMAND ${MSBUILD_EXECUTABLE} /p:Configuration=Release ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.html.shfbproj
-       SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.html.shfbproj
-    )
-    
-	ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite Emgu.TF.Lite.Models)
+    PROJECT(Emgu.TF.Lite.Document)
 
-    PROJECT(Emgu.TF.Lite.Documentation.chm)
+    # Emgu.TF.Lite.html.shfbproj's own HelpFileFormat is "HtmlHelp1, Website", so this first
+    # pass produces both the .chm and the website in one build. Emgu.TF.Lite.OpenXml.shfbproj is
+    # a separate, dedicated copy of it with PresentationStyle/HelpFileFormat hardcoded to OpenXml
+    # for the second pass, rather than overriding those two properties at build time: SHFB's
+    # BuildHelp MSBuild task (SandcastleHelpFileBuilder.targets) never forwards a plain
+    # /property:PresentationStyle=.../property:HelpFileFormat=... global override to the
+    # underlying SandcastleProject, so such an override is silently ignored and SHFB just
+    # rebuilds the project's own default format again - meaning that never actually produced
+    # OpenXml (Word) output. A single pass can't build HtmlHelp1/Website and OpenXml together
+    # either way: SHFB ties HelpFileFormat to PresentationStyle, and no style supports all three
+    # (confirmed via SHFB error BE0074 - VS2013 supports HtmlHelp1/MSHelpViewer/Website; OpenXml
+    # supports only OpenXml), so a second, separate project file is required.
     ADD_CUSTOM_TARGET(
        ${PROJECT_NAME} ALL
-       # Emgu.TF.Lite.chm.shfbproj is a dedicated copy of Emgu.TF.Lite.html.shfbproj with
-       # OutputPath/HelpFileFormat hardcoded to produce HTML Help 1 (.chm) output into a "chm"
-       # subfolder, rather than overriding those two properties at build time: SHFB's BuildHelp
-       # MSBuild task (SandcastleHelpFileBuilder.targets) never forwards a plain
-       # /property:OutputPath=.../property:HelpFileFormat=... global override to the underlying
-       # SandcastleProject, so such overrides are silently ignored and SHFB falls back to
-       # whatever the project file itself says - which left this always producing a Website
-       # build and never an actual .chm, so CPack's install of it below always failed.
-       # (OutputPath also can't just be the project's own directory - SHFB's BE0034 check
-       # refuses that as a "reserved folder", since CleanIntermediates would be free to delete
-       # files there, including the project's own sources - hence the "chm" subfolder.)
-       COMMAND ${MSBUILD_EXECUTABLE} /p:Configuration=Release ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.chm.shfbproj
-       SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.chm.shfbproj
+       COMMAND ${MSBUILD_EXECUTABLE} /p:Configuration=Release ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.html.shfbproj
+       COMMAND ${MSBUILD_EXECUTABLE} /p:Configuration=Release ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.OpenXml.shfbproj
+       SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.html.shfbproj ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.OpenXml.shfbproj
     )
-    #Making sure documentation project is build one by one
-    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite.Document.Html)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite Emgu.TF.Lite.Models)
 
     INSTALL(
       FILES
-      "${CMAKE_CURRENT_SOURCE_DIR}/chm/Emgu.TF.Lite.Documentation.chm"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../Help/Emgu.TF.Lite.Documentation.chm"
       DESTINATION .
       COMPONENT emgutf_document
       )

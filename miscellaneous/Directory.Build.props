@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dedicated SHFB project for the HTML Help 1 (.chm) output. This is a copy of
-     Emgu.TF.Lite.html.shfbproj with OutputPath/HelpFileFormat hardcoded instead of overridden
-     at build time: SHFB's BuildHelp MSBuild task does not forward /property:OutputPath=.../
-     /property:HelpFileFormat=... global overrides to the underlying SandcastleProject, so those
-     values must live in the project file itself. Keep this file's settings in sync with
-     Emgu.TF.Lite.html.shfbproj (DocumentationSources, NamespaceSummaries, etc.) if those change. -->
-<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="14.0">
+<!-- Properties shared between Emgu.TF.Lite.html.shfbproj and Emgu.TF.Lite.OpenXml.shfbproj.
+     Despite being old-style (non-SDK) SHFB projects, both still pick this up automatically:
+     SandcastleHelpFileBuilder.targets (which each project imports) transitively imports
+     Microsoft.Common.props, which performs the standard directory-walk-up Directory.Build.props
+     auto-import. No explicit <Import> is needed in - or should be added to - either project. -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <!-- The configuration and platform will be used to determine which
          assemblies to include from solution and project documentation
@@ -13,7 +12,6 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{c3f5a6b1-6e1a-4a2a-9c2b-2a6e1d5f4b3a}</ProjectGuid>
     <SHFBSchemaVersion>2017.9.26.0</SHFBSchemaVersion>
     <!-- AssemblyName, Name, and RootNamespace are not used by SHFB but Visual
          Studio adds them anyway -->
@@ -21,7 +19,7 @@
     <RootNamespace>Documentation</RootNamespace>
     <Name>Documentation</Name>
     <!-- SHFB properties -->
-    <OutputPath>chm\</OutputPath>
+    <OutputPath>..\Help\</OutputPath>
     <HtmlHelpName>Emgu.TF.Lite.Documentation</HtmlHelpName>
     <ProjectSummary>Emgu TF Lite is a cross platform .Net wrapper for the Google Tensorflow Lite library. Allows Tensorflow Lite functions to be called from .NET compatible languages such as C#, VB, VC++, IronPython.</ProjectSummary>
     <MissingTags>Summary, Parameter, Returns, AutoDocumentCtors, Namespace, TypeParameter</MissingTags>
@@ -36,7 +34,6 @@
     <KeepLogFile>False</KeepLogFile>
     <BuildLogFile>
     </BuildLogFile>
-    <HelpFileFormat>HtmlHelp1</HelpFileFormat>
     <CppCommentsFixup>False</CppCommentsFixup>
     <FrameworkVersion>.NET Core/.NET Standard/.NET 5.0+</FrameworkVersion>
     <HelpTitle>Emgu TF Lite Library Documentation</HelpTitle>
@@ -44,7 +41,6 @@
     <FeedbackEMailAddress>support%40emgu.com</FeedbackEMailAddress>
     <HeaderText>https://www.emgu.com</HeaderText>
     <FooterText>For questions and discussions please visit https://github.com/emgucv/emgutf/issues</FooterText>
-    <PresentationStyle>VS2013</PresentationStyle>
     <DocumentationSources>
       <DocumentationSource sourceFile="..\Solution\Windows.Desktop\Emgu.TF.Lite.sln" />
     </DocumentationSources>
@@ -74,12 +70,4 @@
     <CleanIntermediates>True</CleanIntermediates>
     <SaveComponentCacheCapacity>100</SaveComponentCacheCapacity>
   </PropertyGroup>
-  <!-- There are no properties for these two groups but they need to appear in
-       order for Visual Studio to perform the build. -->
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-  </PropertyGroup>
-  <!-- Import the SHFB build targets -->
-  <Import Project="$(SHFBROOT)\SandcastleHelpFileBuilder.targets" />
 </Project>
