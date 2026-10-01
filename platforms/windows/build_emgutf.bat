@@ -100,9 +100,18 @@ cd b
 -G %CMAKE_CONF% ^
 %CMAKE_CONF_FLAGS% 
 
-SET CMAKE_BUILD_TARGET=ALL_BUILD
+REM ALL_BUILD (which includes the Emgu.TF.Lite.Documentation.chm custom target,
+REM marked ALL) is built in its own separate cmake --build invocation below,
+REM rather than being bundled into one multi-target call together with PACKAGE.
+REM MSBuild gives no ordering guarantee between unrelated top-level targets
+REM requested in a single invocation, and PACKAGE's CPack script installs the
+REM .chm by its exact file path with no CMake-level dependency forcing it to
+REM wait for the doc target - letting them run as one combined build caused an
+REM intermittent "file INSTALL cannot find ...Documentation.chm: File exists"
+REM CPack error when PACKAGE's install raced the doc target's SHFB compile.
+SET CMAKE_BUILD_TARGET_2=
 IF NOT "%3%"=="package" GOTO CHECK_BUILD_TYPE
-SET CMAKE_BUILD_TARGET=%CMAKE_BUILD_TARGET% PACKAGE
+SET CMAKE_BUILD_TARGET_2=%CMAKE_BUILD_TARGET_2% PACKAGE
 SET MOVE_ZIP_SCRIPT=copy *.zip ..\package
 SET MOVE_EXE_SCRIPT=copy *.exe ..\package
 
@@ -110,17 +119,23 @@ SET MOVE_EXE_SCRIPT=copy *.exe ..\package
 
 :BUILD_TF_LITE
 IF NOT "%1%"=="doc" GOTO BUILD_TF_LITE_NUGET
-IF "%HAS_TF_LITE%"=="Y" SET CMAKE_BUILD_TARGET=%CMAKE_BUILD_TARGET% Emgu.TF.Lite.Document.Html 
+IF "%HAS_TF_LITE%"=="Y" SET CMAKE_BUILD_TARGET_2=%CMAKE_BUILD_TARGET_2% Emgu.TF.Lite.Document.Html
 IF "%HAS_TF_LITE%"=="Y" SET ZIP_HELP_SCRIPT=zip package\Help.zip -r Help
 
 :BUILD_TF_LITE_NUGET
 IF NOT "%2%"=="nuget" GOTO BUILD
-IF "%HAS_TF_LITE%"=="Y" SET CMAKE_BUILD_TARGET=%CMAKE_BUILD_TARGET% Emgu.TF.Lite.runtime.windows.nuget
+IF "%HAS_TF_LITE%"=="Y" SET CMAKE_BUILD_TARGET_2=%CMAKE_BUILD_TARGET_2% Emgu.TF.Lite.runtime.windows.nuget
 IF "%HAS_TF_LITE%"=="Y" SET MOVE_NUGET_SCRIPT=copy platforms\nuget\*.nupkg package
 
 :BUILD
-ECHO BUILDING TARGETS: %CMAKE_BUILD_TARGET%
-%CMAKE% --build . --config Release --target %CMAKE_BUILD_TARGET%
+ECHO BUILDING TARGET: ALL_BUILD
+%CMAKE% --build . --config Release --target ALL_BUILD
+
+IF "%CMAKE_BUILD_TARGET_2%"=="" GOTO DONE_BUILD
+ECHO BUILDING TARGETS:%CMAKE_BUILD_TARGET_2%
+%CMAKE% --build . --config Release --target%CMAKE_BUILD_TARGET_2%
+
+:DONE_BUILD
 %MOVE_ZIP_SCRIPT%
 %MOVE_EXE_SCRIPT%
 cd ..
