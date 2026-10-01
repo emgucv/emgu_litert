@@ -119,7 +119,11 @@ SET MOVE_EXE_SCRIPT=copy *.exe ..\package
 
 :BUILD_TF_LITE
 IF NOT "%1%"=="doc" GOTO BUILD_TF_LITE_NUGET
-IF "%HAS_TF_LITE%"=="Y" SET CMAKE_BUILD_TARGET_2=%CMAKE_BUILD_TARGET_2% Emgu.TF.Lite.Document.Html
+REM Emgu.TF.Lite.Document.Html is already built as a dependency of the
+REM Emgu.TF.Lite.Documentation.chm ALL target during the ALL_BUILD step above.
+REM Requesting it again here, alongside PACKAGE, would rebuild it in the same
+REM MSBuild invocation as CPack's install of the .chm - reintroducing the same
+REM race the ALL_BUILD/PACKAGE split above was meant to fix (see comment there).
 IF "%HAS_TF_LITE%"=="Y" SET ZIP_HELP_SCRIPT=zip package\Help.zip -r Help
 
 :BUILD_TF_LITE_NUGET
