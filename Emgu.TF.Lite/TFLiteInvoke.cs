@@ -398,7 +398,7 @@ namespace Emgu.TF.Lite
         /// <summary>
         /// Get the module format string.
         /// </summary>
-        /// <returns>On Windows, "{0}".dll will be returned; On Linux, "lib{0}.so" will be returned; Otherwise {0} is returned.</returns>
+        /// <returns>On Windows, "{0}.dll" will be returned; on Linux and Android, "lib{0}.so"; on macOS, "lib{0}.dylib"; otherwise "{0}".</returns>
         public static String GetModuleFormatString()
         {
             String formatString = "{0}";
@@ -406,7 +406,10 @@ namespace Emgu.TF.Lite
                 .Windows))
                 formatString = "{0}.dll";
             else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices
-                .OSPlatform.Linux))
+                .OSPlatform.Linux) ||
+                // .NET reports Android as its own platform, not Linux.
+                System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices
+                .OSPlatform.Create("ANDROID")))
                 formatString = "lib{0}.so";
             else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices
                 .OSPlatform.OSX))
@@ -433,7 +436,12 @@ namespace Emgu.TF.Lite
             #endregion
 
             #region Check for MAUI Android
-            System.Reflection.Assembly mauiAndroidAssembly = Emgu.LiteRT.Util.Toolbox.FindAssembly("Microsoft.Android.dll");
+            // .NET for Android's Java binding assembly (which defines Java.Lang.JavaSystem) is Mono.Android.dll, even
+            // though its packages are named Microsoft.Android.*. Looking only for Microsoft.Android.dll never matched,
+            // so the Android branch was skipped and the generic dlopen path tried the bare name "tfliteextern".
+            System.Reflection.Assembly mauiAndroidAssembly =
+                Emgu.LiteRT.Util.Toolbox.FindAssembly("Mono.Android.dll") ??
+                Emgu.LiteRT.Util.Toolbox.FindAssembly("Microsoft.Android.dll");
             if (mauiAndroidAssembly != null)
             {
                 //Running on Xamarin Android
