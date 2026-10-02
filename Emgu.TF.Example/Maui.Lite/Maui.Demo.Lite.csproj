@@ -68,6 +68,14 @@
 		<ProjectReference Include="..\..\Emgu.LiteRT.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Emgu.CV.runtime.maui.mini" Version="4.12.0.5764" />
+		<!--
+		Emgu.CV.Models (pulled in by Emgu.CV.runtime.maui.mini) has no Android target, so Android resolves its
+		netstandard2.0 dependency on System.Drawing.Common. That package's Windows-only System.Private.Windows.Core.dll
+		crashes Mono's AOT compiler (it references System.Formats.Nrbf, absent on Android), failing the Android Release
+		build. Exclude the package's assets on Android; nothing here uses it there. Emgu.CV.Models dropped the dependency
+		upstream (emgucv EMGUCV_5_0, commit a2309f10c), so this can go once the demo uses an Emgu CV release with that fix.
+		-->
+		<PackageReference Include="System.Drawing.Common" Version="9.0.0" ExcludeAssets="all" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
 	</ItemGroup>
 	
