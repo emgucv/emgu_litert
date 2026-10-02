@@ -34,11 +34,12 @@ namespace Maui.Demo.Lite
                     </html>", tensorflowVer, hasXnnPack);
             }
 
-            Content = 
+            // No WidthRequest/HeightRequest: a fixed 1000x1000 (device-independent units) WebView is wider than a
+            // phone screen and gets centered, which pushed the left-aligned page content off-screen and left the
+            // page looking blank. As the page's only content, the WebView fills the page by default.
+            Content =
                     new WebView()
                     {
-                        WidthRequest =  1000,
-                        HeightRequest = 1000,
                         Source =  new HtmlWebViewSource()
                         {
                             Html = htmlSource
