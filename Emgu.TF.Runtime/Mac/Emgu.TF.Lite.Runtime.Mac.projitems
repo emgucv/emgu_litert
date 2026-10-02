@@ -23,6 +23,14 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <!-- LiteRT's own runtime library, P/Invoked directly by the Emgu.TF.Lite.LiteRt classes. Optional: the
+       Emgu.TF.Lite (tfliteextern) API works without it. -->
+  <ItemGroup Condition="Exists('$(TFLiteBinaryDir)\runtimes\osx\native\libLiteRt.dylib')">
+    <Content Include="$(TFLiteBinaryDir)\runtimes\osx\native\libLiteRt.dylib">
+      <Link>libLiteRt.dylib</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <Target Name="EmguTFLiteMacPackageBuildImports" BeforeTargets="PrepareForBuild">
     <!-- <Message Condition="'$(EmguTFLiteMacLinkTarget)'!=''" Text="Emgu TF Lite shared project compiling against $(EmguTFLiteMacLinkTarget)" Importance="High" /> -->
     <Warning Text="'$(EmguTFLiteMacErrorMessage)'" Condition="'$(EmguTFLiteMacErrorMessage)'!=''" />
