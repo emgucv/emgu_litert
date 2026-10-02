@@ -39,9 +39,12 @@ The native C++ layer is exposed through P/Invoke via the `tfliteextern` extern l
 
 ### Prerequisites
 - .NET SDK
-- Visual Studio 2022 or VS 2026 (detected automatically by `vswhere.exe`)
+- Visual Studio 2022 or VS 2026 (detected automatically by `vswhere.exe`) — Windows
 - CMake 3.16+
-- TF Lite native DLL already built and placed under `lib/runtimes/`
+- Bazel (for the Bazel native builds; the version is pinned by `litert/.bazelversion`). The macOS and Android Bazel scripts set `HERMETIC_PYTHON_VERSION=3.12` when `python3.12` is on the `PATH`.
+- Xcode — macOS/iOS. The macOS script handles an Xcode installed outside `/Applications` (e.g. on another volume) by passing `DEVELOPER_DIR` into Bazel's sandbox.
+- Android SDK + NDK, and a JDK — Android (see below)
+- TF Lite native library already built and placed under `lib/runtimes/` (or `lib/android/`, `lib/ios/`)
 
 ### Build native TF Lite (Windows x64)
 ```bat
@@ -60,6 +63,34 @@ cd platforms/windows
 build_emgutf.bat
 ```
 Optional args: `doc` (build docs), `nuget` (build NuGet packages), `package` (build zip packages).
+
+### Build native TF Lite (macOS)
+```bash
+platforms/macos/bazel_build_tflite_macos_fat
+```
+Builds `arm64` and `x86_64` and writes the universal `lib/runtimes/osx/native/libtfliteextern.dylib` and `libLiteRt.dylib` (plus the per-arch `*-darwin_arm64.dylib`/`*-darwin.dylib` they are `lipo`'d from). To build one architecture only (the universal files then contain just that one):
+```bash
+platforms/macos/bazel_build_tflite_macos darwin_arm64   # or: darwin (x86_64, cross-compiled on Apple Silicon)
+```
+Alternative CMake build — host architecture only, statically linked, no `libLiteRt.dylib`; output goes to `lib/runtimes/osx/native/<arm64|x64>/libtfliteextern.dylib`:
+```bash
+platforms/macos/cmake_build_tflite
+```
+
+### Build the .NET solution and packages (macOS)
+```bash
+platforms/macos/build_emgutf
+```
+Configures CMake in `build/` (Release) and runs `make package`: builds the managed projects, writes the NuGet packages (`Emgu.LiteRT`, `Emgu.LiteRT.Models`, `Emgu.LiteRT.runtime.*`) to `platforms/nuget/`, and the CPack zip to `build/libemgutflite-ios-macos-<version>.zip`. The version's last component is derived from the git commit count, so it changes with every commit. Run the native build first: packages only include the native binaries already in `lib/`.
+
+### Build native TF Lite (Android, from Linux or macOS)
+The Android binaries can be built on either a Linux or a macOS host, with the same script:
+```bash
+platforms/android/bazel_build_tflite_android arm64   # or: x86_64, arm, x86
+```
+Writes `lib/android/<abi>/libtfliteextern.so` (`arm64-v8a`, `x86_64`, `armeabi-v7a`, `x86`), 16 KB page-aligned, with the Android-only NNAPI and GPU delegates linked in. Run once per ABI; extra arguments are passed to `bazel build`. The script reads the SDK from `ANDROID_HOME` and the NDK from `ANDROID_NDK_HOME`, else the newest version under `$ANDROID_HOME/ndk`:
+- **Linux**: `ANDROID_HOME` defaults to `/usr/lib/android-sdk` (the build image layout) when unset.
+- **macOS**: set `ANDROID_HOME` to the Android Studio SDK, usually `~/Library/Android/sdk` (no default — the Linux path doesn't exist there). Verified with NDK 28.0.12916984 for all four ABIs.
 
 ### Build with CMake (cross-platform)
 ```bash
@@ -88,6 +119,8 @@ dotnet test <project.csproj> --filter "FullyQualifiedName~TestGetVersion"
 ```
 
 Test assets (e.g., `grace_hopper.jpg`) must be present in the working directory when tests run.
+
+`Emgu.TF.Lite.Test.Net` targets `net9.0`; on a machine with only a newer .NET runtime installed (e.g. .NET 10), run it with `DOTNET_ROLL_FORWARD=Major dotnet test ...`. The project also needs the CMake-generated `Directory.Build.props` files (run the platform's `build_emgutf` once), and on macOS it copies `libtfliteextern.dylib`/`libLiteRt.dylib` from `lib/runtimes/osx/native/` via `Emgu.TF.Runtime/Mac`'s `.projitems`.
 
 ## Key Conventions
 
