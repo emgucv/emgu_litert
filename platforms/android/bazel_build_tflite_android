@@ -82,7 +82,18 @@ set +x
 
 cd ..
 
+# Bazel's -c opt outputs keep their debug info, roughly tripling their size. Strip it with the NDK's llvm-strip
+# (under toolchains/llvm/prebuilt/<host>/bin: darwin-x86_64 on macOS, linux-x86_64 on Linux); --strip-unneeded
+# keeps the dynamic symbol table, so the exported tfe*/LiteRt*/TfLite* functions are unaffected.
+LLVM_STRIP=$(ls "$ANDROID_NDK_HOME"/toolchains/llvm/prebuilt/*/bin/llvm-strip 2>/dev/null | head -1)
+if [ -z "$LLVM_STRIP" ]; then
+    echo "llvm-strip not found under $ANDROID_NDK_HOME/toolchains/llvm/prebuilt"
+    exit 1
+fi
+
 for LIB in libtfliteextern libLiteRt; do
     rm -f lib/android/$arch/$LIB.so
     cp -f litert/bazel-bin/tfliteextern/$LIB.so lib/android/$arch/$LIB.so || exit 1
+    chmod u+w lib/android/$arch/$LIB.so
+    "$LLVM_STRIP" --strip-unneeded lib/android/$arch/$LIB.so || exit 1
 done
