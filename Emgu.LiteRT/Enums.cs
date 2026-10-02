@@ -4,7 +4,7 @@
 
 using System;
 
-namespace Emgu.TF.Lite.LiteRt
+namespace Emgu.LiteRT
 {
     /// <summary>
     /// LiteRT status code (LiteRtStatus)

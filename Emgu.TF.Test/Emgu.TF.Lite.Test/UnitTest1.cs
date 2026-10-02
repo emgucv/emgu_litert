@@ -13,6 +13,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.CV;
+using LiteRt = Emgu.LiteRT;
 
 namespace Emgu.TF.Lite.Test
 {
@@ -37,8 +38,8 @@ namespace Emgu.TF.Lite.Test
         }
 
         // Runs MobileNet through the new LiteRt CompiledModel API (libLiteRt, P/Invoked directly) and checks it
-        // against the existing Interpreter API (tfliteextern) on the same input. Inside the Emgu.TF.Lite.Test
-        // namespace, "LiteRt" resolves to Emgu.TF.Lite.LiteRt, which also avoids clashing with System.Environment.
+        // against the existing Interpreter API (tfliteextern) on the same input. The LiteRt alias avoids
+        // Emgu.LiteRT.Environment clashing with System.Environment.
         [TestAttribute]
         public async Task TestLiteRtMobilenet()
         {

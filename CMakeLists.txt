@@ -715,7 +715,7 @@ IF(HAVE_OSX_LITE)
   SET(EMGUTF_LITE_MACOS_NUGET_FILE_LIST "${EMGUTF_LITE_MACOS_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libtfliteextern.dylib\" target=\"runtimes\\osx\\native\" />")
   # LiteRT's own runtime (built by platforms/macos/bazel_build_litert_macos), P/Invoked directly by the
-  # Emgu.TF.Lite.LiteRt classes. Optional: the tfliteextern-based API works without it.
+  # Emgu.LiteRT classes. Optional: the tfliteextern-based API works without it.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libLiteRt.dylib")
     SET(EMGUTF_LITE_MACOS_NUGET_FILE_LIST "${EMGUTF_LITE_MACOS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libLiteRt.dylib\" target=\"runtimes\\osx\\native\" />")
@@ -851,6 +851,7 @@ ENDIF()
 
 ADD_SUBDIRECTORY(Emgu.TF.Util)
 IF(HAVE_LITE_BUILD)
+  ADD_SUBDIRECTORY(Emgu.LiteRT)
   ADD_SUBDIRECTORY(Emgu.TF.Lite)
 ENDIF()
 

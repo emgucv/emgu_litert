@@ -5,7 +5,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace Emgu.TF.Lite.LiteRt
+namespace Emgu.LiteRT
 {
     /// <summary>
     /// Tensor type with a fixed rank (LiteRtRankedTensorType): the element type plus the shape.

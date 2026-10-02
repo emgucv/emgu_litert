@@ -5,7 +5,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace Emgu.TF.Lite.LiteRt
+namespace Emgu.LiteRT
 {
     /// <summary>
     /// A buffer holding the data of an input or output tensor (LiteRtTensorBuffer).

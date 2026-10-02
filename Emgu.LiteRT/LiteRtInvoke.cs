@@ -5,7 +5,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace Emgu.TF.Lite.LiteRt
+namespace Emgu.LiteRT
 {
     /// <summary>
     /// P/Invoke entry points into LiteRT's own runtime library (libLiteRt), which exposes the LiteRt* C API.

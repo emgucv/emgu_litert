@@ -4,7 +4,7 @@
 
 using System;
 
-namespace Emgu.TF.Lite.LiteRt
+namespace Emgu.LiteRT
 {
     /// <summary>
     /// The exception thrown when a LiteRt C API call returns a status other than Ok.

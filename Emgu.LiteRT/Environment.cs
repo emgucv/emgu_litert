@@ -5,7 +5,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace Emgu.TF.Lite.LiteRt
+namespace Emgu.LiteRT
 {
     /// <summary>
     /// The LiteRT environment (LiteRtEnvironment). It holds the runtime-wide state, such as the
@@ -13,7 +13,7 @@ namespace Emgu.TF.Lite.LiteRt
     /// </summary>
     /// <remarks>
     /// This class shares its name with System.Environment; if both namespaces are imported, refer to it as
-    /// Emgu.TF.Lite.LiteRt.Environment or use an alias.
+    /// Emgu.LiteRT.Environment or use an alias.
     /// </remarks>
     public class Environment : Emgu.TF.Util.UnmanagedObject
     {

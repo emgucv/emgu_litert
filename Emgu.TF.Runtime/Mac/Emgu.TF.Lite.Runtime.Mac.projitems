@@ -23,7 +23,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <!-- LiteRT's own runtime library, P/Invoked directly by the Emgu.TF.Lite.LiteRt classes. Optional: the
+  <!-- LiteRT's own runtime library, P/Invoked directly by the Emgu.LiteRT classes. Optional: the
        Emgu.TF.Lite (tfliteextern) API works without it. -->
   <ItemGroup Condition="Exists('$(TFLiteBinaryDir)\runtimes\osx\native\libLiteRt.dylib')">
     <Content Include="$(TFLiteBinaryDir)\runtimes\osx\native\libLiteRt.dylib">
