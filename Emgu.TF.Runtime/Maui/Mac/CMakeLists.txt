@@ -20,7 +20,7 @@ IF(HAVE_MAUI_MAC_LITE)
       )
 	  
   IF (APPLE)
-    PROJECT(Emgu.TF.Lite.runtime.maui.macos)
+    PROJECT(Emgu.LiteRT.runtime.maui.macos)
     SET(EXTRA_BUILD_FLAGS "/p:Platform=\"AnyCPU\"")
     BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}.csproj" "${EXTRA_BUILD_FLAGS}" ALL)
 
@@ -32,7 +32,7 @@ IF(HAVE_MAUI_MAC_LITE)
 
   INSTALL(
     DIRECTORY
-    ${LIBRARY_OUTPUT_PATH}/Build/Emgu.TF.Lite.runtime.maui.macos
+    ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.runtime.maui.macos
     DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
     COMPONENT emgutf_binary)
 	

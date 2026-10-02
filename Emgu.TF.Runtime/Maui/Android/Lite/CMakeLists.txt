@@ -3,7 +3,7 @@
 # --------------------------------------------------------
 
 IF(HAVE_ANDROID_LITE AND (WIN32 OR APPLE))
-  PROJECT(Emgu.TF.Lite.runtime.maui.android)
+  PROJECT(Emgu.LiteRT.runtime.maui.android)
   INSTALL(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     DESTINATION Emgu.TF.Runtime/Maui/Android
@@ -28,7 +28,7 @@ IF(HAVE_ANDROID_LITE AND (WIN32 OR APPLE))
   
   INSTALL(
     DIRECTORY
-    ${LIBRARY_OUTPUT_PATH}/Build/Emgu.TF.Lite.runtime.maui.android
+    ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.runtime.maui.android
     DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
     COMPONENT emgutf_binary)
 ENDIF()

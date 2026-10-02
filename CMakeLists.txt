@@ -227,7 +227,7 @@ IF (HAVE_MAC_CATALYST_LITE_ARM64 OR HAVE_MAC_CATALYST_LITE_X86_64)
 ELSE()
   SET(HAVE_MAC_CATALYST_LITE OFF)
 ENDIF()
-CHECK_BINARY_EXIST("lib/Build/Emgu.TF.Lite.runtime.maui.macos/AnyCPU/Release/net${DOTNET_VERSION_MAJOR}.0-maccatalyst" "Emgu.TF.Lite.runtime.maui.macos.dll" HAVE_MAUI_MAC_LITE ${HAVE_MAC_CATALYST_LITE})
+CHECK_BINARY_EXIST("lib/Build/Emgu.LiteRT.runtime.maui.macos/AnyCPU/Release/net${DOTNET_VERSION_MAJOR}.0-maccatalyst" "Emgu.LiteRT.runtime.maui.macos.dll" HAVE_MAUI_MAC_LITE ${HAVE_MAC_CATALYST_LITE})
 
 
 CHECK_BINARY_EXIST("lib/runtimes/osx/native" "libtfliteextern.dylib" HAVE_OSX_LITE OFF)

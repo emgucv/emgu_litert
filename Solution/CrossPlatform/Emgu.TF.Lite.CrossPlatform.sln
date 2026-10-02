@@ -15,15 +15,15 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Models.Shared"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite", "..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj", "{FDAB1BD5-2BC7-4839-83A6-3DCD6E8C4B5A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.runtime.maui.android", "..\..\Emgu.TF.Runtime\Maui\Android\Lite\Emgu.TF.Lite.runtime.maui.android.csproj", "{4318036D-46DC-4310-8ECE-93ADF819F280}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.LiteRT.runtime.maui.android", "..\..\Emgu.TF.Runtime\Maui\Android\Lite\Emgu.LiteRT.runtime.maui.android.csproj", "{4318036D-46DC-4310-8ECE-93ADF819F280}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.Models", "..\..\Emgu.TF.Lite.Models\NetStandard\Emgu.TF.Lite.Models.csproj", "{593619DC-5CDA-4EE4-9147-7849A4E2497B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.runtime.maui.ios", "..\..\Emgu.TF.Runtime\Maui\iOS\Emgu.TF.Lite.runtime.maui.ios.csproj", "{3E60EE87-FDE0-4913-A502-01FDF8BAF502}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.LiteRT.runtime.maui.ios", "..\..\Emgu.TF.Runtime\Maui\iOS\Emgu.LiteRT.runtime.maui.ios.csproj", "{3E60EE87-FDE0-4913-A502-01FDF8BAF502}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.runtime.maui", "..\..\Emgu.TF.Runtime\Maui\UI\Lite\Emgu.TF.Lite.runtime.maui.csproj", "{E260A929-085E-44A7-9DC9-14B47D7C351B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.LiteRT.runtime.maui", "..\..\Emgu.TF.Runtime\Maui\UI\Lite\Emgu.LiteRT.runtime.maui.csproj", "{E260A929-085E-44A7-9DC9-14B47D7C351B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Emgu.TF.Lite.runtime.maui.macos", "..\..\Emgu.TF.Runtime\Maui\Mac\Emgu.TF.Lite.runtime.maui.macos.csproj", "{C2CC0326-42D7-439D-BF18-6EE77E158563}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Emgu.LiteRT.runtime.maui.macos", "..\..\Emgu.TF.Runtime\Maui\Mac\Emgu.LiteRT.runtime.maui.macos.csproj", "{C2CC0326-42D7-439D-BF18-6EE77E158563}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

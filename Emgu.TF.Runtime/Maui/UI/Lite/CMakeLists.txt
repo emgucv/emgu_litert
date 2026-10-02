@@ -4,7 +4,7 @@
 
 # Only build MAUI projects on Windows or MacOS. MAUI compilation on Linux seems to be a problem.
 IF(HAVE_MAUI_LITE AND (APPLE OR WIN32))
-  PROJECT(Emgu.TF.Lite.runtime.maui)
+  PROJECT(Emgu.LiteRT.runtime.maui)
   INSTALL(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     DESTINATION Emgu.TF.Platform/Maui/UI
@@ -27,12 +27,12 @@ IF(HAVE_MAUI_LITE AND (APPLE OR WIN32))
   
   ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT)
   
-  IF (TARGET Emgu.TF.Lite.runtime.maui.android)
-    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite.runtime.maui.android)
+  IF (TARGET Emgu.LiteRT.runtime.maui.android)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.runtime.maui.android)
   ENDIF()
 
-  IF (TARGET Emgu.TF.Lite.runtime.maui.ios)
-    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite.runtime.maui.ios)
+  IF (TARGET Emgu.LiteRT.runtime.maui.ios)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.runtime.maui.ios)
   ENDIF()
 
   IF (TARGET Emgu.TF.Lite.runtime.windows.nuget)
@@ -41,7 +41,7 @@ IF(HAVE_MAUI_LITE AND (APPLE OR WIN32))
 
   INSTALL(
     DIRECTORY
-    ${LIBRARY_OUTPUT_PATH}/Build/Emgu.TF.Lite.runtime.maui
+    ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.runtime.maui
     DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
     COMPONENT emgutf_binary)
 

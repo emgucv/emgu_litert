@@ -19,7 +19,7 @@ IF(HAVE_IOS_LITE)
       )
 	  
   IF (APPLE)
-    PROJECT(Emgu.TF.Lite.runtime.maui.ios)
+    PROJECT(Emgu.LiteRT.runtime.maui.ios)
 	SET(EXTRA_BUILD_FLAGS "/p:Platform=\"AnyCPU\"")
     BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}.csproj" "${EXTRA_BUILD_FLAGS}" ALL)
     #DOTNET_MSBUILD_CSPROJ_IN_SOLUTION(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/../../../Solution/iOS/Emgu.CV.iOS.Maui.sln" "${PROJECT_NAME}" "${EXTRA_BUILD_FLAGS}" ALL)
@@ -32,7 +32,7 @@ IF(HAVE_IOS_LITE)
 
   INSTALL(
     DIRECTORY
-    ${LIBRARY_OUTPUT_PATH}/Build/Emgu.TF.Lite.runtime.maui.ios
+    ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.runtime.maui.ios
     DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
     COMPONENT emgutf_binary)
 	

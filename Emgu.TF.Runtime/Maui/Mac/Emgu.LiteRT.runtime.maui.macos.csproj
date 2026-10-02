@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>true</ImplicitUsings>
     <IsBindingProject>true</IsBindingProject>	
-    <AssemblyName>Emgu.TF.Lite.runtime.maui.macos</AssemblyName>
+    <AssemblyName>Emgu.LiteRT.runtime.maui.macos</AssemblyName>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\lib))</TfLiteBinaryDir>
     <EmguTfLiteCatalystBinaryDir>$(TfLiteBinaryDir)\ios</EmguTfLiteCatalystBinaryDir>

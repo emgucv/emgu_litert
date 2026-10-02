@@ -58,7 +58,7 @@
 
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\Emgu.TF.Runtime\Maui\UI\Lite\Emgu.TF.Lite.runtime.maui.csproj" />
+		<ProjectReference Include="..\..\Emgu.TF.Runtime\Maui\UI\Lite\Emgu.LiteRT.runtime.maui.csproj" />
 	    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
 	  
 	    <!-- <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.IOS\Emgu.TF.Lite.Models.IOS.csproj" /> -->
