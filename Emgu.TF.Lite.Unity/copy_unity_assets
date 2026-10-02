@@ -28,7 +28,7 @@ cp ../tensorflow/LICENSE Assets/Emgu.TF.Lite/Documentation/tensorflow.license.tx
 cp ../Emgu.LiteRT.Util/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.LiteRT.Util/
 cp ../Emgu.TF.Lite/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite/
 cp ../Emgu.Models/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.Models/
-cp ../Emgu.TF.Lite.Models/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite.Models/
+cp ../Emgu.LiteRT.Models/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite.Models/
 
 cd Assets/Emgu.TF.Lite/Plugins
 if test -d "../../../../platforms/macos/tfliteextern.bundle"

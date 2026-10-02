@@ -9,11 +9,11 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Shared", "..\.
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.Models.Shared", "..\..\Emgu.Models\Emgu.Models.Shared.shproj", "{8EDCE0C8-BA71-4396-9428-35D05877258C}"
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Models.Shared", "..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.shproj", "{E956DD26-1294-4731-8A90-C4CBA9F291B6}"
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Models.Shared", "..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.shproj", "{E956DD26-1294-4731-8A90-C4CBA9F291B6}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite", "..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj", "{EC62D093-7446-4AF0-A3C8-61D497CF3D7E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.Models", "..\..\Emgu.TF.Lite.Models\NetStandard\Emgu.TF.Lite.Models.csproj", "{8D1CDAF7-E886-4A3C-B9D9-39BFE193E07C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.Models", "..\..\Emgu.LiteRT.Models\NetStandard\Emgu.TF.Lite.Models.csproj", "{8D1CDAF7-E886-4A3C-B9D9-39BFE193E07C}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Inception.Console.Lite", "..\..\Emgu.TF.Example\Inception.Console.Lite\Inception.Console.Lite.csproj", "{2622CBA3-4B2D-4B2B-8075-1FA9F5F5BF16}"
 EndProject
@@ -95,7 +95,7 @@ Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		..\..\Emgu.TF.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems*{0d7c99ea-3aae-4f45-9ba7-3b4af8313753}*SharedItemsImports = 13
 		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{0eec5380-c708-4caa-9a1c-fb70ed57a610}*SharedItemsImports = 5
-		..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.projitems*{0eec5380-c708-4caa-9a1c-fb70ed57a610}*SharedItemsImports = 5
+		..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.projitems*{0eec5380-c708-4caa-9a1c-fb70ed57a610}*SharedItemsImports = 5
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{0eec5380-c708-4caa-9a1c-fb70ed57a610}*SharedItemsImports = 5
 		..\..\Emgu.TF.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems*{0eec5380-c708-4caa-9a1c-fb70ed57a610}*SharedItemsImports = 5
 		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{0eec5380-c708-4caa-9a1c-fb70ed57a610}*SharedItemsImports = 5
@@ -106,12 +106,12 @@ Global
 		..\..\Emgu.TF.Runtime\Debian\Emgu.TF.Lite.Runtime.Debian.projitems*{32ebeb2c-7258-4987-9c05-c1952471f8c4}*SharedItemsImports = 13
 		..\..\Emgu.TF.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems*{8519b2b8-e96b-47fd-a466-c6031d34aaab}*SharedItemsImports = 13
 		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{8d1cdaf7-e886-4a3c-b9d9-39bfe193e07c}*SharedItemsImports = 5
-		..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.projitems*{8d1cdaf7-e886-4a3c-b9d9-39bfe193e07c}*SharedItemsImports = 5
+		..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.projitems*{8d1cdaf7-e886-4a3c-b9d9-39bfe193e07c}*SharedItemsImports = 5
 		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{8edce0c8-ba71-4396-9428-35d05877258c}*SharedItemsImports = 13
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{8f587fb9-bba6-4c30-9329-8cbac7020fe0}*SharedItemsImports = 13
 		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{98561642-5ec3-4244-baf9-6876d9ba5527}*SharedItemsImports = 13
 		..\..\Emgu.TF.Runtime\Ubuntu\Emgu.TF.Lite.Runtime.Ubuntu.projitems*{a481cd6d-f3fd-40d3-ba64-64b46219d09e}*SharedItemsImports = 13
-		..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.projitems*{e956dd26-1294-4731-8a90-c4cba9f291b6}*SharedItemsImports = 13
+		..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.projitems*{e956dd26-1294-4731-8a90-c4cba9f291b6}*SharedItemsImports = 13
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{ec62d093-7446-4af0-a3c8-61d497cf3d7e}*SharedItemsImports = 5
 		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{ec62d093-7446-4af0-a3c8-61d497cf3d7e}*SharedItemsImports = 5
 	EndGlobalSection
