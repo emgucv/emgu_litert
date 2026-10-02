@@ -42,6 +42,7 @@ The native C++ layer is exposed through P/Invoke via the `tfliteextern` extern l
 - Visual Studio 2022 or VS 2026 (detected automatically by `vswhere.exe`) — Windows
 - CMake 3.16+
 - Bazel (for the Bazel native builds; the version is pinned by `litert/.bazelversion`). The macOS and Android Bazel scripts set `HERMETIC_PYTHON_VERSION=3.12` when `python3.12` is on the `PATH`.
+  - The macOS, iOS and Android Bazel scripts run `bazel --output_user_root=<repo>/bazel_output build ...`, so Bazel's output tree, install base and cache (several GB per platform) live in `bazel_output/` at the repo root — gitignored, outside the `litert/` workspace — instead of the default `/private/var/tmp/_bazel_$USER` (macOS) or `~/.cache/bazel` (Linux). Running `bazel` by hand in `litert/` needs the same startup flag (e.g. `bazel --output_user_root="$(cd .. && pwd)/bazel_output" build ...` — use an absolute path), otherwise Bazel starts a separate server with a cold cache in the default location. Deleting `bazel_output/` forces a full rebuild.
 - Xcode — macOS/iOS. The macOS script handles an Xcode installed outside `/Applications` (e.g. on another volume) by passing `DEVELOPER_DIR` into Bazel's sandbox.
 - Android SDK + NDK, and a JDK — Android (see below)
 - TF Lite native library already built and placed under `lib/runtimes/` (or `lib/android/`, `lib/ios/`)
