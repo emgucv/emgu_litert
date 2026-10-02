@@ -11,27 +11,27 @@ IF (HAVE_WINDESKTOP_X86_LITE)
 ENDIF()
 
 IF (HAVE_WINDESKTOP_LITE)
-  add_subdirectory(Emgu.TF.Lite.runtime.windows)
+  add_subdirectory(Emgu.LiteRT.runtime.windows)
 ENDIF()
 
 
 IF(HAVE_OSX_LITE)
-  add_subdirectory(Emgu.TF.Lite.runtime.macos)
+  add_subdirectory(Emgu.LiteRT.runtime.macos)
 ENDIF()
 
 #IF ( HAVE_ANDROID_LITE )
-#  add_subdirectory(Emgu.TF.Lite.runtime.xamarin.android)
+#  add_subdirectory(Emgu.LiteRT.runtime.xamarin.android)
 #ENDIF()
 
 #IF ( HAVE_IOS_LITE )
-#  add_subdirectory(Emgu.TF.Lite.runtime.xamarin.ios)
+#  add_subdirectory(Emgu.LiteRT.runtime.xamarin.ios)
 #ENDIF()
 
-add_subdirectory(Emgu.TF.Lite.runtime.ubuntu)
+add_subdirectory(Emgu.LiteRT.runtime.ubuntu)
 
-add_subdirectory(Emgu.TF.Lite.runtime.debian-arm)
-add_subdirectory(Emgu.TF.Lite.runtime.debian-arm64)
+add_subdirectory(Emgu.LiteRT.runtime.debian-arm)
+add_subdirectory(Emgu.LiteRT.runtime.debian-arm64)
 
-#add_subdirectory(Emgu.TF.Lite.runtime.maui)
+#add_subdirectory(Emgu.LiteRT.runtime.maui)
 
 #add_subdirectory(Emgu.TF.runtime.maui)
