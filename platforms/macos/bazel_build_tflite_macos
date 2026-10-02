@@ -57,7 +57,7 @@ cd litert
 
 # litert's .bazelrc auto-applies build:macos via --enable_platform_specific_config on
 # this host, but --config=macos is passed explicitly for clarity, same as
-# platforms/windows/bazel_build_tflite_x86_64.bat does for --config=windows.
+# platforms/windows/bazel_build_litert.ps1 does for --config=windows.
 BAZEL_CONFIG_FLAGS="--config=macos"
 if [ "$BAZEL_CPU" = "darwin_arm64" ]; then
     BAZEL_CONFIG_FLAGS="$BAZEL_CONFIG_FLAGS --config=macos_arm64"

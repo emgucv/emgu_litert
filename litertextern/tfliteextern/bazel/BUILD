@@ -1,5 +1,5 @@
 # Bazel target for building tfliteextern against LiteRT's Bazel path.
-# Wired into platforms/windows/bazel_build_tflite_x86_64.bat (Windows),
+# Wired into platforms/windows/bazel_build_litert.ps1 (Windows),
 # platforms/macos/bazel_build_tflite_macos (macOS),
 # platforms/ubuntu/24.04/bazel_build_tflite (Ubuntu), and
 # platforms/debian/{bookworm,trixie}/bazel_build_tflite (Debian arm/arm64).
