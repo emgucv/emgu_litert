@@ -17,6 +17,10 @@ fi
 
 cd "$(dirname "$0")"
 cd ../../
+# Keep Bazel's output tree (its --output_user_root startup option) in a subfolder of this repo rather than
+# the default /private/var/tmp/_bazel_$USER (macOS) or ~/.cache/bazel (Linux). It sits outside the litert/
+# workspace on purpose, so Bazel never treats it as source.
+BAZEL_OUTPUT_USER_ROOT="$(pwd)/bazel_output"
 mkdir -p lib/ios
 
 # If Xcode is installed outside /Applications (e.g. on a separate volume),
@@ -68,7 +72,7 @@ cp -f litertextern/imgproc/imgproc.h litert/tfliteextern/imgproc.h
 
 cd litert
 
-bazel build \
+bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build \
     --verbose_failures \
     $BAZEL_BUILD_OPTION \
     $BAZEL_XCODE_OPTS \

@@ -40,6 +40,10 @@ echo "Using ANDROID_HOME=$ANDROID_HOME ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
 
 cd "$(dirname "$0")"
 cd ../../
+# Keep Bazel's output tree (its --output_user_root startup option) in a subfolder of this repo rather than
+# the default /private/var/tmp/_bazel_$USER (macOS) or ~/.cache/bazel (Linux). It sits outside the litert/
+# workspace on purpose, so Bazel never treats it as source.
+BAZEL_OUTPUT_USER_ROOT="$(pwd)/bazel_output"
 mkdir -p lib/android/$arch
 
 # litert is a pristine third-party submodule (we don't own/patch it upstream), so the
@@ -57,7 +61,7 @@ cd litert
 
 set -x
 build_with_bazel() {
-  bazel build -c opt \
+  bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build -c opt \
       --config=$config \
       --incompatible_enable_cc_toolchain_resolution \
       --incompatible_enable_android_toolchain_resolution \
