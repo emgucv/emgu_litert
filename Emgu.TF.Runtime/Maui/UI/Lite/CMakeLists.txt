@@ -35,8 +35,8 @@ IF(HAVE_MAUI_LITE AND (APPLE OR WIN32))
     ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.runtime.maui.ios)
   ENDIF()
 
-  IF (TARGET Emgu.TF.Lite.runtime.windows.nuget)
-    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite.runtime.windows.nuget)
+  IF (TARGET Emgu.LiteRT.runtime.windows.nuget)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.runtime.windows.nuget)
   ENDIF()
 
   INSTALL(

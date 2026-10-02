@@ -4,7 +4,7 @@
 
 IF(HAVE_WINDESKTOP_LITE)
 
-PROJECT(Emgu.TF.Lite.runtime.windows.nuget)
+PROJECT(Emgu.LiteRT.runtime.windows.nuget)
 
   get_filename_component(NUGET_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
   BUILD_NUGET_PACKAGE(
@@ -27,7 +27,7 @@ PROJECT(Emgu.TF.Lite.runtime.windows.nuget)
   	ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.runtime.windows.msvc.rt.x86.nuget)
   ENDIF()
   
-#ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite.nuget)
+#ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.nuget)
 
 if(ENABLE_SOLUTION_FOLDERS)
   set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "NUGET")

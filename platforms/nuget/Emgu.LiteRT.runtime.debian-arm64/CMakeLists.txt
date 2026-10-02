@@ -3,7 +3,7 @@
 # --------------------------------------------------------
 
 IF(HAVE_LINUX_ARM64_LITE)
-  PROJECT(Emgu.TF.Lite.runtime.debian-arm64.nuget)
+  PROJECT(Emgu.LiteRT.runtime.debian-arm64.nuget)
   get_filename_component(NUGET_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
   BUILD_NUGET_PACKAGE(
     ${PROJECT_NAME} 

@@ -4,7 +4,7 @@
 
 IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
 
-  PROJECT(Emgu.TF.Lite.runtime.ubuntu.nuget)
+  PROJECT(Emgu.LiteRT.runtime.ubuntu.nuget)
   
   get_filename_component(NUGET_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
   BUILD_NUGET_PACKAGE(

@@ -4,7 +4,7 @@
 
 IF(HAVE_OSX_LITE)
 
-PROJECT(Emgu.TF.Lite.runtime.macos.nuget)
+PROJECT(Emgu.LiteRT.runtime.macos.nuget)
 
   get_filename_component(NUGET_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
 

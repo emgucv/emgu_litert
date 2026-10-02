@@ -126,7 +126,7 @@ IF "%HAS_TF_LITE%"=="Y" SET ZIP_HELP_SCRIPT=zip package\Help.zip -r Help
 
 :BUILD_TF_LITE_NUGET
 IF NOT "%2%"=="nuget" GOTO BUILD
-IF "%HAS_TF_LITE%"=="Y" SET CMAKE_BUILD_TARGET_2=%CMAKE_BUILD_TARGET_2% Emgu.TF.Lite.runtime.windows.nuget
+IF "%HAS_TF_LITE%"=="Y" SET CMAKE_BUILD_TARGET_2=%CMAKE_BUILD_TARGET_2% Emgu.LiteRT.runtime.windows.nuget
 IF "%HAS_TF_LITE%"=="Y" SET MOVE_NUGET_SCRIPT=copy platforms\nuget\*.nupkg package
 
 :BUILD
