@@ -43,6 +43,7 @@ fi
 mkdir -p litert/tfliteextern
 cp -f litertextern/tfliteextern/bazel/BUILD litert/tfliteextern/BUILD
 cp -f litertextern/tfliteextern/bazel/tfliteextern.def litert/tfliteextern/tfliteextern.def
+cp -f litertextern/tfliteextern/bazel/litert_exported_symbols_darwin.lds litert/tfliteextern/litert_exported_symbols_darwin.lds
 cp -f litertextern/tfliteextern/tfliteextern.cc litert/tfliteextern/tfliteextern.cc
 cp -f litertextern/tfliteextern/tfliteextern.h litert/tfliteextern/tfliteextern.h
 cp -f litertextern/imgproc/imgproc.cc litert/tfliteextern/imgproc.cc
@@ -65,20 +66,36 @@ else
     BAZEL_CONFIG_FLAGS="$BAZEL_CONFIG_FLAGS --cpu=$BAZEL_CPU --platforms=@build_bazel_apple_support//platforms:macos_x86_64"
 fi
 
-bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS $BAZEL_XCODE_OPTS $BAZEL_OPTIONS //tfliteextern:tfliteextern || exit 1
+# libtfliteextern.dylib only contains the C API wrapper and links dynamically against libLiteRt.dylib (LiteRT's
+# own runtime, exporting the LiteRt* and TfLite* C APIs) - see the macOS section of
+# litertextern/tfliteextern/bazel/BUILD. Both are built per architecture here, then lipo'd below.
+bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS $BAZEL_XCODE_OPTS $BAZEL_OPTIONS //tfliteextern:litert_runtime //tfliteextern:tfliteextern_dylib || exit 1
 
 cd ..
 
-cp -f litert/bazel-bin/tfliteextern/libtfliteextern.dylib lib/runtimes/osx/native/libtfliteextern-$BAZEL_CPU.dylib
-
-chmod u+w lib/runtimes/osx/native/libtfliteextern-$BAZEL_CPU.dylib
-install_name_tool -id @rpath/libtfliteextern.dylib lib/runtimes/osx/native/libtfliteextern-$BAZEL_CPU.dylib
-chmod u-w lib/runtimes/osx/native/libtfliteextern-$BAZEL_CPU.dylib
+for LIB in libtfliteextern libLiteRt; do
+    OUT=lib/runtimes/osx/native/$LIB-$BAZEL_CPU.dylib
+    rm -f $OUT
+    cp -f litert/bazel-bin/tfliteextern/$LIB.dylib $OUT || exit 1
+    chmod u+w $OUT
+    # The install names (@rpath/<lib>.dylib) are set at link time. Bazel also adds rpaths into its own
+    # _solib/runfiles output folders; drop everything except @loader_path, where the two dylibs are deployed.
+    for RPATH in $(otool -l $OUT | awk '/cmd LC_RPATH/ {getline; getline; print $2}'); do
+        if [ "$RPATH" != "@loader_path" ]; then
+            install_name_tool -delete_rpath "$RPATH" $OUT
+        fi
+    done
+    # install_name_tool invalidates the signature, which arm64 requires - re-sign ad hoc.
+    codesign -f -s - $OUT
+    chmod u-w $OUT
+done
 
 #make fat binary
 cd lib/runtimes/osx/native
-# The previous fat binary is read-only (bazel-bin outputs are), and lipo refuses to
-# overwrite it - remove it first.
-rm -f libtfliteextern.dylib
-lipo -create -output libtfliteextern.dylib libtfliteextern-*.dylib
+# The previous fat binaries are read-only (bazel-bin outputs are), and lipo refuses to
+# overwrite them - remove them first.
+for LIB in libtfliteextern libLiteRt; do
+    rm -f $LIB.dylib
+    lipo -create -output $LIB.dylib $LIB-*.dylib
+done
 cd ../../../../

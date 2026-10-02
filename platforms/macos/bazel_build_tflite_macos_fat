@@ -4,4 +4,3 @@ cd "$(dirname "$0")"
 
 ./bazel_build_tflite_macos darwin_arm64 || exit 1
 ./bazel_build_tflite_macos darwin || exit 1
-./bazel_build_litert_macos || exit 1

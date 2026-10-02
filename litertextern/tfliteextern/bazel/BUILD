@@ -66,20 +66,22 @@ _TFLITEEXTERN_SRCS = [
     "imgproc.h",
 ]
 
-_TFLITEEXTERN_DEPS = [
-    "//tflite:framework",
-    "//tflite:context",
-    "//tflite:string",
-    "//tflite:string_util",
-    "//tflite:schema_fbs_version",
-    "//tflite/kernels:builtin_ops",
-    "//tflite/nnapi:nnapi_lib",
-    "//tflite/delegates/nnapi:nnapi_delegate",
-] + select({
-    # tfliteextern.cc only includes tflite/delegates/gpu/{delegate,delegate_options}.h under
-    # #ifdef __ANDROID__ - the GPU delegate itself is Android-only (needs EGL; see the
-    # "supports_gpu_delegate" comment in tflite/delegates/gpu/BUILD), so these deps are too.
+# tfliteextern only uses the TensorFlow Lite C API (plus the model schema header, for model introspection).
+# //tflite/c:c_api includes the builtin op resolver.
+_TFLITEEXTERN_CAPI_DEPS = [
+    "//tflite/c:c_api",
+    "//tflite/c:c_api_experimental",
+    "//tflite/c:common",
+    "//tflite/schema:schema_fbs",
+]
+
+_TFLITEEXTERN_DEPS = _TFLITEEXTERN_CAPI_DEPS + select({
+    # tfliteextern.cc only includes the NNAPI and GPU delegate headers under #ifdef __ANDROID__ - both
+    # delegates are Android-only (the GPU delegate needs EGL; see the "supports_gpu_delegate" comment in
+    # tflite/delegates/gpu/BUILD), so these deps are too.
     "@org_tensorflow//tensorflow:android": [
+        "//tflite/nnapi:nnapi_lib",
+        "//tflite/delegates/nnapi:nnapi_delegate",
         "//tflite/delegates/gpu:delegate",
         "//tflite/delegates/gpu:delegate_options",
     ],
@@ -113,6 +115,63 @@ cc_library(
     srcs = _TFLITEEXTERN_SRCS,
     copts = tflite_copts() + ["-DWITHOUT_XNNPACK"],
     deps = _TFLITEEXTERN_DEPS,
+)
+
+# ---------------------------------------------------------------------------------------------------------
+# macOS: tfliteextern linked dynamically against LiteRT's own runtime library.
+#
+# ":litert_runtime" builds libLiteRt.dylib from LiteRT's //litert/c:litert_tflite_runtime_c_api_so_shim (the
+# same deps as LiteRT's own //litert/c:litert_tflite_runtime_c_api_so), exporting LiteRT's C API plus the
+# TensorFlow Lite C API. It is defined here rather than using that target directly because the upstream one
+# (a) sets no macOS install name and (b) doesn't link Metal: LiteRT's .bazelrc builds macOS with
+# -undefined dynamic_lookup, so its MTLCreateSystemDefaultDevice reference would otherwise be left to
+# resolve at runtime only if something else happened to load Metal.
+#
+# ":tfliteextern_dylib" builds libtfliteextern.dylib from the same sources as ":tfliteextern", but via
+# dynamic_deps it links against ":litert_runtime" instead of statically including the TFLite runtime: every
+# library tfliteextern needs is already linked into libLiteRt.dylib (exports_filter tells Bazel they may be
+# shared from there), so libtfliteextern.dylib only contains the wrapper itself. XNNPACK is part of
+# libLiteRt, so unlike the static builds it isn't compiled out (no -DWITHOUT_XNNPACK).
+#
+# bazel build --config=macos --config=macos_arm64 //tfliteextern:litert_runtime //tfliteextern:tfliteextern_dylib
+# ---------------------------------------------------------------------------------------------------------
+cc_shared_library(
+    name = "litert_runtime",
+    additional_linker_inputs = ["litert_exported_symbols_darwin.lds"],
+    exports_filter = [
+        "//tflite:__subpackages__",
+        "@flatbuffers//:__subpackages__",
+        "@XNNPACK//:__subpackages__",
+    ],
+    shared_lib_name = "libLiteRt.dylib",
+    target_compatible_with = ["@platforms//os:macos"],
+    user_link_flags = [
+        "-Wl,-exported_symbols_list,$(location litert_exported_symbols_darwin.lds)",
+        "-Wl,-install_name,@rpath/libLiteRt.dylib",
+        "-Wl,-framework,Metal",
+    ],
+    deps = ["//litert/c:litert_tflite_runtime_c_api_so_shim"],
+)
+
+cc_library(
+    name = "tfliteextern_capi_lib",
+    srcs = _TFLITEEXTERN_SRCS,
+    copts = tflite_copts(),
+    target_compatible_with = ["@platforms//os:macos"],
+    deps = _TFLITEEXTERN_CAPI_DEPS + ["//tflite/delegates/xnnpack:xnnpack_delegate"],
+)
+
+cc_shared_library(
+    name = "tfliteextern_dylib",
+    dynamic_deps = [":litert_runtime"],
+    shared_lib_name = "libtfliteextern.dylib",
+    target_compatible_with = ["@platforms//os:macos"],
+    user_link_flags = [
+        "-Wl,-install_name,@rpath/libtfliteextern.dylib",
+        # libLiteRt.dylib is deployed next to libtfliteextern.dylib.
+        "-Wl,-rpath,@loader_path",
+    ],
+    deps = [":tfliteextern_capi_lib"],
 )
 
 # bazel build --config=ios_arm64 //tfliteextern:tfliteextern_ios_framework      # device

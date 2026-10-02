@@ -1,171 +1,304 @@
 #include "tfliteextern.h"
 
-tflite::FlatBufferModel* tfeFlatBufferModelBuildFromFile(char* filename) {
-  std::unique_ptr<tflite::FlatBufferModel> model =
-      tflite::FlatBufferModel::BuildFromFile(filename,
-                                             tflite::CallbackErrorReporter());
-  return model.release();
+#include <cstdarg>
+#include <cstdio>
+#include <fstream>
+#include <map>
+#include <mutex>
+
+#include "tflite/schema/schema_generated.h"
+
+// ---------------------------------------------------------------------------
+// Error reporting
+// ---------------------------------------------------------------------------
+
+static TfeErrorCallback customErrorCallback = 0;
+
+static void tfeReportError(void* /*userData*/, const char* format, va_list args) {
+  char errBuffer[2048];
+  const int result = vsnprintf(errBuffer, sizeof(errBuffer), format, args);
+  if (customErrorCallback) customErrorCallback(result, errBuffer);
 }
 
-tflite::FlatBufferModel* tfeFlatBufferModelBuildFromBuffer(char* buffer,
-                                                           int bufferSize) {
-  std::unique_ptr<tflite::FlatBufferModel> model =
-      tflite::FlatBufferModel::BuildFromBuffer(buffer, bufferSize,
-                                               tflite::CallbackErrorReporter());
-  return model.release();
+static void tfeReportErrorf(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  tfeReportError(nullptr, format, args);
+  va_end(args);
 }
 
-/*
-tflite::FlatBufferModel*
-tfeFlatBufferModelBuildFromModel(tflite::FlatBufferModel* other)
-{
-  std::unique_ptr<tflite::FlatBufferModel> model =
-tflite::FlatBufferModel::BuildFromModel(other); return model.release();
-}
-*/
-
-bool tfeFlatBufferModelInitialized(tflite::FlatBufferModel* model) {
-  return model->initialized();
+void tfeRedirectError(TfeErrorCallback errCallback) {
+  customErrorCallback = errCallback;
 }
 
-bool tfeFlatBufferModelCheckModelIdentifier(tflite::FlatBufferModel* model) {
-  return model->CheckModelIdentifier();
+// ---------------------------------------------------------------------------
+// Model
+// ---------------------------------------------------------------------------
+
+static const tflite::SubGraph* tfePrimarySubgraph(const TfeModel* model) {
+  if (!model || !model->buffer) return nullptr;
+  const tflite::Model* m = tflite::GetModel(model->buffer);
+  if (!m || !m->subgraphs() || m->subgraphs()->size() == 0) return nullptr;
+  return m->subgraphs()->Get(0);
 }
 
-void tfeFlatBufferModelRelease(tflite::FlatBufferModel** model) {
-  delete *model;
+static TfeModel* tfeModelCreate(TfeModel* model) {
+  model->model = TfLiteModelCreateWithErrorReporter(
+      model->buffer, model->bufferSize, tfeReportError, nullptr);
+  if (!model->model) {
+    delete model;
+    return nullptr;
+  }
+  return model;
+}
+
+TfeModel* tfeFlatBufferModelBuildFromFile(char* filename) {
+  std::ifstream file(filename, std::ios::binary | std::ios::ate);
+  if (!file) {
+    tfeReportErrorf("Could not open '%s'.", filename);
+    return nullptr;
+  }
+  std::streamsize size = file.tellg();
+  file.seekg(0, std::ios::beg);
+
+  TfeModel* model = new TfeModel();
+  model->ownedBuffer.resize(static_cast<size_t>(size));
+  if (size > 0 && !file.read(model->ownedBuffer.data(), size)) {
+    tfeReportErrorf("Could not read '%s'.", filename);
+    delete model;
+    return nullptr;
+  }
+  model->buffer = model->ownedBuffer.data();
+  model->bufferSize = model->ownedBuffer.size();
+  return tfeModelCreate(model);
+}
+
+TfeModel* tfeFlatBufferModelBuildFromBuffer(char* buffer, int bufferSize) {
+  // The caller (FlatBufferModel in C#) keeps the buffer pinned for the lifetime of the model.
+  TfeModel* model = new TfeModel();
+  model->buffer = buffer;
+  model->bufferSize = static_cast<size_t>(bufferSize);
+  return tfeModelCreate(model);
+}
+
+bool tfeFlatBufferModelInitialized(TfeModel* model) {
+  return model && model->model;
+}
+
+bool tfeFlatBufferModelCheckModelIdentifier(TfeModel* model) {
+  if (!model || !model->buffer || model->bufferSize < 8 ||
+      !tflite::ModelBufferHasIdentifier(model->buffer)) {
+    tfeReportErrorf("Model provided has model identifier '%.4s', should be '%s'",
+                    model && model->buffer && model->bufferSize >= 8 ? model->buffer + 4 : "",
+                    tflite::ModelIdentifier());
+    return false;
+  }
+  return true;
+}
+
+void tfeFlatBufferModelRelease(TfeModel** model) {
+  if (*model) {
+    TfLiteModelDelete((*model)->model);
+    delete *model;
+  }
   *model = 0;
 }
 
-tflite::ops::builtin::BuiltinOpResolver* tfeBuiltinOpResolverCreate(
-    tflite::OpResolver** opResolver) {
-  tflite::ops::builtin::BuiltinOpResolver* builtinOpResolver =
-      new tflite::ops::builtin::BuiltinOpResolver();
-  *opResolver = dynamic_cast<tflite::OpResolver*>(builtinOpResolver);
-  return builtinOpResolver;
+// ---------------------------------------------------------------------------
+// Op resolver
+// ---------------------------------------------------------------------------
+
+TfeOpResolver* tfeBuiltinOpResolverCreate(TfeOpResolver** opResolver) {
+  TfeOpResolver* resolver = new TfeOpResolver();
+  *opResolver = resolver;
+  return resolver;
 }
-void tfeBuiltinOpResolverRelease(
-    tflite::ops::builtin::BuiltinOpResolver** resolver) {
+
+void tfeBuiltinOpResolverRelease(TfeOpResolver** resolver) {
   delete *resolver;
   *resolver = 0;
 }
-tflite::Interpreter* tfeInterpreterCreate() {
-  return new tflite::Interpreter();
+
+// ---------------------------------------------------------------------------
+// Interpreter
+// ---------------------------------------------------------------------------
+
+// (Re)creates the C API interpreter from the model, thread count and delegates. Returns false on failure.
+static bool tfeInterpreterRecreate(TfeInterpreter* interpreter) {
+  if (interpreter->interpreter) {
+    TfLiteInterpreterDelete(interpreter->interpreter);
+    interpreter->interpreter = nullptr;
+  }
+  if (!interpreter->model || !interpreter->model->model) return false;
+
+  TfLiteInterpreterOptions* options = TfLiteInterpreterOptionsCreate();
+  TfLiteInterpreterOptionsSetNumThreads(options, interpreter->numThreads);
+  TfLiteInterpreterOptionsSetErrorReporter(options, tfeReportError, nullptr);
+  interpreter->interpreter =
+      TfLiteInterpreterCreate(interpreter->model->model, options);
+  TfLiteInterpreterOptionsDelete(options);
+  if (!interpreter->interpreter) return false;
+
+  for (TfLiteDelegate* delegate : interpreter->delegates) {
+    if (TfLiteInterpreterModifyGraphWithDelegate(interpreter->interpreter, delegate) != kTfLiteOk)
+      return false;
+  }
+  return true;
 }
+
+TfeInterpreter* tfeInterpreterCreate() {
+  TfeInterpreter* interpreter = new TfeInterpreter();
+  interpreter->model = nullptr;
+  interpreter->interpreter = nullptr;
+  interpreter->numThreads = -1;
+  interpreter->tensorsAllocated = false;
+  return interpreter;
+}
+
+static int tfeInterpreterBuildFromModel(TfeInterpreter* interpreter, TfeModel* model) {
+  interpreter->model = model;
+  interpreter->delegates.clear();
+  interpreter->tensorsAllocated = false;
+  return tfeInterpreterRecreate(interpreter) ? kTfLiteOk : kTfLiteError;
+}
+
 void tfeInterpreterCreateFromModel(
-    tflite::Interpreter** interpreter,
-    tflite::FlatBufferModel* model,
-    tflite::OpResolver* opResolver) {
-  std::unique_ptr<tflite::Interpreter> interpreterPtr(*interpreter);
-  tflite::InterpreterBuilder(*model, *opResolver)(&interpreterPtr);
-  *interpreter = interpreterPtr.release();
+    TfeInterpreter** interpreter,
+    TfeModel* model,
+    TfeOpResolver* /*opResolver*/) {
+  if (tfeInterpreterBuildFromModel(*interpreter, model) != kTfLiteOk) {
+    // Match InterpreterBuilder: the interpreter is reset to null when it can't be built.
+    tfeInterpreterRelease(interpreter);
+  }
 }
-int tfeInterpreterAllocateTensors(tflite::Interpreter* interpreter) {
-  return interpreter->AllocateTensors();
+
+int tfeInterpreterAllocateTensors(TfeInterpreter* interpreter) {
+  TfLiteStatus status = TfLiteInterpreterAllocateTensors(interpreter->interpreter);
+  if (status == kTfLiteOk) interpreter->tensorsAllocated = true;
+  return status;
 }
-int tfeInterpreterInvoke(tflite::Interpreter* interpreter) {
-  return interpreter->Invoke();
+
+int tfeInterpreterInvoke(TfeInterpreter* interpreter) {
+  return TfLiteInterpreterInvoke(interpreter->interpreter);
 }
-/*
-char* tfeInterpreterInputTensor(tflite::Interpreter* interpreter, int index)
-{
-  return interpreter->typed_input_tensor<char>(index);
+
+TfLiteTensor* tfeInterpreterGetTensor(TfeInterpreter* interpreter, int index) {
+  return TfLiteInterpreterGetTensor(interpreter->interpreter, index);
 }
-char* tfeInterpreterOutputTensor(tflite::Interpreter* interpreter, int index)
-{
-  return interpreter->typed_output_tensor<char>(index);
+
+// The C API has no tensor or node count, so these come from the model's primary subgraph. Tensors or nodes
+// added later by delegates are not included.
+int tfeInterpreterTensorSize(TfeInterpreter* interpreter) {
+  const tflite::SubGraph* subgraph = tfePrimarySubgraph(interpreter->model);
+  return subgraph && subgraph->tensors() ? subgraph->tensors()->size() : 0;
 }
-*/
-TfLiteTensor* tfeInterpreterGetTensor(
-    tflite::Interpreter* interpreter,
-    int index) {
-  return interpreter->tensor(index);
+
+int tfeInterpreterNodesSize(TfeInterpreter* interpreter) {
+  const tflite::SubGraph* subgraph = tfePrimarySubgraph(interpreter->model);
+  return subgraph && subgraph->operators() ? subgraph->operators()->size() : 0;
 }
-int tfeInterpreterTensorSize(tflite::Interpreter* interpreter) {
-  return interpreter->tensors_size();
+
+int tfeInterpreterGetInputSize(TfeInterpreter* interpreter) {
+  return TfLiteInterpreterGetInputTensorCount(interpreter->interpreter);
 }
-int tfeInterpreterNodesSize(tflite::Interpreter* interpreter) {
-  return interpreter->nodes_size();
+
+void tfeInterpreterGetInput(TfeInterpreter* interpreter, int* input) {
+  int count = TfLiteInterpreterGetInputTensorCount(interpreter->interpreter);
+  memcpy(input, TfLiteInterpreterInputTensorIndices(interpreter->interpreter),
+         count * sizeof(int));
 }
-int tfeInterpreterGetInputSize(tflite::Interpreter* interpreter) {
-  return interpreter->inputs().size();
+
+const char* tfeInterpreterGetInputName(TfeInterpreter* interpreter, int index) {
+  return TfLiteTensorName(
+      TfLiteInterpreterGetInputTensor(interpreter->interpreter, index));
 }
-void tfeInterpreterGetInput(
-    tflite::Interpreter* interpreter, 
-    int* input) {
-  std::vector<int> ivec = interpreter->inputs();
-  memcpy(input, &ivec[0], ivec.size() * sizeof(int));
-}
-const char* tfeInterpreterGetInputName(tflite::Interpreter* interpreter,
-                                       int index) {
-  return interpreter->GetInputName(index);
-}
+
 int tfeInterpreterResizeInputTensor(
-    tflite::Interpreter* interpreter,
-    int input_index, 
+    TfeInterpreter* interpreter,
+    int input_index,
     int* input_dims,
     int input_dims_size) {
-  std::vector<int> dims{input_dims, input_dims + input_dims_size};
-  return interpreter->ResizeInputTensor(
-      interpreter->inputs()[input_index], 
-      dims);
+  return TfLiteInterpreterResizeInputTensor(
+      interpreter->interpreter, input_index, input_dims, input_dims_size);
 }
 
-int tfeInterpreterGetOutputSize(tflite::Interpreter* interpreter) {
-  return interpreter->outputs().size();
-}
-int tfeInterpreterGetOutput(
-    tflite::Interpreter* interpreter, 
-    int* output) {
-  std::vector<int> ovec = interpreter->outputs();
-  memcpy(output, &ovec[0], ovec.size() * sizeof(int));
-  return ovec.size();
-}
-const char* tfeInterpreterGetOutputName(
-    tflite::Interpreter* interpreter,
-    int index) {
-  return interpreter->GetOutputName(index);
+int tfeInterpreterGetOutputSize(TfeInterpreter* interpreter) {
+  return TfLiteInterpreterGetOutputTensorCount(interpreter->interpreter);
 }
 
-// void tfeInterpreterUseNNAPI(tflite::Interpreter* interpreter, bool enable)
-//{
-//	interpreter->UseNNAPI(enable);
-//}
-void tfeInterpreterSetNumThreads(
-    tflite::Interpreter* interpreter,
-    int numThreads) {
-  interpreter->SetNumThreads(numThreads);
+int tfeInterpreterGetOutput(TfeInterpreter* interpreter, int* output) {
+  int count = TfLiteInterpreterGetOutputTensorCount(interpreter->interpreter);
+  memcpy(output, TfLiteInterpreterOutputTensorIndices(interpreter->interpreter),
+         count * sizeof(int));
+  return count;
 }
 
-void tfeInterpreterRelease(tflite::Interpreter** interpreter) {
-  delete *interpreter;
+const char* tfeInterpreterGetOutputName(TfeInterpreter* interpreter, int index) {
+  return TfLiteTensorName(
+      TfLiteInterpreterGetOutputTensor(interpreter->interpreter, index));
+}
+
+void tfeInterpreterSetNumThreads(TfeInterpreter* interpreter, int numThreads) {
+  if (interpreter->numThreads == numThreads) return;
+  // These are warnings on stderr rather than tfeReportError: the C# error handler throws from the callback,
+  // which .NET can't unwind through native frames on macOS/Linux, and the C++ API this replaces accepted the
+  // call silently.
+  if (interpreter->tensorsAllocated) {
+    // The C API can't change the thread count of a live interpreter, and re-creating it would invalidate the
+    // tensors the caller already holds.
+    fprintf(stderr, "tfliteextern: SetNumThreads(%d) ignored, it must be called before AllocateTensors.\n",
+            numThreads);
+    return;
+  }
+  interpreter->numThreads = numThreads;
+  if (interpreter->model && !tfeInterpreterRecreate(interpreter))
+    fprintf(stderr, "tfliteextern: failed to re-create the interpreter with %d threads.\n", numThreads);
+}
+
+void tfeInterpreterRelease(TfeInterpreter** interpreter) {
+  if (*interpreter) {
+    TfLiteInterpreterDelete((*interpreter)->interpreter);
+    delete *interpreter;
+  }
   *interpreter = 0;
 }
 
 int tfeInterpreterModifyGraphWithDelegate(
-    tflite::Interpreter* interpreter,
+    TfeInterpreter* interpreter,
     TfLiteDelegate* delegate) {
-  return (int)interpreter->ModifyGraphWithDelegate(delegate);
+  TfLiteStatus status =
+      TfLiteInterpreterModifyGraphWithDelegate(interpreter->interpreter, delegate);
+  // Remembered so a later re-create (SetNumThreads) can re-apply it.
+  if (status == kTfLiteOk) interpreter->delegates.push_back(delegate);
+  return status;
 }
 
-tflite::InterpreterBuilder* tfeInterpreterBuilderCreate(
-    tflite::FlatBufferModel* model, 
-    tflite::OpResolver* opResolver) {
-  return new tflite::InterpreterBuilder(*model, *opResolver);
+// ---------------------------------------------------------------------------
+// Interpreter builder
+// ---------------------------------------------------------------------------
+
+TfeInterpreterBuilder* tfeInterpreterBuilderCreate(
+    TfeModel* model,
+    TfeOpResolver* /*opResolver*/) {
+  TfeInterpreterBuilder* builder = new TfeInterpreterBuilder();
+  builder->model = model;
+  return builder;
 }
 
-void tfeInterpreterBuilderRelease(tflite::InterpreterBuilder** builder) {
+void tfeInterpreterBuilderRelease(TfeInterpreterBuilder** builder) {
   delete *builder;
   *builder = 0;
 }
+
 int tfeInterpreterBuilderBuild(
-    tflite::InterpreterBuilder* builder,
-    tflite::Interpreter* interpreter) {
-  std::unique_ptr<tflite::Interpreter> ptr(interpreter);
-  int status = (*builder)(&ptr);
-  ptr.release();
-  return status;
+    TfeInterpreterBuilder* builder,
+    TfeInterpreter* interpreter) {
+  return tfeInterpreterBuildFromModel(interpreter, builder->model);
 }
+
+// ---------------------------------------------------------------------------
+// Tensor (TfLiteTensor is the public struct from common.h)
+// ---------------------------------------------------------------------------
 
 int tfeTensorGetType(TfLiteTensor* tensor) { return tensor->type; }
 
@@ -187,25 +320,54 @@ bool tfeTensorIsVariable(TfLiteTensor* tensor) { return tensor->is_variable; }
 
 void tfeMemcpy(void* dst, void* src, int length) { memcpy(dst, src, length); }
 
-tflite::DynamicBuffer* tfeDynamicBufferCreate() {
-  return new tflite::DynamicBuffer();
+// ---------------------------------------------------------------------------
+// String tensor buffer
+// ---------------------------------------------------------------------------
+
+TfeDynamicBuffer* tfeDynamicBufferCreate() {
+  TfeDynamicBuffer* buffer = new TfeDynamicBuffer();
+  buffer->offset.push_back(0);
+  return buffer;
 }
-void tfeDynamicBufferRelease(tflite::DynamicBuffer** buffer) {
+
+void tfeDynamicBufferRelease(TfeDynamicBuffer** buffer) {
   delete *buffer;
   *buffer = 0;
 }
-void tfeDynamicBufferAddString(
-    tflite::DynamicBuffer* buffer, 
-    char* str,
-    int len) {
-  buffer->AddString(str, len);
+
+void tfeDynamicBufferAddString(TfeDynamicBuffer* buffer, char* str, int len) {
+  if (len > 0) buffer->data.insert(buffer->data.end(), str, str + len);
+  buffer->offset.push_back(buffer->offset.back() + len);
 }
+
 void tfeDynamicBufferWriteToTensor(
-    tflite::DynamicBuffer* buffer,
+    TfeDynamicBuffer* buffer,
     TfLiteTensor* tensor,
     TfLiteIntArray* newShape) {
-  buffer->WriteToTensor(tensor, newShape);
+  int32_t numStrings = static_cast<int32_t>(buffer->offset.size()) - 1;
+  int32_t start = sizeof(int32_t) * (numStrings + 2);
+  int32_t bytes = start + static_cast<int32_t>(buffer->data.size());
+
+  // TfLiteTensorReset takes ownership of a malloc'd buffer (the tensor frees it with free()).
+  char* tensorBuffer = static_cast<char*>(malloc(bytes));
+  if (!tensorBuffer) return;
+  memcpy(tensorBuffer, &numStrings, sizeof(int32_t));
+  for (size_t i = 0; i < buffer->offset.size(); i++) {
+    int32_t offset = start + buffer->offset[i];
+    memcpy(tensorBuffer + sizeof(int32_t) * (i + 1), &offset, sizeof(int32_t));
+  }
+  if (!buffer->data.empty())
+    memcpy(tensorBuffer + start, buffer->data.data(), buffer->data.size());
+
+  if (newShape == nullptr) newShape = TfLiteIntArrayCopy(tensor->dims);
+  TfLiteTensorReset(tensor->type, tensor->name, newShape, tensor->params,
+                    tensorBuffer, bytes, kTfLiteDynamic, tensor->allocation,
+                    tensor->is_variable, tensor);
 }
+
+// ---------------------------------------------------------------------------
+// Int array
+// ---------------------------------------------------------------------------
 
 TfLiteIntArray* tfeIntArrayCreate(int size) {
   return TfLiteIntArrayCreate(size);
@@ -217,114 +379,112 @@ void tfeIntArrayRelease(TfLiteIntArray** v) {
   *v = 0;
 }
 
-tflite::StatefulNnApiDelegate* tfeStatefulNnApiDelegateCreate(
+// ---------------------------------------------------------------------------
+// Delegates
+// ---------------------------------------------------------------------------
+
+// tfeTfLiteDelegateRelease is shared by every delegate type on the C# side, so remember how each delegate
+// created here has to be deleted.
+typedef void (*TfeDelegateDeleter)(TfLiteDelegate*);
+static std::mutex delegateDeletersMutex;
+static std::map<TfLiteDelegate*, TfeDelegateDeleter>& tfeDelegateDeleters() {
+  static std::map<TfLiteDelegate*, TfeDelegateDeleter> deleters;
+  return deleters;
+}
+
+static TfLiteDelegate* tfeTrackDelegate(TfLiteDelegate* delegate, TfeDelegateDeleter deleter) {
+  if (delegate) {
+    std::lock_guard<std::mutex> lock(delegateDeletersMutex);
+    tfeDelegateDeleters()[delegate] = deleter;
+  }
+  return delegate;
+}
+
+void tfeTfLiteDelegateRelease(TfLiteDelegate** delegate) {
+  if (*delegate) {
+    TfeDelegateDeleter deleter = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(delegateDeletersMutex);
+      auto it = tfeDelegateDeleters().find(*delegate);
+      if (it != tfeDelegateDeleters().end()) {
+        deleter = it->second;
+        tfeDelegateDeleters().erase(it);
+      }
+    }
+    if (deleter) deleter(*delegate);
+  }
+  *delegate = 0;
+}
+
+#ifdef __ANDROID__
+struct TfeStatefulNnApiDelegate : public tflite::StatefulNnApiDelegate {};
+#endif
+
+TfeStatefulNnApiDelegate* tfeStatefulNnApiDelegateCreate(
     TfLiteDelegate** tfLiteDelegate) {
 #ifdef __ANDROID__
-  tflite::StatefulNnApiDelegate* d = new tflite::StatefulNnApiDelegate();
+  TfeStatefulNnApiDelegate* d = new TfeStatefulNnApiDelegate();
   *tfLiteDelegate = static_cast<TfLiteDelegate*>(d);
   return d;
 #else
+  *tfLiteDelegate = 0;
   return 0;
 #endif
 }
-void tfeStatefulNnApiDelegateRelease(tflite::StatefulNnApiDelegate** delegate) {
+
+void tfeStatefulNnApiDelegateRelease(TfeStatefulNnApiDelegate** delegate) {
+#ifdef __ANDROID__
   delete *delegate;
+#endif
   *delegate = 0;
 }
+
+#ifdef __ANDROID__
+static void tfeGpuDelegateV2Deleter(TfLiteDelegate* delegate) {
+  TfLiteGpuDelegateV2Delete(delegate);
+}
+#endif
 
 TfLiteDelegate* tfeGpuDelegateV2Create() {
 #ifdef __ANDROID__
   TfLiteGpuDelegateOptionsV2 options = TfLiteGpuDelegateOptionsV2Default();
-  return TfLiteGpuDelegateV2Create(&options);
+  return tfeTrackDelegate(TfLiteGpuDelegateV2Create(&options), tfeGpuDelegateV2Deleter);
 #else
   return 0;
 #endif
 }
+
 void tfeGpuDelegateV2Delete(TfLiteDelegate** delegate) {
-#ifdef __ANDROID__
-  TfLiteGpuDelegateV2Delete(*delegate);
-#endif
-  *delegate = 0;
+  tfeTfLiteDelegateRelease(delegate);
 }
 
-// TfLiteDelegate* tfeGpuDelegateCreate()
-//{
-// #ifdef __IOS__
-//    return TFLGpuDelegateCreate(nullptr);
-// #else
-//    return 0;
-// #endif
-//}
-// void tfeGpuDelegateDelete(TfLiteDelegate** delegate)
-//{
-// #ifdef __IOS__
-//    TFLGpuDelegateDelete(*delegate);
-// #endif
-//    *delegate = 0;
-//}
+#ifndef WITHOUT_XNNPACK
+static void tfeXNNPackDelegateDeleter(TfLiteDelegate* delegate) {
+  TfLiteXNNPackDelegateDelete(delegate);
+}
+#endif
 
 TfLiteDelegate* tfeXNNPackDelegateCreateDefault() {
-#ifdef TENSORFLOW_LITE_DELEGATES_XNNPACK_XNNPACK_DELEGATE_H_
+#ifndef WITHOUT_XNNPACK
   TfLiteXNNPackDelegateOptions opt = TfLiteXNNPackDelegateOptionsDefault();
-  return TfLiteXNNPackDelegateCreate(&opt);
+  return tfeTrackDelegate(TfLiteXNNPackDelegateCreate(&opt), tfeXNNPackDelegateDeleter);
 #else
   return 0;
 #endif
 }
+
 TfLiteDelegate* tfeXNNPackDelegateCreate(int numThreads) {
-#ifdef TENSORFLOW_LITE_DELEGATES_XNNPACK_XNNPACK_DELEGATE_H_
-  TfLiteXNNPackDelegateOptions opt;
+#ifndef WITHOUT_XNNPACK
+  TfLiteXNNPackDelegateOptions opt = TfLiteXNNPackDelegateOptionsDefault();
   opt.num_threads = numThreads;
-  // opt.enable_int8_weights_unpacking = enableInt8WeightsUnpacking;
-  return TfLiteXNNPackDelegateCreate(&opt);
+  return tfeTrackDelegate(TfLiteXNNPackDelegateCreate(&opt), tfeXNNPackDelegateDeleter);
 #else
   return 0;
 #endif
 }
-void tfeTfLiteDelegateRelease(TfLiteDelegate** delegate) {
-  delete *delegate;
-  *delegate = 0;
-}
 
-// void RegisterSelectedOps(tflite::MutableOpResolver* resolver);
+// ---------------------------------------------------------------------------
+// Version
+// ---------------------------------------------------------------------------
 
-/*
-tflite::MutableOpResolver* tfeMutableOpResolverCreate(tflite::OpResolver**
-opResolver)
-{
-  tflite::MutableOpResolver* mutableOpResolver =  new
-tflite::MutableOpResolver();
-  //RegisterSelectedOps(mutableOpResolver);
-  *opResolver = dynamic_cast<tflite::OpResolver*>( mutableOpResolver );
-  return mutableOpResolver;
-}
-
-void tfeMutableOpResolverRelease(tflite::MutableOpResolver** resolver)
-{
-  delete *resolver;
-  *resolver = 0;
-}*/
-
-static const char* tflite_version = TF_VERSION_STRING;
-
-const char* tfeGetLiteVersion() { return tflite_version; }
-
-static tflite::ErrorCallback customErrorCallback = 0;
-
-char errBuffer[2048];
-
-int tflite::TfliteErrReporter::Report(const char* format, va_list args) {
-  const int result = sprintf(errBuffer, format, args);
-  if (customErrorCallback) customErrorCallback(result, errBuffer);
-  return result;
-}
-
-void tfeRedirectError(tflite::ErrorCallback errCallback) {
-  customErrorCallback = errCallback;
-}
-
-tflite::ErrorReporter* tflite::CallbackErrorReporter() {
-  static tflite::TfliteErrReporter* error_reporter =
-      new tflite::TfliteErrReporter;
-  return error_reporter;
-}
+const char* tfeGetLiteVersion() { return TfLiteVersion(); }
