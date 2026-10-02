@@ -171,11 +171,19 @@
     <EmbeddedNativeLibrary Include="$(EmguTfLiteNativeArmeabiv7a)">
       <Link>lib\armeabi-v7a\libtfliteextern.so</Link>
     </EmbeddedNativeLibrary>
+    <!-- LiteRT's runtime: libtfliteextern.so links against it, and Emgu.LiteRT P/Invokes it directly. -->
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\armeabi-v7a\libLiteRt.so" Condition="Exists('$(TfLiteBinaryDir)\android\armeabi-v7a\libLiteRt.so')">
+      <Link>lib\armeabi-v7a\libLiteRt.so</Link>
+    </EmbeddedNativeLibrary>
   </ItemGroup>
   <!-- arm64-v8a -->
   <ItemGroup Condition="'$(EmguTfLiteBuildAndroidArm64v8a)'=='True' AND Exists('$(EmguTfLiteNativeArm64v8a)')">
     <EmbeddedNativeLibrary Include="$(EmguTfLiteNativeArm64v8a)">
       <Link>lib\arm64-v8a\libtfliteextern.so</Link>
+    </EmbeddedNativeLibrary>
+    <!-- LiteRT's runtime: libtfliteextern.so links against it, and Emgu.LiteRT P/Invokes it directly. -->
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\arm64-v8a\libLiteRt.so" Condition="Exists('$(TfLiteBinaryDir)\android\arm64-v8a\libLiteRt.so')">
+      <Link>lib\arm64-v8a\libLiteRt.so</Link>
     </EmbeddedNativeLibrary>
   </ItemGroup>
   <!-- x86 -->
@@ -183,11 +191,19 @@
     <EmbeddedNativeLibrary Include="$(EmguTfLiteNativex86)">
       <Link>lib\x86\libtfliteextern.so</Link>
     </EmbeddedNativeLibrary>
+    <!-- LiteRT's runtime: libtfliteextern.so links against it, and Emgu.LiteRT P/Invokes it directly. -->
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\x86\libLiteRt.so" Condition="Exists('$(TfLiteBinaryDir)\android\x86\libLiteRt.so')">
+      <Link>lib\x86\libLiteRt.so</Link>
+    </EmbeddedNativeLibrary>
   </ItemGroup>
   <!-- x86_64 -->
   <ItemGroup Condition="'$(EmguTfLiteBuildAndroidx8664)'=='True' AND Exists('$(EmguTfLiteNativex8664)')">
     <EmbeddedNativeLibrary Include="$(EmguTfLiteNativex8664)">
       <Link>lib\x86_64\libtfliteextern.so</Link>
+    </EmbeddedNativeLibrary>
+    <!-- LiteRT's runtime: libtfliteextern.so links against it, and Emgu.LiteRT P/Invokes it directly. -->
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\x86_64\libLiteRt.so" Condition="Exists('$(TfLiteBinaryDir)\android\x86_64\libLiteRt.so')">
+      <Link>lib\x86_64\libLiteRt.so</Link>
     </EmbeddedNativeLibrary>
   </ItemGroup>
     <ItemGroup>

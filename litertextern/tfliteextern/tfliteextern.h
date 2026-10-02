@@ -51,9 +51,15 @@
 #endif
 
 #ifdef __ANDROID__
-// The NNAPI and GPU delegates are Android-only, and are linked into tfliteextern there.
-#include "tflite/delegates/nnapi/nnapi_delegate.h"
+// The NNAPI delegate is Android-only. Its C API is part of LiteRT's libLiteRt.so on Android, so tfliteextern
+// uses that rather than the C++ StatefulNnApiDelegate.
+#include "tflite/delegates/nnapi/nnapi_delegate_c_api.h"
+// The TFLite GPU delegate is not part of libLiteRt.so (LiteRT does GPU through its own accelerator plugin), and
+// it needs TFLite internals libLiteRt.so doesn't export, so the dynamically linked Android build defines
+// WITHOUT_GPU_DELEGATE and tfeGpuDelegateV2Create returns null there.
+#ifndef WITHOUT_GPU_DELEGATE
 #include "tflite/delegates/gpu/delegate.h"
+#endif
 #endif
 
 // A loaded model. Keeps its own view of the flatbuffer bytes (the C API's TfLiteModel is opaque), used for

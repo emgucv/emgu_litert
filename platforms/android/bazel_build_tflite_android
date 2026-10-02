@@ -52,6 +52,7 @@ mkdir -p lib/android/$arch
 mkdir -p litert/tfliteextern
 cp -f litertextern/tfliteextern/bazel/BUILD litert/tfliteextern/BUILD
 cp -f litertextern/tfliteextern/bazel/tfliteextern.def litert/tfliteextern/tfliteextern.def
+cp -f litertextern/tfliteextern/bazel/litert_exported_symbols_linux.lds litert/tfliteextern/litert_exported_symbols_linux.lds
 cp -f litertextern/tfliteextern/tfliteextern.cc litert/tfliteextern/tfliteextern.cc
 cp -f litertextern/tfliteextern/tfliteextern.h litert/tfliteextern/tfliteextern.h
 cp -f litertextern/imgproc/imgproc.cc litert/tfliteextern/imgproc.cc
@@ -69,13 +70,19 @@ build_with_bazel() {
       --linkopt=-fuse-ld=lld \
       --linkopt=-Wl,-z,max-page-size=16384 \
       --verbose_failures $extra_flags "$@" \
-      //tfliteextern:tfliteextern
+      //tfliteextern:litert_runtime_so //tfliteextern:tfliteextern_so
 }
 
-build_with_bazel "${@:2}"
+# libtfliteextern.so only contains the TFLite C API wrapper and links dynamically against libLiteRt.so
+# (LiteRT's own runtime, exporting the LiteRt* and TfLite* C APIs, also used directly by Emgu.LiteRT) - see
+# the "macOS and Android" section of litertextern/tfliteextern/bazel/BUILD.
+build_with_bazel "${@:2}" || exit 1
 bazel --version
 set +x
 
 cd ..
 
-cp -f litert/bazel-bin/tfliteextern/libtfliteextern.so lib/android/$arch/libtfliteextern.so
+for LIB in libtfliteextern libLiteRt; do
+    rm -f lib/android/$arch/$LIB.so
+    cp -f litert/bazel-bin/tfliteextern/$LIB.so lib/android/$arch/$LIB.so || exit 1
+done

@@ -118,7 +118,9 @@ cc_library(
 )
 
 # ---------------------------------------------------------------------------------------------------------
-# macOS: tfliteextern linked dynamically against LiteRT's own runtime library.
+# macOS and Android: tfliteextern linked dynamically against LiteRT's own runtime library.
+# (Android: ":litert_runtime_so"/":tfliteextern_so", producing libLiteRt.so/libtfliteextern.so, same idea as the
+# macOS targets described below.)
 #
 # ":litert_runtime" builds libLiteRt.dylib from LiteRT's //litert/c:litert_tflite_runtime_c_api_so_shim (the
 # same deps as LiteRT's own //litert/c:litert_tflite_runtime_c_api_so), exporting LiteRT's C API plus the
@@ -153,12 +155,45 @@ cc_shared_library(
     deps = ["//litert/c:litert_tflite_runtime_c_api_so_shim"],
 )
 
+cc_shared_library(
+    name = "litert_runtime_so",
+    additional_linker_inputs = ["litert_exported_symbols_linux.lds"],
+    exports_filter = [
+        "//tflite:__subpackages__",
+        "@flatbuffers//:__subpackages__",
+        "@XNNPACK//:__subpackages__",
+    ],
+    shared_lib_name = "libLiteRt.so",
+    target_compatible_with = ["@platforms//os:android"],
+    user_link_flags = [
+        "-Wl,--version-script,$(location litert_exported_symbols_linux.lds)",
+        # LiteRT's own litert_tflite_runtime_c_api_so sets no SONAME, so libtfliteextern.so would record the
+        # Bazel output path of libLiteRt.so as its DT_NEEDED entry instead of the plain file name.
+        "-Wl,-soname,libLiteRt.so",
+        "-landroid",
+    ],
+    deps = ["//litert/c:litert_tflite_runtime_c_api_so_shim"],
+)
+
+# The C API wrapper shared by the dynamically linked macOS and Android builds. On Android, NNAPI comes from its C
+# API in libLiteRt.so, and the TFLite GPU delegate is compiled out (WITHOUT_GPU_DELEGATE): libLiteRt.so doesn't
+# contain it, and it needs TFLite internals libLiteRt.so doesn't export.
 cc_library(
     name = "tfliteextern_capi_lib",
     srcs = _TFLITEEXTERN_SRCS,
-    copts = tflite_copts(),
-    target_compatible_with = ["@platforms//os:macos"],
-    deps = _TFLITEEXTERN_CAPI_DEPS + ["//tflite/delegates/xnnpack:xnnpack_delegate"],
+    copts = tflite_copts() + select({
+        "@org_tensorflow//tensorflow:android": ["-DWITHOUT_GPU_DELEGATE"],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "@platforms//os:macos": [],
+        "@platforms//os:android": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = _TFLITEEXTERN_CAPI_DEPS + ["//tflite/delegates/xnnpack:xnnpack_delegate"] + select({
+        "@org_tensorflow//tensorflow:android": ["//tflite/delegates/nnapi:nnapi_delegate"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_shared_library(
@@ -171,6 +206,15 @@ cc_shared_library(
         # libLiteRt.dylib is deployed next to libtfliteextern.dylib.
         "-Wl,-rpath,@loader_path",
     ],
+    deps = [":tfliteextern_capi_lib"],
+)
+
+cc_shared_library(
+    name = "tfliteextern_so",
+    dynamic_deps = [":litert_runtime_so"],
+    shared_lib_name = "libtfliteextern.so",
+    target_compatible_with = ["@platforms//os:android"],
+    user_link_flags = ["-Wl,-soname,libtfliteextern.so"],
     deps = [":tfliteextern_capi_lib"],
 )
 

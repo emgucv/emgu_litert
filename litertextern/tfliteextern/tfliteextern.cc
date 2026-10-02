@@ -416,15 +416,21 @@ void tfeTfLiteDelegateRelease(TfLiteDelegate** delegate) {
   *delegate = 0;
 }
 
-#ifdef __ANDROID__
-struct TfeStatefulNnApiDelegate : public tflite::StatefulNnApiDelegate {};
-#endif
+// The C# StatefulNnApiDelegate keeps two pointers: this handle (for release) and the TfLiteDelegate* passed
+// to ModifyGraphWithDelegate. With the NNAPI C API the handle just owns the delegate.
+struct TfeStatefulNnApiDelegate {
+  TfLiteDelegate* delegate;
+};
 
 TfeStatefulNnApiDelegate* tfeStatefulNnApiDelegateCreate(
     TfLiteDelegate** tfLiteDelegate) {
 #ifdef __ANDROID__
+  TfLiteNnapiDelegateOptions options = TfLiteNnapiDelegateOptionsDefault();
+  TfLiteDelegate* delegate = TfLiteNnapiDelegateCreate(&options);
+  *tfLiteDelegate = delegate;
+  if (!delegate) return 0;
   TfeStatefulNnApiDelegate* d = new TfeStatefulNnApiDelegate();
-  *tfLiteDelegate = static_cast<TfLiteDelegate*>(d);
+  d->delegate = delegate;
   return d;
 #else
   *tfLiteDelegate = 0;
@@ -434,19 +440,22 @@ TfeStatefulNnApiDelegate* tfeStatefulNnApiDelegateCreate(
 
 void tfeStatefulNnApiDelegateRelease(TfeStatefulNnApiDelegate** delegate) {
 #ifdef __ANDROID__
-  delete *delegate;
+  if (*delegate) {
+    TfLiteNnapiDelegateDelete((*delegate)->delegate);
+    delete *delegate;
+  }
 #endif
   *delegate = 0;
 }
 
-#ifdef __ANDROID__
+#if defined(__ANDROID__) && !defined(WITHOUT_GPU_DELEGATE)
 static void tfeGpuDelegateV2Deleter(TfLiteDelegate* delegate) {
   TfLiteGpuDelegateV2Delete(delegate);
 }
 #endif
 
 TfLiteDelegate* tfeGpuDelegateV2Create() {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) && !defined(WITHOUT_GPU_DELEGATE)
   TfLiteGpuDelegateOptionsV2 options = TfLiteGpuDelegateOptionsV2Default();
   return tfeTrackDelegate(TfLiteGpuDelegateV2Create(&options), tfeGpuDelegateV2Deleter);
 #else
