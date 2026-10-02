@@ -13,7 +13,7 @@ namespace Emgu.TF.Lite
     /// <summary>
     /// Gpu Delegate V2 for Android
     /// </summary>
-    public class GpuDelegateV2 : Emgu.TF.Util.UnmanagedObject, IDelegate
+    public class GpuDelegateV2 : Emgu.LiteRT.Util.UnmanagedObject, IDelegate
     {
         /// <summary>
         /// Gpu Delegate V2 for Android

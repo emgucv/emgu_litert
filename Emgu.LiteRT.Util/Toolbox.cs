@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Collections.Generic;
 
-namespace Emgu.TF.Util
+namespace Emgu.LiteRT.Util
 {
     /// <summary>
     /// utilities functions for Emgu

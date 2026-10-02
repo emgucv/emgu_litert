@@ -4,7 +4,7 @@
 
 using System;
 
-namespace Emgu.TF.Util
+namespace Emgu.LiteRT.Util
 {
     /// <summary>
     /// An abstract class that wrap around a disposable object

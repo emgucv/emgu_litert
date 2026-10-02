@@ -8,10 +8,16 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Runtime.InteropServices;
-using Emgu.TF.Util;
 
-namespace Emgu.TF.Util
+namespace Emgu.TF.Lite
 {
+    /// <summary>
+    /// Image conversion helpers implemented in the tfliteextern native library.
+    /// </summary>
+    /// <remarks>
+    /// These used to extend Emgu.LiteRT.Util.Toolbox as a partial class; they live in Emgu.TF.Lite now that
+    /// Emgu.LiteRT.Util is a separate assembly, since a partial class cannot span assemblies.
+    /// </remarks>
     public static partial class Toolbox
     {
         /// <summary>

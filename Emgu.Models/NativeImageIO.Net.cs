@@ -45,12 +45,12 @@ namespace Emgu.Models
         {
             if (typeof(T) == typeof(float))
             {
-                return Emgu.TF.Util.Toolbox.Pixel24ToPixelFloat(
+                return Emgu.TF.Lite.Toolbox.Pixel24ToPixelFloat(
                     pixels, width, height, inputMean, scale, flipUpSideDown, swapBR, dest);
             }
             else if (typeof(T) == typeof(byte))
             {
-                return Emgu.TF.Util.Toolbox.Pixel24ToPixelByte(
+                return Emgu.TF.Lite.Toolbox.Pixel24ToPixelByte(
                     pixels, width, height, inputMean, scale, flipUpSideDown, swapBR, dest);
             }
             else

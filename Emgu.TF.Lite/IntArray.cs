@@ -6,14 +6,14 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using Emgu.TF.Util;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.TF.Lite
 {
     /// <summary>
     /// A tensorflow integer array
     /// </summary>
-    public class IntArray : Emgu.TF.Util.UnmanagedObject
+    public class IntArray : Emgu.LiteRT.Util.UnmanagedObject
     {
         private bool _needDispose;
 

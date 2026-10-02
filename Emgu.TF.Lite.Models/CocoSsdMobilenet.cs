@@ -30,7 +30,7 @@ namespace Emgu.TF.Lite.Models
     /// <summary>
     /// Coco ssd mobile net base model
     /// </summary>
-    public class CocoSsdMobilenet : Emgu.TF.Util.UnmanagedObject
+    public class CocoSsdMobilenet : Emgu.LiteRT.Util.UnmanagedObject
     {
         private FileDownloadManager _downloadManager;
 
@@ -174,7 +174,7 @@ namespace Emgu.TF.Lite.Models
 #if UNITY_ANDROID && (!UNITY_EDITOR)
                 isAndroid = true;
 #else
-                System.Reflection.Assembly monoAndroidAssembly = Emgu.TF.Util.Toolbox.FindAssembly("Mono.Android.dll");
+                System.Reflection.Assembly monoAndroidAssembly = Emgu.LiteRT.Util.Toolbox.FindAssembly("Mono.Android.dll");
                 if (monoAndroidAssembly != null)
                 {
                     isAndroid = true;

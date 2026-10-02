@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using Emgu.TF.Util;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.TF.Lite
 {
@@ -15,7 +15,7 @@ namespace Emgu.TF.Lite
     /// An RAII object that represents a read-only tflite model, copied from disk,
     /// or mmapped. This uses flatbuffers as the serialization format.
     /// </summary>   
-    public class FlatBufferModel : Emgu.TF.Util.UnmanagedObject
+    public class FlatBufferModel : Emgu.LiteRT.Util.UnmanagedObject
     {
         private byte[] _buffer = null;
         private GCHandle _handle;

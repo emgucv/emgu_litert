@@ -2,7 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.34009.444
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Util.Shared", "..\..\Emgu.TF.Util\Emgu.TF.Util.Shared.shproj", "{98561642-5EC3-4244-BAF9-6876D9BA5527}"
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.LiteRT.Util.Shared", "..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.shproj", "{98561642-5EC3-4244-BAF9-6876D9BA5527}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XamarinForms.Lite.Mac", "..\..\Emgu.TF.Example\XamarinForms\XamarinForms.Lite.Mac\XamarinForms.Lite.Mac.csproj", "{A5BE7C8B-C4DF-4CCE-8640-D533DF7D6892}"
 EndProject
@@ -159,11 +159,11 @@ Global
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{8f587fb9-bba6-4c30-9329-8cbac7020fe0}*SharedItemsImports = 13
 		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{971a6e6a-e7d4-4ff6-931e-8a25d572161c}*SharedItemsImports = 5
 		..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.projitems*{971a6e6a-e7d4-4ff6-931e-8a25d572161c}*SharedItemsImports = 5
-		..\..\Emgu.TF.Util\Emgu.TF.Util.Shared.projitems*{98561642-5ec3-4244-baf9-6876d9ba5527}*SharedItemsImports = 13
+		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{98561642-5ec3-4244-baf9-6876d9ba5527}*SharedItemsImports = 13
 		..\..\Emgu.TF.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.projitems*{a5be7c8b-c4df-4cce-8640-d533df7d6892}*SharedItemsImports = 4
 		..\..\Emgu.TF.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems*{a5be7c8b-c4df-4cce-8640-d533df7d6892}*SharedItemsImports = 4
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{c07f7fe3-3835-460d-b6c2-166250c03ac0}*SharedItemsImports = 5
-		..\..\Emgu.TF.Util\Emgu.TF.Util.Shared.projitems*{c07f7fe3-3835-460d-b6c2-166250c03ac0}*SharedItemsImports = 5
+		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{c07f7fe3-3835-460d-b6c2-166250c03ac0}*SharedItemsImports = 5
 		..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.projitems*{e956dd26-1294-4731-8a90-c4cba9f291b6}*SharedItemsImports = 13
 		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{ff3d6e2c-3e0b-411c-a802-f61ee8a4829f}*SharedItemsImports = 4
 		..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.projitems*{ff3d6e2c-3e0b-411c-a802-f61ee8a4829f}*SharedItemsImports = 4

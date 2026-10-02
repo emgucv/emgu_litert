@@ -106,13 +106,13 @@ namespace Emgu.Models
             if (typeof(T) == typeof(float))
             {
                 GCHandle handle = GCHandle.Alloc(colors, GCHandleType.Pinned);
-                Emgu.TF.Util.Toolbox.Pixel32ToPixelFloat(handle.AddrOfPinnedObject(), width, height, inputMean, scale, flipUpsideDown, swapBR, dest);
+                Emgu.TF.Lite.Toolbox.Pixel32ToPixelFloat(handle.AddrOfPinnedObject(), width, height, inputMean, scale, flipUpsideDown, swapBR, dest);
                 handle.Free();
             }
             else if (typeof(T) == typeof(byte))
             {
                 GCHandle handle = GCHandle.Alloc(colors, GCHandleType.Pinned);
-                Emgu.TF.Util.Toolbox.Pixel32ToPixelByte(handle.AddrOfPinnedObject(), width, height, inputMean, scale, flipUpsideDown, swapBR, dest);
+                Emgu.TF.Lite.Toolbox.Pixel32ToPixelByte(handle.AddrOfPinnedObject(), width, height, inputMean, scale, flipUpsideDown, swapBR, dest);
                 handle.Free();
             }
             else

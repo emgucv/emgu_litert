@@ -10,7 +10,7 @@ namespace Emgu.LiteRT
     /// <summary>
     /// A buffer holding the data of an input or output tensor (LiteRtTensorBuffer).
     /// </summary>
-    public class TensorBuffer : Emgu.TF.Util.UnmanagedObject
+    public class TensorBuffer : Emgu.LiteRT.Util.UnmanagedObject
     {
         internal TensorBuffer(IntPtr ptr)
         {

@@ -69,7 +69,7 @@ namespace Emgu.Models
 
             if (typeof(T) == typeof(float))
             {
-                Emgu.TF.Util.Toolbox.Pixel32ToPixelFloat(
+                Emgu.TF.Lite.Toolbox.Pixel32ToPixelFloat(
                     handle.AddrOfPinnedObject(),
                     inputWidth,
                     inputHeight,
@@ -82,7 +82,7 @@ namespace Emgu.Models
             }
             else if (typeof(T) == typeof(byte))
             {
-                Emgu.TF.Util.Toolbox.Pixel32ToPixelByte(
+                Emgu.TF.Lite.Toolbox.Pixel32ToPixelByte(
                     handle.AddrOfPinnedObject(),
                     inputWidth,
                     inputHeight,

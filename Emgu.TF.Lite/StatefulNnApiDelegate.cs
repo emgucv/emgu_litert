@@ -13,7 +13,7 @@ namespace Emgu.TF.Lite
     /// <summary>
     /// Stateful NNAPI delegate
     /// </summary>
-    public class StatefulNnApiDelegate : Emgu.TF.Util.UnmanagedObject, IDelegate
+    public class StatefulNnApiDelegate : Emgu.LiteRT.Util.UnmanagedObject, IDelegate
     {
         private IntPtr _delegatePtr;
 

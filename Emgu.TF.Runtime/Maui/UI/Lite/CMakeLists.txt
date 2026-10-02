@@ -25,7 +25,7 @@ IF(HAVE_MAUI_LITE AND (APPLE OR WIN32))
   #    set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "emgu")
   #endif() 
   
-  ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite)
+  ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT)
   
   IF (TARGET Emgu.TF.Lite.runtime.maui.android)
     ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite.runtime.maui.android)

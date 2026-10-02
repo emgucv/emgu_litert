@@ -14,7 +14,7 @@ namespace Emgu.TF.Lite
     /// <summary>
     /// GPU delegate for iOS using metal
     /// </summary>
-    public class GpuDelegate : Emgu.TF.Util.UnmanagedObject, IDelegate
+    public class GpuDelegate : Emgu.LiteRT.Util.UnmanagedObject, IDelegate
     {
         /// <summary>
         /// GPU delegate for iOS using metal

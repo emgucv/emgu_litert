@@ -11,7 +11,7 @@ namespace Emgu.LiteRT
     /// <summary>
     /// A LiteRT model (LiteRtModel), loaded from a .tflite file or buffer.
     /// </summary>
-    public class Model : Emgu.TF.Util.UnmanagedObject
+    public class Model : Emgu.LiteRT.Util.UnmanagedObject
     {
         private readonly Environment _environment;
         private byte[] _buffer;

@@ -26,7 +26,27 @@
   </PropertyGroup>
 
   <Import Project="..\Emgu.LiteRT.Shared.projitems" Label="Shared" />
-  <Import Project="..\..\Emgu.TF.Util\Emgu.TF.Util.Shared.projitems" Label="Shared" />
+
+  <!--
+  The Emgu.LiteRT nuget package is the single managed package of Emgu TF Lite: it ships Emgu.LiteRT.dll together
+  with Emgu.TF.Lite.dll and Emgu.LiteRT.Util.dll, which have no packages of their own. PrivateAssets="all" keeps
+  those two projects from becoming package dependencies; IncludeReferencedProjectsInPackage packs their
+  assemblies (and xml docs) into lib/<tfm> instead. Projects that use their types must reference them directly.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeReferencedProjectsInPackage</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <Target Name="IncludeReferencedProjectsInPackage" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference' and ('%(ReferenceCopyLocalPaths.Extension)' == '.dll' or '%(ReferenceCopyLocalPaths.Extension)' == '.xml')" />
+    </ItemGroup>
+  </Target>
   <!-- 
   <Target Name="DeployBinary" AfterTargets="AfterBuild">
     <Message Text="Copying $(OutputPath)$(AssemblyName).dll, $(OutputPath)$(AssemblyName).xml to $(TensorflowBinaryDir)" Importance="high" />

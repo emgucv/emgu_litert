@@ -8,7 +8,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Runtime.InteropServices;
-using Emgu.TF.Util;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.TF.Lite
 {
@@ -154,7 +154,7 @@ namespace Emgu.TF.Lite
                 }
                 else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
                 {
-                    String existingDllDirectory = Emgu.TF.Util.Toolbox.GetDllDirectory();
+                    String existingDllDirectory = Emgu.LiteRT.Util.Toolbox.GetDllDirectory();
                     if (existingDllDirectory != null)
                         subfolderOptions.Add(existingDllDirectory);
 
@@ -231,7 +231,7 @@ namespace Emgu.TF.Lite
                 }
 
 
-                System.Reflection.Assembly monoAndroidAssembly = Emgu.TF.Util.Toolbox.FindAssembly("Mono.Android.dll");
+                System.Reflection.Assembly monoAndroidAssembly = Emgu.LiteRT.Util.Toolbox.FindAssembly("Mono.Android.dll");
                 if (monoAndroidAssembly == null)
                 {
                     //Not running on Android
@@ -267,7 +267,7 @@ namespace Emgu.TF.Lite
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    setDllDirectorySuccess = Emgu.TF.Util.Toolbox.SetDllDirectory(loadDirectory);
+                    setDllDirectorySuccess = Emgu.LiteRT.Util.Toolbox.SetDllDirectory(loadDirectory);
                     if (!setDllDirectorySuccess)
                     {
                         System.Diagnostics.Debug.WriteLine(String.Format("Failed to set dll directory: {0}",
@@ -278,7 +278,7 @@ namespace Emgu.TF.Lite
                 {
 
                 }
-                else if (Emgu.TF.Util.Toolbox.FindAssembly("Xamarin.iOS.dll") != null)
+                else if (Emgu.LiteRT.Util.Toolbox.FindAssembly("Xamarin.iOS.dll") != null)
                 {
                     //do nothing
                     System.Diagnostics.Debug.WriteLine(
@@ -358,7 +358,7 @@ namespace Emgu.TF.Lite
                     //Try to load using the full path
                     System.Diagnostics.Trace.WriteLine(String.Format("Found full path {0} for {1}. Trying to load it.",
                         fullPath, mName));
-                    loaded = !IntPtr.Zero.Equals(Emgu.TF.Util.Toolbox.LoadLibrary(fullPath));
+                    loaded = !IntPtr.Zero.Equals(Emgu.LiteRT.Util.Toolbox.LoadLibrary(fullPath));
                     if (loaded)
                         System.Diagnostics.Trace.WriteLine(String.Format("{0} loaded.", mName));
                     else
@@ -370,7 +370,7 @@ namespace Emgu.TF.Lite
                 {
                     //Try to load without the full path
                     System.Diagnostics.Trace.WriteLine(String.Format("Trying to load {0} using default path.", mName));
-                    loaded = !IntPtr.Zero.Equals(Emgu.TF.Util.Toolbox.LoadLibrary(mName));
+                    loaded = !IntPtr.Zero.Equals(Emgu.LiteRT.Util.Toolbox.LoadLibrary(mName));
                     if (loaded)
                         System.Diagnostics.Trace.WriteLine(String.Format("{0} loaded using default path", mName));
                     else
@@ -428,12 +428,12 @@ namespace Emgu.TF.Lite
 #if !(UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR || UNITY_STANDALONE)
 
             #region Check for MAUI iOS
-            if (Emgu.TF.Util.Toolbox.FindAssembly("Microsoft.iOS.dll") != null)
+            if (Emgu.LiteRT.Util.Toolbox.FindAssembly("Microsoft.iOS.dll") != null)
                 return libraryLoaded;
             #endregion
 
             #region Check for MAUI Android
-            System.Reflection.Assembly mauiAndroidAssembly = Emgu.TF.Util.Toolbox.FindAssembly("Microsoft.Android.dll");
+            System.Reflection.Assembly mauiAndroidAssembly = Emgu.LiteRT.Util.Toolbox.FindAssembly("Microsoft.Android.dll");
             if (mauiAndroidAssembly != null)
             {
                 //Running on Xamarin Android
@@ -509,7 +509,7 @@ namespace Emgu.TF.Lite
 
             try
             {
-                if (Emgu.TF.Util.Toolbox.FindAssembly("Microsoft.iOS.dll") == null)
+                if (Emgu.LiteRT.Util.Toolbox.FindAssembly("Microsoft.iOS.dll") == null)
                 {
                     //When not running on iOS
                     //Use the custom error handler

@@ -10,7 +10,7 @@ namespace Emgu.LiteRT
     /// <summary>
     /// The compilation options used to create a CompiledModel (LiteRtOptions).
     /// </summary>
-    public class Options : Emgu.TF.Util.UnmanagedObject
+    public class Options : Emgu.LiteRT.Util.UnmanagedObject
     {
         /// <summary>
         /// Create compilation options with the default settings.

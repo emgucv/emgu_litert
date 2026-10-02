@@ -11,7 +11,7 @@ namespace Emgu.LiteRT
     /// A model compiled for the selected hardware accelerators (LiteRtCompiledModel). This is LiteRT's
     /// inference API: create the input and output buffers, write the inputs, then call Run.
     /// </summary>
-    public class CompiledModel : Emgu.TF.Util.UnmanagedObject
+    public class CompiledModel : Emgu.LiteRT.Util.UnmanagedObject
     {
         // Held so the environment and model are not finalized while this compiled model still uses them.
         private readonly Environment _environment;

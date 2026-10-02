@@ -4,7 +4,7 @@
 
 using System;
 
-namespace Emgu.TF.Util
+namespace Emgu.LiteRT.Util
 {
    /// <summary>
    /// An Unmanaged Object is a disposable object with a Ptr property pointing to the unmanaged object

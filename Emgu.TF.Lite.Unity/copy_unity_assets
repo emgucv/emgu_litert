@@ -8,8 +8,8 @@ cd Assets
 mkdir -p Scripts
 cd Scripts
 
-rm -rf Emgu.TF.Util
-mkdir -p Emgu.TF.Util
+rm -rf Emgu.LiteRT.Util
+mkdir -p Emgu.LiteRT.Util
 rm -rf Emgu.TF.Lite
 mkdir -p Emgu.TF.Lite
 rm -rf Emgu.Models
@@ -25,7 +25,7 @@ cd ..
 cp ../tensorflow/LICENSE Assets/Emgu.TF.Lite/Documentation/tensorflow.license.txt
 #cp unityStoreIcons/README.txt Assets/Emgu.TF/README.txt
 
-cp ../Emgu.TF.Util/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Util/
+cp ../Emgu.LiteRT.Util/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.LiteRT.Util/
 cp ../Emgu.TF.Lite/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite/
 cp ../Emgu.Models/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.Models/
 cp ../Emgu.TF.Lite.Models/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite.Models/

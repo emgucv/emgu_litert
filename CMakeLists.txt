@@ -492,11 +492,13 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
 
 
 IF(HAVE_LITE_BUILD)
-  SET(EMGUTF_LITE_NUGET_ID "Emgu.TF.Lite")
-  SET(EMGUTF_LITE_NUGET_TITLE "Emgu TF Lite")
+  # Emgu.LiteRT is the single managed nuget package: it contains Emgu.LiteRT.dll, Emgu.TF.Lite.dll and
+  # Emgu.LiteRT.Util.dll. Every other package id (Models, runtime.*) is derived from it.
+  SET(EMGUTF_LITE_NUGET_ID "Emgu.LiteRT")
+  SET(EMGUTF_LITE_NUGET_TITLE "Emgu LiteRT")
 
-  SET(EMGUTF_LITERT_NUGET_ID "Emgu.LiteRT")
-  SET(EMGUTF_LITERT_NUGET_TITLE "Emgu LiteRT")
+  SET(EMGUTF_LITERT_NUGET_ID "${EMGUTF_LITE_NUGET_ID}")
+  SET(EMGUTF_LITERT_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE}")
 	
   SET(EMGUTF_LITE_MODEL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Models")
   
@@ -533,7 +535,7 @@ IF(HAVE_LITE_BUILD)
 #  SET(EMGUTF_LITE_XAMARIN_IOS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.xamarin.ios")  
 #  SET(EMGUTF_LITE_XAMARIN_IOS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Xamarin iOS")	
 
-  SET(EMGUTF_LITE_MODEL_NUGET_TITLE "Emgu TF Lite Models")
+  SET(EMGUTF_LITE_MODEL_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} Models")
   #MESSAGE(STATUS ">>> HAVE_WINDESKTOP_LITE: ${HAVE_WINDESKTOP_LITE}")
   
   IF(EMGU_SIGN_FOUND AND WIN32)
@@ -610,7 +612,7 @@ ENDIF()
 #IF(HAVE_MAUI_LITE)
   SET(EMGUTF_LITE_MAUI_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.maui${EMGUTF_LITE_RUNTIME_EXTRA_TAG}")
   SET(EMGUTF_LITE_MODELS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Models")
-  SET(EMGUTF_LITE_MAUI_NUGET_TITLE "Emgu TF Lite for MAUI Native Runtime")
+  SET(EMGUTF_LITE_MAUI_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} for MAUI Native Runtime")
   
 #  SET(EMGUTF_LITE_MAUI_NUGET_FILE_LIST "	
 #    <file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
@@ -814,15 +816,16 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Directory.Build.pr
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/SignBinary.Targets)
 ENDIF()
-IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/SignPkg.Targets)
-ENDIF()
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/docs/README.md)
 
-# Emgu.LiteRT: the standalone C# wrapper of LiteRT's own runtime C API (libLiteRt). The signing targets in
-# EMGUTF_LITE_POST_PROCESS_* only refer to $(AssemblyName)/$(PackageId), so they are reused as-is.
+# Emgu.LiteRT: the C# wrapper of LiteRT's own runtime C API (libLiteRt), and the project that packs the
+# single Emgu.LiteRT nuget package (Emgu.LiteRT.dll + Emgu.TF.Lite.dll + Emgu.LiteRT.Util.dll). The signing
+# targets in EMGUTF_LITE_POST_PROCESS_* only refer to $(AssemblyName)/$(PackageId), so they are reused as-is.
 SET(EMGUTF_LITERT_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
 SET(EMGUTF_LITERT_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Util.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Util/NetStandard/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Util/NetStandard/SignBinary.Targets)
+ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT/NetStandard/SignBinary.Targets)
@@ -865,10 +868,10 @@ ENDIF()
 #  Build the managed dlls of Emgu TF
 # ----------------------------------------------------------------------------
 
-ADD_SUBDIRECTORY(Emgu.TF.Util)
+ADD_SUBDIRECTORY(Emgu.LiteRT.Util)
 IF(HAVE_LITE_BUILD)
-  ADD_SUBDIRECTORY(Emgu.LiteRT)
   ADD_SUBDIRECTORY(Emgu.TF.Lite)
+  ADD_SUBDIRECTORY(Emgu.LiteRT)
 ENDIF()
 
 ADD_SUBDIRECTORY(Emgu.Models)

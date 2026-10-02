@@ -194,7 +194,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\Android\*.cs" />
   </ItemGroup>
     <ItemGroup>
-      <ProjectReference Include="..\..\..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
+      <!-- Emgu.TF.Lite.dll and Emgu.LiteRT.Util.dll ship inside the Emgu.LiteRT package: reference them for compiling only (PrivateAssets) and depend on the Emgu.LiteRT package. -->
+      <ProjectReference Include="..\..\..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
+      <ProjectReference Include="..\..\..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" PrivateAssets="all" />
+      <ProjectReference Include="..\..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" PrivateAssets="all" />
     </ItemGroup>
   <Target Name="EmguTfLiteMauiAndroidPackageBuildImports" BeforeTargets="PrepareForBuild">
     <Warning Text="'$(EmguTfLiteMauiAndroidErrorMessage)'" Condition="'$(EmguTfLiteMauiAndroidErrorMessage)'!=''" />

@@ -6,14 +6,14 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using Emgu.TF.Util;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.TF.Lite
 {
     /// <summary>
     /// The default tensor flow lite buildin op resolver.
     /// </summary>
-    public class BuildinOpResolver : Emgu.TF.Util.UnmanagedObject, IOpResolver
+    public class BuildinOpResolver : Emgu.LiteRT.Util.UnmanagedObject, IOpResolver
     {
         private IntPtr _opResolverPtr;
         

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
 	
-	<AssemblyName>Emgu.TF.Lite</AssemblyName>
+	<AssemblyName>Emgu.LiteRT.Util</AssemblyName>
 	<TargetName>$(AssemblyName)</TargetName>
 	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
   </PropertyGroup>
@@ -25,10 +25,7 @@
     <DefineConstants>TRACE;__NETSTANDARD_2_0__</DefineConstants>
   </PropertyGroup>
 
-  <Import Project="..\Emgu.TF.Lite.Shared.projitems" Label="Shared" />
-  <ItemGroup>
-    <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
-  </ItemGroup>
+  <Import Project="..\Emgu.LiteRT.Util.Shared.projitems" Label="Shared" />
   <!-- 
   <Target Name="DeployBinary" AfterTargets="AfterBuild">
     <Message Text="Copying $(OutputPath)$(AssemblyName).dll, $(OutputPath)$(AssemblyName).xml to $(TensorflowBinaryDir)" Importance="high" />

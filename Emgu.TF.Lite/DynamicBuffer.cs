@@ -6,14 +6,14 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using Emgu.TF.Util;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.TF.Lite
 {
     /// <summary>
     /// DynamicBuffer holds temporary buffer that will be used to create a dynamic tensor. 
     /// </summary>
-    public class DynamicBuffer : Emgu.TF.Util.UnmanagedObject
+    public class DynamicBuffer : Emgu.LiteRT.Util.UnmanagedObject
     {
         /// <summary>
         /// Create a new dynamic buffer.

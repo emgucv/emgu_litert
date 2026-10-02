@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using Emgu.TF.Util;
+using Emgu.LiteRT.Util;
 using System.Diagnostics;
 
 namespace Emgu.TF.Lite
@@ -14,7 +14,7 @@ namespace Emgu.TF.Lite
     /// <summary>
     /// The tensorflow lite interpreter.
     /// </summary>
-    public class Interpreter : Emgu.TF.Util.UnmanagedObject
+    public class Interpreter : Emgu.LiteRT.Util.UnmanagedObject
     {
         /// <summary>
         /// Create a new tensorflow lite interpreter.

@@ -69,7 +69,7 @@ namespace Emgu.Models
             int bytesWritten = 0;
             if (typeof(T) == typeof(float))
             {
-                bytesWritten = Emgu.TF.Util.Toolbox.Pixel32ToPixelFloat(
+                bytesWritten = Emgu.TF.Lite.Toolbox.Pixel32ToPixelFloat(
                     handle.AddrOfPinnedObject(),
                     inputWidth,
                     inputHeight,
@@ -82,7 +82,7 @@ namespace Emgu.Models
             }
             else if (typeof(T) == typeof(byte))
             {
-                bytesWritten = Emgu.TF.Util.Toolbox.Pixel32ToPixelByte(
+                bytesWritten = Emgu.TF.Lite.Toolbox.Pixel32ToPixelByte(
                     handle.AddrOfPinnedObject(),
                     inputWidth,
                     inputHeight,

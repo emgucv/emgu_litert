@@ -23,7 +23,7 @@ namespace Emgu.TF.Lite.Models
     /// <summary>
     /// The mobile net model for object class labeling 
     /// </summary>
-    public class Mobilenet : Emgu.TF.Util.UnmanagedObject
+    public class Mobilenet : Emgu.LiteRT.Util.UnmanagedObject
     {
         private FileDownloadManager _downloadManager;
 

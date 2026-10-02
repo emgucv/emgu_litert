@@ -7,12 +7,12 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using Emgu.TF.Util;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.TF.Lite
 {
 
-    public class InterpreterBuilder : Emgu.TF.Util.UnmanagedObject
+    public class InterpreterBuilder : Emgu.LiteRT.Util.UnmanagedObject
     {
 
         public InterpreterBuilder(FlatBufferModel flatBufferModel, IOpResolver resolver)

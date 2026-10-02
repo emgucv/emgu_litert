@@ -15,7 +15,7 @@ using Android.OS;
 using Android.Runtime;
 using Android.Views;
 
-namespace Emgu.TF.Util
+namespace Emgu.LiteRT.Util
 {
     /// <summary>
     /// Helper class for writing Android asset into a file

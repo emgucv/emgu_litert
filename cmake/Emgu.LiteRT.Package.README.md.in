@@ -1,6 +1,10 @@
 ## About this package
 
-This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT (part of Emgu TF Lite). 
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.TF.Lite.dll`: the Interpreter API (`Emgu.TF.Lite` namespace), wrapping TensorFlow Lite through the `tfliteextern` native library.
+- `Emgu.LiteRT.dll`: the CompiledModel API (`Emgu.LiteRT` namespace), calling LiteRT's own runtime library (`libLiteRt`) directly.
+- `Emgu.LiteRT.Util.dll`: shared utilities (`Emgu.LiteRT.Util` namespace) used by both.
 
 For online documentation please visit
 <${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
@@ -10,5 +14,5 @@ Release note can be found at
 
 ## Note
 
-Emgu LiteRT calls LiteRT's own runtime library (libLiteRt) directly. To deploy it to a specific platform, you will also need a runtime package that contains libLiteRt for that platform. Currently only Emgu.TF.Lite.runtime.macos includes it. Use the following link to search for the Emgu.TF.Lite.runtime nuget packages:
-<https://www.nuget.org/packages?q=Emgu.TF.Lite.runtime>
+To deploy Emgu LiteRT to a specific platform, you will also need to add one of the ${EMGUTF_LITE_NUGET_ID}.runtime.{platform} nuget packages to your executable project. Currently only ${EMGUTF_LITE_NUGET_ID}.runtime.macos includes `libLiteRt` for the `Emgu.LiteRT` API; the other runtime packages only include `tfliteextern` for the `Emgu.TF.Lite` API. Use the following link to search for the ${EMGUTF_LITE_NUGET_ID}.runtime nuget packages:
+<https://www.nuget.org/packages?q=${EMGUTF_LITE_NUGET_ID}.runtime>

@@ -15,7 +15,7 @@ namespace Emgu.LiteRT
     /// This class shares its name with System.Environment; if both namespaces are imported, refer to it as
     /// Emgu.LiteRT.Environment or use an alias.
     /// </remarks>
-    public class Environment : Emgu.TF.Util.UnmanagedObject
+    public class Environment : Emgu.LiteRT.Util.UnmanagedObject
     {
         /// <summary>
         /// Create a LiteRT environment with the default options.

@@ -22,7 +22,7 @@ namespace Emgu.TF.Lite.Models
     /// <summary>
     /// The inception model for object class labeling 
     /// </summary>
-    public class Inception : Emgu.TF.Util.UnmanagedObject
+    public class Inception : Emgu.LiteRT.Util.UnmanagedObject
     {
         private FileDownloadManager _downloadManager;
         

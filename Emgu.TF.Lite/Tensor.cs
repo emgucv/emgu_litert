@@ -7,7 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using Emgu.TF.Util;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.TF.Lite
 {
@@ -48,7 +48,7 @@ namespace Emgu.TF.Lite
     /// <summary>
     /// A tensorflow lite tensor
     /// </summary>
-    public class Tensor : Emgu.TF.Util.UnmanagedObject
+    public class Tensor : Emgu.LiteRT.Util.UnmanagedObject
     {
         private readonly bool _needDispose;
 

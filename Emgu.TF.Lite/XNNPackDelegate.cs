@@ -13,7 +13,7 @@ namespace Emgu.TF.Lite
     /// <summary>
     /// XNNPackDelegate
     /// </summary>
-    public class XNNPackDelegate : Emgu.TF.Util.UnmanagedObject, IDelegate
+    public class XNNPackDelegate : Emgu.LiteRT.Util.UnmanagedObject, IDelegate
     {
         /// <summary>
         /// XNNPackDelegate

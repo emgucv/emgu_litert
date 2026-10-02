@@ -8,12 +8,12 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using Emgu.TF.Util;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.TF.Lite
 {
     
-    public class MutableOpResolver : Emgu.TF.Util.UnmanagedObject, IOpResolver
+    public class MutableOpResolver : Emgu.LiteRT.Util.UnmanagedObject, IOpResolver
     {
         private IntPtr _opResolverPtr;
         
