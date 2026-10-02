@@ -1,0 +1,14 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT (part of Emgu TF Lite). 
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
+
+Release note can be found at
+<${NUGET_EMGU_URL}/wiki/index.php/Emgu_TF_Version_History#Emgu.TF-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}>
+
+## Note
+
+Emgu LiteRT calls LiteRT's own runtime library (libLiteRt) directly. To deploy it to a specific platform, you will also need a runtime package that contains libLiteRt for that platform. Currently only Emgu.TF.Lite.runtime.macos includes it. Use the following link to search for the Emgu.TF.Lite.runtime nuget packages:
+<https://www.nuget.org/packages?q=Emgu.TF.Lite.runtime>

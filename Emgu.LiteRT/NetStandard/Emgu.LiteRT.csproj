@@ -2,7 +2,7 @@
 
   <PropertyGroup>
 	
-	<AssemblyName>Emgu.TF.Lite</AssemblyName>
+	<AssemblyName>Emgu.LiteRT</AssemblyName>
 	<TargetName>$(AssemblyName)</TargetName>
 	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
   </PropertyGroup>
@@ -25,7 +25,7 @@
     <DefineConstants>TRACE;__NETSTANDARD_2_0__</DefineConstants>
   </PropertyGroup>
 
-  <Import Project="..\Emgu.TF.Lite.Shared.projitems" Label="Shared" />
+  <Import Project="..\Emgu.LiteRT.Shared.projitems" Label="Shared" />
   <Import Project="..\..\Emgu.TF.Util\Emgu.TF.Util.Shared.projitems" Label="Shared" />
   <!-- 
   <Target Name="DeployBinary" AfterTargets="AfterBuild">

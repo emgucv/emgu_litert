@@ -19,6 +19,7 @@ obj/
 Directory.Build.props
 !/miscellaneous/Directory.Build.props
 /Emgu.TF.Lite/NetStandard/docs/
+/Emgu.LiteRT/NetStandard/docs/
 /Emgu.TF.Lite.Models/NetStandard/docs/
 /Emgu.TF.Runtime/Maui/*/docs/
 /Emgu.TF.Runtime/Maui/*/Lite/docs/

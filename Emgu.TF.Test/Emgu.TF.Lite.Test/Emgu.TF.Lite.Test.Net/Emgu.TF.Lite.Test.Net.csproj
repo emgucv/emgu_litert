@@ -33,6 +33,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Emgu.TF.Lite.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
     <ProjectReference Include="..\..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
+    <ProjectReference Include="..\..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
   </ItemGroup>
 
   <Import Project="..\..\..\Emgu.TF.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('windows'))" />

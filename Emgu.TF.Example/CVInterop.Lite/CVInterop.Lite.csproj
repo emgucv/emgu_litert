@@ -33,6 +33,5 @@
   <Import Project="..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems" Label="Shared" />
 
   <Import Project="..\..\Emgu.TF.Util\Emgu.TF.Util.Shared.projitems" Label="Shared" />
-  <Import Project="..\..\Emgu.LiteRT\Emgu.LiteRT.Shared.projitems" Label="Shared" />
 
 </Project>
