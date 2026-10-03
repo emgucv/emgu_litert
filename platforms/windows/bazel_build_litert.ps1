@@ -32,6 +32,22 @@ param(
 
 $ErrorActionPreference = "Continue"
 
+# Get-ChildItem's enumeration order is not guaranteed to be sorted, and even a sorted-by-name
+# fallback would misorder version jumps like "14.9.x" vs "14.10.x" (lexicographic "9" > "1").
+# Parse each directory name as a [version] and pick the numerically highest instead.
+function Get-LatestVersionDir {
+    param([string]$Path, [string]$Filter = "*")
+    Get-ChildItem -Path $Path -Directory -Filter $Filter -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            $parsedVersion = $null
+            if ([version]::TryParse($_.Name, [ref]$parsedVersion)) {
+                [PSCustomObject]@{ Dir = $_; Version = $parsedVersion }
+            }
+        } |
+        Sort-Object Version |
+        Select-Object -Last 1 -ExpandProperty Dir
+}
+
 # %~dp0 in the .bat always refers to the invoking script's own directory, regardless of later
 # `cd`s. $PSScriptRoot has the same property, so capture it before changing location.
 $ScriptDir = $PSScriptRoot
@@ -147,7 +163,10 @@ if (Test-Path $BuildToolsFolder) { $Devenv = $BuildToolsFolder }
 
 # Get full path to the running Python executable
 $PyExe = (& python -c "import sys; print(sys.executable)" 2>$null)
-$PythonBasePath = Split-Path $PyExe -Parent
+# Split-Path throws on $null/empty input (unlike the .bat's FOR /F, which just leaves PYEXE/
+# PYTHON_BASE_PATH blank when python isn't found) - guard it so a missing python doesn't abort
+# the whole script here.
+$PythonBasePath = if ($PyExe) { Split-Path $PyExe -Parent } else { "" }
 $HermeticPythonVersion = $null
 
 if (Test-Path "$ProgramFilesX86\Microsoft Visual Studio\Shared\Python37_64") { $PythonBasePath = "$ProgramFilesX86\Microsoft Visual Studio\Shared\Python37_64" }
@@ -165,6 +184,15 @@ $PythonLibPath = Join-Path $PythonBasePath "lib\site-packages"
 $PythonBasePath = $PythonBasePath -replace '\\', '/'
 $PythonBinPath = $PythonBinPath -replace '\\', '/'
 $PythonLibPath = $PythonLibPath -replace '\\', '/'
+
+# The .bat's SET PYTHON_BASE_PATH=... etc. create real process environment variables that
+# bazel.exe (a child process in the same cmd.exe session) inherits automatically. Plain
+# PowerShell `$Var = ...` assignments are local script variables only and have no effect on
+# child processes, so they must be mirrored into $env: explicitly to actually reach Bazel.
+$env:PYTHON_BASE_PATH = $PythonBasePath
+$env:PYTHON_BIN_PATH = $PythonBinPath
+$env:PYTHON_LIB_PATH = $PythonLibPath
+if ($HermeticPythonVersion) { $env:HERMETIC_PYTHON_VERSION = $HermeticPythonVersion }
 
 # SET_BAZEL_VS_VC
 $BazelVs = $null
@@ -235,8 +263,8 @@ Set-Content -Path "$NativeOutDir\tflite_with_xnnpack.txt" -Value $TfliteWithXnnp
 # START_OF_MSVC_DEPENDENCY
 if ($BazelVc) {
     if ($Devenv -eq $VS2017) {
-        $vs2017Redist = Get-ChildItem -Path (Join-Path $BazelVc "Redist\MSVC") -Directory -Filter "*" -ErrorAction SilentlyContinue |
-            Select-Object -Last 1 | ForEach-Object { Join-Path $_.FullName "x64\Microsoft.VC141.CRT" }
+        $latestDir = Get-LatestVersionDir -Path (Join-Path $BazelVc "Redist\MSVC")
+        $vs2017Redist = if ($latestDir) { Join-Path $latestDir.FullName "x64\Microsoft.VC141.CRT" }
         if ($vs2017Redist) {
             Copy-Item (Join-Path $vs2017Redist "*140.dll") $NativeOutDir -Force -ErrorAction SilentlyContinue
             Copy-Item (Join-Path $vs2017Redist "*140_1.dll") $NativeOutDir -Force -ErrorAction SilentlyContinue
@@ -244,8 +272,8 @@ if ($BazelVc) {
         }
     }
     elseif ($Devenv -eq $VS2019) {
-        $vs2019Redist = Get-ChildItem -Path (Join-Path $BazelVc "Redist\MSVC") -Directory -Filter "14*" -ErrorAction SilentlyContinue |
-            Select-Object -Last 1 | ForEach-Object { Join-Path $_.FullName "x64\Microsoft.VC142.CRT" }
+        $latestDir = Get-LatestVersionDir -Path (Join-Path $BazelVc "Redist\MSVC") -Filter "14*"
+        $vs2019Redist = if ($latestDir) { Join-Path $latestDir.FullName "x64\Microsoft.VC142.CRT" }
         if ($vs2019Redist) {
             Copy-Item (Join-Path $vs2019Redist "*.dll") $NativeOutDir -Force -ErrorAction SilentlyContinue
         }
@@ -253,20 +281,19 @@ if ($BazelVc) {
     elseif ($Devenv -eq $VS2022) {
         # No GOTO between the VS2022 and VS2026 blocks in the original .bat - VS2022 falls
         # through and copies the VS2026 (VC145.CRT) redist too. Mirrored, not fixed.
-        $vs2022Redist = Get-ChildItem -Path (Join-Path $BazelVc "Redist\MSVC") -Directory -Filter "14*" -ErrorAction SilentlyContinue |
-            Select-Object -Last 1 | ForEach-Object { Join-Path $_.FullName "x64\Microsoft.VC143.CRT" }
+        $latestDir = Get-LatestVersionDir -Path (Join-Path $BazelVc "Redist\MSVC") -Filter "14*"
+        $vs2022Redist = if ($latestDir) { Join-Path $latestDir.FullName "x64\Microsoft.VC143.CRT" }
         if ($vs2022Redist) {
             Copy-Item (Join-Path $vs2022Redist "*.dll") $NativeOutDir -Force -ErrorAction SilentlyContinue
         }
-        $vs2026Redist = Get-ChildItem -Path (Join-Path $BazelVc "Redist\MSVC") -Directory -Filter "14*" -ErrorAction SilentlyContinue |
-            Select-Object -Last 1 | ForEach-Object { Join-Path $_.FullName "x64\Microsoft.VC145.CRT" }
+        $vs2026Redist = if ($latestDir) { Join-Path $latestDir.FullName "x64\Microsoft.VC145.CRT" }
         if ($vs2026Redist) {
             Copy-Item (Join-Path $vs2026Redist "*.dll") $NativeOutDir -Force -ErrorAction SilentlyContinue
         }
     }
     elseif ($Devenv -eq $VS2026) {
-        $vs2026Redist = Get-ChildItem -Path (Join-Path $BazelVc "Redist\MSVC") -Directory -Filter "14*" -ErrorAction SilentlyContinue |
-            Select-Object -Last 1 | ForEach-Object { Join-Path $_.FullName "x64\Microsoft.VC145.CRT" }
+        $latestDir = Get-LatestVersionDir -Path (Join-Path $BazelVc "Redist\MSVC") -Filter "14*"
+        $vs2026Redist = if ($latestDir) { Join-Path $latestDir.FullName "x64\Microsoft.VC145.CRT" }
         if ($vs2026Redist) {
             Copy-Item (Join-Path $vs2026Redist "*.dll") $NativeOutDir -Force -ErrorAction SilentlyContinue
         }
@@ -277,8 +304,8 @@ if ($BazelVc) {
         # %BUILD_TOOLS_FOLDER%), so that comparison is always against an empty string and this
         # branch is dead in the original too. $BuildTools is deliberately left unassigned
         # (always $null) here to mirror that exactly, rather than "fixing" it.
-        $vs2019Redist = Get-ChildItem -Path (Join-Path $BazelVc "Redist\MSVC") -Directory -Filter "14*" -ErrorAction SilentlyContinue |
-            Select-Object -Last 1 | ForEach-Object { Join-Path $_.FullName "x64\Microsoft.VC142.CRT" }
+        $latestDir = Get-LatestVersionDir -Path (Join-Path $BazelVc "Redist\MSVC") -Filter "14*"
+        $vs2019Redist = if ($latestDir) { Join-Path $latestDir.FullName "x64\Microsoft.VC142.CRT" }
         if ($vs2019Redist) {
             Copy-Item (Join-Path $vs2019Redist "*.dll") $NativeOutDir -Force -ErrorAction SilentlyContinue
         }

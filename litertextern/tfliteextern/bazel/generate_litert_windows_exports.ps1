@@ -48,11 +48,21 @@ $ErrorActionPreference = "Stop"
 
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $vsInstall = & $vswhere -latest -products * -property installationPath
-$dumpbinCandidates = Get-ChildItem -Path "$vsInstall\VC\Tools\MSVC" -Directory |
-    ForEach-Object { Join-Path $_.FullName "bin\HostX64\x64\dumpbin.exe" } |
-    Where-Object { Test-Path $_ }
-if (-not $dumpbinCandidates) { throw "Could not find dumpbin.exe under $vsInstall\VC\Tools\MSVC\*\bin\HostX64\x64" }
-$dumpbin = $dumpbinCandidates | Select-Object -Last 1
+# Get-ChildItem's enumeration order isn't guaranteed sorted, and a plain name sort would still
+# misorder version jumps like "14.9.x" vs "14.10.x" (lexicographic "9" > "1") - parse each MSVC
+# toolset folder as a [version] and walk highest-to-lowest until one actually has dumpbin.exe.
+$dumpbin = Get-ChildItem -Path "$vsInstall\VC\Tools\MSVC" -Directory -ErrorAction SilentlyContinue |
+    ForEach-Object {
+        $parsedVersion = $null
+        if ([version]::TryParse($_.Name, [ref]$parsedVersion)) {
+            [PSCustomObject]@{ Dir = $_; Version = $parsedVersion }
+        }
+    } |
+    Sort-Object Version -Descending |
+    ForEach-Object { Join-Path $_.Dir.FullName "bin\HostX64\x64\dumpbin.exe" } |
+    Where-Object { Test-Path $_ } |
+    Select-Object -First 1
+if (-not $dumpbin) { throw "Could not find dumpbin.exe under $vsInstall\VC\Tools\MSVC\*\bin\HostX64\x64" }
 Write-Host "Using dumpbin: $dumpbin"
 
 $BazelLlvm = Join-Path $vsInstall "VC\Tools\Llvm\x64"
