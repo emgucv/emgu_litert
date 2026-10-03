@@ -191,6 +191,7 @@ $LitertTfliteexternDir = "litert\tfliteextern"
 if (-not (Test-Path $LitertTfliteexternDir)) { New-Item -ItemType Directory -Path $LitertTfliteexternDir | Out-Null }
 Copy-Item "litertextern\tfliteextern\bazel\BUILD" "$LitertTfliteexternDir\BUILD" -Force
 Copy-Item "litertextern\tfliteextern\bazel\tfliteextern.def" "$LitertTfliteexternDir\tfliteextern.def" -Force
+Copy-Item "litertextern\tfliteextern\bazel\litert_windows_exports.def" "$LitertTfliteexternDir\litert_windows_exports.def" -Force
 Copy-Item "litertextern\tfliteextern\tfliteextern.cc" "$LitertTfliteexternDir\tfliteextern.cc" -Force
 Copy-Item "litertextern\tfliteextern\tfliteextern.h" "$LitertTfliteexternDir\tfliteextern.h" -Force
 Copy-Item "litertextern\imgproc\imgproc.cc" "$LitertTfliteexternDir\imgproc.cc" -Force
@@ -214,11 +215,19 @@ $CommonBazelArgs = @(
 
 & $BazelCommand @CommonBazelArgs "//tfliteextern:tfliteextern" "--verbose_failures"
 
+# LiteRT's own runtime (LiteRT's C API plus the TensorFlow Lite C API), P/Invoked directly by the
+# Emgu.LiteRT classes - same purpose as libLiteRt.dylib/.so on macOS/Android. tfliteextern.dll
+# itself still links the TFLite C API statically on Windows (see litertextern/tfliteextern/
+# bazel/BUILD's comment on the ":libLiteRt" target for why), so this is an independent artifact,
+# not something tfliteextern.dll depends on here.
+& $BazelCommand @CommonBazelArgs "//tfliteextern:libLiteRt" "--verbose_failures"
+
 Set-Location ".."
 
 $NativeOutDir = "lib\runtimes\win-x64\native"
 if (-not (Test-Path $NativeOutDir)) { New-Item -ItemType Directory -Path $NativeOutDir -Force | Out-Null }
 Copy-Item "litert\bazel-bin\tfliteextern\tfliteextern.dll" "$NativeOutDir\tfliteextern.dll" -Force
+Copy-Item "litert\bazel-bin\tfliteextern\libLiteRt.dll" "$NativeOutDir\libLiteRt.dll" -Force
 # Record the tflite_with_xnnpack define next to the dll. The top level CMakeLists.txt reads it
 # to set EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK, and it travels with the binary in the zip package.
 Set-Content -Path "$NativeOutDir\tflite_with_xnnpack.txt" -Value $TfliteWithXnnpack -NoNewline:$false
