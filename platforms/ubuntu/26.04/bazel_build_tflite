@@ -38,6 +38,7 @@ mkdir -p lib/$OUT_FOLDER
 mkdir -p litert/tfliteextern
 cp -f litertextern/tfliteextern/bazel/BUILD litert/tfliteextern/BUILD
 cp -f litertextern/tfliteextern/bazel/tfliteextern.def litert/tfliteextern/tfliteextern.def
+cp -f litertextern/tfliteextern/bazel/litert_exported_symbols_linux.lds litert/tfliteextern/litert_exported_symbols_linux.lds
 cp -f litertextern/tfliteextern/tfliteextern.cc litert/tfliteextern/tfliteextern.cc
 cp -f litertextern/tfliteextern/tfliteextern.h litert/tfliteextern/tfliteextern.h
 cp -f litertextern/imgproc/imgproc.cc litert/tfliteextern/imgproc.cc
@@ -48,10 +49,11 @@ cd litert
 # litert's .bazelrc auto-applies build:linux via --enable_platform_specific_config on this
 # host, but --config=linux is passed explicitly for clarity, same as the other platforms'
 # Bazel build scripts do for their own host config.
-bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS "${@:1}" //tfliteextern:tfliteextern
+bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS "${@:1}" //tfliteextern:litert_runtime_so //tfliteextern:tfliteextern_so
 
 cd ..
 
+cp -f litert/bazel-bin/tfliteextern/libLiteRt.so lib/$OUT_FOLDER/libLiteRt.so
 cp -f litert/bazel-bin/tfliteextern/libtfliteextern.so lib/$OUT_FOLDER/libtfliteextern.so
 # Record the tflite_with_xnnpack define next to the library. The top level CMakeLists.txt reads it
 # to set EMGU_TF_LITE_UBUNTU_XNNPACK, and it travels with the binary in the zip package.
