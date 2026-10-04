@@ -32,25 +32,13 @@ param(
 
 $ErrorActionPreference = "Continue"
 
-# Get-ChildItem's enumeration order is not guaranteed to be sorted, and even a sorted-by-name
-# fallback would misorder version jumps like "14.9.x" vs "14.10.x" (lexicographic "9" > "1").
-# Parse each directory name as a [version] and pick the numerically highest instead.
-function Get-LatestVersionDir {
-    param([string]$Path, [string]$Filter = "*")
-    Get-ChildItem -Path $Path -Directory -Filter $Filter -ErrorAction SilentlyContinue |
-        ForEach-Object {
-            $parsedVersion = $null
-            if ([version]::TryParse($_.Name, [ref]$parsedVersion)) {
-                [PSCustomObject]@{ Dir = $_; Version = $parsedVersion }
-            }
-        } |
-        Sort-Object Version |
-        Select-Object -Last 1 -ExpandProperty Dir
-}
-
 # %~dp0 in the .bat always refers to the invoking script's own directory, regardless of later
 # `cd`s. $PSScriptRoot has the same property, so capture it before changing location.
 $ScriptDir = $PSScriptRoot
+
+# Get-LatestVersionDir, Get-ProgramFilesPaths, Find-VisualStudioDevenv, Find-LegacyMSBuild -
+# shared with build_emgu_litert.ps1 and cmake_build_litert.ps1 (see _common.ps1).
+. (Join-Path $ScriptDir "_common.ps1")
 
 # pushd %~p0 & cd ../..
 Push-Location $ScriptDir
@@ -127,34 +115,20 @@ if ($DockerFlag -eq "docker") {
 if (-not (Test-Path $OutputUserRootDir)) { New-Item -ItemType Directory -Path $OutputUserRootDir | Out-Null }
 if (-not (Test-Path $OutputBaseDir)) { New-Item -ItemType Directory -Path $OutputBaseDir | Out-Null }
 
-$ProgramFilesX86 = ${env:ProgramFiles(x86)}
-if (-not (Test-Path $ProgramFilesX86)) { $ProgramFilesX86 = $env:ProgramFiles }
-$ProgramFilesDir = $env:ProgramFiles
+$ProgramFiles = Get-ProgramFilesPaths
+$ProgramFilesX86 = $ProgramFiles.X86
+$ProgramFilesDir = $ProgramFiles.Default
 
 # Find Visual Studio or Msbuild
-# vswhere can print more than one line when multiple installations of the same VS year are
-# present (e.g. a Community edition and a BuildTools edition both installed). The original .bat's
-# `FOR /F ... DO SET VAR=%%F` overwrites on each line, so the last line wins; `& vswhere.exe`
-# instead captures multi-line output as a string array, and interpolating an array into "$Var\..."
-# below would silently join elements with a space into a garbled, nonexistent path. Select-Object
-# -Last 1 reproduces the .bat's "last line wins" behavior and guarantees a single string.
-$VS2017Dir = & "miscellaneous\vswhere.exe" -version "[15.0,16.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2017 = "$VS2017Dir\Common7\IDE\devenv.com"
+$Vs = Find-VisualStudioDevenv
+$VS2017Dir = $Vs.VS2017Dir; $VS2017 = $Vs.VS2017
+$VS2019Dir = $Vs.VS2019Dir; $VS2019 = $Vs.VS2019
+$VS2022Dir = $Vs.VS2022Dir; $VS2022 = $Vs.VS2022
+$VS2026Dir = $Vs.VS2026Dir; $VS2026 = $Vs.VS2026
 
-$VS2019Dir = & "miscellaneous\vswhere.exe" -version "[16.0,17.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2019 = "$VS2019Dir\Common7\IDE\devenv.com"
-
-$VS2022Dir = & "miscellaneous\vswhere.exe" -version "[17.0,18.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2022 = "$VS2022Dir\Common7\IDE\devenv.com"
-
-$VS2026Dir = & "miscellaneous\vswhere.exe" -version "[18.0,19.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2026 = "$VS2026Dir\Common7\IDE\devenv.com"
-
-$MSBuild35 = $null
-$MSBuild40 = $null
-if (Test-Path "$env:windir\Microsoft.NET\Framework\v3.5\MSBuild.exe") { $MSBuild35 = "$env:windir\Microsoft.NET\Framework\v3.5\MSBuild.exe" }
-if (Test-Path "$env:windir\Microsoft.NET\Framework64\v3.5\MSBuild.exe") { $MSBuild35 = "$env:windir\Microsoft.NET\Framework64\v3.5\MSBuild.exe" }
-if (Test-Path "$env:windir\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe") { $MSBuild40 = "$env:windir\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe" }
+$Legacy = Find-LegacyMSBuild
+$MSBuild35 = $Legacy.MSBuild35
+$MSBuild40 = $Legacy.MSBuild40
 
 # Each check overwrites unconditionally if it matches - same cascading "last/highest found wins"
 # behavior as the .bat's sequence of independent IF EXIST statements (not elseif).

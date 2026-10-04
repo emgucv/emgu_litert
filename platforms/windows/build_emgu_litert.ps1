@@ -28,28 +28,13 @@ param(
 
 $ErrorActionPreference = "Continue"
 
-# Get-ChildItem's enumeration order is not guaranteed to be sorted, and even a sorted-by-name
-# fallback would misorder version jumps like "14.9.x" vs "14.10.x" (lexicographic "9" > "1").
-# Parse each directory name as a [version] and pick the numerically highest instead. (Not
-# currently needed by this script - CMake's own VS-generator detection doesn't need an MSVC
-# toolset folder directly - but kept for parity with bazel_build_litert.ps1 in case a future
-# edit needs it here too.)
-function Get-LatestVersionDir {
-    param([string]$Path, [string]$Filter = "*")
-    Get-ChildItem -Path $Path -Directory -Filter $Filter -ErrorAction SilentlyContinue |
-        ForEach-Object {
-            $parsedVersion = $null
-            if ([version]::TryParse($_.Name, [ref]$parsedVersion)) {
-                [PSCustomObject]@{ Dir = $_; Version = $parsedVersion }
-            }
-        } |
-        Sort-Object Version |
-        Select-Object -Last 1 -ExpandProperty Dir
-}
-
 # %~p0 in the .bat always refers to the invoking script's own directory, regardless of later
 # `cd`s. $PSScriptRoot has the same property, so capture it before changing location.
 $ScriptDir = $PSScriptRoot
+
+# Get-LatestVersionDir, Get-ProgramFilesPaths, Find-VisualStudioDevenv - shared with
+# bazel_build_litert.ps1 and cmake_build_litert.ps1 (see _common.ps1).
+. (Join-Path $ScriptDir "_common.ps1")
 
 # pushd %~p0 & cd ..\..
 Push-Location $ScriptDir
@@ -82,30 +67,18 @@ switch ($Arch.ToUpperInvariant()) {
     "ARM64" { $BuildArch = @("-A", "ARM64") }
 }
 
-$ProgramFilesX86 = ${env:ProgramFiles(x86)}
-if (-not (Test-Path $ProgramFilesX86)) { $ProgramFilesX86 = $env:ProgramFiles }
-$ProgramFilesDir = $env:ProgramFiles
+$ProgramFiles = Get-ProgramFilesPaths
+$ProgramFilesX86 = $ProgramFiles.X86
+$ProgramFilesDir = $ProgramFiles.Default
 
 $BuildTools2019Folder = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
 
 # Find Visual Studio or Msbuild
-# vswhere can print more than one line when multiple installations of the same VS year are
-# present (e.g. a Community edition and a BuildTools edition both installed). The original .bat's
-# `FOR /F ... DO SET VAR=%%F` overwrites on each line, so the last line wins; `& vswhere.exe`
-# instead captures multi-line output as a string array, and interpolating an array into "$Var\..."
-# below would silently join elements with a space into a garbled, nonexistent path. Select-Object
-# -Last 1 reproduces the .bat's "last line wins" behavior and guarantees a single string.
-$VS2017Dir = & "miscellaneous\vswhere.exe" -version "[15.0,16.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2017 = "$VS2017Dir\Common7\IDE\devenv.com"
-
-$VS2019Dir = & "miscellaneous\vswhere.exe" -version "[16.0,17.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2019 = "$VS2019Dir\Common7\IDE\devenv.com"
-
-$VS2022Dir = & "miscellaneous\vswhere.exe" -version "[17.0,18.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2022 = "$VS2022Dir\Common7\IDE\devenv.com"
-
-$VS2026Dir = & "miscellaneous\vswhere.exe" -version "[18.0,19.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2026 = "$VS2026Dir\Common7\IDE\devenv.com"
+$Vs = Find-VisualStudioDevenv
+$VS2017Dir = $Vs.VS2017Dir; $VS2017 = $Vs.VS2017
+$VS2019Dir = $Vs.VS2019Dir; $VS2019 = $Vs.VS2019
+$VS2022Dir = $Vs.VS2022Dir; $VS2022 = $Vs.VS2022
+$VS2026Dir = $Vs.VS2026Dir; $VS2026 = $Vs.VS2026
 
 $MSBuildBuildTools2019 = $null
 if (Test-Path (Join-Path $BuildTools2019Folder "MSBuild\Current\Bin\MSBuild.exe")) {

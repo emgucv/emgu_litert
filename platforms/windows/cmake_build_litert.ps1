@@ -36,6 +36,10 @@ $ErrorActionPreference = "Continue"
 # `cd`s. $PSScriptRoot has the same property, so capture it before changing location.
 $ScriptDir = $PSScriptRoot
 
+# Get-ProgramFilesPaths, Find-VisualStudioDevenv, Find-LegacyMSBuild - shared with
+# build_emgu_litert.ps1 and bazel_build_litert.ps1 (see _common.ps1).
+. (Join-Path $ScriptDir "_common.ps1")
+
 # pushd %~p0 & cd ..\..
 Push-Location $ScriptDir
 Set-Location (Join-Path $ScriptDir "..\..")
@@ -87,9 +91,9 @@ if ($ProcessCountFlag -ne "") {
     $MsbuildMultiprocess = "/m:$ProcessCountFlag"
 }
 
-$ProgramFilesX86 = ${env:ProgramFiles(x86)}
-if (-not (Test-Path $ProgramFilesX86)) { $ProgramFilesX86 = $env:ProgramFiles }
-$ProgramFilesDir = $env:ProgramFiles
+$ProgramFiles = Get-ProgramFilesPaths
+$ProgramFilesX86 = $ProgramFiles.X86
+$ProgramFilesDir = $ProgramFiles.Default
 
 # Find Python executable
 $PythonExecutable = "python.exe"
@@ -109,25 +113,17 @@ $VS2012 = "$($env:VS110COMNTOOLS)..\IDE\devenv.com"
 $VS2013 = "$($env:VS120COMNTOOLS)..\IDE\devenv.com"
 $VS2015 = "$($env:VS140COMNTOOLS)..\IDE\devenv.com"
 
-# vswhere can print more than one line when multiple installations of the same VS year are
-# present (e.g. a Community edition and a BuildTools edition both installed). The original
-# .bat's `FOR /F ... DO SET VAR=%%F` overwrites on each line, so the last line wins; `& vswhere`
-# instead captures multi-line output as a string array, and interpolating an array into
-# "$Var\..." below would silently join elements with a space into a garbled, nonexistent path.
-# Select-Object -Last 1 reproduces the .bat's "last line wins" behavior and guarantees a single
-# string (same fix applied in build_emgu_litert.ps1 / bazel_build_litert.ps1).
-$VS2017Dir = & "miscellaneous\vswhere.exe" -version "[15.0,16.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2017 = "$VS2017Dir\Common7\IDE\devenv.com"
-
-$VS2019Dir = & "miscellaneous\vswhere.exe" -version "[16.0,17.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2019 = "$VS2019Dir\Common7\IDE\devenv.com"
-
-$VS2022Dir = & "miscellaneous\vswhere.exe" -version "[17.0,18.0)" -property installationPath 2>$null | Select-Object -Last 1
-$VS2022 = "$VS2022Dir\Common7\IDE\devenv.com"
+# VS2017/2019/2022 via Find-VisualStudioDevenv (shared with build_emgu_litert.ps1 /
+# bazel_build_litert.ps1 - see _common.ps1). This .bat predates VS2026, so that member is
+# simply left unused here, matching the original.
+$Vs = Find-VisualStudioDevenv
+$VS2017Dir = $Vs.VS2017Dir; $VS2017 = $Vs.VS2017
+$VS2019Dir = $Vs.VS2019Dir; $VS2019 = $Vs.VS2019
+$VS2022Dir = $Vs.VS2022Dir; $VS2022 = $Vs.VS2022
 
 # $VSBuildTools is computed here exactly like the .bat's VS_BUILDTOOLS, but - same as the .bat -
 # it's never actually referenced anywhere afterward. Kept for fidelity.
-$VSBuildTools = & "miscellaneous\vswhere.exe" -products "*" -property installationPath 2>$null | Select-Object -Last 1
+$VSBuildTools = Find-VsWhereInstallPath -VsWhereArgs @("-products", "*")
 
 # Find CMake
 $Cmake = "cmake.exe"
@@ -139,13 +135,11 @@ if (Test-Path (Join-Path $ProgramFilesX86 "CMake\bin\cmake.exe")) { $Cmake = Joi
 if (Test-Path (Join-Path $ProgramFilesDir "CMake\bin\cmake.exe")) { $Cmake = Join-Path $ProgramFilesDir "CMake\bin\cmake.exe" }
 if ($env:ProgramW6432 -and (Test-Path (Join-Path $env:ProgramW6432 "CMake\bin\cmake.exe"))) { $Cmake = Join-Path $env:ProgramW6432 "CMake\bin\cmake.exe" }
 
-$MSBuild35 = $null
-$MSBuild40 = $null
+$Legacy = Find-LegacyMSBuild
+$MSBuild35 = $Legacy.MSBuild35
+$MSBuild40 = $Legacy.MSBuild40
 $MSBuild140 = $null
 $MSBuild150 = $null
-if (Test-Path "$env:windir\Microsoft.NET\Framework\v3.5\MSBuild.exe") { $MSBuild35 = "$env:windir\Microsoft.NET\Framework\v3.5\MSBuild.exe" }
-if (Test-Path "$env:windir\Microsoft.NET\Framework64\v3.5\MSBuild.exe") { $MSBuild35 = "$env:windir\Microsoft.NET\Framework64\v3.5\MSBuild.exe" }
-if (Test-Path "$env:windir\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe") { $MSBuild40 = "$env:windir\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe" }
 if (Test-Path (Join-Path $ProgramFilesX86 "MSBuild\14.0\bin\MSBuild.exe")) { $MSBuild140 = Join-Path $ProgramFilesX86 "MSBuild\14.0\bin\MSBuild.exe" }
 if (Test-Path (Join-Path $VS2017Dir "MSBuild\15.0\Bin\MSBuild.exe")) { $MSBuild150 = Join-Path $VS2017Dir "MSBuild\15.0\Bin\MSBuild.exe" }
 
