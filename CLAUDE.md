@@ -48,9 +48,9 @@ The native C++ layer is exposed through P/Invoke via the `tfliteextern` extern l
 - TF Lite native library already built and placed under `lib/runtimes/` (or `lib/android/`, `lib/ios/`)
 
 ### Build native TF Lite (Windows x64)
-```bat
+```powershell
 cd platforms/windows
-cmake_build_tflite_x86_64.bat
+.\cmake_build_litert.ps1 64 xnn
 ```
 Or via Bazel (also produces `lib/runtimes/win-x64/native/tfliteextern.dll`):
 ```powershell
