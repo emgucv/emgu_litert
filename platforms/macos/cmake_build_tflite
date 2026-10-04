@@ -6,27 +6,31 @@ echo Building with $JOB_COUNT parallel jobs
 cd "$(dirname "$0")"
 cd ../../
 
-# litertextern/tfliteextern's CMakeLists.txt links directly against litert/tflite (the
-# google-ai-edge/LiteRT submodule) - there is no tensorflow/ submodule to build from
-# anymore. It auto-detects osx/arm64 vs osx/x64 from the compiler's predefined __aarch64__
-# macro and writes libtfliteextern.dylib straight into lib/runtimes/osx/native/<arch>
-# itself, so no copy step is needed here (matching the Windows/Debian CMake build scripts).
-# This only builds for the host's own architecture - unlike bazel_build_tflite_macos_fat,
-# there's no per-arch-build-then-lipo step here to produce a universal binary. Setting
-# CMAKE_OSX_ARCHITECTURES to build both arm64 and x86_64 in one pass was tried and
-# rejected: it breaks the same __aarch64__ check_symbol_exists() detection used above,
-# since that check only compiles for a single architecture at a time.
+# CMake counterpart of bazel_build_tflite_macos: builds LiteRT's own runtime, libLiteRt.dylib (from LiteRT's
+# CMake project, litert/litert, which builds litert/tflite itself), and libtfliteextern.dylib linked
+# dynamically against it - see TFLITEEXTERN_LINK_LITERT in litertextern/tfliteextern/CMakeLists.txt, on by
+# default on macOS. libLiteRt exports both the TfLite* C API tfliteextern uses and the LiteRt* C API
+# Emgu.LiteRT P/Invokes directly. XNNPACK is part of libLiteRt (LiteRT's default), as in the Bazel build.
+#
+# It auto-detects osx/arm64 vs osx/x64 from the compiler's predefined __aarch64__ macro and writes both
+# dylibs straight into lib/runtimes/osx/native/<arm64|x64>, with @rpath install names and an @loader_path
+# rpath on libtfliteextern.dylib, so no copy step is needed here. This only builds for the host's own
+# architecture - unlike bazel_build_tflite_macos_fat, there's no per-arch-build-then-lipo step here to
+# produce a universal binary. Setting CMAKE_OSX_ARCHITECTURES to build both arm64 and x86_64 in one pass
+# was tried and rejected: it breaks the same __aarch64__ check_symbol_exists() detection used above, since
+# that check only compiles for a single architecture at a time.
 cd litertextern/tfliteextern
 mkdir -p build
 cd build
 
-cmake -DTFLITE_ENABLE_XNNPACK:BOOL=OFF ..    #-DCMAKE_VERBOSE_MAKEFILE=ON
+# CMAKE_BUILD_TYPE: with the default Makefile generator, --config below is ignored, so the build type must be
+# set at configure time to get an optimized build. CMAKE_POLICY_VERSION_MINIMUM: LiteRT's CMakePresets.json
+# sets it too, since CMake 4 rejects some vendored dependencies' old cmake_minimum_required() otherwise.
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ..    #-DCMAKE_VERBOSE_MAKEFILE=ON
 
-# Build the tfliteextern target specifically rather than the default "all" target -
-# litertextern/tfliteextern/CMakeLists.txt now excludes the handful of litert proto
-# targets that used to break "all" outright (see its EXCLUDE_FROM_ALL comment for why),
-# so "all" would work too, but targeting tfliteextern directly still skips litert's
-# unrelated benchmark/example targets we don't need, same as the Windows/Debian scripts.
-cmake --build . --config Release --target tfliteextern --parallel $JOB_COUNT
+# Build the tfliteextern target specifically (it depends on, and so also builds, libLiteRt) rather than the
+# default "all" target, to skip LiteRT's unrelated tool/example/vendor targets, same as the Windows/Debian
+# scripts.
+cmake --build . --config Release --target tfliteextern --parallel $JOB_COUNT || exit 1
 
 echo Output written to lib/runtimes/osx/native/

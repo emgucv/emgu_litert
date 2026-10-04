@@ -25,7 +25,24 @@ SET(CPACK_PACKAGE_VERSION_MAJOR ${LITERT_VERSION_MAJOR})
 SET(CPACK_PACKAGE_VERSION_MINOR ${LITERT_VERSION_MINOR})
 SET(CPACK_PACKAGE_VERSION_PATCH ${LITERT_VERSION_PATCH})
 
-ADD_SUBDIRECTORY(${LITERT_SOURCE_DIR_ABS}/tflite ${CMAKE_CURRENT_BINARY_DIR}/tflite)
+# TFLITEEXTERN_LINK_LITERT: build LiteRT's own CMake project (litert/litert, which adds litert/tflite itself)
+# and link tfliteextern dynamically against its libLiteRt shared library, instead of statically linking the
+# TFLite runtime into tfliteextern - the same split the macOS/Android Bazel builds use. libLiteRt exports the
+# TfLite* C API tfliteextern needs (on Apple, LiteRT's CMake links it with -all_load and no export list) as
+# well as the LiteRt* C API Emgu.LiteRT P/Invokes directly, so one runtime serves both. On by default for
+# macOS only; the Windows/Linux CMake builds keep the statically linked tfliteextern.
+IF(APPLE AND NOT IOS)
+  SET(TFLITEEXTERN_LINK_LITERT_DEFAULT ON)
+ELSE()
+  SET(TFLITEEXTERN_LINK_LITERT_DEFAULT OFF)
+ENDIF()
+OPTION(TFLITEEXTERN_LINK_LITERT "Link tfliteextern dynamically against LiteRT's libLiteRt shared library" ${TFLITEEXTERN_LINK_LITERT_DEFAULT})
+
+IF(TFLITEEXTERN_LINK_LITERT)
+  ADD_SUBDIRECTORY(${LITERT_SOURCE_DIR_ABS}/litert ${CMAKE_CURRENT_BINARY_DIR}/litert)
+ELSE()
+  ADD_SUBDIRECTORY(${LITERT_SOURCE_DIR_ABS}/tflite ${CMAKE_CURRENT_BINARY_DIR}/tflite)
+ENDIF()
 
 # litert/tflite/CMakeLists.txt unconditionally add_subdirectory()s profiling/proto and
 # tools/benchmark/proto, whose add_custom_command()s pass protoc a
@@ -102,10 +119,18 @@ ADD_DEFINITIONS(-DTF_MINOR_VERSION=${LITERT_VERSION_MINOR})
 ADD_DEFINITIONS(-DTF_PATCH_VERSION=${LITERT_VERSION_PATCH})
 ADD_DEFINITIONS(-DTF_VERSION_SUFFIX="")
 
-target_link_libraries(tfliteextern
-  tensorflow-lite
-)
-ADD_DEPENDENCIES(tfliteextern tensorflow-lite)
+IF(TFLITEEXTERN_LINK_LITERT)
+  # litert_runtime_c_api_shared_lib (libLiteRt) carries the TFLite/TensorFlow include directories as PUBLIC
+  # properties but no link interface. tfliteextern.cc also includes the model schema header, which needs the
+  # flatbuffers headers (header-only use, nothing from libflatbuffers is linked).
+  target_link_libraries(tfliteextern litert_runtime_c_api_shared_lib)
+  target_include_directories(tfliteextern PRIVATE $<TARGET_PROPERTY:flatbuffers,INTERFACE_INCLUDE_DIRECTORIES>)
+ELSE()
+  target_link_libraries(tfliteextern
+    tensorflow-lite
+  )
+  ADD_DEPENDENCIES(tfliteextern tensorflow-lite)
+ENDIF()
 
 IF(TFLITE_ENABLE_XNNPACK)
 ELSE()
@@ -187,6 +212,21 @@ set_target_properties( tfliteextern PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG ${
 set_target_properties( tfliteextern PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE ${TFLITEEXTERN_OUTPUT_DIRECTORY} )
 
 MESSAGE(STATUS "TFLITEEXTERN_OUTPUT_DIRECTORY ${TFLITEEXTERN_OUTPUT_DIRECTORY}")
+
+IF(TFLITEEXTERN_LINK_LITERT)
+  # Deploy libLiteRt next to libtfliteextern, which finds it there via an @loader_path rpath (matching the
+  # Bazel macOS build's @rpath install names), instead of the absolute build-tree rpath CMake uses by default.
+  set_target_properties(litert_runtime_c_api_shared_lib PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY ${TFLITEEXTERN_OUTPUT_DIRECTORY}
+    RUNTIME_OUTPUT_DIRECTORY ${TFLITEEXTERN_OUTPUT_DIRECTORY}
+    INSTALL_NAME_DIR "@rpath"
+    BUILD_WITH_INSTALL_NAME_DIR ON)
+  set_target_properties(tfliteextern PROPERTIES
+    INSTALL_NAME_DIR "@rpath"
+    BUILD_WITH_INSTALL_NAME_DIR ON
+    INSTALL_RPATH "@loader_path"
+    BUILD_WITH_INSTALL_RPATH ON)
+ENDIF()
 
 IF(WIN32)
   # Same marker bazel_build_litert.ps1 writes from the tflite_with_xnnpack define,
