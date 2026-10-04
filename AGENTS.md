@@ -51,9 +51,9 @@ cd platforms/windows
 ```
 
 ### Build the .NET solution (Windows)
-```bat
+```powershell
 cd platforms/windows
-build_emgutf.bat
+.\build_emgu_litert.ps1
 ```
 Optional args: `doc` (build docs), `nuget` (build NuGet packages), `package` (build zip packages).
 
