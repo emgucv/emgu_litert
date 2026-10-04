@@ -164,14 +164,20 @@ cc_shared_library(
         "@XNNPACK//:__subpackages__",
     ],
     shared_lib_name = "libLiteRt.so",
-    target_compatible_with = ["@platforms//os:android"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "@platforms//os:android": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     user_link_flags = [
         "-Wl,--version-script,$(location litert_exported_symbols_linux.lds)",
         # LiteRT's own litert_tflite_runtime_c_api_so sets no SONAME, so libtfliteextern.so would record the
         # Bazel output path of libLiteRt.so as its DT_NEEDED entry instead of the plain file name.
         "-Wl,-soname,libLiteRt.so",
-        "-landroid",
-    ],
+    ] + select({
+        "@platforms//os:android": ["-landroid"],
+        "//conditions:default": [],
+    }),
     deps = ["//litert/c:litert_tflite_runtime_c_api_so_shim"],
 )
 
@@ -235,6 +241,7 @@ cc_library(
     target_compatible_with = select({
         "@platforms//os:macos": [],
         "@platforms//os:android": [],
+        "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = _TFLITEEXTERN_CAPI_DEPS + ["//tflite/delegates/xnnpack:xnnpack_delegate"] + select({
@@ -260,8 +267,16 @@ cc_shared_library(
     name = "tfliteextern_so",
     dynamic_deps = [":litert_runtime_so"],
     shared_lib_name = "libtfliteextern.so",
-    target_compatible_with = ["@platforms//os:android"],
-    user_link_flags = ["-Wl,-soname,libtfliteextern.so"],
+    target_compatible_with = select({
+        "@platforms//os:android": [],
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    user_link_flags = ["-Wl,-soname,libtfliteextern.so"] + select({
+        # libLiteRt.so is deployed next to libtfliteextern.so on Linux, found via $ORIGIN.
+        "@platforms//os:linux": ["-Wl,-rpath,$ORIGIN"],
+        "//conditions:default": [],
+    }),
     deps = [":tfliteextern_capi_lib"],
 )
 
