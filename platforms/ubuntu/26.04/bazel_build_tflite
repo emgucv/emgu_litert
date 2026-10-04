@@ -55,6 +55,11 @@ cd ..
 
 cp -f litert/bazel-bin/tfliteextern/libLiteRt.so lib/$OUT_FOLDER/libLiteRt.so
 cp -f litert/bazel-bin/tfliteextern/libtfliteextern.so lib/$OUT_FOLDER/libtfliteextern.so
+# Strip debug info; --strip-unneeded keeps the dynamic symbol table, so the exported functions are unaffected.
+for LIB in libLiteRt libtfliteextern; do
+    chmod u+w lib/$OUT_FOLDER/$LIB.so
+    strip --strip-unneeded lib/$OUT_FOLDER/$LIB.so || exit 1
+done
 # Record the tflite_with_xnnpack define next to the library. The top level CMakeLists.txt reads it
 # to set EMGU_TF_LITE_UBUNTU_XNNPACK, and it travels with the binary in the zip package.
 echo $TFLITE_WITH_XNNPACK > lib/$OUT_FOLDER/tflite_with_xnnpack.txt
