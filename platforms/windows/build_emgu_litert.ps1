@@ -89,16 +89,22 @@ $ProgramFilesDir = $env:ProgramFiles
 $BuildTools2019Folder = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
 
 # Find Visual Studio or Msbuild
-$VS2017Dir = & "miscellaneous\vswhere.exe" -version "[15.0,16.0)" -property installationPath 2>$null
+# vswhere can print more than one line when multiple installations of the same VS year are
+# present (e.g. a Community edition and a BuildTools edition both installed). The original .bat's
+# `FOR /F ... DO SET VAR=%%F` overwrites on each line, so the last line wins; `& vswhere.exe`
+# instead captures multi-line output as a string array, and interpolating an array into "$Var\..."
+# below would silently join elements with a space into a garbled, nonexistent path. Select-Object
+# -Last 1 reproduces the .bat's "last line wins" behavior and guarantees a single string.
+$VS2017Dir = & "miscellaneous\vswhere.exe" -version "[15.0,16.0)" -property installationPath 2>$null | Select-Object -Last 1
 $VS2017 = "$VS2017Dir\Common7\IDE\devenv.com"
 
-$VS2019Dir = & "miscellaneous\vswhere.exe" -version "[16.0,17.0)" -property installationPath 2>$null
+$VS2019Dir = & "miscellaneous\vswhere.exe" -version "[16.0,17.0)" -property installationPath 2>$null | Select-Object -Last 1
 $VS2019 = "$VS2019Dir\Common7\IDE\devenv.com"
 
-$VS2022Dir = & "miscellaneous\vswhere.exe" -version "[17.0,18.0)" -property installationPath 2>$null
+$VS2022Dir = & "miscellaneous\vswhere.exe" -version "[17.0,18.0)" -property installationPath 2>$null | Select-Object -Last 1
 $VS2022 = "$VS2022Dir\Common7\IDE\devenv.com"
 
-$VS2026Dir = & "miscellaneous\vswhere.exe" -version "[18.0,19.0)" -property installationPath 2>$null
+$VS2026Dir = & "miscellaneous\vswhere.exe" -version "[18.0,19.0)" -property installationPath 2>$null | Select-Object -Last 1
 $VS2026 = "$VS2026Dir\Common7\IDE\devenv.com"
 
 $MSBuildBuildTools2019 = $null
