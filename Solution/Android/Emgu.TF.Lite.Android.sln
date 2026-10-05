@@ -5,13 +5,13 @@ VisualStudioVersion = 17.10.34916.146
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.LiteRT.Util.Shared", "..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.shproj", "{98561642-5EC3-4244-BAF9-6876D9BA5527}"
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Shared", "..\..\Emgu.LiteRT.Tflite\Emgu.LiteRT.Tflite.Shared.shproj", "{8F587FB9-BBA6-4C30-9329-8CBAC7020FE0}"
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.LiteRT.Tflite.Shared", "..\..\Emgu.LiteRT.Tflite\Emgu.LiteRT.Tflite.Shared.shproj", "{8F587FB9-BBA6-4C30-9329-8CBAC7020FE0}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.Models.Shared", "..\..\Emgu.Models\Emgu.Models.Shared.shproj", "{8EDCE0C8-BA71-4396-9428-35D05877258C}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Models.Shared", "..\..\Emgu.LiteRT.Tflite.Models\Emgu.TF.Lite.Models.Shared.shproj", "{E956DD26-1294-4731-8A90-C4CBA9F291B6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite", "..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj", "{FDAB1BD5-2BC7-4839-83A6-3DCD6E8C4B5A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.LiteRT.Tflite", "..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj", "{FDAB1BD5-2BC7-4839-83A6-3DCD6E8C4B5A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.Models", "..\..\Emgu.LiteRT.Tflite.Models\NetStandard\Emgu.TF.Lite.Models.csproj", "{BD5392A2-30E8-4D5A-A1AD-F66A95B54D14}"
 EndProject
