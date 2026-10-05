@@ -18,10 +18,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ubuntu-x64:
-    name: Ubuntu 24.04 x64
-    runs-on: ubuntu-24.04
+  ubuntu:
+    # The libraries need a glibc at least as new as the one they were built against, so these load on Ubuntu 26.04
+    # and newer, not on 24.04.
+    name: Ubuntu 26.04 ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - arch: x64
+          runner: ubuntu-26.04
+        - arch: arm64
+          runner: ubuntu-26.04-arm
     steps:
     - name: Free disk space
       # Standard runners have ~14 GB free on /; a cold LiteRT Bazel build needs more. Remove large preinstalled
@@ -34,16 +44,17 @@ jobs:
       with:
         submodules: true
     - name: Build libLiteRt.so and libtfliteextern.so
-      run: platforms/ubuntu/24.04/bazel_build_tflite
+      # The script detects the host architecture (x86_64 or aarch64) and picks the Bazel configs and output folder.
+      run: platforms/ubuntu/26.04/bazel_build_tflite
     - uses: actions/upload-artifact@v5
       with:
-        name: native-ubuntu-x64
-        path: lib/runtimes/ubuntu-x64/native/
+        name: native-ubuntu-${{ matrix.arch }}
+        path: lib/runtimes/ubuntu-${{ matrix.arch }}/native/
         if-no-files-found: error
 
   android:
     name: Android ${{ matrix.arch }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 360
     strategy:
       fail-fast: false
@@ -80,7 +91,7 @@ jobs:
 
   macos:
     name: macOS universal
-    runs-on: macos-15
+    runs-on: macos-latest
     timeout-minutes: 360
     steps:
     - uses: actions/checkout@v5
