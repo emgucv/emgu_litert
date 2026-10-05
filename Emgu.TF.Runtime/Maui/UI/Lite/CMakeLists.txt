@@ -39,6 +39,10 @@ IF(HAVE_MAUI_LITE AND (APPLE OR WIN32))
     ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.runtime.windows.nuget)
   ENDIF()
 
+  IF (TARGET Emgu.LiteRT.Tflite.runtime.windows.nuget)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.Tflite.runtime.windows.nuget)
+  ENDIF()
+
   INSTALL(
     DIRECTORY
     ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.runtime.maui

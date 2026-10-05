@@ -509,8 +509,15 @@ IF(HAVE_LITE_BUILD)
   #IF ("${LICENSE_TYPE}" STREQUAL "Commercial")
   #  SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGUTF_LITE_WINDOWS_NUGET_ID}-CR")  
   #ENDIF()
-  SET(EMGUTF_LITE_WINDOWS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Windows")	
-  
+  SET(EMGUTF_LITE_WINDOWS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Windows")
+
+  # tfliteextern.dll (the TensorFlow Lite Interpreter C API wrapper Emgu.TF.Lite/Emgu.LiteRT.Util
+  # P/Invoke) is packaged separately from libLiteRt.dll (${EMGUTF_LITE_WINDOWS_NUGET_ID} above,
+  # which Emgu.LiteRT's CompiledModel API P/Invokes directly), with a nuget dependency on it -
+  # see EMGUTF_LITE_TFLITE_WINDOWS_NUGET_DEPENDENCY below.
+  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Tflite.runtime.windows")
+  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_TITLE "Native runtime (tfliteextern) of ${EMGUTF_LITE_NUGET_TITLE} for Windows")
+
   SET(EMGUTF_LITE_MACOS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.macos")
   SET(EMGUTF_LITE_MACOS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
   
@@ -629,9 +636,12 @@ ENDIF()
 #	<file src=\"README.md\" target=\"docs\\\" />
 #    <file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
 
+  # Depends on the Tflite package (tfliteextern.dll), not ${EMGUTF_LITE_WINDOWS_NUGET_ID} directly
+  # (libLiteRt.dll only) - MAUI Windows needs both, and the Tflite package already depends on
+  # ${EMGUTF_LITE_WINDOWS_NUGET_ID}, so this pulls in both transitively.
   SET(EMGUTF_LITE_MAUI_NUGET_DEPENDENCY "
   	<ItemGroup>
-      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGUTF_LITE_WINDOWS_NUGET_ID}\" Version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\">
+      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID}\" Version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\">
 	  </PackageReference>
     </ItemGroup>")
    
@@ -695,17 +705,35 @@ IF (HAVE_WINDESKTOP_LITE)
 ENDIF()
 
 IF( HAVE_WINDESKTOP_LITE )
+  # ${EMGUTF_LITE_WINDOWS_NUGET_ID} contains only libLiteRt.dll (LiteRT's own runtime, which
+  # Emgu.LiteRT's CompiledModel API P/Invokes directly). tfliteextern.dll (the TensorFlow Lite
+  # Interpreter C API wrapper) is packaged separately, as ${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID}
+  # below, depending on this package rather than bundling both DLLs together.
   IF( HAVE_WINDESKTOP_X64_LITE )
-  SET(EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST} 
-    <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\*.dll\" exclude=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\concrt*.dll;..\\..\\..\\lib\\runtimes\\win-x64\\native\\msvcp*.dll;..\\..\\..\\lib\\runtimes\\win-x64\\native\\vcruntime*.dll;..\\..\\..\\lib\\runtimes\\win-x64\\native\\vccorlib*.dll\" target=\"runtimes\\win-x64\\native\" />
+  # libLiteRt.dll only comes from the Bazel build path (bazel_build_litert.ps1); the CMake path
+  # (cmake_build_litert.ps1) only ever produces tfliteextern.dll. Guard on EXISTS, the same way
+  # the macOS packaging below treats libLiteRt.dylib as optional, so a CMake-only build doesn't
+  # fail to pack ${EMGUTF_LITE_WINDOWS_NUGET_ID} over a file that was never built.
+  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/libLiteRt.dll")
+  SET(EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libLiteRt.dll\" target=\"runtimes\\win-x64\\native\" />
+	")
+  ENDIF()
+  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\tfliteextern.dll\" target=\"runtimes\\win-x64\\native\" />
 	")
   ENDIF()
   IF( HAVE_WINDESKTOP_X86_LITE )
-  SET(EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST} 
-    <file src=\"..\\..\\..\\lib\\runtimes\\win-x86\\native\\*.dll\" exclude=\"..\\..\\..\\lib\\runtimes\\win-x86\\native\\concrt*.dll;..\\..\\..\\lib\\runtimes\\win-x86\\native\\msvcp*.dll;..\\..\\..\\lib\\runtimes\\win-x86\\native\\vcruntime*.dll;..\\..\\..\\lib\\runtimes\\win-x86\\native\\vccorlib*.dll\" target=\"runtimes\\win-x86\\native\" />
+  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x86/native/libLiteRt.dll")
+  SET(EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\win-x86\\native\\libLiteRt.dll\" target=\"runtimes\\win-x86\\native\" />
 	")
-  ENDIF()  
-  SET(EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST} 
+  ENDIF()
+  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\win-x86\\native\\tfliteextern.dll\" target=\"runtimes\\win-x86\\native\" />
+	")
+  ENDIF()
+  SET(EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"README.md\" target=\"docs\\\" />")
@@ -713,6 +741,15 @@ IF( HAVE_WINDESKTOP_LITE )
     <dependencies>
 	    ${EMGUTF_LITE_WINDOWS_NUGET_DEPENDENCY}
 		<dependency id=\"${EMGUTF_LITE_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+    </dependencies>")
+
+  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST}
+	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"README.md\" target=\"docs\\\" />")
+  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_DEPENDENCY "
+    <dependencies>
+		<dependency id=\"${EMGUTF_LITE_WINDOWS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")
 ENDIF()
 
@@ -846,6 +883,9 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Package.REA
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/README.md)
+
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Tflite.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.Tflite.runtime.windows/Package.nuspec)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Tflite.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.Tflite.runtime.windows/README.md)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.macos/Package.nuspec)
 

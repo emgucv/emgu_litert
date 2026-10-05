@@ -167,6 +167,8 @@ $DoMoveNuget = $false
 if ($NugetFlag -eq "nuget") {
     if ($HasTfLite) {
         $CmakeBuildTarget2 += "Emgu.LiteRT.runtime.windows.nuget"
+        # tfliteextern.dll's own package, depending on the libLiteRt one above.
+        $CmakeBuildTarget2 += "Emgu.LiteRT.Tflite.runtime.windows.nuget"
         $DoMoveNuget = $true
     }
 }
