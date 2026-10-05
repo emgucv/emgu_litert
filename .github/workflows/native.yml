@@ -81,7 +81,11 @@ jobs:
         [ -z "$NDK" ] && NDK=$(ls "$ANDROID_HOME/ndk" | sort -V | tail -1)
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK" >> "$GITHUB_ENV"
         echo "Using NDK $NDK"
-    - name: Build libLiteRt.so and libtfliteextern.so
+    - name: Fetch LiteRT-LM's prebuilt Gemma library
+      # liblitert-lm.so depends on prebuilt/android_<arch>/libGemmaModelConstraintProvider.so, which LiteRT-LM
+      # stores with Git LFS; the submodule checkout only has its pointer file.
+      run: git -C LiteRT-LM lfs pull --include=prebuilt/android_${{ matrix.arch }}/libGemmaModelConstraintProvider.so
+    - name: Build libLiteRt.so, libtfliteextern.so and liblitert-lm.so
       run: platforms/android/bazel_build_tflite_android ${{ matrix.arch }}
     - uses: actions/upload-artifact@v5
       with:

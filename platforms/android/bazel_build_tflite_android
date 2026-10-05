@@ -28,7 +28,7 @@ else
     exit 1
 fi
 
-# android_sdk_repository/android_ndk_repository (in litert/WORKSPACE) read these from the
+# android_sdk_repository/android_ndk_repository (in LiteRT-LM/WORKSPACE) read these from the
 # real process environment at repository-loading time -- not overridable via --action_env,
 # which only affects build actions. Default to the SDK/NDK actually installed in this image,
 # picking the newest NDK under $ANDROID_HOME/ndk unless ANDROID_NDK_HOME is already set.
@@ -41,25 +41,52 @@ echo "Using ANDROID_HOME=$ANDROID_HOME ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
 cd "$(dirname "$0")"
 cd ../../
 # Keep Bazel's output tree (its --output_user_root startup option) in a subfolder of this repo rather than
-# the default /private/var/tmp/_bazel_$USER (macOS) or ~/.cache/bazel (Linux). It sits outside the litert/
+# the default /private/var/tmp/_bazel_$USER (macOS) or ~/.cache/bazel (Linux). It sits outside the LiteRT-LM/
 # workspace on purpose, so Bazel never treats it as source.
 BAZEL_OUTPUT_USER_ROOT="$(pwd)/bazel_output"
 mkdir -p lib/android/$arch
 
-# litert is a pristine third-party submodule (we don't own/patch it upstream), so the
-# tfliteextern Bazel package can't live there in git. Stage our tracked source into it
-# here instead, each run, mirroring what the Windows/macOS/iOS Bazel build scripts do.
-mkdir -p litert/tfliteextern
-cp -f litertextern/tfliteextern/bazel/BUILD litert/tfliteextern/BUILD
-cp -f litertextern/tfliteextern/bazel/tfliteextern.def litert/tfliteextern/tfliteextern.def
-cp -f litertextern/tfliteextern/bazel/litert_exported_symbols_linux.lds litert/tfliteextern/litert_exported_symbols_linux.lds
-cp -f litertextern/tfliteextern/tfliteextern.cc litert/tfliteextern/tfliteextern.cc
-cp -f litertextern/tfliteextern/tfliteextern.h litert/tfliteextern/tfliteextern.h
-cp -f litertextern/imgproc/imgproc.cc litert/tfliteextern/imgproc.cc
-cp -f litertextern/imgproc/imgproc.h litert/tfliteextern/imgproc.h
+# Build in the LiteRT-LM submodule's Bazel workspace, against the LiteRT it pins (its WORKSPACE fetches LiteRT as
+# the external repository @litert), so that libLiteRt.so comes from the same LiteRT source as LiteRT-LM's
+# liblitert-lm.so and one copy can serve both - as platforms/macos/bazel_build_tflite_macos does. LiteRT-LM is a
+# pristine third-party submodule (we don't own/patch it upstream), so the tfliteextern Bazel package can't live
+# there in git: stage our tracked source into it here instead, each run. Our BUILD file is written for the litert
+# workspace, where LiteRT's packages are local (//tflite/..., //litert/...); rewrite those labels to @litert//...
+WORKSPACE_DIR=LiteRT-LM
+mkdir -p $WORKSPACE_DIR/tfliteextern
+sed -e 's#"//tflite#"@litert//tflite#g' -e 's#"//litert#"@litert//litert#g' \
+    litertextern/tfliteextern/bazel/BUILD > $WORKSPACE_DIR/tfliteextern/BUILD || exit 1
+cp -f litertextern/tfliteextern/bazel/tfliteextern.def $WORKSPACE_DIR/tfliteextern/tfliteextern.def
+cp -f litertextern/tfliteextern/bazel/litert_exported_symbols_linux.lds $WORKSPACE_DIR/tfliteextern/litert_exported_symbols_linux.lds
+cp -f litertextern/tfliteextern/tfliteextern.cc $WORKSPACE_DIR/tfliteextern/tfliteextern.cc
+cp -f litertextern/tfliteextern/tfliteextern.h $WORKSPACE_DIR/tfliteextern/tfliteextern.h
+cp -f litertextern/imgproc/imgproc.cc $WORKSPACE_DIR/tfliteextern/imgproc.cc
+cp -f litertextern/imgproc/imgproc.h $WORKSPACE_DIR/tfliteextern/imgproc.h
 
-cd litert
+# liblitert-lm.so (LiteRT-LM's C API) is built for arm64-v8a and x86_64 only: it needs LiteRT-LM's prebuilt
+# libGemmaModelConstraintProvider.so, which only exists for those two ABIs (prebuilt/android_<abi>, Git LFS).
+BUILD_LITERT_LM=0
+if [ "$arch" = "arm64-v8a" ] || [ "$arch" = "x86_64" ]; then
+    BUILD_LITERT_LM=1
+    GEMMA_PREBUILT=prebuilt/android_${arch%-v8a}/libGemmaModelConstraintProvider.so
+    if ! head -c 4 "$WORKSPACE_DIR/$GEMMA_PREBUILT" | grep -q ELF; then
+        echo "$WORKSPACE_DIR/$GEMMA_PREBUILT is not an ELF library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
+        exit 1
+    fi
+fi
 
+cd $WORKSPACE_DIR
+
+# LiteRT-LM's build:android config turns off platform-specific configs, so on a macOS host its build:macos
+# --host_linkopt=-Wl,-undefined,dynamic_lookup doesn't apply. Without it, the Rust proc-macro dylibs LiteRT-LM's
+# build tools need come out unloadable by dyld ("mis-aligned LINKEDIT string pool"), and rustc then fails with
+# "can't find crate". Pass it explicitly.
+HOST_FLAGS=
+if [ "$(uname)" = "Darwin" ]; then
+    HOST_FLAGS="--host_linkopt=-Wl,-undefined,dynamic_lookup"
+fi
+
+# Bazel's bazel-bin symlink follows the most recent build, so each build's outputs are copied right after it.
 set -x
 build_with_bazel() {
   bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build -c opt \
@@ -69,14 +96,30 @@ build_with_bazel() {
       --copt=-fPIC --cxxopt=-fPIC \
       --linkopt=-fuse-ld=lld \
       --linkopt=-Wl,-z,max-page-size=16384 \
-      --verbose_failures $extra_flags "$@" \
-      //tfliteextern:litert_runtime_so //tfliteextern:tfliteextern_so
+      --verbose_failures $HOST_FLAGS $extra_flags "$@"
 }
+
+if [ "$BUILD_LITERT_LM" = "1" ]; then
+    # --define=litert_runtime_link_mode=dynamic makes liblitert-lm.so link against libLiteRt.so instead of
+    # containing LiteRT's runtime; the libLiteRt.so built below (same LiteRT source) is deployed next to it in place
+    # of the LiteRt*-only one this build produces. The define can't apply to the tfliteextern build (in dynamic mode
+    # LiteRT's C API libraries resolve to headers only, so libLiteRt.so would be built empty) and isn't part of
+    # Bazel's output folder name, so --platform_suffix keeps the two builds from overwriting each other's outputs.
+    build_with_bazel --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic "${@:2}" \
+        //c:litert-lm || exit 1
+    rm -f ../lib/android/$arch/liblitert-lm.so ../lib/android/$arch/libGemmaModelConstraintProvider.so
+    cp -f bazel-bin/c/liblitert-lm.so ../lib/android/$arch/liblitert-lm.so || exit 1
+    cp -f $GEMMA_PREBUILT ../lib/android/$arch/libGemmaModelConstraintProvider.so || exit 1
+fi
 
 # libtfliteextern.so only contains the TFLite C API wrapper and links dynamically against libLiteRt.so
 # (LiteRT's own runtime, exporting the LiteRt* and TfLite* C APIs, also used directly by Emgu.LiteRT) - see
 # the "macOS and Android" section of litertextern/tfliteextern/bazel/BUILD.
-build_with_bazel "${@:2}" || exit 1
+build_with_bazel "${@:2}" //tfliteextern:litert_runtime_so //tfliteextern:tfliteextern_so || exit 1
+for LIB in libtfliteextern libLiteRt; do
+    rm -f ../lib/android/$arch/$LIB.so
+    cp -f bazel-bin/tfliteextern/$LIB.so ../lib/android/$arch/$LIB.so || exit 1
+done
 bazel --version
 set +x
 
@@ -91,9 +134,9 @@ if [ -z "$LLVM_STRIP" ]; then
     exit 1
 fi
 
-for LIB in libtfliteextern libLiteRt; do
-    rm -f lib/android/$arch/$LIB.so
-    cp -f litert/bazel-bin/tfliteextern/$LIB.so lib/android/$arch/$LIB.so || exit 1
-    chmod u+w lib/android/$arch/$LIB.so
-    "$LLVM_STRIP" --strip-unneeded lib/android/$arch/$LIB.so || exit 1
+for LIB in libtfliteextern libLiteRt liblitert-lm; do
+    if [ -f lib/android/$arch/$LIB.so ]; then
+        chmod u+w lib/android/$arch/$LIB.so
+        "$LLVM_STRIP" --strip-unneeded lib/android/$arch/$LIB.so || exit 1
+    fi
 done
