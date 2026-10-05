@@ -16,6 +16,15 @@ fi
 
 echo Output folder is $OUT_FOLDER
 
+# Compile with clang, as LiteRT's own Linux CI does. Newer GCC (e.g. GCC 15 on Ubuntu 26.04) rejects some of
+# LiteRT's sources, such as tflite/kernels/internal/optimized/4bit/neon_fully_connected_aarch64_sdot.cc's
+# __attribute__((target("dotprod"))) on arm64 ("arch extension 'dotprod' should be prefixed by '+'").
+if command -v clang >/dev/null 2>&1 && command -v clang++ >/dev/null 2>&1; then
+    BAZEL_CONFIG_FLAGS="$BAZEL_CONFIG_FLAGS --repo_env=CC=clang --repo_env=CXX=clang++"
+else
+    echo "clang not found - building with the default compiler (install clang if the build fails, e.g. sudo apt install clang)"
+fi
+
 # LiteRT applies the XNNPACK delegate by default unless the build passes
 # --define tflite_with_xnnpack=false, so follow whatever define was passed in.
 TFLITE_WITH_XNNPACK=true

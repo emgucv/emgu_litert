@@ -1,6 +1,6 @@
 #!/bin/bash -v
 
-sudo apt install build-essential protobuf-compiler libprotobuf-dev \
+sudo apt install build-essential clang protobuf-compiler libprotobuf-dev \
   python-is-python3
   
 if [ "$1" == "cuda" ]; then
