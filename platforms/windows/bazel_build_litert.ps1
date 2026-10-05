@@ -12,6 +12,12 @@
     `cmd.exe /c "<vcvars> && set"` + parse, immediately after the point where the original does
     `call %ENV_SETUP_SCRIPT%`.
 
+    Builds in the LiteRT-LM submodule's Bazel workspace rather than the `litert` submodule's -
+    the same switch already made for bazel_build_tflite_macos and
+    platforms/android/bazel_build_tflite_android, and for the same reason: LiteRT-LM's WORKSPACE
+    fetches LiteRT as the external repository @litert, pinned to a newer commit than the `litert`
+    submodule's own v2.2.0 tag.
+
 .PARAMETER Arch
     "32", "64" (default), "ARM", or "ARM64" - matches the .bat's %1.
 
@@ -191,21 +197,28 @@ if (Test-Path "C:\Program Files\LLVM\bin") { $BazelLlvm = "C:\Program Files\LLVM
 if ($BazelVc) { $BazelLlvm = Join-Path $BazelVc "Tools\Llvm\x64" }
 Write-Host "Using BAZEL_LLVM=$BazelLlvm"
 
-# litert is a pristine third-party submodule (we don't own/patch it upstream), so the
-# tfliteextern Bazel package can't live there in git. Stage our tracked source into it here
-# instead, each run, mirroring what litertextern/tfliteextern/CMakeLists.txt does for the
-# CMake path without needing a copy step.
-$LitertTfliteexternDir = "litert\tfliteextern"
-if (-not (Test-Path $LitertTfliteexternDir)) { New-Item -ItemType Directory -Path $LitertTfliteexternDir | Out-Null }
-Copy-Item "litertextern\tfliteextern\bazel\BUILD" "$LitertTfliteexternDir\BUILD" -Force
-Copy-Item "litertextern\tfliteextern\bazel\tfliteextern.def" "$LitertTfliteexternDir\tfliteextern.def" -Force
-Copy-Item "litertextern\tfliteextern\bazel\litert_windows_exports.def" "$LitertTfliteexternDir\litert_windows_exports.def" -Force
-Copy-Item "litertextern\tfliteextern\tfliteextern.cc" "$LitertTfliteexternDir\tfliteextern.cc" -Force
-Copy-Item "litertextern\tfliteextern\tfliteextern.h" "$LitertTfliteexternDir\tfliteextern.h" -Force
-Copy-Item "litertextern\imgproc\imgproc.cc" "$LitertTfliteexternDir\imgproc.cc" -Force
-Copy-Item "litertextern\imgproc\imgproc.h" "$LitertTfliteexternDir\imgproc.h" -Force
+# Build in the LiteRT-LM submodule's Bazel workspace, against the LiteRT it pins (its WORKSPACE
+# fetches LiteRT as the external repository @litert) - same as bazel_build_tflite_macos and
+# platforms/android/bazel_build_tflite_android. LiteRT-LM is a pristine third-party submodule (we
+# don't own/patch it upstream), so the tfliteextern Bazel package can't live there in git either:
+# stage our tracked source into it here instead, each run. Our BUILD file is written for the
+# litert workspace, where LiteRT's packages are local (//tflite/..., //litert/...); rewrite those
+# labels to @litert//... while staging, the same way the macOS/Android scripts do via sed.
+$WorkspaceDir = "LiteRT-LM"
+$TfliteexternStageDir = Join-Path $WorkspaceDir "tfliteextern"
+if (-not (Test-Path $TfliteexternStageDir)) { New-Item -ItemType Directory -Path $TfliteexternStageDir | Out-Null }
+(Get-Content "litertextern\tfliteextern\bazel\BUILD" -Raw) `
+    -replace '"//tflite', '"@litert//tflite' `
+    -replace '"//litert', '"@litert//litert' |
+    Set-Content -Path (Join-Path $TfliteexternStageDir "BUILD") -NoNewline
+Copy-Item "litertextern\tfliteextern\bazel\tfliteextern.def" (Join-Path $TfliteexternStageDir "tfliteextern.def") -Force
+Copy-Item "litertextern\tfliteextern\bazel\litert_windows_exports.def" (Join-Path $TfliteexternStageDir "litert_windows_exports.def") -Force
+Copy-Item "litertextern\tfliteextern\tfliteextern.cc" (Join-Path $TfliteexternStageDir "tfliteextern.cc") -Force
+Copy-Item "litertextern\tfliteextern\tfliteextern.h" (Join-Path $TfliteexternStageDir "tfliteextern.h") -Force
+Copy-Item "litertextern\imgproc\imgproc.cc" (Join-Path $TfliteexternStageDir "imgproc.cc") -Force
+Copy-Item "litertextern\imgproc\imgproc.h" (Join-Path $TfliteexternStageDir "imgproc.h") -Force
 
-Set-Location "litert"
+Set-Location $WorkspaceDir
 
 $BazelCommand = "bazel.exe"
 $MsysPath = "C:\msys64"
@@ -219,7 +232,7 @@ $CommonBazelArgs = @(
     "--repo_env=BAZEL_LLVM=$BazelLlvm"
 ) + $CpuFlags + $BazelXnnFlags + $DockerFlags + @("-c", "opt")
 
-& $BazelCommand @CommonBazelArgs "//tflite:version" "--verbose_failures"
+& $BazelCommand @CommonBazelArgs "@litert//tflite:version" "--verbose_failures"
 
 & $BazelCommand @CommonBazelArgs "//tfliteextern:tfliteextern" "--verbose_failures"
 
@@ -234,8 +247,8 @@ Set-Location ".."
 
 $NativeOutDir = "lib\runtimes\win-x64\native"
 if (-not (Test-Path $NativeOutDir)) { New-Item -ItemType Directory -Path $NativeOutDir -Force | Out-Null }
-Copy-Item "litert\bazel-bin\tfliteextern\tfliteextern.dll" "$NativeOutDir\tfliteextern.dll" -Force
-Copy-Item "litert\bazel-bin\tfliteextern\libLiteRt.dll" "$NativeOutDir\libLiteRt.dll" -Force
+Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\tfliteextern.dll") "$NativeOutDir\tfliteextern.dll" -Force
+Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\libLiteRt.dll") "$NativeOutDir\libLiteRt.dll" -Force
 # Record the tflite_with_xnnpack define next to the dll. The top level CMakeLists.txt reads it
 # to set EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK, and it travels with the binary in the zip package.
 Set-Content -Path "$NativeOutDir\tflite_with_xnnpack.txt" -Value $TfliteWithXnnpack -NoNewline:$false

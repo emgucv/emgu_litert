@@ -27,9 +27,12 @@
     dumpbin /exports on the built .dll after regenerating this file, something about the link
     (not this script) needs investigating.
 
-    Only needs to be re-run when the pinned litert submodule version changes (or if linking
+    Only needs to be re-run when the pinned LiteRT-LM submodule version changes (or if linking
     //tfliteextern:libLiteRt ever fails with an unresolved external referencing a symbol not in
-    the existing .def - a sign the API surface grew).
+    the existing .def - a sign the API surface grew). Queries the LiteRT-LM submodule's Bazel
+    workspace, not the litert submodule's - bazel_build_litert.ps1 builds there (against the
+    LiteRT commit LiteRT-LM pins as the external repository @litert), same as this script's
+    $LitertLmDir default.
 
 .EXAMPLE
     cd platforms/windows
@@ -38,7 +41,7 @@
     .\generate_litert_windows_exports.ps1
 #>
 param(
-    [string]$LitertDir = "$PSScriptRoot\..\..\..\litert",
+    [string]$LitertLmDir = "$PSScriptRoot\..\..\..\LiteRT-LM",
     [string]$OutputBaseDir = "$PSScriptRoot\..\..\..\platforms\windows\output_base",
     [string]$OutputUserRootDir = "$PSScriptRoot\..\..\..\platforms\windows\output_user_root",
     [string]$OutFile = "$PSScriptRoot\litert_windows_exports.def"
@@ -70,7 +73,7 @@ $BazelCommand = "bazel.exe"
 $MsysBin = "C:\msys64\usr\bin"
 if (Test-Path (Join-Path $MsysBin "bazel.exe")) { $BazelCommand = Join-Path $MsysBin "bazel.exe" }
 
-Push-Location $LitertDir
+Push-Location $LitertLmDir
 try {
     # Must match the same flags bazel_build_litert.ps1 uses to build //tfliteextern:libLiteRt -
     # querying with different flags (e.g. a different XNNPACK define) queries a different,
@@ -103,7 +106,7 @@ Write-Host "Found $($libPaths.Count) whole-archived library inputs"
 
 $symbols = New-Object System.Collections.Generic.HashSet[string]
 foreach ($relPath in $libPaths) {
-    $fullPath = Join-Path $LitertDir $relPath
+    $fullPath = Join-Path $LitertLmDir $relPath
     if (-not (Test-Path $fullPath)) { throw "Link input not found on disk: $fullPath (run bazel_build_litert.ps1 first so it's actually built)" }
     $out = & $dumpbin /linkermember:1 $fullPath 2>$null
     foreach ($line in $out) {
