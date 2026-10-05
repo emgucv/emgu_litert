@@ -8,7 +8,7 @@ using NUnit.Framework;
 #endif
 using Emgu.TF.Lite;
 using Emgu.TF.Lite.Models;
-using Emgu.Models;
+using Emgu.LiteRT.Util;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;

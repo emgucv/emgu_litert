@@ -80,6 +80,9 @@
       <Project>{b7f55b47-f2ab-4b5b-97a2-08a027f11002}</Project>
       <Name>Emgu.TF.Lite.NetStandard</Name>
     </ProjectReference>
+    <!-- Annotation/DownloadableFile/FileDownloadManager moved from Emgu.Models into
+         Emgu.LiteRT.Util - needs a direct reference now for UnitTest1.cs to compile. -->
+    <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Emgu.CV.runtime.windows">

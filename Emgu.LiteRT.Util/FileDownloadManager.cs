@@ -15,7 +15,7 @@ using System.Net.Http;
 using UnityEngine;
 #endif
 
-namespace Emgu.Models
+namespace Emgu.LiteRT.Util
 {
     /// <summary>
     /// Use to download files (e.g. models) from the internet

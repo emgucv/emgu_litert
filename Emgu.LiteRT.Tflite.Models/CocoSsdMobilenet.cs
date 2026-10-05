@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Text;
 using Emgu.TF.Lite;
 using Emgu.Models;
+using Emgu.LiteRT.Util;
 using System.IO;
 using System.ComponentModel;
 using System.Diagnostics;

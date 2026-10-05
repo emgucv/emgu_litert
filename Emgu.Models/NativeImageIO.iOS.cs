@@ -10,6 +10,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using CoreGraphics;
 using UIKit;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.Models
 {

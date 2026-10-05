@@ -10,7 +10,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
-namespace Emgu.Models
+namespace Emgu.LiteRT.Util
 {
     /// <summary>
     /// This represent a file that can be downloaded from the internet

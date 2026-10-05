@@ -9,7 +9,7 @@ using System.Text;
 using System.IO;
 
 
-namespace Emgu.Models
+namespace Emgu.LiteRT.Util
 {
     /// <summary>
     /// Image annotation

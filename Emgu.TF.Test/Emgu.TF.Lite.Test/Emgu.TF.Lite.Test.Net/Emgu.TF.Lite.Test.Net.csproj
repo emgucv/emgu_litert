@@ -34,6 +34,9 @@
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Tflite.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
+    <!-- Annotation/DownloadableFile/FileDownloadManager moved from Emgu.Models into
+         Emgu.LiteRT.Util - needs a direct reference now for UnitTest1.cs to compile. -->
+    <ProjectReference Include="..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
   </ItemGroup>
 
   <Import Project="..\..\..\Emgu.TF.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('windows'))" />

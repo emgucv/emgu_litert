@@ -16,6 +16,7 @@ using Emgu.CV.Platform.Maui.UI;
 using Emgu.CV.Structure;
 using Emgu.TF.Lite;
 using Emgu.Models;
+using Emgu.LiteRT.Util;
 using Emgu.TF.Lite.Models;
 using Emgu.Util;
 

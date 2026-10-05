@@ -11,6 +11,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using AppKit;
 using CoreGraphics;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.Models
 {

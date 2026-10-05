@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 
 using Android.Graphics;
 using Android.Provider;
+using Emgu.LiteRT.Util;
 
 namespace Emgu.Models
 {
