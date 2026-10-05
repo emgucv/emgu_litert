@@ -1,0 +1,97 @@
+# Builds the native libraries (libLiteRt + libtfliteextern) with the current platform build scripts on
+# GitHub-hosted runners, and uploads them as artifacts.
+#
+# Only the litert submodule is checked out, not its nested third_party/tensorflow submodule: LiteRT's Bazel
+# WORKSPACE downloads its own pinned TensorFlow archive. Builds start from a cold Bazel cache, so each job is
+# long (GitHub-hosted jobs are limited to 6 hours).
+name: Native builds
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ubuntu-x64:
+    name: Ubuntu 24.04 x64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+    - name: Free disk space
+      # Standard runners have ~14 GB free on /; a cold LiteRT Bazel build needs more. Remove large preinstalled
+      # toolchains this job doesn't use.
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+          /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+        df -h /
+    - uses: actions/checkout@v5
+      with:
+        submodules: true
+    - name: Build libLiteRt.so and libtfliteextern.so
+      run: platforms/ubuntu/24.04/bazel_build_tflite
+    - uses: actions/upload-artifact@v5
+      with:
+        name: native-ubuntu-x64
+        path: lib/runtimes/ubuntu-x64/native/
+        if-no-files-found: error
+
+  android:
+    name: Android ${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - arch: arm64
+          abi: arm64-v8a
+        - arch: x86_64
+          abi: x86_64
+    steps:
+    - name: Free disk space
+      # Keep /usr/local/lib/android: the Android SDK and NDK this job builds with live there.
+      run: |
+        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+          /opt/hostedtoolcache/CodeQL
+        df -h /
+    - uses: actions/checkout@v5
+      with:
+        submodules: true
+    - name: Select the Android NDK
+      # The build is verified with NDK 28; prefer a preinstalled 28.x, else the newest preinstalled NDK.
+      run: |
+        NDK=$(ls "$ANDROID_HOME/ndk" | grep '^28\.' | sort -V | tail -1)
+        [ -z "$NDK" ] && NDK=$(ls "$ANDROID_HOME/ndk" | sort -V | tail -1)
+        echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK" >> "$GITHUB_ENV"
+        echo "Using NDK $NDK"
+    - name: Build libLiteRt.so and libtfliteextern.so
+      run: platforms/android/bazel_build_tflite_android ${{ matrix.arch }}
+    - uses: actions/upload-artifact@v5
+      with:
+        name: native-android-${{ matrix.abi }}
+        path: lib/android/${{ matrix.abi }}/
+        if-no-files-found: error
+
+  macos:
+    name: macOS universal
+    runs-on: macos-15
+    timeout-minutes: 360
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        submodules: true
+    - name: Build universal libLiteRt.dylib and libtfliteextern.dylib
+      run: platforms/macos/bazel_build_tflite_macos_fat
+    - uses: actions/upload-artifact@v5
+      with:
+        name: native-macos-universal
+        path: |
+          lib/runtimes/osx/native/libLiteRt.dylib
+          lib/runtimes/osx/native/libtfliteextern.dylib
+        if-no-files-found: error
