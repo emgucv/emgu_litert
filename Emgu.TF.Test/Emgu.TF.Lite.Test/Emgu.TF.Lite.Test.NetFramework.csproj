@@ -76,7 +76,7 @@
       <Project>{b3ce21ad-95de-4bca-bdbc-9eaf87cadac4}</Project>
       <Name>Emgu.TF.Lite.Models.Netstandard</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj">
+    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.TF.Lite.csproj">
       <Project>{b7f55b47-f2ab-4b5b-97a2-08a027f11002}</Project>
       <Name>Emgu.TF.Lite.NetStandard</Name>
     </ProjectReference>

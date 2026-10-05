@@ -851,9 +851,9 @@ IF (HAVE_WINDESKTOP_X86_LITE)
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/${EMGU_WINDOWS_MSVCRT_X86_NUGET_ID}.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/${EMGU_WINDOWS_MSVCRT_X86_NUGET_ID}/Package.nuspec)    
 ENDIF()
 
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/Directory.Build.props)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/SignBinary.Targets)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite/NetStandard/SignBinary.Targets)
 ENDIF()
 
 # Emgu.LiteRT: the C# wrapper of LiteRT's own runtime C API (libLiteRt), and the project that packs the
@@ -912,7 +912,9 @@ ENDIF()
 
 ADD_SUBDIRECTORY(Emgu.LiteRT.Util)
 IF(HAVE_LITE_BUILD)
-  ADD_SUBDIRECTORY(Emgu.TF.Lite)
+  # Emgu.TF.Lite/ was renamed to Emgu.LiteRT.Tflite/ - the namespace/project/csproj name stays
+  # Emgu.TF.Lite (it's the TFLite Interpreter API wrapper), only the folder moved.
+  ADD_SUBDIRECTORY(Emgu.LiteRT.Tflite)
   ADD_SUBDIRECTORY(Emgu.LiteRT)
 ENDIF()
 

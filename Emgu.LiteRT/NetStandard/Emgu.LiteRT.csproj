@@ -35,7 +35,7 @@
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.TF.Lite.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup>
