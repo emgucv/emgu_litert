@@ -18,7 +18,7 @@ fi
 cd "$(dirname "$0")"
 cd ../../
 # Keep Bazel's output tree (its --output_user_root startup option) in a subfolder of this repo rather than
-# the default /private/var/tmp/_bazel_$USER (macOS) or ~/.cache/bazel (Linux). It sits outside the litert/
+# the default /private/var/tmp/_bazel_$USER (macOS) or ~/.cache/bazel (Linux). It sits outside the LiteRT-LM/
 # workspace on purpose, so Bazel never treats it as source.
 BAZEL_OUTPUT_USER_ROOT="$(pwd)/bazel_output"
 mkdir -p lib/ios
@@ -59,29 +59,34 @@ if [ -n "$XCODE_MOUNT_POINT" ] && [ "$XCODE_MOUNT_POINT" != "/" ]; then
     BAZEL_XCODE_OPTS="--action_env=DEVELOPER_DIR=$XCODE_DEVELOPER_DIR --action_env=APPLE_SDK_VERSION_OVERRIDE=$APPLE_SDK_VERSION --action_env=APPLE_SDK_PLATFORM=$APPLE_SDK_PLATFORM"
 fi
 
-# litert is a pristine third-party submodule (we don't own/patch it upstream), so the
-# tfliteextern Bazel package can't live there in git. Stage our tracked source into it
-# here instead, each run, mirroring what the Windows/macOS Bazel build scripts do.
-mkdir -p litert/tfliteextern
-cp -f litertextern/tfliteextern/bazel/BUILD litert/tfliteextern/BUILD
-cp -f litertextern/tfliteextern/bazel/tfliteextern.def litert/tfliteextern/tfliteextern.def
-cp -f litertextern/tfliteextern/tfliteextern.cc litert/tfliteextern/tfliteextern.cc
-cp -f litertextern/tfliteextern/tfliteextern.h litert/tfliteextern/tfliteextern.h
-cp -f litertextern/imgproc/imgproc.cc litert/tfliteextern/imgproc.cc
-cp -f litertextern/imgproc/imgproc.h litert/tfliteextern/imgproc.h
+# Build in the LiteRT-LM submodule's Bazel workspace, against the LiteRT it pins (its WORKSPACE fetches LiteRT as
+# the external repository @litert), like platforms/macos/bazel_build_tflite_macos and
+# platforms/android/bazel_build_tflite_android, so every Bazel build uses the same LiteRT source. LiteRT-LM is a
+# pristine third-party submodule (we don't own/patch it upstream), so the tfliteextern Bazel package can't live
+# there in git: stage our tracked source into it here instead, each run. Our BUILD file is written for the litert
+# workspace, where LiteRT's packages are local (//tflite/..., //litert/...); rewrite those labels to @litert//...
+WORKSPACE_DIR=LiteRT-LM
+mkdir -p $WORKSPACE_DIR/tfliteextern
+sed -e 's#"//tflite#"@litert//tflite#g' -e 's#"//litert#"@litert//litert#g' \
+    litertextern/tfliteextern/bazel/BUILD > $WORKSPACE_DIR/tfliteextern/BUILD || exit 1
+cp -f litertextern/tfliteextern/bazel/tfliteextern.def $WORKSPACE_DIR/tfliteextern/tfliteextern.def
+cp -f litertextern/tfliteextern/tfliteextern.cc $WORKSPACE_DIR/tfliteextern/tfliteextern.cc
+cp -f litertextern/tfliteextern/tfliteextern.h $WORKSPACE_DIR/tfliteextern/tfliteextern.h
+cp -f litertextern/imgproc/imgproc.cc $WORKSPACE_DIR/tfliteextern/imgproc.cc
+cp -f litertextern/imgproc/imgproc.h $WORKSPACE_DIR/tfliteextern/imgproc.h
 
-cd litert
+cd $WORKSPACE_DIR
 
 bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build \
     --verbose_failures \
     $BAZEL_BUILD_OPTION \
     $BAZEL_XCODE_OPTS \
     -c opt ${@:2} \
-    //tfliteextern:tfliteextern_ios_framework
+    //tfliteextern:tfliteextern_ios_framework || exit 1
 
 cd ..
 
 rm -rf lib/ios/tfliteextern.framework
-unzip -o litert/bazel-bin/tfliteextern/tfliteextern_ios_framework.zip tfliteextern.framework/tfliteextern -d lib/ios
+unzip -o $WORKSPACE_DIR/bazel-bin/tfliteextern/tfliteextern_ios_framework.zip tfliteextern.framework/tfliteextern -d lib/ios
 mv lib/ios/tfliteextern.framework/tfliteextern lib/ios/libtfliteextern_$1.a
 rm -rf lib/ios/tfliteextern.framework
