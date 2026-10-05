@@ -1,0 +1,78 @@
+#!/bin/bash -v
+
+# Builds tfliteextern for Mac Catalyst with CMake: lib/ios/libtfliteextern_darwin_<arch>.a, the self-contained
+# static libraries Emgu.TF.Runtime/Maui/Mac's .csproj force-loads into a Catalyst app (DllImport resolves the
+# tfe* symbols from the app binary itself, as on iOS).
+#
+# Bazel can't target Mac Catalyst: rules_apple/apple_support have no Catalyst platform, and
+# bazel_build_tflite_ios darwin_<arch> actually produces iOS Simulator objects (LC_BUILD_VERSION platform 7),
+# which a Catalyst app can't link. Plain clang can, via the "<arch>-apple-ios<version>-macabi" target, so
+# this configures litertextern/tfliteextern's CMake project (statically linking TFLite, like the iOS builds:
+# TFLITEEXTERN_LINK_LITERT=OFF) with that target.
+#
+# The project builds tfliteextern as a shared library. That link both proves every symbol resolves for
+# Catalyst and records, in its link.txt, exactly which static libraries tfliteextern needs; those plus
+# tfliteextern's own object files are then merged into the one static archive with libtool.
+#
+# Usage: cmake_build_tflite_catalyst [arm64|x86_64]   (default: the host architecture)
+
+ARCH=${1:-$(uname -m)}
+if [ "$ARCH" != "arm64" ] && [ "$ARCH" != "x86_64" ]; then
+    echo "Unknown Mac Catalyst architecture '$ARCH'. Use one of: arm64, x86_64"
+    exit 1
+fi
+# Same minimum version as the MAUI apps' SupportedOSPlatformVersion for maccatalyst.
+CATALYST_MIN_VERSION=15.0
+CATALYST_TARGET=$ARCH-apple-ios$CATALYST_MIN_VERSION-macabi
+
+JOB_COUNT=$(sysctl -n hw.ncpu)
+echo Building for $CATALYST_TARGET with $JOB_COUNT parallel jobs
+
+cd "$(dirname "$0")"
+cd ../../
+REPO_ROOT=$(pwd)
+mkdir -p lib/ios
+
+BUILD_DIR=$REPO_ROOT/litertextern/tfliteextern/build_catalyst_$ARCH
+mkdir -p $BUILD_DIR
+cd $BUILD_DIR
+
+# The -target flag goes to the C/C++/Objective-C(++) compiler and linker flags (including CMake's try_compile checks, so e.g. the
+# __aarch64__ detection in litertextern/tfliteextern/CMakeLists.txt sees the right architecture).
+# CMAKE_POLICY_VERSION_MINIMUM: CMake 4 rejects some vendored dependencies' old cmake_minimum_required()
+# otherwise. Foundation is needed by TFLite's signpost profiler (see TFLITEEXTERN_TARGET_MACCATALYST in
+# litertextern/tfliteextern/CMakeLists.txt); the Catalyst app links it anyway. XNNPACK is off, matching the static iOS builds (tfliteextern is then compiled with
+# WITHOUT_XNNPACK).
+cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+    -DCMAKE_OSX_SYSROOT=macosx \
+    -DCMAKE_OSX_ARCHITECTURES=$ARCH \
+    -DCMAKE_C_FLAGS="-target $CATALYST_TARGET" \
+    -DCMAKE_CXX_FLAGS="-target $CATALYST_TARGET" \
+    -DCMAKE_OBJC_FLAGS="-target $CATALYST_TARGET" \
+    -DCMAKE_OBJCXX_FLAGS="-target $CATALYST_TARGET" \
+    -DCMAKE_SHARED_LINKER_FLAGS="-target $CATALYST_TARGET -framework Foundation" \
+    -DCMAKE_EXE_LINKER_FLAGS="-target $CATALYST_TARGET" \
+    -DTFLITEEXTERN_LINK_LITERT=OFF \
+    -DTFLITE_ENABLE_XNNPACK=OFF \
+    -DTFLITEEXTERN_OUTPUT_DIRECTORY=$BUILD_DIR/out \
+    $REPO_ROOT/litertextern/tfliteextern || exit 1
+
+cmake --build . --config Release --target tfliteextern --parallel $JOB_COUNT || exit 1
+
+# Merge tfliteextern's object files and every static library on its link line into one archive.
+LINK_TXT=CMakeFiles/tfliteextern.dir/link.txt
+OBJECTS=$(find CMakeFiles/tfliteextern.dir -name '*.o')
+ARCHIVES=$(tr ' ' '\n' < $LINK_TXT | grep '\.a$' | while read -r A; do
+    if [ "${A:0:1}" = "/" ]; then echo "$A"; else echo "$BUILD_DIR/$A"; fi
+done | sort -u)
+if [ -z "$OBJECTS" ] || [ -z "$ARCHIVES" ]; then
+    echo "Could not find tfliteextern's objects or static libraries in $LINK_TXT"
+    exit 1
+fi
+
+OUT=$REPO_ROOT/lib/ios/libtfliteextern_darwin_$ARCH.a
+rm -f $OUT
+libtool -static -no_warning_for_no_symbols -o $OUT $OBJECTS $ARCHIVES || exit 1
+echo Output written to $OUT

@@ -13,6 +13,10 @@
 
 cmake_minimum_required(VERSION 3.16)
 
+# Declared before anything that needs a compiler (the Mac Catalyst check below, litert's subdirectories), so C/C++
+# are enabled up front instead of only once a subdirectory's own project() runs.
+PROJECT(tfliteextern)
+
 SET(CMAKE_CXX_STANDARD 20)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/modules")
@@ -38,11 +42,39 @@ ELSE()
 ENDIF()
 OPTION(TFLITEEXTERN_LINK_LITERT "Link tfliteextern dynamically against LiteRT's libLiteRt shared library" ${TFLITEEXTERN_LINK_LITERT_DEFAULT})
 
+# Mac Catalyst (clang's "-target <arch>-apple-ios<version>-macabi", see platforms/ios/cmake_build_tflite_catalyst)
+# is CMAKE_SYSTEM_NAME Darwin to CMake, but TARGET_OS_IOS to the compiler. litert/tflite's
+# profiling/platform_profiler.cc calls MaybeCreateSignpostProfiler() whenever TARGET_OS_IOS, while its
+# CMakeLists.txt only compiles profiling/signpost_profiler.mm (which defines it) when CMAKE_SYSTEM_NAME is iOS,
+# so a Catalyst link fails on that undefined symbol. litert is a pristine submodule we don't patch, so the file
+# is added to tensorflow-lite below, with the same -fno-objc-arc it gets on iOS. Objective-C++ has to be
+# enabled before litert/tflite's directory is added, or that directory lacks the OBJCXX compile rules.
+IF(APPLE)
+  INCLUDE(CheckCXXSourceCompiles)
+  CHECK_CXX_SOURCE_COMPILES("
+    #include <TargetConditionals.h>
+    #if !TARGET_OS_MACCATALYST
+    #error not Mac Catalyst
+    #endif
+    int main() { return 0; }" TFLITEEXTERN_TARGET_MACCATALYST)
+  IF(TFLITEEXTERN_TARGET_MACCATALYST)
+    enable_language(OBJCXX)
+  ENDIF()
+ENDIF()
+
 IF(TFLITEEXTERN_LINK_LITERT)
   ADD_SUBDIRECTORY(${LITERT_SOURCE_DIR_ABS}/litert ${CMAKE_CURRENT_BINARY_DIR}/litert)
 ELSE()
   ADD_SUBDIRECTORY(${LITERT_SOURCE_DIR_ABS}/tflite ${CMAKE_CURRENT_BINARY_DIR}/tflite)
 ENDIF()
+
+IF(TFLITEEXTERN_TARGET_MACCATALYST AND TARGET tensorflow-lite)
+  target_sources(tensorflow-lite PRIVATE ${LITERT_SOURCE_DIR_ABS}/tflite/profiling/signpost_profiler.mm)
+  set_source_files_properties(${LITERT_SOURCE_DIR_ABS}/tflite/profiling/signpost_profiler.mm
+    TARGET_DIRECTORY tensorflow-lite PROPERTIES COMPILE_FLAGS -fno-objc-arc)
+ENDIF()
+
+
 
 # litert/tflite/CMakeLists.txt unconditionally add_subdirectory()s profiling/proto and
 # tools/benchmark/proto, whose add_custom_command()s pass protoc a
@@ -94,7 +126,6 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.rc.in ${CMAKE_CURRENT_S
 
 
 
-PROJECT(tfliteextern)
 INCLUDE_DIRECTORIES("${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/../imgproc" "${LITERT_SOURCE_DIR_ABS}")
 
 SET(TFLITEEXTERN_SOURCES tfliteextern.cc ${CMAKE_CURRENT_SOURCE_DIR}/../imgproc/imgproc.cc)
@@ -203,8 +234,13 @@ IF(WIN32 AND MSVC AND (NOT NETFX_CORE))
   LIST(APPEND TFLITEEXTERN_DEPENDENCY_DLLS ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS})
 ENDIF()
 
-SET(TFLITEEXTERN_OUTPUT_DIRECTORY_RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/../../lib/${BINARY_OUTPUT_SUBFOLDER})
-GET_FILENAME_COMPONENT(TFLITEEXTERN_OUTPUT_DIRECTORY "${TFLITEEXTERN_OUTPUT_DIRECTORY_RELATIVE}" ABSOLUTE)
+# TFLITEEXTERN_OUTPUT_DIRECTORY can be set on the command line to override the per-platform lib/ folder - e.g.
+# platforms/ios/cmake_build_tflite_catalyst, whose Mac Catalyst build would otherwise land in (and overwrite)
+# the macOS folder, since CMake sees both as APPLE AND NOT IOS.
+IF(NOT TFLITEEXTERN_OUTPUT_DIRECTORY)
+  SET(TFLITEEXTERN_OUTPUT_DIRECTORY_RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/../../lib/${BINARY_OUTPUT_SUBFOLDER})
+  GET_FILENAME_COMPONENT(TFLITEEXTERN_OUTPUT_DIRECTORY "${TFLITEEXTERN_OUTPUT_DIRECTORY_RELATIVE}" ABSOLUTE)
+ENDIF()
 set_target_properties( tfliteextern PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${TFLITEEXTERN_OUTPUT_DIRECTORY} )
 set_target_properties( tfliteextern PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${TFLITEEXTERN_OUTPUT_DIRECTORY} )
 set_target_properties( tfliteextern PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${TFLITEEXTERN_OUTPUT_DIRECTORY} )

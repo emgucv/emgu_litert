@@ -6,6 +6,9 @@
     <PropertyGroup>
 	
 	<TargetFrameworks>netstandard2.0;net${DOTNET_VERSION_MAJOR}.0-ios;net${DOTNET_VERSION_MAJOR}.0-android</TargetFrameworks>
+	<!-- Mac Catalyst apps resolve this TFM, which references Emgu.LiteRT.runtime.maui.macos (and its Catalyst
+	     static libraries); without it they fell back to netstandard2.0 and linked no tfliteextern at all. -->
+	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx')) or $([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFrameworks>
 	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-windows10.0.19041.0</TargetFrameworks>
 	
 	<MauiVersion Condition="'$(MauiVersion)' == ''">${DOTNET_VERSION_MAJOR}.0.0</MauiVersion>

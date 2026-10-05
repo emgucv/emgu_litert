@@ -10,6 +10,7 @@ obj/
 /build/
 /lib/
 /litertextern/tfliteextern/build/
+/litertextern/tfliteextern/build_catalyst_*/
 # Bazel output tree (--output_user_root) used by the macOS/iOS/Android Bazel build scripts
 /bazel_output/
 
