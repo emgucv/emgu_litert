@@ -23,6 +23,7 @@ Directory.Build.props
 !/miscellaneous/Directory.Build.props
 /Emgu.LiteRT.Tflite/NetStandard/docs/
 /Emgu.LiteRT.Util/NetStandard/docs/
+/Emgu.LiteRT.ImageIO/NetStandard/docs/
 /Emgu.LiteRT/NetStandard/docs/
 /Emgu.LiteRT.Tflite.Models/NetStandard/docs/
 /Emgu.TF.Runtime/Maui/*/docs/

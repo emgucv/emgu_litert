@@ -14,7 +14,6 @@ using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Platform.Maui.UI;
 using Emgu.TF.Lite;
-using Emgu.Models;
 using Emgu.TF.Lite.Models;
 using Size = System.Drawing.Size;
 

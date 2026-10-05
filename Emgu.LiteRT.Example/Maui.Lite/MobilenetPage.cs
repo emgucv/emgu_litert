@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using Emgu.CV.Platform.Maui.UI;
 using Emgu.TF.Lite;
-using Emgu.Models;
 using Emgu.TF.Lite.Models;
 using Emgu.CV;
 using Emgu.CV.CvEnum;

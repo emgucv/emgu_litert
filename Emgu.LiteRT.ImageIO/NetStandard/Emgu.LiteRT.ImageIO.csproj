@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+
+	<AssemblyName>Emgu.LiteRT.ImageIO</AssemblyName>
+	<TargetName>$(AssemblyName)</TargetName>
+	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TensorflowBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\lib))</TensorflowBinaryDir>
+	<OutputPath>$(TensorflowBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>TRACE;__NETSTANDARD_2_0__</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DefineConstants>TRACE;__NETSTANDARD_2_0__</DefineConstants>
+  </PropertyGroup>
+
+  <!-- NativeImageIO.Net.cs needs Emgu.CV/System.Drawing.Common to decode images from a file path
+       on plain .NET; the iOS/macOS/Android/Unity variants use platform APIs instead
+       (UIKit/AppKit/Android.Graphics/UnityEngine), guarded by #if, so they don't need these. -->
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="9.0.2" Condition="'$(TargetFramework)'=='netstandard2.0'" />
+    <PackageReference Include="Emgu.CV" Version="4.13.0.5924" Condition="'$(TargetFramework)'=='netstandard2.0'" />
+  </ItemGroup>
+
+  <!-- Emgu.LiteRT.Util: for the Annotation type NativeImageIO's DrawAnnotations/ImageFileToJpeg
+       overloads take. Emgu.LiteRT.Tflite: for Emgu.TF.Lite.Toolbox's native pixel-conversion
+       P/Invokes NativeImageIO calls into (tfePixel32ToPixelFloat etc.) - this is why ImageIO
+       can't live inside Emgu.LiteRT.Util itself, which Emgu.LiteRT.Tflite already depends on;
+       putting it there would create a circular reference. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\Emgu.LiteRT.ImageIO.Shared.projitems" Label="Shared" />
+</Project>

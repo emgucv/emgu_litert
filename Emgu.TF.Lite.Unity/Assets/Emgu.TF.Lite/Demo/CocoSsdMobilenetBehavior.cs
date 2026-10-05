@@ -13,7 +13,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using Emgu.TF.Lite;
 using UnityEngine.UI;
-using Emgu.Models;
+using Emgu.LiteRT.ImageIO;
 using Emgu.LiteRT.Util;
 using Emgu.TF.Lite.Models;
 using System.IO;

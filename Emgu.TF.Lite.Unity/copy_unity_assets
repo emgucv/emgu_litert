@@ -12,8 +12,8 @@ rm -rf Emgu.LiteRT.Util
 mkdir -p Emgu.LiteRT.Util
 rm -rf Emgu.TF.Lite
 mkdir -p Emgu.TF.Lite
-rm -rf Emgu.Models
-mkdir -p Emgu.Models
+rm -rf Emgu.LiteRT.ImageIO
+mkdir -p Emgu.LiteRT.ImageIO
 rm -rf Emgu.TF.Lite.Models
 mkdir -p Emgu.TF.Lite.Models
 
@@ -27,7 +27,7 @@ cp ../tensorflow/LICENSE Assets/Emgu.TF.Lite/Documentation/tensorflow.license.tx
 
 cp ../Emgu.LiteRT.Util/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.LiteRT.Util/
 cp ../Emgu.LiteRT.Tflite/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite/
-cp ../Emgu.Models/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.Models/
+cp ../Emgu.LiteRT.ImageIO/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.LiteRT.ImageIO/
 cp ../Emgu.LiteRT.Tflite.Models/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite.Models/
 
 cd Assets/Emgu.TF.Lite/Plugins

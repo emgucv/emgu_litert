@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
 	<AssemblyName>Emgu.TF.Lite.Models</AssemblyName>
@@ -10,22 +10,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Drawing.Common" Version="9.0.2" Condition="'$(TargetFramework)'=='netstandard2.0'" />
-    <PackageReference Include="Emgu.CV" Version="4.13.0.5924" Condition="'$(TargetFramework)'=='netstandard2.0'" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- Emgu.LiteRT.Tflite and Emgu.LiteRT.Util each have their own nuget package now: plain
          ProjectReferences (no PrivateAssets) so this project's package correctly depends on
          both, matching what its code (the Interpreter API, UnmanagedObject) actually uses. -->
     <ProjectReference Include="..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
     <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
     <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.ImageIO\NetStandard\Emgu.LiteRT.ImageIO.csproj" />
   </ItemGroup>
 
   <Import Project="..\Emgu.TF.Lite.Models.Shared.projitems" Label="Shared" />
 
-  <Import Project="..\..\Emgu.Models\Emgu.Models.Shared.projitems" Label="Shared" />
+  <!-- Emgu.Models (NativeImageIO, JpegData, etc.) was renamed to Emgu.LiteRT.ImageIO and made
+       its own project+package - this project's code uses its types via the ProjectReference
+       above, no direct Shared.projitems import needed here anymore. -->
   <!-- 
   <Target Name="DeployBinary" AfterTargets="AfterBuild">
     <Message Text="Copying $(OutputPath)$(AssemblyName).dll, $(OutputPath)$(AssemblyName).xml to $(TensorflowBinaryDir)" Importance="high" />

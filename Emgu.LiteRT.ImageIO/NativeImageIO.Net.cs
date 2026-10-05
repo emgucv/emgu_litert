@@ -1,4 +1,4 @@
-﻿//----------------------------------------------------------------------------
+//----------------------------------------------------------------------------
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.       
 //----------------------------------------------------------------------------
 #if !(UNITY_EDITOR || UNITY_IOS || UNITY_ANDROID || UNITY_STANDALONE || __ANDROID__ || __IOS__ || __MACOS__)
@@ -16,7 +16,7 @@ using Emgu.TF;
 using Emgu.LiteRT.Util;
 
 
-namespace Emgu.Models
+namespace Emgu.LiteRT.ImageIO
 {
     /// <summary>
     /// Platform specific implementation of Image IO

@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<Project>
+ <PropertyGroup>
+
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+	<!-- Don't build for iOS, Android or Maccatalyst on Linux. net-android is needed here (like
+	     Emgu.LiteRT.Util, unlike Emgu.LiteRT/Emgu.LiteRT.Tflite) because
+	     Android/NativeImageIO.Android.cs and AndroidFileAsset.cs (guarded by #if __ANDROID__)
+	     need it to compile. -->
+	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx')) or $([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-ios;net${DOTNET_VERSION_MAJOR}.0-android;net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFrameworks>
+
+    <PackageId>${EMGUTF_LITE_IMAGEIO_NUGET_ID}</PackageId>
+	<title>${EMGUTF_LITE_IMAGEIO_NUGET_TITLE}</title>
+    <version>${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>Image IO helpers (NativeImageIO, JpegData) for reading images into tensors, used by Emgu LiteRT Tflite Models.</summary>
+    <Description>Emgu.LiteRT.ImageIO provides NativeImageIO and JpegData for reading images (from a file path, platform image objects, or a Unity texture) into tensor-ready pixel buffers, through Emgu.CV on plain .NET or platform-native APIs (UIKit/AppKit/Android.Graphics/UnityEngine) elsewhere.</Description>
+    <PackageReleaseNotes>This is the ${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu TF Lite. For online documentation please visit
+http://www.emgu.com/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/</PackageReleaseNotes>
+
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\platforms\nuget))</PackageOutputPath>
+	<PackageTags>tensorflow lite emgu emgutf ai</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+
+ </PropertyGroup>
+
+    <ItemGroup>
+      <None Include="..\..\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="..\..\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+
+  <!-- https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022 -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!--
+  ${EMGUTF_LITE_IMAGEIO_POST_PROCESS_BINARY}
+  ${EMGUTF_LITE_IMAGEIO_POST_PROCESS_NUGET}
+  -->
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />
+</Project>

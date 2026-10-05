@@ -1,4 +1,4 @@
-﻿//----------------------------------------------------------------------------
+//----------------------------------------------------------------------------
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.       
 //----------------------------------------------------------------------------
 
@@ -8,7 +8,7 @@ using System.Text;
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace Emgu.Models
+namespace Emgu.LiteRT.ImageIO
 {
     /// <summary>
     /// Platform specific implementation of Image IO

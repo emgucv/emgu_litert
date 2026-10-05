@@ -1,4 +1,4 @@
-﻿//----------------------------------------------------------------------------
+//----------------------------------------------------------------------------
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.       
 //----------------------------------------------------------------------------
 
@@ -13,7 +13,7 @@ using Android.Graphics;
 using Android.Provider;
 using Emgu.LiteRT.Util;
 
-namespace Emgu.Models
+namespace Emgu.LiteRT.ImageIO
 {
     /// <summary>
     /// Platform specific implementation of Image IO
@@ -26,7 +26,7 @@ namespace Emgu.Models
         /// <param name="fileName">The name of the file.</param>
         /// <param name="annotations">Annotations to be add to the image. Can consist of rectangles and labels</param>
         /// <returns>The image in Jpeg stream format</returns>
-        public static Emgu.Models.JpegData ImageFileToJpeg(String fileName, Annotation[] annotations = null)
+        public static Emgu.LiteRT.ImageIO.JpegData ImageFileToJpeg(String fileName, Annotation[] annotations = null)
         {
             using (Android.Graphics.Bitmap bmp = ImageFileToBitmap(fileName, annotations))
             {
@@ -39,7 +39,7 @@ namespace Emgu.Models
         /// </summary>
         /// <param name="bmp">The android bitmap</param>
         /// <returns>The jpeg representation</returns>
-        public static Emgu.Models.JpegData ToJpeg(this Android.Graphics.Bitmap bmp)
+        public static Emgu.LiteRT.ImageIO.JpegData ToJpeg(this Android.Graphics.Bitmap bmp)
         {
             using (MemoryStream ms = new MemoryStream())
             {
@@ -259,7 +259,7 @@ namespace Emgu.Models
         /// <param name="height">The height of the image</param>
         /// <param name="channels">The number of channels</param>
         /// <returns>The jpeg stream</returns>
-        public static Emgu.Models.JpegData PixelToJpeg(byte[] rawPixel, int width, int height, int channels)
+        public static Emgu.LiteRT.ImageIO.JpegData PixelToJpeg(byte[] rawPixel, int width, int height, int channels)
         {
             using (Bitmap bmp = PixelToBitmap(rawPixel, width, height, channels))
                 return bmp.ToJpeg();

@@ -18,9 +18,9 @@ namespace Emgu
 }
 
 /// <summary>
-/// Utilities for downloading model files.
+/// Image IO helpers (NativeImageIO, JpegData) for reading images into tensors.
 /// </summary>
-namespace Emgu.Models
+namespace Emgu.LiteRT.ImageIO
 {
 }
 
