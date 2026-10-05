@@ -11,13 +11,13 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Shared", "..\.
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.Models.Shared", "..\..\Emgu.Models\Emgu.Models.Shared.shproj", "{8EDCE0C8-BA71-4396-9428-35D05877258C}"
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Models.Shared", "..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.shproj", "{E956DD26-1294-4731-8A90-C4CBA9F291B6}"
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Models.Shared", "..\..\Emgu.LiteRT.Tflite.Models\Emgu.TF.Lite.Models.Shared.shproj", "{E956DD26-1294-4731-8A90-C4CBA9F291B6}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite", "..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj", "{FDAB1BD5-2BC7-4839-83A6-3DCD6E8C4B5A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.LiteRT.runtime.maui.android", "..\..\Emgu.TF.Runtime\Maui\Android\Lite\Emgu.LiteRT.runtime.maui.android.csproj", "{4318036D-46DC-4310-8ECE-93ADF819F280}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.Models", "..\..\Emgu.LiteRT.Models\NetStandard\Emgu.TF.Lite.Models.csproj", "{593619DC-5CDA-4EE4-9147-7849A4E2497B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.Models", "..\..\Emgu.LiteRT.Tflite.Models\NetStandard\Emgu.TF.Lite.Models.csproj", "{593619DC-5CDA-4EE4-9147-7849A4E2497B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.LiteRT.runtime.maui.ios", "..\..\Emgu.TF.Runtime\Maui\iOS\Emgu.LiteRT.runtime.maui.ios.csproj", "{3E60EE87-FDE0-4913-A502-01FDF8BAF502}"
 EndProject
@@ -225,11 +225,11 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{593619dc-5cda-4ee4-9147-7849a4e2497b}*SharedItemsImports = 5
-		..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.projitems*{593619dc-5cda-4ee4-9147-7849a4e2497b}*SharedItemsImports = 5
+		..\..\Emgu.LiteRT.Tflite.Models\Emgu.TF.Lite.Models.Shared.projitems*{593619dc-5cda-4ee4-9147-7849a4e2497b}*SharedItemsImports = 5
 		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{8edce0c8-ba71-4396-9428-35d05877258c}*SharedItemsImports = 13
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{8f587fb9-bba6-4c30-9329-8cbac7020fe0}*SharedItemsImports = 13
 		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{98561642-5ec3-4244-baf9-6876d9ba5527}*SharedItemsImports = 13
-		..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.projitems*{e956dd26-1294-4731-8a90-c4cba9f291b6}*SharedItemsImports = 13
+		..\..\Emgu.LiteRT.Tflite.Models\Emgu.TF.Lite.Models.Shared.projitems*{e956dd26-1294-4731-8a90-c4cba9f291b6}*SharedItemsImports = 13
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{fdab1bd5-2bc7-4839-83a6-3dcd6e8c4b5a}*SharedItemsImports = 5
 		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{fdab1bd5-2bc7-4839-83a6-3dcd6e8c4b5a}*SharedItemsImports = 5
 	EndGlobalSection

@@ -72,7 +72,7 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Emgu.LiteRT.Models\NetStandard\Emgu.TF.Lite.Models.csproj">
+    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite.Models\NetStandard\Emgu.TF.Lite.Models.csproj">
       <Project>{b3ce21ad-95de-4bca-bdbc-9eaf87cadac4}</Project>
       <Name>Emgu.TF.Lite.Models.Netstandard</Name>
     </ProjectReference>

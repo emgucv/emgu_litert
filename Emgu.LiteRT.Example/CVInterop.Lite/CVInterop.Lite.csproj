@@ -24,7 +24,7 @@
     <PackageReference Include="Emgu.CV.UI" Version="4.9.0.5494" />
   </ItemGroup>
 
-  <Import Project="..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.projitems" Label="Shared" />
+  <Import Project="..\..\Emgu.LiteRT.Tflite.Models\Emgu.TF.Lite.Models.Shared.projitems" Label="Shared" />
 
   <Import Project="..\..\Emgu.Models\Emgu.Models.Shared.projitems" Label="Shared" />
 

@@ -500,8 +500,10 @@ IF(HAVE_LITE_BUILD)
   SET(EMGUTF_LITERT_NUGET_ID "${EMGUTF_LITE_NUGET_ID}")
   SET(EMGUTF_LITERT_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE}")
 	
-  SET(EMGUTF_LITE_MODEL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Models")
-  
+  # Emgu.LiteRT.Models/ was renamed to Emgu.LiteRT.Tflite.Models/ - it's built on the TFLite
+  # Interpreter API (Emgu.TF.Lite), not LiteRT's own CompiledModel API.
+  SET(EMGUTF_LITE_MODEL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Tflite.Models")
+
   SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.windows")  
   IF (HAVE_WINDESKTOP_X64_LITE_XNN)
     SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGUTF_LITE_WINDOWS_NUGET_ID}.xnn")  
@@ -618,7 +620,7 @@ ENDIF()
 
 #IF(HAVE_MAUI_LITE)
   SET(EMGUTF_LITE_MAUI_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.maui${EMGUTF_LITE_RUNTIME_EXTRA_TAG}")
-  SET(EMGUTF_LITE_MODELS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Models")
+  SET(EMGUTF_LITE_MODELS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Tflite.Models")
   SET(EMGUTF_LITE_MAUI_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} for MAUI Native Runtime")
   
 #  SET(EMGUTF_LITE_MAUI_NUGET_FILE_LIST "	
@@ -872,14 +874,14 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT/NetStandard/docs/README.md)
 
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models/NetStandard/Directory.Build.props)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite.Models/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models/NetStandard/SignBinary.Targets)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite.Models/NetStandard/SignBinary.Targets)
 ENDIF()
 IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models/NetStandard/SignPkg.Targets)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite.Models/NetStandard/SignPkg.Targets)
 ENDIF()
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models/NetStandard/docs/README.md)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite.Models/NetStandard/docs/README.md)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/README.md)
@@ -917,7 +919,7 @@ ENDIF()
 ADD_SUBDIRECTORY(Emgu.Models)
 
 IF(HAVE_LITE_BUILD)
-  ADD_SUBDIRECTORY(Emgu.LiteRT.Models)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.Tflite.Models)
 ENDIF()
 
 IF (HAVE_LITE_BUILD)
