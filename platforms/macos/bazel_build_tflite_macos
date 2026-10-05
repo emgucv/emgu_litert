@@ -74,20 +74,29 @@ else
     BAZEL_CONFIG_FLAGS="$BAZEL_CONFIG_FLAGS --cpu=$BAZEL_CPU --platforms=@build_bazel_apple_support//platforms:macos_x86_64"
 fi
 
-# libtfliteextern.dylib only contains the C API wrapper and links dynamically against libLiteRt.dylib (LiteRT's
-# own runtime, exporting the LiteRt* and TfLite* C APIs) - see the macOS section of
-# litertextern/tfliteextern/bazel/BUILD. Both are built per architecture here, then lipo'd below.
-bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS $BAZEL_XCODE_OPTS $BAZEL_OPTIONS //tfliteextern:litert_runtime //tfliteextern:tfliteextern_dylib || exit 1
+# liblitert-lm.dylib (LiteRT-LM's C API) is built for arm64 only: it needs LiteRT-LM's prebuilt
+# libGemmaModelConstraintProvider.dylib, which only exists for macOS arm64 (prebuilt/macos_arm64, stored with Git LFS).
+BUILD_LITERT_LM=0
+if [ "$BAZEL_CPU" = "darwin_arm64" ]; then
+    BUILD_LITERT_LM=1
+    GEMMA_PREBUILT=prebuilt/macos_arm64/libGemmaModelConstraintProvider.dylib
+    if ! file "$GEMMA_PREBUILT" | grep -q Mach-O; then
+        echo "$WORKSPACE_DIR/$GEMMA_PREBUILT is not a Mach-O library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
+        exit 1
+    fi
+fi
 
-cd ..
-
-for LIB in libtfliteextern libLiteRt; do
-    OUT=lib/runtimes/osx/native/$LIB-$BAZEL_CPU.dylib
+# Bazel's bazel-bin symlink follows the most recent build, so each build's outputs are copied right after it.
+# copy_dylib <bazel-bin relative path> <destination>: copies a built dylib out of bazel-bin, sets its install name
+# to @rpath/<file name>, and drops every rpath except @loader_path (Bazel adds rpaths into its own _solib/runfiles
+# output folders), since all of these dylibs are deployed side by side.
+copy_dylib() {
+    local SRC=$WORKSPACE_DIR/bazel-bin/$1
+    local OUT=$2
     rm -f $OUT
-    cp -f $WORKSPACE_DIR/bazel-bin/tfliteextern/$LIB.dylib $OUT || exit 1
+    cp -f $SRC $OUT || exit 1
     chmod u+w $OUT
-    # The install names (@rpath/<lib>.dylib) are set at link time. Bazel also adds rpaths into its own
-    # _solib/runfiles output folders; drop everything except @loader_path, where the two dylibs are deployed.
+    install_name_tool -id "@rpath/$(basename $SRC)" $OUT
     for RPATH in $(otool -l $OUT | awk '/cmd LC_RPATH/ {getline; getline; print $2}'); do
         if [ "$RPATH" != "@loader_path" ]; then
             install_name_tool -delete_rpath "$RPATH" $OUT
@@ -96,14 +105,43 @@ for LIB in libtfliteextern libLiteRt; do
     # install_name_tool invalidates the signature, which arm64 requires - re-sign ad hoc.
     codesign -f -s - $OUT
     chmod u-w $OUT
+}
+
+if [ "$BUILD_LITERT_LM" = "1" ]; then
+    # --define=litert_runtime_link_mode=dynamic makes liblitert-lm.dylib link against @rpath/libLiteRt.dylib instead
+    # of containing LiteRT's runtime; the libLiteRt.dylib built below (same LiteRT source) is deployed next to it in
+    # place of the LiteRt*-only one this build produces. TFLite's kernels and XNNPACK stay inside liblitert-lm.dylib:
+    # its embedding code calls them through TFLite's C++ API, which libLiteRt.dylib doesn't export.
+    # The define can't apply to the tfliteextern build: in dynamic mode LiteRT's C API libraries resolve to headers
+    # only, so libLiteRt.dylib would be built empty. It also isn't part of Bazel's output folder name, so
+    # --platform_suffix keeps this build's outputs apart instead of the two builds overwriting each other's.
+    bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS $BAZEL_XCODE_OPTS --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic $BAZEL_OPTIONS //c:litert-lm || exit 1
+    cd ..
+    copy_dylib c/liblitert-lm.dylib lib/runtimes/osx/native/liblitert-lm-$BAZEL_CPU.dylib
+    rm -f lib/runtimes/osx/native/libGemmaModelConstraintProvider.dylib
+    cp -f $WORKSPACE_DIR/$GEMMA_PREBUILT lib/runtimes/osx/native/libGemmaModelConstraintProvider.dylib || exit 1
+    cd $WORKSPACE_DIR
+fi
+
+# libtfliteextern.dylib only contains the C API wrapper and links dynamically against libLiteRt.dylib (LiteRT's
+# own runtime, exporting the LiteRt* and TfLite* C APIs) - see the macOS section of
+# litertextern/tfliteextern/bazel/BUILD. Both are built per architecture here, then lipo'd below.
+bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS $BAZEL_XCODE_OPTS $BAZEL_OPTIONS //tfliteextern:litert_runtime //tfliteextern:tfliteextern_dylib || exit 1
+
+cd ..
+
+for LIB in libtfliteextern libLiteRt; do
+    copy_dylib tfliteextern/$LIB.dylib lib/runtimes/osx/native/$LIB-$BAZEL_CPU.dylib
 done
 
 #make fat binary
 cd lib/runtimes/osx/native
 # The previous fat binaries are read-only (bazel-bin outputs are), and lipo refuses to
-# overwrite them - remove them first.
-for LIB in libtfliteextern libLiteRt; do
-    rm -f $LIB.dylib
-    lipo -create -output $LIB.dylib $LIB-*.dylib
+# overwrite them - remove them first. liblitert-lm.dylib only ever has the arm64 slice (see above).
+for LIB in libtfliteextern libLiteRt liblitert-lm; do
+    if ls $LIB-*.dylib >/dev/null 2>&1; then
+        rm -f $LIB.dylib
+        lipo -create -output $LIB.dylib $LIB-*.dylib || exit 1
+    fi
 done
 cd ../../../../
