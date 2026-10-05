@@ -49,12 +49,6 @@ load(
     "tflite_copts",
 )
 load(
-    # tflite/ios/ has no BUILD file of its own (only BUILD.apple) so it isn't a package -
-    # ios.bzl is addressed as a file within the parent //tflite package instead.
-    "//tflite:ios/ios.bzl",
-    "TFL_MINIMUM_OS_VERSION",
-)
-load(
     "@build_bazel_rules_apple//apple:ios.bzl",
     "ios_static_framework",
 )
@@ -292,9 +286,13 @@ cc_shared_library(
 # symbols (via DllImport("tfliteextern") -> "__Internal"), never an Objective-C-visible
 # public header - and ios_static_framework's umbrella header (named "<bundle_name>.h",
 # i.e. "tfliteextern.h") collides with our own tfliteextern.h if it's listed as a header.
+# Same value as TFL_MINIMUM_OS_VERSION in litert v2.2.0's tflite/ios/ios.bzl. Defined here rather than loaded from
+# there, since newer LiteRT (such as the commit LiteRT-LM pins, which the macOS build uses) no longer has that file.
+_IOS_MINIMUM_OS_VERSION = "15.0"
+
 ios_static_framework(
     name = "tfliteextern_ios_framework",
     bundle_name = "tfliteextern",
-    minimum_os_version = TFL_MINIMUM_OS_VERSION,
+    minimum_os_version = _IOS_MINIMUM_OS_VERSION,
     deps = [":tfliteextern_lib"],
 )

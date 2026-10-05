@@ -5,3 +5,4 @@
 [submodule "LiteRT-LM"]
 	path = LiteRT-LM
 	url = https://github.com/google-ai-edge/LiteRT-LM.git
+	ignore = dirty
