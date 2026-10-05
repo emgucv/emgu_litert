@@ -2,7 +2,7 @@
 
   <PropertyGroup>
 	
-	<AssemblyName>Emgu.TF.Lite</AssemblyName>
+	<AssemblyName>Emgu.LiteRT.Tflite</AssemblyName>
 	<TargetName>$(AssemblyName)</TargetName>
 	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
   </PropertyGroup>

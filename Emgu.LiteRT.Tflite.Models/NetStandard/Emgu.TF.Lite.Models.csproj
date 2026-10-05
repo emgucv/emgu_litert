@@ -15,9 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Emgu.TF.Lite.dll and Emgu.LiteRT.Util.dll ship inside the Emgu.LiteRT package: reference them for compiling only (PrivateAssets) and depend on the Emgu.LiteRT package. -->
+    <!-- Emgu.LiteRT.Tflite.dll and Emgu.LiteRT.Util.dll ship inside the Emgu.LiteRT package: reference them for compiling only (PrivateAssets) and depend on the Emgu.LiteRT package. -->
     <ProjectReference Include="..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
-    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.TF.Lite.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" PrivateAssets="all" />
   </ItemGroup>
 

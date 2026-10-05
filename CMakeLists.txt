@@ -492,7 +492,7 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
 
 
 IF(HAVE_LITE_BUILD)
-  # Emgu.LiteRT is the single managed nuget package: it contains Emgu.LiteRT.dll, Emgu.TF.Lite.dll and
+  # Emgu.LiteRT is the single managed nuget package: it contains Emgu.LiteRT.dll, Emgu.LiteRT.Tflite.dll and
   # Emgu.LiteRT.Util.dll. Every other package id (Models, runtime.*) is derived from it.
   SET(EMGUTF_LITE_NUGET_ID "Emgu.LiteRT")
   SET(EMGUTF_LITE_NUGET_TITLE "Emgu LiteRT")
@@ -857,7 +857,7 @@ IF(EMGU_SIGN_FOUND AND WIN32)
 ENDIF()
 
 # Emgu.LiteRT: the C# wrapper of LiteRT's own runtime C API (libLiteRt), and the project that packs the
-# single Emgu.LiteRT nuget package (Emgu.LiteRT.dll + Emgu.TF.Lite.dll + Emgu.LiteRT.Util.dll). The signing
+# single Emgu.LiteRT nuget package (Emgu.LiteRT.dll + Emgu.LiteRT.Tflite.dll + Emgu.LiteRT.Util.dll). The signing
 # targets in EMGUTF_LITE_POST_PROCESS_* only refer to $(AssemblyName)/$(PackageId), so they are reused as-is.
 SET(EMGUTF_LITERT_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
 SET(EMGUTF_LITERT_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")

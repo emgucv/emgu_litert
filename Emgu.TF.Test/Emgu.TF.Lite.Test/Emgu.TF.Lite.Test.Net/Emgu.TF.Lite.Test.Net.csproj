@@ -32,7 +32,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Tflite.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
-    <ProjectReference Include="..\..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.TF.Lite.csproj" />
+    <ProjectReference Include="..\..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
   </ItemGroup>
 

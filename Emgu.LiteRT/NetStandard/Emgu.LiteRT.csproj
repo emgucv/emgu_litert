@@ -29,13 +29,13 @@
 
   <!--
   The Emgu.LiteRT nuget package is the single managed package of Emgu TF Lite: it ships Emgu.LiteRT.dll together
-  with Emgu.TF.Lite.dll and Emgu.LiteRT.Util.dll, which have no packages of their own. PrivateAssets="all" keeps
+  with Emgu.LiteRT.Tflite.dll and Emgu.LiteRT.Util.dll, which have no packages of their own. PrivateAssets="all" keeps
   those two projects from becoming package dependencies; IncludeReferencedProjectsInPackage packs their
   assemblies (and xml docs) into lib/<tfm> instead. Projects that use their types must reference them directly.
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.TF.Lite.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup>

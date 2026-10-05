@@ -6,7 +6,7 @@
 	<!-- Don't build for iOS or Maccatalyst on Linux -->
 	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx')) or $([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-ios;net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFrameworks>
  
-	<!-- Emgu.TF.Lite.dll is shipped inside the ${EMGUTF_LITERT_NUGET_ID} nuget package, it has no package of its own. -->
+	<!-- Emgu.LiteRT.Tflite.dll is shipped inside the ${EMGUTF_LITERT_NUGET_ID} nuget package, it has no package of its own. -->
 	<IsPackable>False</IsPackable>
 	<GeneratePackageOnBuild>False</GeneratePackageOnBuild>
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
