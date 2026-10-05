@@ -13,6 +13,7 @@ INSTALL(
   PATTERN "*.csproj"
   PATTERN "*.cs"
   PATTERN "*.resx"
+  PATTERN "README.md"
   PATTERN "Directory.Build.props"
   PATTERN ".svn" EXCLUDE
   PATTERN "obj" EXCLUDE

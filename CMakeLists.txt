@@ -492,14 +492,29 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
 
 
 IF(HAVE_LITE_BUILD)
-  # Emgu.LiteRT is the single managed nuget package: it contains Emgu.LiteRT.dll, Emgu.LiteRT.Tflite.dll and
-  # Emgu.LiteRT.Util.dll. Every other package id (Models, runtime.*) is derived from it.
+  # Emgu.LiteRT.Util, Emgu.LiteRT.Tflite and Emgu.LiteRT each produce their own nuget package
+  # (EMGUTF_LITE_NUGET_ID is still the root every other package id derives from, for Models and
+  # the native runtime.* packages). Emgu.LiteRT.Tflite depends on Emgu.LiteRT.Util (its
+  # UnmanagedObject-derived types need it to compile); Emgu.LiteRT also depends on
+  # Emgu.LiteRT.Util for the same reason, but has no code dependency on Emgu.LiteRT.Tflite -
+  # the two were only ever bundled together for packaging convenience, not because one needs
+  # the other.
   SET(EMGUTF_LITE_NUGET_ID "Emgu.LiteRT")
   SET(EMGUTF_LITE_NUGET_TITLE "Emgu LiteRT")
 
   SET(EMGUTF_LITERT_NUGET_ID "${EMGUTF_LITE_NUGET_ID}")
   SET(EMGUTF_LITERT_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE}")
-	
+
+  SET(EMGUTF_LITERT_UTIL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Util")
+  SET(EMGUTF_LITERT_UTIL_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} Util")
+
+  # Emgu.LiteRT.Tflite/ (renamed from Emgu.TF.Lite/) is the TensorFlow Lite Interpreter API
+  # wrapper (Emgu.TF.Lite namespace); EMGUTF_LITE_TFLITE_NUGET_ID is its own managed package id,
+  # distinct from EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID below (the native tfliteextern.dll runtime
+  # package for Windows).
+  SET(EMGUTF_LITE_TFLITE_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Tflite")
+  SET(EMGUTF_LITE_TFLITE_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} Tflite")
+
   # Emgu.LiteRT.Models/ was renamed to Emgu.LiteRT.Tflite.Models/ - it's built on the TFLite
   # Interpreter API (Emgu.TF.Lite), not LiteRT's own CompiledModel API.
   SET(EMGUTF_LITE_MODEL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Tflite.Models")
@@ -851,20 +866,39 @@ IF (HAVE_WINDESKTOP_X86_LITE)
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/${EMGU_WINDOWS_MSVCRT_X86_NUGET_ID}.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/${EMGU_WINDOWS_MSVCRT_X86_NUGET_ID}/Package.nuspec)    
 ENDIF()
 
+# Emgu.LiteRT.Tflite: the TensorFlow Lite Interpreter API wrapper (Emgu.TF.Lite namespace), its
+# own nuget package (depends on Emgu.LiteRT.Util - see its csproj's ProjectReference). The
+# signing targets in EMGUTF_LITE_POST_PROCESS_* only refer to $(AssemblyName)/$(PackageId), so
+# they are reused as-is for every self-packing project below.
+SET(EMGUTF_LITE_TFLITE_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
+SET(EMGUTF_LITE_TFLITE_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite/NetStandard/SignBinary.Targets)
 ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite/NetStandard/docs/README.md)
 
-# Emgu.LiteRT: the C# wrapper of LiteRT's own runtime C API (libLiteRt), and the project that packs the
-# single Emgu.LiteRT nuget package (Emgu.LiteRT.dll + Emgu.LiteRT.Tflite.dll + Emgu.LiteRT.Util.dll). The signing
-# targets in EMGUTF_LITE_POST_PROCESS_* only refer to $(AssemblyName)/$(PackageId), so they are reused as-is.
-SET(EMGUTF_LITERT_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
-SET(EMGUTF_LITERT_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
+# Emgu.LiteRT.Util: the shared UnmanagedObject/Toolbox base both Emgu.LiteRT.Tflite and Emgu.LiteRT
+# depend on. Its own nuget package too, with no managed dependencies of its own.
+SET(EMGUTF_LITERT_UTIL_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
+SET(EMGUTF_LITERT_UTIL_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Util.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Util/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Util/NetStandard/SignBinary.Targets)
 ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Util/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Util.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Util/NetStandard/docs/README.md)
+
+# Emgu.LiteRT: the C# wrapper of LiteRT's own runtime C API (libLiteRt). Its own nuget package
+# depends on Emgu.LiteRT.Util (its UnmanagedObject-derived types need it to compile); it has no
+# code dependency on Emgu.LiteRT.Tflite, which is a fully independent package.
+SET(EMGUTF_LITERT_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
+SET(EMGUTF_LITERT_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT/NetStandard/SignBinary.Targets)

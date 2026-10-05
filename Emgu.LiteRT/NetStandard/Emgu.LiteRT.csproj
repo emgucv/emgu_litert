@@ -28,26 +28,17 @@
   <Import Project="..\Emgu.LiteRT.Shared.projitems" Label="Shared" />
 
   <!--
-  The Emgu.LiteRT nuget package is the single managed package of Emgu TF Lite: it ships Emgu.LiteRT.dll together
-  with Emgu.LiteRT.Tflite.dll and Emgu.LiteRT.Util.dll, which have no packages of their own. PrivateAssets="all" keeps
-  those two projects from becoming package dependencies; IncludeReferencedProjectsInPackage packs their
-  assemblies (and xml docs) into lib/<tfm> instead. Projects that use their types must reference them directly.
+  Emgu.LiteRT, Emgu.LiteRT.Tflite and Emgu.LiteRT.Util each produce their own nuget package.
+  Emgu.LiteRT's UnmanagedObject-derived types need Emgu.LiteRT.Util to compile, so that
+  ProjectReference (without PrivateAssets) becomes a normal package dependency when this
+  project is packed - NuGet does this automatically for a ProjectReference to another packable
+  project. There is no reference to Emgu.LiteRT.Tflite here: this project's code never used it,
+  it was only ever bundled into this same package for convenience before the split.
   -->
   <ItemGroup>
-    <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeReferencedProjectsInPackage</TargetsForTfmSpecificBuildOutput>
-  </PropertyGroup>
-
-  <Target Name="IncludeReferencedProjectsInPackage" DependsOnTargets="ResolveReferences">
-    <ItemGroup>
-      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference' and ('%(ReferenceCopyLocalPaths.Extension)' == '.dll' or '%(ReferenceCopyLocalPaths.Extension)' == '.xml')" />
-    </ItemGroup>
-  </Target>
-  <!-- 
+  <!--
   <Target Name="DeployBinary" AfterTargets="AfterBuild">
     <Message Text="Copying $(OutputPath)$(AssemblyName).dll, $(OutputPath)$(AssemblyName).xml to $(TensorflowBinaryDir)" Importance="high" />
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(TensorflowBinaryDir)" ContinueOnError="true" />

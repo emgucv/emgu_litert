@@ -1,25 +1,60 @@
 <?xml version="1.0"?>
 <Project>
  <PropertyGroup>
- 
+
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
 	<!-- Don't build for iOS or Maccatalyst on Linux -->
 	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx')) or $([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-ios;net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFrameworks>
- 
-	<!-- Emgu.LiteRT.Util.dll is shipped inside the ${EMGUTF_LITERT_NUGET_ID} nuget package, it has no package of its own. -->
-	<IsPackable>False</IsPackable>
-	<GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+
+    <PackageId>${EMGUTF_LITERT_UTIL_NUGET_ID}</PackageId>
+	<title>${EMGUTF_LITERT_UTIL_NUGET_TITLE}</title>
+    <version>${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>Shared native-handle lifetime management base classes used by Emgu.LiteRT and Emgu.LiteRT.Tflite.</summary>
+    <Description>Emgu.LiteRT.Util provides UnmanagedObject and other shared infrastructure for wrapping native handles with proper lifetime management (Dispose/finalizer pattern), used by both the Emgu.LiteRT (CompiledModel) and Emgu.LiteRT.Tflite (Interpreter) APIs.</Description>
+    <PackageReleaseNotes>This is the ${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT. For online documentation please visit
+http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
+
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\platforms\nuget))</PackageOutputPath>
+	<PackageTags>litert tensorflow lite emgu emgutflite ai</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
     <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
-    
+
  </PropertyGroup>
-	
+
+    <ItemGroup>
+      <None Include="..\..\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="..\..\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+
   <!-- https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022 -->
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
-  
+
   <!--
-  ${EMGUTF_LITERT_POST_PROCESS_BINARY}
+  ${EMGUTF_LITERT_UTIL_POST_PROCESS_BINARY}
+  ${EMGUTF_LITERT_UTIL_POST_PROCESS_NUGET}
   -->
-  
-  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />	
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />
 </Project>

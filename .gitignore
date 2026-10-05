@@ -22,12 +22,14 @@ obj/
 Directory.Build.props
 !/miscellaneous/Directory.Build.props
 /Emgu.LiteRT.Tflite/NetStandard/docs/
+/Emgu.LiteRT.Util/NetStandard/docs/
 /Emgu.LiteRT/NetStandard/docs/
 /Emgu.LiteRT.Tflite.Models/NetStandard/docs/
 /Emgu.TF.Runtime/Maui/*/docs/
 /Emgu.TF.Runtime/Maui/*/Lite/docs/
 /platforms/nuget/*/Package.nuspec
 /platforms/nuget/Emgu.LiteRT.runtime.windows/README.md
+/platforms/nuget/Emgu.LiteRT.Tflite.runtime.windows/README.md
 
 # NuGet packages produced by the build
 /platforms/nuget/*.nupkg

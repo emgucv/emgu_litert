@@ -25,8 +25,9 @@ IF(HAVE_LITE_BUILD)
   IF (DOTNET_FOUND)
     PROJECT(Emgu.LiteRT)
     BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/NetStandard/Emgu.LiteRT.csproj" "" ALL)
-    # Emgu.LiteRT packs Emgu.LiteRT.Tflite.dll and Emgu.LiteRT.Util.dll into its nuget package, so build them first.
-    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.Util Emgu.TF.Lite)
+    # Emgu.LiteRT.csproj's UnmanagedObject-derived types need Emgu.LiteRT.Util to compile; it has
+    # no dependency on Emgu.TF.Lite (Emgu.LiteRT.Tflite is a fully independent package).
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.Util)
   
     INSTALL(
       DIRECTORY

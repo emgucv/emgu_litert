@@ -15,10 +15,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Emgu.LiteRT.Tflite.dll and Emgu.LiteRT.Util.dll ship inside the Emgu.LiteRT package: reference them for compiling only (PrivateAssets) and depend on the Emgu.LiteRT package. -->
+    <!-- Emgu.LiteRT.Tflite and Emgu.LiteRT.Util each have their own nuget package now: plain
+         ProjectReferences (no PrivateAssets) so this project's package correctly depends on
+         both, matching what its code (the Interpreter API, UnmanagedObject) actually uses. -->
     <ProjectReference Include="..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
-    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
   </ItemGroup>
 
   <Import Project="..\Emgu.TF.Lite.Models.Shared.projitems" Label="Shared" />
