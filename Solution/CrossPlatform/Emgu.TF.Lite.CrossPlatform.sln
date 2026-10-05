@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31611.283
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Maui.Demo.Lite", "..\..\Emgu.TF.Example\Maui.Lite\Maui.Demo.Lite.csproj", "{E1EA24DC-FE69-487C-967D-028FDE402E85}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Maui.Demo.Lite", "..\..\Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj", "{E1EA24DC-FE69-487C-967D-028FDE402E85}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.LiteRT.Util.Shared", "..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.shproj", "{98561642-5EC3-4244-BAF9-6876D9BA5527}"
 EndProject

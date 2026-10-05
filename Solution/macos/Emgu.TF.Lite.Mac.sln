@@ -4,17 +4,17 @@ VisualStudioVersion = 17.7.34009.444
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.LiteRT.Util.Shared", "..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.shproj", "{98561642-5EC3-4244-BAF9-6876D9BA5527}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XamarinForms.Lite.Mac", "..\..\Emgu.TF.Example\XamarinForms\XamarinForms.Lite.Mac\XamarinForms.Lite.Mac.csproj", "{A5BE7C8B-C4DF-4CCE-8640-D533DF7D6892}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XamarinForms.Lite.Mac", "..\..\Emgu.LiteRT.Example\XamarinForms\XamarinForms.Lite.Mac\XamarinForms.Lite.Mac.csproj", "{A5BE7C8B-C4DF-4CCE-8640-D533DF7D6892}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.Models.Shared", "..\..\Emgu.Models\Emgu.Models.Shared.shproj", "{8EDCE0C8-BA71-4396-9428-35D05877258C}"
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "XamarinForms.Lite", "..\..\Emgu.TF.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.shproj", "{26F4D7AF-57B6-4D2D-9A1C-AAFA757DDC4A}"
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "XamarinForms.Lite", "..\..\Emgu.LiteRT.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.shproj", "{26F4D7AF-57B6-4D2D-9A1C-AAFA757DDC4A}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Shared", "..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.shproj", "{8F587FB9-BBA6-4C30-9329-8CBAC7020FE0}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Models.Shared", "..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.shproj", "{E956DD26-1294-4731-8A90-C4CBA9F291B6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Inception.Console.Lite.NetCore", "..\..\Emgu.TF.Example\Inception.Console.Lite.NetCore\Inception.Console.Lite.NetCore.csproj", "{7F80AE6A-BD36-45BA-A152-5D366BCF8570}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Inception.Console.Lite.NetCore", "..\..\Emgu.LiteRT.Example\Inception.Console.Lite.NetCore\Inception.Console.Lite.NetCore.csproj", "{7F80AE6A-BD36-45BA-A152-5D366BCF8570}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.NetStandard", "..\..\Emgu.TF.Lite\Emgu.TF.Lite.Netstandard\Emgu.TF.Lite.NetStandard.csproj", "{C07F7FE3-3835-460D-B6C2-166250C03AC0}"
 EndProject
@@ -149,7 +149,7 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		..\..\Emgu.TF.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems*{0d7c99ea-3aae-4f45-9ba7-3b4af8313753}*SharedItemsImports = 13
-		..\..\Emgu.TF.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.projitems*{26f4d7af-57b6-4d2d-9a1c-aafa757ddc4a}*SharedItemsImports = 13
+		..\..\Emgu.LiteRT.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.projitems*{26f4d7af-57b6-4d2d-9a1c-aafa757ddc4a}*SharedItemsImports = 13
 		..\..\Emgu.TF.Runtime\Debian\Emgu.TF.Lite.Runtime.Debian.projitems*{7f80ae6a-bd36-45ba-a152-5d366bcf8570}*SharedItemsImports = 5
 		..\..\Emgu.TF.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems*{7f80ae6a-bd36-45ba-a152-5d366bcf8570}*SharedItemsImports = 5
 		..\..\Emgu.TF.Runtime\Ubuntu\Emgu.TF.Lite.Runtime.Ubuntu.projitems*{7f80ae6a-bd36-45ba-a152-5d366bcf8570}*SharedItemsImports = 5
@@ -160,7 +160,7 @@ Global
 		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{971a6e6a-e7d4-4ff6-931e-8a25d572161c}*SharedItemsImports = 5
 		..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.projitems*{971a6e6a-e7d4-4ff6-931e-8a25d572161c}*SharedItemsImports = 5
 		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{98561642-5ec3-4244-baf9-6876d9ba5527}*SharedItemsImports = 13
-		..\..\Emgu.TF.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.projitems*{a5be7c8b-c4df-4cce-8640-d533df7d6892}*SharedItemsImports = 4
+		..\..\Emgu.LiteRT.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.projitems*{a5be7c8b-c4df-4cce-8640-d533df7d6892}*SharedItemsImports = 4
 		..\..\Emgu.TF.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems*{a5be7c8b-c4df-4cce-8640-d533df7d6892}*SharedItemsImports = 4
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{c07f7fe3-3835-460d-b6c2-166250c03ac0}*SharedItemsImports = 5
 		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{c07f7fe3-3835-460d-b6c2-166250c03ac0}*SharedItemsImports = 5

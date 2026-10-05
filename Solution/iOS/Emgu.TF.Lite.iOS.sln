@@ -20,7 +20,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Emgu.TF.Lite.Models", "..\.
 EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		..\..\Emgu.TF.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.projitems*{26f4d7af-57b6-4d2d-9a1c-aafa757ddc4a}*SharedItemsImports = 13
+		..\..\Emgu.LiteRT.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.projitems*{26f4d7af-57b6-4d2d-9a1c-aafa757ddc4a}*SharedItemsImports = 13
 		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{7bd4df97-8015-4554-846a-c6a8979cd8db}*SharedItemsImports = 4
 		..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.projitems*{7bd4df97-8015-4554-846a-c6a8979cd8db}*SharedItemsImports = 4
 		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{8edce0c8-ba71-4396-9428-35d05877258c}*SharedItemsImports = 13
@@ -29,7 +29,7 @@ Global
 		..\..\Emgu.LiteRT.Models\Emgu.TF.Lite.Models.Shared.projitems*{e956dd26-1294-4731-8a90-c4cba9f291b6}*SharedItemsImports = 13
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{f167aea1-eba9-4164-b944-5ca6c8bc1914}*SharedItemsImports = 5
 		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{f167aea1-eba9-4164-b944-5ca6c8bc1914}*SharedItemsImports = 5
-		..\..\Emgu.TF.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.projitems*{fb5cf614-195e-4d5a-abdb-1b831a5f8f79}*SharedItemsImports = 4
+		..\..\Emgu.LiteRT.Example\XamarinForms\XamarinForms.Lite\XamarinForms.Lite.projitems*{fb5cf614-195e-4d5a-abdb-1b831a5f8f79}*SharedItemsImports = 4
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Ad-Hoc|Any CPU = Ad-Hoc|Any CPU

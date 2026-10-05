@@ -10,6 +10,6 @@ IF(HAVE_WINDESKTOP_LITE)
 	"${CMAKE_CURRENT_SOURCE_DIR}/dog416.png"
     ${CMAKE_CURRENT_SOURCE_DIR}/CVInterop.Lite.csproj
     #${CMAKE_CURRENT_SOURCE_DIR}/App.config
-    DESTINATION Emgu.TF.Example/CVInterop.Lite COMPONENT emgutf_example_source)
+    DESTINATION Emgu.LiteRT.Example/CVInterop.Lite COMPONENT emgutf_example_source)
 
 ENDIF()

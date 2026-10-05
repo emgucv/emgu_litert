@@ -646,7 +646,7 @@ ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Runtime/Maui/UI/Lite/docs/README.md)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Runtime/Maui/UI/Lite/Directory.Build.props)
 
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Maui.Demo.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Example/Maui.Lite/Directory.Build.props)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Maui.Demo.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/Maui.Lite/Directory.Build.props)
 IF (HAVE_WINDESKTOP_LITE)
     IF (HAVE_WINDESKTOP_X64_LITE)
       SET(EMGU_WINDOWS_MSVCRT_X64_NUGET_TITLE "MSVC x64 runtime for windows")
@@ -855,7 +855,7 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm6
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Test.Net.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Test/Emgu.TF.Lite.Test/Emgu.TF.Lite.Test.Net/Directory.Build.props)
 
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Inception.Console.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Example/Inception.Console.Lite/Directory.Build.props)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Inception.Console.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/Inception.Console.Lite/Directory.Build.props)
 
 IF(TARGET_ARCH_64)
   SET(UNMANAGED_CODE_BITNESS "64")
@@ -887,7 +887,7 @@ ENDIF()
 #Add MAUI project
 ADD_SUBDIRECTORY(Emgu.TF.Runtime)
 
-ADD_SUBDIRECTORY(Emgu.TF.Example)
+ADD_SUBDIRECTORY(Emgu.LiteRT.Example)
 
 INSTALL(
   FILES
