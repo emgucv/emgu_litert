@@ -76,6 +76,34 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
+        /// True if chat messages may include images (ChatAttachment.Image / ImageFile)
+        /// </summary>
+        public virtual bool SupportsImages
+        {
+            get { return false; }
+        }
+
+        /// <summary>
+        /// True if chat messages may include audio (ChatAttachment.Audio / AudioFile)
+        /// </summary>
+        public virtual bool SupportsAudio
+        {
+            get { return false; }
+        }
+
+        /// <summary>
+        /// Create the engine settings in Init. The default uses the given backend for the main model only; models
+        /// that accept images or audio override this to also set their vision / audio backends.
+        /// </summary>
+        /// <param name="modelPath">The local path of the model file</param>
+        /// <param name="backend">The backend passed to Init</param>
+        /// <returns>The engine settings</returns>
+        protected virtual EngineSettings CreateEngineSettings(String modelPath, String backend)
+        {
+            return new EngineSettings(modelPath, backend);
+        }
+
+        /// <summary>
         /// True once Init has loaded the model
         /// </summary>
         public bool Initialized
@@ -109,7 +137,7 @@ namespace Emgu.LiteRT.LM.Models
             // Loading a model can take a while; don't block the caller's thread.
             Engine engine = await Task.Run(() =>
             {
-                using (EngineSettings settings = new EngineSettings(modelPath, backend))
+                using (EngineSettings settings = CreateEngineSettings(modelPath, backend))
                 {
                     // Keep compiled-model caches next to the model.
                     settings.CacheDir = Path.GetDirectoryName(modelPath);

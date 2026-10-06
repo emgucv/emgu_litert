@@ -2,7 +2,7 @@
 
 This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
 
-- `Emgu.LiteRT.LM.Models.dll`: ready-to-use language models (`Emgu.LiteRT.LM.Models` namespace) built on the `Emgu.LiteRT.LM` API. Each model class (currently `Qwen3`, Qwen3-0.6B, and `Gemma4E2B`, Gemma 4 E2B) downloads its `.litertlm` file on first use and creates the LiteRT-LM engine; `Chat` keeps the message history and sends messages, with optional streaming of the reply.
+- `Emgu.LiteRT.LM.Models.dll`: ready-to-use language models (`Emgu.LiteRT.LM.Models` namespace) built on the `Emgu.LiteRT.LM` API. Each model class (currently `Qwen3`, Qwen3-0.6B, and `Gemma4E2B`, Gemma 4 E2B) downloads its `.litertlm` file on first use and creates the LiteRT-LM engine; `Chat` keeps the message history and sends messages, with optional streaming of the reply. `Gemma4E2B` also accepts images and audio, sent as `ChatAttachment`s, e.g. `chat.Send("What is in this image?", ChatAttachment.ImageFile("photo.jpg"))`.
 
 ```csharp
 using (Qwen3 model = new Qwen3())

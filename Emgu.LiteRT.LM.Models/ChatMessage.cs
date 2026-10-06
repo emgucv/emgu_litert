@@ -25,15 +25,29 @@ namespace Emgu.LiteRT.LM.Models
         /// </summary>
         public const String AssistantRole = "assistant";
 
+        private static readonly ChatAttachment[] NoAttachments = new ChatAttachment[0];
+
         /// <summary>
         /// Create a chat message.
         /// </summary>
         /// <param name="role">The role, e.g. UserRole or AssistantRole</param>
         /// <param name="text">The message text</param>
-        public ChatMessage(String role, String text)
+        /// <param name="attachments">The images and audio of the message, or null for none</param>
+        public ChatMessage(String role, String text, IEnumerable<ChatAttachment> attachments = null)
         {
             Role = role;
             Text = text;
+            List<ChatAttachment> list = new List<ChatAttachment>();
+            if (attachments != null)
+            {
+                foreach (ChatAttachment attachment in attachments)
+                {
+                    if (attachment == null)
+                        throw new ArgumentNullException("attachments", "An attachment is null");
+                    list.Add(attachment);
+                }
+            }
+            Attachments = list.Count == 0 ? NoAttachments : list.ToArray();
         }
 
         /// <summary>
@@ -47,17 +61,24 @@ namespace Emgu.LiteRT.LM.Models
         public String Text { get; }
 
         /// <summary>
+        /// The images and audio of the message (empty if none)
+        /// </summary>
+        public IReadOnlyList<ChatAttachment> Attachments { get; }
+
+        /// <summary>
         /// Return the message as "role: text"
         /// </summary>
         /// <returns>The message as "role: text"</returns>
         public override String ToString()
         {
-            return String.Format("{0}: {1}", Role, Text);
+            if (Attachments.Count == 0)
+                return String.Format("{0}: {1}", Role, Text);
+            return String.Format("{0}: {1} [{2}]", Role, Text, String.Join(", ", Attachments));
         }
 
         /// <summary>
         /// Write the message in LiteRT-LM's JSON message format:
-        /// {"role": ..., "content": [{"type": "text", "text": ...}]}
+        /// {"role": ..., "content": [attachments..., {"type": "text", "text": ...}]}
         /// </summary>
         internal void WriteJson(Utf8JsonWriter writer)
         {
@@ -65,6 +86,8 @@ namespace Emgu.LiteRT.LM.Models
             writer.WriteString("role", Role);
             writer.WritePropertyName("content");
             writer.WriteStartArray();
+            foreach (ChatAttachment attachment in Attachments)
+                attachment.WriteJson(writer);
             writer.WriteStartObject();
             writer.WriteString("type", "text");
             writer.WriteString("text", Text ?? String.Empty);

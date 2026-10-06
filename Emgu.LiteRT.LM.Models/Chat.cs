@@ -101,15 +101,15 @@ namespace Emgu.LiteRT.LM.Models
         /// the history.
         /// </summary>
         /// <param name="text">The message text</param>
+        /// <param name="attachments">Images and audio to send with the text, for models that accept them
+        /// (LanguageModel.SupportsImages / SupportsAudio)</param>
         /// <returns>The reply</returns>
-        public ChatReply Send(String text)
+        public ChatReply Send(String text, params ChatAttachment[] attachments)
         {
-            if (text == null)
-                throw new ArgumentNullException("text");
+            ChatMessage message = CreateUserMessage(text, attachments);
             EnterSend();
             try
             {
-                ChatMessage message = new ChatMessage(ChatMessage.UserRole, text);
                 ConversationResources resources = AcquireConversation();
                 ChatReply reply;
                 try
@@ -141,17 +141,36 @@ namespace Emgu.LiteRT.LM.Models
         /// background thread. May be null.</param>
         /// <param name="cancellationToken">Cancels the generation; the task is then cancelled</param>
         /// <returns>A task that completes with the reply</returns>
-        public async Task<ChatReply> SendAsync(
+        public Task<ChatReply> SendAsync(
             String text,
             Action<String> onText = null,
             CancellationToken cancellationToken = default(CancellationToken))
         {
-            if (text == null)
-                throw new ArgumentNullException("text");
+            return SendAsync(text, (IEnumerable<ChatAttachment>)null, onText, cancellationToken);
+        }
+
+        /// <summary>
+        /// Send a message with images and/or audio and stream the reply as it is generated. The message and the
+        /// reply's answer (without thinking) are added to the history when the reply completes; nothing is added if it
+        /// is cancelled or fails.
+        /// </summary>
+        /// <param name="text">The message text</param>
+        /// <param name="attachments">Images and audio to send with the text, for models that accept them
+        /// (LanguageModel.SupportsImages / SupportsAudio); may be null</param>
+        /// <param name="onText">Called with each piece of generated text (including any thinking), on a LiteRT-LM
+        /// background thread. May be null.</param>
+        /// <param name="cancellationToken">Cancels the generation; the task is then cancelled</param>
+        /// <returns>A task that completes with the reply</returns>
+        public async Task<ChatReply> SendAsync(
+            String text,
+            IEnumerable<ChatAttachment> attachments,
+            Action<String> onText = null,
+            CancellationToken cancellationToken = default(CancellationToken))
+        {
+            ChatMessage message = CreateUserMessage(text, attachments);
             EnterSend();
             try
             {
-                ChatMessage message = new ChatMessage(ChatMessage.UserRole, text);
                 ConversationResources resources = AcquireConversation();
                 String[] chunks;
                 try
@@ -203,6 +222,21 @@ namespace Emgu.LiteRT.LM.Models
             }
         }
 
+        private ChatMessage CreateUserMessage(String text, IEnumerable<ChatAttachment> attachments)
+        {
+            if (text == null)
+                throw new ArgumentNullException("text");
+            ChatMessage message = new ChatMessage(ChatMessage.UserRole, text, attachments);
+            foreach (ChatAttachment attachment in message.Attachments)
+            {
+                if (attachment.Type == ChatAttachmentType.Image && !_model.SupportsImages)
+                    throw new NotSupportedException(String.Format("{0} doesn't accept images", _model.GetType().Name));
+                if (attachment.Type == ChatAttachmentType.Audio && !_model.SupportsAudio)
+                    throw new NotSupportedException(String.Format("{0} doesn't accept audio", _model.GetType().Name));
+            }
+            return message;
+        }
+
         private void EnterSend()
         {
             if (Interlocked.Exchange(ref _busy, 1) != 0)
@@ -214,6 +248,8 @@ namespace Emgu.LiteRT.LM.Models
             Volatile.Write(ref _busy, 0);
         }
 
+        // The user message is kept with its attachments, so a conversation rebuilt from the history (see the remarks of
+        // Chat) still includes them.
         private void AddToHistory(ChatMessage message, ChatReply reply)
         {
             _history.Add(message);

@@ -12,8 +12,9 @@ namespace Emgu.LiteRT.LM.Models
     /// https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm
     /// </summary>
     /// <remarks>
-    /// The model also accepts image and audio input (LoadedFile.SupportsInputModality), which Chat doesn't use yet:
-    /// Chat sends text only. Unlike Qwen3, it doesn't think before answering. Its chat template supports multi-turn
+    /// The model accepts images and audio as well as text: send them with Chat.Send / SendAsync as ChatAttachments
+    /// (e.g. ask about an image, or to transcribe a recording). The vision and audio parts of the model are only
+    /// loaded when first used. Unlike Qwen3, it doesn't think before answering. Its chat template supports multi-turn
     /// conversations, so Chat keeps one LiteRT-LM Conversation open across messages.
     /// </remarks>
     public class Gemma4E2B : LanguageModel
@@ -38,6 +39,45 @@ namespace Emgu.LiteRT.LM.Models
         public override DownloadableFile DefaultModelFile
         {
             get { return ModelFile; }
+        }
+
+        /// <summary>
+        /// The backend of the vision encoder, used for images, e.g. "cpu" or "gpu"; null to not load it (images are
+        /// then not supported). Set before Init.
+        /// </summary>
+        public String VisionBackend { get; set; } = "cpu";
+
+        /// <summary>
+        /// The backend of the audio encoder, used for audio, e.g. "cpu"; null to not load it (audio is then not
+        /// supported). Set before Init.
+        /// </summary>
+        public String AudioBackend { get; set; } = "cpu";
+
+        /// <summary>
+        /// True unless VisionBackend is null
+        /// </summary>
+        public override bool SupportsImages
+        {
+            get { return VisionBackend != null; }
+        }
+
+        /// <summary>
+        /// True unless AudioBackend is null
+        /// </summary>
+        public override bool SupportsAudio
+        {
+            get { return AudioBackend != null; }
+        }
+
+        /// <summary>
+        /// Create the engine settings with the vision and audio backends.
+        /// </summary>
+        /// <param name="modelPath">The local path of the model file</param>
+        /// <param name="backend">The backend of the main model</param>
+        /// <returns>The engine settings</returns>
+        protected override EngineSettings CreateEngineSettings(String modelPath, String backend)
+        {
+            return new EngineSettings(modelPath, backend, VisionBackend, AudioBackend);
         }
 
         /// <summary>

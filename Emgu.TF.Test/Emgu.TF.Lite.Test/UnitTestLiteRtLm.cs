@@ -326,5 +326,60 @@ namespace Emgu.TF.Lite.Test
                 }
             }
         }
+
+        // Gemma 4 E2B also accepts images and audio (test inputs from the LiteRT-LM submodule).
+        [TestAttribute]
+        public async Task TestGemma4E2BImageAndAudio()
+        {
+            RequireLiteRtLm();
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                await model.Init();
+                if (!model.SupportsImages || !model.SupportsAudio)
+                    throw new Exception("Gemma 4 E2B should accept images and audio");
+                using (Chat chat = model.CreateChat())
+                {
+                    chat.MaxOutputTokens = 64;
+
+                    ChatReply image = chat.Send("What fruit is in this image? Answer with one word.",
+                        ChatAttachment.ImageFile("apple.jpg"));
+                    Console.WriteLine("Image: {0}", image.Text);
+                    if (image.Text.IndexOf("apple", StringComparison.OrdinalIgnoreCase) < 0)
+                        throw new Exception("The image reply doesn't mention an apple");
+
+                    // Audio given as bytes (sent base64-encoded), in the same conversation.
+                    ChatReply audio = await chat.SendAsync("Transcribe this audio.",
+                        new ChatAttachment[] { ChatAttachment.Audio(System.IO.File.ReadAllBytes("audio_sample.wav")) });
+                    Console.WriteLine("Audio: {0}", audio.Text);
+                    if (String.IsNullOrEmpty(audio.Text))
+                        throw new Exception("The audio reply is empty");
+
+                    if (chat.History[0].Attachments.Count != 1 || chat.History[2].Attachments.Count != 1)
+                        throw new Exception("The history should keep the attachments");
+                }
+            }
+        }
+
+        [TestAttribute]
+        public async Task TestQwen3RejectsImages()
+        {
+            await GetModelPath();
+            using (Qwen3 model = new Qwen3())
+            {
+                await model.Init();
+                using (Chat chat = model.CreateChat())
+                {
+                    try
+                    {
+                        chat.Send("What is in this image?", ChatAttachment.ImageFile("apple.jpg"));
+                        throw new Exception("Qwen3 should not accept images");
+                    }
+                    catch (NotSupportedException e)
+                    {
+                        Console.WriteLine("Rejected: {0}", e.Message);
+                    }
+                }
+            }
+        }
     }
 }
