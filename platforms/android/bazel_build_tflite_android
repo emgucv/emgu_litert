@@ -84,6 +84,11 @@ cd $WORKSPACE_DIR
 HOST_FLAGS=
 if [ "$(uname)" = "Darwin" ]; then
     HOST_FLAGS="--host_linkopt=-Wl,-undefined,dynamic_lookup"
+elif command -v clang >/dev/null 2>&1 && command -v clang++ >/dev/null 2>&1; then
+    # On a Linux host, compile the host-side build tools (Bazel's [for tool] actions; Android code itself is built
+    # with the NDK) with clang, as platforms/ubuntu/*/bazel_build_tflite do. Newer GCC (GCC 15 on Ubuntu 26.04)
+    # rejects Abseil's absl/container/internal/raw_hash_set.cc: "Never use <bmi2intrin.h> directly".
+    HOST_FLAGS="--repo_env=CC=clang --repo_env=CXX=clang++"
 fi
 
 # Bazel's bazel-bin symlink follows the most recent build, so each build's outputs are copied right after it.
