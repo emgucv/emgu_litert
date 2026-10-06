@@ -75,7 +75,7 @@ Tests use either NUnit or MSTest (selected at compile-time via the `VS_TEST` pre
 
 ### TF Lite — run all tests
 ```bash
-dotnet test Emgu.TF.Test/Emgu.TF.Lite.Test/Emgu.TF.Lite.Test.Net/Emgu.TF.Lite.Test.Net.csproj
+dotnet test Emgu.LiteRT.Test/Emgu.TF.Lite.Test/Emgu.TF.Lite.Test.Net/Emgu.TF.Lite.Test.Net.csproj
 ```
 
 ### Run a single test

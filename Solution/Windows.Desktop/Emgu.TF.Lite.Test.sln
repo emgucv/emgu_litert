@@ -17,7 +17,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.Models", "..\.
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Runtime.Windows", "..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.shproj", "{0D7C99EA-3AAE-4F45-9BA7-3B4AF8313753}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.Test.Net", "..\..\Emgu.TF.Test\Emgu.TF.Lite.Test\Emgu.TF.Lite.Test.Net\Emgu.TF.Lite.Test.Net.csproj", "{47C5C217-8CD6-4A69-9AD8-BE574FB5A149}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.Test.Net", "..\..\Emgu.LiteRT.Test\Emgu.TF.Lite.Test\Emgu.TF.Lite.Test.Net\Emgu.TF.Lite.Test.Net.csproj", "{47C5C217-8CD6-4A69-9AD8-BE574FB5A149}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Runtime.Ubuntu", "..\..\Emgu.LiteRT.Runtime\Ubuntu\Emgu.TF.Lite.Runtime.Ubuntu.shproj", "{A481CD6D-F3FD-40D3-BA64-64B46219D09E}"
 EndProject
@@ -25,7 +25,7 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Runtime.Debian
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Runtime.Mac", "..\..\Emgu.LiteRT.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.shproj", "{8519B2B8-E96B-47FD-A466-C6031D34AAAB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Emgu.TF.Lite.Test.NetFramework", "..\..\Emgu.TF.Test\Emgu.TF.Lite.Test\Emgu.TF.Lite.Test.NetFramework.csproj", "{D1F84983-691B-4E10-B202-448229F6564E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Emgu.TF.Lite.Test.NetFramework", "..\..\Emgu.LiteRT.Test\Emgu.TF.Lite.Test\Emgu.TF.Lite.Test.NetFramework.csproj", "{D1F84983-691B-4E10-B202-448229F6564E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -989,7 +989,7 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.ubuntu.Pack
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.debian-arm/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm64.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.debian-arm64/Package.nuspec)
 
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Test.Net.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Test/Emgu.TF.Lite.Test/Emgu.TF.Lite.Test.Net/Directory.Build.props)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Test.Net.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Test/Emgu.TF.Lite.Test/Emgu.TF.Lite.Test.Net/Directory.Build.props)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Inception.Console.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/Inception.Console.Lite/Directory.Build.props)
 
