@@ -3,6 +3,7 @@
 //----------------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Emgu.LiteRT.Util;
@@ -15,8 +16,15 @@ namespace Emgu.LiteRT.LM.Models
     /// </summary>
     public abstract class LanguageModel : DisposableObject
     {
+        /// <summary>
+        /// The folder, under the application's local data folder, the models' files are downloaded to by default
+        /// </summary>
+        public const String DefaultLocalSubfolder = "LiteRT-LM";
+
         private readonly FileDownloadManager _downloadManager;
         private Engine _engine;
+        // The chats that opened a conversation on the engine; their conversations must be released before the engine.
+        private readonly List<WeakReference<Chat>> _chats = new List<WeakReference<Chat>>();
 
         /// <summary>
         /// Create the model. Call Init to download and load it.
@@ -55,6 +63,16 @@ namespace Emgu.LiteRT.LM.Models
         public Engine Engine
         {
             get { return _engine; }
+        }
+
+        /// <summary>
+        /// True if LiteRT-LM can keep one Conversation open across the messages of a chat for this model, i.e. its chat
+        /// template renders earlier turns the same way as more turns follow. Chat then keeps the conversation open
+        /// instead of creating a new one, seeded with the history, for every message (see the remarks of Chat).
+        /// </summary>
+        public virtual bool SupportsMultiTurnConversation
+        {
+            get { return false; }
         }
 
         /// <summary>
@@ -101,6 +119,7 @@ namespace Emgu.LiteRT.LM.Models
                 }
             }).ConfigureAwait(false);
 
+            CloseChatConversations();
             if (_engine != null)
                 _engine.Dispose();
             _engine = engine;
@@ -118,10 +137,38 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
+        /// Remember a chat that created a conversation on the engine.
+        /// </summary>
+        internal void RegisterChat(Chat chat)
+        {
+            lock (_chats)
+            {
+                _chats.RemoveAll(c => { Chat target; return !c.TryGetTarget(out target) || target == chat; });
+                _chats.Add(new WeakReference<Chat>(chat));
+            }
+        }
+
+        // Release the chats' open conversations, which must not outlive the engine they were created on.
+        private void CloseChatConversations()
+        {
+            lock (_chats)
+            {
+                foreach (WeakReference<Chat> reference in _chats)
+                {
+                    Chat chat;
+                    if (reference.TryGetTarget(out chat))
+                        chat.CloseConversation();
+                }
+                _chats.Clear();
+            }
+        }
+
+        /// <summary>
         /// Release the engine
         /// </summary>
         protected override void ReleaseManagedResources()
         {
+            CloseChatConversations();
             if (_engine != null)
             {
                 _engine.Dispose();

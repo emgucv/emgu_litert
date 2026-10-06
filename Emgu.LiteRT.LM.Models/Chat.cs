@@ -15,18 +15,31 @@ namespace Emgu.LiteRT.LM.Models
     /// A chat with a language model: keeps the message history and sends new messages with it.
     /// </summary>
     /// <remarks>
-    /// Each message is sent through a new LiteRT-LM Conversation whose initial messages are the history so far,
-    /// rather than through one long-lived Conversation. LiteRT-LM v0.17.1 renders a conversation incrementally and
-    /// refuses a second message when the model's chat template renders earlier turns differently once more turns
-    /// follow (Qwen3's template drops the previous answer's empty &lt;think&gt;&lt;/think&gt; block: "The new
-    /// rendered template string does not start with the previous rendered template string"). The history is also
-    /// managed here, so it can be inspected or cleared. One message can be sent at a time.
+    /// <para>
+    /// For models whose chat template supports it (LanguageModel.SupportsMultiTurnConversation, e.g. Gemma4E2B),
+    /// the chat keeps one LiteRT-LM Conversation open across messages, so each message only processes the new
+    /// tokens. For the others (e.g. Qwen3), each message is sent through a new Conversation whose initial messages
+    /// are the history so far: LiteRT-LM v0.17.1 renders a conversation incrementally and refuses a second message
+    /// when the model's chat template renders earlier turns differently once more turns follow (Qwen3's template
+    /// drops the previous answer's empty &lt;think&gt;&lt;/think&gt; block: "The new rendered template string does
+    /// not start with the previous rendered template string").
+    /// </para>
+    /// <para>
+    /// Either way the history is kept here, so it can be inspected or cleared, and an open Conversation is rebuilt
+    /// from it when the settings change, or after a send fails or is cancelled (LiteRT-LM doesn't support reusing a
+    /// conversation after that). One message can be sent at a time. Dispose the chat (or the model) to release an
+    /// open Conversation.
+    /// </para>
     /// </remarks>
-    public class Chat
+    public class Chat : IDisposable
     {
         private readonly LanguageModel _model;
         private readonly List<ChatMessage> _history = new List<ChatMessage>();
         private int _busy;
+        // The open conversation, and the settings it was created with, when the model supports multi-turn
+        // conversations.
+        private ConversationResources _openConversation;
+        private String _openConversationSettings;
 
         internal Chat(LanguageModel model, String systemMessage)
         {
@@ -50,6 +63,15 @@ namespace Emgu.LiteRT.LM.Models
         public bool? EnableThinking { get; set; }
 
         /// <summary>
+        /// True if the chat keeps one LiteRT-LM Conversation open across messages, false if it sends each message
+        /// through a new Conversation seeded with the history (see the remarks of Chat)
+        /// </summary>
+        public bool KeepsConversationOpen
+        {
+            get { return _model.SupportsMultiTurnConversation; }
+        }
+
+        /// <summary>
         /// The messages sent and received so far
         /// </summary>
         public ReadOnlyCollection<ChatMessage> History
@@ -62,7 +84,16 @@ namespace Emgu.LiteRT.LM.Models
         /// </summary>
         public void ClearHistory()
         {
-            _history.Clear();
+            EnterSend();
+            try
+            {
+                CloseConversation();
+                _history.Clear();
+            }
+            finally
+            {
+                ExitSend();
+            }
         }
 
         /// <summary>
@@ -79,12 +110,19 @@ namespace Emgu.LiteRT.LM.Models
             try
             {
                 ChatMessage message = new ChatMessage(ChatMessage.UserRole, text);
+                ConversationResources resources = AcquireConversation();
                 ChatReply reply;
-                using (ConversationResources resources = CreateConversation())
+                try
                 {
                     String json = resources.Conversation.SendMessage(message.ToJson());
                     reply = new ChatReply(ChatMessage.GetText(json), json);
                 }
+                catch
+                {
+                    ReleaseConversation(resources, false);
+                    throw;
+                }
+                ReleaseConversation(resources, true);
                 AddToHistory(message, reply);
                 return reply;
             }
@@ -114,8 +152,9 @@ namespace Emgu.LiteRT.LM.Models
             try
             {
                 ChatMessage message = new ChatMessage(ChatMessage.UserRole, text);
+                ConversationResources resources = AcquireConversation();
                 String[] chunks;
-                using (ConversationResources resources = CreateConversation())
+                try
                 {
                     Action<String> onChunk = null;
                     if (onText != null)
@@ -123,6 +162,12 @@ namespace Emgu.LiteRT.LM.Models
                     chunks = await resources.Conversation.SendMessageStreamAsync(
                         message.ToJson(), onChunk, null, null, cancellationToken).ConfigureAwait(false);
                 }
+                catch
+                {
+                    ReleaseConversation(resources, false);
+                    throw;
+                }
+                ReleaseConversation(resources, true);
                 StringBuilder fullText = new StringBuilder();
                 foreach (String chunk in chunks)
                     fullText.Append(ChatMessage.GetText(chunk));
@@ -133,6 +178,28 @@ namespace Emgu.LiteRT.LM.Models
             finally
             {
                 ExitSend();
+            }
+        }
+
+        /// <summary>
+        /// Release the open LiteRT-LM Conversation, if any. The history is kept; a later message opens a new
+        /// Conversation from it.
+        /// </summary>
+        public void Dispose()
+        {
+            CloseConversation();
+        }
+
+        /// <summary>
+        /// Release the open conversation; called by the model before it disposes its engine.
+        /// </summary>
+        internal void CloseConversation()
+        {
+            if (_openConversation != null)
+            {
+                _openConversation.Dispose();
+                _openConversation = null;
+                _openConversationSettings = null;
             }
         }
 
@@ -151,6 +218,44 @@ namespace Emgu.LiteRT.LM.Models
         {
             _history.Add(message);
             _history.Add(new ChatMessage(ChatMessage.AssistantRole, reply.Text));
+        }
+
+        private String GetSettingsKey()
+        {
+            return String.Format("{0}|{1}|{2}", SystemMessage, MaxOutputTokens, EnableThinking);
+        }
+
+        // Get the conversation to send the next message through: the open one if it's still valid, else a new one
+        // seeded with the history.
+        private ConversationResources AcquireConversation()
+        {
+            if (!KeepsConversationOpen)
+                return CreateConversation();
+
+            String settings = GetSettingsKey();
+            if (_openConversation != null && _openConversationSettings != settings)
+                CloseConversation();
+            if (_openConversation == null)
+            {
+                _openConversation = CreateConversation();
+                _openConversationSettings = settings;
+            }
+            return _openConversation;
+        }
+
+        // Done with the conversation after a send: keep an open conversation if the send succeeded, otherwise (and
+        // always for a per-message conversation) dispose it.
+        private void ReleaseConversation(ConversationResources resources, bool succeeded)
+        {
+            if (resources == _openConversation)
+            {
+                if (!succeeded)
+                    CloseConversation();
+            }
+            else
+            {
+                resources.Dispose();
+            }
         }
 
         private ConversationResources CreateConversation()
@@ -180,6 +285,7 @@ namespace Emgu.LiteRT.LM.Models
                 if (_history.Count > 0)
                     resources.Config.MessagesJson = ChatMessage.ToJson(_history);
                 resources.Conversation = engine.CreateConversation(resources.Config);
+                _model.RegisterChat(this);
                 return resources;
             }
             catch
@@ -190,7 +296,7 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
-        /// The native objects of one message's conversation, disposed together.
+        /// The native objects of one conversation, disposed together.
         /// </summary>
         private class ConversationResources : IDisposable
         {

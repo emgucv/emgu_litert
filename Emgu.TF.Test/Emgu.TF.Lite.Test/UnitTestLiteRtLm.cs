@@ -31,7 +31,8 @@ namespace Emgu.TF.Lite.Test
         // Keep the generated answers short, so the tests run quickly on the CPU.
         private const int MaxOutputTokens = 32;
 
-        private static async Task<String> GetModelPath()
+        // Skip the test if liblitert-lm can't be loaded on this platform.
+        private static void RequireLiteRtLm()
         {
             try
             {
@@ -41,6 +42,11 @@ namespace Emgu.TF.Lite.Test
             {
                 Skip("liblitert-lm is not available on this platform: " + e.Message);
             }
+        }
+
+        private static async Task<String> GetModelPath()
+        {
+            RequireLiteRtLm();
 
             if (!ModelFile.IsLocalFileValid)
             {
@@ -280,6 +286,44 @@ namespace Emgu.TF.Lite.Test
                     throw new Exception("The reply has no thinking");
                 if (String.IsNullOrEmpty(reply.Text))
                     throw new Exception("The reply has no answer after the thinking");
+            }
+        }
+
+        // Gemma 4 E2B supports multi-turn LiteRT-LM conversations, so Chat keeps one conversation open (2.6 GB download).
+        [TestAttribute]
+        public async Task TestGemma4E2BChat()
+        {
+            RequireLiteRtLm();
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                await model.Init();
+                using (Chat chat = model.CreateChat("You are a helpful assistant. Answer in one short sentence."))
+                {
+                    chat.MaxOutputTokens = 64;
+                    if (!chat.KeepsConversationOpen)
+                        throw new Exception("Gemma 4 chats should keep the conversation open");
+
+                    ChatReply first = chat.Send("What is the capital of France?");
+                    ChatReply second = await chat.SendAsync("And of Germany?");
+                    // Needs both earlier answers.
+                    ChatReply third = chat.Send("Which of the two cities is bigger? Answer with just its name.");
+                    Console.WriteLine("Replies: {0} | {1} | {2}", first.Text, second.Text, third.Text);
+                    if (!second.Text.Contains("Berlin"))
+                        throw new Exception("The second reply doesn't use the history");
+                    if (chat.History.Count != 6)
+                        throw new Exception(String.Format("The history has {0} messages, expected 6", chat.History.Count));
+
+                    // Changing a setting reopens the conversation from the history.
+                    chat.MaxOutputTokens = 32;
+                    ChatReply fourth = chat.Send("And what is the capital of Italy?");
+                    Console.WriteLine("After a settings change: {0}", fourth.Text);
+                    if (String.IsNullOrEmpty(fourth.Text) || chat.History.Count != 8)
+                        throw new Exception("Sending after a settings change failed");
+
+                    chat.ClearHistory();
+                    if (chat.History.Count != 0)
+                        throw new Exception("ClearHistory didn't clear the history");
+                }
             }
         }
     }

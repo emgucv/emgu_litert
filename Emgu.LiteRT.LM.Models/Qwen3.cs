@@ -16,7 +16,7 @@ namespace Emgu.LiteRT.LM.Models
         /// <summary>
         /// The folder, under the application's local data folder, the model file is downloaded to
         /// </summary>
-        public const String LocalSubfolder = "LiteRT-LM";
+        public const String LocalSubfolder = DefaultLocalSubfolder;
 
         /// <summary>
         /// The mixed int4 build of Qwen3-0.6B (about 500 MB). The repository's Qwen3-0.6B.litertlm needs a newer
