@@ -62,6 +62,34 @@ IF(APPLE)
   ENDIF()
 ENDIF()
 
+# The TFLite version (TfLiteVersion(), TFLITE_VERSION_STRING) is TensorFlow's version. Bazel passes it to
+# litert/tflite/version.h as TF_MAJOR_VERSION etc., but LiteRT's CMake doesn't, so version.h would fall back to its
+# hardcoded (stale) default. Define them here, before LiteRT's directories are added so they inherit them, from the
+# TensorFlow source LiteRT's CMake builds against: TENSORFLOW_SOURCE_DIR's tf_version.bzl if one is given, else the
+# GIT_TAG litert/tflite/CMakeLists.txt downloads. tflite_version.txt below records it for the package versions.
+IF(TENSORFLOW_SOURCE_DIR AND EXISTS "${TENSORFLOW_SOURCE_DIR}/tensorflow/tf_version.bzl")
+  INCLUDE(TensorflowVersion)
+  SET(TFLITEEXTERN_TF_VERSION_SUFFIX "")
+ELSE()
+  FILE(STRINGS "${LITERT_SOURCE_DIR_ABS}/tflite/CMakeLists.txt" TFLITEEXTERN_TF_GIT_TAG REGEX "GIT_TAG[ ]+v[0-9]+\\.[0-9]+\\.[0-9]+")
+  STRING(REGEX MATCH "v([0-9]+)\\.([0-9]+)\\.([0-9]+)([-a-z0-9]*)" TFLITEEXTERN_TF_TAG_MATCH "${TFLITEEXTERN_TF_GIT_TAG}")
+  SET(TENSORFLOW_VERSION_MAJOR "${CMAKE_MATCH_1}")
+  SET(TENSORFLOW_VERSION_MINOR "${CMAKE_MATCH_2}")
+  SET(TENSORFLOW_VERSION_PATCH "${CMAKE_MATCH_3}")
+  SET(TFLITEEXTERN_TF_VERSION_SUFFIX "${CMAKE_MATCH_4}")
+ENDIF()
+IF(TENSORFLOW_VERSION_MAJOR STREQUAL "")
+  MESSAGE(WARNING "Could not determine the TensorFlow version; TfLiteVersion() falls back to litert/tflite/version.h's default")
+ELSE()
+  SET(TFLITEEXTERN_TFLITE_VERSION "${TENSORFLOW_VERSION_MAJOR}.${TENSORFLOW_VERSION_MINOR}.${TENSORFLOW_VERSION_PATCH}")
+  MESSAGE(STATUS "TFLite (TensorFlow) version: ${TFLITEEXTERN_TFLITE_VERSION}${TFLITEEXTERN_TF_VERSION_SUFFIX}")
+  ADD_COMPILE_DEFINITIONS(
+    TF_MAJOR_VERSION=${TENSORFLOW_VERSION_MAJOR}
+    TF_MINOR_VERSION=${TENSORFLOW_VERSION_MINOR}
+    TF_PATCH_VERSION=${TENSORFLOW_VERSION_PATCH}
+    "TF_VERSION_SUFFIX=\"${TFLITEEXTERN_TF_VERSION_SUFFIX}\"")
+ENDIF()
+
 IF(TFLITEEXTERN_LINK_LITERT)
   ADD_SUBDIRECTORY(${LITERT_SOURCE_DIR_ABS}/litert ${CMAKE_CURRENT_BINARY_DIR}/litert)
 ELSE()
@@ -145,10 +173,7 @@ ENDIF()
 add_library(tfliteextern SHARED ${TFLITEEXTERN_HDRS} ${TFLITEEXTERN_SOURCES} ${TFLITEEXTERN_VER_RC})
 
 
-ADD_DEFINITIONS(-DTF_MAJOR_VERSION=${LITERT_VERSION_MAJOR})
-ADD_DEFINITIONS(-DTF_MINOR_VERSION=${LITERT_VERSION_MINOR})
-ADD_DEFINITIONS(-DTF_PATCH_VERSION=${LITERT_VERSION_PATCH})
-ADD_DEFINITIONS(-DTF_VERSION_SUFFIX="")
+# TF_MAJOR_VERSION etc. are defined before LiteRT's directories are added, see above.
 
 IF(TFLITEEXTERN_LINK_LITERT)
   # litert_runtime_c_api_shared_lib (libLiteRt) carries the TFLite/TensorFlow include directories as PUBLIC
@@ -262,6 +287,12 @@ IF(TFLITEEXTERN_LINK_LITERT)
     BUILD_WITH_INSTALL_NAME_DIR ON
     INSTALL_RPATH "@loader_path"
     BUILD_WITH_INSTALL_RPATH ON)
+ENDIF()
+
+# Same marker the Bazel build scripts write: the TFLite version, read by the top level CMakeLists.txt to version the
+# Emgu.LiteRT.Tflite* nuget packages.
+IF(TFLITEEXTERN_TFLITE_VERSION)
+  FILE(WRITE "${TFLITEEXTERN_OUTPUT_DIRECTORY}/tflite_version.txt" "${TFLITEEXTERN_TFLITE_VERSION}\n")
 ENDIF()
 
 IF(WIN32)

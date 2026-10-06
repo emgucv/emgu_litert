@@ -63,6 +63,16 @@ cd $WORKSPACE_DIR
 # Bazel build scripts do for their own host config.
 bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS "${@:1}" //tfliteextern:litert_runtime_so //tfliteextern:tfliteextern_so || exit 1
 
+# Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
+# libraries. The top level CMakeLists.txt reads it to version the Emgu.LiteRT.Tflite* nuget packages.
+TF_VERSION_BZL="$(bazel info output_base)/external/org_tensorflow/tensorflow/tf_version.bzl"
+TFLITE_VERSION=$(sed -n 's/^TF_VERSION = "\([0-9][0-9.]*\)".*/\1/p' "$TF_VERSION_BZL")
+if [ -n "$TFLITE_VERSION" ]; then
+    echo $TFLITE_VERSION > ../lib/$OUT_FOLDER/tflite_version.txt
+else
+    echo "Warning: could not read TF_VERSION from $TF_VERSION_BZL; ../lib/$OUT_FOLDER/tflite_version.txt not written"
+fi
+
 cd ..
 
 cp -f $WORKSPACE_DIR/bazel-bin/tfliteextern/libLiteRt.so lib/$OUT_FOLDER/libLiteRt.so

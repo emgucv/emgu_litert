@@ -125,6 +125,15 @@ for LIB in libtfliteextern libLiteRt; do
     rm -f ../lib/android/$arch/$LIB.so
     cp -f bazel-bin/tfliteextern/$LIB.so ../lib/android/$arch/$LIB.so || exit 1
 done
+# Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
+# libraries. The top level CMakeLists.txt reads it to version the Emgu.LiteRT.Tflite* nuget packages.
+TF_VERSION_BZL="$(bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" info output_base)/external/org_tensorflow/tensorflow/tf_version.bzl"
+TFLITE_VERSION=$(sed -n 's/^TF_VERSION = "\([0-9][0-9.]*\)".*/\1/p' "$TF_VERSION_BZL")
+if [ -n "$TFLITE_VERSION" ]; then
+    echo $TFLITE_VERSION > ../lib/android/$arch/tflite_version.txt
+else
+    echo "Warning: could not read TF_VERSION from $TF_VERSION_BZL; ../lib/android/$arch/tflite_version.txt not written"
+fi
 bazel --version
 set +x
 

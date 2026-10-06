@@ -424,6 +424,41 @@ FILE(WRITE "emgutf.version.txt" "${CPACK_PACKAGE_VERSION}${LICENSE_LABEL}")
 #SET(CPACK_PACKAGE_DEPENDENCY_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}.*")
 SET(CPACK_PACKAGE_DEPENDENCY_VERSION "${CPACK_PACKAGE_VERSION}")
 
+# The Emgu.LiteRT.Tflite* packages (the TFLite Interpreter API, its models, and the tfliteextern runtime) are
+# versioned with the TFLite version - TensorFlow's TF_VERSION - instead of LiteRT's. Each native build records it in a
+# tflite_version.txt next to its libraries (the Bazel build scripts from the TensorFlow source Bazel built against,
+# litertextern/tfliteextern/CMakeLists.txt from the one LiteRT's CMake downloads). Without any, fall back to LiteRT's.
+FILE(GLOB EMGUTF_TFLITE_VERSION_MARKERS
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/*/native/tflite_version.txt"
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/*/native/*/tflite_version.txt"
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/android/*/tflite_version.txt"
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/tflite_version.txt")
+SET(EMGUTF_TFLITE_VERSION "")
+SET(EMGUTF_TFLITE_VERSIONS_FOUND "")
+FOREACH(EMGUTF_TFLITE_VERSION_MARKER ${EMGUTF_TFLITE_VERSION_MARKERS})
+  # Reconfigure when a native rebuild changes the marker.
+  SET_PROPERTY(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${EMGUTF_TFLITE_VERSION_MARKER}")
+  FILE(STRINGS "${EMGUTF_TFLITE_VERSION_MARKER}" EMGUTF_TFLITE_MARKER_VERSION REGEX "^[0-9]+\\.[0-9]+\\.[0-9]+" LIMIT_COUNT 1)
+  STRING(STRIP "${EMGUTF_TFLITE_MARKER_VERSION}" EMGUTF_TFLITE_MARKER_VERSION)
+  IF(EMGUTF_TFLITE_MARKER_VERSION)
+    LIST(APPEND EMGUTF_TFLITE_VERSIONS_FOUND "${EMGUTF_TFLITE_MARKER_VERSION}")
+    IF(EMGUTF_TFLITE_VERSION STREQUAL "" OR EMGUTF_TFLITE_MARKER_VERSION VERSION_GREATER EMGUTF_TFLITE_VERSION)
+      SET(EMGUTF_TFLITE_VERSION "${EMGUTF_TFLITE_MARKER_VERSION}")
+    ENDIF()
+  ENDIF()
+ENDFOREACH()
+LIST(REMOVE_DUPLICATES EMGUTF_TFLITE_VERSIONS_FOUND)
+LIST(LENGTH EMGUTF_TFLITE_VERSIONS_FOUND EMGUTF_TFLITE_VERSION_COUNT)
+IF(EMGUTF_TFLITE_VERSION_COUNT GREATER 1)
+  MESSAGE(WARNING "The native builds in lib/ report different TFLite versions (${EMGUTF_TFLITE_VERSIONS_FOUND}; see their tflite_version.txt), using ${EMGUTF_TFLITE_VERSION} for the Emgu.LiteRT.Tflite* packages")
+ENDIF()
+IF(EMGUTF_TFLITE_VERSION STREQUAL "")
+  SET(EMGUTF_TFLITE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
+  MESSAGE(STATUS "No tflite_version.txt found in lib/; the Emgu.LiteRT.Tflite* packages use the LiteRT version")
+ENDIF()
+SET(EMGUTF_TFLITE_PACKAGE_VERSION "${EMGUTF_TFLITE_VERSION}.${EMGUTF_GITVERSION}")
+MESSAGE(STATUS "Emgu.LiteRT.Tflite* package version (TFLite ${EMGUTF_TFLITE_VERSION}): ${EMGUTF_TFLITE_PACKAGE_VERSION}")
+
 SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/${LICENSE_FILE_NAME}")
 
 IF (WIN32 OR APPLE)
@@ -671,7 +706,7 @@ ENDIF()
   # ${EMGUTF_LITE_WINDOWS_NUGET_ID}, so this pulls in both transitively.
   SET(EMGUTF_LITE_MAUI_NUGET_DEPENDENCY "
   	<ItemGroup>
-      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID}\" Version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\">
+      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID}\" Version=\"${EMGUTF_TFLITE_PACKAGE_VERSION}\">
 	  </PackageReference>
     </ItemGroup>")
    
