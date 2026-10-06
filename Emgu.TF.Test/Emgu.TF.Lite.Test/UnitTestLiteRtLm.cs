@@ -16,8 +16,11 @@ using System.Threading.Tasks;
 
 namespace Emgu.TF.Lite.Test
 {
-    // Tests of the Emgu.LiteRT.LM wrapper of LiteRT-LM's C API (liblitert-lm), using Qwen3-0.6B on the CPU. They are
-    // skipped where liblitert-lm isn't available (it is currently built for Apple Silicon macOS and Android only).
+    // Tests of the Emgu.LiteRT.LM wrapper of LiteRT-LM's C API (liblitert-lm) and of Emgu.LiteRT.LM.Models, on the
+    // CPU. They download large models on the first run (Qwen3-0.6B ~500 MB, Gemma 4 E2B ~2.6 GB), so like Emgu CV's
+    // model tests they are ignored by default: opt in with dotnet test -p:TestModels=true (defines TEST_MODELS). They
+    // are also skipped where liblitert-lm isn't available (it is currently built for Apple Silicon macOS and Android
+    // only).
     [TestFixture]
     public class UnitTestLiteRtLm
     {
@@ -84,6 +87,13 @@ namespace Emgu.TF.Lite.Test
             return config;
         }
 
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestLiteRtLmLoadedFile()
         {
@@ -98,6 +108,13 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestLiteRtLmTokenize()
         {
@@ -117,6 +134,13 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestLiteRtLmGenerate()
         {
@@ -132,6 +156,13 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestLiteRtLmGenerateStream()
         {
@@ -160,6 +191,13 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestLiteRtLmConversation()
         {
@@ -201,6 +239,13 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestLiteRtLmCancel()
         {
@@ -236,6 +281,13 @@ namespace Emgu.TF.Lite.Test
         }
 
         // Emgu.LiteRT.LM.Models: Qwen3 downloads the model and Chat keeps the history across messages.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestQwen3Chat()
         {
@@ -268,6 +320,13 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestQwen3Thinking()
         {
@@ -290,6 +349,13 @@ namespace Emgu.TF.Lite.Test
         }
 
         // Gemma 4 E2B supports multi-turn LiteRT-LM conversations, so Chat keeps one conversation open (2.6 GB download).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestGemma4E2BChat()
         {
@@ -328,6 +394,13 @@ namespace Emgu.TF.Lite.Test
         }
 
         // Gemma 4 E2B also accepts images and audio (test inputs from the LiteRT-LM submodule).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestGemma4E2BImageAndAudio()
         {
@@ -360,6 +433,13 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
         [TestAttribute]
         public async Task TestQwen3RejectsImages()
         {

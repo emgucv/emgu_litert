@@ -4,6 +4,9 @@
     <TargetFramework>net9.0</TargetFramework>
 
     <IsPackable>false</IsPackable>
+    <!-- Opt in to the model-downloading tests (UnitTestLiteRtLm) with
+         dotnet test -p:TestModels=true -->
+    <DefineConstants Condition="'$(TestModels)'=='true'">$(DefineConstants);TEST_MODELS</DefineConstants>
 
     <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>

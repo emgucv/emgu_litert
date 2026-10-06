@@ -133,6 +133,8 @@ dotnet test <project.csproj> --filter "FullyQualifiedName~TestGetVersion"
 
 Test assets (e.g., `grace_hopper.jpg`) must be present in the working directory when tests run.
 
+The LiteRT-LM tests (`UnitTestLiteRtLm.cs`) download large models on the first run (Qwen3-0.6B ~500 MB, Gemma 4 E2B ~2.6 GB), so they are ignored by default, the same way as Emgu CV's model tests: opt in with `dotnet test <project.csproj> -p:TestModels=true`, which defines `TEST_MODELS` (each test has an `#if !TEST_MODELS` `[Ignore]` block).
+
 `Emgu.TF.Lite.Test.Net` targets `net9.0`; on a machine with only a newer .NET runtime installed (e.g. .NET 10), run it with `DOTNET_ROLL_FORWARD=Major dotnet test ...`. The project also needs the CMake-generated `Directory.Build.props` files (run the platform's `build_emgutf` once), and on macOS it copies `libtfliteextern.dylib`/`libLiteRt.dylib` from `lib/runtimes/osx/native/` via `Emgu.TF.Runtime/Mac`'s `.projitems`.
 
 ## Key Conventions
