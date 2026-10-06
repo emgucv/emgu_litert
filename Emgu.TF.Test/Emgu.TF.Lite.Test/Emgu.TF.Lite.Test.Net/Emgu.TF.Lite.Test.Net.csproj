@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <!-- The TargetFramework (net<major>.0 of the dotnet CMake found) comes from the Directory.Build.props
+         generated from cmake/Emgu.TF.Lite.Test.Net.Directory.Build.props.in. -->
 
     <IsPackable>false</IsPackable>
     <!-- Opt in to the model-downloading tests (UnitTestLiteRtLm) with

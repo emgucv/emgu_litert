@@ -2,7 +2,8 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <!-- The TargetFramework (net<major>.0-windows of the dotnet CMake found) comes from the Directory.Build.props
+         generated from cmake/Emgu.TF.Lite.CVInterop.Directory.Build.props.in. -->
     <UseWindowsForms>true</UseWindowsForms>
     <Platforms>AnyCPU;x86;x64</Platforms>
   </PropertyGroup>

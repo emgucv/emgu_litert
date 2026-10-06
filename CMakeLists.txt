@@ -993,6 +993,8 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Test.Net.Directory
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Inception.Console.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/Inception.Console.Lite/Directory.Build.props)
 
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.CVInterop.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/CVInterop.Lite/Directory.Build.props)
+
 IF(TARGET_ARCH_64)
   SET(UNMANAGED_CODE_BITNESS "64")
 ELSE()

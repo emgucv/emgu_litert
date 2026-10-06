@@ -9,6 +9,7 @@ IF(HAVE_WINDESKTOP_LITE)
     ${SRC_Example_CVInterop_Lite}
 	"${CMAKE_CURRENT_SOURCE_DIR}/dog416.png"
     ${CMAKE_CURRENT_SOURCE_DIR}/CVInterop.Lite.csproj
+    ${CMAKE_CURRENT_SOURCE_DIR}/Directory.Build.props
     #${CMAKE_CURRENT_SOURCE_DIR}/App.config
     DESTINATION Emgu.LiteRT.Example/CVInterop.Lite COMPONENT emgutf_example_source)
 
