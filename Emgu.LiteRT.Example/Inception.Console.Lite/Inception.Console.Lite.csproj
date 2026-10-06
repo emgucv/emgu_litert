@@ -27,10 +27,10 @@
     <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
   </ItemGroup>
 
-  <Import Project="..\..\Emgu.TF.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="Exists('..\..\Emgu.TF.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems')" />
-  <Import Project="..\..\Emgu.TF.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems" Label="Shared" Condition="Exists('..\..\Emgu.TF.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems')" />
-  <Import Project="..\..\Emgu.TF.Runtime\Ubuntu\Emgu.TF.Lite.Runtime.Ubuntu.projitems" Label="Shared" />
-  <Import Project="..\..\Emgu.TF.Runtime\Debian\Emgu.TF.Lite.Runtime.Debian.projitems" Label="Shared" />
+  <Import Project="..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="Exists('..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems')" />
+  <Import Project="..\..\Emgu.LiteRT.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems" Label="Shared" Condition="Exists('..\..\Emgu.LiteRT.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems')" />
+  <Import Project="..\..\Emgu.LiteRT.Runtime\Ubuntu\Emgu.TF.Lite.Runtime.Ubuntu.projitems" Label="Shared" />
+  <Import Project="..\..\Emgu.LiteRT.Runtime\Debian\Emgu.TF.Lite.Runtime.Debian.projitems" Label="Shared" />
   
   <Target Name="DeployBinary" AfterTargets="AfterBuild">
     <Message Text="Copying $(OutputPath)$(AssemblyName).dll to ..\..\lib" Importance="high" />

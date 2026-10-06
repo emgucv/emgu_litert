@@ -102,7 +102,7 @@ cc_binary(
 # Static-library counterpart of the ":tfliteextern" shared library above, for platforms
 # (iOS device/simulator, Mac Catalyst) where the C# side statically links tfliteextern
 # into the app instead of loading a shared object - DllImport("tfliteextern") resolves to
-# "__Internal" there (see Emgu.TF.Runtime/Maui/iOS's NativeReference), so the exported tfe*
+# "__Internal" there (see Emgu.LiteRT.Runtime/Maui/iOS's NativeReference), so the exported tfe*
 # symbols just need to be present in the final linked binary, not in a standalone .dylib/.so.
 cc_library(
     name = "tfliteextern_lib",

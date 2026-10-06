@@ -6,7 +6,7 @@ IF(HAVE_LITE_BUILD)
   INSTALL(
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Mac
-    DESTINATION Emgu.TF.Runtime
+    DESTINATION Emgu.LiteRT.Runtime
     COMPONENT emgutf_source
     FILES_MATCHING 
     PATTERN "Emgu.TF.Lite.Runtime.Mac.shproj"
@@ -19,7 +19,7 @@ IF(HAVE_LITE_BUILD)
   INSTALL(
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Windows
-    DESTINATION Emgu.TF.Runtime
+    DESTINATION Emgu.LiteRT.Runtime
     COMPONENT emgutf_source
     FILES_MATCHING 
     PATTERN "Emgu.TF.Lite.Runtime.Windows.shproj"
@@ -32,7 +32,7 @@ IF(HAVE_LITE_BUILD)
   INSTALL(
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Ubuntu
-    DESTINATION Emgu.TF.Runtime
+    DESTINATION Emgu.LiteRT.Runtime
     COMPONENT emgutf_source
     FILES_MATCHING 
     PATTERN "Emgu.TF.Lite.Runtime.Ubuntu.shproj"
@@ -45,7 +45,7 @@ IF(HAVE_LITE_BUILD)
   INSTALL(
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Debian
-    DESTINATION Emgu.TF.Runtime
+    DESTINATION Emgu.LiteRT.Runtime
     COMPONENT emgutf_source
     FILES_MATCHING 
     PATTERN "Emgu.TF.Lite.Runtime.Debian.shproj"
@@ -62,7 +62,7 @@ ENDIF()
 #  INSTALL(
 #    DIRECTORY
 #    ${CMAKE_CURRENT_SOURCE_DIR}/ios
-#    DESTINATION Emgu.TF.Runtime
+#    DESTINATION Emgu.LiteRT.Runtime
 #    COMPONENT emgutf_source
 #    FILES_MATCHING 
 #    PATTERN "Emgu.TF.Lite.Runtime.iOS.csproj"

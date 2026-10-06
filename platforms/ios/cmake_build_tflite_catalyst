@@ -1,7 +1,7 @@
 #!/bin/bash -v
 
 # Builds tfliteextern for Mac Catalyst with CMake: lib/ios/libtfliteextern_darwin_<arch>.a, the self-contained
-# static libraries Emgu.TF.Runtime/Maui/Mac's .csproj force-loads into a Catalyst app (DllImport resolves the
+# static libraries Emgu.LiteRT.Runtime/Maui/Mac's .csproj force-loads into a Catalyst app (DllImport resolves the
 # tfe* symbols from the app binary itself, as on iOS).
 #
 # Bazel can't target Mac Catalyst: rules_apple/apple_support have no Catalyst platform, and

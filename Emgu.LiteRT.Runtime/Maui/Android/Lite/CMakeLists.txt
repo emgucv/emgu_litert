@@ -6,7 +6,7 @@ IF(HAVE_ANDROID_LITE AND (WIN32 OR APPLE))
   PROJECT(Emgu.LiteRT.runtime.maui.android)
   INSTALL(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DESTINATION Emgu.TF.Runtime/Maui/Android
+    DESTINATION Emgu.LiteRT.Runtime/Maui/Android
     COMPONENT emgutf_source
     FILES_MATCHING 
     PATTERN "*.cs"

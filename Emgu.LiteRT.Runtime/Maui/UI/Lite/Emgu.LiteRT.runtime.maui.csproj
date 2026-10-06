@@ -37,11 +37,11 @@
 	  <ProjectReference Include="..\..\..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
 	  <ProjectReference Include="..\..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
 	  
-	  <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\..\..\Emgu.TF.Runtime\Maui\Android\Lite\Emgu.LiteRT.runtime.maui.android.csproj" />
+	  <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\..\..\Emgu.LiteRT.Runtime\Maui\Android\Lite\Emgu.LiteRT.runtime.maui.android.csproj" />
 
-	  <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\..\..\Emgu.TF.Runtime\Maui\iOS\Emgu.LiteRT.runtime.maui.ios.csproj" />
+	  <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\..\..\Emgu.LiteRT.Runtime\Maui\iOS\Emgu.LiteRT.runtime.maui.ios.csproj" />
 	  
-	  <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\..\..\Emgu.TF.Runtime\Maui\Mac\Emgu.LiteRT.runtime.maui.macos.csproj" />
+	  <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\..\..\Emgu.LiteRT.Runtime\Maui\Mac\Emgu.LiteRT.runtime.maui.macos.csproj" />
 
 	  <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
       <PackageReference Update="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />

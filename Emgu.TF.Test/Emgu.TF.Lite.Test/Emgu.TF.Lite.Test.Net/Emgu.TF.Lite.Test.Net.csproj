@@ -53,7 +53,7 @@
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
   </ItemGroup>
 
-  <Import Project="..\..\..\Emgu.TF.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
-  <Import Project="..\..\..\Emgu.TF.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
+  <Import Project="..\..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
+  <Import Project="..\..\..\Emgu.LiteRT.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
 
 </Project>
