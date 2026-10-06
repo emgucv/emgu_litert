@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<AssemblyName>Emgu.LiteRT.LM.Models</AssemblyName>
+	<TargetName>$(AssemblyName)</TargetName>
+	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TensorflowBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\lib))</TensorflowBinaryDir>
+	<OutputPath>$(TensorflowBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <Import Project="..\Emgu.LiteRT.LM.Models.Shared.projitems" Label="Shared" />
+
+  <!--
+  Emgu.LiteRT.LM.Models provides ready-to-use language models (download + chat) on top of Emgu.LiteRT.LM.
+  Both ProjectReferences become nuget package dependencies when this project is packed.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
+  </ItemGroup>
+
+  <!-- LiteRT-LM's conversation API exchanges messages as JSON. System.Text.Json is part of the .NET runtime for
+       the net*-ios / net*-maccatalyst targets; netstandard2.0 needs the package. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="System.Text.Json" Version="10.0.9" />
+  </ItemGroup>
+</Project>

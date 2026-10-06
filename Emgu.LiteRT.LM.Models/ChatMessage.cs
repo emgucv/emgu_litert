@@ -1,0 +1,214 @@
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using System.Text.Json;
+
+namespace Emgu.LiteRT.LM.Models
+{
+    /// <summary>
+    /// One message of a chat history.
+    /// </summary>
+    public class ChatMessage
+    {
+        /// <summary>
+        /// The role of a message written by the user
+        /// </summary>
+        public const String UserRole = "user";
+
+        /// <summary>
+        /// The role of a message written by the model
+        /// </summary>
+        public const String AssistantRole = "assistant";
+
+        /// <summary>
+        /// Create a chat message.
+        /// </summary>
+        /// <param name="role">The role, e.g. UserRole or AssistantRole</param>
+        /// <param name="text">The message text</param>
+        public ChatMessage(String role, String text)
+        {
+            Role = role;
+            Text = text;
+        }
+
+        /// <summary>
+        /// The role, e.g. "user" or "assistant"
+        /// </summary>
+        public String Role { get; }
+
+        /// <summary>
+        /// The message text
+        /// </summary>
+        public String Text { get; }
+
+        /// <summary>
+        /// Return the message as "role: text"
+        /// </summary>
+        /// <returns>The message as "role: text"</returns>
+        public override String ToString()
+        {
+            return String.Format("{0}: {1}", Role, Text);
+        }
+
+        /// <summary>
+        /// Write the message in LiteRT-LM's JSON message format:
+        /// {"role": ..., "content": [{"type": "text", "text": ...}]}
+        /// </summary>
+        internal void WriteJson(Utf8JsonWriter writer)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("role", Role);
+            writer.WritePropertyName("content");
+            writer.WriteStartArray();
+            writer.WriteStartObject();
+            writer.WriteString("type", "text");
+            writer.WriteString("text", Text ?? String.Empty);
+            writer.WriteEndObject();
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        /// <summary>
+        /// Convert the message to LiteRT-LM's JSON message format.
+        /// </summary>
+        /// <returns>The message as JSON</returns>
+        public String ToJson()
+        {
+            return BuildJson(writer => WriteJson(writer));
+        }
+
+        /// <summary>
+        /// Convert messages to a JSON array in LiteRT-LM's message format.
+        /// </summary>
+        /// <param name="messages">The messages</param>
+        /// <returns>The messages as a JSON array</returns>
+        public static String ToJson(IEnumerable<ChatMessage> messages)
+        {
+            return BuildJson(writer =>
+            {
+                writer.WriteStartArray();
+                foreach (ChatMessage message in messages)
+                    message.WriteJson(writer);
+                writer.WriteEndArray();
+            });
+        }
+
+        private static String BuildJson(Action<Utf8JsonWriter> write)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                using (Utf8JsonWriter writer = new Utf8JsonWriter(stream))
+                    write(writer);
+                return Encoding.UTF8.GetString(stream.ToArray());
+            }
+        }
+
+        /// <summary>
+        /// Get the text of a message in LiteRT-LM's JSON message format: its "content" string, or the concatenated
+        /// "text" of its content parts of type "text".
+        /// </summary>
+        /// <param name="messageJson">The message as JSON</param>
+        /// <returns>The message text, or an empty string if it has none</returns>
+        public static String GetText(String messageJson)
+        {
+            if (String.IsNullOrEmpty(messageJson))
+                return String.Empty;
+            using (JsonDocument document = JsonDocument.Parse(messageJson))
+            {
+                JsonElement content;
+                if (document.RootElement.ValueKind != JsonValueKind.Object
+                    || !document.RootElement.TryGetProperty("content", out content))
+                    return String.Empty;
+                if (content.ValueKind == JsonValueKind.String)
+                    return content.GetString();
+                if (content.ValueKind != JsonValueKind.Array)
+                    return String.Empty;
+                StringBuilder text = new StringBuilder();
+                foreach (JsonElement part in content.EnumerateArray())
+                {
+                    JsonElement type, partText;
+                    if (part.ValueKind == JsonValueKind.Object
+                        && part.TryGetProperty("type", out type) && type.ValueKind == JsonValueKind.String && type.GetString() == "text"
+                        && part.TryGetProperty("text", out partText) && partText.ValueKind == JsonValueKind.String)
+                        text.Append(partText.GetString());
+                }
+                return text.ToString();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The model's reply to a chat message.
+    /// </summary>
+    public class ChatReply
+    {
+        private const String ThinkStartTag = "<think>";
+        private const String ThinkEndTag = "</think>";
+
+        /// <summary>
+        /// Create a chat reply from the generated text, splitting off a leading &lt;think&gt;...&lt;/think&gt; block.
+        /// </summary>
+        /// <param name="fullText">The generated text</param>
+        /// <param name="json">The reply message as JSON, or null</param>
+        public ChatReply(String fullText, String json = null)
+        {
+            FullText = fullText ?? String.Empty;
+            Json = json;
+            String trimmed = FullText.TrimStart();
+            if (trimmed.StartsWith(ThinkStartTag, StringComparison.Ordinal))
+            {
+                int end = trimmed.IndexOf(ThinkEndTag, StringComparison.Ordinal);
+                if (end < 0)
+                {
+                    // The output ended (e.g. at the token limit) while still thinking.
+                    Thinking = trimmed.Substring(ThinkStartTag.Length).Trim();
+                    Text = String.Empty;
+                }
+                else
+                {
+                    Thinking = trimmed.Substring(ThinkStartTag.Length, end - ThinkStartTag.Length).Trim();
+                    Text = trimmed.Substring(end + ThinkEndTag.Length).Trim();
+                }
+            }
+            else
+            {
+                Thinking = String.Empty;
+                Text = FullText.Trim();
+            }
+        }
+
+        /// <summary>
+        /// The answer, without the model's thinking
+        /// </summary>
+        public String Text { get; }
+
+        /// <summary>
+        /// The model's thinking (the content of a leading &lt;think&gt;...&lt;/think&gt; block), or an empty string
+        /// </summary>
+        public String Thinking { get; }
+
+        /// <summary>
+        /// The whole generated text, including any thinking
+        /// </summary>
+        public String FullText { get; }
+
+        /// <summary>
+        /// The reply message as JSON in LiteRT-LM's message format, or null for a streamed reply
+        /// </summary>
+        public String Json { get; }
+
+        /// <summary>
+        /// Return the answer text
+        /// </summary>
+        /// <returns>The answer text</returns>
+        public override String ToString()
+        {
+            return Text;
+        }
+    }
+}

@@ -509,6 +509,9 @@ IF(HAVE_LITE_BUILD)
   # depending on Emgu.LiteRT.Util only.
   SET(EMGUTF_LITERT_LM_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.LM")
   SET(EMGUTF_LITERT_LM_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} LM")
+  # Emgu.LiteRT.LM.Models/: ready-to-use language models (download + chat) on top of Emgu.LiteRT.LM.
+  SET(EMGUTF_LITERT_LM_MODELS_NUGET_ID "${EMGUTF_LITERT_LM_NUGET_ID}.Models")
+  SET(EMGUTF_LITERT_LM_MODELS_NUGET_TITLE "${EMGUTF_LITERT_LM_NUGET_TITLE} Models")
 
   SET(EMGUTF_LITERT_UTIL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Util")
   SET(EMGUTF_LITERT_UTIL_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} Util")
@@ -938,6 +941,19 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM/NetStandard/docs/README.md)
 
+# Emgu.LiteRT.LM.Models: ready-to-use language models (download + chat). Its own nuget package, depending on
+# Emgu.LiteRT.LM and Emgu.LiteRT.Util.
+SET(EMGUTF_LITERT_LM_MODELS_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
+SET(EMGUTF_LITERT_LM_MODELS_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Models.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Models/NetStandard/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Models/NetStandard/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Models/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Models/NetStandard/docs/README.md)
+
 # Emgu.LiteRT.ImageIO: NativeImageIO/JpegData (renamed from Emgu.Models). Its own nuget package,
 # depending on Emgu.LiteRT.Util (Annotation) and Emgu.LiteRT.Tflite (Emgu.TF.Lite.Toolbox's
 # native pixel-conversion P/Invokes).
@@ -995,6 +1011,7 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.LiteRT.Tflite)
   ADD_SUBDIRECTORY(Emgu.LiteRT)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Models)
   # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and made its own project+package (it used
   # to be shared source imported directly into Emgu.LiteRT.Tflite.Models.csproj and
   # CVInterop.Lite.csproj). Depends on Emgu.LiteRT.Tflite (Emgu.TF.Lite.Toolbox), so must come

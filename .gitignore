@@ -26,6 +26,7 @@ Directory.Build.props
 /Emgu.LiteRT.ImageIO/NetStandard/docs/
 /Emgu.LiteRT/NetStandard/docs/
 /Emgu.LiteRT.LM/NetStandard/docs/
+/Emgu.LiteRT.LM.Models/NetStandard/docs/
 /Emgu.LiteRT.Tflite.Models/NetStandard/docs/
 /Emgu.TF.Runtime/Maui/*/docs/
 /Emgu.TF.Runtime/Maui/*/Lite/docs/

@@ -7,6 +7,7 @@ using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttrib
 using NUnit.Framework;
 #endif
 using Emgu.LiteRT.LM;
+using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.Util;
 using System.Linq;
 using System.Text;
@@ -225,6 +226,60 @@ namespace Emgu.TF.Lite.Test
                         Console.WriteLine("Cancelled after {0} chunk(s)", chunkCount);
                     }
                 }
+            }
+        }
+
+        // Emgu.LiteRT.LM.Models: Qwen3 downloads the model and Chat keeps the history across messages.
+        [TestAttribute]
+        public async Task TestQwen3Chat()
+        {
+            await GetModelPath();
+            using (Qwen3 model = new Qwen3())
+            {
+                await model.Init();
+                Chat chat = model.CreateChat("You are a helpful assistant. Answer in one short sentence.");
+                chat.MaxOutputTokens = 64;
+
+                ChatReply first = chat.Send("What is the capital of France?");
+                Console.WriteLine("Reply 1: {0}", first.Text);
+                if (String.IsNullOrEmpty(first.Text))
+                    throw new Exception("The first reply has no text");
+
+                // A follow-up that only makes sense with the history.
+                StringBuilder streamed = new StringBuilder();
+                ChatReply second = await chat.SendAsync("And of Germany?", text =>
+                {
+                    lock (streamed)
+                        streamed.Append(text);
+                });
+                Console.WriteLine("Reply 2: {0} (streamed: {1})", second.Text, streamed);
+                if (String.IsNullOrEmpty(second.Text))
+                    throw new Exception("The second reply has no text");
+                if (streamed.ToString() != second.FullText)
+                    throw new Exception("The streamed text doesn't add up to the reply");
+                if (chat.History.Count != 4)
+                    throw new Exception(String.Format("The history has {0} messages, expected 4", chat.History.Count));
+            }
+        }
+
+        [TestAttribute]
+        public async Task TestQwen3Thinking()
+        {
+            await GetModelPath();
+            using (Qwen3 model = new Qwen3())
+            {
+                model.EnableThinking = true;
+                await model.Init();
+                Chat chat = model.CreateChat();
+                chat.MaxOutputTokens = 512;
+                // A prompt that needs little thinking, so the answer fits in the token limit after the thinking. (If
+                // the limit is reached while thinking, the reply has the thinking and an empty Text.)
+                ChatReply reply = await chat.SendAsync("Reply with just the word: hello");
+                Console.WriteLine("Thinking: {0}\nAnswer: {1}", reply.Thinking, reply.Text);
+                if (String.IsNullOrEmpty(reply.Thinking))
+                    throw new Exception("The reply has no thinking");
+                if (String.IsNullOrEmpty(reply.Text))
+                    throw new Exception("The reply has no answer after the thinking");
             }
         }
     }

@@ -1,0 +1,26 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Models.dll`: ready-to-use language models (`Emgu.LiteRT.LM.Models` namespace) built on the `Emgu.LiteRT.LM` API. Each model class (currently `Qwen3`, Qwen3-0.6B) downloads its `.litertlm` file on first use and creates the LiteRT-LM engine; `Chat` keeps the message history and sends messages, with optional streaming of the reply.
+
+```csharp
+using (Qwen3 model = new Qwen3())
+{
+    await model.Init();
+    Chat chat = model.CreateChat("You are a helpful assistant.");
+    ChatReply reply = await chat.SendAsync("What is the capital of France?");
+    Console.WriteLine(reply.Text);
+}
+```
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
+
+Release note can be found at
+<${NUGET_EMGU_URL}/wiki/index.php/Emgu_TF_Version_History#Emgu.TF-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}>
+
+## Note
+
+To deploy to a specific platform, you will also need to add one of the ${EMGUTF_LITE_NUGET_ID}.runtime.{platform} nuget packages that include `liblitert-lm` to your executable project: currently ${EMGUTF_LITE_NUGET_ID}.runtime.macos (Apple Silicon only) and ${EMGUTF_LITE_NUGET_ID}.runtime.maui.android (arm64-v8a and x86_64).
+<https://www.nuget.org/packages?q=${EMGUTF_LITE_NUGET_ID}.runtime>
