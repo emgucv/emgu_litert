@@ -1,0 +1,16 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.dll`: the LiteRT-LM API (`Emgu.LiteRT.LM` namespace), calling LiteRT-LM's C API library (`liblitert-lm`) directly, for running large language models stored as `.litertlm` files: `Engine`, `Session` (blocking and streaming generation), `Conversation` (JSON chat messages, tools, thinking) and `LoadedFile` (model capabilities).
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
+
+Release note can be found at
+<${NUGET_EMGU_URL}/wiki/index.php/Emgu_TF_Version_History#Emgu.TF-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}>
+
+## Note
+
+To deploy Emgu LiteRT LM to a specific platform, you will also need to add one of the ${EMGUTF_LITE_NUGET_ID}.runtime.{platform} nuget packages to your executable project. Currently `liblitert-lm` (with `libLiteRt` and LiteRT-LM's `libGemmaModelConstraintProvider`) is included in ${EMGUTF_LITE_NUGET_ID}.runtime.macos (Apple Silicon only) and ${EMGUTF_LITE_NUGET_ID}.runtime.maui.android (arm64-v8a and x86_64). Use the following link to search for the ${EMGUTF_LITE_NUGET_ID}.runtime nuget packages:
+<https://www.nuget.org/packages?q=${EMGUTF_LITE_NUGET_ID}.runtime>

@@ -505,6 +505,11 @@ IF(HAVE_LITE_BUILD)
   SET(EMGUTF_LITERT_NUGET_ID "${EMGUTF_LITE_NUGET_ID}")
   SET(EMGUTF_LITERT_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE}")
 
+  # Emgu.LiteRT.LM/: the wrapper of LiteRT-LM's C API (liblitert-lm), its own managed package id,
+  # depending on Emgu.LiteRT.Util only.
+  SET(EMGUTF_LITERT_LM_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.LM")
+  SET(EMGUTF_LITERT_LM_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} LM")
+
   SET(EMGUTF_LITERT_UTIL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Util")
   SET(EMGUTF_LITERT_UTIL_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} Util")
 
@@ -784,6 +789,13 @@ IF(HAVE_OSX_LITE)
     SET(EMGUTF_LITE_MACOS_NUGET_FILE_LIST "${EMGUTF_LITE_MACOS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libLiteRt.dylib\" target=\"runtimes\\osx\\native\" />")
   ENDIF()
+  # LiteRT-LM's C API (built by platforms/macos/bazel_build_tflite_macos, Apple Silicon only), P/Invoked directly by
+  # the Emgu.LiteRT.LM classes, plus the prebuilt libGemmaModelConstraintProvider.dylib it depends on. Optional.
+  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/liblitert-lm.dylib")
+    SET(EMGUTF_LITE_MACOS_NUGET_FILE_LIST "${EMGUTF_LITE_MACOS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\liblitert-lm.dylib\" target=\"runtimes\\osx\\native\" />
+    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libGemmaModelConstraintProvider.dylib\" target=\"runtimes\\osx\\native\" />")
+  ENDIF()
   SET(EMGUTF_LITE_MACOS_NUGET_FILE_LIST "${EMGUTF_LITE_MACOS_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
@@ -913,6 +925,19 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT/NetStandard/docs/README.md)
 
+# Emgu.LiteRT.LM: the C# wrapper of LiteRT-LM's C API (liblitert-lm). Its own nuget package,
+# depending on Emgu.LiteRT.Util only.
+SET(EMGUTF_LITERT_LM_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
+SET(EMGUTF_LITERT_LM_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM/NetStandard/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM/NetStandard/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM/NetStandard/docs/README.md)
+
 # Emgu.LiteRT.ImageIO: NativeImageIO/JpegData (renamed from Emgu.Models). Its own nuget package,
 # depending on Emgu.LiteRT.Util (Annotation) and Emgu.LiteRT.Tflite (Emgu.TF.Lite.Toolbox's
 # native pixel-conversion P/Invokes).
@@ -969,6 +994,7 @@ IF(HAVE_LITE_BUILD)
   # Emgu.TF.Lite (it's the TFLite Interpreter API wrapper), only the folder moved.
   ADD_SUBDIRECTORY(Emgu.LiteRT.Tflite)
   ADD_SUBDIRECTORY(Emgu.LiteRT)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM)
   # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and made its own project+package (it used
   # to be shared source imported directly into Emgu.LiteRT.Tflite.Models.csproj and
   # CVInterop.Lite.csproj). Depends on Emgu.LiteRT.Tflite (Emgu.TF.Lite.Toolbox), so must come

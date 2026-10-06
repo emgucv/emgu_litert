@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <Compile Include="..\UnitTest1.cs" Link="UnitTest1.cs" />
+    <Compile Include="..\UnitTestLiteRtLm.cs" Link="UnitTestLiteRtLm.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,6 +35,7 @@
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Tflite.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
+    <ProjectReference Include="..\..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />
     <!-- Annotation/DownloadableFile/FileDownloadManager moved from Emgu.Models into
          Emgu.LiteRT.Util - needs a direct reference now for UnitTest1.cs to compile. -->
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />

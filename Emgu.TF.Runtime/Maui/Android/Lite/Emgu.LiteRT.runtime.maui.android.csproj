@@ -185,6 +185,14 @@
     <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\arm64-v8a\libLiteRt.so" Condition="Exists('$(TfLiteBinaryDir)\android\arm64-v8a\libLiteRt.so')">
       <Link>lib\arm64-v8a\libLiteRt.so</Link>
     </EmbeddedNativeLibrary>
+    <!-- LiteRT-LM's C API, P/Invoked directly by Emgu.LiteRT.LM, and the prebuilt library it depends on. Only built
+         for arm64-v8a and x86_64 (LiteRT-LM's libGemmaModelConstraintProvider.so only exists for those ABIs). -->
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\arm64-v8a\liblitert-lm.so" Condition="Exists('$(TfLiteBinaryDir)\android\arm64-v8a\liblitert-lm.so')">
+      <Link>lib\arm64-v8a\liblitert-lm.so</Link>
+    </EmbeddedNativeLibrary>
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\arm64-v8a\libGemmaModelConstraintProvider.so" Condition="Exists('$(TfLiteBinaryDir)\android\arm64-v8a\liblitert-lm.so')">
+      <Link>lib\arm64-v8a\libGemmaModelConstraintProvider.so</Link>
+    </EmbeddedNativeLibrary>
   </ItemGroup>
   <!-- x86 -->
   <ItemGroup Condition="'$(EmguTfLiteBuildAndroidx86)'=='True' AND Exists('$(EmguTfLiteNativex86)')">
@@ -204,6 +212,14 @@
     <!-- LiteRT's runtime: libtfliteextern.so links against it, and Emgu.LiteRT P/Invokes it directly. -->
     <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\x86_64\libLiteRt.so" Condition="Exists('$(TfLiteBinaryDir)\android\x86_64\libLiteRt.so')">
       <Link>lib\x86_64\libLiteRt.so</Link>
+    </EmbeddedNativeLibrary>
+    <!-- LiteRT-LM's C API, P/Invoked directly by Emgu.LiteRT.LM, and the prebuilt library it depends on. Only built
+         for arm64-v8a and x86_64 (LiteRT-LM's libGemmaModelConstraintProvider.so only exists for those ABIs). -->
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\x86_64\liblitert-lm.so" Condition="Exists('$(TfLiteBinaryDir)\android\x86_64\liblitert-lm.so')">
+      <Link>lib\x86_64\liblitert-lm.so</Link>
+    </EmbeddedNativeLibrary>
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\x86_64\libGemmaModelConstraintProvider.so" Condition="Exists('$(TfLiteBinaryDir)\android\x86_64\liblitert-lm.so')">
+      <Link>lib\x86_64\libGemmaModelConstraintProvider.so</Link>
     </EmbeddedNativeLibrary>
   </ItemGroup>
     <ItemGroup>

@@ -31,6 +31,18 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <!-- LiteRT-LM's C API (Apple Silicon only), P/Invoked directly by the Emgu.LiteRT.LM classes, and the prebuilt
+       libGemmaModelConstraintProvider.dylib it depends on. Optional. -->
+  <ItemGroup Condition="Exists('$(TFLiteBinaryDir)\runtimes\osx\native\liblitert-lm.dylib')">
+    <Content Include="$(TFLiteBinaryDir)\runtimes\osx\native\liblitert-lm.dylib">
+      <Link>liblitert-lm.dylib</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(TFLiteBinaryDir)\runtimes\osx\native\libGemmaModelConstraintProvider.dylib">
+      <Link>libGemmaModelConstraintProvider.dylib</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <Target Name="EmguTFLiteMacPackageBuildImports" BeforeTargets="PrepareForBuild">
     <!-- <Message Condition="'$(EmguTFLiteMacLinkTarget)'!=''" Text="Emgu TF Lite shared project compiling against $(EmguTFLiteMacLinkTarget)" Importance="High" /> -->
     <Warning Text="'$(EmguTFLiteMacErrorMessage)'" Condition="'$(EmguTFLiteMacErrorMessage)'!=''" />
