@@ -12,7 +12,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
 
 SET(EMGU_TF_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
-PROJECT(emgutf)
+PROJECT(emgulitert)
 
 # ----------------------------------------------------------------------------
 #  Autodetect if we are in a GIT repository
@@ -202,8 +202,8 @@ MACRO(CHECK_BINARY_EXIST folder patterns property_name second_check)
         FILES
         ${DLL_LIST}
         DESTINATION ${folder}
-        COMPONENT emgutf_binary
-        )  
+        COMPONENT emgulitert_binary
+        )
       #SET(${property_name} ON)
     ELSE()
       SET(${property_name} ${second_check})
@@ -402,10 +402,9 @@ IF(HAVE_LITE_BUILD)
     # The pro package also bundles the Ubuntu binary, so the Ubuntu label only goes on the others.
     SET(LITE_BUILD_LABEL "${LITE_BUILD_LABEL}${UBUNTU_LITE_LABEL}")
   ENDIF()
-  SET(LITE_BUILD_LABEL "tflite${LITE_BUILD_LABEL}")
 ENDIF()
 
-SET(CPACK_PACKAGE_NAME "emgu${LITE_BUILD_LABEL}")
+SET(CPACK_PACKAGE_NAME "emgulitert${LITE_BUILD_LABEL}")
 
 #SET(CPACK_PACKAGE_NAME "${PACKAGE_NAME}")
 
@@ -1104,7 +1103,7 @@ INSTALL(
   FILES
   "litert/LICENSE"
   DESTINATION "litert"
-  COMPONENT emgutf_source
+  COMPONENT emgulitert_source
   )
 
 IF(HAVE_ANDROID_LITE)
@@ -1112,8 +1111,8 @@ IF(HAVE_ANDROID_LITE)
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Solution/Android
     DESTINATION Solution
-    COMPONENT emgutf_source
-    FILES_MATCHING 
+    COMPONENT emgulitert_source
+    FILES_MATCHING
     PATTERN "Emgu.TF.Lite.Android.sln"
     PATTERN ".git" EXCLUDE
     PATTERN "bin" EXCLUDE
@@ -1122,7 +1121,7 @@ IF(HAVE_ANDROID_LITE)
 #    DIRECTORY
 #    ${CMAKE_CURRENT_SOURCE_DIR}/Solution/Android
 #    DESTINATION Solution
-#    COMPONENT emgutf_example_source
+#    COMPONENT emgulitert_example_source
 #    FILES_MATCHING 
 #	PATTERN "Emgu.TF.Lite.Android.sln"
 #    PATTERN ".git" EXCLUDE
@@ -1135,8 +1134,8 @@ IF(HAVE_IOS_LITE)
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Solution/iOS
     DESTINATION Solution
-    COMPONENT emgutf_source
-    FILES_MATCHING 
+    COMPONENT emgulitert_source
+    FILES_MATCHING
     PATTERN "Emgu.TF.Lite.iOS.sln"
     PATTERN ".git" EXCLUDE
     PATTERN "bin" EXCLUDE
@@ -1148,8 +1147,8 @@ IF(HAVE_OSX_LITE)
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Solution/macos
     DESTINATION Solution
-    COMPONENT emgutf_source
-    FILES_MATCHING 
+    COMPONENT emgulitert_source
+    FILES_MATCHING
     PATTERN "Emgu.TF.Lite.Mac.sln"
     PATTERN ".git" EXCLUDE
     PATTERN "bin" EXCLUDE
@@ -1161,8 +1160,8 @@ IF(HAVE_WINDESKTOP_LITE)
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Solution/Windows.Desktop
     DESTINATION Solution
-    COMPONENT emgutf_source
-    FILES_MATCHING 
+    COMPONENT emgulitert_source
+    FILES_MATCHING
     PATTERN "Emgu.TF.Lite.sln"
     PATTERN ".git" EXCLUDE
     PATTERN "bin" EXCLUDE
@@ -1171,7 +1170,7 @@ IF(HAVE_WINDESKTOP_LITE)
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Solution/Windows.Desktop
     DESTINATION Solution
-    COMPONENT emgutf_example_source
+    COMPONENT emgulitert_example_source
     FILES_MATCHING 
     PATTERN "Emgu.LiteRT.Example.sln"
     PATTERN ".git" EXCLUDE
@@ -1187,14 +1186,14 @@ INSTALL(
   "${CMAKE_CURRENT_SOURCE_DIR}/${LICENSE_FILE_NAME}" #LICENSE
   "${CMAKE_CURRENT_SOURCE_DIR}/${EMGUTF_LICENSE_FILE}" #LICENSE.txt
   DESTINATION .
-  COMPONENT emgutf_source
+  COMPONENT emgulitert_source
   )
 
 INSTALL(
   FILES 
   "${CMAKE_CURRENT_SOURCE_DIR}/miscellaneous/nuget_icon.png" 
-  DESTINATION "miscellaneous/" 
-  COMPONENT emgutf_source)
+  DESTINATION "miscellaneous/"
+  COMPONENT emgulitert_source)
 
 
 SET(CPACK_GENERATOR ZIP)
@@ -1213,8 +1212,8 @@ INSTALL(
   DIRECTORY
   ${CMAKE_CURRENT_SOURCE_DIR}/lib
   DESTINATION .
-  COMPONENT emgutf_binary
-  FILES_MATCHING 
+  COMPONENT emgulitert_binary
+  FILES_MATCHING
   PATTERN "*.dll"
   PATTERN "*.dylib"
   PATTERN "*.so"
@@ -1231,10 +1230,10 @@ INSTALL(
   PATTERN "${PROJECT_NAME}.dir" EXCLUDE
   ) 
 
-set(CPACK_COMPONENTS_ALL 
-  emgutf_binary 
-  emgutf_source
-  emgutf_example_source
+set(CPACK_COMPONENTS_ALL
+  emgulitert_binary
+  emgulitert_source
+  emgulitert_example_source
   )
 
 IF (WIN32)
@@ -1268,9 +1267,9 @@ IF (WIN32)
   IF(EMGU_TF_DOCUMENTATION_BUILD)
     #SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}\nCreateDirectory \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Documentation\\\" ")
     
-    LIST(APPEND CPACK_COMPONENTS_ALL emgutf_document)
-    set(CPACK_COMPONENT_EMGUTF_DOCUMENT_DISPLAY_NAME "Emgu TF Documentation")
-    set(CPACK_COMPONENT_EMGUTF_DOCUMENT_DEPENDS emgutf_binary)
+    LIST(APPEND CPACK_COMPONENTS_ALL emgulitert_document)
+    set(CPACK_COMPONENT_EMGULITERT_DOCUMENT_DISPLAY_NAME "Emgu TF Documentation")
+    set(CPACK_COMPONENT_EMGULITERT_DOCUMENT_DEPENDS emgulitert_binary)
     #IF (HAVE_WINDESKTOP)
     #  SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}\nCreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Documentation\\\\Emgu TF Documentation.lnk\\\"  \\\"$INSTDIR\\\\Emgu.TF.Documentation.chm\\\" ")	
     #  SET(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "${CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS}\n Delete \\\"$SMPROGRAMS\\\\$MUI_TEMP\\\\Documentation\\\\Emgu TF Documentation.lnk\\\" ")
@@ -1319,20 +1318,20 @@ IF (WIN32)
   #SET(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "${CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS}\nRMDir  \\\"$SMPROGRAMS\\\\$MUI_TEMP\\\\License\\\" ")
   
   #IF(EMGU_TF_EXAMPLE_BUILD AND NOT NETFX_CORE)
-  #  LIST(APPEND CPACK_COMPONENTS_ALL emgutf_example_binary)
-  #  SET(CPACK_COMPONENT_EMGUTF_EXAMPLE_BINARY_DISPLAY_NAME "Emgu TF Examples (Binary)")
-  #  SET(CPACK_COMPONENT_EMGUTF_EXAMPLE_BINARY_DEPENDS emgutf_binary)
+  #  LIST(APPEND CPACK_COMPONENTS_ALL emgulitert_example_binary)
+  #  SET(CPACK_COMPONENT_EMGULITERT_EXAMPLE_BINARY_DISPLAY_NAME "Emgu TF Examples (Binary)")
+  #  SET(CPACK_COMPONENT_EMGULITERT_EXAMPLE_BINARY_DEPENDS emgulitert_binary)
   #ENDIF()
   
   set(CPACK_COMPONENT_MAIN_DISPLAY_NAME "Tensorflow Native Binary")
   set(CPACK_COMPONENT_MAIN_REQUIRED ON)
-  set(CPACK_COMPONENT_EMGUTF_BINARY_DISPLAY_NAME "Emgu TF (Binary)")
-  set(CPACK_COMPONENT_EMGUTF_BINARY_REQUIRED ON)
-  #set(CPACK_COMPONENT_EMGUTF_BINARY_DEPENDS libs)
-  set(CPACK_COMPONENT_EMGUTF_SOURCE_DISPLAY_NAME "Emgu TF (Source)")
-  set(CPACK_COMPONENT_EMGUTF_SOURCE_DEPENDS emgutf_binary)
-  set(CPACK_COMPONENT_EMGUTF_EXAMPLE_SOURCE_DISPLAY_NAME "Emgu TF Examples (Source)")
-  set(CPACK_COMPONENT_EMGUTF_EXAMPLE_SOURCE_DEPENDS emgutf_source)
+  set(CPACK_COMPONENT_EMGULITERT_BINARY_DISPLAY_NAME "Emgu TF (Binary)")
+  set(CPACK_COMPONENT_EMGULITERT_BINARY_REQUIRED ON)
+  #set(CPACK_COMPONENT_EMGULITERT_BINARY_DEPENDS libs)
+  set(CPACK_COMPONENT_EMGULITERT_SOURCE_DISPLAY_NAME "Emgu TF (Source)")
+  set(CPACK_COMPONENT_EMGULITERT_SOURCE_DEPENDS emgulitert_binary)
+  set(CPACK_COMPONENT_EMGULITERT_EXAMPLE_SOURCE_DISPLAY_NAME "Emgu TF Examples (Source)")
+  set(CPACK_COMPONENT_EMGULITERT_EXAMPLE_SOURCE_DEPENDS emgulitert_source)
   
   IF (${CMAKE_VERSION} VERSION_GREATER "3.19.0")
     IF(EMGU_SIGN_FOUND AND WIN32)

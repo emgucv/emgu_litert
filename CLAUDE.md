@@ -85,7 +85,7 @@ platforms/macos/cmake_build_tflite
 ```bash
 platforms/macos/build_emgutf
 ```
-Configures CMake in `build/` (Release) and runs `make package`: builds the managed projects, writes the NuGet packages (`Emgu.LiteRT`, `Emgu.LiteRT.Tflite`, `Emgu.LiteRT.Util`, `Emgu.LiteRT.ImageIO`, `Emgu.LiteRT.Tflite.Models`, `Emgu.LiteRT.runtime.*`) to `platforms/nuget/`, and the CPack zip to `build/libemgutflite-ios-macos-<version>.zip`. The version's last component is derived from the git commit count, so it changes with every commit. Run the native build first: packages only include the native binaries already in `lib/`.
+Configures CMake in `build/` (Release) and runs `make package`: builds the managed projects, writes the NuGet packages (`Emgu.LiteRT`, `Emgu.LiteRT.Tflite`, `Emgu.LiteRT.Util`, `Emgu.LiteRT.ImageIO`, `Emgu.LiteRT.Tflite.Models`, `Emgu.LiteRT.runtime.*`) to `platforms/nuget/`, and the CPack zip to `build/libemgulitert-ios-macos-<version>.zip`. The version's last component is derived from the git commit count, so it changes with every commit. Run the native build first: packages only include the native binaries already in `lib/`.
 
 ### Build native TF Lite (Mac Catalyst)
 ```bash
