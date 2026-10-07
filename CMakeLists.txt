@@ -388,11 +388,11 @@ ENDIF()
 # ----------------------------------------------------------------------------
 SET(PACKAGE "${PROJECT_NAME}")
 SET(GITHUB_REPO_URL "https://github.com/emgucv/emgu_litert")
-SET(CPACK_PACKAGE_CONTACT "Emgu TF support <support@emgu.com>")
+SET(CPACK_PACKAGE_CONTACT "Emgu support <support@emgu.com>")
 SET(PACKAGE_BUGREPORT "${CPACK_PACKAGE_CONTACT}")
 SET(PACKAGE_NAME "${PROJECT_NAME}")
 
-SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Emgu TF Lite is a cross platform .Net wrapper to the Google Tensorflow Lite library.")
+SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Emgu LiteRT is a cross platform .Net wrapper to the Google LiteRT library.")
 SET(LITE_BUILD_LABEL "")
 IF(HAVE_LITE_BUILD)
   SET(LITE_BUILD_LABEL "${IOS_LITE_LABEL}${ANDROID_LITE_LABEL}${WINDESKTOP_LITE_LABEL}${OSX_LITE_LABEL}")
