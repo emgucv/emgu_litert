@@ -7,7 +7,7 @@ IF(HAVE_LITE_BUILD)
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Mac
     DESTINATION Emgu.LiteRT.Runtime
-    COMPONENT emgutf_source
+    COMPONENT emgulitert_source
     FILES_MATCHING 
     PATTERN "Emgu.TF.Lite.Runtime.Mac.shproj"
     PATTERN "Emgu.TF.Lite.Runtime.Mac.projitems"
@@ -20,7 +20,7 @@ IF(HAVE_LITE_BUILD)
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Windows
     DESTINATION Emgu.LiteRT.Runtime
-    COMPONENT emgutf_source
+    COMPONENT emgulitert_source
     FILES_MATCHING 
     PATTERN "Emgu.TF.Lite.Runtime.Windows.shproj"
     PATTERN "Emgu.TF.Lite.Runtime.Windows.projitems"
@@ -33,7 +33,7 @@ IF(HAVE_LITE_BUILD)
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Ubuntu
     DESTINATION Emgu.LiteRT.Runtime
-    COMPONENT emgutf_source
+    COMPONENT emgulitert_source
     FILES_MATCHING 
     PATTERN "Emgu.TF.Lite.Runtime.Ubuntu.shproj"
     PATTERN "Emgu.TF.Lite.Runtime.Ubuntu.projitems"
@@ -46,7 +46,7 @@ IF(HAVE_LITE_BUILD)
     DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/Debian
     DESTINATION Emgu.LiteRT.Runtime
-    COMPONENT emgutf_source
+    COMPONENT emgulitert_source
     FILES_MATCHING 
     PATTERN "Emgu.TF.Lite.Runtime.Debian.shproj"
     PATTERN "Emgu.TF.Lite.Runtime.Debian.projitems"
@@ -63,7 +63,7 @@ ENDIF()
 #    DIRECTORY
 #    ${CMAKE_CURRENT_SOURCE_DIR}/ios
 #    DESTINATION Emgu.LiteRT.Runtime
-#    COMPONENT emgutf_source
+#    COMPONENT emgulitert_source
 #    FILES_MATCHING 
 #    PATTERN "Emgu.TF.Lite.Runtime.iOS.csproj"
 #    PATTERN "*.cs"
@@ -80,7 +80,7 @@ ENDIF()
 #      ${LIBRARY_OUTPUT_PATH}/${PROJECT_NAME}.xml
 #      ${LIBRARY_OUTPUT_PATH}/${PROJECT_NAME}.dll 
 #      DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
-#      COMPONENT emgutf_binary)
+#      COMPONENT emgulitert_binary)
 #  ENDIF()	
 #ENDIF()
 

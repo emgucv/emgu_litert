@@ -8,7 +8,7 @@ IF(HAVE_MAUI_LITE AND (APPLE OR WIN32))
   INSTALL(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     DESTINATION Emgu.TF.Platform/Maui/UI
-    COMPONENT emgutf_source
+    COMPONENT emgulitert_source
     FILES_MATCHING 
 	PATTERN "*.cs"
     PATTERN "${PROJECT_NAME}.csproj"
@@ -47,6 +47,6 @@ IF(HAVE_MAUI_LITE AND (APPLE OR WIN32))
     DIRECTORY
     ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.runtime.maui
     DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
-    COMPONENT emgutf_binary)
+    COMPONENT emgulitert_binary)
 
 ENDIF()

@@ -7,7 +7,7 @@ IF(HAVE_ANDROID_LITE AND (WIN32 OR APPLE))
   INSTALL(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     DESTINATION Emgu.LiteRT.Runtime/Maui/Android
-    COMPONENT emgutf_source
+    COMPONENT emgulitert_source
     FILES_MATCHING 
     PATTERN "*.cs"
     PATTERN "Directory.Build.props"
@@ -30,6 +30,6 @@ IF(HAVE_ANDROID_LITE AND (WIN32 OR APPLE))
     DIRECTORY
     ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.runtime.maui.android
     DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
-    COMPONENT emgutf_binary)
+    COMPONENT emgulitert_binary)
 ENDIF()
 

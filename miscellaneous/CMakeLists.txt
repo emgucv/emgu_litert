@@ -41,7 +41,7 @@ ELSE()
       FILES
       "${CMAKE_CURRENT_SOURCE_DIR}/../Help/Emgu.TF.Lite.Documentation.chm"
       DESTINATION .
-      COMPONENT emgutf_document
+      COMPONENT emgulitert_document
       )
   ENDIF()
 ENDIF()

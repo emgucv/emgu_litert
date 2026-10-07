@@ -6,7 +6,7 @@ INSTALL(
   DIRECTORY
   ${CMAKE_CURRENT_SOURCE_DIR}
   DESTINATION .
-  COMPONENT emgutf_source
+  COMPONENT emgulitert_source
   FILES_MATCHING 
   PATTERN "*.shproj"
   PATTERN "*.projitems"
@@ -29,5 +29,5 @@ IF (DOTNET_FOUND)
     DIRECTORY
     ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.Util
     DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
-    COMPONENT emgutf_binary)
+    COMPONENT emgulitert_binary)
 ENDIF()

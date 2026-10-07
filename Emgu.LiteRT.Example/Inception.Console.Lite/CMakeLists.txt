@@ -11,7 +11,7 @@ IF(HAVE_LITE_BUILD)
 	"${CMAKE_CURRENT_SOURCE_DIR}/tulips.jpg"
 	"${CMAKE_CURRENT_SOURCE_DIR}/runtimeconfig.template.json"
     DESTINATION Emgu.LiteRT.Example/Inception.Console.Lite/
-    COMPONENT emgutf_example_source
+    COMPONENT emgulitert_example_source
     )
 
   IF (DOTNET_FOUND)
