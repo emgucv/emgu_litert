@@ -59,7 +59,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\Emgu.LiteRT.Runtime\Maui\UI\Lite\Emgu.LiteRT.runtime.maui.csproj" />
-	    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
+	    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
 	  
 	    <!-- <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.LiteRT.Tflite.Models\Emgu.TF.Lite.Models.IOS\Emgu.TF.Lite.Models.IOS.csproj" /> -->
 	    <!-- <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.Tflite.Models\Emgu.TF.Lite.Models.Android\Emgu.TF.Lite.Models.Android.csproj" /> -->

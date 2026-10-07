@@ -31,7 +31,7 @@
 
   <Import Project="..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" />
 
-  <Import Project="..\..\Emgu.LiteRT.Tflite\Emgu.TF.Lite.Shared.projitems" Label="Shared" />
+  <Import Project="..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems" Label="Shared" />
 
   <Import Project="..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems" Label="Shared" />
 

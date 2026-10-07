@@ -36,7 +36,7 @@
        putting it there would create a circular reference. -->
   <ItemGroup>
     <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
-    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
+    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
   </ItemGroup>
 
   <Import Project="..\Emgu.LiteRT.ImageIO.Shared.projitems" Label="Shared" />

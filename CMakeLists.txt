@@ -550,8 +550,9 @@ IF(HAVE_LITE_BUILD)
   SET(EMGUTF_LITERT_UTIL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Util")
   SET(EMGUTF_LITERT_UTIL_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} Util")
 
-  # Emgu.LiteRT.Tflite/ (renamed from Emgu.TF.Lite/) is the TensorFlow Lite Interpreter API
-  # wrapper (Emgu.TF.Lite namespace); EMGUTF_LITE_TFLITE_NUGET_ID is its own managed package id,
+  # The Emgu.LiteRT.Tflite nuget package (source folder Emgu.TF.Lite/, moved back from
+  # Emgu.LiteRT.Tflite/) is the TensorFlow Lite Interpreter API wrapper (Emgu.TF.Lite namespace);
+  # EMGUTF_LITE_TFLITE_NUGET_ID is its own managed package id,
   # distinct from EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID below (the native tfliteextern.dll runtime
   # package for Windows).
   SET(EMGUTF_LITE_TFLITE_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Tflite")
@@ -959,14 +960,14 @@ ENDIF()
 # they are reused as-is for every self-packing project below.
 SET(EMGUTF_LITE_TFLITE_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
 SET(EMGUTF_LITE_TFLITE_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite/NetStandard/Directory.Build.props)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite/NetStandard/SignBinary.Targets)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/SignBinary.Targets)
 ENDIF()
 IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite/NetStandard/SignPkg.Targets)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/SignPkg.Targets)
 ENDIF()
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite/NetStandard/docs/README.md)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/docs/README.md)
 
 # Emgu.LiteRT.Util: the shared UnmanagedObject/Toolbox base both Emgu.LiteRT.Tflite and Emgu.LiteRT
 # depend on. Its own nuget package too, with no managed dependencies of its own.
@@ -1076,9 +1077,10 @@ ENDIF()
 
 ADD_SUBDIRECTORY(Emgu.LiteRT.Util)
 IF(HAVE_LITE_BUILD)
-  # Emgu.TF.Lite/ was renamed to Emgu.LiteRT.Tflite/ - the namespace/project/csproj name stays
-  # Emgu.TF.Lite (it's the TFLite Interpreter API wrapper), only the folder moved.
-  ADD_SUBDIRECTORY(Emgu.LiteRT.Tflite)
+  # The Emgu.LiteRT.Tflite/ folder was moved back to Emgu.TF.Lite/ - the namespace/project/csproj
+  # name (and nuget package id) stay Emgu.LiteRT.Tflite (it's the TFLite Interpreter API
+  # wrapper), only the folder moved.
+  ADD_SUBDIRECTORY(Emgu.TF.Lite)
   ADD_SUBDIRECTORY(Emgu.LiteRT)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Models)

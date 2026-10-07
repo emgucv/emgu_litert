@@ -14,7 +14,7 @@
          ProjectReferences (no PrivateAssets) so this project's package correctly depends on
          both, matching what its code (the Interpreter API, UnmanagedObject) actually uses. -->
     <ProjectReference Include="..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
-    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
+    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
     <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
     <ProjectReference Include="..\..\Emgu.LiteRT.ImageIO\NetStandard\Emgu.LiteRT.ImageIO.csproj" />
   </ItemGroup>
