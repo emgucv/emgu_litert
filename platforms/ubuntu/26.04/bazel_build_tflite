@@ -6,9 +6,11 @@ echo System is $SYSTEM_ARCH
 if [ $SYSTEM_ARCH == "x86_64" ]; then
     OUT_FOLDER="runtimes/ubuntu-x64/native"
     BAZEL_CONFIG_FLAGS="--config=linux"
+    PREBUILT_ARCH="x86_64"
 elif [ $SYSTEM_ARCH == "aarch64" ]; then
     OUT_FOLDER="runtimes/ubuntu-arm64/native"
     BAZEL_CONFIG_FLAGS="--config=linux --config=linux_arm64"
+    PREBUILT_ARCH="arm64"
 else
     echo "Unsupported architecture: $SYSTEM_ARCH"
     exit 1
@@ -56,11 +58,31 @@ cp -f litertextern/tfliteextern/tfliteextern.h $WORKSPACE_DIR/tfliteextern/tflit
 cp -f litertextern/imgproc/imgproc.cc $WORKSPACE_DIR/tfliteextern/imgproc.cc
 cp -f litertextern/imgproc/imgproc.h $WORKSPACE_DIR/tfliteextern/imgproc.h
 
+# liblitert-lm.so (LiteRT-LM's C API) needs LiteRT-LM's prebuilt libGemmaModelConstraintProvider.so
+# (prebuilt/linux_<arch>, Git LFS).
+GEMMA_PREBUILT=prebuilt/linux_$PREBUILT_ARCH/libGemmaModelConstraintProvider.so
+if ! head -c 4 "$WORKSPACE_DIR/$GEMMA_PREBUILT" | grep -q ELF; then
+    echo "$WORKSPACE_DIR/$GEMMA_PREBUILT is not an ELF library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
+    exit 1
+fi
+
 cd $WORKSPACE_DIR
 
 # LiteRT-LM's .bazelrc auto-applies build:linux via --enable_platform_specific_config on this
 # host, but --config=linux is passed explicitly for clarity, same as the other platforms'
 # Bazel build scripts do for their own host config.
+
+# --define=litert_runtime_link_mode=dynamic makes liblitert-lm.so link against libLiteRt.so instead of
+# containing LiteRT's runtime; the libLiteRt.so built below (same LiteRT source) is deployed next to it in
+# place of the LiteRt*-only one this build produces. The define can't apply to the tfliteextern build (in
+# dynamic mode LiteRT's C API libraries resolve to headers only, so libLiteRt.so would be built empty) and
+# isn't part of Bazel's output folder name, so --platform_suffix keeps the two builds from overwriting each
+# other's outputs. Bazel's bazel-bin symlink follows the most recent build, so copy its output right after.
+bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS --define=litert_runtime_link_mode=dynamic \
+    --platform_suffix=-litert_lm_dynamic "${@:1}" //c:litert-lm || exit 1
+cp -f bazel-bin/c/liblitert-lm.so ../lib/$OUT_FOLDER/liblitert-lm.so || exit 1
+cp -f $GEMMA_PREBUILT ../lib/$OUT_FOLDER/libGemmaModelConstraintProvider.so || exit 1
+
 bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS "${@:1}" //tfliteextern:litert_runtime_so //tfliteextern:tfliteextern_so || exit 1
 
 # Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
@@ -78,7 +100,7 @@ cd ..
 cp -f $WORKSPACE_DIR/bazel-bin/tfliteextern/libLiteRt.so lib/$OUT_FOLDER/libLiteRt.so
 cp -f $WORKSPACE_DIR/bazel-bin/tfliteextern/libtfliteextern.so lib/$OUT_FOLDER/libtfliteextern.so
 # Strip debug info; --strip-unneeded keeps the dynamic symbol table, so the exported functions are unaffected.
-for LIB in libLiteRt libtfliteextern; do
+for LIB in libLiteRt libtfliteextern liblitert-lm libGemmaModelConstraintProvider; do
     chmod u+w lib/$OUT_FOLDER/$LIB.so
     strip --strip-unneeded lib/$OUT_FOLDER/$LIB.so || exit 1
 done
