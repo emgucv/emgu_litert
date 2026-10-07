@@ -18,6 +18,15 @@
     fetches LiteRT as the external repository @litert, pinned to a newer commit than the `litert`
     submodule's own v2.2.0 tag.
 
+    For Arch "64" only, also builds liblitert-lm.dll (LiteRT-LM's C API), the same way
+    bazel_build_tflite_macos and platforms/android/bazel_build_tflite_android do: via
+    //c:litert-lm with --define=litert_runtime_link_mode=dynamic (so it links against the
+    libLiteRt.dll built above instead of bundling LiteRT's runtime itself), copied alongside
+    LiteRT-LM's prebuilt libGemmaModelConstraintProvider.dll (prebuilt/windows_x86_64/, Git LFS -
+    the one external dependency that restricts this to x64, same as the arm64-only/
+    arm64-v8a+x86_64-only restrictions on macOS/Android). Skipped with a warning if that prebuilt
+    is missing or looks like an un-pulled Git LFS pointer.
+
 .PARAMETER Arch
     "32", "64" (default), "ARM", or "ARM64" - matches the .bat's %1.
 
@@ -121,6 +130,26 @@ if ($DockerFlag -eq "docker") {
 if (-not (Test-Path $OutputUserRootDir)) { New-Item -ItemType Directory -Path $OutputUserRootDir | Out-Null }
 if (-not (Test-Path $OutputBaseDir)) { New-Item -ItemType Directory -Path $OutputBaseDir | Out-Null }
 
+# //c:litert-lm (see $BuildLitertLm below) needs its own, shorter output_base/output_user_root: it
+# pulls in rules_rust's cargo_toml_variable_extractor as a host-exec-configured build tool, and that
+# extra exec configuration inserts a "-exec-ST-<hash>" segment into its own bazel-out path (unlike the
+# plain-target-configured tfliteextern/libLiteRt builds above) - verified that building it under
+# $OutputBaseDir/$OutputUserRootDir (nested under platforms\windows\) fails with "LINK : fatal error
+# LNK1181: cannot open input file ...cgu.00.rcgu.o" at 266 characters (rustc/link.exe silently losing
+# the file past Windows' legacy 260-char MAX_PATH, even with the registry's LongPathsEnabled=1 set -
+# link.exe itself has no long-path-aware manifest, so it enforces the limit regardless of that system
+# policy). Kept directly under the repo root, as short as possible ("o"/"u", not e.g. "ebo"/"ebu" -
+# every character here is shaved off a margin that's already razor-thin: a longer-named rules_rust
+# dependency (crate_index__macro_rules_attribute-proc_macro) hit 261 characters - one over - with
+# "ebo"/"ebu" at the repo root, while this same build succeeds comfortably under a short root one
+# level further out (e.g. directly under a drive root). Kept as a second, separate output_base/root
+# (its own Bazel server/cache) rather than changing the one above, so the already-warm cache for
+# tfliteextern/libLiteRt isn't disturbed.
+$LitertLmOutputUserRootDir = Join-Path $RepoRoot "u"
+$LitertLmOutputBaseDir = Join-Path $RepoRoot "o"
+if (-not (Test-Path $LitertLmOutputUserRootDir)) { New-Item -ItemType Directory -Path $LitertLmOutputUserRootDir | Out-Null }
+if (-not (Test-Path $LitertLmOutputBaseDir)) { New-Item -ItemType Directory -Path $LitertLmOutputBaseDir | Out-Null }
+
 $ProgramFiles = Get-ProgramFilesPaths
 $ProgramFilesX86 = $ProgramFiles.X86
 $ProgramFilesDir = $ProgramFiles.Default
@@ -205,6 +234,21 @@ Write-Host "Using BAZEL_LLVM=$BazelLlvm"
 # litert workspace, where LiteRT's packages are local (//tflite/..., //litert/...); rewrite those
 # labels to @litert//... while staging, the same way the macOS/Android scripts do via sed.
 $WorkspaceDir = "LiteRT-LM"
+
+# liblitert-lm.dll (LiteRT-LM's C API) is built for x64 only: it needs LiteRT-LM's prebuilt
+# libGemmaModelConstraintProvider.dll, which only exists for windows_x86_64 (prebuilt/windows_x86_64,
+# stored with Git LFS) - same restriction as the macOS (arm64-only) and Android (arm64-v8a/x86_64-only)
+# scripts, which depend on the equivalent per-platform prebuilt.
+$BuildLitertLm = $false
+$GemmaPrebuilt = Join-Path $WorkspaceDir "prebuilt\windows_x86_64\libGemmaModelConstraintProvider.dll"
+if ($Arch -eq "64") {
+    if ((Test-Path $GemmaPrebuilt) -and ((Get-Item $GemmaPrebuilt).Length -gt 1024)) {
+        $BuildLitertLm = $true
+    } else {
+        Write-Warning "$GemmaPrebuilt is missing or too small (a Git LFS pointer?) - run 'git -C $WorkspaceDir lfs pull'. Skipping liblitert-lm.dll."
+    }
+}
+
 $TfliteexternStageDir = Join-Path $WorkspaceDir "tfliteextern"
 if (-not (Test-Path $TfliteexternStageDir)) { New-Item -ItemType Directory -Path $TfliteexternStageDir | Out-Null }
 (Get-Content "litertextern\tfliteextern\bazel\BUILD" -Raw) `
@@ -232,6 +276,15 @@ $CommonBazelArgs = @(
     "--repo_env=BAZEL_LLVM=$BazelLlvm"
 ) + $CpuFlags + $BazelXnnFlags + $DockerFlags + @("-c", "opt")
 
+# See $LitertLmOutputBaseDir/$LitertLmOutputUserRootDir above for why //c:litert-lm uses a separate,
+# short output_base/root instead of $CommonBazelArgs's.
+$LitertLmBazelArgs = @(
+    "--output_base=$LitertLmOutputBaseDir",
+    "--output_user_root=$LitertLmOutputUserRootDir",
+    "build",
+    "--repo_env=BAZEL_LLVM=$BazelLlvm"
+) + $CpuFlags + $BazelXnnFlags + $DockerFlags + @("-c", "opt")
+
 & $BazelCommand @CommonBazelArgs "@litert//tflite:version" "--verbose_failures"
 
 & $BazelCommand @CommonBazelArgs "//tfliteextern:tfliteextern" "--verbose_failures"
@@ -249,11 +302,32 @@ $NativeOutDir = "lib\runtimes\win-x64\native"
 if (-not (Test-Path $NativeOutDir)) { New-Item -ItemType Directory -Path $NativeOutDir -Force | Out-Null }
 Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\tfliteextern.dll") "$NativeOutDir\tfliteextern.dll" -Force
 Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\libLiteRt.dll") "$NativeOutDir\libLiteRt.dll" -Force
+
+if ($BuildLitertLm) {
+    Set-Location $WorkspaceDir
+    # --define=litert_runtime_link_mode=dynamic makes litert-lm.dll link against libLiteRt.dll instead of
+    # containing LiteRT's runtime; the libLiteRt.dll built above (same LiteRT source) is deployed next to it
+    # in place of the LiteRt*-only one this build produces. The define isn't part of Bazel's output folder
+    # name, so --platform_suffix keeps this from colliding with a non-dynamic build of the same target
+    # under the same (short) output_base - same approach as bazel_build_tflite_macos and
+    # platforms/android/bazel_build_tflite_android. Uses $LitertLmBazelArgs (a separate, short
+    # output_base/root - see above), not $CommonBazelArgs.
+    & $BazelCommand @LitertLmBazelArgs "//c:litert-lm" "--define=litert_runtime_link_mode=dynamic" "--platform_suffix=-litert_lm_dynamic" "--verbose_failures"
+    Set-Location ".."
+
+    # Bazel's Windows shared-library naming doesn't auto-prepend "lib" the way Linux/macOS do (see
+    # tfliteextern.dll vs. libLiteRt.dll above - libLiteRt gets its prefix from the target name itself,
+    # ":libLiteRt", not from Bazel); the //c:litert-lm target has no such prefix, so its Windows output is
+    # litert-lm.dll - renamed here to liblitert-lm.dll to match what DllImport("liblitert-lm") resolves on
+    # every platform (Emgu.LiteRT.LM P/Invokes this one name regardless of OS).
+    Copy-Item (Join-Path $WorkspaceDir "bazel-bin\c\litert-lm.dll") "$NativeOutDir\liblitert-lm.dll" -Force
+    Copy-Item $GemmaPrebuilt "$NativeOutDir\libGemmaModelConstraintProvider.dll" -Force
+}
 # Record the tflite_with_xnnpack define next to the dll. The top level CMakeLists.txt reads it
 # to set EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK, and it travels with the binary in the zip package.
 Set-Content -Path "$NativeOutDir\tflite_with_xnnpack.txt" -Value $TfliteWithXnnpack -NoNewline:$false
 # Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
-# dll. The top level CMakeLists.txt reads it to version the Emgu.TF.Lite/Emgu.LiteRT.Tflite.* nuget packages.
+# dll. The top level CMakeLists.txt reads it to version the Emgu.TF.Lite, Emgu.LiteRT.Tflite.Models and Emgu.TF.Lite.runtime.windows nuget packages.
 $TfVersionBzl = Join-Path $OutputBaseDir "external\org_tensorflow\tensorflow\tf_version.bzl"
 $TfliteVersion = $null
 if (Test-Path $TfVersionBzl) {
