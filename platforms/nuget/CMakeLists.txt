@@ -13,6 +13,7 @@ ENDIF()
 IF (HAVE_WINDESKTOP_LITE)
   add_subdirectory(Emgu.LiteRT.runtime.windows)
   add_subdirectory(Emgu.TF.Lite.runtime.windows)
+  add_subdirectory(Emgu.LiteRT.LM.runtime.windows)
 ENDIF()
 
 

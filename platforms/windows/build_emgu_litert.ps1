@@ -41,6 +41,7 @@ Push-Location $ScriptDir
 Set-Location (Join-Path $ScriptDir "..\..")
 
 $HasTfLite = (Test-Path "lib\runtimes\win-x86\native\tfliteextern.dll") -or (Test-Path "lib\runtimes\win-x64\native\tfliteextern.dll")
+$HasLitertLm = Test-Path "lib\runtimes\win-x64\native\liblitert-lm.dll"
 
 # If we're a 32-bit process on 64-bit Windows, PROCESSOR_ARCHITEW6432 is set.
 $Arch = $env:PROCESSOR_ARCHITECTURE
@@ -169,6 +170,16 @@ if ($NugetFlag -eq "nuget") {
         $CmakeBuildTarget2 += "Emgu.LiteRT.runtime.windows.nuget"
         # tfliteextern.dll's own package, depending on the libLiteRt one above.
         $CmakeBuildTarget2 += "Emgu.TF.Lite.runtime.windows.nuget"
+        $DoMoveNuget = $true
+    }
+    if ($HasLitertLm) {
+        # liblitert-lm.dll's own package, depending on the libLiteRt one above. Unlike
+        # Emgu.TF.Lite.runtime.windows.nuget (always defined whenever $HasTfLite, since
+        # tfliteextern.dll is virtually guaranteed), Emgu.LiteRT.LM.runtime.windows.nuget's
+        # CMakeLists.txt only defines this target at all when liblitert-lm.dll exists - so it's
+        # only added to $CmakeBuildTarget2 under the same condition, to avoid cmake --build
+        # erroring on an undefined target.
+        $CmakeBuildTarget2 += "Emgu.LiteRT.LM.runtime.windows.nuget"
         $DoMoveNuget = $true
     }
 }

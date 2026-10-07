@@ -587,6 +587,14 @@ IF(HAVE_LITE_BUILD)
   SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID "Emgu.TF.Lite.runtime.windows")
   SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_TITLE "Native runtime (tfliteextern) of Emgu TF Lite for Windows")
 
+  # liblitert-lm.dll (LiteRT-LM's C API runtime, built by bazel_build_litert.ps1) is packaged
+  # separately from libLiteRt.dll (${EMGUTF_LITE_WINDOWS_NUGET_ID} above), with a nuget dependency
+  # on it - see EMGUTF_LITERT_LM_WINDOWS_NUGET_DEPENDENCY below. Unlike EMGUTF_LITE_TFLITE_WINDOWS_
+  # NUGET_ID, this one derives from EMGUTF_LITERT_LM_NUGET_ID normally: Emgu.LiteRT.LM already fits
+  # the Emgu.LiteRT.* convention (it's the managed wrapper's own name), unlike Emgu.TF.Lite.
+  SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_ID "${EMGUTF_LITERT_LM_NUGET_ID}.runtime.windows")
+  SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGUTF_LITERT_LM_NUGET_TITLE} for Windows")
+
   SET(EMGUTF_LITE_MACOS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.macos")
   SET(EMGUTF_LITE_MACOS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
   
@@ -798,6 +806,19 @@ IF( HAVE_WINDESKTOP_LITE )
   SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\tfliteextern.dll\" target=\"runtimes\\win-x64\\native\" />
 	")
+  # liblitert-lm.dll/libGemmaModelConstraintProvider.dll (bazel_build_litert.ps1) are x64-only and
+  # only built when Bazel can build //c:litert-lm (needs LiteRT-LM's Windows Gemma prebuilt) - guard
+  # the whole Emgu.LiteRT.LM.runtime.windows package (not just its file list, unlike libLiteRt.dll
+  # above) on EXISTS, since unlike tfliteextern/libLiteRt this package has nothing to ship at all
+  # when it's missing.
+  SET(HAVE_WINDOWS_LITERT_LM OFF)
+  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/liblitert-lm.dll")
+    SET(HAVE_WINDOWS_LITERT_LM ON)
+    SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\liblitert-lm.dll\" target=\"runtimes\\win-x64\\native\" />
+    <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libGemmaModelConstraintProvider.dll\" target=\"runtimes\\win-x64\\native\" />
+	")
+  ENDIF()
   ENDIF()
   IF( HAVE_WINDESKTOP_X86_LITE )
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x86/native/libLiteRt.dll")
@@ -827,9 +848,20 @@ IF( HAVE_WINDESKTOP_LITE )
     <dependencies>
 		<dependency id=\"${EMGUTF_LITE_WINDOWS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")
+
+  IF(HAVE_WINDOWS_LITERT_LM)
+    SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
+	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"README.md\" target=\"docs\\\" />")
+    SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_DEPENDENCY "
+      <dependencies>
+		<dependency id=\"${EMGUTF_LITE_WINDOWS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+      </dependencies>")
+  ENDIF()
 ENDIF()
 
-IF(HAVE_OSX_LITE) 
+IF(HAVE_OSX_LITE)
   SET(EMGUTF_LITE_MACOS_NUGET_FILE_LIST "${EMGUTF_LITE_MACOS_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libtfliteextern.dylib\" target=\"runtimes\\osx\\native\" />")
   # LiteRT's own runtime (built by platforms/macos/bazel_build_litert_macos), P/Invoked directly by the
@@ -1054,6 +1086,9 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Pac
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.windows/README.md)
+
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.windows/Package.nuspec)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.windows/README.md)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.macos/Package.nuspec)
 
