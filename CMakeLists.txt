@@ -590,8 +590,15 @@ IF(HAVE_LITE_BUILD)
   #IF ("${LICENSE_TYPE}" STREQUAL "Commercial")
   #  SET(EMGUTF_LITE_UBUNTU_NUGET_ID "${EMGUTF_LITE_UBUNTU_NUGET_ID}-CR")  
   #ENDIF()  
-  SET(EMGUTF_LITE_UBUNTU_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Ubuntu")	
-  
+  SET(EMGUTF_LITE_UBUNTU_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Ubuntu")
+
+  # liblitert-lm.so (LiteRT-LM's own C API, P/Invoked directly by Emgu.LiteRT.LM) and the prebuilt
+  # libGemmaModelConstraintProvider.so it depends on are packaged separately from
+  # ${EMGUTF_LITE_UBUNTU_NUGET_ID} above (libLiteRt.so/libtfliteextern.so), with a nuget dependency on
+  # it - see EMGUTF_LITE_LM_UBUNTU_NUGET_DEPENDENCY below.
+  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.LM.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
+  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGUTF_LITE_NUGET_TITLE} for Ubuntu")
+
   SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.maui.android")  
   SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Maui Android")	
   
@@ -844,22 +851,48 @@ IF(HAVE_OSX_LITE)
 ENDIF()
 
 IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
+  # liblitert-lm.so/libGemmaModelConstraintProvider.so (when present) are excluded from this package's
+  # *.so glob - they ship in ${EMGUTF_LITE_LM_UBUNTU_NUGET_ID} instead, see below.
   IF (HAVE_UBUNTU_X86_64_LITE)
-    SET(EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST} 
-      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" target=\"runtimes\\runtimes\\ubuntu-x64\\native\" />")
+    SET(EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST}
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\runtimes\\ubuntu-x64\\native\" />")
   ENDIF()
   IF (HAVE_UBUNTU_ARM64_LITE)
-    SET(EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST} 
-      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" target=\"runtimes\\runtimes\\ubuntu-arm64\\native\" />")
+    SET(EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST}
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\runtimes\\ubuntu-arm64\\native\" />")
   ENDIF()
-  SET(EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST} 
+  SET(EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
 	#<file src=\"Emgu.TF.Lite.runtime.ubuntu.targets\" target=\"build\\${EMGUTF_LITE_UBUNTU_NUGET_ID}.targets\" />")
   SET(EMGUTF_LITE_UBUNTU_NUGET_DEPENDENCY "${EMGUTF_LITE_UBUNTU_NUGET_DEPENDENCY}
     <dependencies>
 		<dependency id=\"${EMGUTF_LITE_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
-    </dependencies>")	
+    </dependencies>")
+ENDIF()
+
+# Emgu.LiteRT.LM.runtime.ubuntu: liblitert-lm.so (LiteRT-LM's C API, built by
+# platforms/ubuntu/{24.04,26.04}/bazel_build_tflite) plus the prebuilt libGemmaModelConstraintProvider.so
+# it depends on. Optional - guarded on EXISTS the same way the macOS packaging treats liblitert-lm.dylib,
+# so a build that didn't produce it doesn't fail to pack an empty package.
+IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-x64/native/liblitert-lm.so")
+  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so\" target=\"runtimes\\ubuntu-x64\\native\" />
+    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\ubuntu-x64\\native\" />")
+ENDIF()
+IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-arm64/native/liblitert-lm.so")
+  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so\" target=\"runtimes\\ubuntu-arm64\\native\" />
+    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\ubuntu-arm64\\native\" />")
+ENDIF()
+IF(NOT "${EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST}" STREQUAL "")
+  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST}
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
+  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_DEPENDENCY "${EMGUTF_LITE_LM_UBUNTU_NUGET_DEPENDENCY}
+    <dependencies>
+		<dependency id=\"${EMGUTF_LITE_UBUNTU_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+    </dependencies>")
 ENDIF()
 
 IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
@@ -1021,6 +1054,7 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Tflite.runtime.wind
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.macos/Package.nuspec)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.ubuntu.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.ubuntu/Package.nuspec)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.ubuntu.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.ubuntu/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.debian-arm/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm64.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.debian-arm64/Package.nuspec)
 
