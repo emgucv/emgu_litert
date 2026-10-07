@@ -23,7 +23,7 @@ Directory.Build.props
 !/miscellaneous/Directory.Build.props
 /Emgu.TF.Lite/NetStandard/docs/
 /Emgu.LiteRT.Util/NetStandard/docs/
-/Emgu.LiteRT.ImageIO/NetStandard/docs/
+/Emgu.TF.Lite.ImageIO/NetStandard/docs/
 /Emgu.LiteRT/NetStandard/docs/
 /Emgu.LiteRT.LM/NetStandard/docs/
 /Emgu.LiteRT.LM.Models/NetStandard/docs/

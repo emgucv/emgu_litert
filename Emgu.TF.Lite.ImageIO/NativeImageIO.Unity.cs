@@ -10,7 +10,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
-namespace Emgu.LiteRT.ImageIO
+namespace Emgu.TF.Lite.ImageIO
 {
     /// <summary>
     /// Platform specific implementation of Image IO

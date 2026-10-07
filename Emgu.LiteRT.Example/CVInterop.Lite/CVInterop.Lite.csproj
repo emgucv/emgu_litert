@@ -27,7 +27,7 @@
 
   <Import Project="..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.projitems" Label="Shared" />
 
-  <Import Project="..\..\Emgu.LiteRT.ImageIO\Emgu.LiteRT.ImageIO.Shared.projitems" Label="Shared" />
+  <Import Project="..\..\Emgu.TF.Lite.ImageIO\Emgu.TF.Lite.ImageIO.Shared.projitems" Label="Shared" />
 
   <Import Project="..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" />
 

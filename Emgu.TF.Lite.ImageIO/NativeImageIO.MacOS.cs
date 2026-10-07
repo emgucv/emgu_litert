@@ -13,7 +13,7 @@ using AppKit;
 using CoreGraphics;
 using Emgu.LiteRT.Util;
 
-namespace Emgu.LiteRT.ImageIO
+namespace Emgu.TF.Lite.ImageIO
 {
     /// <summary>
     /// Platform specific implementation of Image IO

@@ -7,7 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using Emgu.TF.Lite;
-using Emgu.LiteRT.ImageIO;
+using Emgu.TF.Lite.ImageIO;
 using Emgu.LiteRT.Util;
 using System.IO;
 using System.ComponentModel;

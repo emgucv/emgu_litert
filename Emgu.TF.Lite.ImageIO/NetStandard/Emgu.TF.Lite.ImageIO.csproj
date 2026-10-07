@@ -2,7 +2,7 @@
 
   <PropertyGroup>
 
-	<AssemblyName>Emgu.LiteRT.ImageIO</AssemblyName>
+	<AssemblyName>Emgu.TF.Lite.ImageIO</AssemblyName>
 	<TargetName>$(AssemblyName)</TargetName>
 	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
   </PropertyGroup>
@@ -39,5 +39,5 @@
     <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
   </ItemGroup>
 
-  <Import Project="..\Emgu.LiteRT.ImageIO.Shared.projitems" Label="Shared" />
+  <Import Project="..\Emgu.TF.Lite.ImageIO.Shared.projitems" Label="Shared" />
 </Project>

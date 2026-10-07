@@ -15,7 +15,7 @@
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
 	<summary>Image IO helpers (NativeImageIO, JpegData) for reading images into tensors, used by Emgu LiteRT Tflite Models.</summary>
-    <Description>Emgu.LiteRT.ImageIO provides NativeImageIO and JpegData for reading images (from a file path, platform image objects, or a Unity texture) into tensor-ready pixel buffers, through Emgu.CV on plain .NET or platform-native APIs (UIKit/AppKit/Android.Graphics/UnityEngine) elsewhere.</Description>
+    <Description>Emgu.TF.Lite.ImageIO provides NativeImageIO and JpegData for reading images (from a file path, platform image objects, or a Unity texture) into tensor-ready pixel buffers, through Emgu.CV on plain .NET or platform-native APIs (UIKit/AppKit/Android.Graphics/UnityEngine) elsewhere.</Description>
     <PackageReleaseNotes>This is the ${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu TF Lite. For online documentation please visit
 http://www.emgu.com/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/</PackageReleaseNotes>
 

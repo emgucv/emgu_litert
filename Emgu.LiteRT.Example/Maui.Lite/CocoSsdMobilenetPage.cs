@@ -15,7 +15,7 @@ using Emgu.CV.CvEnum;
 using Emgu.CV.Platform.Maui.UI;
 using Emgu.CV.Structure;
 using Emgu.TF.Lite;
-using Emgu.LiteRT.ImageIO;
+using Emgu.TF.Lite.ImageIO;
 using Emgu.LiteRT.Util;
 using Emgu.TF.Lite.Models;
 using Emgu.Util;

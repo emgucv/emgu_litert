@@ -16,12 +16,13 @@
     <ProjectReference Include="..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
     <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
     <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
-    <ProjectReference Include="..\..\Emgu.LiteRT.ImageIO\NetStandard\Emgu.LiteRT.ImageIO.csproj" />
+    <ProjectReference Include="..\..\Emgu.TF.Lite.ImageIO\NetStandard\Emgu.TF.Lite.ImageIO.csproj" />
   </ItemGroup>
 
   <Import Project="..\Emgu.TF.Lite.Models.Shared.projitems" Label="Shared" />
 
-  <!-- Emgu.Models (NativeImageIO, JpegData, etc.) was renamed to Emgu.LiteRT.ImageIO and made
+  <!-- Emgu.Models (NativeImageIO, JpegData, etc.) was renamed to Emgu.LiteRT.ImageIO, then
+       Emgu.TF.Lite.ImageIO, and made
        its own project+package - this project's code uses its types via the ProjectReference
        above, no direct Shared.projitems import needed here anymore. -->
   <!-- 

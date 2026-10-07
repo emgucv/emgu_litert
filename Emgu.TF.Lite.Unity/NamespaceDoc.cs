@@ -20,7 +20,7 @@ namespace Emgu
 /// <summary>
 /// Image IO helpers (NativeImageIO, JpegData) for reading images into tensors.
 /// </summary>
-namespace Emgu.LiteRT.ImageIO
+namespace Emgu.TF.Lite.ImageIO
 {
 }
 

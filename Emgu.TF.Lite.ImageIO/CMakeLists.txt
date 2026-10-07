@@ -24,13 +24,13 @@ IF(HAVE_LITE_BUILD)
     )
 
   IF (DOTNET_FOUND)
-    PROJECT(Emgu.LiteRT.ImageIO)
-    BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/NetStandard/Emgu.LiteRT.ImageIO.csproj" "" ALL)
+    PROJECT(Emgu.TF.Lite.ImageIO)
+    BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/NetStandard/Emgu.TF.Lite.ImageIO.csproj" "" ALL)
     ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.Util Emgu.TF.Lite)
 
     INSTALL(
       DIRECTORY
-      ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.ImageIO
+      ${LIBRARY_OUTPUT_PATH}/Build/Emgu.TF.Lite.ImageIO
       DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
       COMPONENT emgulitert_binary)
   ENDIF()

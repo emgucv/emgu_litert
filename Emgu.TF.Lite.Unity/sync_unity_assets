@@ -3,5 +3,5 @@ cd "$(dirname "$0")"
 
 cp Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.LiteRT.Util/*.cs ../Emgu.LiteRT.Util/
 cp Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite/*.cs ../Emgu.TF.Lite/
-cp Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.LiteRT.ImageIO/*.cs ../Emgu.LiteRT.ImageIO/
+cp Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite.ImageIO/*.cs ../Emgu.TF.Lite.ImageIO/
 cp Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite.Models/*.cs ../Emgu.TF.Lite.Models/

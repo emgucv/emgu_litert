@@ -559,10 +559,12 @@ IF(HAVE_LITE_BUILD)
   SET(EMGUTF_LITE_TFLITE_NUGET_ID "Emgu.TF.Lite")
   SET(EMGUTF_LITE_TFLITE_NUGET_TITLE "Emgu TF Lite")
 
-  # Emgu.LiteRT.ImageIO/ (renamed from Emgu.Models/) - NativeImageIO/JpegData, its own managed
-  # package id too, depending on Emgu.LiteRT.Util and Emgu.TF.Lite.
-  SET(EMGUTF_LITE_IMAGEIO_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.ImageIO")
-  SET(EMGUTF_LITE_IMAGEIO_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} ImageIO")
+  # Emgu.TF.Lite.ImageIO/ (renamed from Emgu.Models/, then Emgu.LiteRT.ImageIO/) -
+  # NativeImageIO/JpegData, its own managed package - a literal package id, not derived from
+  # EMGUTF_LITE_NUGET_ID like its siblings, since the project itself isn't named Emgu.LiteRT.*.
+  # Depends on Emgu.LiteRT.Util and Emgu.TF.Lite.
+  SET(EMGUTF_LITE_IMAGEIO_NUGET_ID "Emgu.TF.Lite.ImageIO")
+  SET(EMGUTF_LITE_IMAGEIO_NUGET_TITLE "Emgu TF Lite ImageIO")
 
   # Emgu.LiteRT.Models/ was renamed to Emgu.LiteRT.Tflite.Models/ - it's built on the TFLite
   # Interpreter API (Emgu.TF.Lite), not LiteRT's own CompiledModel API.
@@ -1023,19 +1025,19 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Models/NetStandard/docs/README.md)
 
-# Emgu.LiteRT.ImageIO: NativeImageIO/JpegData (renamed from Emgu.Models). Its own nuget package,
-# depending on Emgu.LiteRT.Util (Annotation) and Emgu.TF.Lite (Emgu.TF.Lite.Toolbox's
-# native pixel-conversion P/Invokes).
+# Emgu.TF.Lite.ImageIO: NativeImageIO/JpegData (renamed from Emgu.Models, then Emgu.LiteRT.ImageIO).
+# Its own nuget package, depending on Emgu.LiteRT.Util (Annotation) and Emgu.TF.Lite
+# (Emgu.TF.Lite.Toolbox's native pixel-conversion P/Invokes).
 SET(EMGUTF_LITE_IMAGEIO_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
 SET(EMGUTF_LITE_IMAGEIO_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.ImageIO.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.ImageIO/NetStandard/Directory.Build.props)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.ImageIO.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.ImageIO/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.ImageIO/NetStandard/SignBinary.Targets)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.ImageIO/NetStandard/SignBinary.Targets)
 ENDIF()
 IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.ImageIO/NetStandard/SignPkg.Targets)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.ImageIO/NetStandard/SignPkg.Targets)
 ENDIF()
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.ImageIO.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.ImageIO/NetStandard/docs/README.md)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.ImageIO.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.ImageIO/NetStandard/docs/README.md)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.Models/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
@@ -1086,11 +1088,11 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.LiteRT)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Models)
-  # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and made its own project+package (it used
-  # to be shared source imported directly into Emgu.LiteRT.Tflite.Models.csproj and
-  # CVInterop.Lite.csproj). Depends on Emgu.TF.Lite (Emgu.TF.Lite.Toolbox), so must come
-  # after it and stay inside this HAVE_LITE_BUILD block.
-  ADD_SUBDIRECTORY(Emgu.LiteRT.ImageIO)
+  # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and later to Emgu.TF.Lite.ImageIO/, and made
+  # its own project+package (it used to be shared source imported directly into
+  # Emgu.LiteRT.Tflite.Models.csproj and CVInterop.Lite.csproj). Depends on Emgu.TF.Lite
+  # (Emgu.TF.Lite.Toolbox), so must come after it and stay inside this HAVE_LITE_BUILD block.
+  ADD_SUBDIRECTORY(Emgu.TF.Lite.ImageIO)
   ADD_SUBDIRECTORY(Emgu.TF.Lite.Models)
 ENDIF()
 

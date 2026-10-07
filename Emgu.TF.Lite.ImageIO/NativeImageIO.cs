@@ -8,7 +8,7 @@ using System.Text;
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace Emgu.LiteRT.ImageIO
+namespace Emgu.TF.Lite.ImageIO
 {
     /// <summary>
     /// Platform specific implementation of Image IO
