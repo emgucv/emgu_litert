@@ -387,7 +387,7 @@ ENDIF()
 #  Setup Package information
 # ----------------------------------------------------------------------------
 SET(PACKAGE "${PROJECT_NAME}")
-SET(GITHUB_REPO_URL "https://github.com/emgucv/emgutf")
+SET(GITHUB_REPO_URL "https://github.com/emgucv/emgu_litert")
 SET(CPACK_PACKAGE_CONTACT "Emgu TF support <support@emgu.com>")
 SET(PACKAGE_BUGREPORT "${CPACK_PACKAGE_CONTACT}")
 SET(PACKAGE_NAME "${PROJECT_NAME}")
