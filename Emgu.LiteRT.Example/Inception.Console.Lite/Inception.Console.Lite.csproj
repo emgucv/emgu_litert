@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Emgu.LiteRT.Tflite.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
+    <ProjectReference Include="..\..\Emgu.TF.Lite.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
     <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
   </ItemGroup>
 

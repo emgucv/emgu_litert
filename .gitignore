@@ -27,7 +27,7 @@ Directory.Build.props
 /Emgu.LiteRT/NetStandard/docs/
 /Emgu.LiteRT.LM/NetStandard/docs/
 /Emgu.LiteRT.LM.Models/NetStandard/docs/
-/Emgu.LiteRT.Tflite.Models/NetStandard/docs/
+/Emgu.TF.Lite.Models/NetStandard/docs/
 /Emgu.LiteRT.Runtime/Maui/*/docs/
 /Emgu.LiteRT.Runtime/Maui/*/Lite/docs/
 /platforms/nuget/*/Package.nuspec

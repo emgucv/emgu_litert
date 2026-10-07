@@ -1037,14 +1037,14 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.ImageIO.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.ImageIO/NetStandard/docs/README.md)
 
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite.Models/NetStandard/Directory.Build.props)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.Models/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite.Models/NetStandard/SignBinary.Targets)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.Models/NetStandard/SignBinary.Targets)
 ENDIF()
 IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite.Models/NetStandard/SignPkg.Targets)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.Models/NetStandard/SignPkg.Targets)
 ENDIF()
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Tflite.Models/NetStandard/docs/README.md)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.Models/NetStandard/docs/README.md)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/README.md)
@@ -1091,7 +1091,7 @@ IF(HAVE_LITE_BUILD)
   # CVInterop.Lite.csproj). Depends on Emgu.TF.Lite (Emgu.TF.Lite.Toolbox), so must come
   # after it and stay inside this HAVE_LITE_BUILD block.
   ADD_SUBDIRECTORY(Emgu.LiteRT.ImageIO)
-  ADD_SUBDIRECTORY(Emgu.LiteRT.Tflite.Models)
+  ADD_SUBDIRECTORY(Emgu.TF.Lite.Models)
 ENDIF()
 
 IF (HAVE_LITE_BUILD)
