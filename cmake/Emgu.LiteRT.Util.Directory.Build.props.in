@@ -11,8 +11,8 @@
     <version>${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
-	<summary>Shared native-handle lifetime management base classes used by Emgu.LiteRT and Emgu.LiteRT.Tflite.</summary>
-    <Description>Emgu.LiteRT.Util provides UnmanagedObject and other shared infrastructure for wrapping native handles with proper lifetime management (Dispose/finalizer pattern), used by both the Emgu.LiteRT (CompiledModel) and Emgu.LiteRT.Tflite (Interpreter) APIs.</Description>
+	<summary>Shared native-handle lifetime management base classes used by Emgu.LiteRT and Emgu.TF.Lite.</summary>
+    <Description>Emgu.LiteRT.Util provides UnmanagedObject and other shared infrastructure for wrapping native handles with proper lifetime management (Dispose/finalizer pattern), used by both the Emgu.LiteRT (CompiledModel) and Emgu.TF.Lite (Interpreter) APIs.</Description>
     <PackageReleaseNotes>This is the ${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT. For online documentation please visit
 http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
 

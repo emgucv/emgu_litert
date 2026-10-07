@@ -2,7 +2,7 @@
 #  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 # --------------------------------------------------------
 
-# Depends on Emgu.LiteRT.Tflite (for Emgu.TF.Lite.Toolbox's native pixel-conversion P/Invokes),
+# Depends on Emgu.TF.Lite (for Emgu.TF.Lite.Toolbox's native pixel-conversion P/Invokes),
 # which is only built when HAVE_LITE_BUILD is set.
 IF(HAVE_LITE_BUILD)
   INSTALL(

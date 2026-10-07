@@ -28,11 +28,11 @@
   <Import Project="..\Emgu.LiteRT.Shared.projitems" Label="Shared" />
 
   <!--
-  Emgu.LiteRT, Emgu.LiteRT.Tflite and Emgu.LiteRT.Util each produce their own nuget package.
+  Emgu.LiteRT, Emgu.TF.Lite and Emgu.LiteRT.Util each produce their own nuget package.
   Emgu.LiteRT's UnmanagedObject-derived types need Emgu.LiteRT.Util to compile, so that
   ProjectReference (without PrivateAssets) becomes a normal package dependency when this
   project is packed - NuGet does this automatically for a ProjectReference to another packable
-  project. There is no reference to Emgu.LiteRT.Tflite here: this project's code never used it,
+  project. There is no reference to Emgu.TF.Lite here: this project's code never used it,
   it was only ever bundled into this same package for convenience before the split.
   -->
   <ItemGroup>

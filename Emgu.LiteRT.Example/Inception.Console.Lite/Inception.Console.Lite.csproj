@@ -24,7 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Emgu.LiteRT.Tflite.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
-    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
+    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
   </ItemGroup>
 
   <Import Project="..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="Exists('..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems')" />

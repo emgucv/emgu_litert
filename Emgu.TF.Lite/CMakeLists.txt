@@ -24,12 +24,11 @@ IF(HAVE_LITE_BUILD)
     )
   
   IF (DOTNET_FOUND)
-    # CMake target name stays Emgu.TF.Lite (other CMakeLists.txt files ADD_DEPENDENCIES on it by
-    # this name) - only the csproj file, its AssemblyName, and the output DLL were renamed to
-    # Emgu.LiteRT.Tflite. The C# namespace stays Emgu.TF.Lite.
+    # CMake target name, csproj file, AssemblyName, output DLL, nuget PackageId and C# namespace
+    # are all Emgu.TF.Lite again (they briefly diverged to Emgu.LiteRT.Tflite).
     PROJECT(Emgu.TF.Lite)
     #MESSAGE("In Emgu.TF.Lite.Netstandard project now. HAVE_WINDESKTOP_X64: ${HAVE_WINDESKTOP_X64}")
-    BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/NetStandard/Emgu.LiteRT.Tflite.csproj" "" ALL)
+    BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/NetStandard/Emgu.TF.Lite.csproj" "" ALL)
     ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.Util)
 
     IF (EMGU_SIGN_FOUND)
@@ -40,12 +39,12 @@ IF(HAVE_LITE_BUILD)
         EMGU_SIGN_BINARY(${PROJECT_NAME} ${LIBRARY_OUTPUT_PATH}/runtimes/win-x86/native/tfliteextern.dll)
       ENDIF()
       #Binary signing should be done during project build time
-      #EMGU_SIGN_BINARY(${PROJECT_NAME} ${LIBRARY_OUTPUT_PATH}/Emgu.LiteRT.Tflite.dll)
+      #EMGU_SIGN_BINARY(${PROJECT_NAME} ${LIBRARY_OUTPUT_PATH}/Emgu.TF.Lite.dll)
     ENDIF()
 
     INSTALL(
       DIRECTORY
-      ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.Tflite
+      ${LIBRARY_OUTPUT_PATH}/Build/Emgu.TF.Lite
       DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
       COMPONENT emgulitert_binary)
   	

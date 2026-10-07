@@ -11,8 +11,8 @@
     <version>${EMGUTF_TFLITE_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
-	<summary>Emgu.LiteRT.Tflite is the TensorFlow Lite Interpreter C API wrapper for Emgu TF Lite.</summary>
-    <Description>Emgu.LiteRT.Tflite (Emgu.TF.Lite namespace) wraps the TensorFlow Lite Interpreter C API through the tfliteextern native library. Allows TensorFlow Lite functions to be called from .NET compatible languages such as C#, VB, VC++, IronPython.</Description>
+	<summary>Emgu.TF.Lite is the TensorFlow Lite Interpreter C API wrapper for Emgu TF Lite.</summary>
+    <Description>Emgu.TF.Lite wraps the TensorFlow Lite Interpreter C API through the tfliteextern native library. Allows TensorFlow Lite functions to be called from .NET compatible languages such as C#, VB, VC++, IronPython.</Description>
     <PackageReleaseNotes>This is the ${EMGUTF_TFLITE_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu TF Lite, built on TensorFlow Lite ${EMGUTF_TFLITE_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
 http://www.emgu.com/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/</PackageReleaseNotes>
 

@@ -26,7 +26,7 @@ cp ../tensorflow/LICENSE Assets/Emgu.TF.Lite/Documentation/tensorflow.license.tx
 #cp unityStoreIcons/README.txt Assets/Emgu.TF/README.txt
 
 cp ../Emgu.LiteRT.Util/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.LiteRT.Util/
-cp ../Emgu.LiteRT.Tflite/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite/
+cp ../Emgu.TF.Lite/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite/
 cp ../Emgu.LiteRT.ImageIO/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.LiteRT.ImageIO/
 cp ../Emgu.LiteRT.Tflite.Models/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite.Models/
 

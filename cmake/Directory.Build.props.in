@@ -1,7 +1,7 @@
 <Project>
  <PropertyGroup>
     <!-- The default version; a project's own Directory.Build.props (which imports this file at its end) may set its
-         own, e.g. the Emgu.LiteRT.Tflite* packages use the TFLite version. -->
+         own, e.g. Emgu.TF.Lite and its sibling TFLite-versioned packages use the TFLite version. -->
     <Version Condition="'$(Version)' == ''">${CPACK_PACKAGE_VERSION}</Version>
     <Company>Emgu Corporation</Company>
     <Product>Emgu.TF</Product>

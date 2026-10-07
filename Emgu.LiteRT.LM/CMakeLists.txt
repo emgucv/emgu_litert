@@ -26,7 +26,7 @@ IF(HAVE_LITE_BUILD)
     PROJECT(Emgu.LiteRT.LM)
     BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/NetStandard/Emgu.LiteRT.LM.csproj" "" ALL)
     # Emgu.LiteRT.LM.csproj's UnmanagedObject-derived types need Emgu.LiteRT.Util to compile; it has
-    # no code dependency on Emgu.LiteRT or Emgu.LiteRT.Tflite.
+    # no code dependency on Emgu.LiteRT or Emgu.TF.Lite.
     ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.Util)
 
     INSTALL(

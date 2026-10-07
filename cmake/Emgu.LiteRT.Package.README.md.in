@@ -2,7 +2,7 @@
 
 This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
 
-- `Emgu.LiteRT.Tflite.dll`: the Interpreter API (`Emgu.TF.Lite` namespace), wrapping TensorFlow Lite through the `tfliteextern` native library.
+- `Emgu.TF.Lite.dll`: the Interpreter API (`Emgu.TF.Lite` namespace), wrapping TensorFlow Lite through the `tfliteextern` native library.
 - `Emgu.LiteRT.dll`: the CompiledModel API (`Emgu.LiteRT` namespace), calling LiteRT's own runtime library (`libLiteRt`) directly.
 - `Emgu.LiteRT.Util.dll`: shared utilities (`Emgu.LiteRT.Util` namespace) used by both.
 

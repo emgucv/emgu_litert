@@ -44,10 +44,10 @@
       </NativeReference>
     </ItemGroup>
     <ItemGroup>
-      <!-- Emgu.LiteRT.Tflite and Emgu.LiteRT.Util each have their own nuget package now: plain
+      <!-- Emgu.TF.Lite and Emgu.LiteRT.Util each have their own nuget package now: plain
            ProjectReferences (no PrivateAssets) so this project's package depends on all three. -->
       <ProjectReference Include="..\..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
-      <ProjectReference Include="..\..\..\Emgu.TF.Lite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
+      <ProjectReference Include="..\..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
       <ProjectReference Include="..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
     </ItemGroup>
   <Target Name="DeployBinary" AfterTargets="AfterBuild">

@@ -44,7 +44,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Tflite.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
-    <ProjectReference Include="..\..\..\Emgu.TF.Lite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
+    <ProjectReference Include="..\..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />

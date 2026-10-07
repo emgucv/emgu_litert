@@ -4,7 +4,7 @@
 
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
 	<!-- Don't build for iOS, Android or Maccatalyst on Linux. net-android is needed here (like
-	     Emgu.LiteRT.Util, unlike Emgu.LiteRT/Emgu.LiteRT.Tflite) because
+	     Emgu.LiteRT.Util, unlike Emgu.LiteRT/Emgu.TF.Lite) because
 	     Android/NativeImageIO.Android.cs and AndroidFileAsset.cs (guarded by #if __ANDROID__)
 	     need it to compile. -->
 	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx')) or $([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-ios;net${DOTNET_VERSION_MAJOR}.0-android;net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFrameworks>

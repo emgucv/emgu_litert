@@ -25,7 +25,7 @@
   <!--
   Emgu.LiteRT.LM wraps LiteRT-LM's C API (liblitert-lm). Its UnmanagedObject-derived types need
   Emgu.LiteRT.Util to compile, so that ProjectReference becomes a normal package dependency when
-  this project is packed. It has no code dependency on Emgu.LiteRT or Emgu.LiteRT.Tflite:
+  this project is packed. It has no code dependency on Emgu.LiteRT or Emgu.TF.Lite:
   liblitert-lm loads libLiteRt itself.
   -->
   <ItemGroup>

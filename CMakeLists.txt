@@ -423,7 +423,8 @@ FILE(WRITE "emgutf.version.txt" "${CPACK_PACKAGE_VERSION}${LICENSE_LABEL}")
 #SET(CPACK_PACKAGE_DEPENDENCY_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}.*")
 SET(CPACK_PACKAGE_DEPENDENCY_VERSION "${CPACK_PACKAGE_VERSION}")
 
-# The Emgu.LiteRT.Tflite* packages (the TFLite Interpreter API, its models, and the tfliteextern runtime) are
+# Emgu.TF.Lite (the TFLite Interpreter API), Emgu.LiteRT.Tflite.Models (its models) and
+# Emgu.LiteRT.Tflite.runtime.windows (the tfliteextern runtime) are
 # versioned with the TFLite version - TensorFlow's TF_VERSION - instead of LiteRT's. Each native build records it in a
 # tflite_version.txt next to its libraries (the Bazel build scripts from the TensorFlow source Bazel built against,
 # litertextern/tfliteextern/CMakeLists.txt from the one LiteRT's CMake downloads). Without any, fall back to LiteRT's.
@@ -449,14 +450,14 @@ ENDFOREACH()
 LIST(REMOVE_DUPLICATES EMGUTF_TFLITE_VERSIONS_FOUND)
 LIST(LENGTH EMGUTF_TFLITE_VERSIONS_FOUND EMGUTF_TFLITE_VERSION_COUNT)
 IF(EMGUTF_TFLITE_VERSION_COUNT GREATER 1)
-  MESSAGE(WARNING "The native builds in lib/ report different TFLite versions (${EMGUTF_TFLITE_VERSIONS_FOUND}; see their tflite_version.txt), using ${EMGUTF_TFLITE_VERSION} for the Emgu.LiteRT.Tflite* packages")
+  MESSAGE(WARNING "The native builds in lib/ report different TFLite versions (${EMGUTF_TFLITE_VERSIONS_FOUND}; see their tflite_version.txt), using ${EMGUTF_TFLITE_VERSION} for the TFLite-versioned packages (Emgu.TF.Lite, Emgu.LiteRT.Tflite.Models, Emgu.LiteRT.Tflite.runtime.windows)")
 ENDIF()
 IF(EMGUTF_TFLITE_VERSION STREQUAL "")
   SET(EMGUTF_TFLITE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
-  MESSAGE(STATUS "No tflite_version.txt found in lib/; the Emgu.LiteRT.Tflite* packages use the LiteRT version")
+  MESSAGE(STATUS "No tflite_version.txt found in lib/; the TFLite-versioned packages use the LiteRT version")
 ENDIF()
 SET(EMGUTF_TFLITE_PACKAGE_VERSION "${EMGUTF_TFLITE_VERSION}.${EMGUTF_GITVERSION}")
-MESSAGE(STATUS "Emgu.LiteRT.Tflite* package version (TFLite ${EMGUTF_TFLITE_VERSION}): ${EMGUTF_TFLITE_PACKAGE_VERSION}")
+MESSAGE(STATUS "Emgu.TF.Lite* package version (TFLite ${EMGUTF_TFLITE_VERSION}): ${EMGUTF_TFLITE_PACKAGE_VERSION}")
 
 SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/${LICENSE_FILE_NAME}")
 
@@ -526,11 +527,11 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
 
 
 IF(HAVE_LITE_BUILD)
-  # Emgu.LiteRT.Util, Emgu.LiteRT.Tflite and Emgu.LiteRT each produce their own nuget package
+  # Emgu.LiteRT.Util, Emgu.TF.Lite and Emgu.LiteRT each produce their own nuget package
   # (EMGUTF_LITE_NUGET_ID is still the root every other package id derives from, for Models and
-  # the native runtime.* packages). Emgu.LiteRT.Tflite depends on Emgu.LiteRT.Util (its
+  # the native runtime.* packages). Emgu.TF.Lite depends on Emgu.LiteRT.Util (its
   # UnmanagedObject-derived types need it to compile); Emgu.LiteRT also depends on
-  # Emgu.LiteRT.Util for the same reason, but has no code dependency on Emgu.LiteRT.Tflite -
+  # Emgu.LiteRT.Util for the same reason, but has no code dependency on Emgu.TF.Lite -
   # the two were only ever bundled together for packaging convenience, not because one needs
   # the other.
   SET(EMGUTF_LITE_NUGET_ID "Emgu.LiteRT")
@@ -550,16 +551,16 @@ IF(HAVE_LITE_BUILD)
   SET(EMGUTF_LITERT_UTIL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Util")
   SET(EMGUTF_LITERT_UTIL_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} Util")
 
-  # The Emgu.LiteRT.Tflite nuget package (source folder Emgu.TF.Lite/, moved back from
-  # Emgu.LiteRT.Tflite/) is the TensorFlow Lite Interpreter API wrapper (Emgu.TF.Lite namespace);
-  # EMGUTF_LITE_TFLITE_NUGET_ID is its own managed package id,
-  # distinct from EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID below (the native tfliteextern.dll runtime
-  # package for Windows).
-  SET(EMGUTF_LITE_TFLITE_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Tflite")
-  SET(EMGUTF_LITE_TFLITE_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} Tflite")
+  # Emgu.TF.Lite (folder, csproj, AssemblyName, nuget PackageId and C# namespace all Emgu.TF.Lite
+  # again) is the TensorFlow Lite Interpreter API wrapper; EMGUTF_LITE_TFLITE_NUGET_ID is its own
+  # managed package id - a literal, not derived from EMGUTF_LITE_NUGET_ID like its siblings, since
+  # the package itself isn't named Emgu.LiteRT.* - distinct from EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID
+  # below (the native tfliteextern.dll runtime package for Windows, still Emgu.LiteRT.Tflite.*).
+  SET(EMGUTF_LITE_TFLITE_NUGET_ID "Emgu.TF.Lite")
+  SET(EMGUTF_LITE_TFLITE_NUGET_TITLE "Emgu TF Lite")
 
   # Emgu.LiteRT.ImageIO/ (renamed from Emgu.Models/) - NativeImageIO/JpegData, its own managed
-  # package id too, depending on Emgu.LiteRT.Util and Emgu.LiteRT.Tflite.
+  # package id too, depending on Emgu.LiteRT.Util and Emgu.TF.Lite.
   SET(EMGUTF_LITE_IMAGEIO_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.ImageIO")
   SET(EMGUTF_LITE_IMAGEIO_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} ImageIO")
 
@@ -954,7 +955,7 @@ IF (HAVE_WINDESKTOP_X86_LITE)
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/${EMGU_WINDOWS_MSVCRT_X86_NUGET_ID}.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/${EMGU_WINDOWS_MSVCRT_X86_NUGET_ID}/Package.nuspec)    
 ENDIF()
 
-# Emgu.LiteRT.Tflite: the TensorFlow Lite Interpreter API wrapper (Emgu.TF.Lite namespace), its
+# Emgu.TF.Lite: the TensorFlow Lite Interpreter API wrapper, its
 # own nuget package (depends on Emgu.LiteRT.Util - see its csproj's ProjectReference). The
 # signing targets in EMGUTF_LITE_POST_PROCESS_* only refer to $(AssemblyName)/$(PackageId), so
 # they are reused as-is for every self-packing project below.
@@ -969,7 +970,7 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/docs/README.md)
 
-# Emgu.LiteRT.Util: the shared UnmanagedObject/Toolbox base both Emgu.LiteRT.Tflite and Emgu.LiteRT
+# Emgu.LiteRT.Util: the shared UnmanagedObject/Toolbox base both Emgu.TF.Lite and Emgu.LiteRT
 # depend on. Its own nuget package too, with no managed dependencies of its own.
 SET(EMGUTF_LITERT_UTIL_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
 SET(EMGUTF_LITERT_UTIL_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
@@ -984,7 +985,7 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Util.Package.README
 
 # Emgu.LiteRT: the C# wrapper of LiteRT's own runtime C API (libLiteRt). Its own nuget package
 # depends on Emgu.LiteRT.Util (its UnmanagedObject-derived types need it to compile); it has no
-# code dependency on Emgu.LiteRT.Tflite, which is a fully independent package.
+# code dependency on Emgu.TF.Lite, which is a fully independent package.
 SET(EMGUTF_LITERT_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
 SET(EMGUTF_LITERT_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT/NetStandard/Directory.Build.props)
@@ -1023,7 +1024,7 @@ ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Models/NetStandard/docs/README.md)
 
 # Emgu.LiteRT.ImageIO: NativeImageIO/JpegData (renamed from Emgu.Models). Its own nuget package,
-# depending on Emgu.LiteRT.Util (Annotation) and Emgu.LiteRT.Tflite (Emgu.TF.Lite.Toolbox's
+# depending on Emgu.LiteRT.Util (Annotation) and Emgu.TF.Lite (Emgu.TF.Lite.Toolbox's
 # native pixel-conversion P/Invokes).
 SET(EMGUTF_LITE_IMAGEIO_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
 SET(EMGUTF_LITE_IMAGEIO_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
@@ -1077,16 +1078,17 @@ ENDIF()
 
 ADD_SUBDIRECTORY(Emgu.LiteRT.Util)
 IF(HAVE_LITE_BUILD)
-  # The Emgu.LiteRT.Tflite/ folder was moved back to Emgu.TF.Lite/ - the namespace/project/csproj
-  # name (and nuget package id) stay Emgu.LiteRT.Tflite (it's the TFLite Interpreter API
-  # wrapper), only the folder moved.
+  # Emgu.TF.Lite/ - the TensorFlow Lite Interpreter API wrapper. Folder, csproj, AssemblyName,
+  # nuget PackageId and C# namespace are all Emgu.TF.Lite again (they briefly diverged, with the
+  # folder and then the csproj/AssemblyName/PackageId each renamed to Emgu.LiteRT.Tflite and
+  # later moved back).
   ADD_SUBDIRECTORY(Emgu.TF.Lite)
   ADD_SUBDIRECTORY(Emgu.LiteRT)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Models)
   # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and made its own project+package (it used
   # to be shared source imported directly into Emgu.LiteRT.Tflite.Models.csproj and
-  # CVInterop.Lite.csproj). Depends on Emgu.LiteRT.Tflite (Emgu.TF.Lite.Toolbox), so must come
+  # CVInterop.Lite.csproj). Depends on Emgu.TF.Lite (Emgu.TF.Lite.Toolbox), so must come
   # after it and stay inside this HAVE_LITE_BUILD block.
   ADD_SUBDIRECTORY(Emgu.LiteRT.ImageIO)
   ADD_SUBDIRECTORY(Emgu.LiteRT.Tflite.Models)

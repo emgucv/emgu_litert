@@ -290,7 +290,7 @@ IF(TFLITEEXTERN_LINK_LITERT)
 ENDIF()
 
 # Same marker the Bazel build scripts write: the TFLite version, read by the top level CMakeLists.txt to version the
-# Emgu.LiteRT.Tflite* nuget packages.
+# Emgu.TF.Lite/Emgu.LiteRT.Tflite.* nuget packages.
 IF(TFLITEEXTERN_TFLITE_VERSION)
   FILE(WRITE "${TFLITEEXTERN_OUTPUT_DIRECTORY}/tflite_version.txt" "${TFLITEEXTERN_TFLITE_VERSION}\n")
 ENDIF()

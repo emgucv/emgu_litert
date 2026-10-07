@@ -30,13 +30,13 @@
   </ItemGroup>
 
   <!-- Emgu.LiteRT.Util: for the Annotation type NativeImageIO's DrawAnnotations/ImageFileToJpeg
-       overloads take. Emgu.LiteRT.Tflite: for Emgu.TF.Lite.Toolbox's native pixel-conversion
+       overloads take. Emgu.TF.Lite: for Emgu.TF.Lite.Toolbox's native pixel-conversion
        P/Invokes NativeImageIO calls into (tfePixel32ToPixelFloat etc.) - this is why ImageIO
-       can't live inside Emgu.LiteRT.Util itself, which Emgu.LiteRT.Tflite already depends on;
+       can't live inside Emgu.LiteRT.Util itself, which Emgu.TF.Lite already depends on;
        putting it there would create a circular reference. -->
   <ItemGroup>
     <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
-    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.LiteRT.Tflite.csproj" />
+    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
   </ItemGroup>
 
   <Import Project="..\Emgu.LiteRT.ImageIO.Shared.projitems" Label="Shared" />

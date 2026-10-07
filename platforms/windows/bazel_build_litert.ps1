@@ -253,7 +253,7 @@ Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\libLiteRt.dll") "$Nat
 # to set EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK, and it travels with the binary in the zip package.
 Set-Content -Path "$NativeOutDir\tflite_with_xnnpack.txt" -Value $TfliteWithXnnpack -NoNewline:$false
 # Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
-# dll. The top level CMakeLists.txt reads it to version the Emgu.LiteRT.Tflite* nuget packages.
+# dll. The top level CMakeLists.txt reads it to version the Emgu.TF.Lite/Emgu.LiteRT.Tflite.* nuget packages.
 $TfVersionBzl = Join-Path $OutputBaseDir "external\org_tensorflow\tensorflow\tf_version.bzl"
 $TfliteVersion = $null
 if (Test-Path $TfVersionBzl) {
