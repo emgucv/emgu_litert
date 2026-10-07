@@ -32,7 +32,7 @@ Directory.Build.props
 /Emgu.LiteRT.Runtime/Maui/*/Lite/docs/
 /platforms/nuget/*/Package.nuspec
 /platforms/nuget/Emgu.LiteRT.runtime.windows/README.md
-/platforms/nuget/Emgu.LiteRT.Tflite.runtime.windows/README.md
+/platforms/nuget/Emgu.TF.Lite.runtime.windows/README.md
 
 # NuGet packages produced by the build
 /platforms/nuget/*.nupkg

@@ -424,7 +424,7 @@ FILE(WRITE "emgutf.version.txt" "${CPACK_PACKAGE_VERSION}${LICENSE_LABEL}")
 SET(CPACK_PACKAGE_DEPENDENCY_VERSION "${CPACK_PACKAGE_VERSION}")
 
 # Emgu.TF.Lite (the TFLite Interpreter API), Emgu.LiteRT.Tflite.Models (its models) and
-# Emgu.LiteRT.Tflite.runtime.windows (the tfliteextern runtime) are
+# Emgu.TF.Lite.runtime.windows (the tfliteextern runtime) are
 # versioned with the TFLite version - TensorFlow's TF_VERSION - instead of LiteRT's. Each native build records it in a
 # tflite_version.txt next to its libraries (the Bazel build scripts from the TensorFlow source Bazel built against,
 # litertextern/tfliteextern/CMakeLists.txt from the one LiteRT's CMake downloads). Without any, fall back to LiteRT's.
@@ -450,7 +450,7 @@ ENDFOREACH()
 LIST(REMOVE_DUPLICATES EMGUTF_TFLITE_VERSIONS_FOUND)
 LIST(LENGTH EMGUTF_TFLITE_VERSIONS_FOUND EMGUTF_TFLITE_VERSION_COUNT)
 IF(EMGUTF_TFLITE_VERSION_COUNT GREATER 1)
-  MESSAGE(WARNING "The native builds in lib/ report different TFLite versions (${EMGUTF_TFLITE_VERSIONS_FOUND}; see their tflite_version.txt), using ${EMGUTF_TFLITE_VERSION} for the TFLite-versioned packages (Emgu.TF.Lite, Emgu.LiteRT.Tflite.Models, Emgu.LiteRT.Tflite.runtime.windows)")
+  MESSAGE(WARNING "The native builds in lib/ report different TFLite versions (${EMGUTF_TFLITE_VERSIONS_FOUND}; see their tflite_version.txt), using ${EMGUTF_TFLITE_VERSION} for the TFLite-versioned packages (Emgu.TF.Lite, Emgu.LiteRT.Tflite.Models, Emgu.TF.Lite.runtime.windows)")
 ENDIF()
 IF(EMGUTF_TFLITE_VERSION STREQUAL "")
   SET(EMGUTF_TFLITE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
@@ -555,7 +555,8 @@ IF(HAVE_LITE_BUILD)
   # again) is the TensorFlow Lite Interpreter API wrapper; EMGUTF_LITE_TFLITE_NUGET_ID is its own
   # managed package id - a literal, not derived from EMGUTF_LITE_NUGET_ID like its siblings, since
   # the package itself isn't named Emgu.LiteRT.* - distinct from EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID
-  # below (the native tfliteextern.dll runtime package for Windows, still Emgu.LiteRT.Tflite.*).
+  # below (the native tfliteextern.dll runtime package for Windows, also a literal Emgu.TF.Lite.*
+  # id now rather than derived from EMGUTF_LITE_NUGET_ID).
   SET(EMGUTF_LITE_TFLITE_NUGET_ID "Emgu.TF.Lite")
   SET(EMGUTF_LITE_TFLITE_NUGET_TITLE "Emgu TF Lite")
 
@@ -583,8 +584,8 @@ IF(HAVE_LITE_BUILD)
   # P/Invoke) is packaged separately from libLiteRt.dll (${EMGUTF_LITE_WINDOWS_NUGET_ID} above,
   # which Emgu.LiteRT's CompiledModel API P/Invokes directly), with a nuget dependency on it -
   # see EMGUTF_LITE_TFLITE_WINDOWS_NUGET_DEPENDENCY below.
-  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Tflite.runtime.windows")
-  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_TITLE "Native runtime (tfliteextern) of ${EMGUTF_LITE_NUGET_TITLE} for Windows")
+  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID "Emgu.TF.Lite.runtime.windows")
+  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_TITLE "Native runtime (tfliteextern) of Emgu TF Lite for Windows")
 
   SET(EMGUTF_LITE_MACOS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.macos")
   SET(EMGUTF_LITE_MACOS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
@@ -1051,8 +1052,8 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Package.REA
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/README.md)
 
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Tflite.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.Tflite.runtime.windows/Package.nuspec)
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Tflite.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.Tflite.runtime.windows/README.md)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.windows/Package.nuspec)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.windows/README.md)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.macos/Package.nuspec)
 

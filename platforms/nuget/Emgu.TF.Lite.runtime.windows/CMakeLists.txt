@@ -4,7 +4,7 @@
 
 IF(HAVE_WINDESKTOP_LITE)
 
-PROJECT(Emgu.LiteRT.Tflite.runtime.windows.nuget)
+PROJECT(Emgu.TF.Lite.runtime.windows.nuget)
 
   get_filename_component(NUGET_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
   BUILD_NUGET_PACKAGE(

@@ -85,7 +85,7 @@ bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build \
     //tfliteextern:tfliteextern_ios_framework || exit 1
 
 # Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
-# libraries. The top level CMakeLists.txt reads it to version the Emgu.TF.Lite/Emgu.LiteRT.Tflite.* nuget packages.
+# libraries. The top level CMakeLists.txt reads it to version the Emgu.TF.Lite, Emgu.LiteRT.Tflite.Models and Emgu.TF.Lite.runtime.windows nuget packages.
 TF_VERSION_BZL="$(bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" info output_base)/external/org_tensorflow/tensorflow/tf_version.bzl"
 TFLITE_VERSION=$(sed -n 's/^TF_VERSION = "\([0-9][0-9.]*\)".*/\1/p' "$TF_VERSION_BZL")
 if [ -n "$TFLITE_VERSION" ]; then
