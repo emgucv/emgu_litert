@@ -68,7 +68,7 @@ MESSAGE(STATUS "LITERT_VERSION: ${LITERT_VERSION} ")
 INCLUDE (LitertLmVersion)
 MESSAGE(STATUS "LITERT_LM_VERSION: ${LITERT_LM_VERSION} ")
 # Emgu.LiteRT.LM and Emgu.LiteRT.LM.runtime.windows (the C# wrapper and its native Windows runtime
-# package - see EMGU_LITERT_LM_NUGET_ID/EMGUTF_LITERT_LM_WINDOWS_NUGET_ID below) are versioned
+# package - see EMGU_LITERT_LM_NUGET_ID/EMGU_LITERT_LM_WINDOWS_NUGET_ID below) are versioned
 # with LiteRT-LM's own version (read directly from the LiteRT-LM/ submodule's version.bzl, the same
 # way the overall CPACK_PACKAGE_VERSION is read from litert/version.bzl - unlike EMGUTF_TFLITE_
 # PACKAGE_VERSION, there's no separate Bazel-fetched-vs-submodule ambiguity to resolve here, since
@@ -505,8 +505,6 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${LICENSE_FILE_NAME} ${CMAKE_CURRENT_
 # ----------------------------------------------------------------------------
 #CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/component.yaml.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/xamarin/emgutf_v1/component/component.yaml)
 
-SET(EMGUTF_NUGET_FILE_LIST "")
-
 SET(EMGU_WINDOWS_MSVCRT_X86_NUGET_ID "Emgu.runtime.windows.msvc.rt.x86")
 SET(EMGU_WINDOWS_MSVCRT_X64_NUGET_ID "Emgu.runtime.windows.msvc.rt.x64")
 
@@ -538,7 +536,7 @@ SET(EMGUTF_MAUI_IOS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-ios17.2")
 SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19041.0")
 
 
-IF(HAVE_LITE_BUILD)
+#IF(HAVE_LITE_BUILD)
   # Emgu.LiteRT.Util, Emgu.TF.Lite and Emgu.LiteRT each produce their own nuget package
   # (EMGU_LITERT_NUGET_ID is still the root every other package id derives from, for Models and
   # the native runtime.* packages). Emgu.TF.Lite depends on Emgu.LiteRT.Util (its
@@ -557,8 +555,8 @@ IF(HAVE_LITE_BUILD)
   SET(EMGU_LITERT_LM_MODELS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Models")
   SET(EMGU_LITERT_LM_MODELS_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} Models")
 
-  SET(EMGUTF_LITERT_UTIL_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Util")
-  SET(EMGUTF_LITERT_UTIL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Util")
+  SET(EMGU_LITERT_UTIL_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Util")
+  SET(EMGU_LITERT_UTIL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Util")
 
   # Emgu.TF.Lite (folder, csproj, AssemblyName, nuget PackageId and C# namespace all Emgu.TF.Lite
   # again) is the TensorFlow Lite Interpreter API wrapper; EMGU_TFLITE_NUGET_ID is its own
@@ -574,7 +572,7 @@ IF(HAVE_LITE_BUILD)
   # EMGU_LITERT_NUGET_ID like its siblings, since the project itself isn't named Emgu.LiteRT.*.
   # Depends on Emgu.LiteRT.Util and Emgu.TF.Lite.
   SET(EMGUTF_LITE_IMAGEIO_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.ImageIO")
-  SET(EMGUTF_LITE_IMAGEIO_NUGET_TITLE "Emgu TF Lite ImageIO")
+  SET(EMGUTF_LITE_IMAGEIO_NUGET_TITLE "${EMGU_TFLITE_NUGET_TITLE} ImageIO")
 
   # Interpreter API (Emgu.TF.Lite), not LiteRT's own CompiledModel API.
   SET(EMGU_TFLITE_MODELS_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.Models")
@@ -598,27 +596,24 @@ IF(HAVE_LITE_BUILD)
 
   # liblitert-lm.dll (LiteRT-LM's C API runtime, built by bazel_build_litert.ps1) is packaged
   # separately from libLiteRt.dll (${EMGU_LITERT_WINDOWS_NUGET_ID} above), with a nuget dependency
-  # on it - see EMGUTF_LITERT_LM_WINDOWS_NUGET_DEPENDENCY below. Unlike EMGUTF_LITE_TFLITE_WINDOWS_
+  # on it - see EMGU_LITERT_LM_WINDOWS_NUGET_DEPENDENCY below. Unlike EMGUTF_LITE_TFLITE_WINDOWS_
   # NUGET_ID, this one derives from EMGU_LITERT_LM_NUGET_ID normally: Emgu.LiteRT.LM already fits
   # the Emgu.LiteRT.* convention (it's the managed wrapper's own name), unlike Emgu.TF.Lite.
-  SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.runtime.windows")
-  SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGU_LITERT_LM_NUGET_TITLE} for Windows")
+  SET(EMGU_LITERT_LM_WINDOWS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.runtime.windows")
+  SET(EMGU_LITERT_LM_WINDOWS_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGU_LITERT_LM_NUGET_TITLE} for Windows")
 
-  SET(EMGUTF_LITE_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.macos")
-  SET(EMGUTF_LITE_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
+  SET(EMGU_LITERT_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.macos")
+  SET(EMGU_LITERT_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
   
-  SET(EMGUTF_LITE_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}") 
-  #IF ("${LICENSE_TYPE}" STREQUAL "Commercial")
-  #  SET(EMGUTF_LITE_UBUNTU_NUGET_ID "${EMGUTF_LITE_UBUNTU_NUGET_ID}-CR")  
-  #ENDIF()  
-  SET(EMGUTF_LITE_UBUNTU_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
+  SET(EMGU_LITERT_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}") 
+  SET(EMGU_LITERT_UBUNTU_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
 
   # liblitert-lm.so (LiteRT-LM's own C API, P/Invoked directly by Emgu.LiteRT.LM) and the prebuilt
   # libGemmaModelConstraintProvider.so it depends on are packaged separately from
-  # ${EMGUTF_LITE_UBUNTU_NUGET_ID} above (libLiteRt.so/libtfliteextern.so), with a nuget dependency on
-  # it - see EMGUTF_LITE_LM_UBUNTU_NUGET_DEPENDENCY below.
-  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
-  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
+  # ${EMGU_LITERT_UBUNTU_NUGET_ID} above (libLiteRt.so/libtfliteextern.so), with a nuget dependency on
+  # it - see EMGU_LITERT_LM_UBUNTU_NUGET_DEPENDENCY below.
+  SET(EMGU_LITERT_LM_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
+  SET(EMGU_LITERT_LM_UBUNTU_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
 
   SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.android")  
   SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui Android")	
@@ -628,9 +623,6 @@ IF(HAVE_LITE_BUILD)
   
   SET(EMGUTF_LITE_MAUI_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.macos")  
   SET(EMGUTF_LITE_MAUI_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui MacOS")	
-
-
-  #MESSAGE(STATUS ">>> HAVE_WINDESKTOP_LITE: ${HAVE_WINDESKTOP_LITE}")
   
   IF(EMGU_SIGN_FOUND AND WIN32)
   
@@ -701,7 +693,7 @@ IF(HAVE_LITE_BUILD)
   ENDIF()
   MESSAGE(STATUS "HAVE_MAUI_LITE: ${HAVE_MAUI_LITE}")
       
-ENDIF()
+#ENDIF()
 
 #IF(HAVE_MAUI_LITE)
   SET(EMGUTF_LITE_MAUI_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui${EMGUTF_LITE_RUNTIME_EXTRA_TAG}")
@@ -740,7 +732,7 @@ ENDIF()
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/liblitert-lm.dll")
     SET(EMGUTF_LITE_MAUI_NUGET_DEPENDENCY "${EMGUTF_LITE_MAUI_NUGET_DEPENDENCY}
   	<ItemGroup>
-      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGUTF_LITERT_LM_WINDOWS_NUGET_ID}\" Version=\"${EMGU_LITERT_LM_PACKAGE_VERSION}\">
+      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGU_LITERT_LM_WINDOWS_NUGET_ID}\" Version=\"${EMGU_LITERT_LM_PACKAGE_VERSION}\">
 	  </PackageReference>
     </ItemGroup>")
   ENDIF()
@@ -819,7 +811,7 @@ IF( HAVE_WINDESKTOP_LITE )
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libLiteRt.dll\" target=\"runtimes\\win-x64\\native\" />
 	")
   ENDIF()
-  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST}
+  SET(EMGU_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGU_TFLITE_WINDOWS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\tfliteextern.dll\" target=\"runtimes\\win-x64\\native\" />
 	")
   # liblitert-lm.dll/libGemmaModelConstraintProvider.dll (bazel_build_litert.ps1) are x64-only and
@@ -830,7 +822,7 @@ IF( HAVE_WINDESKTOP_LITE )
   SET(HAVE_WINDOWS_LITERT_LM OFF)
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/liblitert-lm.dll")
     SET(HAVE_WINDOWS_LITERT_LM ON)
-    SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
+    SET(EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\liblitert-lm.dll\" target=\"runtimes\\win-x64\\native\" />
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libGemmaModelConstraintProvider.dll\" target=\"runtimes\\win-x64\\native\" />
 	")
@@ -842,7 +834,7 @@ IF( HAVE_WINDESKTOP_LITE )
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x86\\native\\libLiteRt.dll\" target=\"runtimes\\win-x86\\native\" />
 	")
   ENDIF()
-  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST}
+  SET(EMGU_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGU_TFLITE_WINDOWS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x86\\native\\tfliteextern.dll\" target=\"runtimes\\win-x86\\native\" />
 	")
   ENDIF()
@@ -856,7 +848,7 @@ IF( HAVE_WINDESKTOP_LITE )
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")
 
-  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST}
+  SET(EMGU_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGU_TFLITE_WINDOWS_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"README.md\" target=\"docs\\\" />")
@@ -866,11 +858,11 @@ IF( HAVE_WINDESKTOP_LITE )
     </dependencies>")
 
   IF(HAVE_WINDOWS_LITERT_LM)
-    SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
+    SET(EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"README.md\" target=\"docs\\\" />")
-    SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_DEPENDENCY "
+    SET(EMGU_LITERT_LM_WINDOWS_NUGET_DEPENDENCY "
       <dependencies>
 		<dependency id=\"${EMGU_LITERT_WINDOWS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
       </dependencies>")
@@ -878,25 +870,25 @@ IF( HAVE_WINDESKTOP_LITE )
 ENDIF()
 
 IF(HAVE_OSX_LITE)
-  SET(EMGUTF_LITE_MACOS_NUGET_FILE_LIST "${EMGUTF_LITE_MACOS_NUGET_FILE_LIST} 
+  SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libtfliteextern.dylib\" target=\"runtimes\\osx\\native\" />")
   # LiteRT's own runtime (built by platforms/macos/bazel_build_litert_macos), P/Invoked directly by the
   # Emgu.LiteRT classes. Optional: the tfliteextern-based API works without it.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libLiteRt.dylib")
-    SET(EMGUTF_LITE_MACOS_NUGET_FILE_LIST "${EMGUTF_LITE_MACOS_NUGET_FILE_LIST}
+    SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libLiteRt.dylib\" target=\"runtimes\\osx\\native\" />")
   ENDIF()
   # LiteRT-LM's C API (built by platforms/macos/bazel_build_tflite_macos, Apple Silicon only), P/Invoked directly by
   # the Emgu.LiteRT.LM classes, plus the prebuilt libGemmaModelConstraintProvider.dylib it depends on. Optional.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/liblitert-lm.dylib")
-    SET(EMGUTF_LITE_MACOS_NUGET_FILE_LIST "${EMGUTF_LITE_MACOS_NUGET_FILE_LIST}
+    SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\liblitert-lm.dylib\" target=\"runtimes\\osx\\native\" />
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libGemmaModelConstraintProvider.dylib\" target=\"runtimes\\osx\\native\" />")
   ENDIF()
-  SET(EMGUTF_LITE_MACOS_NUGET_FILE_LIST "${EMGUTF_LITE_MACOS_NUGET_FILE_LIST}
+  SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
-  SET(EMGUTF_LITE_MACOS_NUGET_DEPENDENCY "${EMGUTF_LITE_MACOS_NUGET_DEPENDENCY}
+  SET(EMGU_LITERT_MACOS_NUGET_DEPENDENCY "${EMGU_LITERT_MACOS_NUGET_DEPENDENCY}
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")	
@@ -904,20 +896,20 @@ ENDIF()
 
 IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
   # liblitert-lm.so/libGemmaModelConstraintProvider.so (when present) are excluded from this package's
-  # *.so glob - they ship in ${EMGUTF_LITE_LM_UBUNTU_NUGET_ID} instead, see below.
+  # *.so glob - they ship in ${EMGU_LITERT_LM_UBUNTU_NUGET_ID} instead, see below.
   IF (HAVE_UBUNTU_X86_64_LITE)
-    SET(EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST}
+    SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
       <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\runtimes\\ubuntu-x64\\native\" />")
   ENDIF()
   IF (HAVE_UBUNTU_ARM64_LITE)
-    SET(EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST}
+    SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
       <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\runtimes\\ubuntu-arm64\\native\" />")
   ENDIF()
-  SET(EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_UBUNTU_NUGET_FILE_LIST}
+  SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
-	#<file src=\"Emgu.TF.Lite.runtime.ubuntu.targets\" target=\"build\\${EMGUTF_LITE_UBUNTU_NUGET_ID}.targets\" />")
-  SET(EMGUTF_LITE_UBUNTU_NUGET_DEPENDENCY "${EMGUTF_LITE_UBUNTU_NUGET_DEPENDENCY}
+	#<file src=\"Emgu.TF.Lite.runtime.ubuntu.targets\" target=\"build\\${EMGU_LITERT_UBUNTU_NUGET_ID}.targets\" />")
+  SET(EMGU_LITERT_UBUNTU_NUGET_DEPENDENCY "${EMGU_LITERT_UBUNTU_NUGET_DEPENDENCY}
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")
@@ -928,22 +920,22 @@ ENDIF()
 # it depends on. Optional - guarded on EXISTS the same way the macOS packaging treats liblitert-lm.dylib,
 # so a build that didn't produce it doesn't fail to pack an empty package.
 IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-x64/native/liblitert-lm.so")
-  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST}
+  SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so\" target=\"runtimes\\ubuntu-x64\\native\" />
     <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\ubuntu-x64\\native\" />")
 ENDIF()
 IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-arm64/native/liblitert-lm.so")
-  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST}
+  SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so\" target=\"runtimes\\ubuntu-arm64\\native\" />
     <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\ubuntu-arm64\\native\" />")
 ENDIF()
-IF(NOT "${EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST}" STREQUAL "")
-  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST "${EMGUTF_LITE_LM_UBUNTU_NUGET_FILE_LIST}
+IF(NOT "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}" STREQUAL "")
+  SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
-  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_DEPENDENCY "${EMGUTF_LITE_LM_UBUNTU_NUGET_DEPENDENCY}
+  SET(EMGU_LITERT_LM_UBUNTU_NUGET_DEPENDENCY "${EMGU_LITERT_LM_UBUNTU_NUGET_DEPENDENCY}
     <dependencies>
-		<dependency id=\"${EMGUTF_LITE_UBUNTU_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+		<dependency id=\"${EMGU_LITERT_UBUNTU_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")
 ENDIF()
 
