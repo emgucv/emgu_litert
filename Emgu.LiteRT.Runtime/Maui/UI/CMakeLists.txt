@@ -2,5 +2,55 @@
 #  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 # --------------------------------------------------------
 
-ADD_SUBDIRECTORY(Lite)
+# Only build MAUI projects on Windows or MacOS. MAUI compilation on Linux seems to be a problem.
+IF(HAVE_MAUI_LITE AND (APPLE OR WIN32))
+  PROJECT(Emgu.LiteRT.runtime.maui)
+  INSTALL(
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    DESTINATION Emgu.TF.Platform/Maui/UI
+    COMPONENT emgulitert_source
+    FILES_MATCHING
+	PATTERN "*.cs"
+    PATTERN "${PROJECT_NAME}.csproj"
+    PATTERN ".svn" EXCLUDE
+    PATTERN "obj" EXCLUDE
+    PATTERN "CMakeFiles" EXCLUDE
+    PATTERN "${PROJECT_NAME}.dir" EXCLUDE
+    )
+  SET(EXTRA_BUILD_FLAGS "/p:Platform=\"AnyCPU\"")
 
+  BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}.csproj" "${EXTRA_BUILD_FLAGS}" ALL)
+
+  #if(ENABLE_SOLUTION_FOLDERS)
+  #    set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "emgu")
+  #endif()
+
+  ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT)
+
+  IF (TARGET Emgu.LiteRT.runtime.maui.android)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.runtime.maui.android)
+  ENDIF()
+
+  IF (TARGET Emgu.LiteRT.runtime.maui.ios)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.runtime.maui.ios)
+  ENDIF()
+
+  IF (TARGET Emgu.LiteRT.runtime.windows.nuget)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.runtime.windows.nuget)
+  ENDIF()
+
+  IF (TARGET Emgu.TF.Lite.runtime.windows.nuget)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite.runtime.windows.nuget)
+  ENDIF()
+
+  IF (TARGET Emgu.LiteRT.LM.runtime.windows.nuget)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.LM.runtime.windows.nuget)
+  ENDIF()
+
+  INSTALL(
+    DIRECTORY
+    ${LIBRARY_OUTPUT_PATH}/Build/Emgu.LiteRT.runtime.maui
+    DESTINATION ${CPACK_PACKAGE_CLI_FOLDER}
+    COMPONENT emgulitert_binary)
+
+ENDIF()

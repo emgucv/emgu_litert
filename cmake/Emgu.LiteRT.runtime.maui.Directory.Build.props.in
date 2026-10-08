@@ -13,7 +13,7 @@
 	
 	<MauiVersion Condition="'$(MauiVersion)' == ''">${DOTNET_VERSION_MAJOR}.0.0</MauiVersion>
 	
-    <EmguTFProjectRoot>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\))</EmguTFProjectRoot>
+    <EmguTFProjectRoot>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\))</EmguTFProjectRoot>
 	
     <PackageId>${EMGUTF_LITE_MAUI_NUGET_ID}</PackageId>
 	
