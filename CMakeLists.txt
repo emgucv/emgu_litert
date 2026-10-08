@@ -40,6 +40,7 @@ ELSE()
   SET(EMGUTF_GITVERSION "0")
 ENDIF()
 SET(LITERT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/litert")
+SET(LITERT_LM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/LiteRT-LM")
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 SET(CSC_PREFERRED_VERSION "16.0")
@@ -64,6 +65,17 @@ ENDIF()
 INCLUDE (CSharpMacros)
 INCLUDE (LitertVersion)
 MESSAGE(STATUS "LITERT_VERSION: ${LITERT_VERSION} ")
+INCLUDE (LitertLmVersion)
+MESSAGE(STATUS "LITERT_LM_VERSION: ${LITERT_LM_VERSION} ")
+# Emgu.LiteRT.LM and Emgu.LiteRT.LM.runtime.windows (the C# wrapper and its native Windows runtime
+# package - see EMGUTF_LITERT_LM_NUGET_ID/EMGUTF_LITERT_LM_WINDOWS_NUGET_ID below) are versioned
+# with LiteRT-LM's own version (read directly from the LiteRT-LM/ submodule's version.bzl, the same
+# way the overall CPACK_PACKAGE_VERSION is read from litert/version.bzl - unlike EMGUTF_TFLITE_
+# PACKAGE_VERSION, there's no separate Bazel-fetched-vs-submodule ambiguity to resolve here, since
+# liblitert-lm.dll is built directly from this submodule, not a separately-pinned dependency),
+# instead of the main CPACK_PACKAGE_VERSION (LiteRT's own version) - they wrap a different Google
+# project with its own, unrelated release numbering.
+SET(EMGUTF_LITERT_LM_PACKAGE_VERSION "${LITERT_LM_VERSION}.${EMGUTF_GITVERSION}")
 
 SET(LICENSE_FILE_NAME "LICENSE")
 MACRO(CHECK_LICENSE_TYPE)

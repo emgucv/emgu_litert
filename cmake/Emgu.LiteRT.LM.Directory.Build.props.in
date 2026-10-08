@@ -8,12 +8,12 @@
  
     <PackageId>${EMGUTF_LITERT_LM_NUGET_ID}</PackageId>
 	<title>${EMGUTF_LITERT_LM_NUGET_TITLE}</title>
-    <version>${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <version>${EMGUTF_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
 	<summary>Emgu LiteRT LM is a cross platform .Net wrapper for the Google LiteRT-LM C API.</summary>
     <Description>Emgu LiteRT LM is a cross platform .Net wrapper for the Google LiteRT-LM (liblitert-lm) C API, for running large language models (.litertlm files): engine, session, streaming generation and conversation APIs. Allows LiteRT-LM functions to be called from .NET compatible languages such as C#, VB, VC++, IronPython.</Description>
-    <PackageReleaseNotes>This is the ${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM. For online documentation please visit
+    <PackageReleaseNotes>This is the ${EMGUTF_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM, built on LiteRT-LM ${LITERT_LM_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
 http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
 	
 	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
