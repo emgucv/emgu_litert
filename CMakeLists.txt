@@ -740,7 +740,20 @@ ENDIF()
       <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID}\" Version=\"${EMGUTF_TFLITE_PACKAGE_VERSION}\">
 	  </PackageReference>
     </ItemGroup>")
-   
+  # Emgu.LiteRT.LM.runtime.windows (liblitert-lm.dll) is optional - only built when
+  # lib/runtimes/win-x64/native/liblitert-lm.dll exists (see HAVE_WINDOWS_LITERT_LM further below,
+  # computed after this point in the file - re-checked here with the same EXISTS test rather than
+  # reordering that block) - so only add this PackageReference when it does. Without the guard, a
+  # MAUI build on a machine that never built liblitert-lm.dll would fail trying to restore a package
+  # version that was never packed.
+  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/liblitert-lm.dll")
+    SET(EMGUTF_LITE_MAUI_NUGET_DEPENDENCY "${EMGUTF_LITE_MAUI_NUGET_DEPENDENCY}
+  	<ItemGroup>
+      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGUTF_LITERT_LM_WINDOWS_NUGET_ID}\" Version=\"${EMGUTF_LITERT_LM_PACKAGE_VERSION}\">
+	  </PackageReference>
+    </ItemGroup>")
+  ENDIF()
+
   IF(EMGU_SIGN_FOUND AND WIN32)
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/UI/Lite/SignBinary.Targets)
   ENDIF()
