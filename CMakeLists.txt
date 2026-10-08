@@ -68,7 +68,7 @@ MESSAGE(STATUS "LITERT_VERSION: ${LITERT_VERSION} ")
 INCLUDE (LitertLmVersion)
 MESSAGE(STATUS "LITERT_LM_VERSION: ${LITERT_LM_VERSION} ")
 # Emgu.LiteRT.LM and Emgu.LiteRT.LM.runtime.windows (the C# wrapper and its native Windows runtime
-# package - see EMGUTF_LITERT_LM_NUGET_ID/EMGUTF_LITERT_LM_WINDOWS_NUGET_ID below) are versioned
+# package - see EMGU_LITERT_LM_NUGET_ID/EMGUTF_LITERT_LM_WINDOWS_NUGET_ID below) are versioned
 # with LiteRT-LM's own version (read directly from the LiteRT-LM/ submodule's version.bzl, the same
 # way the overall CPACK_PACKAGE_VERSION is read from litert/version.bzl - unlike EMGUTF_TFLITE_
 # PACKAGE_VERSION, there's no separate Bazel-fetched-vs-submodule ambiguity to resolve here, since
@@ -551,34 +551,33 @@ IF(HAVE_LITE_BUILD)
 
   # Emgu.LiteRT.LM/: the wrapper of LiteRT-LM's C API (liblitert-lm), its own managed package id,
   # depending on Emgu.LiteRT.Util only.
-  SET(EMGUTF_LITERT_LM_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM")
-  SET(EMGUTF_LITERT_LM_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} LM")
+  SET(EMGU_LITERT_LM_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM")
+  SET(EMGU_LITERT_LM_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} LM")
   # Emgu.LiteRT.LM.Models/: ready-to-use language models (download + chat) on top of Emgu.LiteRT.LM.
-  SET(EMGUTF_LITERT_LM_MODELS_NUGET_ID "${EMGUTF_LITERT_LM_NUGET_ID}.Models")
-  SET(EMGUTF_LITERT_LM_MODELS_NUGET_TITLE "${EMGUTF_LITERT_LM_NUGET_TITLE} Models")
+  SET(EMGU_LITERT_LM_MODELS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Models")
+  SET(EMGU_LITERT_LM_MODELS_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} Models")
 
   SET(EMGUTF_LITERT_UTIL_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Util")
   SET(EMGUTF_LITERT_UTIL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Util")
 
   # Emgu.TF.Lite (folder, csproj, AssemblyName, nuget PackageId and C# namespace all Emgu.TF.Lite
-  # again) is the TensorFlow Lite Interpreter API wrapper; EMGUTF_LITE_TFLITE_NUGET_ID is its own
+  # again) is the TensorFlow Lite Interpreter API wrapper; EMGU_TFLITE_NUGET_ID is its own
   # managed package id - a literal, not derived from EMGU_LITERT_NUGET_ID like its siblings, since
   # the package itself isn't named Emgu.LiteRT.* - distinct from EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID
   # below (the native tfliteextern.dll runtime package for Windows, also a literal Emgu.TF.Lite.*
   # id now rather than derived from EMGU_LITERT_NUGET_ID).
-  SET(EMGUTF_LITE_TFLITE_NUGET_ID "Emgu.TF.Lite")
-  SET(EMGUTF_LITE_TFLITE_NUGET_TITLE "Emgu TF Lite")
+  SET(EMGU_TFLITE_NUGET_ID "Emgu.TF.Lite")
+  SET(EMGU_TFLITE_NUGET_TITLE "Emgu TF Lite")
 
-  # Emgu.TF.Lite.ImageIO/ (renamed from Emgu.Models/, then Emgu.LiteRT.ImageIO/) -
+  # Emgu.TF.Lite.ImageIO/ -
   # NativeImageIO/JpegData, its own managed package - a literal package id, not derived from
   # EMGU_LITERT_NUGET_ID like its siblings, since the project itself isn't named Emgu.LiteRT.*.
   # Depends on Emgu.LiteRT.Util and Emgu.TF.Lite.
-  SET(EMGUTF_LITE_IMAGEIO_NUGET_ID "${EMGUTF_LITE_TFLITE_NUGET_ID}.ImageIO")
+  SET(EMGUTF_LITE_IMAGEIO_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.ImageIO")
   SET(EMGUTF_LITE_IMAGEIO_NUGET_TITLE "Emgu TF Lite ImageIO")
 
-  # Emgu.LiteRT.Models/ was renamed to Emgu.LiteRT.Tflite.Models/ - it's built on the TFLite
   # Interpreter API (Emgu.TF.Lite), not LiteRT's own CompiledModel API.
-  SET(EMGUTF_LITE_MODEL_NUGET_ID "${EMGUTF_LITE_TFLITE_NUGET_ID}.Models")
+  SET(EMGU_TFLITE_MODELS_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.Models")
 
   SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.windows")  
   IF (HAVE_WINDESKTOP_X64_LITE_XNN)
@@ -599,10 +598,10 @@ IF(HAVE_LITE_BUILD)
   # liblitert-lm.dll (LiteRT-LM's C API runtime, built by bazel_build_litert.ps1) is packaged
   # separately from libLiteRt.dll (${EMGUTF_LITE_WINDOWS_NUGET_ID} above), with a nuget dependency
   # on it - see EMGUTF_LITERT_LM_WINDOWS_NUGET_DEPENDENCY below. Unlike EMGUTF_LITE_TFLITE_WINDOWS_
-  # NUGET_ID, this one derives from EMGUTF_LITERT_LM_NUGET_ID normally: Emgu.LiteRT.LM already fits
+  # NUGET_ID, this one derives from EMGU_LITERT_LM_NUGET_ID normally: Emgu.LiteRT.LM already fits
   # the Emgu.LiteRT.* convention (it's the managed wrapper's own name), unlike Emgu.TF.Lite.
-  SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_ID "${EMGUTF_LITERT_LM_NUGET_ID}.runtime.windows")
-  SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGUTF_LITERT_LM_NUGET_TITLE} for Windows")
+  SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.runtime.windows")
+  SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGU_LITERT_LM_NUGET_TITLE} for Windows")
 
   SET(EMGUTF_LITE_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.macos")
   SET(EMGUTF_LITE_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
@@ -622,18 +621,13 @@ IF(HAVE_LITE_BUILD)
 
   SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.android")  
   SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui Android")	
-  
-#  SET(EMGUTF_LITE_XAMARIN_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.xamarin.android")  
-#  SET(EMGUTF_LITE_XAMARIN_ANDROID_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Xamarin Android")	
 
   SET(EMGUTF_LITE_MAUI_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.ios")  
   SET(EMGUTF_LITE_MAUI_IOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui iOS")	
   
   SET(EMGUTF_LITE_MAUI_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.macos")  
   SET(EMGUTF_LITE_MAUI_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui MacOS")	
-  
-#  SET(EMGUTF_LITE_XAMARIN_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.xamarin.ios")  
-#  SET(EMGUTF_LITE_XAMARIN_IOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Xamarin iOS")	
+
 
   SET(EMGUTF_LITE_MODEL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Models")
   #MESSAGE(STATUS ">>> HAVE_WINDESKTOP_LITE: ${HAVE_WINDESKTOP_LITE}")
