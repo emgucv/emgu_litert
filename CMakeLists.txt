@@ -75,7 +75,7 @@ MESSAGE(STATUS "LITERT_LM_VERSION: ${LITERT_LM_VERSION} ")
 # liblitert-lm.dll is built directly from this submodule, not a separately-pinned dependency),
 # instead of the main CPACK_PACKAGE_VERSION (LiteRT's own version) - they wrap a different Google
 # project with its own, unrelated release numbering.
-SET(EMGUTF_LITERT_LM_PACKAGE_VERSION "${LITERT_LM_VERSION}.${EMGU_LITERT_GITVERSION}")
+SET(EMGU_LITERT_LM_PACKAGE_VERSION "${LITERT_LM_VERSION}.${EMGU_LITERT_GITVERSION}")
 
 SET(LICENSE_FILE_NAME "LICENSE")
 MACRO(CHECK_LICENSE_TYPE)
@@ -440,14 +440,14 @@ SET(CPACK_PACKAGE_DEPENDENCY_VERSION "${CPACK_PACKAGE_VERSION}")
 # versioned with the TFLite version - TensorFlow's TF_VERSION - instead of LiteRT's. Each native build records it in a
 # tflite_version.txt next to its libraries (the Bazel build scripts from the TensorFlow source Bazel built against,
 # litertextern/tfliteextern/CMakeLists.txt from the one LiteRT's CMake downloads). Without any, fall back to LiteRT's.
-FILE(GLOB EMGUTF_TFLITE_VERSION_MARKERS
+FILE(GLOB EMGU_TFLITE_VERSION_MARKERS
   "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/*/native/tflite_version.txt"
   "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/*/native/*/tflite_version.txt"
   "${CMAKE_CURRENT_SOURCE_DIR}/lib/android/*/tflite_version.txt"
   "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/tflite_version.txt")
 SET(EMGUTF_TFLITE_VERSION "")
 SET(EMGUTF_TFLITE_VERSIONS_FOUND "")
-FOREACH(EMGUTF_TFLITE_VERSION_MARKER ${EMGUTF_TFLITE_VERSION_MARKERS})
+FOREACH(EMGUTF_TFLITE_VERSION_MARKER ${EMGU_TFLITE_VERSION_MARKERS})
   # Reconfigure when a native rebuild changes the marker.
   SET_PROPERTY(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${EMGUTF_TFLITE_VERSION_MARKER}")
   FILE(STRINGS "${EMGUTF_TFLITE_VERSION_MARKER}" EMGUTF_TFLITE_MARKER_VERSION REGEX "^[0-9]+\\.[0-9]+\\.[0-9]+" LIMIT_COUNT 1)
@@ -563,7 +563,7 @@ IF(HAVE_LITE_BUILD)
   # Emgu.TF.Lite (folder, csproj, AssemblyName, nuget PackageId and C# namespace all Emgu.TF.Lite
   # again) is the TensorFlow Lite Interpreter API wrapper; EMGU_TFLITE_NUGET_ID is its own
   # managed package id - a literal, not derived from EMGU_LITERT_NUGET_ID like its siblings, since
-  # the package itself isn't named Emgu.LiteRT.* - distinct from EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID
+  # the package itself isn't named Emgu.LiteRT.* - distinct from EMGU_TFLITE_WINDOWS_NUGET_ID
   # below (the native tfliteextern.dll runtime package for Windows, also a literal Emgu.TF.Lite.*
   # id now rather than derived from EMGU_LITERT_NUGET_ID).
   SET(EMGU_TFLITE_NUGET_ID "Emgu.TF.Lite")
@@ -578,25 +578,26 @@ IF(HAVE_LITE_BUILD)
 
   # Interpreter API (Emgu.TF.Lite), not LiteRT's own CompiledModel API.
   SET(EMGU_TFLITE_MODELS_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.Models")
+  SET(EMGU_TFLITE_MODELS_NUGET_TITLE "${EMGU_TFLITE_NUGET_TITLE} Models")
 
-  SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.windows")  
+  SET(EMGU_LITERT_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.windows")  
   IF (HAVE_WINDESKTOP_X64_LITE_XNN)
-    SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGUTF_LITE_WINDOWS_NUGET_ID}.xnn")  
+    SET(EMGU_LITERT_WINDOWS_NUGET_ID "${EMGU_LITERT_WINDOWS_NUGET_ID}.xnn")  
   ENDIF()
   #IF ("${LICENSE_TYPE}" STREQUAL "Commercial")
-  #  SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGUTF_LITE_WINDOWS_NUGET_ID}-CR")  
+  #  SET(EMGU_LITERT_WINDOWS_NUGET_ID "${EMGU_LITERT_WINDOWS_NUGET_ID}-CR")  
   #ENDIF()
-  SET(EMGUTF_LITE_WINDOWS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Windows")
+  SET(EMGU_LITERT_WINDOWS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Windows")
 
   # tfliteextern.dll (the TensorFlow Lite Interpreter C API wrapper Emgu.TF.Lite/Emgu.LiteRT.Util
-  # P/Invoke) is packaged separately from libLiteRt.dll (${EMGUTF_LITE_WINDOWS_NUGET_ID} above,
+  # P/Invoke) is packaged separately from libLiteRt.dll (${EMGU_LITERT_WINDOWS_NUGET_ID} above,
   # which Emgu.LiteRT's CompiledModel API P/Invokes directly), with a nuget dependency on it -
   # see EMGUTF_LITE_TFLITE_WINDOWS_NUGET_DEPENDENCY below.
-  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID "Emgu.TF.Lite.runtime.windows")
-  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_TITLE "Native runtime (tfliteextern) of Emgu TF Lite for Windows")
+  SET(EMGU_TFLITE_WINDOWS_NUGET_ID "Emgu.TF.Lite.runtime.windows")
+  SET(EMGU_TFLITE_WINDOWS_NUGET_TITLE "Native runtime (tfliteextern) of Emgu TF Lite for Windows")
 
   # liblitert-lm.dll (LiteRT-LM's C API runtime, built by bazel_build_litert.ps1) is packaged
-  # separately from libLiteRt.dll (${EMGUTF_LITE_WINDOWS_NUGET_ID} above), with a nuget dependency
+  # separately from libLiteRt.dll (${EMGU_LITERT_WINDOWS_NUGET_ID} above), with a nuget dependency
   # on it - see EMGUTF_LITERT_LM_WINDOWS_NUGET_DEPENDENCY below. Unlike EMGUTF_LITE_TFLITE_WINDOWS_
   # NUGET_ID, this one derives from EMGU_LITERT_LM_NUGET_ID normally: Emgu.LiteRT.LM already fits
   # the Emgu.LiteRT.* convention (it's the managed wrapper's own name), unlike Emgu.TF.Lite.
@@ -629,7 +630,6 @@ IF(HAVE_LITE_BUILD)
   SET(EMGUTF_LITE_MAUI_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui MacOS")	
 
 
-  SET(EMGUTF_LITE_MODEL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Models")
   #MESSAGE(STATUS ">>> HAVE_WINDESKTOP_LITE: ${HAVE_WINDESKTOP_LITE}")
   
   IF(EMGU_SIGN_FOUND AND WIN32)
@@ -723,12 +723,12 @@ ENDIF()
 #	<file src=\"README.md\" target=\"docs\\\" />
 #    <file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
 
-  # Depends on the Tflite package (tfliteextern.dll), not ${EMGUTF_LITE_WINDOWS_NUGET_ID} directly
+  # Depends on the Tflite package (tfliteextern.dll), not ${EMGU_LITERT_WINDOWS_NUGET_ID} directly
   # (libLiteRt.dll only) - MAUI Windows needs both, and the Tflite package already depends on
-  # ${EMGUTF_LITE_WINDOWS_NUGET_ID}, so this pulls in both transitively.
+  # ${EMGU_LITERT_WINDOWS_NUGET_ID}, so this pulls in both transitively.
   SET(EMGUTF_LITE_MAUI_NUGET_DEPENDENCY "
   	<ItemGroup>
-      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID}\" Version=\"${EMGUTF_TFLITE_PACKAGE_VERSION}\">
+      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGU_TFLITE_WINDOWS_NUGET_ID}\" Version=\"${EMGUTF_TFLITE_PACKAGE_VERSION}\">
 	  </PackageReference>
     </ItemGroup>")
   # Emgu.LiteRT.LM.runtime.windows (liblitert-lm.dll) is optional - only built when
@@ -740,7 +740,7 @@ ENDIF()
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/liblitert-lm.dll")
     SET(EMGUTF_LITE_MAUI_NUGET_DEPENDENCY "${EMGUTF_LITE_MAUI_NUGET_DEPENDENCY}
   	<ItemGroup>
-      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGUTF_LITERT_LM_WINDOWS_NUGET_ID}\" Version=\"${EMGUTF_LITERT_LM_PACKAGE_VERSION}\">
+      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGUTF_LITERT_LM_WINDOWS_NUGET_ID}\" Version=\"${EMGU_LITERT_LM_PACKAGE_VERSION}\">
 	  </PackageReference>
     </ItemGroup>")
   ENDIF()
@@ -805,15 +805,15 @@ IF (HAVE_WINDESKTOP_LITE)
 ENDIF()
 
 IF( HAVE_WINDESKTOP_LITE )
-  # ${EMGUTF_LITE_WINDOWS_NUGET_ID} contains only libLiteRt.dll (LiteRT's own runtime, which
+  # ${EMGU_LITERT_WINDOWS_NUGET_ID} contains only libLiteRt.dll (LiteRT's own runtime, which
   # Emgu.LiteRT's CompiledModel API P/Invokes directly). tfliteextern.dll (the TensorFlow Lite
-  # Interpreter C API wrapper) is packaged separately, as ${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID}
+  # Interpreter C API wrapper) is packaged separately, as ${EMGU_TFLITE_WINDOWS_NUGET_ID}
   # below, depending on this package rather than bundling both DLLs together.
   IF( HAVE_WINDESKTOP_X64_LITE )
   # libLiteRt.dll only comes from the Bazel build path (bazel_build_litert.ps1); the CMake path
   # (cmake_build_litert.ps1) only ever produces tfliteextern.dll. Guard on EXISTS, the same way
   # the macOS packaging below treats libLiteRt.dylib as optional, so a CMake-only build doesn't
-  # fail to pack ${EMGUTF_LITE_WINDOWS_NUGET_ID} over a file that was never built.
+  # fail to pack ${EMGU_LITERT_WINDOWS_NUGET_ID} over a file that was never built.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/libLiteRt.dll")
   SET(EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libLiteRt.dll\" target=\"runtimes\\win-x64\\native\" />
@@ -862,7 +862,7 @@ IF( HAVE_WINDESKTOP_LITE )
 	<file src=\"README.md\" target=\"docs\\\" />")
   SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_DEPENDENCY "
     <dependencies>
-		<dependency id=\"${EMGUTF_LITE_WINDOWS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+		<dependency id=\"${EMGU_LITERT_WINDOWS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")
 
   IF(HAVE_WINDOWS_LITERT_LM)
@@ -872,7 +872,7 @@ IF( HAVE_WINDESKTOP_LITE )
 	<file src=\"README.md\" target=\"docs\\\" />")
     SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_DEPENDENCY "
       <dependencies>
-		<dependency id=\"${EMGUTF_LITE_WINDOWS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+		<dependency id=\"${EMGU_LITERT_WINDOWS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
       </dependencies>")
   ENDIF()
 ENDIF()

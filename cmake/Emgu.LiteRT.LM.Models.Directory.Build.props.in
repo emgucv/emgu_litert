@@ -8,12 +8,12 @@
  
     <PackageId>${EMGU_LITERT_LM_MODELS_NUGET_ID}</PackageId>
 	<title>${EMGU_LITERT_LM_MODELS_NUGET_TITLE}</title>
-    <version>${EMGUTF_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <version>${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
 	<summary>Ready-to-use language models for Emgu LiteRT LM.</summary>
     <Description>Ready-to-use language models for Emgu LiteRT LM: downloads the model files (e.g. Qwen3-0.6B) and provides a simple chat API on top of the LiteRT-LM (liblitert-lm) C API wrapper.</Description>
-    <PackageReleaseNotes>This is the ${EMGUTF_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM Models, built on LiteRT-LM ${LITERT_LM_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+    <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM Models, built on LiteRT-LM ${LITERT_LM_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
 http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
 	
 	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
