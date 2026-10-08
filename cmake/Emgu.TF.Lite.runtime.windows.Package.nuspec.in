@@ -3,7 +3,7 @@
   <metadata>
     <id>${EMGU_TFLITE_WINDOWS_NUGET_ID}</id>
 	<title>${EMGU_TFLITE_WINDOWS_NUGET_TITLE}</title>
-    <version>${EMGUTF_TFLITE_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <version>${EMGU_TFLITE_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
     <license type="file">${EMGU_LITERT_LICENSE_FILE}</license>
@@ -13,10 +13,10 @@
     <requireLicenseAcceptance>true</requireLicenseAcceptance>
 	<summary>Runtime package of tfliteextern (Emgu TF Lite's TensorFlow Lite C API wrapper) for Windows</summary>
     <description>This package contains tfliteextern.dll, the native TensorFlow Lite Interpreter C API wrapper used by Emgu.TF.Lite/Emgu.LiteRT.Util, for Windows. It depends on ${EMGU_LITERT_WINDOWS_NUGET_ID} (libLiteRt.dll), which Emgu.LiteRT's CompiledModel API P/Invokes directly.</description>
-    <releaseNotes>This is the ${EMGUTF_TFLITE_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu TF Lite for Windows, built on TensorFlow Lite ${EMGUTF_TFLITE_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+    <releaseNotes>This is the ${EMGU_TFLITE_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu TF Lite for Windows, built on TensorFlow Lite ${EMGU_TFLITE_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
 http://www.emgu.com/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/</releaseNotes>
     <readme>docs/README.md</readme>
-	${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_DEPENDENCY}
+	${EMGU_TFLITE_WINDOWS_NUGET_DEPENDENCY}
     <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
     <tags>tensorflow lite emgu emgutf ai</tags>
   </metadata>

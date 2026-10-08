@@ -130,7 +130,7 @@ if ($Devenv -eq $VS2026) { $CmakeConf = @("Visual Studio 18") + $BuildArch }
 
 # build EMGU TF
 $CmakeConfFlags = @()
-if ($DocFlag -eq "doc") { $CmakeConfFlags += "-DEMGU_TF_DOCUMENTATION_BUILD:BOOL=TRUE" }
+if ($DocFlag -eq "doc") { $CmakeConfFlags += "-DEMGU_LITERT_DOCUMENTATION_BUILD:BOOL=TRUE" }
 
 if (-not (Test-Path "b")) { New-Item -ItemType Directory -Path "b" | Out-Null }
 if (-not (Test-Path "package")) { New-Item -ItemType Directory -Path "package" | Out-Null }

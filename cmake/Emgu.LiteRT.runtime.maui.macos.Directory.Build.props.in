@@ -5,8 +5,8 @@
 
   <PropertyGroup>
     <TargetFramework>net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFramework>
-    <PackageId>${EMGUTF_LITE_MAUI_MACOS_NUGET_ID}</PackageId>
-	<title>${EMGUTF_LITE_MAUI_MACOS_NUGET_TITLE}</title>
+    <PackageId>${EMGU_LITERT_MAUI_MACOS_NUGET_ID}</PackageId>
+	<title>${EMGU_LITERT_MAUI_MACOS_NUGET_TITLE}</title>
     <version>${CPACK_PACKAGE_VERSION}</version>
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>

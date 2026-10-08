@@ -70,7 +70,7 @@ MESSAGE(STATUS "LITERT_LM_VERSION: ${LITERT_LM_VERSION} ")
 # Emgu.LiteRT.LM and Emgu.LiteRT.LM.runtime.windows (the C# wrapper and its native Windows runtime
 # package - see EMGU_LITERT_LM_NUGET_ID/EMGU_LITERT_LM_WINDOWS_NUGET_ID below) are versioned
 # with LiteRT-LM's own version (read directly from the LiteRT-LM/ submodule's version.bzl, the same
-# way the overall CPACK_PACKAGE_VERSION is read from litert/version.bzl - unlike EMGUTF_TFLITE_
+# way the overall CPACK_PACKAGE_VERSION is read from litert/version.bzl - unlike EMGU_TFLITE_
 # PACKAGE_VERSION, there's no separate Bazel-fetched-vs-submodule ambiguity to resolve here, since
 # liblitert-lm.dll is built directly from this submodule, not a separately-pinned dependency),
 # instead of the main CPACK_PACKAGE_VERSION (LiteRT's own version) - they wrap a different Google
@@ -445,31 +445,31 @@ FILE(GLOB EMGU_TFLITE_VERSION_MARKERS
   "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/*/native/*/tflite_version.txt"
   "${CMAKE_CURRENT_SOURCE_DIR}/lib/android/*/tflite_version.txt"
   "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/tflite_version.txt")
-SET(EMGUTF_TFLITE_VERSION "")
-SET(EMGUTF_TFLITE_VERSIONS_FOUND "")
-FOREACH(EMGUTF_TFLITE_VERSION_MARKER ${EMGU_TFLITE_VERSION_MARKERS})
+SET(EMGU_TFLITE_VERSION "")
+SET(EMGU_TFLITE_VERSIONS_FOUND "")
+FOREACH(EMGU_TFLITE_VERSION_MARKER ${EMGU_TFLITE_VERSION_MARKERS})
   # Reconfigure when a native rebuild changes the marker.
-  SET_PROPERTY(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${EMGUTF_TFLITE_VERSION_MARKER}")
-  FILE(STRINGS "${EMGUTF_TFLITE_VERSION_MARKER}" EMGUTF_TFLITE_MARKER_VERSION REGEX "^[0-9]+\\.[0-9]+\\.[0-9]+" LIMIT_COUNT 1)
-  STRING(STRIP "${EMGUTF_TFLITE_MARKER_VERSION}" EMGUTF_TFLITE_MARKER_VERSION)
-  IF(EMGUTF_TFLITE_MARKER_VERSION)
-    LIST(APPEND EMGUTF_TFLITE_VERSIONS_FOUND "${EMGUTF_TFLITE_MARKER_VERSION}")
-    IF(EMGUTF_TFLITE_VERSION STREQUAL "" OR EMGUTF_TFLITE_MARKER_VERSION VERSION_GREATER EMGUTF_TFLITE_VERSION)
-      SET(EMGUTF_TFLITE_VERSION "${EMGUTF_TFLITE_MARKER_VERSION}")
+  SET_PROPERTY(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${EMGU_TFLITE_VERSION_MARKER}")
+  FILE(STRINGS "${EMGU_TFLITE_VERSION_MARKER}" EMGU_TFLITE_MARKER_VERSION REGEX "^[0-9]+\\.[0-9]+\\.[0-9]+" LIMIT_COUNT 1)
+  STRING(STRIP "${EMGU_TFLITE_MARKER_VERSION}" EMGU_TFLITE_MARKER_VERSION)
+  IF(EMGU_TFLITE_MARKER_VERSION)
+    LIST(APPEND EMGU_TFLITE_VERSIONS_FOUND "${EMGU_TFLITE_MARKER_VERSION}")
+    IF(EMGU_TFLITE_VERSION STREQUAL "" OR EMGU_TFLITE_MARKER_VERSION VERSION_GREATER EMGU_TFLITE_VERSION)
+      SET(EMGU_TFLITE_VERSION "${EMGU_TFLITE_MARKER_VERSION}")
     ENDIF()
   ENDIF()
 ENDFOREACH()
-LIST(REMOVE_DUPLICATES EMGUTF_TFLITE_VERSIONS_FOUND)
-LIST(LENGTH EMGUTF_TFLITE_VERSIONS_FOUND EMGUTF_TFLITE_VERSION_COUNT)
-IF(EMGUTF_TFLITE_VERSION_COUNT GREATER 1)
-  MESSAGE(WARNING "The native builds in lib/ report different TFLite versions (${EMGUTF_TFLITE_VERSIONS_FOUND}; see their tflite_version.txt), using ${EMGUTF_TFLITE_VERSION} for the TFLite-versioned packages (Emgu.TF.Lite, Emgu.LiteRT.Tflite.Models, Emgu.TF.Lite.runtime.windows)")
+LIST(REMOVE_DUPLICATES EMGU_TFLITE_VERSIONS_FOUND)
+LIST(LENGTH EMGU_TFLITE_VERSIONS_FOUND EMGU_TFLITE_VERSION_COUNT)
+IF(EMGU_TFLITE_VERSION_COUNT GREATER 1)
+  MESSAGE(WARNING "The native builds in lib/ report different TFLite versions (${EMGU_TFLITE_VERSIONS_FOUND}; see their tflite_version.txt), using ${EMGU_TFLITE_VERSION} for the TFLite-versioned packages (Emgu.TF.Lite, Emgu.LiteRT.Tflite.Models, Emgu.TF.Lite.runtime.windows)")
 ENDIF()
-IF(EMGUTF_TFLITE_VERSION STREQUAL "")
-  SET(EMGUTF_TFLITE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
+IF(EMGU_TFLITE_VERSION STREQUAL "")
+  SET(EMGU_TFLITE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
   MESSAGE(STATUS "No tflite_version.txt found in lib/; the TFLite-versioned packages use the LiteRT version")
 ENDIF()
-SET(EMGUTF_TFLITE_PACKAGE_VERSION "${EMGUTF_TFLITE_VERSION}.${EMGU_LITERT_GITVERSION}")
-MESSAGE(STATUS "Emgu.TF.Lite* package version (TFLite ${EMGUTF_TFLITE_VERSION}): ${EMGUTF_TFLITE_PACKAGE_VERSION}")
+SET(EMGU_TFLITE_PACKAGE_VERSION "${EMGU_TFLITE_VERSION}.${EMGU_LITERT_GITVERSION}")
+MESSAGE(STATUS "Emgu.TF.Lite* package version (TFLite ${EMGU_TFLITE_VERSION}): ${EMGU_TFLITE_PACKAGE_VERSION}")
 
 SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/${LICENSE_FILE_NAME}")
 
@@ -483,9 +483,6 @@ ENDIF()
 SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_PATH}" )
 SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
-
-SET(EMGU_TF_BUILD ON CACHE BOOL "BUILD Emgu TF")
-SET(EMGU_TF_EXAMPLE_BUILD ON CACHE BOOL "Build Emgu TF Example")
 
 # ----------------------------------------------------------------------------
 #  Generate required common assembly file for Emgu TF project
@@ -519,21 +516,21 @@ SET(EMGU_WINDOWS_MSVCRT_X64_NUGET_ID "Emgu.runtime.windows.msvc.rt.x64")
 #ENDIF()
 
 
-SET(EMGUTF_MAUI_DOTNET_VERSION "net${DOTNET_VERSION_MAJOR}.0")
+SET(EMGU_LITERT_MAUI_DOTNET_VERSION "net${DOTNET_VERSION_MAJOR}.0")
 if ("${DOTNET_VERSION_MAJOR}" STREQUAL "10")
 	SET(MAUI_VERSION_MSBUILD "<MauiVersion>10.0.11</MauiVersion>")
     #message(STATUS "Using .NET 10")
 endif()
 
-SET(EMGUTF_MAUI_ANDROID_SRC_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-android")
-SET(EMGUTF_MAUI_IOS_SRC_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-ios")
-#SET(EMGUTF_MAUI_MACOS_SRC_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-maccatalyst")
-SET(EMGUTF_MAUI_WINDOWS_SRC_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19041.0")
+SET(EMGU_LITERT_MAUI_ANDROID_SRC_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-android")
+SET(EMGU_LITERT_MAUI_IOS_SRC_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-ios")
+#SET(EMGU_LITERT_MAUI_MACOS_SRC_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-maccatalyst")
+SET(EMGU_LITERT_MAUI_WINDOWS_SRC_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-windows10.0.19041.0")
 
-SET(EMGUTF_MAUI_ANDROID_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-android34.0")
-SET(EMGUTF_MAUI_IOS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-ios17.2")
-#SET(EMGUTF_MAUI_MACOS_DST_FOLDER "${EMGUCV_MAUI_DOTNET_VERSION}-maccatalyst16.1")
-SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19041.0")
+SET(EMGU_LITERT_MAUI_ANDROID_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-android34.0")
+SET(EMGU_LITERT_MAUI_IOS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-ios17.2")
+#SET(EMGU_LITERT_MAUI_MACOS_DST_FOLDER "${EMGUCV_MAUI_DOTNET_VERSION}-maccatalyst16.1")
+SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-windows10.0.19041.0")
 
 
 
@@ -571,8 +568,8 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
   # NativeImageIO/JpegData, its own managed package - a literal package id, not derived from
   # EMGU_LITERT_NUGET_ID like its siblings, since the project itself isn't named Emgu.LiteRT.*.
   # Depends on Emgu.LiteRT.Util and Emgu.TF.Lite.
-  SET(EMGUTF_LITE_IMAGEIO_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.ImageIO")
-  SET(EMGUTF_LITE_IMAGEIO_NUGET_TITLE "${EMGU_TFLITE_NUGET_TITLE} ImageIO")
+  SET(EMGU_TFLITE_IMAGEIO_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.ImageIO")
+  SET(EMGU_TFLITE_IMAGEIO_NUGET_TITLE "${EMGU_TFLITE_NUGET_TITLE} ImageIO")
 
   # Interpreter API (Emgu.TF.Lite), not LiteRT's own CompiledModel API.
   SET(EMGU_TFLITE_MODELS_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.Models")
@@ -590,7 +587,7 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
   # tfliteextern.dll (the TensorFlow Lite Interpreter C API wrapper Emgu.TF.Lite/Emgu.LiteRT.Util
   # P/Invoke) is packaged separately from libLiteRt.dll (${EMGU_LITERT_WINDOWS_NUGET_ID} above,
   # which Emgu.LiteRT's CompiledModel API P/Invokes directly), with a nuget dependency on it -
-  # see EMGUTF_LITE_TFLITE_WINDOWS_NUGET_DEPENDENCY below.
+  # see EMGU_TFLITE_WINDOWS_NUGET_DEPENDENCY below.
   SET(EMGU_TFLITE_WINDOWS_NUGET_ID "Emgu.TF.Lite.runtime.windows")
   SET(EMGU_TFLITE_WINDOWS_NUGET_TITLE "Native runtime (tfliteextern) of Emgu TF Lite for Windows")
 
@@ -615,14 +612,14 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
 
-  SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.android")  
-  SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui Android")	
+  SET(EMGU_LITERT_MAUI_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.android")  
+  SET(EMGU_LITERT_MAUI_ANDROID_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui Android")	
 
-  SET(EMGUTF_LITE_MAUI_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.ios")  
-  SET(EMGUTF_LITE_MAUI_IOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui iOS")	
+  SET(EMGU_LITERT_MAUI_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.ios")  
+  SET(EMGU_LITERT_MAUI_IOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui iOS")	
   
-  SET(EMGUTF_LITE_MAUI_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.macos")  
-  SET(EMGUTF_LITE_MAUI_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui MacOS")	
+  SET(EMGU_LITERT_MAUI_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.macos")  
+  SET(EMGU_LITERT_MAUI_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui MacOS")	
   
   
   #IF (HAVE_ANDROID_LITE)
@@ -662,17 +659,15 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
   ENDIF()
   MESSAGE(STATUS "HAVE_MAUI_LITE: ${HAVE_MAUI_LITE}")
 
-
-
-  SET(EMGUTF_LITE_MAUI_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui${EMGUTF_LITE_RUNTIME_EXTRA_TAG}")
-  SET(EMGUTF_LITE_MAUI_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} for MAUI Native Runtime")
+  SET(EMGU_LITERT_MAUI_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui${EMGUTF_LITE_RUNTIME_EXTRA_TAG}")
+  SET(EMGU_LITERT_MAUI_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} for MAUI Native Runtime")
   
   # Depends on the Tflite package (tfliteextern.dll), not ${EMGU_LITERT_WINDOWS_NUGET_ID} directly
   # (libLiteRt.dll only) - MAUI Windows needs both, and the Tflite package already depends on
   # ${EMGU_LITERT_WINDOWS_NUGET_ID}, so this pulls in both transitively.
-  SET(EMGUTF_LITE_MAUI_NUGET_DEPENDENCY "
+  SET(EMGU_LITERT_MAUI_NUGET_DEPENDENCY "
   	<ItemGroup>
-      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGU_TFLITE_WINDOWS_NUGET_ID}\" Version=\"${EMGUTF_TFLITE_PACKAGE_VERSION}\">
+      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGU_TFLITE_WINDOWS_NUGET_ID}\" Version=\"${EMGU_TFLITE_PACKAGE_VERSION}\">
 	  </PackageReference>
     </ItemGroup>")
   # Emgu.LiteRT.LM.runtime.windows (liblitert-lm.dll) is optional - only built when
@@ -682,7 +677,7 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
   # MAUI build on a machine that never built liblitert-lm.dll would fail trying to restore a package
   # version that was never packed.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/liblitert-lm.dll")
-    SET(EMGUTF_LITE_MAUI_NUGET_DEPENDENCY "${EMGUTF_LITE_MAUI_NUGET_DEPENDENCY}
+    SET(EMGU_LITERT_MAUI_NUGET_DEPENDENCY "${EMGU_LITERT_MAUI_NUGET_DEPENDENCY}
   	<ItemGroup>
       <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGU_LITERT_LM_WINDOWS_NUGET_ID}\" Version=\"${EMGU_LITERT_LM_PACKAGE_VERSION}\">
 	  </PackageReference>
@@ -736,12 +731,12 @@ IF (HAVE_WINDESKTOP_LITE)
 	  ENDIF()
 	  MESSAGE(STATUS "MSVCRT NUGET VERSION: ${EMGU_WINDOWS_MSVCRT_NUGET_VERSION}")
 	  IF (HAVE_WINDESKTOP_X86_LITE)
-	    SET(EMGUTF_LITE_WINDOWS_NUGET_DEPENDENCY "${EMGUTF_LITE_WINDOWS_NUGET_DEPENDENCY}
+	    SET(EMGU_LITERT_WINDOWS_NUGET_DEPENDENCY "${EMGU_LITERT_WINDOWS_NUGET_DEPENDENCY}
 	  <dependency id=\"${EMGU_WINDOWS_MSVCRT_X86_NUGET_ID}\" version=\"${EMGU_WINDOWS_MSVCRT_VERSION}\" />
 	  ")
 	  ENDIF()
 	  IF (HAVE_WINDESKTOP_X64_LITE)
-	    SET(EMGUTF_LITE_WINDOWS_NUGET_DEPENDENCY "${EMGUTF_LITE_WINDOWS_NUGET_DEPENDENCY}
+	    SET(EMGU_LITERT_WINDOWS_NUGET_DEPENDENCY "${EMGU_LITERT_WINDOWS_NUGET_DEPENDENCY}
 	  <dependency id=\"${EMGU_WINDOWS_MSVCRT_X64_NUGET_ID}\" version=\"${EMGU_WINDOWS_MSVCRT_VERSION}\" />
 	  ")
 	  ENDIF()
@@ -792,9 +787,9 @@ IF (HAVE_WINDESKTOP_LITE)
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"README.md\" target=\"docs\\\" />")
-  SET(EMGUTF_LITE_WINDOWS_NUGET_DEPENDENCY "
+  SET(EMGU_LITERT_WINDOWS_NUGET_DEPENDENCY "
     <dependencies>
-	    ${EMGUTF_LITE_WINDOWS_NUGET_DEPENDENCY}
+	    ${EMGU_LITERT_WINDOWS_NUGET_DEPENDENCY}
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")
 
@@ -802,7 +797,7 @@ IF (HAVE_WINDESKTOP_LITE)
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"README.md\" target=\"docs\\\" />")
-  SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_DEPENDENCY "
+  SET(EMGU_TFLITE_WINDOWS_NUGET_DEPENDENCY "
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_WINDOWS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")
@@ -896,18 +891,18 @@ IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
     </dependencies>")	
 	
   IF(HAVE_LINUX_ARM_LITE)
-    SET(EMGUTF_LITE_DEBIAN_ARM_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.debian-arm")
-    SET(EMGUTF_LITE_DEBIAN_ARM_NUGET_TITLE "Native ARM runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")
-    SET(EMGUTF_LITE_DEBIAN_ARM_NUGET_FILE_LIST "${EMGUTF_LITE_DEBIAN_ARM_NUGET_FILE_LIST} 
+    SET(EMGU_LITERT_DEBIAN_ARM_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.debian-arm")
+    SET(EMGU_LITERT_DEBIAN_ARM_NUGET_TITLE "Native ARM runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")
+    SET(EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST "${EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\\*.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\" />
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
   ENDIF()
 
   IF(HAVE_LINUX_ARM64_LITE)
-    SET(EMGUTF_LITE_DEBIAN_ARM64_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.debian-arm64")
-    SET(EMGUTF_LITE_DEBIAN_ARM64_NUGET_TITLE "Native ARM64 runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")  
-    SET(EMGUTF_LITE_DEBIAN_ARM64_NUGET_FILE_LIST "${EMGUTF_LITE_DEBIAN_ARM64_NUGET_FILE_LIST} 
+    SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.debian-arm64")
+    SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_TITLE "Native ARM64 runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")  
+    SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST "${EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\*.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\" />
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
@@ -915,11 +910,11 @@ IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
 ENDIF()
 
   #Sign Binary
-  SET(EMGUTF_POST_PROCESS_BINARY "")
+  SET(EMGU_LITERT_POST_PROCESS_BINARY "")
   IF(EMGU_SIGN_FOUND AND WIN32)
     file(TO_NATIVE_PATH ${EMGU_SIGN_EXECUTABLE} EMGU_SIGN_EXECUTABLE_NATIVE_PATH)
     file(TO_NATIVE_PATH ${SIGNTOOL_EXECUTABLE} SIGNTOOL_EXECUTABLE_NATIVE_PATH)
-	  SET(EMGUTF_POST_PROCESS_BINARY "${EMGUTF_POST_PROCESS_BINARY}
+	  SET(EMGU_LITERT_POST_PROCESS_BINARY "${EMGU_LITERT_POST_PROCESS_BINARY}
 	<Target Name=\"PostProcessBinary\" AfterTargets=\"PostBuildEvent\" Condition=\"Exists('${EMGU_SIGN_EXECUTABLE_NATIVE_PATH}')\">
     <Message Text=\"Signing $(OutputPath)$(AssemblyName).dll\" Importance=\"high\" />
 	<MakeDir Directories=\"$(OutputPath)\\signed\"/>
@@ -1155,7 +1150,7 @@ ENDIF()
 
 INSTALL(
   FILES
-  "${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.snk"
+  "${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.snk"
   "${CMAKE_CURRENT_SOURCE_DIR}/CommonAssemblyInfo.cs"
   "${CMAKE_CURRENT_SOURCE_DIR}/Directory.Build.props"
   "${CMAKE_CURRENT_SOURCE_DIR}/${LICENSE_FILE_NAME}" #LICENSE
@@ -1218,8 +1213,8 @@ IF (WIN32)
   # ----------------------------------------------------------------------------
   #  Build the documents of Emgu TF
   # ----------------------------------------------------------------------------
-  SET(EMGU_TF_DOCUMENTATION_BUILD OFF CACHE BOOL "Build Emgu TF Documentation")
-  IF(EMGU_TF_DOCUMENTATION_BUILD)
+  SET(EMGU_LITERT_DOCUMENTATION_BUILD OFF CACHE BOOL "Build Emgu TF Documentation")
+  IF(EMGU_LITERT_DOCUMENTATION_BUILD)
     ADD_SUBDIRECTORY(miscellaneous)
   ENDIF()
   
@@ -1239,7 +1234,7 @@ IF (WIN32)
   # ----------------------------------------------------------------------------
   
   
-  IF(EMGU_TF_DOCUMENTATION_BUILD)
+  IF(EMGU_LITERT_DOCUMENTATION_BUILD)
     #SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}\nCreateDirectory \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Documentation\\\" ")
     
     LIST(APPEND CPACK_COMPONENTS_ALL emgulitert_document)
