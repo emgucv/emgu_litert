@@ -1087,16 +1087,6 @@ IF(HAVE_ANDROID_LITE)
     PATTERN ".git" EXCLUDE
     PATTERN "bin" EXCLUDE
     )
-#  INSTALL(
-#    DIRECTORY
-#    ${CMAKE_CURRENT_SOURCE_DIR}/Solution/Android
-#    DESTINATION Solution
-#    COMPONENT emgulitert_example_source
-#    FILES_MATCHING 
-#	PATTERN "Emgu.TF.Lite.Android.sln"
-#    PATTERN ".git" EXCLUDE
-#    PATTERN "bin" EXCLUDE
-#    )
 ENDIF()
 
 IF(HAVE_IOS_LITE)
@@ -1213,7 +1203,7 @@ IF (WIN32)
   # ----------------------------------------------------------------------------
   #  Build the documents of Emgu TF
   # ----------------------------------------------------------------------------
-  SET(EMGU_LITERT_DOCUMENTATION_BUILD OFF CACHE BOOL "Build Emgu TF Documentation")
+  SET(EMGU_LITERT_DOCUMENTATION_BUILD OFF CACHE BOOL "Build Emgu LiteRT Documentation")
   IF(EMGU_LITERT_DOCUMENTATION_BUILD)
     ADD_SUBDIRECTORY(miscellaneous)
   ENDIF()
@@ -1238,7 +1228,7 @@ IF (WIN32)
     #SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}\nCreateDirectory \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Documentation\\\" ")
     
     LIST(APPEND CPACK_COMPONENTS_ALL emgulitert_document)
-    set(CPACK_COMPONENT_EMGULITERT_DOCUMENT_DISPLAY_NAME "Emgu TF Documentation")
+    set(CPACK_COMPONENT_EMGULITERT_DOCUMENT_DISPLAY_NAME "Emgu LiteRT Documentation")
     set(CPACK_COMPONENT_EMGULITERT_DOCUMENT_DEPENDS emgulitert_binary)
     #IF (HAVE_WINDESKTOP)
     #  SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}\nCreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Documentation\\\\Emgu TF Documentation.lnk\\\"  \\\"$INSTDIR\\\\Emgu.TF.Documentation.chm\\\" ")	
@@ -1295,12 +1285,12 @@ IF (WIN32)
   
   set(CPACK_COMPONENT_MAIN_DISPLAY_NAME "Tensorflow Native Binary")
   set(CPACK_COMPONENT_MAIN_REQUIRED ON)
-  set(CPACK_COMPONENT_EMGULITERT_BINARY_DISPLAY_NAME "Emgu TF (Binary)")
+  set(CPACK_COMPONENT_EMGULITERT_BINARY_DISPLAY_NAME "Emgu LiteRT (Binary)")
   set(CPACK_COMPONENT_EMGULITERT_BINARY_REQUIRED ON)
   #set(CPACK_COMPONENT_EMGULITERT_BINARY_DEPENDS libs)
-  set(CPACK_COMPONENT_EMGULITERT_SOURCE_DISPLAY_NAME "Emgu TF (Source)")
+  set(CPACK_COMPONENT_EMGULITERT_SOURCE_DISPLAY_NAME "Emgu LiteRT (Source)")
   set(CPACK_COMPONENT_EMGULITERT_SOURCE_DEPENDS emgulitert_binary)
-  set(CPACK_COMPONENT_EMGULITERT_EXAMPLE_SOURCE_DISPLAY_NAME "Emgu TF Examples (Source)")
+  set(CPACK_COMPONENT_EMGULITERT_EXAMPLE_SOURCE_DISPLAY_NAME "Emgu LiteRT Examples (Source)")
   set(CPACK_COMPONENT_EMGULITERT_EXAMPLE_SOURCE_DEPENDS emgulitert_source)
   
   IF (${CMAKE_VERSION} VERSION_GREATER "3.19.0")
