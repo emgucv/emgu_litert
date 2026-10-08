@@ -12,5 +12,5 @@ Release note can be found at
 
 ## Note
 
-To deploy Emgu LiteRT LM to a specific platform, you will also need to add one of the ${EMGUTF_LITE_NUGET_ID}.runtime.{platform} nuget packages to your executable project. Currently `liblitert-lm` (with `libLiteRt` and LiteRT-LM's `libGemmaModelConstraintProvider`) is included in ${EMGUTF_LITE_NUGET_ID}.runtime.macos (Apple Silicon only) and ${EMGUTF_LITE_NUGET_ID}.runtime.maui.android (arm64-v8a and x86_64). Use the following link to search for the ${EMGUTF_LITE_NUGET_ID}.runtime nuget packages:
-<https://www.nuget.org/packages?q=${EMGUTF_LITE_NUGET_ID}.runtime>
+To deploy Emgu LiteRT LM to a specific platform, you will also need to add one of the ${EMGU_LITERT_NUGET_ID}.runtime.{platform} nuget packages to your executable project. Currently `liblitert-lm` (with `libLiteRt` and LiteRT-LM's `libGemmaModelConstraintProvider`) is included in ${EMGU_LITERT_NUGET_ID}.runtime.macos (Apple Silicon only) and ${EMGU_LITERT_NUGET_ID}.runtime.maui.android (arm64-v8a and x86_64). Use the following link to search for the ${EMGU_LITERT_NUGET_ID}.runtime nuget packages:
+<https://www.nuget.org/packages?q=${EMGU_LITERT_NUGET_ID}.runtime>

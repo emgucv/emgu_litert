@@ -24,5 +24,5 @@ Release note can be found at
 
 ## Note
 
-To deploy to a specific platform, you will also need to add one of the ${EMGUTF_LITE_NUGET_ID}.runtime.{platform} nuget packages that include `liblitert-lm` to your executable project: currently ${EMGUTF_LITE_NUGET_ID}.runtime.macos (Apple Silicon only) and ${EMGUTF_LITE_NUGET_ID}.runtime.maui.android (arm64-v8a and x86_64).
-<https://www.nuget.org/packages?q=${EMGUTF_LITE_NUGET_ID}.runtime>
+To deploy to a specific platform, you will also need to add one of the ${EMGU_LITERT_NUGET_ID}.runtime.{platform} nuget packages that include `liblitert-lm` to your executable project: currently ${EMGU_LITERT_NUGET_ID}.runtime.macos (Apple Silicon only) and ${EMGU_LITERT_NUGET_ID}.runtime.maui.android (arm64-v8a and x86_64).
+<https://www.nuget.org/packages?q=${EMGU_LITERT_NUGET_ID}.runtime>

@@ -540,57 +540,54 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
 
 IF(HAVE_LITE_BUILD)
   # Emgu.LiteRT.Util, Emgu.TF.Lite and Emgu.LiteRT each produce their own nuget package
-  # (EMGUTF_LITE_NUGET_ID is still the root every other package id derives from, for Models and
+  # (EMGU_LITERT_NUGET_ID is still the root every other package id derives from, for Models and
   # the native runtime.* packages). Emgu.TF.Lite depends on Emgu.LiteRT.Util (its
   # UnmanagedObject-derived types need it to compile); Emgu.LiteRT also depends on
   # Emgu.LiteRT.Util for the same reason, but has no code dependency on Emgu.TF.Lite -
   # the two were only ever bundled together for packaging convenience, not because one needs
   # the other.
-  SET(EMGUTF_LITE_NUGET_ID "Emgu.LiteRT")
-  SET(EMGUTF_LITE_NUGET_TITLE "Emgu LiteRT")
-
-  SET(EMGUTF_LITERT_NUGET_ID "${EMGUTF_LITE_NUGET_ID}")
-  SET(EMGUTF_LITERT_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE}")
+  SET(EMGU_LITERT_NUGET_ID "Emgu.LiteRT")
+  SET(EMGU_LITERT_NUGET_TITLE "Emgu LiteRT")
 
   # Emgu.LiteRT.LM/: the wrapper of LiteRT-LM's C API (liblitert-lm), its own managed package id,
   # depending on Emgu.LiteRT.Util only.
-  SET(EMGUTF_LITERT_LM_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.LM")
-  SET(EMGUTF_LITERT_LM_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} LM")
+  SET(EMGUTF_LITERT_LM_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM")
+  SET(EMGUTF_LITERT_LM_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} LM")
   # Emgu.LiteRT.LM.Models/: ready-to-use language models (download + chat) on top of Emgu.LiteRT.LM.
   SET(EMGUTF_LITERT_LM_MODELS_NUGET_ID "${EMGUTF_LITERT_LM_NUGET_ID}.Models")
   SET(EMGUTF_LITERT_LM_MODELS_NUGET_TITLE "${EMGUTF_LITERT_LM_NUGET_TITLE} Models")
 
-  SET(EMGUTF_LITERT_UTIL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Util")
-  SET(EMGUTF_LITERT_UTIL_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} Util")
+  SET(EMGUTF_LITERT_UTIL_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Util")
+  SET(EMGUTF_LITERT_UTIL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Util")
 
   # Emgu.TF.Lite (folder, csproj, AssemblyName, nuget PackageId and C# namespace all Emgu.TF.Lite
   # again) is the TensorFlow Lite Interpreter API wrapper; EMGUTF_LITE_TFLITE_NUGET_ID is its own
-  # managed package id - a literal, not derived from EMGUTF_LITE_NUGET_ID like its siblings, since
+  # managed package id - a literal, not derived from EMGU_LITERT_NUGET_ID like its siblings, since
   # the package itself isn't named Emgu.LiteRT.* - distinct from EMGUTF_LITE_TFLITE_WINDOWS_NUGET_ID
   # below (the native tfliteextern.dll runtime package for Windows, also a literal Emgu.TF.Lite.*
-  # id now rather than derived from EMGUTF_LITE_NUGET_ID).
+  # id now rather than derived from EMGU_LITERT_NUGET_ID).
   SET(EMGUTF_LITE_TFLITE_NUGET_ID "Emgu.TF.Lite")
   SET(EMGUTF_LITE_TFLITE_NUGET_TITLE "Emgu TF Lite")
 
   # Emgu.TF.Lite.ImageIO/ (renamed from Emgu.Models/, then Emgu.LiteRT.ImageIO/) -
   # NativeImageIO/JpegData, its own managed package - a literal package id, not derived from
-  # EMGUTF_LITE_NUGET_ID like its siblings, since the project itself isn't named Emgu.LiteRT.*.
+  # EMGU_LITERT_NUGET_ID like its siblings, since the project itself isn't named Emgu.LiteRT.*.
   # Depends on Emgu.LiteRT.Util and Emgu.TF.Lite.
-  SET(EMGUTF_LITE_IMAGEIO_NUGET_ID "Emgu.TF.Lite.ImageIO")
+  SET(EMGUTF_LITE_IMAGEIO_NUGET_ID "${EMGUTF_LITE_TFLITE_NUGET_ID}.ImageIO")
   SET(EMGUTF_LITE_IMAGEIO_NUGET_TITLE "Emgu TF Lite ImageIO")
 
   # Emgu.LiteRT.Models/ was renamed to Emgu.LiteRT.Tflite.Models/ - it's built on the TFLite
   # Interpreter API (Emgu.TF.Lite), not LiteRT's own CompiledModel API.
-  SET(EMGUTF_LITE_MODEL_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Tflite.Models")
+  SET(EMGUTF_LITE_MODEL_NUGET_ID "${EMGUTF_LITE_TFLITE_NUGET_ID}.Models")
 
-  SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.windows")  
+  SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.windows")  
   IF (HAVE_WINDESKTOP_X64_LITE_XNN)
     SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGUTF_LITE_WINDOWS_NUGET_ID}.xnn")  
   ENDIF()
   #IF ("${LICENSE_TYPE}" STREQUAL "Commercial")
   #  SET(EMGUTF_LITE_WINDOWS_NUGET_ID "${EMGUTF_LITE_WINDOWS_NUGET_ID}-CR")  
   #ENDIF()
-  SET(EMGUTF_LITE_WINDOWS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Windows")
+  SET(EMGUTF_LITE_WINDOWS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Windows")
 
   # tfliteextern.dll (the TensorFlow Lite Interpreter C API wrapper Emgu.TF.Lite/Emgu.LiteRT.Util
   # P/Invoke) is packaged separately from libLiteRt.dll (${EMGUTF_LITE_WINDOWS_NUGET_ID} above,
@@ -607,38 +604,38 @@ IF(HAVE_LITE_BUILD)
   SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_ID "${EMGUTF_LITERT_LM_NUGET_ID}.runtime.windows")
   SET(EMGUTF_LITERT_LM_WINDOWS_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGUTF_LITERT_LM_NUGET_TITLE} for Windows")
 
-  SET(EMGUTF_LITE_MACOS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.macos")
-  SET(EMGUTF_LITE_MACOS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
+  SET(EMGUTF_LITE_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.macos")
+  SET(EMGUTF_LITE_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
   
-  SET(EMGUTF_LITE_UBUNTU_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}") 
+  SET(EMGUTF_LITE_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}") 
   #IF ("${LICENSE_TYPE}" STREQUAL "Commercial")
   #  SET(EMGUTF_LITE_UBUNTU_NUGET_ID "${EMGUTF_LITE_UBUNTU_NUGET_ID}-CR")  
   #ENDIF()  
-  SET(EMGUTF_LITE_UBUNTU_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Ubuntu")
+  SET(EMGUTF_LITE_UBUNTU_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
 
   # liblitert-lm.so (LiteRT-LM's own C API, P/Invoked directly by Emgu.LiteRT.LM) and the prebuilt
   # libGemmaModelConstraintProvider.so it depends on are packaged separately from
   # ${EMGUTF_LITE_UBUNTU_NUGET_ID} above (libLiteRt.so/libtfliteextern.so), with a nuget dependency on
   # it - see EMGUTF_LITE_LM_UBUNTU_NUGET_DEPENDENCY below.
-  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.LM.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
-  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGUTF_LITE_NUGET_TITLE} for Ubuntu")
+  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
+  SET(EMGUTF_LITE_LM_UBUNTU_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
 
-  SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.maui.android")  
-  SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Maui Android")	
+  SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.android")  
+  SET(EMGUTF_LITE_MAUI_ANDROID_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui Android")	
   
-#  SET(EMGUTF_LITE_XAMARIN_ANDROID_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.xamarin.android")  
-#  SET(EMGUTF_LITE_XAMARIN_ANDROID_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Xamarin Android")	
+#  SET(EMGUTF_LITE_XAMARIN_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.xamarin.android")  
+#  SET(EMGUTF_LITE_XAMARIN_ANDROID_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Xamarin Android")	
 
-  SET(EMGUTF_LITE_MAUI_IOS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.maui.ios")  
-  SET(EMGUTF_LITE_MAUI_IOS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Maui iOS")	
+  SET(EMGUTF_LITE_MAUI_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.ios")  
+  SET(EMGUTF_LITE_MAUI_IOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui iOS")	
   
-  SET(EMGUTF_LITE_MAUI_MACOS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.maui.macos")  
-  SET(EMGUTF_LITE_MAUI_MACOS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Maui MacOS")	
+  SET(EMGUTF_LITE_MAUI_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.macos")  
+  SET(EMGUTF_LITE_MAUI_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui MacOS")	
   
-#  SET(EMGUTF_LITE_XAMARIN_IOS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.xamarin.ios")  
-#  SET(EMGUTF_LITE_XAMARIN_IOS_NUGET_TITLE "Native runtime of ${EMGUTF_LITE_NUGET_TITLE} for Xamarin iOS")	
+#  SET(EMGUTF_LITE_XAMARIN_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.xamarin.ios")  
+#  SET(EMGUTF_LITE_XAMARIN_IOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Xamarin iOS")	
 
-  SET(EMGUTF_LITE_MODEL_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} Models")
+  SET(EMGUTF_LITE_MODEL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Models")
   #MESSAGE(STATUS ">>> HAVE_WINDESKTOP_LITE: ${HAVE_WINDESKTOP_LITE}")
   
   IF(EMGU_SIGN_FOUND AND WIN32)
@@ -713,9 +710,9 @@ IF(HAVE_LITE_BUILD)
 ENDIF()
 
 #IF(HAVE_MAUI_LITE)
-  SET(EMGUTF_LITE_MAUI_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.maui${EMGUTF_LITE_RUNTIME_EXTRA_TAG}")
-  SET(EMGUTF_LITE_MODELS_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.Tflite.Models")
-  SET(EMGUTF_LITE_MAUI_NUGET_TITLE "${EMGUTF_LITE_NUGET_TITLE} for MAUI Native Runtime")
+  SET(EMGUTF_LITE_MAUI_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui${EMGUTF_LITE_RUNTIME_EXTRA_TAG}")
+  SET(EMGUTF_LITE_MODELS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Tflite.Models")
+  SET(EMGUTF_LITE_MAUI_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} for MAUI Native Runtime")
   
 #  SET(EMGUTF_LITE_MAUI_NUGET_FILE_LIST "	
 #    <file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
@@ -862,7 +859,7 @@ IF( HAVE_WINDESKTOP_LITE )
   SET(EMGUTF_LITE_WINDOWS_NUGET_DEPENDENCY "
     <dependencies>
 	    ${EMGUTF_LITE_WINDOWS_NUGET_DEPENDENCY}
-		<dependency id=\"${EMGUTF_LITE_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")
 
   SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_TFLITE_WINDOWS_NUGET_FILE_LIST}
@@ -907,7 +904,7 @@ IF(HAVE_OSX_LITE)
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
   SET(EMGUTF_LITE_MACOS_NUGET_DEPENDENCY "${EMGUTF_LITE_MACOS_NUGET_DEPENDENCY}
     <dependencies>
-		<dependency id=\"${EMGUTF_LITE_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")	
 ENDIF()
 
@@ -928,7 +925,7 @@ IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
 	#<file src=\"Emgu.TF.Lite.runtime.ubuntu.targets\" target=\"build\\${EMGUTF_LITE_UBUNTU_NUGET_ID}.targets\" />")
   SET(EMGUTF_LITE_UBUNTU_NUGET_DEPENDENCY "${EMGUTF_LITE_UBUNTU_NUGET_DEPENDENCY}
     <dependencies>
-		<dependency id=\"${EMGUTF_LITE_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")
 ENDIF()
 
@@ -959,11 +956,11 @@ ENDIF()
 IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
   SET(EMGUTF_LITE_DEBIAN_NUGET_DEPENDENCY "${EMGUTF_LITE_DEBIAN_NUGET_DEPENDENCY}
     <dependencies>
-		<dependency id=\"${EMGUTF_LITE_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")	
 	
   IF(HAVE_LINUX_ARM_LITE)
-    SET(EMGUTF_LITE_DEBIAN_ARM_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.debian-arm")
+    SET(EMGUTF_LITE_DEBIAN_ARM_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.debian-arm")
     SET(EMGUTF_LITE_DEBIAN_ARM_NUGET_TITLE "Native ARM runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")
     SET(EMGUTF_LITE_DEBIAN_ARM_NUGET_FILE_LIST "${EMGUTF_LITE_DEBIAN_ARM_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\\*.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\" />
@@ -972,7 +969,7 @@ IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
   ENDIF()
 
   IF(HAVE_LINUX_ARM64_LITE)
-    SET(EMGUTF_LITE_DEBIAN_ARM64_NUGET_ID "${EMGUTF_LITE_NUGET_ID}.runtime.debian-arm64")
+    SET(EMGUTF_LITE_DEBIAN_ARM64_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.debian-arm64")
     SET(EMGUTF_LITE_DEBIAN_ARM64_NUGET_TITLE "Native ARM64 runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")  
     SET(EMGUTF_LITE_DEBIAN_ARM64_NUGET_FILE_LIST "${EMGUTF_LITE_DEBIAN_ARM64_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\*.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\" />

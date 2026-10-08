@@ -14,5 +14,5 @@ Release note can be found at
 
 ## Note
 
-To deploy Emgu LiteRT to a specific platform, you will also need to add one of the ${EMGUTF_LITE_NUGET_ID}.runtime.{platform} nuget packages to your executable project. Currently only ${EMGUTF_LITE_NUGET_ID}.runtime.macos includes `libLiteRt` for the `Emgu.LiteRT` API; the other runtime packages only include `tfliteextern` for the `Emgu.TF.Lite` API. Use the following link to search for the ${EMGUTF_LITE_NUGET_ID}.runtime nuget packages:
-<https://www.nuget.org/packages?q=${EMGUTF_LITE_NUGET_ID}.runtime>
+To deploy Emgu LiteRT to a specific platform, you will also need to add one of the ${EMGU_LITERT_NUGET_ID}.runtime.{platform} nuget packages to your executable project. Currently only ${EMGU_LITERT_NUGET_ID}.runtime.macos includes `libLiteRt` for the `Emgu.LiteRT` API; the other runtime packages only include `tfliteextern` for the `Emgu.TF.Lite` API. Use the following link to search for the ${EMGU_LITERT_NUGET_ID}.runtime nuget packages:
+<https://www.nuget.org/packages?q=${EMGU_LITERT_NUGET_ID}.runtime>
