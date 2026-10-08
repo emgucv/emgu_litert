@@ -497,8 +497,8 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CommonAssemblyInfo.cs.in ${CMAK
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Directory.Build.props)
 
-SET (EMGUTF_LICENSE_FILE "${LICENSE_FILE_NAME}.txt")
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${LICENSE_FILE_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${EMGUTF_LICENSE_FILE} COPYONLY)
+SET (EMGU_LITERT_LICENSE_FILE "${LICENSE_FILE_NAME}.txt")
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${LICENSE_FILE_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${EMGU_LITERT_LICENSE_FILE} COPYONLY)
 
 # ----------------------------------------------------------------------------
 #  Generate xamarin component configuration file
@@ -536,7 +536,7 @@ SET(EMGUTF_MAUI_IOS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-ios17.2")
 SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19041.0")
 
 
-#IF(HAVE_LITE_BUILD)
+
   # Emgu.LiteRT.Util, Emgu.TF.Lite and Emgu.LiteRT each produce their own nuget package
   # (EMGU_LITERT_NUGET_ID is still the root every other package id derives from, for Models and
   # the native runtime.* packages). Emgu.TF.Lite depends on Emgu.LiteRT.Util (its
@@ -624,37 +624,6 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
   SET(EMGUTF_LITE_MAUI_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.macos")  
   SET(EMGUTF_LITE_MAUI_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui MacOS")	
   
-  IF(EMGU_SIGN_FOUND AND WIN32)
-  
-	  SET(EMGUTF_LITE_POST_PROCESS_BINARY "<Target Name=\"PostProcessBinary\" AfterTargets=\"PostBuildEvent\">")
-      SET(EMGUTF_LITE_MODELS_POST_PROCESS_BINARY "<Target Name=\"PostProcessBinary\" AfterTargets=\"PostBuildEvent\">")
-	  SET(EMGUTF_LITE_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}
-    <Message Text=\"Signing $(OutputPath)$(AssemblyName).dll\" Importance=\"high\" />
-	<MakeDir Directories=\"$(OutputPath)\\signed\"/>
-    <Exec Command='${EMGU_SIGN_EXECUTABLE_NATIVE_PATH} \"$(OutputPath)$(AssemblyName).dll\" \"$(OutputPath)signed\" \"${SIGNTOOL_EXECUTABLE_NATIVE_PATH}\"' WorkingDirectory=\"$(OutputPath)\" />
-	</Target>")
-	  SET(EMGUTF_LITE_MODELS_POST_PROCESS_BINARY "${EMGUTF_LITE_MODELS_POST_PROCESS_BINARY}
-    <Message Text=\"Signing $(OutputPath)$(AssemblyName).dll\" Importance=\"high\" />
-	<MakeDir Directories=\"$(OutputPath)\\signed\"/>
-    <Exec Command='${EMGU_SIGN_EXECUTABLE_NATIVE_PATH} \"$(OutputPath)$(AssemblyName).dll\" \"$(OutputPath)signed\" \"${SIGNTOOL_EXECUTABLE_NATIVE_PATH}\"' WorkingDirectory=\"$(OutputPath)\" />
-	</Target>")
-  ENDIF()
-  IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
-	  
-	  SET(EMGUTF_LITE_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}
-    <Target Name=\"PostProcessNuget\" AfterTargets=\"Pack\">
-      <Message Text=\"Signing $(PackageOutputPath)\\$(PackageId).$(PackageVersion).nupkg\" Importance=\"high\" />
-      <MakeDir Directories=\"$(PackageOutputPath)\\signed\"/>
-      <Exec Command='${EMGU_NUGET_SIGN_EXECUTABLE_NATIVE_PATH} \"$(PackageOutputPath)\\$(PackageId).$(PackageVersion).nupkg\" \"$(PackageOutputPath)\\signed\" \"${NUGET_EXECUTABLE_NATIVE_PATH}\"' WorkingDirectory=\"$(PackageOutputPath)\" />
-    </Target>")
-	  SET(EMGUTF_LITE_MODELS_POST_PROCESS_NUGET "${EMGUTF_LITE_MODELS_POST_PROCESS_NUGET}
-    <Target Name=\"PostProcessNuget\" AfterTargets=\"Pack\">
-      <Message Text=\"Signing $(PackageOutputPath)\\$(PackageId).$(PackageVersion).nupkg\" Importance=\"high\" />
-      <MakeDir Directories=\"$(PackageOutputPath)\\signed\"/>
-      <Exec Command='${EMGU_NUGET_SIGN_EXECUTABLE_NATIVE_PATH} \"$(PackageOutputPath)\\$(PackageId).$(PackageVersion).nupkg\" \"$(PackageOutputPath)\\signed\" \"${NUGET_EXECUTABLE_NATIVE_PATH}\"' WorkingDirectory=\"$(PackageOutputPath)\" />
-    </Target>")
-	
-  ENDIF()
   
   #IF (HAVE_ANDROID_LITE)
 	CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.android.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/Lite/Directory.Build.props)
@@ -692,29 +661,12 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
     SET (HAVE_MAUI_LITE ON)
   ENDIF()
   MESSAGE(STATUS "HAVE_MAUI_LITE: ${HAVE_MAUI_LITE}")
-      
-#ENDIF()
 
-#IF(HAVE_MAUI_LITE)
+
+
   SET(EMGUTF_LITE_MAUI_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui${EMGUTF_LITE_RUNTIME_EXTRA_TAG}")
-  SET(EMGUTF_LITE_MODELS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Tflite.Models")
   SET(EMGUTF_LITE_MAUI_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} for MAUI Native Runtime")
   
-#  SET(EMGUTF_LITE_MAUI_NUGET_FILE_LIST "	
-#    <file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
-#	
-#	<file src=\"..\\..\\..\\lib\\Build\\Emgu.TF.Lite.Platform.Maui.UI\\AnyCPU\\Release\\${EMGUTF_MAUI_ANDROID_SRC_FOLDER}\\Emgu.TF.Lite.Platform.Maui.UI.dll\" target=\"lib\\${EMGUTF_MAUI_ANDROID_DST_FOLDER}\" />
-#    <file src=\"..\\..\\..\\lib\\Build\\Emgu.TF.Lite.Platform.Maui.UI\\AnyCPU\\Release\\${EMGUTF_MAUI_ANDROID_SRC_FOLDER}\\Emgu.TF.Lite.Platform.Maui.UI.xml\" target=\"lib\\${EMGUTF_MAUI_ANDROID_DST_FOLDER}\" />
-#	
-#	<file src=\"..\\..\\..\\lib\\Build\\Emgu.TF.Lite.Platform.Maui.UI\\AnyCPU\\Release\\${EMGUTF_MAUI_IOS_SRC_FOLDER}\\Emgu.TF.Lite.Platform.Maui.UI.dll\" target=\"lib\\${EMGUTF_MAUI_IOS_DST_FOLDER}\" />
-#    <file src=\"..\\..\\..\\lib\\Build\\Emgu.TF.Lite.Platform.Maui.UI\\AnyCPU\\Release\\${EMGUTF_MAUI_IOS_SRC_FOLDER}\\Emgu.TF.Lite.Platform.Maui.UI.xml\" target=\"lib\\${EMGUTF_MAUI_IOS_DST_FOLDER}\" />
-#	
-#	<file src=\"..\\..\\..\\lib\\Build\\Emgu.TF.Lite.Platform.Maui.UI\\AnyCPU\\Release\\${EMGUTF_MAUI_WINDOWS_SRC_FOLDER}\\Emgu.TF.Lite.Platform.Maui.UI.dll\" target=\"lib\\${EMGUTF_MAUI_WINDOWS_DST_FOLDER}\" />
-#    <file src=\"..\\..\\..\\lib\\Build\\Emgu.TF.Lite.Platform.Maui.UI\\AnyCPU\\Release\\${EMGUTF_MAUI_WINDOWS_SRC_FOLDER}\\Emgu.TF.Lite.Platform.Maui.UI.xml\" target=\"lib\\${EMGUTF_MAUI_WINDOWS_DST_FOLDER}\" />
-#	
-#	<file src=\"README.md\" target=\"docs\\\" />
-#    <file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
-
   # Depends on the Tflite package (tfliteextern.dll), not ${EMGU_LITERT_WINDOWS_NUGET_ID} directly
   # (libLiteRt.dll only) - MAUI Windows needs both, and the Tflite package already depends on
   # ${EMGU_LITERT_WINDOWS_NUGET_ID}, so this pulls in both transitively.
@@ -743,7 +695,7 @@ SET(EMGUTF_MAUI_WINDOWS_DST_FOLDER "${EMGUTF_MAUI_DOTNET_VERSION}-windows10.0.19
   IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/UI/SignPkg.Targets)
   ENDIF()
-#ENDIF()
+
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/UI/docs/README.md)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/UI/Directory.Build.props)
@@ -758,7 +710,7 @@ IF (HAVE_WINDESKTOP_LITE)
 	<file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\vcruntime*.dll\" target=\"runtimes\\win-x64\\native\" />     
 	<file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\vccorlib*.dll\" target=\"runtimes\\win-x64\\native\" />     
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
-    <file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
+    <file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />")
     ENDIF()
 	IF (HAVE_WINDESKTOP_X86_LITE)
       SET(EMGU_WINDOWS_MSVCRT_X86_NUGET_TITLE "MSVC x86 runtime for windows")
@@ -768,7 +720,7 @@ IF (HAVE_WINDESKTOP_LITE)
 	<file src=\"..\\..\\..\\lib\\runtimes\\win-x86\\native\\vcruntime*.dll\" target=\"runtimes\\win-x86\\native\" />     
 	<file src=\"..\\..\\..\\lib\\runtimes\\win-x86\\native\\vccorlib*.dll\" target=\"runtimes\\win-x86\\native\" />     
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
-    <file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
+    <file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />")
     ENDIF()
 	IF(MSVC)
       SET(EMGU_WINDOWS_MSVCRT_VERSION ${CMAKE_CXX_COMPILER_VERSION})
@@ -794,9 +746,7 @@ IF (HAVE_WINDESKTOP_LITE)
 	  ")
 	  ENDIF()
     ENDIF()
-ENDIF()
 
-IF( HAVE_WINDESKTOP_LITE )
   # ${EMGU_LITERT_WINDOWS_NUGET_ID} contains only libLiteRt.dll (LiteRT's own runtime, which
   # Emgu.LiteRT's CompiledModel API P/Invokes directly). tfliteextern.dll (the TensorFlow Lite
   # Interpreter C API wrapper) is packaged separately, as ${EMGU_TFLITE_WINDOWS_NUGET_ID}
@@ -807,7 +757,7 @@ IF( HAVE_WINDESKTOP_LITE )
   # the macOS packaging below treats libLiteRt.dylib as optional, so a CMake-only build doesn't
   # fail to pack ${EMGU_LITERT_WINDOWS_NUGET_ID} over a file that was never built.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/libLiteRt.dll")
-  SET(EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST}
+  SET(EMGU_LITERT_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_WINDOWS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libLiteRt.dll\" target=\"runtimes\\win-x64\\native\" />
 	")
   ENDIF()
@@ -830,7 +780,7 @@ IF( HAVE_WINDESKTOP_LITE )
   ENDIF()
   IF( HAVE_WINDESKTOP_X86_LITE )
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x86/native/libLiteRt.dll")
-  SET(EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST}
+  SET(EMGU_LITERT_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_WINDOWS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x86\\native\\libLiteRt.dll\" target=\"runtimes\\win-x86\\native\" />
 	")
   ENDIF()
@@ -838,8 +788,8 @@ IF( HAVE_WINDESKTOP_LITE )
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x86\\native\\tfliteextern.dll\" target=\"runtimes\\win-x86\\native\" />
 	")
   ENDIF()
-  SET(EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST "${EMGUTF_LITE_WINDOWS_NUGET_FILE_LIST}
-	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
+  SET(EMGU_LITERT_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_WINDOWS_NUGET_FILE_LIST}
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"README.md\" target=\"docs\\\" />")
   SET(EMGUTF_LITE_WINDOWS_NUGET_DEPENDENCY "
@@ -849,7 +799,7 @@ IF( HAVE_WINDESKTOP_LITE )
     </dependencies>")
 
   SET(EMGU_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGU_TFLITE_WINDOWS_NUGET_FILE_LIST}
-	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"README.md\" target=\"docs\\\" />")
   SET(EMGUTF_LITE_TFLITE_WINDOWS_NUGET_DEPENDENCY "
@@ -859,7 +809,7 @@ IF( HAVE_WINDESKTOP_LITE )
 
   IF(HAVE_WINDOWS_LITERT_LM)
     SET(EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
-	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"README.md\" target=\"docs\\\" />")
     SET(EMGU_LITERT_LM_WINDOWS_NUGET_DEPENDENCY "
@@ -886,7 +836,7 @@ IF(HAVE_OSX_LITE)
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libGemmaModelConstraintProvider.dylib\" target=\"runtimes\\osx\\native\" />")
   ENDIF()
   SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
-	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
   SET(EMGU_LITERT_MACOS_NUGET_DEPENDENCY "${EMGU_LITERT_MACOS_NUGET_DEPENDENCY}
     <dependencies>
@@ -907,7 +857,7 @@ IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
   ENDIF()
   SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
-	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />")
 	#<file src=\"Emgu.TF.Lite.runtime.ubuntu.targets\" target=\"build\\${EMGU_LITERT_UBUNTU_NUGET_ID}.targets\" />")
   SET(EMGU_LITERT_UBUNTU_NUGET_DEPENDENCY "${EMGU_LITERT_UBUNTU_NUGET_DEPENDENCY}
     <dependencies>
@@ -932,7 +882,7 @@ ENDIF()
 IF(NOT "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}" STREQUAL "")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
-	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />")
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_DEPENDENCY "${EMGU_LITERT_LM_UBUNTU_NUGET_DEPENDENCY}
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_UBUNTU_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
@@ -950,7 +900,7 @@ IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
     SET(EMGUTF_LITE_DEBIAN_ARM_NUGET_TITLE "Native ARM runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")
     SET(EMGUTF_LITE_DEBIAN_ARM_NUGET_FILE_LIST "${EMGUTF_LITE_DEBIAN_ARM_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\\*.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\" />
-	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
   ENDIF()
 
@@ -959,7 +909,7 @@ IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
     SET(EMGUTF_LITE_DEBIAN_ARM64_NUGET_TITLE "Native ARM64 runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")  
     SET(EMGUTF_LITE_DEBIAN_ARM64_NUGET_FILE_LIST "${EMGUTF_LITE_DEBIAN_ARM64_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\*.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\" />
-	<file src=\"..\\..\\..\\${EMGUTF_LICENSE_FILE}\" target=\"\" />
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
   ENDIF()  
 ENDIF()
@@ -975,23 +925,10 @@ ENDIF()
 	<MakeDir Directories=\"$(OutputPath)\\signed\"/>
     <Exec Command='${EMGU_SIGN_EXECUTABLE_NATIVE_PATH} \"$(OutputPath)$(AssemblyName).dll\" \"$(OutputPath)signed\" \"${SIGNTOOL_EXECUTABLE_NATIVE_PATH}\"' WorkingDirectory=\"$(OutputPath)\" />
 	</Target>")
-	#  SET(EMGUTF_MODELS_POST_PROCESS_BINARY "<Target Name=\"PostProcessBinary\" AfterTargets=\"PostBuildEvent\">
-    #<Message Text=\"Signing $(OutputPath)$(AssemblyName).dll\" Importance=\"high\" />
-	#<MakeDir Directories=\"$(OutputPath)\\signed\"/>
-    #<Exec Command='${EMGU_SIGN_EXECUTABLE_NATIVE_PATH} \"$(OutputPath)$(AssemblyName).dll\" \"$(OutputPath)signed\" \"${SIGNTOOL_EXECUTABLE_NATIVE_PATH}\"' WorkingDirectory=\"$(OutputPath)\" />
-	#</Target>")
-	#  SET(EMGUTF_PROTOBUF_POST_PROCESS_BINARY "<Target Name=\"PostProcessBinary\" AfterTargets=\"PostBuildEvent\">
-    #<Message Text=\"Signing $(OutputPath)$(AssemblyName).dll\" Importance=\"high\" />
-	#<MakeDir Directories=\"$(OutputPath)\\signed\"/>
-    #<Exec Command='${EMGU_SIGN_EXECUTABLE_NATIVE_PATH} \"$(OutputPath)$(AssemblyName).dll\" \"$(OutputPath)signed\" \"${SIGNTOOL_EXECUTABLE_NATIVE_PATH}\"' WorkingDirectory=\"$(OutputPath)\" />
-	#</Target>")
   ENDIF()
-
-
 
 IF (HAVE_WINDESKTOP_X64_LITE)
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/${EMGU_WINDOWS_MSVCRT_X64_NUGET_ID}.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/${EMGU_WINDOWS_MSVCRT_X64_NUGET_ID}/Package.nuspec)
-    #CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/${EMGU_WINDOWS_MSVCRT_X64_NUGET_ID}.targets.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/${EMGU_WINDOWS_MSVCRT_X64_NUGET_ID}/${EMGU_WINDOWS_MSVCRT_X64_NUGET_ID}.targets)
 ENDIF()
 
 IF (HAVE_WINDESKTOP_X86_LITE)
@@ -1002,8 +939,6 @@ ENDIF()
 # own nuget package (depends on Emgu.LiteRT.Util - see its csproj's ProjectReference). The
 # signing targets in EMGUTF_LITE_POST_PROCESS_* only refer to $(AssemblyName)/$(PackageId), so
 # they are reused as-is for every self-packing project below.
-SET(EMGUTF_LITE_TFLITE_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
-SET(EMGUTF_LITE_TFLITE_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite/NetStandard/SignBinary.Targets)
@@ -1015,8 +950,6 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Package.README.md.
 
 # Emgu.LiteRT.Util: the shared UnmanagedObject/Toolbox base both Emgu.TF.Lite and Emgu.LiteRT
 # depend on. Its own nuget package too, with no managed dependencies of its own.
-SET(EMGUTF_LITERT_UTIL_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
-SET(EMGUTF_LITERT_UTIL_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Util.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Util/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Util/NetStandard/SignBinary.Targets)
@@ -1029,8 +962,6 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Util.Package.README
 # Emgu.LiteRT: the C# wrapper of LiteRT's own runtime C API (libLiteRt). Its own nuget package
 # depends on Emgu.LiteRT.Util (its UnmanagedObject-derived types need it to compile); it has no
 # code dependency on Emgu.TF.Lite, which is a fully independent package.
-SET(EMGUTF_LITERT_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
-SET(EMGUTF_LITERT_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT/NetStandard/SignBinary.Targets)
@@ -1042,8 +973,6 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Package.README.md.i
 
 # Emgu.LiteRT.LM: the C# wrapper of LiteRT-LM's C API (liblitert-lm). Its own nuget package,
 # depending on Emgu.LiteRT.Util only.
-SET(EMGUTF_LITERT_LM_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
-SET(EMGUTF_LITERT_LM_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM/NetStandard/SignBinary.Targets)
@@ -1055,8 +984,6 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Package.README.m
 
 # Emgu.LiteRT.LM.Models: ready-to-use language models (download + chat). Its own nuget package, depending on
 # Emgu.LiteRT.LM and Emgu.LiteRT.Util.
-SET(EMGUTF_LITERT_LM_MODELS_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
-SET(EMGUTF_LITERT_LM_MODELS_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Models.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Models/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Models/NetStandard/SignBinary.Targets)
@@ -1069,8 +996,6 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Models.Package.R
 # Emgu.TF.Lite.ImageIO: NativeImageIO/JpegData (renamed from Emgu.Models, then Emgu.LiteRT.ImageIO).
 # Its own nuget package, depending on Emgu.LiteRT.Util (Annotation) and Emgu.TF.Lite
 # (Emgu.TF.Lite.Toolbox's native pixel-conversion P/Invokes).
-SET(EMGUTF_LITE_IMAGEIO_POST_PROCESS_BINARY "${EMGUTF_LITE_POST_PROCESS_BINARY}")
-SET(EMGUTF_LITE_IMAGEIO_POST_PROCESS_NUGET "${EMGUTF_LITE_POST_PROCESS_NUGET}")
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.ImageIO.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.ImageIO/NetStandard/Directory.Build.props)
 IF(EMGU_SIGN_FOUND AND WIN32)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.ImageIO/NetStandard/SignBinary.Targets)
@@ -1234,7 +1159,7 @@ INSTALL(
   "${CMAKE_CURRENT_SOURCE_DIR}/CommonAssemblyInfo.cs"
   "${CMAKE_CURRENT_SOURCE_DIR}/Directory.Build.props"
   "${CMAKE_CURRENT_SOURCE_DIR}/${LICENSE_FILE_NAME}" #LICENSE
-  "${CMAKE_CURRENT_SOURCE_DIR}/${EMGUTF_LICENSE_FILE}" #LICENSE.txt
+  "${CMAKE_CURRENT_SOURCE_DIR}/${EMGU_LITERT_LICENSE_FILE}" #LICENSE.txt
   DESTINATION .
   COMPONENT emgulitert_source
   )
