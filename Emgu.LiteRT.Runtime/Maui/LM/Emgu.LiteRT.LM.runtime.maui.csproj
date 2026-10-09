@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+
+		<ImplicitUsings>enable</ImplicitUsings>
+		<AssemblyName>Emgu.LiteRT.LM.runtime.maui</AssemblyName>
+		<LangVersion>latest</LangVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\lib))</TfLiteBinaryDir>
+		<BaseOutputPath>$(TfLiteBinaryDir)\Build\$(AssemblyName)\$(Platform)\</BaseOutputPath>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <!-- Both Android and Windows are referenced as PackageReferences (not ProjectReference for
+	       Android), pulling in the already-built Emgu.LiteRT.LM.runtime.maui.android /
+	       Emgu.LiteRT.LM.runtime.windows packages instead - see the generated Directory.Build.props
+	       for the actual conditional PackageReference entries (EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY
+	       in the top-level CMakeLists.txt). A ProjectReference to the android sub-project here would
+	       work for the android TFM itself, but NuGet's cross-targeting restore evaluates the whole
+	       multi-TFM closure together and errors on this project's own netstandard2.0/windows TFMs
+	       being asked to resolve an android-only referenced project; PackageReference has no such
+	       problem, since package compatibility is checked per-TFM independently.
+	       iOS/Mac Catalyst never build LiteRT-LM at all (static-only tfliteextern linking, no dynamic
+	       libLiteRt to link against) - when that changes, add a
+	       net${DOTNET_VERSION_MAJOR}.0-ios/-maccatalyst TargetFramework and a matching
+	       PackageReference here, following Android as the template. -->
+	</ItemGroup>
+</Project>

@@ -612,10 +612,20 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
 
-  SET(EMGU_LITERT_MAUI_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.android")  
-  SET(EMGU_LITERT_MAUI_ANDROID_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui Android")	
+  SET(EMGU_LITERT_MAUI_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.android")
+  SET(EMGU_LITERT_MAUI_ANDROID_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui Android")
 
-  SET(EMGU_LITERT_MAUI_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.ios")  
+  # Emgu.LiteRT.LM.runtime.maui/.runtime.maui.android: the LiteRT-LM add-on counterparts of
+  # Emgu.LiteRT.runtime.maui/.runtime.maui.android, kept as separate packages rather than folded
+  # into the base ones - same split as Emgu.LiteRT.LM.runtime.windows/.runtime.ubuntu.* vs their
+  # base siblings. See EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY below and
+  # Emgu.LiteRT.Runtime/Maui/LM/.
+  SET(EMGU_LITERT_LM_MAUI_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.runtime.maui")
+  SET(EMGU_LITERT_LM_MAUI_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} for MAUI Native Runtime")
+  SET(EMGU_LITERT_LM_MAUI_ANDROID_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.runtime.maui.android")
+  SET(EMGU_LITERT_LM_MAUI_ANDROID_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} for MAUI Android")
+
+  SET(EMGU_LITERT_MAUI_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.ios")
   SET(EMGU_LITERT_MAUI_IOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui iOS")	
   
   SET(EMGU_LITERT_MAUI_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.macos")  
@@ -632,8 +642,17 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
     ENDIF()
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.android.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/Lite/docs/README.md)
   #ENDIF()
-  
-  #IF (HAVE_IOS_LITE)	
+
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.maui.android.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Android/Directory.Build.props)
+  IF(EMGU_SIGN_FOUND AND WIN32)
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Android/SignBinary.Targets)
+  ENDIF()
+  IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Android/SignPkg.Targets)
+  ENDIF()
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.maui.android.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Android/docs/README.md)
+
+  #IF (HAVE_IOS_LITE)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.ios.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/iOS/Directory.Build.props)
   IF(EMGU_SIGN_FOUND AND WIN32)
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/iOS/SignBinary.Targets)
@@ -670,14 +689,33 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
       <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGU_TFLITE_WINDOWS_NUGET_ID}\" Version=\"${EMGU_TFLITE_PACKAGE_VERSION}\">
 	  </PackageReference>
     </ItemGroup>")
+  # Emgu.LiteRT.LM.runtime.windows (liblitert-lm.dll) is NOT pulled in here - it's a separate,
+  # optional add-on package (Emgu.LiteRT.LM.runtime.maui, see EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY
+  # and Emgu.LiteRT.Runtime/Maui/LM/), same base/LM split used everywhere else in the repo
+  # (Emgu.LiteRT vs Emgu.LiteRT.LM, Emgu.LiteRT.runtime.windows vs Emgu.LiteRT.LM.runtime.windows).
+  # Only built when lib/runtimes/win-x64/native/liblitert-lm.dll exists (see HAVE_WINDOWS_LITERT_LM
+  # further below, computed after this point in the file - re-checked here with the same EXISTS
+  # test rather than reordering that block).
+  # Android's Emgu.LiteRT.LM.runtime.maui.android is referenced unconditionally (a PackageReference,
+  # not a ProjectReference - NuGet's cross-targeting restore evaluates every TargetFrameworks entry
+  # of this multi-TFM project together and errors if a ProjectReference to an android-only project
+  # can't be resolved for this project's other TFMs; PackageReference has no such problem). Gated on
+  # HAVE_ANDROID_LITE the same way the base Emgu.LiteRT.runtime.maui's own android ProjectReference
+  # is, not on whether liblitert-lm.so actually exists - same as that base reference, this one is
+  # unconditional at the CMake-string level and relies on the android-TFM MSBuild Condition plus the
+  # referenced package's own (possibly-empty, same as the base android package when no native binary
+  # was built) content.
+  SET(EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY "
+	<ItemGroup>
+    <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'\" Include=\"${EMGU_LITERT_LM_MAUI_ANDROID_NUGET_ID}\" Version=\"${EMGU_LITERT_LM_PACKAGE_VERSION}\">
+	  </PackageReference>
+  </ItemGroup>")
   # Emgu.LiteRT.LM.runtime.windows (liblitert-lm.dll) is optional - only built when
   # lib/runtimes/win-x64/native/liblitert-lm.dll exists (see HAVE_WINDOWS_LITERT_LM further below,
   # computed after this point in the file - re-checked here with the same EXISTS test rather than
-  # reordering that block) - so only add this PackageReference when it does. Without the guard, a
-  # MAUI build on a machine that never built liblitert-lm.dll would fail trying to restore a package
-  # version that was never packed.
+  # reordering that block).
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/liblitert-lm.dll")
-    SET(EMGU_LITERT_MAUI_NUGET_DEPENDENCY "${EMGU_LITERT_MAUI_NUGET_DEPENDENCY}
+    SET(EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY "${EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY}
   	<ItemGroup>
       <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'\" Include=\"${EMGU_LITERT_LM_WINDOWS_NUGET_ID}\" Version=\"${EMGU_LITERT_LM_PACKAGE_VERSION}\">
 	  </PackageReference>
@@ -694,6 +732,15 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/UI/docs/README.md)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/UI/Directory.Build.props)
+
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.maui.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/docs/README.md)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.maui.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/SignPkg.Targets)
+ENDIF()
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Maui.Demo.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/Maui.Lite/Directory.Build.props)
 IF (HAVE_WINDESKTOP_LITE)

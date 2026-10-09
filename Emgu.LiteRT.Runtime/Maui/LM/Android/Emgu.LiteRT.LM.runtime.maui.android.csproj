@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+
+    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+    <PropertyGroup>
+    <TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\lib))</TfLiteBinaryDir>
+  </PropertyGroup>
+    <PropertyGroup>
+
+    <EmguTfLiteLinkTarget>MAUI Android LiteRT-LM Library</EmguTfLiteLinkTarget>
+    <!-- LiteRT-LM's native library (liblitert-lm.so) and the prebuilt libGemmaModelConstraintProvider.so it
+         depends on only ever exist for arm64-v8a and x86_64 - see Emgu.LiteRT.runtime.maui.android.csproj's
+         own comment for why (that's where these items used to live, before being split out here). -->
+    <EmguTfLiteBuildAndroidArm64v8a Condition="$(AndroidSupportedAbis.Contains('arm64-v8a%3')) OR $(AndroidSupportedAbis.Contains('arm64-v8a,')) OR $(AndroidSupportedAbis.EndsWith('arm64-v8a;')) OR $(AndroidSupportedAbis.EndsWith('arm64-v8a')) OR ('$(AndroidSupportedAbis)'=='' AND '$(Platform)'=='AnyCPU')  OR ('$(Platform)'=='arm64-v8a')">True</EmguTfLiteBuildAndroidArm64v8a>
+    <EmguTfLiteBuildAndroidx8664 Condition="$(AndroidSupportedAbis.Contains('x86_64%3')) OR $(AndroidSupportedAbis.Contains('x86_64,')) OR $(AndroidSupportedAbis.Contains('x86_64;')) OR $(AndroidSupportedAbis.EndsWith('x86_64')) OR ('$(AndroidSupportedAbis)'=='' AND '$(Platform)'=='AnyCPU') OR ('$(Platform)'=='x86_64')">True</EmguTfLiteBuildAndroidx8664>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <!-- arm64-v8a -->
+  <ItemGroup Condition="'$(EmguTfLiteBuildAndroidArm64v8a)'=='True'">
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\arm64-v8a\liblitert-lm.so" Condition="Exists('$(TfLiteBinaryDir)\android\arm64-v8a\liblitert-lm.so')">
+      <Link>lib\arm64-v8a\liblitert-lm.so</Link>
+    </EmbeddedNativeLibrary>
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\arm64-v8a\libGemmaModelConstraintProvider.so" Condition="Exists('$(TfLiteBinaryDir)\android\arm64-v8a\liblitert-lm.so')">
+      <Link>lib\arm64-v8a\libGemmaModelConstraintProvider.so</Link>
+    </EmbeddedNativeLibrary>
+  </ItemGroup>
+  <!-- x86_64 -->
+  <ItemGroup Condition="'$(EmguTfLiteBuildAndroidx8664)'=='True'">
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\x86_64\liblitert-lm.so" Condition="Exists('$(TfLiteBinaryDir)\android\x86_64\liblitert-lm.so')">
+      <Link>lib\x86_64\liblitert-lm.so</Link>
+    </EmbeddedNativeLibrary>
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\x86_64\libGemmaModelConstraintProvider.so" Condition="Exists('$(TfLiteBinaryDir)\android\x86_64\liblitert-lm.so')">
+      <Link>lib\x86_64\libGemmaModelConstraintProvider.so</Link>
+    </EmbeddedNativeLibrary>
+  </ItemGroup>
+    <ItemGroup>
+      <!-- Depends on Emgu.LiteRT.runtime.maui.android (libtfliteextern.so/libLiteRt.so), not the other way
+           around - same direction as Emgu.LiteRT.LM.runtime.windows depending on Emgu.LiteRT.runtime.windows.xnn.
+           Unconditional - this project only ever targets android, same as the base project it references. -->
+      <ProjectReference Include="..\..\Android\Lite\Emgu.LiteRT.runtime.maui.android.csproj" />
+    </ItemGroup>
+  <Target Name="EmguTfLiteLmMauiAndroidPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <Message Text="Emgu LiteRT LM MAUI Android Compiling" Importance="High" />
+  </Target>
+</Project>

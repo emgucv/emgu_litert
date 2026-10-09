@@ -34,6 +34,7 @@ Directory.Build.props
 /Emgu.TF.Lite.Models/NetStandard/docs/
 /Emgu.LiteRT.Runtime/Maui/*/docs/
 /Emgu.LiteRT.Runtime/Maui/*/Lite/docs/
+/Emgu.LiteRT.Runtime/Maui/LM/Android/docs/
 /platforms/nuget/*/Package.nuspec
 /platforms/nuget/Emgu.LiteRT.runtime.windows/README.md
 /platforms/nuget/Emgu.TF.Lite.runtime.windows/README.md

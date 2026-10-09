@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+
+    <!-- Android is the only MAUI platform with a LiteRT-LM native library today (liblitert-lm.so, via
+         Emgu.LiteRT.LM.runtime.maui.android). iOS/Mac Catalyst never build LiteRT-LM (static-only
+         tfliteextern linking) - add net${DOTNET_VERSION_MAJOR}.0-ios/-maccatalyst here, plus a matching
+         ProjectReference in this project's own .csproj, once that changes. -->
+    <TargetFrameworks>netstandard2.0;net${DOTNET_VERSION_MAJOR}.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-windows10.0.19041.0</TargetFrameworks>
+
+    <EmguLiteRTProjectRoot>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\))</EmguLiteRTProjectRoot>
+
+    <PackageId>${EMGU_LITERT_LM_MAUI_NUGET_ID}</PackageId>
+
+    <title>${EMGU_LITERT_LM_MAUI_NUGET_TITLE}</title>
+    <version>${EMGU_LITERT_LM_PACKAGE_VERSION}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>Runtime package of Emgu LiteRT LM for MAUI</summary>
+    <Description>This package contains the native LiteRT-LM (liblitert-lm) runtime add-on of Emgu LiteRT for MAUI. Currently only Android and Windows platforms are supported; this package has nothing to add for iOS/Mac Catalyst heads.</Description>
+    <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION} release of Emgu LiteRT LM for MAUI, built on LiteRT-LM ${LITERT_LM_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html
+</PackageReleaseNotes>
+
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(EmguLiteRTProjectRoot)\platforms\nuget))</PackageOutputPath>
+	<PackageTags>tensorflow emgu emgutf ai maui litert-lm</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+
+	<!-- Add local repository path to RestoreSources -->
+    <RestoreSources>$(RestoreSources);$(PackageOutputPath);https://api.nuget.org/v3/index.json</RestoreSources>
+
+  </PropertyGroup>
+
+  ${EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY}
+
+     <ItemGroup>
+      <None Include="$(EmguLiteRTProjectRoot)\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="$(EmguLiteRTProjectRoot)\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />
+</Project>
