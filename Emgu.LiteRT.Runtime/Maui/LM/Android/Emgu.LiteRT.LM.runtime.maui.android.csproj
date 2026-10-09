@@ -40,7 +40,7 @@
       <!-- Depends on Emgu.LiteRT.runtime.maui.android (libtfliteextern.so/libLiteRt.so), not the other way
            around - same direction as Emgu.LiteRT.LM.runtime.windows depending on Emgu.LiteRT.runtime.windows.xnn.
            Unconditional - this project only ever targets android, same as the base project it references. -->
-      <ProjectReference Include="..\..\Android\Lite\Emgu.LiteRT.runtime.maui.android.csproj" />
+      <ProjectReference Include="..\..\Android\Emgu.LiteRT.runtime.maui.android.csproj" />
     </ItemGroup>
   <Target Name="EmguTfLiteLmMauiAndroidPackageBuildImports" BeforeTargets="PrepareForBuild">
     <Message Text="Emgu LiteRT LM MAUI Android Compiling" Importance="High" />

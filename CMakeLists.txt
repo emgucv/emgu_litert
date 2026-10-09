@@ -633,14 +633,14 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   
   
   #IF (HAVE_ANDROID_LITE)
-	CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.android.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/Lite/Directory.Build.props)
+	CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.android.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/Directory.Build.props)
 	IF(EMGU_SIGN_FOUND AND WIN32)
-      CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/Lite/SignBinary.Targets)
+      CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/SignBinary.Targets)
     ENDIF()
     IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
-      CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/Lite/SignPkg.Targets)
+      CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/SignPkg.Targets)
     ENDIF()
-    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.android.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/Lite/docs/README.md)
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.android.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/docs/README.md)
   #ENDIF()
 
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.maui.android.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Android/Directory.Build.props)
@@ -1130,7 +1130,7 @@ IF(HAVE_ANDROID_LITE)
     DESTINATION Solution
     COMPONENT emgulitert_source
     FILES_MATCHING
-    PATTERN "Emgu.TF.Lite.Android.sln"
+    PATTERN "Emgu.LiteRT.Android.sln"
     PATTERN ".git" EXCLUDE
     PATTERN "bin" EXCLUDE
     )
@@ -1156,7 +1156,7 @@ IF(HAVE_OSX_LITE)
     DESTINATION Solution
     COMPONENT emgulitert_source
     FILES_MATCHING
-    PATTERN "Emgu.TF.Lite.Mac.sln"
+    PATTERN "Emgu.LiteRT.MacOS.sln"
     PATTERN ".git" EXCLUDE
     PATTERN "bin" EXCLUDE
     )

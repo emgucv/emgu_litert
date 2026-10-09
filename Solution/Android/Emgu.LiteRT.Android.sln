@@ -15,7 +15,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite", "..\..\Emgu.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite.Models", "..\..\Emgu.TF.Lite.Models\NetStandard\Emgu.TF.Lite.Models.csproj", "{BD5392A2-30E8-4D5A-A1AD-F66A95B54D14}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.LiteRT.runtime.maui.andriod", "..\..\Emgu.LiteRT.Runtime\Maui\Android\Lite\Emgu.LiteRT.runtime.maui.android.csproj", "{0EA73EE9-FC06-4734-BC29-F8AE34EE31A9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.LiteRT.runtime.maui.andriod", "..\..\Emgu.LiteRT.Runtime\Maui\Android\Emgu.LiteRT.runtime.maui.android.csproj", "{0EA73EE9-FC06-4734-BC29-F8AE34EE31A9}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Maui.Demo.Lite", "..\..\Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj", "{E162F4C3-F8C8-495F-B9B1-B7A1FC806D2C}"
 EndProject

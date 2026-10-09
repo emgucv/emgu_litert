@@ -37,7 +37,7 @@
 	  <ProjectReference Include="..\..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
 	  <ProjectReference Include="..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
 
-	  <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\..\Emgu.LiteRT.Runtime\Maui\Android\Lite\Emgu.LiteRT.runtime.maui.android.csproj" />
+	  <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\..\Emgu.LiteRT.Runtime\Maui\Android\Emgu.LiteRT.runtime.maui.android.csproj" />
 
 	  <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\..\Emgu.LiteRT.Runtime\Maui\iOS\Emgu.LiteRT.runtime.maui.ios.csproj" />
 
