@@ -17,8 +17,8 @@ ELSE()
   IF(HAVE_WINDESKTOP_LITE)
     PROJECT(Emgu.TF.Lite.Document)
 
-    # Emgu.TF.Lite.html.shfbproj's own HelpFileFormat is "HtmlHelp1, Website", so this first
-    # pass produces both the .chm and the website in one build. Emgu.TF.Lite.OpenXml.shfbproj is
+    # Emgu.LiteRT.html.shfbproj's own HelpFileFormat is "HtmlHelp1, Website", so this first
+    # pass produces both the .chm and the website in one build. Emgu.LiteRT.OpenXml.shfbproj is
     # a separate, dedicated copy of it with PresentationStyle/HelpFileFormat hardcoded to OpenXml
     # for the second pass, rather than overriding those two properties at build time: SHFB's
     # BuildHelp MSBuild task (SandcastleHelpFileBuilder.targets) never forwards a plain
@@ -31,9 +31,9 @@ ELSE()
     # supports only OpenXml), so a second, separate project file is required.
     ADD_CUSTOM_TARGET(
        ${PROJECT_NAME} ALL
-       COMMAND ${MSBUILD_EXECUTABLE} /p:Configuration=Release ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.html.shfbproj
-       COMMAND ${MSBUILD_EXECUTABLE} /p:Configuration=Release ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.OpenXml.shfbproj
-       SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.html.shfbproj ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.OpenXml.shfbproj
+       COMMAND ${MSBUILD_EXECUTABLE} /p:Configuration=Release ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.html.shfbproj
+       COMMAND ${MSBUILD_EXECUTABLE} /p:Configuration=Release ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.OpenXml.shfbproj
+       SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.html.shfbproj ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.OpenXml.shfbproj
     )
     ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.TF.Lite Emgu.TF.Lite.Models)
 

@@ -114,7 +114,7 @@ cmake --build . --config Release
 
 ### Visual Studio solutions
 Platform-specific `.sln` files live under `Solution/`:
-- `Solution/Windows.Desktop/` — `Emgu.TF.Lite.sln`, plus test/example solutions
+- `Solution/Windows.Desktop/` — `Emgu.LiteRT.sln`, plus test/example solutions
 - `Solution/Android/`, `Solution/iOS/`, `Solution/CrossPlatform/`, `Solution/macos/`
 
 ## Running Tests

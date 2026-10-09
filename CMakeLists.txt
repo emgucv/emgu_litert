@@ -1169,7 +1169,7 @@ IF(HAVE_WINDESKTOP_LITE)
     DESTINATION Solution
     COMPONENT emgulitert_source
     FILES_MATCHING
-    PATTERN "Emgu.TF.Lite.sln"
+    PATTERN "Emgu.LiteRT.sln"
     PATTERN ".git" EXCLUDE
     PATTERN "bin" EXCLUDE
     )

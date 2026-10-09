@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Properties shared between Emgu.TF.Lite.html.shfbproj and Emgu.TF.Lite.OpenXml.shfbproj.
+<!-- Properties shared between Emgu.LiteRT.html.shfbproj and Emgu.LiteRT.OpenXml.shfbproj.
      Despite being old-style (non-SDK) SHFB projects, both still pick this up automatically:
      SandcastleHelpFileBuilder.targets (which each project imports) transitively imports
      Microsoft.Common.props, which performs the standard directory-walk-up Directory.Build.props
@@ -42,7 +42,7 @@
     <HeaderText>https://www.emgu.com</HeaderText>
     <FooterText>For questions and discussions please visit https://github.com/emgucv/emgutf/issues</FooterText>
     <DocumentationSources>
-      <DocumentationSource sourceFile="..\Solution\Windows.Desktop\Emgu.TF.Lite.sln" />
+      <DocumentationSource sourceFile="..\Solution\Windows.Desktop\Emgu.LiteRT.sln" />
     </DocumentationSources>
     <NamespaceSummaries>
       <NamespaceSummaryItem name="(global)" isDocumented="True">Emgu TF Lite is a cross platform .Net wrapper for the Google Tensorflow Lite library. Allows Tensorflow Lite functions to be called from .NET compatible languages such as C#, VB, VC++, IronPython.</NamespaceSummaryItem>
