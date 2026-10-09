@@ -1,101 +1,80 @@
-﻿//----------------------------------------------------------------------------
+//----------------------------------------------------------------------------
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.       
 //----------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.IO;
-using System.Drawing;
-using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
-using Emgu.CV.Platform.Maui.UI;
 using Emgu.TF.Lite;
 using Emgu.TF.Lite.Models;
-using Size = System.Drawing.Size;
-
 
 namespace Maui.Demo.Lite
 {
-    public class InceptionPage : ButtonTextImagePage
+    public class InceptionPage : DemoPage
     {
         private Inception _inception;
 
         public InceptionPage()
-           : base()
+            : base(
+                "Inception",
+                "Recognize flowers in a photo.",
+                Theme.GlyphSparkle,
+                "Classifies a photo with an Inception model trained on flower species, running on the TensorFlow Lite interpreter, and lists the most likely species with their probabilities.",
+                new[]
+                {
+                    new Sample("tulips.jpg", "Tulips"),
+                    new Sample("space_shuttle.jpg", "Space shuttle"),
+                    new Sample("dog416.png", "Dog & bike", Theme.GlyphPets),
+                    new Sample("surfers.jpg", "Surfers")
+                },
+                0,
+                "Classify Image",
+                "Top predictions")
         {
-
-            var button = this.TopButton;
-            button.Text = "Perform Image Classification";
-            button.Clicked += OnButtonClicked;
-
-            _inception = new Inception();
-            _inception.OnDownloadProgressChanged += onDownloadProgressChanged;
-
         }
 
-        private void onDownloadProgressChanged(long? totalBytesToReceive, long bytesReceived, double? progressPercentage)
+        protected override void ReleaseModel()
         {
-            if (totalBytesToReceive.HasValue && totalBytesToReceive > 0)
-                SetMessage(String.Format("{0} of {1} bytes downloaded ({2}%)", bytesReceived, totalBytesToReceive, progressPercentage));
-            else
-                SetMessage(String.Format("{0} bytes downloaded", bytesReceived, progressPercentage));
+            _inception?.Dispose();
+            _inception = null;
         }
 
-        private void onDownloadCompleted(object sender, System.ComponentModel.AsyncCompletedEventArgs e)
+        protected override async Task<DemoResult> RunAsync(Mat input)
         {
-            if (e != null && e.Error != null)
+            if (_inception == null)
             {
-                SetMessage(e.Error.Message);
-                return;
+                _inception = new Inception();
+                _inception.OnDownloadProgressChanged += OnDownloadProgress;
             }
-        }
-
-        private async void OnButtonClicked(Object sender, EventArgs args)
-        {
-            SetMessage("Please wait while the Inception Model is being downloaded...");
+            ShowProgress("Preparing the Inception model...\n(the first run downloads it)");
             await _inception.Init();
             if (!_inception.Imported)
-            {
-                SetMessage("Failed to initialize Inception Model.");
-                return;
-            }
-            SetImage(null);
-            Mat[] images = await LoadImages(new string[] { "tulips.jpg" });
+                throw new Exception("Failed to initialize the Inception model.");
 
-            //handle user cancel
-            if (images == null || (images.Length > 0 && images[0] == null))
+            ShowProgress("Classifying...");
+            Inception model = _inception;
+            (Inception.RecognitionResult[] result, long ms) = await Task.Run(() =>
             {
-                SetMessage("");
-                return;
-            }
-            
-            Tensor t = _inception.InputTensor;
-            System.Drawing.Size s = new System.Drawing.Size(299, 299);
-            using (Mat resizedMat = new Mat(s, DepthType.Cv8U, 3))
-            using (Mat tensorMat = new Mat(
-                       s, 
-                       DepthType.Cv32F, 
-                       3, 
-                       t.DataPointer,
-                       3 * s.Width * Marshal.SizeOf<float>()))
-            {
-                CvInvoke.Resize(images[0], resizedMat, s);
-                CvInvoke.CvtColor(resizedMat, resizedMat, ColorConversion.Bgr2Rgb);
-                resizedMat.ConvertTo(tensorMat, DepthType.Cv32F, 1.0/255.0, -0.0);
-            }
+                Tensor t = model.InputTensor;
+                System.Drawing.Size s = new System.Drawing.Size(299, 299);
+                using (Mat resizedMat = new Mat(s, DepthType.Cv8U, 3))
+                using (Mat tensorMat = new Mat(s, DepthType.Cv32F, 3, t.DataPointer, 3 * s.Width * Marshal.SizeOf<float>()))
+                {
+                    CvInvoke.Resize(input, resizedMat, s);
+                    CvInvoke.CvtColor(resizedMat, resizedMat, ColorConversion.Bgr2Rgb);
+                    resizedMat.ConvertTo(tensorMat, DepthType.Cv32F, 1.0 / 255.0, -0.0);
+                }
+                Stopwatch watch = Stopwatch.StartNew();
+                var r = model.Invoke();
+                watch.Stop();
+                return (r, watch.ElapsedMilliseconds);
+            });
 
-            Stopwatch watch = Stopwatch.StartNew();
-            var result = _inception.Invoke();
-            watch.Stop();
-            String resStr = String.Format("Object is {0} with {1}% probability. Recognition completed in {2} milliseconds.", result[0].Label, result[0].Probability * 100, watch.ElapsedMilliseconds);
-
-            SetImage(images[0]);
-            SetMessage(resStr);
+            DemoResult demo = new DemoResult { Summary = $"Recognized in {ms} ms" };
+            foreach (var r in result.Take(5))
+                demo.Rows.Add(new ResultRow(r.Label, $"{r.Probability * 100:0.#}%", r.Probability));
+            return demo;
         }
-
     }
 }

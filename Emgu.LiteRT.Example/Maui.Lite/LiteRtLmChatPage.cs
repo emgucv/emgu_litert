@@ -38,11 +38,11 @@ namespace Maui.Demo.Lite
             new ModelOption { Name = "Gemma 4 E2B", Detail = "~2.6 GB download. Larger, keeps a conversation open across turns.", Choice = ModelChoice.Gemma4E2B },
         };
 
-        private static readonly Color UserBubbleColor = Color.FromArgb("#512BD4");
-        private static readonly Color ModelBubbleColor = Color.FromArgb("#DFD8F7");
+        private static readonly Color UserBubbleColor = Theme.Accent;
+        private static readonly Color ModelBubbleColor = Theme.TileBackground;
         private static readonly Color UserTextColor = Colors.White;
-        private static readonly Color ModelTextColor = Color.FromArgb("#212121");
-        private static readonly Color ThinkingTextColor = Color.FromArgb("#6E6E6E");
+        private static readonly Color ModelTextColor = Theme.PrimaryText;
+        private static readonly Color ThinkingTextColor = Theme.SecondaryText;
 
         private readonly Picker _modelPicker;
         private readonly Label _modelDetailLabel;
@@ -66,9 +66,10 @@ namespace Maui.Demo.Lite
         public LiteRtLmChatPage()
         {
             Title = "LiteRT-LM Chat";
-            BackgroundColor = Colors.White;
+            Shell.SetNavBarIsVisible(this, false);
+            BackgroundColor = Theme.PageBackground;
 
-            _modelPicker = new Picker { Title = "Model", TextColor = ModelTextColor, TitleColor = Colors.Gray };
+            _modelPicker = new Picker { Title = "Model", FontFamily = Theme.TitleFont, TextColor = Theme.PrimaryText, TitleColor = Theme.SecondaryText };
             foreach (ModelOption option in Models)
                 _modelPicker.Items.Add(option.Name);
             _modelPicker.SelectedIndex = 0;
@@ -77,50 +78,64 @@ namespace Maui.Demo.Lite
             _modelDetailLabel = new Label
             {
                 Text = Models[0].Detail,
-                FontSize = 12,
-                TextColor = Colors.Gray
+                FontFamily = Theme.BodyFont,
+                FontSize = 13,
+                TextColor = Theme.SecondaryText
             };
 
-            _thinkingLabel = new Label { Text = "Let it think before answering", TextColor = ModelTextColor, VerticalOptions = LayoutOptions.Center };
-            _thinkingSwitch = new Switch { IsToggled = false };
-            _thinkingSwitch.Toggled += OnThinkingToggled;
-            var thinkingRow = new HorizontalStackLayout
+            _thinkingLabel = new Label
             {
-                Spacing = 8,
-                Children = { _thinkingSwitch, _thinkingLabel }
+                Text = "Let it think before answering",
+                FontFamily = Theme.BodyFont,
+                FontSize = 15,
+                TextColor = Theme.PrimaryText,
+                VerticalOptions = LayoutOptions.Center
             };
+            _thinkingSwitch = new Switch { IsToggled = false, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+            _thinkingSwitch.Toggled += OnThinkingToggled;
+            var thinkingRow = new Grid
+            {
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+            };
+            thinkingRow.Add(_thinkingLabel, 0, 0);
+            thinkingRow.Add(_thinkingSwitch, 1, 0);
 
-            _newChatButton = new Button { Text = "New Chat", HorizontalOptions = LayoutOptions.Start };
+            _newChatButton = Theme.SecondaryButton("New Chat", Theme.GlyphWand);
+            _newChatButton.HeightRequest = 44;
+            _newChatButton.FontSize = 15;
             _newChatButton.Clicked += OnNewChat;
 
-            var header = new VerticalStackLayout
+            var optionsCard = Theme.Card(new VerticalStackLayout
             {
                 Spacing = 6,
-                Padding = new Thickness(16, 12, 16, 8),
-                Children = { _modelPicker, _modelDetailLabel, thinkingRow, _newChatButton }
-            };
+                Children = { _modelPicker, _modelDetailLabel, Theme.Divider(), thinkingRow, _newChatButton }
+            }, 14);
 
             _emptyLabel = new Label
             {
                 Text = "Ask anything - the model runs entirely on this device.",
+                FontFamily = Theme.BodyFont,
+                FontSize = 15,
                 HorizontalTextAlignment = TextAlignment.Center,
-                TextColor = Colors.Gray,
+                TextColor = Theme.SecondaryText,
                 Margin = new Thickness(24)
             };
-            _transcript = new VerticalStackLayout { Spacing = 10, Padding = new Thickness(12, 4), Children = { _emptyLabel } };
+            _transcript = new VerticalStackLayout { Spacing = 10, Padding = new Thickness(4), Children = { _emptyLabel } };
             _scroll = new ScrollView { Content = _transcript };
 
             _statusLabel = new Label
             {
                 IsVisible = false,
-                Padding = new Thickness(16, 4),
-                TextColor = Color.FromArgb("#512BD4"),
-                FontAttributes = FontAttributes.Italic
+                Padding = new Thickness(4, 2),
+                TextColor = Theme.Accent,
+                FontFamily = Theme.BodyFont,
+                FontSize = 14
             };
 
             _promptEditor = new Editor
             {
                 Placeholder = "Type your message...",
+                FontFamily = Theme.BodyFont,
                 // On Windows, the native TextBox's idle-state foreground brush doesn't reliably follow
                 // Editor.TextColor (a known MAUI/WinUI quirk), so a dark TextColor still rendered white
                 // here. Going dark end-to-end instead - a black background always shows the (effectively
@@ -133,37 +148,51 @@ namespace Maui.Demo.Lite
                 MaximumHeightRequest = 120
             };
 
-            _busyIndicator = new ActivityIndicator { IsVisible = false, IsRunning = false, WidthRequest = 36 };
-            _sendButton = new Button { Text = "Send", WidthRequest = 90 };
+            _busyIndicator = new ActivityIndicator { IsVisible = false, IsRunning = false, WidthRequest = 36, Color = Theme.Accent };
+            _sendButton = new Button
+            {
+                Text = "Send",
+                FontFamily = Theme.TitleFont,
+                BackgroundColor = Theme.Accent,
+                TextColor = Colors.White,
+                CornerRadius = 14,
+                HeightRequest = 44,
+                WidthRequest = 90
+            };
             _sendButton.Clicked += OnSendClicked;
 
-            var sendArea = new Grid();
+            var sendArea = new Grid { VerticalOptions = LayoutOptions.End };
             sendArea.Children.Add(_sendButton);
             sendArea.Children.Add(_busyIndicator);
 
             var composerRow = new Grid
             {
                 ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
-                ColumnSpacing = 8,
-                Padding = new Thickness(12)
+                ColumnSpacing = 8
             };
             composerRow.Add(_promptEditor, 0, 0);
             composerRow.Add(sendArea, 1, 0);
 
             var root = new Grid
             {
+                RowSpacing = 12,
+                Padding = new Thickness(16, 12, 16, 16),
+                MaximumWidthRequest = 760,
+                HorizontalOptions = LayoutOptions.Fill,
                 RowDefinitions =
                 {
+                    new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Star),
                     new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Auto)
                 }
             };
-            root.Add(header, 0, 0);
-            root.Add(_scroll, 0, 1);
-            root.Add(_statusLabel, 0, 2);
-            root.Add(composerRow, 0, 3);
+            root.Add(Theme.PageHeader(this, Theme.GlyphText, "LiteRT-LM Chat", "On-device language model", true, false), 0, 0);
+            root.Add(optionsCard, 0, 1);
+            root.Add(_scroll, 0, 2);
+            root.Add(_statusLabel, 0, 3);
+            root.Add(Theme.Card(composerRow, 10), 0, 4);
 
             Content = root;
         }
@@ -358,9 +387,9 @@ namespace Maui.Demo.Lite
 
         private StreamingBubble AddStreamingBubble()
         {
-            var thinkingLabel = new Label { FontAttributes = FontAttributes.Italic, TextColor = ThinkingTextColor, FontSize = 13, IsVisible = false };
-            var separator = new BoxView { HeightRequest = 1, Color = Colors.LightGray, IsVisible = false };
-            var textLabel = new Label { TextColor = ModelTextColor };
+            var thinkingLabel = new Label { FontFamily = Theme.BodyFont, TextColor = ThinkingTextColor, FontSize = 13, IsVisible = false };
+            var separator = new BoxView { HeightRequest = 1, Color = Theme.Chevron, IsVisible = false };
+            var textLabel = new Label { TextColor = ModelTextColor, FontFamily = Theme.BodyFont, FontSize = 15 };
 
             Border bubble = ModelBubble(new VerticalStackLayout
             {
@@ -407,9 +436,9 @@ namespace Maui.Demo.Lite
             {
                 BackgroundColor = background,
                 Stroke = Colors.Transparent,
-                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(14) },
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(18) },
                 Padding = new Thickness(12, 9),
-                Content = new Label { Text = text, TextColor = textColor }
+                Content = new Label { Text = text, TextColor = textColor, FontFamily = Theme.BodyFont, FontSize = 15 }
             };
         }
 
@@ -419,7 +448,7 @@ namespace Maui.Demo.Lite
             {
                 BackgroundColor = ModelBubbleColor,
                 Stroke = Colors.Transparent,
-                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(14) },
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(18) },
                 Padding = new Thickness(12, 9),
                 Content = content
             };

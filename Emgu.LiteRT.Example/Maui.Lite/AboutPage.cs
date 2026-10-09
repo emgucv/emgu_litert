@@ -1,62 +1,102 @@
-﻿//----------------------------------------------------------------------------
-//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.       
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace Maui.Demo.Lite
 {
     public class AboutPage : ContentPage
     {
-        public AboutPage(String htmlSource = null)
+        public AboutPage()
         {
+            Shell.SetNavBarIsVisible(this, false);
+            BackgroundColor = Theme.PageBackground;
+
             String tensorflowVer = Emgu.TF.Lite.TfLiteInvoke.Version;
+            bool hasXnnPack = Emgu.TF.Lite.TfLiteInvoke.HasXNNPack;
 
-            // LiteRT has no runtime-queryable version API (no native export to P/Invoke, unlike
-            // TfLiteInvoke.Version above); its Major.Minor.Patch is baked into the Emgu.LiteRT
-            // assembly's own version at build time (CMakeLists.txt sets CPACK_PACKAGE_VERSION_
-            // MAJOR/MINOR/PATCH from litert/version.bzl's LITERT_EXPERIMENTAL_VERSION), so read it
-            // back via reflection instead. The Revision component is EmguTF's own git commit count,
-            // not part of LiteRT's version, so it's left out.
-            Version liteRtAssemblyVer = typeof(Emgu.LiteRT.CompiledModel).Assembly.GetName().Version;
-            String liteRtVer = (liteRtAssemblyVer == null)
+            // LiteRT has no runtime-queryable version API; its Major.Minor.Patch is baked into the
+            // Emgu.LiteRT assembly's version at build time, so read it back via reflection. The
+            // Revision component is Emgu's own git commit count, not part of LiteRT's version.
+            Version asmVer = typeof(Emgu.LiteRT.CompiledModel).Assembly.GetName().Version;
+            String liteRtVer = (asmVer == null)
                 ? "unknown"
-                : String.Format("{0}.{1}.{2}", liteRtAssemblyVer.Major, liteRtAssemblyVer.Minor, liteRtAssemblyVer.Build);
+                : String.Format("{0}.{1}.{2}", asmVer.Major, asmVer.Minor, asmVer.Build);
 
-            if (htmlSource == null)
+            var versions = new VerticalStackLayout
             {
-                bool hasXnnPack = Emgu.TF.Lite.TfLiteInvoke.HasXNNPack;
+                Spacing = 0,
+                Children =
+                {
+                    InfoRow("TensorFlow Lite", tensorflowVer),
+                    Theme.Divider(),
+                    InfoRow("LiteRT", liteRtVer),
+                    Theme.Divider(),
+                    InfoRow("XNNPack", hasXnnPack ? "Yes" : "No")
+                }
+            };
 
-                htmlSource = String.Format(
-                    @"<html>
-                    <body>
-                    <H1> Emgu TF Lite Examples </H1>
-                    <H3> Tensorflow Lite version: {0} </H3>
-                    <H3> LiteRT version: {2} </H3>
-                    <H3> Has XNNPack: {1} </H3>
-                    <H3> Tensorflow Lite <a href=https://github.com/tensorflow/tensorflow/blob/master/LICENSE > license</a> </H3>
-                    <H3><a href=https://www.emgu.com/wiki/index.php/Emgu_TF >Visit our website</a> <br/><br/><H3>
-                    <H3><a href=mailto:support@emgu.com>Email Support</a> <br/><br/><H3>"
-                    + @"
-                    </body>
-                    </html>", tensorflowVer, hasXnnPack, liteRtVer);
-            }
+            var links = new VerticalStackLayout
+            {
+                Spacing = 0,
+                Children =
+                {
+                    LinkRow(Theme.GlyphInfo, "TensorFlow Lite license", "https://github.com/tensorflow/tensorflow/blob/master/LICENSE"),
+                    Theme.Divider(54),
+                    LinkRow(Theme.GlyphGrid, "Visit our website", "https://www.emgu.com/wiki/index.php/Emgu_TF"),
+                    Theme.Divider(54),
+                    LinkRow(Theme.GlyphText, "Email support", "mailto:support@emgu.com")
+                }
+            };
 
-            // No WidthRequest/HeightRequest: a fixed 1000x1000 (device-independent units) WebView is wider than a
-            // phone screen and gets centered, which pushed the left-aligned page content off-screen and left the
-            // page looking blank. As the page's only content, the WebView fills the page by default.
-            Content =
-                    new WebView()
-                    {
-                        Source =  new HtmlWebViewSource()
-                        {
-                            Html = htmlSource
-                        }
-                    };
+            Content = Theme.CenteredScroll(new VerticalStackLayout
+            {
+                Spacing = 16,
+                Padding = new Thickness(16, 12, 16, 24),
+                Children =
+                {
+                    Theme.PageHeader(this, Theme.GlyphInfo, "About", "Emgu LiteRT examples", true, false),
+                    Theme.Card(new VerticalStackLayout { Spacing = 8, Children = { Theme.SectionTitle("Versions"), versions } }),
+                    Theme.Card(new VerticalStackLayout { Spacing = 8, Children = { Theme.SectionTitle("Links"), links } })
+                }
+            });
+        }
+
+        private static View InfoRow(string name, string value)
+        {
+            var g = new Grid
+            {
+                Padding = new Thickness(0, 12),
+                ColumnSpacing = 16,
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+            };
+            g.Add(new Label { Text = name, FontFamily = Theme.BodyFont, FontSize = 16, TextColor = Theme.SecondaryText }, 0, 0);
+            g.Add(new Label { Text = value, FontFamily = Theme.TitleFont, FontSize = 16, TextColor = Theme.PrimaryText }, 1, 0);
+            return g;
+        }
+
+        private static View LinkRow(string glyph, string text, string uri)
+        {
+            var g = new Grid
+            {
+                Padding = new Thickness(0, 10),
+                ColumnSpacing = 12,
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto)
+                }
+            };
+            g.Add(Theme.IconTile(glyph, 42, 22, 11), 0, 0);
+            g.Add(new Label { Text = text, FontFamily = Theme.TitleFont, FontSize = 16, TextColor = Theme.PrimaryText, VerticalOptions = LayoutOptions.Center }, 1, 0);
+            g.Add(Theme.MakeIcon(Theme.GlyphChevronRight, Theme.Chevron, 22), 2, 0);
+            g.OnTap(async () =>
+            {
+                try { await Launcher.OpenAsync(new Uri(uri)); } catch { }
+            });
+            return g;
         }
     }
 }
