@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="14.0">
-  <!-- Properties shared with Emgu.TF.Lite.OpenXml.shfbproj live in Directory.Build.props.
+  <!-- Properties shared with Emgu.LiteRT.OpenXml.shfbproj live in Directory.Build.props.
        SHFB's own SandcastleHelpFileBuilder.targets (imported below) transitively imports
        Microsoft.Common.props, which auto-imports Directory.Build.props from this same folder -
        no explicit <Import> needed here (adding one causes a duplicate-import warning, since the

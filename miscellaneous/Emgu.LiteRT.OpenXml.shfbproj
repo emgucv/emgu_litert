@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Dedicated SHFB project for the OpenXml (Word) documentation output - see
-     Emgu.TF.Lite.html.shfbproj and Directory.Build.props for why this is a separate project
-     file rather than a build-time override of Emgu.TF.Lite.html.shfbproj. -->
+     Emgu.LiteRT.html.shfbproj and Directory.Build.props for why this is a separate project
+     file rather than a build-time override of Emgu.LiteRT.html.shfbproj. -->
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="14.0">
-  <!-- Properties shared with Emgu.TF.Lite.html.shfbproj live in Directory.Build.props.
+  <!-- Properties shared with Emgu.LiteRT.html.shfbproj live in Directory.Build.props.
        SHFB's own SandcastleHelpFileBuilder.targets (imported below) transitively imports
        Microsoft.Common.props, which auto-imports Directory.Build.props from this same folder -
        no explicit <Import> needed here (adding one causes a duplicate-import warning, since the
