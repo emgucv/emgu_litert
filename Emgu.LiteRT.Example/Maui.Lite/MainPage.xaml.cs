@@ -66,6 +66,16 @@ public partial class MainPage : ContentPage
             inceptionButton,
             modelCheckerButton
         };
+
+#if WINDOWS
+        Button liteRtLmChatButton = new Button();
+        liteRtLmChatButton.Text = "LiteRT-LM Chat";
+        liteRtLmChatButton.Clicked += (sender, args) =>
+        {
+            this.Navigation.PushAsync(new LiteRtLmChatPage());
+        };
+        buttonList.Add(liteRtLmChatButton);
+#endif
         
 
         StackLayout buttonsLayout = new StackLayout
