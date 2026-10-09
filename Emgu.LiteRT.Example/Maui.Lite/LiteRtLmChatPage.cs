@@ -5,6 +5,7 @@
 #if WINDOWS
 
 using System;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Models;
@@ -204,19 +205,39 @@ namespace Maui.Demo.Lite
                     return;
 
                 _promptEditor.Text = string.Empty;
-                AddMessage(prompt.Trim(), true);
+                AddUserMessage(prompt.Trim());
                 SetStatus("Generating...");
 
-                // Chat.Send blocks on native LiteRT-LM calls; keep it off the UI thread, and keep the
-                // task around so teardown (OnNavigatedFrom / switching models) can wait for it instead
-                // of freeing the chat/engine while this is still reading them.
-                Chat chat = _chat;
-                string text = prompt;
-                Task<ChatReply> generation = Task.Run(() => chat.Send(text));
+                // Stream the reply into its own bubble as it's generated, rather than waiting for the
+                // full answer. onChunk fires on a LiteRT-LM background thread with each incremental piece
+                // of text (including any <think>...</think> block), so re-splitting the text accumulated
+                // so far through ChatReply on every chunk gives the same thinking/answer split a finished
+                // reply would show, just filled in live.
+                StreamingBubble bubble = AddStreamingBubble();
+                StringBuilder streamed = new StringBuilder();
+                bool firstChunk = true;
+                Action<string> onChunk = chunk =>
+                {
+                    streamed.Append(chunk);
+                    ChatReply partial = new ChatReply(streamed.ToString());
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        if (firstChunk)
+                        {
+                            firstChunk = false;
+                            SetStatus(null);
+                        }
+                        UpdateStreamingBubble(bubble, partial);
+                    });
+                };
+
+                // Kept so teardown (OnNavigatedFrom / switching models) can wait for it instead of
+                // freeing the chat/engine while LiteRT-LM is still generating into it.
+                Task<ChatReply> generation = _chat.SendAsync(prompt, onChunk);
                 _generation = generation;
                 ChatReply reply = await generation;
 
-                AddReply(reply);
+                UpdateStreamingBubble(bubble, reply);
                 SetStatus(null);
             }
             catch (Exception ex)
@@ -326,34 +347,46 @@ namespace Maui.Demo.Lite
             _transcript.Children.Add(_emptyLabel);
         }
 
-        private void AddReply(ChatReply reply)
+        // The views of a model bubble that is still streaming, so each chunk can update it in place
+        // instead of adding a new bubble per chunk.
+        private sealed class StreamingBubble
         {
-            if (!string.IsNullOrWhiteSpace(reply.Thinking))
-            {
-                var bubble = ModelBubble(new VerticalStackLayout
-                {
-                    Spacing = 4,
-                    Children =
-                    {
-                        new Label { Text = reply.Thinking, FontAttributes = FontAttributes.Italic, TextColor = ThinkingTextColor, FontSize = 13 },
-                        new BoxView { HeightRequest = 1, Color = Colors.LightGray },
-                        new Label { Text = reply.Text, TextColor = ModelTextColor }
-                    }
-                });
-                AddBubbleRow(bubble, false);
-            }
-            else
-            {
-                AddMessage(reply.Text, false);
-            }
+            public Label ThinkingLabel;
+            public BoxView Separator;
+            public Label TextLabel;
         }
 
-        private void AddMessage(string text, bool isUser)
+        private StreamingBubble AddStreamingBubble()
         {
-            Border bubble = isUser
-                ? Bubble(text, UserBubbleColor, UserTextColor)
-                : ModelBubble(new Label { Text = text, TextColor = ModelTextColor });
-            AddBubbleRow(bubble, isUser);
+            var thinkingLabel = new Label { FontAttributes = FontAttributes.Italic, TextColor = ThinkingTextColor, FontSize = 13, IsVisible = false };
+            var separator = new BoxView { HeightRequest = 1, Color = Colors.LightGray, IsVisible = false };
+            var textLabel = new Label { TextColor = ModelTextColor };
+
+            Border bubble = ModelBubble(new VerticalStackLayout
+            {
+                Spacing = 4,
+                Children = { thinkingLabel, separator, textLabel }
+            });
+            AddBubbleRow(bubble, false);
+
+            return new StreamingBubble { ThinkingLabel = thinkingLabel, Separator = separator, TextLabel = textLabel };
+        }
+
+        // Called on the UI thread with the thinking/answer split of everything streamed so far (or, once,
+        // with the finished reply).
+        private void UpdateStreamingBubble(StreamingBubble bubble, ChatReply partial)
+        {
+            bool hasThinking = !string.IsNullOrEmpty(partial.Thinking);
+            bubble.ThinkingLabel.IsVisible = hasThinking;
+            bubble.Separator.IsVisible = hasThinking;
+            bubble.ThinkingLabel.Text = partial.Thinking;
+            bubble.TextLabel.Text = partial.Text;
+            ScrollToEnd();
+        }
+
+        private void AddUserMessage(string text)
+        {
+            AddBubbleRow(Bubble(text, UserBubbleColor, UserTextColor), true);
         }
 
         private void AddBubbleRow(Border bubble, bool isUser)
