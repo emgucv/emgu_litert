@@ -45,13 +45,15 @@
       <DocumentationSource sourceFile="..\Solution\Windows.Desktop\Emgu.LiteRT.sln" />
     </DocumentationSources>
     <NamespaceSummaries>
-      <NamespaceSummaryItem name="(global)" isDocumented="True">Emgu TF Lite is a cross platform .Net wrapper for the Google Tensorflow Lite library. Allows Tensorflow Lite functions to be called from .NET compatible languages such as C#, VB, VC++, IronPython.</NamespaceSummaryItem>
+      <NamespaceSummaryItem name="(global)" isDocumented="True">Emgu LiteRT is a cross platform .Net wrapper for Google's LiteRT and TensorFlow Lite libraries. Allows LiteRT and TensorFlow Lite functions to be called from .NET compatible languages such as C#, VB, VC++, IronPython.</NamespaceSummaryItem>
 <NamespaceSummaryItem name="Emgu" isDocumented="True">Root namespace for class and functions implemented by Emgu Corporation</NamespaceSummaryItem>
-<NamespaceSummaryItem name="Emgu.TF.Lite" isDocumented="True">Wrapper of Tensorflow Lite functions.</NamespaceSummaryItem>
-<NamespaceSummaryItem name="Emgu.LiteRT.Util" isDocumented="True">Emgu TF Utilities.</NamespaceSummaryItem>
-<NamespaceSummaryItem name="Emgu.LiteRT.Util.TypeEnum" isDocumented="True">Enumeration container for the Utility namespace</NamespaceSummaryItem>
-<NamespaceSummaryItem name="Emgu.Models" isDocumented="True">Emgu Models</NamespaceSummaryItem>
-<NamespaceSummaryItem name="Emgu.TF.Lite.Models" isDocumented="True">Emgu TF Lite models</NamespaceSummaryItem></NamespaceSummaries>
+<NamespaceSummaryItem name="Emgu.TF.Lite" isDocumented="True">Managed wrapper (Interpreter, Tensor, TfLiteInvoke) over the TensorFlow Lite C API, exposed through the tfliteextern native library.</NamespaceSummaryItem>
+<NamespaceSummaryItem name="Emgu.TF.Lite.Models" isDocumented="True">High-level pre-built model helpers (MobileNet, COCO SSD, etc.) that download weights and run inference, built on the Emgu.TF.Lite Interpreter API.</NamespaceSummaryItem>
+<NamespaceSummaryItem name="Emgu.TF.Lite.ImageIO" isDocumented="True">Image loading helpers (NativeImageIO, JpegData) for decoding images into tensors.</NamespaceSummaryItem>
+<NamespaceSummaryItem name="Emgu.LiteRT" isDocumented="True">Managed wrapper (Model, CompiledModel, Environment, TensorBuffer) over LiteRT's own libLiteRt C API.</NamespaceSummaryItem>
+<NamespaceSummaryItem name="Emgu.LiteRT.Util" isDocumented="True">Base classes (UnmanagedObject, DisposableObject) and shared utilities (Annotation, DownloadableFile, FileDownloadManager) used across the Emgu LiteRT libraries.</NamespaceSummaryItem>
+<NamespaceSummaryItem name="Emgu.LiteRT.LM" isDocumented="True">Managed wrapper (EngineSettings, Engine, Session, Conversation) over LiteRT-LM's C API for running on-device language models.</NamespaceSummaryItem>
+<NamespaceSummaryItem name="Emgu.LiteRT.LM.Models" isDocumented="True">Ready-to-use language models (Qwen3, Gemma4E2B) and chat helpers (Chat, ChatMessage, ChatAttachment) built on Emgu.LiteRT.LM.</NamespaceSummaryItem></NamespaceSummaries>
     <PlugInConfigurations>
     </PlugInConfigurations>
     <MaximumGroupParts>2</MaximumGroupParts>
