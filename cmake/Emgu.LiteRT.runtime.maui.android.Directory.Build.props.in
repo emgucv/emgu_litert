@@ -23,7 +23,7 @@ ${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKA
 	<PackageIcon>nuget_icon.png</PackageIcon>
     <PackageReadmeFile>docs/README.md</PackageReadmeFile>
 	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
-	<RepositoryUrl>https://github.com/emgucv/emgutf</RepositoryUrl>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
     <PackageOutputPath>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\platforms\nuget))</PackageOutputPath>

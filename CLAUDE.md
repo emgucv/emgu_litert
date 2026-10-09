@@ -36,7 +36,7 @@ The native C++ layer is exposed through P/Invoke via the `tfliteextern` extern l
 6. **Unity integration** — `Emgu.TF.Lite.Unity/` is a Unity project that mirrors the managed API for use in game engines.
 
 ### Shared projects
-`Emgu.LiteRT.Tflite.Shared.shproj`, `Emgu.LiteRT.Util.Shared.shproj`, etc. share source files across multiple target frameworks (NetStandard, Android, iOS, Unity). The `.projitems` files define which `.cs` files are included (unaffected by the `.shproj` rename - `Emgu.TF.Lite/Emgu.TF.Lite.Shared.projitems` keeps its own name, even though it now sits back inside the `Emgu.TF.Lite/` folder rather than `Emgu.LiteRT.Tflite/`).
+`Emgu.TF.Lite.Shared.shproj`, `Emgu.LiteRT.Util.Shared.shproj`, etc. share source files across multiple target frameworks (NetStandard, Android, iOS, Unity). The `.projitems` files define which `.cs` files are included.
 
 ## Building
 

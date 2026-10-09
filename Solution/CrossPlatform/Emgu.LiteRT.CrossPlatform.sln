@@ -1,19 +1,23 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31611.283
+# Visual Studio Version 18
+VisualStudioVersion = 18.10.12201.205 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Maui.Demo.Lite", "..\..\Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj", "{E1EA24DC-FE69-487C-967D-028FDE402E85}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.LiteRT.Util.Shared", "..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.shproj", "{98561642-5EC3-4244-BAF9-6876D9BA5527}"
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.LiteRT.Tflite.Shared", "..\..\Emgu.TF.Lite\Emgu.LiteRT.Tflite.Shared.shproj", "{8F587FB9-BBA6-4C30-9329-8CBAC7020FE0}"
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Shared", "..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.shproj", "{8F587FB9-BBA6-4C30-9329-8CBAC7020FE0}"
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.Models.Shared", "..\..\Emgu.Models\Emgu.Models.Shared.shproj", "{8EDCE0C8-BA71-4396-9428-35D05877258C}"
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.ImageIO.Shared", "..\..\Emgu.TF.Lite.ImageIO\Emgu.TF.Lite.ImageIO.Shared.shproj", "{8EDCE0C8-BA71-4396-9428-35D05877258C}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.TF.Lite.Models.Shared", "..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.shproj", "{E956DD26-1294-4731-8A90-C4CBA9F291B6}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Emgu.LiteRT.LM.Shared", "..\..\Emgu.LiteRT.LM\Emgu.LiteRT.LM.Shared.shproj", "{7FBB7295-8167-43CD-AD5F-6EA8A51A52C9}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.TF.Lite", "..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj", "{FDAB1BD5-2BC7-4839-83A6-3DCD6E8C4B5A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.LiteRT.LM", "..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj", "{B10D6464-2A82-46EA-87E6-4ED24814DB27}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Emgu.LiteRT.runtime.maui.android", "..\..\Emgu.LiteRT.Runtime\Maui\Android\Lite\Emgu.LiteRT.runtime.maui.android.csproj", "{4318036D-46DC-4310-8ECE-93ADF819F280}"
 EndProject
@@ -96,6 +100,30 @@ Global
 		{FDAB1BD5-2BC7-4839-83A6-3DCD6E8C4B5A}.Release|x64.Build.0 = Release|Any CPU
 		{FDAB1BD5-2BC7-4839-83A6-3DCD6E8C4B5A}.Release|x86.ActiveCfg = Release|Any CPU
 		{FDAB1BD5-2BC7-4839-83A6-3DCD6E8C4B5A}.Release|x86.Build.0 = Release|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|ARM.ActiveCfg = Debug|ARM
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|ARM.Build.0 = Debug|ARM
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|iPhone.ActiveCfg = Debug|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|iPhone.Build.0 = Debug|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|iPhoneSimulator.ActiveCfg = Debug|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|iPhoneSimulator.Build.0 = Debug|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|x64.Build.0 = Debug|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Debug|x86.Build.0 = Debug|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|ARM.ActiveCfg = Release|ARM
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|ARM.Build.0 = Release|ARM
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|iPhone.ActiveCfg = Release|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|iPhone.Build.0 = Release|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|iPhoneSimulator.ActiveCfg = Release|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|iPhoneSimulator.Build.0 = Release|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|x64.ActiveCfg = Release|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|x64.Build.0 = Release|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|x86.ActiveCfg = Release|Any CPU
+		{B10D6464-2A82-46EA-87E6-4ED24814DB27}.Release|x86.Build.0 = Release|Any CPU
 		{4318036D-46DC-4310-8ECE-93ADF819F280}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4318036D-46DC-4310-8ECE-93ADF819F280}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4318036D-46DC-4310-8ECE-93ADF819F280}.Debug|ARM.ActiveCfg = Debug|Any CPU
@@ -224,13 +252,13 @@ Global
 		SolutionGuid = {61F7FB11-1E47-470C-91E2-47F8143E1572}
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{593619dc-5cda-4ee4-9147-7849a4e2497b}*SharedItemsImports = 5
 		..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.projitems*{593619dc-5cda-4ee4-9147-7849a4e2497b}*SharedItemsImports = 5
-		..\..\Emgu.Models\Emgu.Models.Shared.projitems*{8edce0c8-ba71-4396-9428-35d05877258c}*SharedItemsImports = 13
+		..\..\Emgu.TF.Lite.ImageIO\Emgu.TF.Lite.ImageIO.Shared.projitems*{8edce0c8-ba71-4396-9428-35d05877258c}*SharedItemsImports = 13
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{8f587fb9-bba6-4c30-9329-8cbac7020fe0}*SharedItemsImports = 13
 		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{98561642-5ec3-4244-baf9-6876d9ba5527}*SharedItemsImports = 13
 		..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.Shared.projitems*{e956dd26-1294-4731-8a90-c4cba9f291b6}*SharedItemsImports = 13
 		..\..\Emgu.TF.Lite\Emgu.TF.Lite.Shared.projitems*{fdab1bd5-2bc7-4839-83a6-3dcd6e8c4b5a}*SharedItemsImports = 5
-		..\..\Emgu.LiteRT.Util\Emgu.LiteRT.Util.Shared.projitems*{fdab1bd5-2bc7-4839-83a6-3dcd6e8c4b5a}*SharedItemsImports = 5
+		..\..\Emgu.LiteRT.LM\Emgu.LiteRT.LM.Shared.projitems*{7fbb7295-8167-43cd-ad5f-6ea8a51a52c9}*SharedItemsImports = 13
+		..\..\Emgu.LiteRT.LM\Emgu.LiteRT.LM.Shared.projitems*{b10d6464-2a82-46ea-87e6-4ed24814db27}*SharedItemsImports = 5
 	EndGlobalSection
 EndGlobal

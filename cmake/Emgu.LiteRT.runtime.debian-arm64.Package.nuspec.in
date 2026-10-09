@@ -8,7 +8,7 @@
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
     <license type="file">${EMGU_LITERT_LICENSE_FILE}</license>
     <projectUrl>${EMGUTF_MAIN_WEB_URL}</projectUrl>
-	<repository type="git" url="https://github.com/emgucv/emgutf" />
+	<repository type="git" url="${GITHUB_REPO_URL}" />
 	<icon>icon.png</icon>
     <requireLicenseAcceptance>true</requireLicenseAcceptance>
 	<summary>ARM64 runtime package of Emgu TF Lite for Debian (including Raspberry Pi OS)</summary>
