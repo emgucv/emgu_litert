@@ -2,7 +2,7 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if WINDOWS
+#if WINDOWS || IOS
 
 using System;
 using System.Text;
@@ -14,7 +14,7 @@ namespace Maui.Demo.Lite
 {
     /// <summary>
     /// Chat demo backed by LiteRT-LM: downloads a .litertlm model and runs it entirely on this device
-    /// through Emgu.LiteRT.LM.Models (LanguageModel, Chat). Only wired up for Windows for now -
+    /// through Emgu.LiteRT.LM.Models (LanguageModel, Chat). Wired up for Windows and iOS for now -
     /// LiteRT-LM's native library is not yet bundled with this app on the other MAUI targets.
     /// </summary>
     public class LiteRtLmChatPage : ContentPage
@@ -136,6 +136,7 @@ namespace Maui.Demo.Lite
             {
                 Placeholder = "Type your message...",
                 FontFamily = Theme.BodyFont,
+#if WINDOWS
                 // On Windows, the native TextBox's idle-state foreground brush doesn't reliably follow
                 // Editor.TextColor (a known MAUI/WinUI quirk), so a dark TextColor still rendered white
                 // here. Going dark end-to-end instead - a black background always shows the (effectively
@@ -143,6 +144,10 @@ namespace Maui.Demo.Lite
                 BackgroundColor = Colors.Black,
                 TextColor = Colors.White,
                 PlaceholderColor = Colors.LightGray,
+#else
+                TextColor = Theme.PrimaryText,
+                PlaceholderColor = Theme.SecondaryText,
+#endif
                 AutoSize = EditorAutoSizeOption.TextChanges,
                 MinimumHeightRequest = 44,
                 MaximumHeightRequest = 120

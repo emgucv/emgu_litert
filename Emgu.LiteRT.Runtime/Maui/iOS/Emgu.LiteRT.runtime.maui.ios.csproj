@@ -59,7 +59,20 @@
       <LinkerFlags>-stdlib=libc++ -ObjC -lc++</LinkerFlags>
       <Frameworks>Foundation Accelerate CoreFoundation CoreGraphics AssetsLibrary AVFoundation CoreImage CoreMedia CoreVideo QuartzCore ImageIO UIKit CoreText</Frameworks>
     </NativeReference>
-    
+
+    <!-- LiteRT-LM's C API (Emgu.LiteRT.LM), built by platforms/ios/bazel_build_litert_lm_ios: a dynamic framework,
+         since it carries its own statically linked LiteRT/TFLite, which would clash with the static tfliteextern
+         above in one binary. It depends on LiteRT-LM's prebuilt Gemma model constraint provider, which that script
+         wraps into a framework of its own. Both are optional: without them, Emgu.LiteRT.LM is unavailable on iOS. -->
+    <NativeReference Condition="Exists('$(TfLiteBinaryDir)\ios\CLiteRTLM.xcframework')" Include="$(TfLiteBinaryDir)\ios\CLiteRTLM.xcframework">
+      <Kind>Framework</Kind>
+      <SmartLink>False</SmartLink>
+    </NativeReference>
+    <NativeReference Condition="Exists('$(TfLiteBinaryDir)\ios\GemmaModelConstraintProvider.xcframework')" Include="$(TfLiteBinaryDir)\ios\GemmaModelConstraintProvider.xcframework">
+      <Kind>Framework</Kind>
+      <SmartLink>False</SmartLink>
+    </NativeReference>
+
   </ItemGroup>
   
     <ItemGroup>
