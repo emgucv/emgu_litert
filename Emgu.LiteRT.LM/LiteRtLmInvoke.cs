@@ -84,8 +84,7 @@ namespace Emgu.LiteRT.LM
         }
 
         /// <summary>
-        /// Throw a LiteRtLmException if a LiteRT-LM C API call returned NULL. The C API reports no error
-        /// message; the details are written to LiteRT-LM's native log.
+        /// Throw a LiteRtLmException if a LiteRT-LM C API call returned NULL, with LiteRT-LM's error message.
         /// </summary>
         /// <param name="ptr">The pointer returned by the call</param>
         /// <param name="functionName">The name of the C API function, for the exception message</param>
@@ -93,20 +92,52 @@ namespace Emgu.LiteRT.LM
         internal static IntPtr CheckPtr(IntPtr ptr, String functionName)
         {
             if (ptr == IntPtr.Zero)
-                throw new LiteRtLmException(String.Format("{0} failed; see the LiteRT-LM log for details", functionName));
+                throw new LiteRtLmException(String.Format("{0} failed: {1}", functionName, TakeLastError()));
             return ptr;
         }
 
         /// <summary>
-        /// Throw a LiteRtLmException if a LiteRT-LM C API call returned a non-zero status.
+        /// Throw a LiteRtLmException if a LiteRT-LM C API call returned a non-zero status, with LiteRT-LM's error
+        /// message.
         /// </summary>
         /// <param name="status">The status returned by the call, 0 on success</param>
         /// <param name="functionName">The name of the C API function, for the exception message</param>
         internal static void CheckStatus(int status, String functionName)
         {
             if (status != 0)
-                throw new LiteRtLmException(String.Format("{0} failed with status {1}; see the LiteRT-LM log for details", functionName, status));
+                throw new LiteRtLmException(String.Format("{0} failed with status {1}: {2}", functionName, status, TakeLastError()));
         }
+
+        // Whether liblitert-lm has the error reporter (litert_lm_get_last_error_message, LiteRT-LM v0.18.0 and later).
+        private static bool _hasErrorReporter = true;
+
+        // The error message LiteRT-LM recorded for the last failed call on this thread, cleared once read so a later
+        // failure that records none can't report it again. Must be called on the thread that made the failed call,
+        // right after it (the error state is thread-local).
+        private static String TakeLastError()
+        {
+            const String NoDetails = "see the LiteRT-LM log for details";
+            if (!_hasErrorReporter)
+                return NoDetails;
+            try
+            {
+                String message = PtrToStringUtf8(litert_lm_get_last_error_message());
+                litert_lm_clear_last_error();
+                return String.IsNullOrEmpty(message) ? NoDetails : message;
+            }
+            catch (EntryPointNotFoundException)
+            {
+                // An older liblitert-lm.
+                _hasErrorReporter = false;
+                return NoDetails;
+            }
+        }
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        private static extern IntPtr litert_lm_get_last_error_message();
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        private static extern void litert_lm_clear_last_error();
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         private static extern void litert_lm_set_min_log_level(LogSeverity level);

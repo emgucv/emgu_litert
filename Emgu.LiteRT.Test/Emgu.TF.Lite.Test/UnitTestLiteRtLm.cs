@@ -28,12 +28,8 @@ namespace Emgu.TF.Lite.Test
     [TestFixture]
     public class UnitTestLiteRtLm
     {
-        // The repo's mixed int4 build: its Qwen3-0.6B.litertlm needs a newer LiteRT-LM than the pinned v0.17.1 (engine
-        // creation fails loading its tokenizer, "piece must not include null character", also with litert_lm_main).
-        private static readonly DownloadableFile ModelFile = new DownloadableFile(
-            "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/qwen3_0_6b_mixed_int4.litertlm",
-            "LiteRT-LM",
-            "7900eb4e7362d88c58782c6f9999bb7a129e03544aa98b8f338ea0cc5d8c22c1");
+        // The model the Qwen3 class downloads (Qwen3-0.6B, dynamic int4).
+        private static readonly DownloadableFile ModelFile = Qwen3.ModelFile;
 
         // Keep the generated answers short, so the tests run quickly on the CPU.
         private const int MaxOutputTokens = 32;
@@ -218,10 +214,7 @@ namespace Emgu.TF.Lite.Test
                         config.SessionConfig = sessionConfig;
                         config.SystemMessage = "You are a helpful assistant. Answer in one short sentence.";
                         config.ThinkingConfig = thinkingConfig;
-                        // A fresh conversation for each message: with Qwen3's chat template, LiteRT-LM v0.17.1 can't
-                        // send a second message in the same conversation ("The new rendered template string does not
-                        // start with the previous rendered template string" - the template drops the previous
-                        // answer's empty <think></think> block when rendering the next turn).
+                        // A fresh conversation for each message (the raw API, without Chat's history handling).
                         using (Conversation conversation = engine.CreateConversation(config))
                         {
                             String reply = conversation.SendMessage(Conversation.CreateTextMessage("What is the capital of France?"));
@@ -304,8 +297,10 @@ namespace Emgu.TF.Lite.Test
 
                 ChatReply first = chat.Send("What is the capital of France?");
                 Console.WriteLine("Reply 1: {0}", first.Text);
-                if (String.IsNullOrEmpty(first.Text))
-                    throw new Exception("The first reply has no text");
+                // Check the answer, not just that there is one: a chat template that drops the user's text (as the
+                // earlier qwen3_0_6b_mixed_int4.litertlm's does with LiteRT-LM v0.18.0) still produces a reply.
+                if (!first.Text.Contains("Paris"))
+                    throw new Exception("The first reply doesn't answer the question");
 
                 // A follow-up that only makes sense with the history.
                 StringBuilder streamed = new StringBuilder();
@@ -315,8 +310,8 @@ namespace Emgu.TF.Lite.Test
                         streamed.Append(text);
                 });
                 Console.WriteLine("Reply 2: {0} (streamed: {1})", second.Text, streamed);
-                if (String.IsNullOrEmpty(second.Text))
-                    throw new Exception("The second reply has no text");
+                if (!second.Text.Contains("Berlin"))
+                    throw new Exception("The second reply doesn't use the history");
                 if (streamed.ToString() != second.FullText)
                     throw new Exception("The streamed text doesn't add up to the reply");
                 if (chat.History.Count != 4)
@@ -635,12 +630,32 @@ namespace Emgu.TF.Lite.Test
         [TestAttribute]
         public async Task TestChatClientTools()
         {
+            await TestChatClientTools(false);
+        }
+
+        // The same with constrained decoding (LiteRT-LM v0.18.0 or later).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestChatClientToolsConstrained()
+        {
+            await TestChatClientTools(true);
+        }
+
+        private static async Task TestChatClientTools(bool constrained)
+        {
             RequireLiteRtLm();
             using (Gemma4E2B model = new Gemma4E2B())
             {
                 await model.Init();
                 int calls = 0;
-                using (IChatClient client = new ChatClientBuilder(model.AsIChatClient()).UseFunctionInvocation().Build())
+                LiteRtLmChatClient inner = new LiteRtLmChatClient(model) { EnableConstrainedDecoding = constrained };
+                using (IChatClient client = new ChatClientBuilder(inner).UseFunctionInvocation().Build())
                 {
                     ChatOptions options = new ChatOptions { Tools = new List<AITool> { CreateSecretCodeTool(() => calls++) } };
                     List<Microsoft.Extensions.AI.ChatMessage> history = new List<Microsoft.Extensions.AI.ChatMessage>

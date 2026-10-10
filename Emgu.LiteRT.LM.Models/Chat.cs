@@ -18,11 +18,11 @@ namespace Emgu.LiteRT.LM.Models
     /// <para>
     /// For models whose chat template supports it (LanguageModel.SupportsMultiTurnConversation, e.g. Gemma4E2B),
     /// the chat keeps one LiteRT-LM Conversation open across messages, so each message only processes the new
-    /// tokens. For the others (e.g. Qwen3), each message is sent through a new Conversation whose initial messages
-    /// are the history so far: LiteRT-LM v0.17.1 renders a conversation incrementally and refuses a second message
-    /// when the model's chat template renders earlier turns differently once more turns follow (Qwen3's template
-    /// drops the previous answer's empty &lt;think&gt;&lt;/think&gt; block: "The new rendered template string does
-    /// not start with the previous rendered template string").
+    /// tokens. For the others, each message is sent through a new Conversation whose initial messages are the history
+    /// so far: LiteRT-LM renders a conversation incrementally and refuses a second message when the model's chat
+    /// template renders earlier turns differently once more turns follow (e.g. a Qwen3 template that drops the previous
+    /// answer's empty &lt;think&gt;&lt;/think&gt; block: "The new rendered template string does not start with the
+    /// previous rendered template string").
     /// </para>
     /// <para>
     /// Either way the history is kept here, so it can be inspected or cleared, and an open Conversation is rebuilt

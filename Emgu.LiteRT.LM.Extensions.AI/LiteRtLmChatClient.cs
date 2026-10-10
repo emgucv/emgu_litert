@@ -69,6 +69,14 @@ namespace Emgu.LiteRT.LM.Extensions.AI
         }
 
         /// <summary>
+        /// Whether to constrain generation when tools are given, so the model can only produce well-formed calls to the
+        /// given tools (or plain text): LiteRT-LM's constrained decoding, using its Gemma model constraint provider
+        /// (libGemmaModelConstraintProvider). Off by default. Needs LiteRT-LM v0.18.0 or later: v0.17.1's prebuilt
+        /// constraint provider crashes the process.
+        /// </summary>
+        public bool EnableConstrainedDecoding { get; set; }
+
+        /// <summary>
         /// The language model this client runs
         /// </summary>
         public LanguageModel Model
@@ -116,7 +124,8 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             String toolsJson = GetToolsJson(options);
             bool? enableThinking = GetEnableThinking(options);
             int maxOutputTokens = options != null && options.MaxOutputTokens.HasValue ? options.MaxOutputTokens.Value : 0;
-            String settingsKey = String.Join("\u0001", new[] { systemMessage ?? "", toolsJson ?? "", enableThinking.ToString(), maxOutputTokens.ToString() });
+            bool constrained = EnableConstrainedDecoding && toolsJson != null;
+            String settingsKey = String.Join("\u0001", new[] { systemMessage ?? "", toolsJson ?? "", enableThinking.ToString(), maxOutputTokens.ToString(), constrained.ToString() });
             List<String> keys = turns.Select(GetMessageKey).ToList();
 
             await _requestLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -136,7 +145,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                 if (conversation == null)
                 {
                     conversation = CreateConversation(
-                        turns.Take(turns.Count - 1).ToList(), systemMessage, toolsJson, enableThinking, maxOutputTokens);
+                        turns.Take(turns.Count - 1).ToList(), systemMessage, toolsJson, constrained, enableThinking, maxOutputTokens);
                     conversation.SettingsKey = settingsKey;
                     conversation.MessageKeys.AddRange(keys.Take(keys.Count - 1));
                 }
@@ -267,7 +276,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
         // ---------- Conversations ----------
 
         private OpenConversation CreateConversation(
-            List<AIChatMessage> history, String systemMessage, String toolsJson, bool? enableThinking, int maxOutputTokens)
+            List<AIChatMessage> history, String systemMessage, String toolsJson, bool constrained, bool? enableThinking, int maxOutputTokens)
         {
             Engine engine = _model.Engine;
             if (engine == null)
@@ -292,6 +301,8 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                     open.Config.SystemMessage = systemMessage;
                 if (toolsJson != null)
                     open.Config.ToolsJson = toolsJson;
+                if (constrained)
+                    open.Config.EnableConstrainedDecoding = true;
                 if (history.Count > 0)
                     open.Config.MessagesJson = "[" + String.Join(",", history.Select(ToLiteRtLmJson)) + "]";
                 open.Conversation = engine.CreateConversation(open.Config);

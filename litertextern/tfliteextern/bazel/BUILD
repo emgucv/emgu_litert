@@ -172,7 +172,17 @@ cc_shared_library(
         "@platforms//os:android": ["-landroid"],
         "//conditions:default": [],
     }),
-    deps = ["//litert/c:litert_tflite_runtime_c_api_so_shim"],
+    # On Android, libLiteRt.so also carries TFLite's NNAPI delegate (its C API, TfLiteNnapiDelegate*), which
+    # libtfliteextern.so uses: LiteRT's runtime no longer pulls it in itself (it did up to the LiteRT commit LiteRT-LM
+    # v0.17.1 used). nnapi_delegate is headers only; the C API is in nnapi_delegate_no_nnapi_implementation, listed
+    # directly so its objects are linked in whole.
+    deps = ["//litert/c:litert_tflite_runtime_c_api_so_shim"] + select({
+        "@org_tensorflow//tensorflow:android": [
+            "//tflite/delegates/nnapi:nnapi_delegate",
+            "//tflite/delegates/nnapi:nnapi_delegate_no_nnapi_implementation",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 # ---------------------------------------------------------------------------------------------------------

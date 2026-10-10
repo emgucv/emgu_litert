@@ -19,8 +19,9 @@ namespace Emgu.LiteRT.LM.Models
         public const String LocalSubfolder = DefaultLocalSubfolder;
 
         /// <summary>
-        /// The mixed int4 build of Qwen3-0.6B (about 500 MB). The repository's Qwen3-0.6B.litertlm needs a newer
-        /// LiteRT-LM than the v0.17.1 that Emgu.LiteRT.LM is built with: creating an engine from it fails loading its
+        /// The dynamic int4 build of Qwen3-0.6B (about 350 MB). Its chat template takes message content as text parts,
+        /// which LiteRT-LM v0.18.0 always passes; with the repository's earlier qwen3_0_6b_mixed_int4.litertlm the
+        /// template drops the user's text and fails on a system message, and its Qwen3-0.6B.litertlm fails loading its
         /// tokenizer.
         /// </summary>
         public static DownloadableFile ModelFile
@@ -28,9 +29,9 @@ namespace Emgu.LiteRT.LM.Models
             get
             {
                 return new DownloadableFile(
-                    "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/qwen3_0_6b_mixed_int4.litertlm",
+                    "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm",
                     LocalSubfolder,
-                    "7900eb4e7362d88c58782c6f9999bb7a129e03544aa98b8f338ea0cc5d8c22c1");
+                    "03e7da1eb1108b50dffaa9bb52cc7bcbad2eb0c66ca990267f480c1e545d2856");
             }
         }
 
@@ -40,6 +41,14 @@ namespace Emgu.LiteRT.LM.Models
         public override DownloadableFile DefaultModelFile
         {
             get { return ModelFile; }
+        }
+
+        /// <summary>
+        /// True: this file's chat template supports multi-turn LiteRT-LM conversations
+        /// </summary>
+        public override bool SupportsMultiTurnConversation
+        {
+            get { return true; }
         }
 
         /// <summary>
