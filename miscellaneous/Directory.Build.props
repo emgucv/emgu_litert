@@ -53,7 +53,7 @@
 <NamespaceSummaryItem name="Emgu.LiteRT" isDocumented="True">Managed wrapper (Model, CompiledModel, Environment, TensorBuffer) over LiteRT's own libLiteRt C API.</NamespaceSummaryItem>
 <NamespaceSummaryItem name="Emgu.LiteRT.Util" isDocumented="True">Base classes (UnmanagedObject, DisposableObject) and shared utilities (Annotation, DownloadableFile, FileDownloadManager) used across the Emgu LiteRT libraries.</NamespaceSummaryItem>
 <NamespaceSummaryItem name="Emgu.LiteRT.LM" isDocumented="True">Managed wrapper (EngineSettings, Engine, Session, Conversation) over LiteRT-LM's C API for running on-device language models.</NamespaceSummaryItem>
-<NamespaceSummaryItem name="Emgu.LiteRT.LM.Models" isDocumented="True">Ready-to-use language models (Qwen3, Gemma4E2B) and chat helpers (Chat, ChatMessage, ChatAttachment) built on Emgu.LiteRT.LM.</NamespaceSummaryItem></NamespaceSummaries>
+<NamespaceSummaryItem name="Emgu.LiteRT.LM.Models" isDocumented="True">Ready-to-use language models (Qwen3, Gemma4E2B, Gemma4E4B) and chat helpers (Chat, ChatMessage, ChatAttachment) built on Emgu.LiteRT.LM.</NamespaceSummaryItem></NamespaceSummaries>
     <PlugInConfigurations>
     </PlugInConfigurations>
     <MaximumGroupParts>2</MaximumGroupParts>

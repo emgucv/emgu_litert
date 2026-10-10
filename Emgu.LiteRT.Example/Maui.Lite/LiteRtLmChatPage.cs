@@ -5,6 +5,8 @@
 #if WINDOWS || IOS || ANDROID || MACCATALYST
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls.Shapes;
@@ -15,14 +17,16 @@ namespace Maui.Demo.Lite
     /// <summary>
     /// Chat demo backed by LiteRT-LM: downloads a .litertlm model and runs it entirely on this device
     /// through Emgu.LiteRT.LM.Models (LanguageModel, Chat). Wired up for Windows, iOS, Android and Mac
-    /// Catalyst (Apple Silicon only).
+    /// Catalyst (Apple Silicon only). For models that accept images and audio (Gemma 4), the "+" button
+    /// attaches a photo or an audio file to the next message.
     /// </summary>
     public class LiteRtLmChatPage : ContentPage
     {
         private enum ModelChoice
         {
             Qwen3,
-            Gemma4E2B
+            Gemma4E2B,
+            Gemma4E4B
         }
 
         private sealed class ModelOption
@@ -30,12 +34,42 @@ namespace Maui.Demo.Lite
             public string Name;
             public string Detail;
             public ModelChoice Choice;
+            // Whether the model accepts images and audio (LanguageModel.SupportsImages / SupportsAudio), known
+            // before the model is loaded so the attach button can be shown right away.
+            public bool AcceptsMedia;
         }
+
+        // An image or audio file attached to the message being written.
+        private sealed class PendingAttachment
+        {
+            public ChatAttachment Attachment;
+            // The (re-encoded) image, for the thumbnails; null for audio.
+            public byte[] Image;
+            public string Name;
+        }
+
+        // LiteRT-LM decodes audio with miniaudio, which reads WAV, MP3 and FLAC (not AAC/M4A).
+        private static readonly FilePickerFileType AudioFileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+        {
+            { DevicePlatform.iOS, new[] { "com.microsoft.waveform-audio", "public.mp3", "org.xiph.flac" } },
+            { DevicePlatform.MacCatalyst, new[] { "com.microsoft.waveform-audio", "public.mp3", "org.xiph.flac" } },
+            { DevicePlatform.Android, new[] { "audio/wav", "audio/x-wav", "audio/mpeg", "audio/flac", "audio/x-flac" } },
+            { DevicePlatform.WinUI, new[] { ".wav", ".mp3", ".flac" } },
+        });
+
+        // Sample inputs bundled with the app (Resources/Raw, plus LiteRT-LM's audio test sample).
+        private static readonly string[] SampleImages = { "surfers.jpg", "tulips.jpg", "space_shuttle.jpg" };
+        private const string SampleAudio = "audio_sample.wav";
+
+        // Images are downscaled to this size before sending: the vision encoder resizes them anyway, and
+        // smaller images keep the base64-encoded message small.
+        private const int MaxImageSize = 1024;
 
         private static readonly ModelOption[] Models = new[]
         {
             new ModelOption { Name = "Qwen3 0.6B", Detail = "~500 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
-            new ModelOption { Name = "Gemma 4 E2B", Detail = "~2.6 GB download. Larger, can think before answering, keeps a conversation open across turns.", Choice = ModelChoice.Gemma4E2B },
+            new ModelOption { Name = "Gemma 4 E2B", Detail = "~2.6 GB download. Larger, can think before answering, keeps a conversation open across turns.", Choice = ModelChoice.Gemma4E2B, AcceptsMedia = true },
+            new ModelOption { Name = "Gemma 4 E4B", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsMedia = true },
         };
 
         private static readonly Color UserBubbleColor = Theme.Accent;
@@ -56,6 +90,11 @@ namespace Maui.Demo.Lite
         private readonly Editor _promptEditor;
         private readonly Button _sendButton;
         private readonly ActivityIndicator _busyIndicator;
+        private readonly Border _attachButton;
+        private readonly HorizontalStackLayout _attachmentStrip;
+        private readonly ScrollView _attachmentScroll;
+        private readonly BottomSheet _sheet;
+        private readonly List<PendingAttachment> _pending = new List<PendingAttachment>();
 
         private LanguageModel _model;
         private Chat _chat;
@@ -170,13 +209,46 @@ namespace Maui.Demo.Lite
             sendArea.Children.Add(_sendButton);
             sendArea.Children.Add(_busyIndicator);
 
+            _attachButton = new Border
+            {
+                WidthRequest = 44,
+                HeightRequest = 44,
+                BackgroundColor = Theme.TileBackground,
+                Stroke = Colors.Transparent,
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(22) },
+                VerticalOptions = LayoutOptions.End,
+                IsVisible = Models[0].AcceptsMedia,
+                Content = new Label
+                {
+                    Text = "+",
+                    FontFamily = Theme.TitleFont,
+                    FontSize = 26,
+                    TextColor = Theme.Accent,
+                    HorizontalOptions = LayoutOptions.Center,
+                    VerticalOptions = LayoutOptions.Center
+                }
+            };
+            _attachButton.OnTap(OnAttachClicked);
+            SemanticProperties.SetDescription(_attachButton, "Attach an image or audio");
+
             var composerRow = new Grid
             {
-                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
                 ColumnSpacing = 8
             };
-            composerRow.Add(_promptEditor, 0, 0);
-            composerRow.Add(sendArea, 1, 0);
+            composerRow.Add(_attachButton, 0, 0);
+            composerRow.Add(_promptEditor, 1, 0);
+            composerRow.Add(sendArea, 2, 0);
+
+            _attachmentStrip = new HorizontalStackLayout { Spacing = 8 };
+            _attachmentScroll = new ScrollView
+            {
+                Orientation = ScrollOrientation.Horizontal,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Never,
+                IsVisible = false,
+                Content = _attachmentStrip
+            };
+            var composer = new VerticalStackLayout { Spacing = 8, Children = { _attachmentScroll, composerRow } };
 
             var root = new Grid
             {
@@ -197,18 +269,24 @@ namespace Maui.Demo.Lite
             root.Add(optionsCard, 0, 1);
             root.Add(_scroll, 0, 2);
             root.Add(_statusLabel, 0, 3);
-            root.Add(Theme.Card(composerRow, 10), 0, 4);
+            root.Add(Theme.Card(composer, 10), 0, 4);
 
-            Content = root;
+            _sheet = new BottomSheet();
+            Content = new Grid { Children = { root, _sheet } };
         }
 
-        private ModelChoice SelectedChoice => Models[Math.Max(_modelPicker.SelectedIndex, 0)].Choice;
+        private ModelChoice SelectedChoice => SelectedOption.Choice;
 
         // ---------- Model selection ----------
 
+        private ModelOption SelectedOption => Models[Math.Max(_modelPicker.SelectedIndex, 0)];
+
         private void OnModelPickerChanged(object sender, EventArgs e)
         {
-            _modelDetailLabel.Text = Models[Math.Max(_modelPicker.SelectedIndex, 0)].Detail;
+            _modelDetailLabel.Text = SelectedOption.Detail;
+            _attachButton.IsVisible = SelectedOption.AcceptsMedia;
+            if (!SelectedOption.AcceptsMedia)
+                ClearPendingAttachments();
         }
 
         private void OnThinkingToggled(object sender, ToggledEventArgs e)
@@ -224,9 +302,17 @@ namespace Maui.Demo.Lite
             if (_busy)
                 return;
 
-            string prompt = _promptEditor.Text;
-            if (string.IsNullOrWhiteSpace(prompt))
-                return;
+            string prompt = _promptEditor.Text?.Trim();
+            List<PendingAttachment> attachments = _pending.ToList();
+            if (string.IsNullOrEmpty(prompt))
+            {
+                if (attachments.Count == 0)
+                    return;
+                // Attachments without a question: ask for the obvious.
+                prompt = attachments.Any(a => a.Image != null)
+                    ? (attachments.All(a => a.Image != null) ? "Describe this image." : "Describe the image and transcribe the audio.")
+                    : "Transcribe this audio.";
+            }
 
             SetBusy(true);
             try
@@ -235,7 +321,8 @@ namespace Maui.Demo.Lite
                     return;
 
                 _promptEditor.Text = string.Empty;
-                AddUserMessage(prompt.Trim());
+                ClearPendingAttachments();
+                AddUserMessage(prompt, attachments);
                 SetStatus("Generating...");
 
                 // Stream the reply into its own bubble as it's generated, rather than waiting for the
@@ -263,7 +350,7 @@ namespace Maui.Demo.Lite
 
                 // Kept so teardown (OnNavigatedFrom / switching models) can wait for it instead of
                 // freeing the chat/engine while LiteRT-LM is still generating into it.
-                Task<ChatReply> generation = _chat.SendAsync(prompt, onChunk);
+                Task<ChatReply> generation = _chat.SendAsync(prompt, attachments.Select(a => a.Attachment), onChunk);
                 _generation = generation;
                 ChatReply reply = await generation;
 
@@ -295,7 +382,19 @@ namespace Maui.Demo.Lite
 
             SetStatus("Preparing the model... the first run downloads it.");
 
-            LanguageModel model = choice == ModelChoice.Qwen3 ? (LanguageModel)new Qwen3() : new Gemma4E2B();
+            LanguageModel model;
+            switch (choice)
+            {
+                case ModelChoice.Qwen3:
+                    model = new Qwen3();
+                    break;
+                case ModelChoice.Gemma4E4B:
+                    model = new Gemma4E4B();
+                    break;
+                default:
+                    model = new Gemma4E2B();
+                    break;
+            }
             model.OnDownloadProgressChanged += OnDownloadProgressChanged;
             try
             {
@@ -321,6 +420,165 @@ namespace Maui.Demo.Lite
                 ? string.Format("Downloading model... {0} of {1} MB ({2}%)", bytesReceived / (1024 * 1024), totalBytesToReceive.Value / (1024 * 1024), (int)(progressPercentage ?? 0))
                 : string.Format("Downloading model... {0} MB", bytesReceived / (1024 * 1024));
             MainThread.BeginInvokeOnMainThread(() => SetStatus(message));
+        }
+
+        // ---------- Attachments ----------
+
+        private async void OnAttachClicked()
+        {
+            if (_busy)
+                return;
+
+            var rows = new List<(string Section, string Glyph, string Text, string Value)>
+            {
+                ("IMAGE", Theme.GlyphImage, "Photo Library", "library")
+            };
+            foreach (string sample in SampleImages)
+                rows.Add((null, Theme.GlyphImage, "Sample: " + System.IO.Path.GetFileNameWithoutExtension(sample).Replace('_', ' '), "image:" + sample));
+            rows.Add(("AUDIO (WAV, MP3, FLAC)", Theme.GlyphPlay, "Audio File", "audio"));
+            rows.Add((null, Theme.GlyphPlay, "Sample: speech recording", "sampleaudio"));
+
+            string action = await _sheet.ShowAsync("Attach", rows);
+            if (string.IsNullOrEmpty(action))
+                return;
+
+            try
+            {
+                if (action == "library")
+                {
+                    FileResult file = (await MediaPicker.Default.PickPhotosAsync())?.FirstOrDefault();
+                    if (file != null)
+                        AddPendingImage(await ReadAllBytesAsync(file), file.FileName);
+                }
+                else if (action.StartsWith("image:"))
+                {
+                    string sample = action.Substring("image:".Length);
+                    AddPendingImage(await ImageUtil.ReadAppFileAsync(sample), sample);
+                }
+                else if (action == "audio")
+                {
+                    FileResult file = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Choose an audio file", FileTypes = AudioFileTypes });
+                    if (file != null)
+                        AddPendingAudio(await ReadAllBytesAsync(file), file.FileName);
+                }
+                else if (action == "sampleaudio")
+                {
+                    AddPendingAudio(await ImageUtil.ReadAppFileAsync(SampleAudio), SampleAudio);
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Could not attach the file: " + ex.Message);
+            }
+        }
+
+        private static async Task<byte[]> ReadAllBytesAsync(FileResult file)
+        {
+            using System.IO.Stream stream = await file.OpenReadAsync();
+            using System.IO.MemoryStream ms = new System.IO.MemoryStream();
+            await stream.CopyToAsync(ms);
+            return ms.ToArray();
+        }
+
+        // Decode the image here (any format the platform's photo picker returns that OpenCV reads), downscale it
+        // and re-encode it as JPEG, which LiteRT-LM's image decoder (stb) reads.
+        private void AddPendingImage(byte[] bytes, string name)
+        {
+            Emgu.CV.Mat image = ImageUtil.Decode(bytes);
+            if (image == null)
+            {
+                SetStatus("That file could not be read as an image.");
+                return;
+            }
+            byte[] jpeg;
+            // Downscale disposes the original when it returns a smaller copy.
+            using (Emgu.CV.Mat small = ImageUtil.Downscale(image, MaxImageSize))
+            using (Emgu.CV.Util.VectorOfByte buffer = new Emgu.CV.Util.VectorOfByte())
+            {
+                Emgu.CV.CvInvoke.Imencode(".jpg", small, buffer);
+                jpeg = buffer.ToArray();
+            }
+            AddPending(new PendingAttachment { Attachment = ChatAttachment.Image(jpeg), Image = jpeg, Name = name });
+        }
+
+        private void AddPendingAudio(byte[] bytes, string name)
+        {
+            AddPending(new PendingAttachment { Attachment = ChatAttachment.Audio(bytes), Name = name });
+        }
+
+        private void AddPending(PendingAttachment attachment)
+        {
+            _pending.Add(attachment);
+            SetStatus(null);
+
+            Border chip = AttachmentChip(attachment, false);
+            var remove = new Label
+            {
+                Text = Theme.GlyphClose,
+                FontFamily = Theme.IconFont,
+                FontSize = 18,
+                TextColor = Theme.SecondaryText,
+                VerticalOptions = LayoutOptions.Center
+            };
+            ((HorizontalStackLayout)chip.Content).Children.Add(remove);
+            remove.OnTap(() =>
+            {
+                if (_busy)
+                    return;
+                _pending.Remove(attachment);
+                _attachmentStrip.Children.Remove(chip);
+                _attachmentScroll.IsVisible = _pending.Count > 0;
+            });
+
+            _attachmentStrip.Children.Add(chip);
+            _attachmentScroll.IsVisible = true;
+        }
+
+        private void ClearPendingAttachments()
+        {
+            _pending.Clear();
+            _attachmentStrip.Children.Clear();
+            _attachmentScroll.IsVisible = false;
+        }
+
+        // A thumbnail (image) or an icon and file name (audio); larger in the transcript than in the composer.
+        private static Border AttachmentChip(PendingAttachment attachment, bool inTranscript)
+        {
+            var content = new HorizontalStackLayout { Spacing = 6 };
+            if (attachment.Image != null)
+            {
+                byte[] image = attachment.Image;
+                content.Children.Add(new Image
+                {
+                    Source = ImageSource.FromStream(() => new System.IO.MemoryStream(image)),
+                    HeightRequest = inTranscript ? 140 : 48,
+                    MaximumWidthRequest = inTranscript ? 240 : 96,
+                    Aspect = Aspect.AspectFit
+                });
+            }
+            else
+            {
+                content.Children.Add(Theme.MakeIcon(Theme.GlyphPlay, Theme.Accent, 20));
+                content.Children.Add(new Label
+                {
+                    Text = attachment.Name,
+                    FontFamily = Theme.BodyFont,
+                    FontSize = 13,
+                    TextColor = Theme.PrimaryText,
+                    LineBreakMode = LineBreakMode.MiddleTruncation,
+                    MaximumWidthRequest = 180,
+                    VerticalOptions = LayoutOptions.Center
+                });
+            }
+            return new Border
+            {
+                BackgroundColor = inTranscript ? Colors.White : Theme.TileBackground,
+                Stroke = Colors.Transparent,
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(10) },
+                Padding = attachment.Image != null ? new Thickness(4) : new Thickness(8, 6),
+                HorizontalOptions = LayoutOptions.End,
+                Content = content
+            };
         }
 
         // ---------- New chat / model switching ----------
@@ -414,8 +672,18 @@ namespace Maui.Demo.Lite
             ScrollToEnd();
         }
 
-        private void AddUserMessage(string text)
+        private void AddUserMessage(string text, IReadOnlyList<PendingAttachment> attachments)
         {
+            if (attachments.Count > 0)
+            {
+                // The attachments right-aligned above the message bubble.
+                var media = new VerticalStackLayout { Spacing = 6, HorizontalOptions = LayoutOptions.End };
+                foreach (PendingAttachment attachment in attachments)
+                    media.Children.Add(AttachmentChip(attachment, true));
+                if (_transcript.Children.Contains(_emptyLabel))
+                    _transcript.Children.Remove(_emptyLabel);
+                _transcript.Children.Add(media);
+            }
             AddBubbleRow(Bubble(text, UserBubbleColor, UserTextColor), true);
         }
 
@@ -481,6 +749,7 @@ namespace Maui.Demo.Lite
             _promptEditor.IsEnabled = !busy;
             _modelPicker.IsEnabled = !busy;
             _newChatButton.IsEnabled = !busy;
+            _attachButton.Opacity = busy ? 0.4 : 1;
         }
 
         private void SetStatus(string message)

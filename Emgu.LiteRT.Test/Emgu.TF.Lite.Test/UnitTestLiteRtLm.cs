@@ -17,7 +17,7 @@ using System.Threading.Tasks;
 namespace Emgu.TF.Lite.Test
 {
     // Tests of the Emgu.LiteRT.LM wrapper of LiteRT-LM's C API (liblitert-lm) and of Emgu.LiteRT.LM.Models, on the
-    // CPU. They download large models on the first run (Qwen3-0.6B ~500 MB, Gemma 4 E2B ~2.6 GB), so like Emgu CV's
+    // CPU. They download large models on the first run (Qwen3-0.6B ~500 MB, Gemma 4 E2B ~2.6 GB, E4B ~3.7 GB), so like Emgu CV's
     // model tests they are ignored by default: opt in with dotnet test -p:TestModels=true (defines TEST_MODELS). They
     // are also skipped where liblitert-lm isn't available (it is currently built for Apple Silicon macOS and Android
     // only).
@@ -348,7 +348,7 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
-        // Gemma 4 E2B supports multi-turn LiteRT-LM conversations, so Chat keeps one conversation open (2.6 GB download).
+        // Gemma 4 supports multi-turn LiteRT-LM conversations, so Chat keeps one conversation open (E2B: 2.6 GB download).
 #if !TEST_MODELS
 #if VS_TEST
         [Ignore()]
@@ -359,8 +359,27 @@ namespace Emgu.TF.Lite.Test
         [TestAttribute]
         public async Task TestGemma4E2BChat()
         {
+            await TestGemma4Chat(new Gemma4E2B());
+        }
+
+        // The same with Gemma 4 E4B (3.7 GB download).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestGemma4E4BChat()
+        {
+            await TestGemma4Chat(new Gemma4E4B());
+        }
+
+        private static async Task TestGemma4Chat(Gemma4 gemma)
+        {
             RequireLiteRtLm();
-            using (Gemma4E2B model = new Gemma4E2B())
+            using (Gemma4 model = gemma)
             {
                 await model.Init();
                 using (Chat chat = model.CreateChat("You are a helpful assistant. Answer in one short sentence."))
@@ -393,7 +412,7 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
-        // Gemma 4 E2B reports its thinking in a separate channel; ChatReply.Thinking exposes it like Qwen3's.
+        // Gemma 4 reports its thinking in a separate channel; ChatReply.Thinking exposes it like Qwen3's.
 #if !TEST_MODELS
 #if VS_TEST
         [Ignore()]
@@ -404,8 +423,27 @@ namespace Emgu.TF.Lite.Test
         [TestAttribute]
         public async Task TestGemma4E2BThinking()
         {
+            await TestGemma4Thinking(new Gemma4E2B());
+        }
+
+        // The same with Gemma 4 E4B (3.7 GB download).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestGemma4E4BThinking()
+        {
+            await TestGemma4Thinking(new Gemma4E4B());
+        }
+
+        private static async Task TestGemma4Thinking(Gemma4 gemma)
+        {
             RequireLiteRtLm();
-            using (Gemma4E2B model = new Gemma4E2B())
+            using (Gemma4 model = gemma)
             {
                 model.EnableThinking = true;
                 await model.Init();
@@ -430,7 +468,7 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
-        // Gemma 4 E2B also accepts images and audio (test inputs from the LiteRT-LM submodule).
+        // Gemma 4 also accepts images and audio (test inputs from the LiteRT-LM submodule).
 #if !TEST_MODELS
 #if VS_TEST
         [Ignore()]
@@ -441,12 +479,31 @@ namespace Emgu.TF.Lite.Test
         [TestAttribute]
         public async Task TestGemma4E2BImageAndAudio()
         {
+            await TestGemma4ImageAndAudio(new Gemma4E2B());
+        }
+
+        // The same with Gemma 4 E4B (3.7 GB download).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestGemma4E4BImageAndAudio()
+        {
+            await TestGemma4ImageAndAudio(new Gemma4E4B());
+        }
+
+        private static async Task TestGemma4ImageAndAudio(Gemma4 gemma)
+        {
             RequireLiteRtLm();
-            using (Gemma4E2B model = new Gemma4E2B())
+            using (Gemma4 model = gemma)
             {
                 await model.Init();
                 if (!model.SupportsImages || !model.SupportsAudio)
-                    throw new Exception("Gemma 4 E2B should accept images and audio");
+                    throw new Exception("Gemma 4 should accept images and audio");
                 using (Chat chat = model.CreateChat())
                 {
                     chat.MaxOutputTokens = 64;

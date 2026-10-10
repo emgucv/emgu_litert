@@ -47,6 +47,8 @@
 
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+		<!-- Sample audio for the LiteRT-LM chat page's attachments, from the LiteRT-LM submodule. -->
+		<MauiAsset Include="..\..\LiteRT-LM\support\preprocessor\testdata\audio_sample.wav" LogicalName="audio_sample.wav" Condition="Exists('..\..\LiteRT-LM\support\preprocessor\testdata\audio_sample.wav')" />
 	</ItemGroup>
 
 	<ItemGroup>
