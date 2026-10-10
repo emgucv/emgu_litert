@@ -27,6 +27,8 @@ namespace Maui.Demo.Lite
         private enum ModelChoice
         {
             Qwen3,
+            Qwen35_0_8B_VL,
+            Qwen35_4B,
             Gemma4E2B,
             Gemma4E4B
         }
@@ -36,9 +38,11 @@ namespace Maui.Demo.Lite
             public string Name;
             public string Detail;
             public ModelChoice Choice;
-            // Whether the model accepts images and audio (LanguageModel.SupportsImages / SupportsAudio), known
-            // before the model is loaded so the attach button can be shown right away.
-            public bool AcceptsMedia;
+            // Whether the model accepts images / audio (LanguageModel.SupportsImages / SupportsAudio) and can
+            // think, known before the model is loaded so the controls can be shown right away.
+            public bool AcceptsImages;
+            public bool AcceptsAudio;
+            public bool CanThink = true;
         }
 
         // An image or audio file attached to the message being written.
@@ -48,6 +52,8 @@ namespace Maui.Demo.Lite
             // The (re-encoded) image, for the thumbnails; null for audio.
             public byte[] Image;
             public string Name;
+            // Its chip in the composer, while pending.
+            public View Chip;
         }
 
         // LiteRT-LM decodes audio with miniaudio, which reads WAV, MP3 and FLAC (not AAC/M4A).
@@ -76,8 +82,10 @@ namespace Maui.Demo.Lite
         private static readonly ModelOption[] Models = new[]
         {
             new ModelOption { Name = "Qwen3 0.6B", Detail = "~500 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
-            new ModelOption { Name = "Gemma 4 E2B", Detail = "~2.6 GB download. Larger, can think before answering, keeps a conversation open across turns.", Choice = ModelChoice.Gemma4E2B, AcceptsMedia = true },
-            new ModelOption { Name = "Gemma 4 E4B", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsMedia = true },
+            new ModelOption { Name = "Qwen3.5 0.8B", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
+            new ModelOption { Name = "Qwen3.5 4B", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B },
+            new ModelOption { Name = "Gemma 4 E2B", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true },
+            new ModelOption { Name = "Gemma 4 E4B", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true },
         };
 
         private static readonly Color UserBubbleColor = Theme.Accent;
@@ -90,6 +98,7 @@ namespace Maui.Demo.Lite
         private readonly Label _modelDetailLabel;
         private readonly Switch _thinkingSwitch;
         private readonly Label _thinkingLabel;
+        private readonly Grid _thinkingRow;
         private readonly Button _newChatButton;
         private readonly VerticalStackLayout _transcript;
         private readonly Label _emptyLabel;
@@ -148,12 +157,12 @@ namespace Maui.Demo.Lite
             };
             _thinkingSwitch = new Switch { IsToggled = false, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
             _thinkingSwitch.Toggled += OnThinkingToggled;
-            var thinkingRow = new Grid
+            _thinkingRow = new Grid
             {
                 ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
             };
-            thinkingRow.Add(_thinkingLabel, 0, 0);
-            thinkingRow.Add(_thinkingSwitch, 1, 0);
+            _thinkingRow.Add(_thinkingLabel, 0, 0);
+            _thinkingRow.Add(_thinkingSwitch, 1, 0);
 
             _readAloudSwitch = new Switch { IsToggled = false, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
             _readAloudSwitch.Toggled += (s, e) =>
@@ -183,7 +192,7 @@ namespace Maui.Demo.Lite
             var optionsCard = Theme.Card(new VerticalStackLayout
             {
                 Spacing = 6,
-                Children = { _modelPicker, _modelDetailLabel, Theme.Divider(), thinkingRow, readAloudRow, _newChatButton }
+                Children = { _modelPicker, _modelDetailLabel, Theme.Divider(), _thinkingRow, readAloudRow, _newChatButton }
             }, 14);
 
             _emptyLabel = new Label
@@ -253,7 +262,7 @@ namespace Maui.Demo.Lite
                 Stroke = Colors.Transparent,
                 StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(22) },
                 VerticalOptions = LayoutOptions.End,
-                IsVisible = Models[0].AcceptsMedia,
+                IsVisible = Models[0].AcceptsImages || Models[0].AcceptsAudio,
                 Content = new Label
                 {
                     Text = "+",
@@ -294,7 +303,7 @@ namespace Maui.Demo.Lite
                 Stroke = Colors.Transparent,
                 StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(22) },
                 VerticalOptions = LayoutOptions.End,
-                IsVisible = Models[0].AcceptsMedia,
+                IsVisible = Models[0].AcceptsAudio,
                 Content = new Grid { Children = { _micIcon, _stopIcon } }
             };
             _talkButton.OnTap(OnTalkClicked);
@@ -360,10 +369,14 @@ namespace Maui.Demo.Lite
         private void OnModelPickerChanged(object sender, EventArgs e)
         {
             _modelDetailLabel.Text = SelectedOption.Detail;
-            _attachButton.IsVisible = SelectedOption.AcceptsMedia;
-            _talkButton.IsVisible = SelectedOption.AcceptsMedia;
-            if (!SelectedOption.AcceptsMedia)
-                ClearPendingAttachments();
+            ModelOption option = SelectedOption;
+            _attachButton.IsVisible = option.AcceptsImages || option.AcceptsAudio;
+            _talkButton.IsVisible = option.AcceptsAudio;
+            _thinkingRow.IsVisible = option.CanThink;
+            // Drop attachments the new model can't take.
+            foreach (PendingAttachment attachment in _pending.ToList())
+                if (attachment.Image != null ? !option.AcceptsImages : !option.AcceptsAudio)
+                    RemovePending(attachment);
         }
 
         private void OnThinkingToggled(object sender, ToggledEventArgs e)
@@ -473,6 +486,12 @@ namespace Maui.Demo.Lite
             {
                 case ModelChoice.Qwen3:
                     model = new Qwen3();
+                    break;
+                case ModelChoice.Qwen35_0_8B_VL:
+                    model = new Qwen35_0_8B_VL();
+                    break;
+                case ModelChoice.Qwen35_4B:
+                    model = new Qwen35_4B();
                     break;
                 case ModelChoice.Gemma4E4B:
                     model = new Gemma4E4B();
@@ -651,14 +670,18 @@ namespace Maui.Demo.Lite
             if (_busy)
                 return;
 
-            var rows = new List<(string Section, string Glyph, string Text, string Value)>
+            var rows = new List<(string Section, string Glyph, string Text, string Value)>();
+            if (SelectedOption.AcceptsImages)
             {
-                ("IMAGE", Theme.GlyphImage, "Photo Library", "library")
-            };
-            foreach (string sample in SampleImages)
-                rows.Add((null, Theme.GlyphImage, "Sample: " + System.IO.Path.GetFileNameWithoutExtension(sample).Replace('_', ' '), "image:" + sample));
-            rows.Add(("AUDIO (WAV, MP3, FLAC)", Theme.GlyphPlay, "Audio File", "audio"));
-            rows.Add((null, Theme.GlyphPlay, "Sample: speech recording", "sampleaudio"));
+                rows.Add(("IMAGE", Theme.GlyphImage, "Photo Library", "library"));
+                foreach (string sample in SampleImages)
+                    rows.Add((null, Theme.GlyphImage, "Sample: " + System.IO.Path.GetFileNameWithoutExtension(sample).Replace('_', ' '), "image:" + sample));
+            }
+            if (SelectedOption.AcceptsAudio)
+            {
+                rows.Add(("AUDIO (WAV, MP3, FLAC)", Theme.GlyphPlay, "Audio File", "audio"));
+                rows.Add((null, Theme.GlyphPlay, "Sample: speech recording", "sampleaudio"));
+            }
 
             string action = await _sheet.ShowAsync("Attach", rows);
             if (string.IsNullOrEmpty(action))
@@ -745,15 +768,20 @@ namespace Maui.Demo.Lite
             ((HorizontalStackLayout)chip.Content).Children.Add(remove);
             remove.OnTap(() =>
             {
-                if (_busy)
-                    return;
-                _pending.Remove(attachment);
-                _attachmentStrip.Children.Remove(chip);
-                _attachmentScroll.IsVisible = _pending.Count > 0;
+                if (!_busy)
+                    RemovePending(attachment);
             });
 
+            attachment.Chip = chip;
             _attachmentStrip.Children.Add(chip);
             _attachmentScroll.IsVisible = true;
+        }
+
+        private void RemovePending(PendingAttachment attachment)
+        {
+            _pending.Remove(attachment);
+            _attachmentStrip.Children.Remove(attachment.Chip);
+            _attachmentScroll.IsVisible = _pending.Count > 0;
         }
 
         private void ClearPendingAttachments()

@@ -17,7 +17,7 @@ using System.Threading.Tasks;
 namespace Emgu.TF.Lite.Test
 {
     // Tests of the Emgu.LiteRT.LM wrapper of LiteRT-LM's C API (liblitert-lm) and of Emgu.LiteRT.LM.Models, on the
-    // CPU. They download large models on the first run (Qwen3-0.6B ~500 MB, Gemma 4 E2B ~2.6 GB, E4B ~3.7 GB), so like Emgu CV's
+    // CPU. They download large models on the first run (Qwen3-0.6B ~500 MB, Qwen3.5 0.8B ~1 GB / VL ~1.3 GB / 4B ~2.8 GB, Gemma 4 E2B ~2.6 GB, E4B ~3.7 GB), so like Emgu CV's
     // model tests they are ignored by default: opt in with dotnet test -p:TestModels=true (defines TEST_MODELS). They
     // are also skipped where liblitert-lm isn't available (it is currently built for Apple Silicon macOS and Android
     // only).
@@ -552,6 +552,104 @@ namespace Emgu.TF.Lite.Test
                     {
                         Console.WriteLine("Rejected: {0}", e.Message);
                     }
+                }
+            }
+        }
+
+        // Qwen3.5 0.8B keeps one LiteRT-LM conversation open across messages (1 GB download).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestQwen35Chat()
+        {
+            RequireLiteRtLm();
+            using (Qwen35_0_8B model = new Qwen35_0_8B())
+            {
+                await model.Init();
+                using (Chat chat = model.CreateChat("You are a helpful assistant. Answer in one short sentence."))
+                {
+                    chat.MaxOutputTokens = 64;
+                    if (!chat.KeepsConversationOpen)
+                        throw new Exception("Qwen3.5 chats should keep the conversation open");
+                    ChatReply first = chat.Send("My name is Kenji. What is the capital of France?");
+                    ChatReply second = await chat.SendAsync("What is my name?");
+                    Console.WriteLine("Replies: {0} | {1}", first.Text, second.Text);
+                    if (!first.Text.Contains("Paris"))
+                        throw new Exception("The first reply is wrong");
+                    if (!second.Text.Contains("Kenji"))
+                        throw new Exception("The second reply doesn't use the history");
+                }
+            }
+        }
+
+        // Qwen3.5 0.8B with its vision encoder accepts images (1.3 GB download).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestQwen35VLImage()
+        {
+            RequireLiteRtLm();
+            using (Qwen35_0_8B_VL model = new Qwen35_0_8B_VL())
+            {
+                await model.Init();
+                if (!model.SupportsImages || model.SupportsAudio)
+                    throw new Exception("Qwen3.5 0.8B VL should accept images and no audio");
+                using (Chat chat = model.CreateChat())
+                {
+                    chat.MaxOutputTokens = 64;
+                    ChatReply image = chat.Send("What fruit is in this image? Answer with one word.",
+                        ChatAttachment.ImageFile("apple.jpg"));
+                    ChatReply color = chat.Send("What color is it? Answer with one word.");
+                    Console.WriteLine("Image: {0} | {1}", image.Text, color.Text);
+                    if (image.Text.IndexOf("apple", StringComparison.OrdinalIgnoreCase) < 0)
+                        throw new Exception("The image reply doesn't mention an apple");
+                    if (color.Text.IndexOf("red", StringComparison.OrdinalIgnoreCase) < 0)
+                        throw new Exception("The follow-up reply doesn't say red");
+                }
+            }
+        }
+
+        // Qwen3.5 4B reports its thinking in a separate channel (2.8 GB download).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestQwen35_4BThinking()
+        {
+            RequireLiteRtLm();
+            using (Qwen35_4B model = new Qwen35_4B())
+            {
+                model.EnableThinking = true;
+                await model.Init();
+                using (Chat chat = model.CreateChat())
+                {
+                    chat.MaxOutputTokens = 1024;
+                    ChatReply reply = await chat.SendAsync("What is 17 times 23?");
+                    Console.WriteLine("Thinking: {0}\nAnswer: {1}", reply.Thinking, reply.Text);
+                    if (String.IsNullOrEmpty(reply.Thinking))
+                        throw new Exception("The reply has no thinking");
+                    if (!reply.Text.Contains("391"))
+                        throw new Exception("The reply has no (correct) answer after the thinking");
+
+                    chat.EnableThinking = false;
+                    ChatReply plain = chat.Send("What is 5 plus 5? Answer with just the number.");
+                    Console.WriteLine("Without thinking: {0} / {1}", plain.Thinking, plain.Text);
+                    if (!String.IsNullOrEmpty(plain.Thinking))
+                        throw new Exception("The reply has thinking although it is disabled");
                 }
             }
         }
