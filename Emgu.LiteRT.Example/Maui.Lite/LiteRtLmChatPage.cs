@@ -12,6 +12,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Models;
+using Emgu.LiteRT.LM.Extensions.AI;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
 
 namespace Maui.Demo.Lite
 {
@@ -20,7 +24,9 @@ namespace Maui.Demo.Lite
     /// through Emgu.LiteRT.LM.Models (LanguageModel, Chat). Wired up for Windows, iOS, Android and Mac
     /// Catalyst (Apple Silicon only). For models that accept images and audio (Gemma 4), the "+" button
     /// attaches a photo or an audio file to the next message, and the microphone button records a voice
-    /// message: the model answers what was said (no transcription step). Replies can be read aloud.
+    /// message: the model answers what was said (no transcription step). Replies can be read aloud. With "Allow web
+    /// search" on (Gemma 4), messages go through a Microsoft Agent Framework agent over the model's IChatClient
+    /// (Emgu.LiteRT.LM.Extensions.AI), which can search Wikipedia and - with a Tavily API key - the web (AgentTools).
     /// </summary>
     public class LiteRtLmChatPage : ContentPage
     {
@@ -43,6 +49,8 @@ namespace Maui.Demo.Lite
             public bool AcceptsImages;
             public bool AcceptsAudio;
             public bool CanThink = true;
+            // Whether the model can call tools (LanguageModel.SupportsToolCalling), for web search.
+            public bool CanUseTools;
         }
 
         // An image or audio file attached to the message being written.
@@ -52,6 +60,9 @@ namespace Maui.Demo.Lite
             // The (re-encoded) image, for the thumbnails; null for audio.
             public byte[] Image;
             public string Name;
+            // The encoded image or audio and its media type, for the agent (Microsoft.Extensions.AI DataContent).
+            public byte[] Data;
+            public string MediaType;
             // Its chip in the composer, while pending.
             public View Chip;
         }
@@ -84,8 +95,8 @@ namespace Maui.Demo.Lite
             new ModelOption { Name = "Qwen3 0.6B", Detail = "~500 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
             new ModelOption { Name = "Qwen3.5 0.8B", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
             new ModelOption { Name = "Qwen3.5 4B", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B },
-            new ModelOption { Name = "Gemma 4 E2B", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true },
-            new ModelOption { Name = "Gemma 4 E4B", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true },
+            new ModelOption { Name = "Gemma 4 E2B", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true },
+            new ModelOption { Name = "Gemma 4 E4B", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true },
         };
 
         private static readonly Color UserBubbleColor = Theme.Accent;
@@ -120,6 +131,21 @@ namespace Maui.Demo.Lite
         private DateTime _recordingStarted;
         private CancellationTokenSource _recordingTimer;
         private CancellationTokenSource _speech;
+
+        // Web search: an agent (Microsoft Agent Framework) over the model's IChatClient, with the AgentTools.
+        private const string TavilyKeyStorageName = "tavily_api_key";
+        private const string AgentInstructions =
+            "You are a helpful assistant running on the user's device. You can look things up with your tools: use them " +
+            "for facts you are not sure about, recent events and anything that depends on today's date. Base your answer " +
+            "on what the tools return, mention where it came from, and keep it short.";
+        private readonly Switch _webSearchSwitch;
+        private readonly VerticalStackLayout _webSearchSection;
+        private readonly Entry _tavilyKeyEntry;
+        private string _tavilyKey = string.Empty;
+        private IChatClient _chatClient;
+        private ChatClientAgent _agent;
+        private string _agentToolsKey;
+        private AgentSession _session;
 
         private LanguageModel _model;
         private Chat _chat;
@@ -189,10 +215,52 @@ namespace Maui.Demo.Lite
             _newChatButton.FontSize = 15;
             _newChatButton.Clicked += OnNewChat;
 
+            _webSearchSwitch = new Switch { IsToggled = false, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+            _webSearchSwitch.Toggled += OnWebSearchToggled;
+            var webSearchRow = new Grid
+            {
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+            };
+            webSearchRow.Add(new VerticalStackLayout
+            {
+                VerticalOptions = LayoutOptions.Center,
+                Children =
+                {
+                    new Label { Text = "Allow web search", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText },
+                    new Label
+                    {
+                        Text = "Lets the model look things up on Wikipedia (and the web, with a Tavily key). Your searches leave the device.",
+                        FontFamily = Theme.BodyFont,
+                        FontSize = 12,
+                        TextColor = Theme.SecondaryText
+                    }
+                }
+            }, 0, 0);
+            webSearchRow.Add(_webSearchSwitch, 1, 0);
+            _tavilyKeyEntry = new Entry
+            {
+                Placeholder = "Tavily API key (optional - free at tavily.com)",
+                IsPassword = true,
+                IsVisible = false,
+                FontFamily = Theme.BodyFont,
+                FontSize = 14,
+                TextColor = Theme.PrimaryText,
+                PlaceholderColor = Theme.SecondaryText
+            };
+            _tavilyKeyEntry.Completed += (s, e) => OnTavilyKeyChanged();
+            _tavilyKeyEntry.Unfocused += (s, e) => OnTavilyKeyChanged();
+            _webSearchSection = new VerticalStackLayout
+            {
+                Spacing = 6,
+                IsVisible = Models[0].CanUseTools,
+                Children = { webSearchRow, _tavilyKeyEntry }
+            };
+            _ = LoadTavilyKeyAsync();
+
             var optionsCard = Theme.Card(new VerticalStackLayout
             {
                 Spacing = 6,
-                Children = { _modelPicker, _modelDetailLabel, Theme.Divider(), _thinkingRow, readAloudRow, _newChatButton }
+                Children = { _modelPicker, _modelDetailLabel, Theme.Divider(), _thinkingRow, readAloudRow, _webSearchSection, _newChatButton }
             }, 14);
 
             _emptyLabel = new Label
@@ -373,6 +441,7 @@ namespace Maui.Demo.Lite
             _attachButton.IsVisible = option.AcceptsImages || option.AcceptsAudio;
             _talkButton.IsVisible = option.AcceptsAudio;
             _thinkingRow.IsVisible = option.CanThink;
+            _webSearchSection.IsVisible = option.CanUseTools;
             // Drop attachments the new model can't take.
             foreach (PendingAttachment attachment in _pending.ToList())
                 if (attachment.Image != null ? !option.AcceptsImages : !option.AcceptsAudio)
@@ -447,7 +516,9 @@ namespace Maui.Demo.Lite
 
                 // Kept so teardown (OnNavigatedFrom / switching models) can wait for it instead of
                 // freeing the chat/engine while LiteRT-LM is still generating into it.
-                Task<ChatReply> generation = _chat.SendAsync(prompt, attachments.Select(a => a.Attachment), onChunk);
+                Task<ChatReply> generation = UseAgent
+                    ? RunAgentAsync(prompt, attachments, bubble)
+                    : _chat.SendAsync(prompt, attachments.Select(a => a.Attachment), onChunk);
                 _generation = generation;
                 ChatReply reply = await generation;
 
@@ -463,6 +534,165 @@ namespace Maui.Demo.Lite
             finally
             {
                 SetBusy(false);
+            }
+        }
+
+        // ---------- Web search (agent) ----------
+
+        private bool UseAgent => _webSearchSwitch.IsToggled && SelectedOption.CanUseTools;
+
+        // Send a message through the agent, streaming its reply into the bubble and showing each tool call as a step
+        // line above it. Runs on the UI thread (the await foreach resumes on it).
+        private async Task<ChatReply> RunAgentAsync(string prompt, List<PendingAttachment> attachments, StreamingBubble bubble)
+        {
+            await EnsureAgentAsync();
+
+            List<AIContent> contents = new List<AIContent>();
+            foreach (PendingAttachment attachment in attachments)
+                contents.Add(new DataContent(attachment.Data, attachment.MediaType));
+            contents.Add(new TextContent(prompt));
+            ChatOptions options = new ChatOptions
+            {
+                Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled ? ReasoningEffort.Medium : ReasoningEffort.None }
+            };
+
+            StringBuilder thinking = new StringBuilder();
+            StringBuilder answer = new StringBuilder();
+            Dictionary<string, Label> steps = new Dictionary<string, Label>();
+            await foreach (AgentResponseUpdate update in _agent.RunStreamingAsync(
+                new AIChatMessage(ChatRole.User, contents), _session, new ChatClientAgentRunOptions(options)))
+            {
+                foreach (AIContent content in update.Contents)
+                {
+                    switch (content)
+                    {
+                        case TextReasoningContent reasoning:
+                            thinking.Append(reasoning.Text);
+                            break;
+                        case TextContent text:
+                            answer.Append(text.Text);
+                            break;
+                        case FunctionCallContent call:
+                            string step = AgentTools.Describe(call);
+                            steps[call.CallId] = AddStepLine(bubble, step + "...");
+                            SetStatus(step + "...");
+                            break;
+                        case FunctionResultContent result:
+                            if (steps.TryGetValue(result.CallId, out Label line))
+                                line.Text = line.Text.TrimEnd('.') + (result.Exception != null ? " - failed: " + result.Exception.Message : "");
+                            SetStatus("Generating...");
+                            break;
+                    }
+                }
+                if (thinking.Length > 0 || answer.Length > 0)
+                {
+                    if (!steps.Values.Any(l => l.Text.EndsWith("...")))
+                        SetStatus(null);
+                    UpdateStreamingBubble(bubble, ToReply(thinking, answer));
+                }
+            }
+            return ToReply(thinking, answer);
+        }
+
+        private static ChatReply ToReply(StringBuilder thinking, StringBuilder answer)
+        {
+            return new ChatReply(thinking.Length > 0 ? "<think>" + thinking + "</think>" + answer : answer.ToString());
+        }
+
+        // The agent, its tools and its session (the conversation) are created on first use; a new Tavily key means
+        // new tools, and so a new agent.
+        private async Task EnsureAgentAsync()
+        {
+            if (_chatClient == null)
+                _chatClient = _model.AsIChatClient();
+            if (_agent == null || _agentToolsKey != _tavilyKey)
+            {
+                _agent = new ChatClientAgent(_chatClient, AgentInstructions, "Assistant", null, AgentTools.Create(_tavilyKey));
+                _agentToolsKey = _tavilyKey;
+                _session = null;
+            }
+            if (_session == null)
+                _session = await _agent.CreateSessionAsync();
+        }
+
+        private void ResetAgent()
+        {
+            _agent = null;
+            _session = null;
+            _chatClient?.Dispose();
+            _chatClient = null;
+        }
+
+        // A grey line above the reply bubble, describing a tool call.
+        private Label AddStepLine(StreamingBubble bubble, string text)
+        {
+            Label line = new Label
+            {
+                Text = "\U0001F50E " + text,
+                FontFamily = Theme.BodyFont,
+                FontSize = 13,
+                TextColor = Theme.SecondaryText,
+                Margin = new Thickness(6, 0)
+            };
+            int index = _transcript.Children.IndexOf(bubble.Row);
+            if (index < 0)
+                _transcript.Children.Add(line);
+            else
+                _transcript.Children.Insert(index, line);
+            ScrollToEnd();
+            return line;
+        }
+
+        // Switching web search on or off starts a new chat: the agent keeps its own conversation.
+        private void OnWebSearchToggled(object sender, ToggledEventArgs e)
+        {
+            _tavilyKeyEntry.IsVisible = e.Value;
+            if (_busy)
+                return;
+            bool hadMessages = !_transcript.Children.Contains(_emptyLabel);
+            _chat?.ClearHistory();
+            _session = null;
+            ClearTranscript();
+            if (hadMessages)
+                SetStatus(e.Value ? "Web search is on - started a new chat." : "Web search is off - started a new chat.");
+        }
+
+        private async Task LoadTavilyKeyAsync()
+        {
+            try
+            {
+                _tavilyKey = await SecureStorage.Default.GetAsync(TavilyKeyStorageName) ?? string.Empty;
+                _tavilyKeyEntry.Text = _tavilyKey;
+            }
+            catch (Exception)
+            {
+                // No secure storage (e.g. no keychain access): the key is kept for this session only.
+            }
+        }
+
+        private async void OnTavilyKeyChanged()
+        {
+            string key = _tavilyKeyEntry.Text?.Trim() ?? string.Empty;
+            if (key == _tavilyKey)
+                return;
+            _tavilyKey = key;
+            try
+            {
+                if (key.Length > 0)
+                    await SecureStorage.Default.SetAsync(TavilyKeyStorageName, key);
+                else
+                    SecureStorage.Default.Remove(TavilyKeyStorageName);
+            }
+            catch (Exception)
+            {
+                // Kept for this session only.
+            }
+            // New tools mean a new agent conversation.
+            if (_session != null && !_busy)
+            {
+                _session = null;
+                ClearTranscript();
+                SetStatus(key.Length > 0 ? "Web search with Tavily is on - started a new chat." : "Tavily key removed - started a new chat.");
             }
         }
 
@@ -612,6 +842,8 @@ namespace Maui.Demo.Lite
             attachments.Add(new PendingAttachment
             {
                 Attachment = ChatAttachment.Audio(wav),
+                Data = wav,
+                MediaType = "audio/wav",
                 Name = string.Format("Voice message ({0:m\\:ss})", length)
             });
             await SendAsync(_promptEditor.Text?.Trim() ?? string.Empty, attachments);
@@ -743,12 +975,22 @@ namespace Maui.Demo.Lite
                 Emgu.CV.CvInvoke.Imencode(".jpg", small, buffer);
                 jpeg = buffer.ToArray();
             }
-            AddPending(new PendingAttachment { Attachment = ChatAttachment.Image(jpeg), Image = jpeg, Name = name });
+            AddPending(new PendingAttachment { Attachment = ChatAttachment.Image(jpeg), Image = jpeg, Data = jpeg, MediaType = "image/jpeg", Name = name });
         }
 
         private void AddPendingAudio(byte[] bytes, string name)
         {
-            AddPending(new PendingAttachment { Attachment = ChatAttachment.Audio(bytes), Name = name });
+            AddPending(new PendingAttachment { Attachment = ChatAttachment.Audio(bytes), Data = bytes, MediaType = AudioMediaType(name), Name = name });
+        }
+
+        private static string AudioMediaType(string fileName)
+        {
+            switch (System.IO.Path.GetExtension(fileName)?.ToLowerInvariant())
+            {
+                case ".mp3": return "audio/mpeg";
+                case ".flac": return "audio/flac";
+                default: return "audio/wav";
+            }
         }
 
         private void AddPending(PendingAttachment attachment)
@@ -843,6 +1085,7 @@ namespace Maui.Demo.Lite
             if (_chat != null)
             {
                 _chat.ClearHistory();
+                _session = null;
                 ClearTranscript();
             }
         }
@@ -859,6 +1102,8 @@ namespace Maui.Demo.Lite
                 catch { /* already reported via SetStatus where it was awaited */ }
             }
 
+            // The chat client's conversation must be released before the model's engine.
+            ResetAgent();
             Chat chat = _chat;
             LanguageModel model = _model;
             _chat = null;
@@ -894,6 +1139,8 @@ namespace Maui.Demo.Lite
             public Label ThinkingLabel;
             public BoxView Separator;
             public Label TextLabel;
+            // The bubble in the transcript, so tool steps can be inserted above it.
+            public View Row;
         }
 
         private StreamingBubble AddStreamingBubble()
@@ -909,7 +1156,7 @@ namespace Maui.Demo.Lite
             });
             AddBubbleRow(bubble, false);
 
-            return new StreamingBubble { ThinkingLabel = thinkingLabel, Separator = separator, TextLabel = textLabel };
+            return new StreamingBubble { ThinkingLabel = thinkingLabel, Separator = separator, TextLabel = textLabel, Row = bubble };
         }
 
         // Called on the UI thread with the thinking/answer split of everything streamed so far (or, once,

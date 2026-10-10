@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<AssemblyName>Emgu.LiteRT.LM.Extensions.AI</AssemblyName>
+	<TargetName>$(AssemblyName)</TargetName>
+	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
+	<!-- async streams (IAsyncEnumerable) for the netstandard2.0 build -->
+	<LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TensorflowBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\lib))</TensorflowBinaryDir>
+	<OutputPath>$(TensorflowBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <Import Project="..\Emgu.LiteRT.LM.Extensions.AI.Shared.projitems" Label="Shared" />
+
+  <!--
+  Emgu.LiteRT.LM.Extensions.AI implements Microsoft.Extensions.AI's IChatClient on top of the Emgu.LiteRT.LM.Models
+  language models, so they can be used with Microsoft.Extensions.AI and Microsoft Agent Framework. It is its own
+  package, so the LiteRT-LM packages themselves don't depend on Microsoft.Extensions.AI. The references become nuget
+  package dependencies when this project is packed.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.10.1" />
+  </ItemGroup>
+</Project>

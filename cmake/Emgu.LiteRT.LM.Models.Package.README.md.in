@@ -16,6 +16,8 @@ using (Qwen3 model = new Qwen3())
 }
 ```
 
+To use the models with Microsoft.Extensions.AI (`IChatClient`, tool calling) or Microsoft Agent Framework, add the ${EMGU_LITERT_LM_EXTENSIONS_AI_NUGET_ID} package.
+
 For online documentation please visit
 <${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
 

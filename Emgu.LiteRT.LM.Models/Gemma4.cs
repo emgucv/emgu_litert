@@ -77,6 +77,14 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
+        /// True: LiteRT-LM parses Gemma 4's tool calls, and its chat template takes the tool responses
+        /// </summary>
+        public override bool SupportsToolCalling
+        {
+            get { return true; }
+        }
+
+        /// <summary>
         /// True: Gemma 4's chat template supports multi-turn LiteRT-LM conversations
         /// </summary>
         public override bool SupportsMultiTurnConversation

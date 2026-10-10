@@ -7,8 +7,12 @@ using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttrib
 using NUnit.Framework;
 #endif
 using Emgu.LiteRT.LM;
+using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Models;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using Emgu.LiteRT.Util;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -552,6 +556,181 @@ namespace Emgu.TF.Lite.Test
                     {
                         Console.WriteLine("Rejected: {0}", e.Message);
                     }
+                }
+            }
+        }
+
+        // A tool only the test knows the answer of, so a correct reply shows the model called it.
+        private static AIFunction CreateSecretCodeTool(Action onCall = null)
+        {
+            return AIFunctionFactory.Create(
+                (string person) =>
+                {
+                    if (onCall != null)
+                        onCall();
+                    return person.IndexOf("Alice", StringComparison.OrdinalIgnoreCase) >= 0 ? "7391" : "unknown";
+                },
+                "get_secret_code",
+                "Returns the secret code of a person.");
+        }
+
+        // Gemma 4 E2B through Microsoft.Extensions.AI's IChatClient: answers, a follow-up and streaming.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestChatClient()
+        {
+            RequireLiteRtLm();
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                await model.Init();
+                using (IChatClient client = model.AsIChatClient())
+                {
+                    ChatOptions options = new ChatOptions { MaxOutputTokens = 64 };
+                    List<Microsoft.Extensions.AI.ChatMessage> history = new List<Microsoft.Extensions.AI.ChatMessage>
+                    {
+                        new Microsoft.Extensions.AI.ChatMessage(ChatRole.System, "Answer in one short sentence."),
+                        new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, "What is the capital of France?")
+                    };
+                    ChatResponse first = await client.GetResponseAsync(history, options);
+                    history.AddMessages(first);
+                    history.Add(new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, "And of Germany?"));
+
+                    StringBuilder streamed = new StringBuilder();
+                    List<ChatResponseUpdate> updates = new List<ChatResponseUpdate>();
+                    await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(history, options))
+                    {
+                        streamed.Append(update.Text);
+                        updates.Add(update);
+                    }
+                    Console.WriteLine("Replies: {0} | {1} ({2} updates)", first.Text, streamed, updates.Count);
+                    if (!first.Text.Contains("Paris"))
+                        throw new Exception("The first reply is wrong");
+                    if (!streamed.ToString().Contains("Berlin"))
+                        throw new Exception("The follow-up doesn't use the history");
+                    if (updates.Count < 2)
+                        throw new Exception("The reply wasn't streamed");
+                    if (updates[updates.Count - 1].FinishReason != ChatFinishReason.Stop)
+                        throw new Exception("The last update has no Stop finish reason");
+                    ChatClientMetadata metadata = client.GetService<ChatClientMetadata>();
+                    if (metadata == null || metadata.DefaultModelId != "gemma-4-E2B-it.litertlm")
+                        throw new Exception("Wrong metadata");
+                }
+            }
+        }
+
+        // Tool calling through UseFunctionInvocation(): the answer needs the tool's result.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestChatClientTools()
+        {
+            RequireLiteRtLm();
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                await model.Init();
+                int calls = 0;
+                using (IChatClient client = new ChatClientBuilder(model.AsIChatClient()).UseFunctionInvocation().Build())
+                {
+                    ChatOptions options = new ChatOptions { Tools = new List<AITool> { CreateSecretCodeTool(() => calls++) } };
+                    List<Microsoft.Extensions.AI.ChatMessage> history = new List<Microsoft.Extensions.AI.ChatMessage>
+                    {
+                        new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, "What is the secret code of Alice?")
+                    };
+                    ChatResponse response = await client.GetResponseAsync(history, options);
+                    Console.WriteLine("Reply: {0}", response.Text);
+                    foreach (Microsoft.Extensions.AI.ChatMessage message in response.Messages)
+                        Console.WriteLine("  {0}: {1}", message.Role, String.Join(", ", message.Contents.Select(c => c.GetType().Name)));
+                    if (calls != 1)
+                        throw new Exception(String.Format("The tool was called {0} times, expected once", calls));
+                    if (!response.Text.Contains("7391"))
+                        throw new Exception("The reply doesn't use the tool's result");
+                    if (!response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().Any()
+                        || !response.Messages.SelectMany(m => m.Contents).OfType<FunctionResultContent>().Any())
+                        throw new Exception("The response should include the tool call and its result");
+
+                    // A follow-up in the same conversation.
+                    history.AddMessages(response);
+                    history.Add(new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, "Repeat the code backwards, digits only."));
+                    ChatResponse second = await client.GetResponseAsync(history, options);
+                    Console.WriteLine("Follow-up: {0}", second.Text);
+                    if (!second.Text.Contains("1937"))
+                        throw new Exception("The follow-up doesn't use the earlier tool result");
+                }
+            }
+        }
+
+        // An image as DataContent.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestChatClientImage()
+        {
+            RequireLiteRtLm();
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                await model.Init();
+                using (IChatClient client = model.AsIChatClient())
+                {
+                    Microsoft.Extensions.AI.ChatMessage message = new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, new List<AIContent>
+                    {
+                        new DataContent(System.IO.File.ReadAllBytes("apple.jpg"), "image/jpeg"),
+                        new TextContent("What fruit is in this image? Answer with one word.")
+                    });
+                    ChatResponse response = await client.GetResponseAsync(new[] { message }, new ChatOptions { MaxOutputTokens = 32 });
+                    Console.WriteLine("Image: {0}", response.Text);
+                    if (response.Text.IndexOf("apple", StringComparison.OrdinalIgnoreCase) < 0)
+                        throw new Exception("The reply doesn't mention an apple");
+                }
+            }
+        }
+
+        // A Microsoft Agent Framework agent (ChatClientAgent) with a tool, two turns in one session.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestAgent()
+        {
+            RequireLiteRtLm();
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                await model.Init();
+                using (IChatClient client = model.AsIChatClient())
+                {
+                    ChatClientAgent agent = new ChatClientAgent(
+                        client,
+                        "You are a helpful assistant. Use the tools when they can help. Answer briefly.",
+                        "Assistant",
+                        null,
+                        new List<AITool> { CreateSecretCodeTool() });
+                    AgentSession session = await agent.CreateSessionAsync();
+                    AgentResponse first = await agent.RunAsync("What is the secret code of Alice?", session);
+                    AgentResponse second = await agent.RunAsync("What is that code plus one? Just the number.", session);
+                    Console.WriteLine("Agent: {0} | {1}", first.Text, second.Text);
+                    if (!first.Text.Contains("7391"))
+                        throw new Exception("The agent didn't use the tool");
+                    if (!second.Text.Contains("7392"))
+                        throw new Exception("The agent's session doesn't keep the conversation");
                 }
             }
         }

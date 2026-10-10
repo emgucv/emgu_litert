@@ -1,0 +1,35 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Extensions.AI.dll`: `LiteRtLmChatClient`, an `IChatClient` ([Microsoft.Extensions.AI](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-ai)) for the `${EMGU_LITERT_LM_MODELS_NUGET_ID}` language models, which run on the device through LiteRT-LM. Code written against `IChatClient` - including [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework/) agents - can use them like any other chat client: streaming, images and audio (`DataContent`, for models that accept them), thinking (`TextReasoningContent`, switched with `ChatOptions.Reasoning`) and tool calling (`UseFunctionInvocation()`, for models with `LanguageModel.SupportsToolCalling`: currently the Gemma 4 models).
+
+```csharp
+using Emgu.LiteRT.LM.Extensions.AI;
+using Emgu.LiteRT.LM.Models;
+using Microsoft.Extensions.AI;
+
+using (Gemma4E2B model = new Gemma4E2B())
+{
+    await model.Init();
+    using (IChatClient client = new ChatClientBuilder(model.AsIChatClient()).UseFunctionInvocation().Build())
+    {
+        ChatOptions options = new ChatOptions
+        {
+            Tools = { AIFunctionFactory.Create(() => DateTime.Now.ToString("D"), "get_date", "Returns today's date") }
+        };
+        ChatResponse response = await client.GetResponseAsync("What day is it today?", options);
+        Console.WriteLine(response.Text);
+    }
+}
+```
+
+`LiteRtLmChatClient` keeps one LiteRT-LM conversation open while each request only adds to it, so earlier turns aren't processed again. Tool calling uses `UseFunctionInvocation()` from the `Microsoft.Extensions.AI` package.
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
+
+## Note
+
+To deploy to a specific platform, you will also need to add one of the ${EMGU_LITERT_NUGET_ID}.runtime.{platform} nuget packages that include `liblitert-lm` to your executable project: currently ${EMGU_LITERT_NUGET_ID}.runtime.macos (Apple Silicon only) and the MAUI add-on ${EMGU_LITERT_LM_NUGET_ID}.runtime.maui.
+<https://www.nuget.org/packages?q=${EMGU_LITERT_NUGET_ID}.runtime>

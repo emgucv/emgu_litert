@@ -551,6 +551,9 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # Emgu.LiteRT.LM.Models/: ready-to-use language models (download + chat) on top of Emgu.LiteRT.LM.
   SET(EMGU_LITERT_LM_MODELS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Models")
   SET(EMGU_LITERT_LM_MODELS_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} Models")
+  # Emgu.LiteRT.LM.Extensions.AI/: Microsoft.Extensions.AI IChatClient for the Emgu.LiteRT.LM.Models language models.
+  SET(EMGU_LITERT_LM_EXTENSIONS_AI_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Extensions.AI")
+  SET(EMGU_LITERT_LM_EXTENSIONS_AI_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} Extensions AI")
 
   SET(EMGU_LITERT_UTIL_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Util")
   SET(EMGU_LITERT_UTIL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Util")
@@ -1081,6 +1084,17 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Models/NetStandard/docs/README.md)
 
+# Emgu.LiteRT.LM.Extensions.AI: Microsoft.Extensions.AI IChatClient for the language models. Its own nuget package,
+# depending on Emgu.LiteRT.LM.Models, Emgu.LiteRT.LM and Microsoft.Extensions.AI.Abstractions.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Extensions.AI.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Extensions.AI/NetStandard/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Extensions.AI/NetStandard/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Extensions.AI/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Extensions.AI.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Extensions.AI/NetStandard/docs/README.md)
+
 # Emgu.TF.Lite.ImageIO: NativeImageIO/JpegData (renamed from Emgu.Models, then Emgu.LiteRT.ImageIO).
 # Its own nuget package, depending on Emgu.LiteRT.Util (Annotation) and Emgu.TF.Lite
 # (Emgu.TF.Lite.Toolbox's native pixel-conversion P/Invokes).
@@ -1145,6 +1159,7 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.LiteRT)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Models)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Extensions.AI)
   # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and later to Emgu.TF.Lite.ImageIO/, and made
   # its own project+package (it used to be shared source imported directly into
   # Emgu.LiteRT.Tflite.Models.csproj and CVInterop.Lite.csproj). Depends on Emgu.TF.Lite

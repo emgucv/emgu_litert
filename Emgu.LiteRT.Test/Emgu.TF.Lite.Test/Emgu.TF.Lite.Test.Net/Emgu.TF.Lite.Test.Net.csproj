@@ -48,6 +48,7 @@
     <ProjectReference Include="..\..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
+    <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Extensions.AI\NetStandard\Emgu.LiteRT.LM.Extensions.AI.csproj" />
     <!-- Annotation/DownloadableFile/FileDownloadManager moved from Emgu.Models into
          Emgu.LiteRT.Util - needs a direct reference now for UnitTest1.cs to compile. -->
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
@@ -56,4 +57,9 @@
   <Import Project="..\..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
   <Import Project="..\..\..\Emgu.LiteRT.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
 
+  <!-- Microsoft Agent Framework (brings Microsoft.Extensions.AI), for the IChatClient / agent tests of
+       Emgu.LiteRT.LM.Extensions.AI in UnitTestLiteRtLm.cs. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.24.0" />
+  </ItemGroup>
 </Project>

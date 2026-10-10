@@ -92,6 +92,21 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
+        /// True if the model can call tools (functions) in a LiteRT-LM conversation, i.e. LiteRT-LM parses its tool calls
+        /// and its chat template takes the tool responses
+        /// </summary>
+        public virtual bool SupportsToolCalling
+        {
+            get { return false; }
+        }
+
+        /// <summary>
+        /// Raised before the engine is disposed or replaced (by Dispose or another Init), so objects that created
+        /// conversations on it can release them first. Chats are released automatically.
+        /// </summary>
+        public event EventHandler EngineReleasing;
+
+        /// <summary>
         /// Create the engine settings in Init. The default uses the given backend for the main model only; models
         /// that accept images or audio override this to also set their vision / audio backends.
         /// </summary>
@@ -179,6 +194,9 @@ namespace Emgu.LiteRT.LM.Models
         // Release the chats' open conversations, which must not outlive the engine they were created on.
         private void CloseChatConversations()
         {
+            EventHandler engineReleasing = EngineReleasing;
+            if (engineReleasing != null && _engine != null)
+                engineReleasing(this, EventArgs.Empty);
             lock (_chats)
             {
                 foreach (WeakReference<Chat> reference in _chats)
