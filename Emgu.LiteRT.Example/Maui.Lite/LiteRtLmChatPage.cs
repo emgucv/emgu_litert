@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Models;
@@ -18,7 +19,8 @@ namespace Maui.Demo.Lite
     /// Chat demo backed by LiteRT-LM: downloads a .litertlm model and runs it entirely on this device
     /// through Emgu.LiteRT.LM.Models (LanguageModel, Chat). Wired up for Windows, iOS, Android and Mac
     /// Catalyst (Apple Silicon only). For models that accept images and audio (Gemma 4), the "+" button
-    /// attaches a photo or an audio file to the next message.
+    /// attaches a photo or an audio file to the next message, and the microphone button records a voice
+    /// message: the model answers what was said (no transcription step). Replies can be read aloud.
     /// </summary>
     public class LiteRtLmChatPage : ContentPage
     {
@@ -65,6 +67,12 @@ namespace Maui.Demo.Lite
         // smaller images keep the base64-encoded message small.
         private const int MaxImageSize = 1024;
 
+        // Voice messages stop (and are sent) after this long: audio models take a limited length of audio.
+        private static readonly TimeSpan MaxVoiceLength = TimeSpan.FromSeconds(30);
+
+        // Material Symbols "mic" (Apache 2.0); the bundled icon font is a subset without it.
+        private const string MicPathData = "M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z";
+
         private static readonly ModelOption[] Models = new[]
         {
             new ModelOption { Name = "Qwen3 0.6B", Detail = "~500 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
@@ -95,6 +103,14 @@ namespace Maui.Demo.Lite
         private readonly ScrollView _attachmentScroll;
         private readonly BottomSheet _sheet;
         private readonly List<PendingAttachment> _pending = new List<PendingAttachment>();
+        private readonly Border _talkButton;
+        private readonly Microsoft.Maui.Controls.Shapes.Path _micIcon;
+        private readonly BoxView _stopIcon;
+        private readonly Switch _readAloudSwitch;
+        private readonly VoiceRecorder _recorder = new VoiceRecorder();
+        private DateTime _recordingStarted;
+        private CancellationTokenSource _recordingTimer;
+        private CancellationTokenSource _speech;
 
         private LanguageModel _model;
         private Chat _chat;
@@ -139,6 +155,26 @@ namespace Maui.Demo.Lite
             thinkingRow.Add(_thinkingLabel, 0, 0);
             thinkingRow.Add(_thinkingSwitch, 1, 0);
 
+            _readAloudSwitch = new Switch { IsToggled = false, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+            _readAloudSwitch.Toggled += (s, e) =>
+            {
+                if (!e.Value)
+                    StopSpeaking();
+            };
+            var readAloudRow = new Grid
+            {
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+            };
+            readAloudRow.Add(new Label
+            {
+                Text = "Read replies aloud",
+                FontFamily = Theme.BodyFont,
+                FontSize = 15,
+                TextColor = Theme.PrimaryText,
+                VerticalOptions = LayoutOptions.Center
+            }, 0, 0);
+            readAloudRow.Add(_readAloudSwitch, 1, 0);
+
             _newChatButton = Theme.SecondaryButton("New Chat", Theme.GlyphWand);
             _newChatButton.HeightRequest = 44;
             _newChatButton.FontSize = 15;
@@ -147,7 +183,7 @@ namespace Maui.Demo.Lite
             var optionsCard = Theme.Card(new VerticalStackLayout
             {
                 Spacing = 6,
-                Children = { _modelPicker, _modelDetailLabel, Theme.Divider(), thinkingRow, _newChatButton }
+                Children = { _modelPicker, _modelDetailLabel, Theme.Divider(), thinkingRow, readAloudRow, _newChatButton }
             }, 14);
 
             _emptyLabel = new Label
@@ -231,14 +267,54 @@ namespace Maui.Demo.Lite
             _attachButton.OnTap(OnAttachClicked);
             SemanticProperties.SetDescription(_attachButton, "Attach an image or audio");
 
+            _micIcon = new Microsoft.Maui.Controls.Shapes.Path
+            {
+                Data = (Geometry)new PathGeometryConverter().ConvertFromInvariantString(MicPathData),
+                Fill = Theme.Accent,
+                WidthRequest = 24,
+                HeightRequest = 24,
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.Center
+            };
+            _stopIcon = new BoxView
+            {
+                Color = Colors.White,
+                CornerRadius = 3,
+                WidthRequest = 16,
+                HeightRequest = 16,
+                IsVisible = false,
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.Center
+            };
+            _talkButton = new Border
+            {
+                WidthRequest = 44,
+                HeightRequest = 44,
+                BackgroundColor = Theme.TileBackground,
+                Stroke = Colors.Transparent,
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(22) },
+                VerticalOptions = LayoutOptions.End,
+                IsVisible = Models[0].AcceptsMedia,
+                Content = new Grid { Children = { _micIcon, _stopIcon } }
+            };
+            _talkButton.OnTap(OnTalkClicked);
+            SemanticProperties.SetDescription(_talkButton, "Talk: record a voice message");
+
             var composerRow = new Grid
             {
-                ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Auto)
+                },
                 ColumnSpacing = 8
             };
             composerRow.Add(_attachButton, 0, 0);
             composerRow.Add(_promptEditor, 1, 0);
-            composerRow.Add(sendArea, 2, 0);
+            composerRow.Add(_talkButton, 2, 0);
+            composerRow.Add(sendArea, 3, 0);
 
             _attachmentStrip = new HorizontalStackLayout { Spacing = 8 };
             _attachmentScroll = new ScrollView
@@ -285,6 +361,7 @@ namespace Maui.Demo.Lite
         {
             _modelDetailLabel.Text = SelectedOption.Detail;
             _attachButton.IsVisible = SelectedOption.AcceptsMedia;
+            _talkButton.IsVisible = SelectedOption.AcceptsMedia;
             if (!SelectedOption.AcceptsMedia)
                 ClearPendingAttachments();
         }
@@ -299,7 +376,7 @@ namespace Maui.Demo.Lite
 
         private async void OnSendClicked(object sender, EventArgs e)
         {
-            if (_busy)
+            if (_busy || _recorder.IsRecording)
                 return;
 
             string prompt = _promptEditor.Text?.Trim();
@@ -313,7 +390,14 @@ namespace Maui.Demo.Lite
                     ? (attachments.All(a => a.Image != null) ? "Describe this image." : "Describe the image and transcribe the audio.")
                     : "Transcribe this audio.";
             }
+            await SendAsync(prompt, attachments);
+        }
 
+        // Send a message (prompt may be empty for a voice message: the model answers what was said) and stream
+        // the reply into the transcript.
+        private async Task SendAsync(string prompt, List<PendingAttachment> attachments)
+        {
+            StopSpeaking();
             SetBusy(true);
             try
             {
@@ -356,6 +440,8 @@ namespace Maui.Demo.Lite
 
                 UpdateStreamingBubble(bubble, reply);
                 SetStatus(null);
+                if (_readAloudSwitch.IsToggled)
+                    Speak(reply.Text);
             }
             catch (Exception ex)
             {
@@ -420,6 +506,142 @@ namespace Maui.Demo.Lite
                 ? string.Format("Downloading model... {0} of {1} MB ({2}%)", bytesReceived / (1024 * 1024), totalBytesToReceive.Value / (1024 * 1024), (int)(progressPercentage ?? 0))
                 : string.Format("Downloading model... {0} MB", bytesReceived / (1024 * 1024));
             MainThread.BeginInvokeOnMainThread(() => SetStatus(message));
+        }
+
+        // ---------- Voice messages ----------
+
+        // Tap to start recording, tap again to send. The recording goes to the model as audio, with whatever
+        // is typed in the editor and any pending attachments.
+        private async void OnTalkClicked()
+        {
+            if (_recorder.IsRecording)
+            {
+                await StopRecordingAndSendAsync();
+                return;
+            }
+            if (_busy)
+                return;
+
+            StopSpeaking();
+            try
+            {
+                if (!await _recorder.StartAsync())
+                {
+                    SetStatus("Microphone access is needed to talk to the model.");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Could not start recording: " + ex.Message);
+                return;
+            }
+
+            _recordingStarted = DateTime.UtcNow;
+            SetRecording(true);
+            _recordingTimer = new CancellationTokenSource();
+            _ = UpdateRecordingStatusAsync(_recordingTimer.Token);
+        }
+
+        private async Task UpdateRecordingStatusAsync(CancellationToken token)
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    TimeSpan elapsed = DateTime.UtcNow - _recordingStarted;
+                    if (elapsed >= MaxVoiceLength)
+                    {
+                        await StopRecordingAndSendAsync();
+                        return;
+                    }
+                    SetStatus(string.Format("Listening... {0:m\\:ss} - tap the button again to send", elapsed));
+                    await Task.Delay(250, token);
+                }
+            }
+            catch (TaskCanceledException)
+            {
+            }
+        }
+
+        private async Task StopRecordingAndSendAsync()
+        {
+            if (!_recorder.IsRecording)
+                return;
+            _recordingTimer?.Cancel();
+            TimeSpan length = DateTime.UtcNow - _recordingStarted;
+            byte[] wav;
+            try
+            {
+                wav = await _recorder.StopAsync();
+            }
+            catch (Exception ex)
+            {
+                SetRecording(false);
+                SetStatus("Could not record: " + ex.Message);
+                return;
+            }
+            SetRecording(false);
+            SetStatus(null);
+            if (wav == null || length < TimeSpan.FromSeconds(0.5))
+            {
+                SetStatus("That was too short - tap the microphone, speak, then tap it again.");
+                return;
+            }
+
+            List<PendingAttachment> attachments = _pending.ToList();
+            attachments.Add(new PendingAttachment
+            {
+                Attachment = ChatAttachment.Audio(wav),
+                Name = string.Format("Voice message ({0:m\\:ss})", length)
+            });
+            await SendAsync(_promptEditor.Text?.Trim() ?? string.Empty, attachments);
+        }
+
+        private void SetRecording(bool recording)
+        {
+            _talkButton.BackgroundColor = recording ? Theme.Danger : Theme.TileBackground;
+            _micIcon.IsVisible = !recording;
+            _stopIcon.IsVisible = recording;
+            SemanticProperties.SetDescription(_talkButton, recording ? "Stop and send the voice message" : "Talk: record a voice message");
+            _sendButton.IsEnabled = !recording;
+            _attachButton.IsEnabled = !recording;
+            _modelPicker.IsEnabled = !recording && !_busy;
+            _newChatButton.IsEnabled = !recording && !_busy;
+        }
+
+        // Discard a recording in progress (leaving the page).
+        private async Task CancelRecordingAsync()
+        {
+            if (!_recorder.IsRecording)
+                return;
+            _recordingTimer?.Cancel();
+            try { await _recorder.StopAsync(); }
+            catch { }
+            SetRecording(false);
+        }
+
+        private async void Speak(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return;
+            StopSpeaking();
+            CancellationTokenSource speech = new CancellationTokenSource();
+            _speech = speech;
+            try
+            {
+                await TextToSpeech.Default.SpeakAsync(text, cancelToken: speech.Token);
+            }
+            catch (Exception)
+            {
+                // Cancelled, or no speech engine
+            }
+        }
+
+        private void StopSpeaking()
+        {
+            _speech?.Cancel();
+            _speech = null;
         }
 
         // ---------- Attachments ----------
@@ -623,6 +845,8 @@ namespace Maui.Demo.Lite
             base.OnNavigatedFrom(args);
             if (!Navigation.NavigationStack.Contains(this) && !Navigation.ModalStack.Contains(this))
             {
+                StopSpeaking();
+                _ = CancelRecordingAsync();
                 _ = CleanupModelAsync();
             }
         }
@@ -684,7 +908,10 @@ namespace Maui.Demo.Lite
                     _transcript.Children.Remove(_emptyLabel);
                 _transcript.Children.Add(media);
             }
-            AddBubbleRow(Bubble(text, UserBubbleColor, UserTextColor), true);
+            if (!string.IsNullOrEmpty(text))
+                AddBubbleRow(Bubble(text, UserBubbleColor, UserTextColor), true);
+            else
+                ScrollToEnd();
         }
 
         private void AddBubbleRow(Border bubble, bool isUser)
@@ -750,6 +977,7 @@ namespace Maui.Demo.Lite
             _modelPicker.IsEnabled = !busy;
             _newChatButton.IsEnabled = !busy;
             _attachButton.Opacity = busy ? 0.4 : 1;
+            _talkButton.Opacity = busy ? 0.4 : 1;
         }
 
         private void SetStatus(string message)

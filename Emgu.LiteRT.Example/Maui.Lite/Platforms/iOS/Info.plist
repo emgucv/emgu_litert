@@ -45,5 +45,7 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The LiteRT-LM chat records your voice to send it to the on-device language model.</string>
 </dict>
 </plist>
