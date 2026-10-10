@@ -132,6 +132,27 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
+        /// Get the model's reasoning of a message in LiteRT-LM's JSON message format: its "reasoning_content" string,
+        /// reported by models that think in a separate channel (e.g. Gemma 4).
+        /// </summary>
+        /// <param name="messageJson">The message as JSON</param>
+        /// <returns>The reasoning, or an empty string if the message has none</returns>
+        public static String GetReasoning(String messageJson)
+        {
+            if (String.IsNullOrEmpty(messageJson))
+                return String.Empty;
+            using (JsonDocument document = JsonDocument.Parse(messageJson))
+            {
+                JsonElement reasoning;
+                if (document.RootElement.ValueKind == JsonValueKind.Object
+                    && document.RootElement.TryGetProperty("reasoning_content", out reasoning)
+                    && reasoning.ValueKind == JsonValueKind.String)
+                    return reasoning.GetString();
+                return String.Empty;
+            }
+        }
+
+        /// <summary>
         /// Get the text of a message in LiteRT-LM's JSON message format: its "content" string, or the concatenated
         /// "text" of its content parts of type "text".
         /// </summary>
@@ -162,6 +183,58 @@ namespace Emgu.LiteRT.LM.Models
                 }
                 return text.ToString();
             }
+        }
+    }
+
+    /// <summary>
+    /// Builds the generated text of a reply from the messages (or streamed chunks) LiteRT-LM returns. Models whose
+    /// chat template uses a "thought" channel (e.g. Gemma 4) report their thinking in a separate "reasoning_content"
+    /// field instead of in the text; it is written here as a leading &lt;think&gt;...&lt;/think&gt; block, the same
+    /// way models like Qwen3 emit it, so ChatReply and streaming consumers treat both alike.
+    /// </summary>
+    internal class ReplyTextBuilder
+    {
+        private readonly StringBuilder _text = new StringBuilder();
+        private bool _thinkingOpen;
+
+        /// <summary>
+        /// The generated text so far
+        /// </summary>
+        public String Text
+        {
+            get { return _text.ToString(); }
+        }
+
+        /// <summary>
+        /// Add a reply message or streamed chunk.
+        /// </summary>
+        /// <param name="messageJson">The message or chunk as JSON</param>
+        /// <returns>The text this adds to the generated text</returns>
+        public String Add(String messageJson)
+        {
+            String reasoning = ChatMessage.GetReasoning(messageJson);
+            String text = ChatMessage.GetText(messageJson);
+            StringBuilder piece = new StringBuilder();
+            if (reasoning.Length > 0)
+            {
+                if (!_thinkingOpen)
+                {
+                    piece.Append("<think>");
+                    _thinkingOpen = true;
+                }
+                piece.Append(reasoning);
+            }
+            if (text.Length > 0)
+            {
+                if (_thinkingOpen)
+                {
+                    piece.Append("</think>");
+                    _thinkingOpen = false;
+                }
+                piece.Append(text);
+            }
+            _text.Append(piece);
+            return piece.ToString();
         }
     }
 

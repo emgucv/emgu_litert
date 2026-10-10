@@ -14,8 +14,9 @@ namespace Emgu.LiteRT.LM.Models
     /// <remarks>
     /// The model accepts images and audio as well as text: send them with Chat.Send / SendAsync as ChatAttachments
     /// (e.g. ask about an image, or to transcribe a recording). The vision and audio parts of the model are only
-    /// loaded when first used. Unlike Qwen3, it doesn't think before answering. Its chat template supports multi-turn
-    /// conversations, so Chat keeps one LiteRT-LM Conversation open across messages.
+    /// loaded when first used. It can think before answering (EnableThinking, off by default); unlike Qwen3, it
+    /// reports the thinking in a separate channel, which ChatReply.Thinking exposes the same way. Its chat template
+    /// supports multi-turn conversations, so Chat keeps one LiteRT-LM Conversation open across messages.
     /// </remarks>
     public class Gemma4E2B : LanguageModel
     {
@@ -39,6 +40,24 @@ namespace Emgu.LiteRT.LM.Models
         public override DownloadableFile DefaultModelFile
         {
             get { return ModelFile; }
+        }
+
+        /// <summary>
+        /// Whether new chats let the model think before answering. Thinking gives better answers to harder
+        /// questions, but takes longer and uses more tokens.
+        /// </summary>
+        public bool EnableThinking { get; set; }
+
+        /// <summary>
+        /// Start a chat with the model, using EnableThinking.
+        /// </summary>
+        /// <param name="systemMessage">The system message (instructions for the model), or null for none</param>
+        /// <returns>The chat</returns>
+        public override Chat CreateChat(String systemMessage = null)
+        {
+            Chat chat = base.CreateChat(systemMessage);
+            chat.EnableThinking = EnableThinking;
+            return chat;
         }
 
         /// <summary>

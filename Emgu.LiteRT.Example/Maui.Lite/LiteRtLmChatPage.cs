@@ -35,7 +35,7 @@ namespace Maui.Demo.Lite
         private static readonly ModelOption[] Models = new[]
         {
             new ModelOption { Name = "Qwen3 0.6B", Detail = "~500 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
-            new ModelOption { Name = "Gemma 4 E2B", Detail = "~2.6 GB download. Larger, keeps a conversation open across turns.", Choice = ModelChoice.Gemma4E2B },
+            new ModelOption { Name = "Gemma 4 E2B", Detail = "~2.6 GB download. Larger, can think before answering, keeps a conversation open across turns.", Choice = ModelChoice.Gemma4E2B },
         };
 
         private static readonly Color UserBubbleColor = Theme.Accent;
@@ -204,10 +204,6 @@ namespace Maui.Demo.Lite
         private void OnModelPickerChanged(object sender, EventArgs e)
         {
             _modelDetailLabel.Text = Models[Math.Max(_modelPicker.SelectedIndex, 0)].Detail;
-            bool isQwen3 = SelectedChoice == ModelChoice.Qwen3;
-            _thinkingSwitch.IsEnabled = isQwen3;
-            if (!isQwen3)
-                _thinkingSwitch.IsToggled = false;
         }
 
         private void OnThinkingToggled(object sender, ToggledEventArgs e)
@@ -309,7 +305,7 @@ namespace Maui.Demo.Lite
 
             _model = model;
             _chat = model.CreateChat();
-            _chat.EnableThinking = choice == ModelChoice.Qwen3 ? _thinkingSwitch.IsToggled : (bool?)null;
+            _chat.EnableThinking = _thinkingSwitch.IsToggled;
             _loaded = choice;
             return true;
         }

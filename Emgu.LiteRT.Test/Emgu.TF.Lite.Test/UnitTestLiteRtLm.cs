@@ -393,6 +393,43 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // Gemma 4 E2B reports its thinking in a separate channel; ChatReply.Thinking exposes it like Qwen3's.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestGemma4E2BThinking()
+        {
+            RequireLiteRtLm();
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                model.EnableThinking = true;
+                await model.Init();
+                using (Chat chat = model.CreateChat())
+                {
+                    chat.MaxOutputTokens = 2048;
+                    System.Text.StringBuilder streamed = new System.Text.StringBuilder();
+                    ChatReply reply = await chat.SendAsync("A farmer has 17 sheep, all but 9 die, then he buys 3 times as many as remain. How many sheep now? Give the final number.",
+                        text => { lock (streamed) streamed.Append(text); });
+                    Console.WriteLine("Streamed: {0}\nThinking: {1}\nAnswer: {2}", streamed, reply.Thinking, reply.Text);
+                    if (String.IsNullOrEmpty(reply.Thinking))
+                        throw new Exception("The reply has no thinking");
+                    if (!reply.Text.Contains("36"))
+                        throw new Exception("The reply has no (correct) answer after the thinking");
+
+                    chat.EnableThinking = false;
+                    ChatReply plain = chat.Send("What is 5 plus 5? Answer with just the number.");
+                    Console.WriteLine("Without thinking: {0} / {1}", plain.Thinking, plain.Text);
+                    if (!String.IsNullOrEmpty(plain.Thinking))
+                        throw new Exception("The reply has thinking although it is disabled");
+                }
+            }
+        }
+
         // Gemma 4 E2B also accepts images and audio (test inputs from the LiteRT-LM submodule).
 #if !TEST_MODELS
 #if VS_TEST

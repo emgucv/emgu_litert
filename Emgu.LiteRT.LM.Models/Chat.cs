@@ -115,7 +115,9 @@ namespace Emgu.LiteRT.LM.Models
                 try
                 {
                     String json = resources.Conversation.SendMessage(message.ToJson());
-                    reply = new ChatReply(ChatMessage.GetText(json), json);
+                    ReplyTextBuilder builder = new ReplyTextBuilder();
+                    builder.Add(json);
+                    reply = new ChatReply(builder.Text, json);
                 }
                 catch
                 {
@@ -172,13 +174,16 @@ namespace Emgu.LiteRT.LM.Models
             try
             {
                 ConversationResources resources = AcquireConversation();
-                String[] chunks;
+                ReplyTextBuilder builder = new ReplyTextBuilder();
                 try
                 {
-                    Action<String> onChunk = null;
-                    if (onText != null)
-                        onChunk = chunkJson => onText(ChatMessage.GetText(chunkJson));
-                    chunks = await resources.Conversation.SendMessageStreamAsync(
+                    Action<String> onChunk = chunkJson =>
+                    {
+                        String piece = builder.Add(chunkJson);
+                        if (onText != null && piece.Length > 0)
+                            onText(piece);
+                    };
+                    await resources.Conversation.SendMessageStreamAsync(
                         message.ToJson(), onChunk, null, null, cancellationToken).ConfigureAwait(false);
                 }
                 catch
@@ -187,10 +192,7 @@ namespace Emgu.LiteRT.LM.Models
                     throw;
                 }
                 ReleaseConversation(resources, true);
-                StringBuilder fullText = new StringBuilder();
-                foreach (String chunk in chunks)
-                    fullText.Append(ChatMessage.GetText(chunk));
-                ChatReply reply = new ChatReply(fullText.ToString());
+                ChatReply reply = new ChatReply(builder.Text);
                 AddToHistory(message, reply);
                 return reply;
             }
