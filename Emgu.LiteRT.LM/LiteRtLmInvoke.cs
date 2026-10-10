@@ -108,29 +108,45 @@ namespace Emgu.LiteRT.LM
                 throw new LiteRtLmException(String.Format("{0} failed with status {1}: {2}", functionName, status, TakeLastError()));
         }
 
-        // Whether liblitert-lm has the error reporter (litert_lm_get_last_error_message, LiteRT-LM v0.18.0 and later).
-        private static bool _hasErrorReporter = true;
+        // Whether liblitert-lm has the error reporter: null until checked.
+        private static bool? _hasErrorReporter;
+
+        /// <summary>
+        /// True if the loaded liblitert-lm is LiteRT-LM v0.18.0 or later, detected by the error reporter functions
+        /// (litert_lm_get_last_error_message etc.) that version added. Loads liblitert-lm.
+        /// </summary>
+        public static bool IsV018OrLater
+        {
+            get
+            {
+                if (!_hasErrorReporter.HasValue)
+                {
+                    try
+                    {
+                        // Harmless: only resets this thread's error state.
+                        litert_lm_clear_last_error();
+                        _hasErrorReporter = true;
+                    }
+                    catch (EntryPointNotFoundException)
+                    {
+                        _hasErrorReporter = false;
+                    }
+                }
+                return _hasErrorReporter.Value;
+            }
+        }
 
         // The error message LiteRT-LM recorded for the last failed call on this thread, cleared once read so a later
         // failure that records none can't report it again. Must be called on the thread that made the failed call,
-        // right after it (the error state is thread-local).
+        // right after it (the error state is thread-local). Older liblitert-lm versions have no error reporter.
         private static String TakeLastError()
         {
             const String NoDetails = "see the LiteRT-LM log for details";
-            if (!_hasErrorReporter)
+            if (!IsV018OrLater)
                 return NoDetails;
-            try
-            {
-                String message = PtrToStringUtf8(litert_lm_get_last_error_message());
-                litert_lm_clear_last_error();
-                return String.IsNullOrEmpty(message) ? NoDetails : message;
-            }
-            catch (EntryPointNotFoundException)
-            {
-                // An older liblitert-lm.
-                _hasErrorReporter = false;
-                return NoDetails;
-            }
+            String message = PtrToStringUtf8(litert_lm_get_last_error_message());
+            litert_lm_clear_last_error();
+            return String.IsNullOrEmpty(message) ? NoDetails : message;
         }
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]

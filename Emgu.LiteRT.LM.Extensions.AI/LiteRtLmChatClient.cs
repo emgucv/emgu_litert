@@ -71,10 +71,11 @@ namespace Emgu.LiteRT.LM.Extensions.AI
         /// <summary>
         /// Whether to constrain generation when tools are given, so the model can only produce well-formed calls to the
         /// given tools (or plain text): LiteRT-LM's constrained decoding, using its Gemma model constraint provider
-        /// (libGemmaModelConstraintProvider). Off by default. Needs LiteRT-LM v0.18.0 or later: v0.17.1's prebuilt
-        /// constraint provider crashes the process.
+        /// (libGemmaModelConstraintProvider). On by default. Only applied with LiteRT-LM v0.18.0 or later
+        /// (LiteRtLmInvoke.IsV018OrLater): v0.17.1's prebuilt constraint provider crashes the process, so with an older
+        /// liblitert-lm the tools are used without constraints.
         /// </summary>
-        public bool EnableConstrainedDecoding { get; set; }
+        public bool EnableConstrainedDecoding { get; set; } = true;
 
         /// <summary>
         /// The language model this client runs
@@ -124,7 +125,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             String toolsJson = GetToolsJson(options);
             bool? enableThinking = GetEnableThinking(options);
             int maxOutputTokens = options != null && options.MaxOutputTokens.HasValue ? options.MaxOutputTokens.Value : 0;
-            bool constrained = EnableConstrainedDecoding && toolsJson != null;
+            bool constrained = EnableConstrainedDecoding && toolsJson != null && LiteRtLmInvoke.IsV018OrLater;
             String settingsKey = String.Join("\u0001", new[] { systemMessage ?? "", toolsJson ?? "", enableThinking.ToString(), maxOutputTokens.ToString(), constrained.ToString() });
             List<String> keys = turns.Select(GetMessageKey).ToList();
 

@@ -24,7 +24,7 @@ using (Gemma4E2B model = new Gemma4E2B())
 }
 ```
 
-`LiteRtLmChatClient` keeps one LiteRT-LM conversation open while each request only adds to it, so earlier turns aren't processed again. Set `LiteRtLmChatClient.EnableConstrainedDecoding` to constrain generation to well-formed calls of the given tools (Gemma 4). Tool calling uses `UseFunctionInvocation()` from the `Microsoft.Extensions.AI` package.
+`LiteRtLmChatClient` keeps one LiteRT-LM conversation open while each request only adds to it, so earlier turns aren't processed again. With tools, generation is constrained to well-formed calls of the given tools (`LiteRtLmChatClient.EnableConstrainedDecoding`, on by default; it needs a LiteRT-LM v0.18.0 or later native library and is skipped with an older one). Tool calling uses `UseFunctionInvocation()` from the `Microsoft.Extensions.AI` package.
 
 For online documentation please visit
 <${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

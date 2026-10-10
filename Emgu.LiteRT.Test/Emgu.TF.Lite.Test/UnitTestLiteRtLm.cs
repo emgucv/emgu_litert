@@ -630,10 +630,11 @@ namespace Emgu.TF.Lite.Test
         [TestAttribute]
         public async Task TestChatClientTools()
         {
+            // Without constraints (the client's default is constrained).
             await TestChatClientTools(false);
         }
 
-        // The same with constrained decoding (LiteRT-LM v0.18.0 or later).
+        // The same with constrained decoding (LiteRT-LM v0.18.0 or later; the client's default).
 #if !TEST_MODELS
 #if VS_TEST
         [Ignore()]
@@ -650,6 +651,8 @@ namespace Emgu.TF.Lite.Test
         private static async Task TestChatClientTools(bool constrained)
         {
             RequireLiteRtLm();
+            if (constrained && !LiteRtLmInvoke.IsV018OrLater)
+                throw new Exception("Constrained decoding needs LiteRT-LM v0.18.0 or later");
             using (Gemma4E2B model = new Gemma4E2B())
             {
                 await model.Init();
