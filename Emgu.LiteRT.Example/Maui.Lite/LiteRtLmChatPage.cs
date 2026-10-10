@@ -2,7 +2,7 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if WINDOWS || IOS || ANDROID
+#if WINDOWS || IOS || ANDROID || MACCATALYST
 
 using System;
 using System.Text;
@@ -14,8 +14,8 @@ namespace Maui.Demo.Lite
 {
     /// <summary>
     /// Chat demo backed by LiteRT-LM: downloads a .litertlm model and runs it entirely on this device
-    /// through Emgu.LiteRT.LM.Models (LanguageModel, Chat). Wired up for Windows, iOS and Android -
-    /// LiteRT-LM's native library is not yet bundled with this app on Mac Catalyst.
+    /// through Emgu.LiteRT.LM.Models (LanguageModel, Chat). Wired up for Windows, iOS, Android and Mac
+    /// Catalyst (Apple Silicon only).
     /// </summary>
     public class LiteRtLmChatPage : ContentPage
     {

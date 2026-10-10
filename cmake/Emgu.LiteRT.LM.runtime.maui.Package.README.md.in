@@ -1,6 +1,6 @@
 ## About this package
 
-This package contains the native LiteRT-LM (liblitert-lm) runtime add-on of Emgu LiteRT for MAUI - Android, iOS and Windows today, with Mac Catalyst to follow. It depends on the platform-specific Emgu.LiteRT.LM.runtime.maui.* / Emgu.LiteRT.LM.runtime.windows packages, and is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT.
+This package contains the native LiteRT-LM (liblitert-lm) runtime add-on of Emgu LiteRT for MAUI - Android, iOS, Mac Catalyst (Apple Silicon) and Windows. It depends on the platform-specific Emgu.LiteRT.LM.runtime.maui.* / Emgu.LiteRT.LM.runtime.windows packages, and is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT.
 
 For online documentation please visit
 <${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

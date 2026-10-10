@@ -626,6 +626,8 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   SET(EMGU_LITERT_LM_MAUI_ANDROID_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} for MAUI Android")
   SET(EMGU_LITERT_LM_MAUI_IOS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.runtime.maui.ios")
   SET(EMGU_LITERT_LM_MAUI_IOS_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} for MAUI iOS")
+  SET(EMGU_LITERT_LM_MAUI_MACOS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.runtime.maui.macos")
+  SET(EMGU_LITERT_LM_MAUI_MACOS_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} for MAUI Mac Catalyst")
 
   SET(EMGU_LITERT_MAUI_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.ios")
   SET(EMGU_LITERT_MAUI_IOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui iOS")	
@@ -662,6 +664,15 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/iOS/SignPkg.Targets)
   ENDIF()
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.maui.ios.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/iOS/docs/README.md)
+
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.maui.macos.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Mac/Directory.Build.props)
+  IF(EMGU_SIGN_FOUND AND WIN32)
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Mac/SignBinary.Targets)
+  ENDIF()
+  IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Mac/SignPkg.Targets)
+  ENDIF()
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.maui.macos.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Mac/docs/README.md)
 
   #IF (HAVE_IOS_LITE)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.ios.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/iOS/Directory.Build.props)
@@ -735,6 +746,17 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
     SET(EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY "${EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY}
   	<ItemGroup>
       <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'\" Include=\"${EMGU_LITERT_LM_MAUI_IOS_NUGET_ID}\" Version=\"${EMGU_LITERT_LM_PACKAGE_VERSION}\">
+	  </PackageReference>
+    </ItemGroup>")
+  ENDIF()
+  # Emgu.LiteRT.LM.runtime.maui.macos (Mac Catalyst, which loads the macOS liblitert-lm.dylib built by
+  # platforms/macos/bazel_build_tflite_macos darwin_arm64) the same way, with the maccatalyst TargetFramework.
+  SET(EMGU_LITERT_LM_MAUI_MACCATALYST_TFM "")
+  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/liblitert-lm.dylib")
+    SET(EMGU_LITERT_LM_MAUI_MACCATALYST_TFM ";net${DOTNET_VERSION_MAJOR}.0-maccatalyst")
+    SET(EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY "${EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY}
+  	<ItemGroup>
+      <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'\" Include=\"${EMGU_LITERT_LM_MAUI_MACOS_NUGET_ID}\" Version=\"${EMGU_LITERT_LM_PACKAGE_VERSION}\">
 	  </PackageReference>
     </ItemGroup>")
   ENDIF()

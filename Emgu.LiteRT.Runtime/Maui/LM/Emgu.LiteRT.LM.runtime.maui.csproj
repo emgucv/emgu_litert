@@ -7,6 +7,7 @@
 		<LangVersion>latest</LangVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 
@@ -17,15 +18,15 @@
 
 	<ItemGroup>
 	  <!-- Android, iOS and Windows are all referenced as PackageReferences (not ProjectReferences),
-	       pulling in the already-built Emgu.LiteRT.LM.runtime.maui.android / .maui.ios /
+	       pulling in the already-built Emgu.LiteRT.LM.runtime.maui.android / .maui.ios / .maui.macos /
 	       Emgu.LiteRT.LM.runtime.windows packages instead - see the generated Directory.Build.props
 	       for the actual conditional PackageReference entries (EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY
 	       in the top-level CMakeLists.txt). A ProjectReference to the android/ios sub-projects here
 	       would work for that TFM itself, but NuGet's cross-targeting restore evaluates the whole
 	       multi-TFM closure together and errors on this project's other TFMs being asked to resolve
 	       a platform-only referenced project; PackageReference has no such problem, since package
-	       compatibility is checked per-TFM independently. The ios TFM and its PackageReference are
-	       only generated when lib/ios/CLiteRTLM.xcframework exists. Mac Catalyst has no LiteRT-LM
-	       build yet - add a -maccatalyst TargetFramework and PackageReference the same way once it does. -->
+	       compatibility is checked per-TFM independently. The ios and maccatalyst TFMs and their
+	       PackageReferences are only generated when lib/ios/CLiteRTLM.xcframework /
+	       lib/runtimes/osx/native/liblitert-lm.dylib exist. -->
 	</ItemGroup>
 </Project>

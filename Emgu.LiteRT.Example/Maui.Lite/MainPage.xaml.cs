@@ -22,7 +22,7 @@ public partial class MainPage : ContentPage
             (Theme.GlyphSparkle, "Inception", "Recognize flower species", () => new InceptionPage()),
             (Theme.GlyphSettings, "Model Checker", "Inspect any .tflite model file", () => new ModelCheckerPage()),
         };
-#if WINDOWS || IOS || ANDROID
+#if WINDOWS || IOS || ANDROID || MACCATALYST
         rows.Add((Theme.GlyphText, "LiteRT-LM Chat", "Chat with an on-device language model", () => new LiteRtLmChatPage()));
 #endif
 

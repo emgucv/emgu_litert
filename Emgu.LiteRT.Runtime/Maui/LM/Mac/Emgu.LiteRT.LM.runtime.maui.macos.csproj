@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\lib))</TfLiteBinaryDir>
+    <EmguLiteRtLmMacBinaryDir>$(TfLiteBinaryDir)\runtimes\osx\native</EmguLiteRtLmMacBinaryDir>
+    <EmguLiteRtLmMacLibrary>$(EmguLiteRtLmMacBinaryDir)\liblitert-lm.dylib</EmguLiteRtLmMacLibrary>
+    <BaseOutputPath>$(TfLiteBinaryDir)\Build\$(MSBuildProjectName)\$(Platform)\</BaseOutputPath>
+  </PropertyGroup>
+
+  <!-- There is no Mac Catalyst build of LiteRT-LM: Bazel (rules_apple) has no Mac Catalyst platform, and
+       LiteRT-LM's prebuilt libGemmaModelConstraintProvider only exists for macOS, iOS and Android. A Mac Catalyst
+       app can't link against a macOS dylib, but it can load one at run time, so this add-on ships the macOS
+       liblitert-lm.dylib built by platforms/macos/bazel_build_tflite_macos (Apple Silicon only), with the
+       libGemmaModelConstraintProvider.dylib and libLiteRt.dylib it depends on (found through its @loader_path
+       rpath), in the app bundle's Contents/MonoBundle, where Emgu.LiteRT.LM's DllImport("liblitert-lm") finds
+       them. They're copied, not linked, so the static tfliteextern of Emgu.LiteRT.runtime.maui.macos and the
+       TFLite inside these dylibs never meet in one binary. -->
+  <ItemGroup Condition="Exists('$(EmguLiteRtLmMacLibrary)')">
+    <None Include="$(EmguLiteRtLmMacLibrary);$(EmguLiteRtLmMacBinaryDir)\libGemmaModelConstraintProvider.dylib;$(EmguLiteRtLmMacBinaryDir)\libLiteRt.dylib">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Pack>True</Pack>
+      <PackagePath>runtimes\maccatalyst-arm64\native</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Depends on Emgu.LiteRT.runtime.maui.macos, not the other way around - same direction as the Android and iOS
+         LiteRT-LM add-ons. -->
+    <ProjectReference Include="..\..\Mac\Emgu.LiteRT.runtime.maui.macos.csproj" />
+  </ItemGroup>
+
+  <Target Name="EmguLiteRtLmMauiMacPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <Message Text="LiteRT-LM Mac Catalyst library included: '$(EmguLiteRtLmMacLibrary)'" Importance="high" Condition="Exists('$(EmguLiteRtLmMacLibrary)')" />
+    <Warning Text="LiteRT-LM is not available for $(TargetFramework): $(EmguLiteRtLmMacLibrary) is missing - run platforms/macos/bazel_build_tflite_macos darwin_arm64." Condition="!Exists('$(EmguLiteRtLmMacLibrary)')" />
+  </Target>
+</Project>

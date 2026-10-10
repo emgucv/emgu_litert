@@ -1,0 +1,6 @@
+## About this package
+
+This package contains the native Mac Catalyst runtime of Emgu LiteRT LM for MAUI (Apple Silicon only): LiteRT-LM's macOS liblitert-lm.dylib with the libGemmaModelConstraintProvider.dylib and libLiteRt.dylib it depends on. There is no Mac Catalyst build of LiteRT-LM, but a Mac Catalyst app can load these macOS libraries from its bundle at run time. It is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT.
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

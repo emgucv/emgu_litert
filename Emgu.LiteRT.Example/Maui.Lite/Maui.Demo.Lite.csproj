@@ -71,13 +71,16 @@
 		     bundled with this app on Mac Catalyst yet (on iOS it comes from the CLiteRTLM.xcframework the iOS MAUI
 		     runtime embeds, built by platforms/ios/bazel_build_litert_lm_ios; on Android from liblitert-lm.so, arm64-v8a
 		     and x86_64 only, which the Android MAUI runtime packages). -->
-		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />
-		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
-		<!-- On Android and iOS, LiteRT-LM's native library comes from the separate LiteRT-LM add-on runtimes (the base
-		     Emgu.LiteRT.runtime.maui.android/.ios only carry tfliteextern/libLiteRt): liblitert-lm.so and
-		     libGemmaModelConstraintProvider.so on Android, CLiteRTLM.xcframework and GemmaModelConstraintProvider.xcframework on iOS. -->
+		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />
+		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
+		<!-- On Android, iOS and Mac Catalyst, LiteRT-LM's native library comes from the separate LiteRT-LM add-on
+		     runtimes (the base Emgu.LiteRT.runtime.maui.android/.ios/.macos only carry tfliteextern/libLiteRt):
+		     liblitert-lm.so and libGemmaModelConstraintProvider.so on Android, CLiteRTLM.xcframework and
+		     GemmaModelConstraintProvider.xcframework on iOS, and on Mac Catalyst the macOS liblitert-lm.dylib (with
+		     libGemmaModelConstraintProvider.dylib and libLiteRt.dylib), loaded from the app bundle. -->
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\Android\Emgu.LiteRT.LM.runtime.maui.android.csproj" />
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\iOS\Emgu.LiteRT.LM.runtime.maui.ios.csproj" />
+		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\Mac\Emgu.LiteRT.LM.runtime.maui.macos.csproj" />
 
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Emgu.CV.runtime.maui.mini" Version="4.12.0.5764" />

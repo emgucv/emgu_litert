@@ -8,8 +8,10 @@
          Emgu.LiteRT.LM.runtime.maui.android), iOS (CLiteRTLM.xcframework, via
          Emgu.LiteRT.LM.runtime.maui.ios - its TargetFramework is only added when that framework was
          built, see EMGU_LITERT_LM_MAUI_IOS_TFM in the top-level CMakeLists.txt) and Windows
-         (Emgu.LiteRT.LM.runtime.windows). Mac Catalyst has no LiteRT-LM build yet. -->
-    <TargetFrameworks>netstandard2.0;net${DOTNET_VERSION_MAJOR}.0-android${EMGU_LITERT_LM_MAUI_IOS_TFM}</TargetFrameworks>
+         (Emgu.LiteRT.LM.runtime.windows), and Mac Catalyst (the macOS liblitert-lm.dylib, via
+         Emgu.LiteRT.LM.runtime.maui.macos - likewise only added when it was built,
+         EMGU_LITERT_LM_MAUI_MACCATALYST_TFM). -->
+    <TargetFrameworks>netstandard2.0;net${DOTNET_VERSION_MAJOR}.0-android${EMGU_LITERT_LM_MAUI_IOS_TFM}${EMGU_LITERT_LM_MAUI_MACCATALYST_TFM}</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-windows10.0.19041.0</TargetFrameworks>
 
     <EmguLiteRTProjectRoot>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\))</EmguLiteRTProjectRoot>
@@ -21,7 +23,7 @@
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
 	<summary>Runtime package of Emgu LiteRT LM for MAUI</summary>
-    <Description>This package contains the native LiteRT-LM (liblitert-lm) runtime add-on of Emgu LiteRT for MAUI. Currently Android, iOS and Windows are supported; this package has nothing to add for Mac Catalyst heads.</Description>
+    <Description>This package contains the native LiteRT-LM (liblitert-lm) runtime add-on of Emgu LiteRT for MAUI. Currently Android, iOS, Mac Catalyst (Apple Silicon) and Windows are supported.</Description>
     <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION} release of Emgu LiteRT LM for MAUI, built on LiteRT-LM ${LITERT_LM_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
 ${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html
 </PackageReleaseNotes>
