@@ -2,7 +2,7 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if WINDOWS || IOS
+#if WINDOWS || IOS || ANDROID
 
 using System;
 using System.Text;
@@ -14,8 +14,8 @@ namespace Maui.Demo.Lite
 {
     /// <summary>
     /// Chat demo backed by LiteRT-LM: downloads a .litertlm model and runs it entirely on this device
-    /// through Emgu.LiteRT.LM.Models (LanguageModel, Chat). Wired up for Windows and iOS for now -
-    /// LiteRT-LM's native library is not yet bundled with this app on the other MAUI targets.
+    /// through Emgu.LiteRT.LM.Models (LanguageModel, Chat). Wired up for Windows, iOS and Android -
+    /// LiteRT-LM's native library is not yet bundled with this app on Mac Catalyst.
     /// </summary>
     public class LiteRtLmChatPage : ContentPage
     {
@@ -460,7 +460,10 @@ namespace Maui.Demo.Lite
             try
             {
                 await Task.Yield();
-                await _scroll.ScrollToAsync(0, double.MaxValue, true);
+                // Scroll to the actual bottom: Android doesn't clamp the offset, so scrolling to
+                // double.MaxValue would scroll the whole transcript out of view.
+                double bottom = Math.Max(0, _transcript.Height - _scroll.Height);
+                await _scroll.ScrollToAsync(0, bottom, true);
             }
             catch (Exception)
             {

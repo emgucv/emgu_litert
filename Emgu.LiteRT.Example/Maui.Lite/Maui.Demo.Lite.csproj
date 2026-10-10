@@ -67,11 +67,15 @@
 		
 		<ProjectReference Include="..\..\Emgu.TF.Lite.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
 
-		<!-- LiteRT-LM chat demo (LiteRtLmChatPage.cs), Windows and iOS for now: LiteRT-LM's native library isn't
-		     bundled with this app on the other MAUI targets yet (on iOS it comes from the CLiteRTLM.xcframework the
-		     iOS MAUI runtime embeds, built by platforms/ios/bazel_build_litert_lm_ios). -->
-		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />
-		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
+		<!-- LiteRT-LM chat demo (LiteRtLmChatPage.cs), on Windows, iOS and Android: LiteRT-LM's native library isn't
+		     bundled with this app on Mac Catalyst yet (on iOS it comes from the CLiteRTLM.xcframework the iOS MAUI
+		     runtime embeds, built by platforms/ios/bazel_build_litert_lm_ios; on Android from liblitert-lm.so, arm64-v8a
+		     and x86_64 only, which the Android MAUI runtime packages). -->
+		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />
+		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
+		<!-- On Android, liblitert-lm.so and libGemmaModelConstraintProvider.so come from the separate LiteRT-LM add-on
+		     runtime (the base Emgu.LiteRT.runtime.maui.android only carries libtfliteextern.so/libLiteRt.so). -->
+		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\Android\Emgu.LiteRT.LM.runtime.maui.android.csproj" />
 
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Emgu.CV.runtime.maui.mini" Version="4.12.0.5764" />
