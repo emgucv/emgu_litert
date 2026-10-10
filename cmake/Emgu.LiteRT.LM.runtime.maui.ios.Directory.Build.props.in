@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<Project>
+  <!-- https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022
+       Starts the upward search two levels up (past LM/ itself), not one - LM/Directory.Build.props
+       is this package's own *sibling aggregator's* generated props (PackageId
+       Emgu.LiteRT.LM.runtime.maui, different TargetFrameworks); importing it here would wrongly
+       layer the aggregator's own identity onto this project instead of reaching the real repo-root
+       Directory.Build.props the rest of the repo's projects find this way. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../../'))" />
+
+  <PropertyGroup>
+
+    <TargetFramework>net${DOTNET_VERSION_MAJOR}.0-ios</TargetFramework>
+
+    <PackageId>${EMGU_LITERT_LM_MAUI_IOS_NUGET_ID}</PackageId>
+
+	<title>${EMGU_LITERT_LM_MAUI_IOS_NUGET_TITLE}</title>
+    <version>${EMGU_LITERT_LM_PACKAGE_VERSION}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>iOS runtime package of Emgu LiteRT LM for MAUI</summary>
+    <Description>This package contains the native iOS runtime of Emgu LiteRT LM for MAUI: LiteRT-LM's C API as CLiteRTLM.xcframework (a dynamic framework with its own LiteRT/TFLite), and the prebuilt Gemma model constraint provider it depends on, wrapped as GemmaModelConstraintProvider.xcframework. Requires iOS 26.4 or later at run time. Depends on Emgu.LiteRT.runtime.maui.ios.</Description>
+    <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION} release of Emgu LiteRT LM for MAUI iOS, built on LiteRT-LM ${LITERT_LM_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html
+</PackageReleaseNotes>
+
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\platforms\nuget))</PackageOutputPath>
+	<PackageTags>tensorflow;emgu;emgutf;ai;ios;maui;litert-lm</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+
+  </PropertyGroup>
+
+    <ItemGroup>
+      <None Include="..\..\..\..\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="..\..\..\..\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />
+</Project>

@@ -3,6 +3,7 @@
 # --------------------------------------------------------
 
 ADD_SUBDIRECTORY(Android)
+ADD_SUBDIRECTORY(iOS)
 
 # Only build MAUI projects on Windows or MacOS. MAUI compilation on Linux seems to be a problem.
 # Also only build when there's an actual LiteRT-LM binary to reference for at least one platform
@@ -28,6 +29,10 @@ IF(HAVE_MAUI_LITE AND HAVE_WINDOWS_LITERT_LM AND (APPLE OR WIN32))
 
   IF (TARGET Emgu.LiteRT.LM.runtime.maui.android)
     ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.LM.runtime.maui.android)
+  ENDIF()
+
+  IF (TARGET Emgu.LiteRT.LM.runtime.maui.ios)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.LM.runtime.maui.ios)
   ENDIF()
 
   IF (TARGET Emgu.LiteRT.LM.runtime.windows.nuget)

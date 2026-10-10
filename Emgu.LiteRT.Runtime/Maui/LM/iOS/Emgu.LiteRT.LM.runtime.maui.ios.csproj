@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>true</ImplicitUsings>
+    <IsBindingProject>true</IsBindingProject>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <NoBindingEmbedding>true</NoBindingEmbedding>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\lib))</TfLiteBinaryDir>
+    <EmguLiteRtLmIOSFramework>$(TfLiteBinaryDir)\ios\CLiteRTLM.xcframework</EmguLiteRtLmIOSFramework>
+    <EmguLiteRtLmGemmaIOSFramework>$(TfLiteBinaryDir)\ios\GemmaModelConstraintProvider.xcframework</EmguLiteRtLmGemmaIOSFramework>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <WarningLevel>4</WarningLevel>
+    <OutputPath>$(TfLiteBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>$(TfLiteBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ObjcBindingApiDefinition Include="ApiDefinition.cs" />
+    <ObjcBindingCoreSource Include="StructsAndEnums.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- LiteRT-LM's C API (Emgu.LiteRT.LM), built by platforms/ios/bazel_build_litert_lm_ios: a dynamic framework,
+         since it carries its own statically linked LiteRT/TFLite, which would clash with the static tfliteextern
+         of Emgu.LiteRT.runtime.maui.ios in one binary. It depends on LiteRT-LM's prebuilt Gemma model constraint
+         provider, which that script wraps into a framework of its own. Emgu.LiteRT.LM's DllImport("__Internal")
+         resolves against the linked framework. -->
+    <NativeReference Condition="Exists('$(EmguLiteRtLmIOSFramework)')" Include="$(EmguLiteRtLmIOSFramework)">
+      <Kind>Framework</Kind>
+      <SmartLink>False</SmartLink>
+    </NativeReference>
+    <NativeReference Condition="Exists('$(EmguLiteRtLmGemmaIOSFramework)')" Include="$(EmguLiteRtLmGemmaIOSFramework)">
+      <Kind>Framework</Kind>
+      <SmartLink>False</SmartLink>
+    </NativeReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Depends on Emgu.LiteRT.runtime.maui.ios, not the other way around - same direction as
+         Emgu.LiteRT.LM.runtime.maui.android depending on Emgu.LiteRT.runtime.maui.android. -->
+    <ProjectReference Include="..\..\iOS\Emgu.LiteRT.runtime.maui.ios.csproj" />
+  </ItemGroup>
+
+  <Target Name="EmguLiteRtLmMauiIOSPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <Message Text="LiteRT-LM iOS framework linked: '$(EmguLiteRtLmIOSFramework)'" Importance="high" Condition="Exists('$(EmguLiteRtLmIOSFramework)')" />
+    <Warning Text="LiteRT-LM is not available for $(TargetFramework): $(EmguLiteRtLmIOSFramework) is missing - run platforms/ios/bazel_build_litert_lm_ios." Condition="!Exists('$(EmguLiteRtLmIOSFramework)')" />
+  </Target>
+</Project>

@@ -4,8 +4,8 @@
 #   lib/ios/CLiteRTLM.xcframework                      - LiteRT-LM's own //swift:CLiteRTLM target
 #   lib/ios/GemmaModelConstraintProvider.xcframework   - LiteRT-LM's prebuilt Gemma model constraint provider,
 #                                                        which CLiteRTLM links, wrapped into a framework
-# Both are dynamic frameworks with a device (arm64) and a simulator (arm64) slice. Emgu.LiteRT.Runtime/Maui/iOS's
-# .csproj embeds them in the app when present.
+# Both are dynamic frameworks with a device (arm64) and a simulator (arm64) slice. The LiteRT-LM add-on
+# Emgu.LiteRT.Runtime/Maui/LM/iOS (Emgu.LiteRT.LM.runtime.maui.ios) embeds them in the app when present.
 #
 # CLiteRTLM must stay a dynamic framework: it carries its own statically linked LiteRT/TFLite, while the iOS
 # tfliteextern (bazel_build_tflite_ios) is a static library with its own TFLite, so linking both statically into
