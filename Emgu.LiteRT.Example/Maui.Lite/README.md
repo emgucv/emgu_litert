@@ -122,6 +122,7 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
   loading as soon as they are selected, and the page reopens with the model used last. The first load after a
   download checks the file once (a few seconds for the larger models); you can type meanwhile, and a message sent
   while the model loads is sent when it's ready.
+- Code in replies is shown in a code block with a Copy button.
 - "Think" and "Web search" (Gemma 4) are per-message switches above the message box. Web search uses Wikipedia, and
   the web with a Tavily API key (Settings); your searches leave the device.
 - The "+" button attaches images (from the photo library, the camera - "Take Photo", on devices with one - or the

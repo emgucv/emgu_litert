@@ -1599,7 +1599,8 @@ namespace Maui.Demo.Lite
         {
             public Label ThinkingLabel;
             public BoxView Separator;
-            public Label TextLabel;
+            // The answer, with code blocks shown as code (ReplyBody).
+            public ReplyBody Body;
             // The bubble in the transcript, so tool steps can be inserted above it.
             public View Row;
         }
@@ -1608,16 +1609,16 @@ namespace Maui.Demo.Lite
         {
             var thinkingLabel = new Label { FontFamily = Theme.BodyFont, TextColor = ThinkingTextColor, FontSize = 13, IsVisible = false };
             var separator = new BoxView { HeightRequest = 1, Color = Theme.Chevron, IsVisible = false };
-            var textLabel = new Label { TextColor = ModelTextColor, FontFamily = Theme.BodyFont, FontSize = 15 };
+            var body = new ReplyBody(ModelTextColor);
 
             Border bubble = ModelBubble(new VerticalStackLayout
             {
                 Spacing = 4,
-                Children = { thinkingLabel, separator, textLabel }
+                Children = { thinkingLabel, separator, body }
             });
             AddBubbleRow(bubble, false);
 
-            return new StreamingBubble { ThinkingLabel = thinkingLabel, Separator = separator, TextLabel = textLabel, Row = bubble };
+            return new StreamingBubble { ThinkingLabel = thinkingLabel, Separator = separator, Body = body, Row = bubble };
         }
 
         // Called on the UI thread with the thinking/answer split of everything streamed so far (or, once,
@@ -1628,7 +1629,7 @@ namespace Maui.Demo.Lite
             bubble.ThinkingLabel.IsVisible = hasThinking;
             bubble.Separator.IsVisible = hasThinking;
             bubble.ThinkingLabel.Text = partial.Thinking;
-            bubble.TextLabel.Text = partial.Text;
+            bubble.Body.SetText(partial.Text);
             ScrollToEnd();
         }
 
