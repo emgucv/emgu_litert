@@ -1,4 +1,4 @@
-//----------------------------------------------------------------------------
+﻿//----------------------------------------------------------------------------
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
@@ -97,6 +97,29 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
+        /// Replace the history with earlier messages, e.g. to continue a conversation saved in a previous session. The
+        /// next message is sent with them (a conversation open on the old history is released first).
+        /// </summary>
+        /// <param name="messages">The messages, oldest first: user messages (with their attachments, which must still
+        /// exist if given as files) and the model's answers</param>
+        public void LoadHistory(IEnumerable<ChatMessage> messages)
+        {
+            if (messages == null)
+                throw new ArgumentNullException("messages");
+            EnterSend();
+            try
+            {
+                CloseConversation();
+                _history.Clear();
+                _history.AddRange(messages);
+            }
+            finally
+            {
+                ExitSend();
+            }
+        }
+
+        /// <summary>
         /// Send a message and wait for the reply. The message and the reply's answer (without thinking) are added to
         /// the history.
         /// </summary>
@@ -173,7 +196,9 @@ namespace Emgu.LiteRT.LM.Models
             EnterSend();
             try
             {
-                ConversationResources resources = AcquireConversation();
+                // Creating a LiteRT-LM conversation can take seconds (e.g. with a history to process): not on the
+                // caller's thread, which may be a UI thread.
+                ConversationResources resources = await Task.Run(() => AcquireConversation()).ConfigureAwait(false);
                 ReplyTextBuilder builder = new ReplyTextBuilder();
                 try
                 {

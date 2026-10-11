@@ -124,6 +124,8 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
   while the model loads is sent when it's ready.
 - Replies are formatted (headings, bold, italic, lists, links), and code is shown in a code block with a Copy
   button.
+- Chats are saved on the device after each reply; the history button (or the Chats list in the side panel on wide
+  screens) reopens one - the model continues from its last 20 messages - or deletes it.
 - "Think" and "Web search" (Gemma 4) are per-message switches above the message box. Web search uses Wikipedia, and
   the web with a Tavily API key (Settings); your searches leave the device.
 - The "+" button attaches images (from the photo library, the camera - "Take Photo", on devices with one - or the

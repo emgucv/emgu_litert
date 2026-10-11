@@ -347,6 +347,44 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // A chat continued from a saved history (Chat.LoadHistory), as after restarting an app.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestChatLoadHistory()
+        {
+            RequireLiteRtLm();
+            using (Qwen3 model = new Qwen3())
+            {
+                await model.Init();
+                List<Emgu.LiteRT.LM.Models.ChatMessage> saved;
+                using (Chat chat = model.CreateChat("Answer in one short sentence."))
+                {
+                    chat.MaxOutputTokens = 64;
+                    chat.EnableThinking = false;
+                    chat.Send("My favourite colour is teal. Just say OK.");
+                    saved = chat.History.ToList();
+                }
+                using (Chat restored = model.CreateChat("Answer in one short sentence."))
+                {
+                    restored.MaxOutputTokens = 64;
+                    restored.EnableThinking = false;
+                    restored.LoadHistory(saved);
+                    ChatReply reply = restored.Send("What is my favourite colour?");
+                    Console.WriteLine("Restored chat: {0}", reply.Text);
+                    if (reply.Text.IndexOf("teal", StringComparison.OrdinalIgnoreCase) < 0)
+                        throw new Exception("The restored chat doesn't use the loaded history");
+                    if (restored.History.Count != saved.Count + 2)
+                        throw new Exception("The history should continue from the loaded messages");
+                }
+            }
+        }
+
         // Gemma 4 supports multi-turn LiteRT-LM conversations, so Chat keeps one conversation open (E2B: 2.6 GB download).
 #if !TEST_MODELS
 #if VS_TEST

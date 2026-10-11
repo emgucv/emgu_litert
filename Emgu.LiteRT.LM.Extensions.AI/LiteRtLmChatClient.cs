@@ -145,8 +145,11 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                 }
                 if (conversation == null)
                 {
-                    conversation = CreateConversation(
-                        turns.Take(turns.Count - 1).ToList(), systemMessage, toolsJson, constrained, enableThinking, maxOutputTokens);
+                    // Creating a LiteRT-LM conversation can take seconds (e.g. with a history to process): not on the
+                    // caller's thread, which may be a UI thread.
+                    List<AIChatMessage> history = turns.Take(turns.Count - 1).ToList();
+                    conversation = await Task.Run(() => CreateConversation(
+                        history, systemMessage, toolsJson, constrained, enableThinking, maxOutputTokens)).ConfigureAwait(false);
                     conversation.SettingsKey = settingsKey;
                     conversation.MessageKeys.AddRange(keys.Take(keys.Count - 1));
                 }

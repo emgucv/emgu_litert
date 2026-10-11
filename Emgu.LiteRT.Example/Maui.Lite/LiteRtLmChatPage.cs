@@ -167,6 +167,27 @@ namespace Maui.Demo.Lite
         private Chat _chat;
         private ModelChoice? _loaded;
 
+        // Saved chats (ChatStore, SQLite): the current chat's id once its first exchange is saved, and its messages,
+        // used to give the model the earlier conversation when a saved chat is opened (or the agent's tools change).
+        private const int MaxRestoredMessages = 20;
+        private const string HistoryIconPath = "M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z";
+        private readonly ChatStore _store = new ChatStore();
+        private int? _conversationId;
+        private readonly List<HistoryItem> _historyItems = new List<HistoryItem>();
+        private List<AIChatMessage> _agentPrimeHistory;
+        private List<Emgu.LiteRT.LM.Models.ChatMessage> _pendingChatHistory;
+        private readonly List<string> _sendSteps = new List<string>();
+        private readonly Border _historyButton;
+        private readonly VerticalStackLayout _sideChatList;
+
+        // A message of the current chat, as given to the model.
+        private sealed class HistoryItem
+        {
+            public string Role;
+            public string Text;
+            public List<(string Kind, string MediaType, byte[] Data)> Attachments = new List<(string, string, byte[])>();
+        }
+
         // Loading: models load in the background as soon as they are selected (when already downloaded), shown in a
         // card at the top of the conversation; a message sent meanwhile waits for it.
         private const string LastModelPreference = "litert_lm_chat_model";
@@ -243,6 +264,28 @@ namespace Maui.Demo.Lite
             SemanticProperties.SetDescription(_newChatButton, "New chat");
             _settingsButton = Theme.CircleButton(Theme.GlyphSettings, OnSettingsTapped);
             SemanticProperties.SetDescription(_settingsButton, "Settings");
+            _historyButton = new Border
+            {
+                WidthRequest = 44,
+                HeightRequest = 44,
+                BackgroundColor = Theme.CardBackground,
+                Stroke = Theme.RowBorder,
+                StrokeThickness = 1,
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(22) },
+                VerticalOptions = LayoutOptions.Center,
+                Content = new Microsoft.Maui.Controls.Shapes.Path
+                {
+                    Data = (Geometry)new PathGeometryConverter().ConvertFromInvariantString(HistoryIconPath),
+                    Fill = Theme.PrimaryText,
+                    WidthRequest = 22,
+                    HeightRequest = 22,
+                    Aspect = Stretch.Uniform,
+                    HorizontalOptions = LayoutOptions.Center,
+                    VerticalOptions = LayoutOptions.Center
+                }
+            };
+            _historyButton.OnTap(OnHistoryTapped);
+            SemanticProperties.SetDescription(_historyButton, "Saved chats");
             var header = new Grid
             {
                 ColumnSpacing = 8,
@@ -251,13 +294,15 @@ namespace Maui.Demo.Lite
                     new ColumnDefinition(GridLength.Auto),
                     new ColumnDefinition(GridLength.Star),
                     new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Auto),
                     new ColumnDefinition(GridLength.Auto)
                 }
             };
             header.Add(Theme.CircleButton(Theme.GlyphChevronLeft, async () => await Navigation.PopAsync()), 0, 0);
             header.Add(new Grid { Children = { _modelChip, _titleLabel } }, 1, 0);
-            header.Add(_newChatButton, 2, 0);
-            header.Add(_settingsButton, 3, 0);
+            header.Add(_historyButton, 2, 0);
+            header.Add(_newChatButton, 3, 0);
+            header.Add(_settingsButton, 4, 0);
 
             // ---- Per-message toggles, shown above the message box for models that support them ----
             _thinkingSwitch = new ToggleChip("\u2728 Think");
@@ -508,6 +553,7 @@ namespace Maui.Demo.Lite
             _mainColumn.Add(composerCard, 0, 3);
 
             // ---- Side panel (wide screens): the model list and the settings ----
+            _sideChatList = new VerticalStackLayout { Spacing = 2 };
             _sideModelList = new VerticalStackLayout { Spacing = 4 };
             _sideSettingsHost = new VerticalStackLayout();
             _sidePanel = new Border
@@ -524,6 +570,9 @@ namespace Maui.Demo.Lite
                         Spacing = 10,
                         Children =
                         {
+                            Theme.SectionTitle("Chats"),
+                            _sideChatList,
+                            Theme.Divider(),
                             Theme.SectionTitle("Model"),
                             _sideModelList,
                             Theme.Divider(),
@@ -565,10 +614,12 @@ namespace Maui.Demo.Lite
             _modelChip.IsVisible = !wide;
             _titleLabel.IsVisible = wide;
             _settingsButton.IsVisible = !wide;
+            _historyButton.IsVisible = !wide;
             if (wide)
             {
                 MoveTo(_settingsView, _sideSettingsHost);
                 RefreshModelList();
+                _ = RefreshChatListAsync();
             }
         }
 
@@ -660,6 +711,9 @@ namespace Maui.Demo.Lite
         private void SelectModel(int index)
         {
             UiStallWatchdog.Mark("Select model " + Models[index].Name);
+            // A chat belongs to a model: another model starts a new chat.
+            if (_pageStarted && index != _selectedModel)
+                StartNewChat();
             _selectedModel = index;
             ModelOption option = SelectedOption;
             _modelChipLabel.Text = option.Name;
@@ -747,10 +801,7 @@ namespace Maui.Demo.Lite
                 try { await previousLoad; } catch (Exception) { }
             }
             if (_model != null && _loaded != option.Choice)
-            {
                 await CleanupModelAsync();
-                ClearTranscript();
-            }
             if (token.IsCancellationRequested)
                 return false;
 
@@ -787,6 +838,11 @@ namespace Maui.Demo.Lite
 
             _model = model;
             _chat = model.CreateChat();
+            if (_pendingChatHistory != null)
+            {
+                _chat.LoadHistory(_pendingChatHistory);
+                _pendingChatHistory = null;
+            }
             _chat.EnableThinking = _thinkingSwitch.IsToggled;
             _loaded = option.Choice;
             ClearLoading(option.Choice);
@@ -957,6 +1013,7 @@ namespace Maui.Demo.Lite
         // the reply into the transcript.
         private async Task SendAsync(string prompt, List<PendingAttachment> attachments)
         {
+            _sendSteps.Clear();
             UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, agent {3}, think {4}, web {5}",
                 prompt.Length, attachments.Count, SelectedOption.Name, UseAgent, _thinkingSwitch.IsToggled, _webSearchSwitch.IsToggled));
             StopSpeaking();
@@ -1004,6 +1061,7 @@ namespace Maui.Demo.Lite
 
                 UpdateStreamingBubble(bubble, reply);
                 UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
+                await SaveExchangeAsync(prompt, attachments, reply);
                 SetStatus(null);
                 if (_readAloudSwitch.IsToggled)
                     Speak(reply.Text);
@@ -1043,8 +1101,16 @@ namespace Maui.Demo.Lite
             StringBuilder thinking = new StringBuilder();
             StringBuilder answer = new StringBuilder();
             Dictionary<string, Label> steps = new Dictionary<string, Label>();
+            // A restored chat: the first message of the session carries the earlier conversation.
+            List<AIChatMessage> messages = new List<AIChatMessage>();
+            if (_agentPrimeHistory != null)
+            {
+                messages.AddRange(_agentPrimeHistory);
+                _agentPrimeHistory = null;
+            }
+            messages.Add(new AIChatMessage(ChatRole.User, contents));
             await foreach (AgentResponseUpdate update in _agent.RunStreamingAsync(
-                new AIChatMessage(ChatRole.User, contents), _session, new ChatClientAgentRunOptions(options)))
+                messages, _session, new ChatClientAgentRunOptions(options)))
             {
                 foreach (AIContent content in update.Contents)
                 {
@@ -1060,6 +1126,7 @@ namespace Maui.Demo.Lite
                             string step = AgentTools.Describe(call);
                             UiStallWatchdog.Mark("Tool call: " + step);
                             steps[call.CallId] = AddStepLine(bubble, step + "...");
+                            _sendSteps.Add(step);
                             SetStatus(step + "...");
                             break;
                         case FunctionResultContent result:
@@ -1170,12 +1237,12 @@ namespace Maui.Demo.Lite
             {
                 // Kept for this session only.
             }
-            // New tools mean a new agent conversation.
+            // New tools mean a new agent session; it is given the conversation so far.
             if (_session != null && !_busy)
             {
                 _session = null;
-                ClearTranscript();
-                SetStatus(key.Length > 0 ? "Web search with Tavily is on - started a new chat." : "Tavily key removed - started a new chat.");
+                _agentPrimeHistory = BuildAgentHistory();
+                SetStatus(key.Length > 0 ? "Web search with Tavily is on." : "Tavily key removed.");
             }
         }
 
@@ -1537,12 +1604,269 @@ namespace Maui.Demo.Lite
                 SetStatus("Hang on - still answering.");
                 return;
             }
-            if (_chat != null)
+            StartNewChat();
+        }
+
+        // Clear the transcript and the model's conversation; the next message starts a new saved chat.
+        private void StartNewChat()
+        {
+            _chat?.ClearHistory();
+            _session = null;
+            _conversationId = null;
+            _historyItems.Clear();
+            _agentPrimeHistory = null;
+            _pendingChatHistory = null;
+            ClearTranscript();
+        }
+
+        // ---------- Saved chats ----------
+
+        // Save a completed exchange: the message (with its attachments), any tool steps, and the reply.
+        private async Task SaveExchangeAsync(string prompt, List<PendingAttachment> attachments, ChatReply reply)
+        {
+            var userItem = new HistoryItem { Role = MessageRecord.UserRole, Text = prompt };
+            foreach (PendingAttachment attachment in attachments)
+                userItem.Attachments.Add((attachment.Image != null ? "image" : "audio", attachment.MediaType, attachment.Data));
+            _historyItems.Add(userItem);
+            _historyItems.Add(new HistoryItem { Role = MessageRecord.AssistantRole, Text = reply.Text });
+            try
             {
-                _chat.ClearHistory();
-                _session = null;
-                ClearTranscript();
+                if (_conversationId == null)
+                {
+                    string title = !string.IsNullOrWhiteSpace(prompt) ? prompt
+                        : attachments.Any(a => a.Image != null) ? "Image" : "Voice message";
+                    _conversationId = await _store.CreateConversationAsync(title, SelectedChoice.ToString());
+                }
+                int id = _conversationId.Value;
+                await _store.AddMessageAsync(id, MessageRecord.UserRole, prompt, null, userItem.Attachments);
+                foreach (string step in _sendSteps)
+                    await _store.AddMessageAsync(id, MessageRecord.StepRole, step, null);
+                await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking);
+                await RefreshChatListAsync();
             }
+            catch (Exception ex)
+            {
+                SetStatus("Could not save the chat: " + ex.Message);
+            }
+        }
+
+        // The conversation so far, for a new agent session (the last messages, so it fits the model's context).
+        private List<AIChatMessage> BuildAgentHistory()
+        {
+            List<AIChatMessage> messages = new List<AIChatMessage>();
+            foreach (HistoryItem item in _historyItems.Skip(Math.Max(0, _historyItems.Count - MaxRestoredMessages)))
+            {
+                List<AIContent> contents = new List<AIContent>();
+                foreach (var attachment in item.Attachments)
+                    if (attachment.Data != null)
+                        contents.Add(new DataContent(attachment.Data, attachment.MediaType));
+                contents.Add(new TextContent(item.Text ?? string.Empty));
+                messages.Add(new AIChatMessage(item.Role == MessageRecord.UserRole ? ChatRole.User : ChatRole.Assistant, contents));
+            }
+            return messages.Count > 0 ? messages : null;
+        }
+
+        private List<Emgu.LiteRT.LM.Models.ChatMessage> BuildChatHistory()
+        {
+            List<Emgu.LiteRT.LM.Models.ChatMessage> messages = new List<Emgu.LiteRT.LM.Models.ChatMessage>();
+            foreach (HistoryItem item in _historyItems.Skip(Math.Max(0, _historyItems.Count - MaxRestoredMessages)))
+            {
+                List<ChatAttachment> attachments = new List<ChatAttachment>();
+                foreach (var attachment in item.Attachments)
+                    if (attachment.Data != null)
+                        attachments.Add(attachment.Kind == "image" ? ChatAttachment.Image(attachment.Data) : ChatAttachment.Audio(attachment.Data));
+                messages.Add(new Emgu.LiteRT.LM.Models.ChatMessage(item.Role, item.Text ?? string.Empty, attachments));
+            }
+            return messages;
+        }
+
+        private async void OnHistoryTapped()
+        {
+            if (!CanChangeModel)
+                return;
+            List<ConversationRecord> chats = await _store.GetConversationsAsync();
+            string action = await _sheet.ShowViewAsync("Chats", BuildChatList(chats, true), "Close");
+            await HandleChatListActionAsync(action, true);
+        }
+
+        private async Task HandleChatListActionAsync(string action, bool reopenSheet)
+        {
+            if (string.IsNullOrEmpty(action))
+                return;
+            int id = int.Parse(action.Substring(action.IndexOf(':') + 1));
+            if (action.StartsWith("delete:"))
+            {
+                await _store.DeleteConversationAsync(id);
+                if (_conversationId == id)
+                    StartNewChat();
+                await RefreshChatListAsync();
+                if (reopenSheet)
+                    OnHistoryTapped();
+            }
+            else
+            {
+                await OpenConversationAsync(id);
+            }
+        }
+
+        // The saved chats: title, model and date; tapping opens one, the cross deletes it.
+        private View BuildChatList(List<ConversationRecord> chats, bool inSheet)
+        {
+            var list = new VerticalStackLayout { Spacing = 2 };
+            if (chats.Count == 0)
+            {
+                list.Children.Add(new Label
+                {
+                    Text = "No saved chats yet - they appear here after the first reply.",
+                    FontFamily = Theme.BodyFont,
+                    FontSize = 13,
+                    TextColor = Theme.SecondaryText,
+                    Margin = new Thickness(10, 6)
+                });
+                return list;
+            }
+            foreach (ConversationRecord chat in chats)
+            {
+                int id = chat.Id;
+                string modelName = Models.FirstOrDefault(m => m.Choice.ToString() == chat.Model)?.Name ?? chat.Model;
+                var row = new Grid
+                {
+                    Padding = new Thickness(10, 7),
+                    ColumnSpacing = 6,
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+                };
+                row.Add(new VerticalStackLayout
+                {
+                    Children =
+                    {
+                        new Label { Text = chat.Title, FontFamily = Theme.TitleFont, FontSize = 14, TextColor = Theme.PrimaryText, LineBreakMode = LineBreakMode.TailTruncation },
+                        new Label { Text = modelName + " \u00B7 " + chat.Updated.ToLocalTime().ToString("g"), FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText }
+                    }
+                }, 0, 0);
+                var delete = new Label
+                {
+                    Text = Theme.GlyphClose,
+                    FontFamily = Theme.IconFont,
+                    FontSize = 18,
+                    TextColor = Theme.SecondaryText,
+                    Padding = new Thickness(6),
+                    VerticalOptions = LayoutOptions.Center
+                };
+                SemanticProperties.SetDescription(delete, "Delete this chat");
+                row.Add(delete, 1, 0);
+                var cell = new Border
+                {
+                    BackgroundColor = id == _conversationId ? Theme.TileBackground : Colors.Transparent,
+                    Stroke = Colors.Transparent,
+                    StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(10) },
+                    Content = row
+                };
+                delete.OnTap(() =>
+                {
+                    if (inSheet)
+                        _sheet.Dismiss("delete:" + id);
+                    else if (CanChangeModel)
+                        _ = HandleChatListActionAsync("delete:" + id, false);
+                });
+                cell.OnTap(() =>
+                {
+                    if (inSheet)
+                        _sheet.Dismiss("open:" + id);
+                    else if (CanChangeModel)
+                        _ = HandleChatListActionAsync("open:" + id, false);
+                });
+                list.Children.Add(cell);
+            }
+            return list;
+        }
+
+        private async Task RefreshChatListAsync()
+        {
+            if (_wide != true)
+                return;
+            try
+            {
+                List<ConversationRecord> chats = await _store.GetConversationsAsync();
+                _sideChatList.Children.Clear();
+                _sideChatList.Children.Add(BuildChatList(chats, false));
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        // Open a saved chat: switch to its model, show its messages, and give the model the conversation so far.
+        private async Task OpenConversationAsync(int id)
+        {
+            if (!CanChangeModel)
+                return;
+            ConversationRecord chat = (await _store.GetConversationsAsync()).FirstOrDefault(c => c.Id == id);
+            if (chat == null)
+                return;
+            UiStallWatchdog.Mark("Open saved chat " + id);
+            int index = Array.FindIndex(Models, m => m.Choice.ToString() == chat.Model);
+            if (index >= 0 && index != _selectedModel)
+                SelectModel(index);
+            StartNewChat();
+            _conversationId = id;
+
+            foreach (MessageRecord message in await _store.GetMessagesAsync(id))
+            {
+                if (message.Role == MessageRecord.StepRole)
+                {
+                    AddSavedStep(message.Text);
+                    continue;
+                }
+                var item = new HistoryItem { Role = message.Role, Text = message.Text };
+                List<PendingAttachment> shown = new List<PendingAttachment>();
+                foreach (SavedAttachment attachment in _store.GetAttachments(message))
+                {
+                    byte[] data = await System.IO.File.ReadAllBytesAsync(attachment.Path);
+                    item.Attachments.Add((attachment.Kind, attachment.MediaType, data));
+                    shown.Add(new PendingAttachment
+                    {
+                        Image = attachment.Kind == "image" ? data : null,
+                        Data = data,
+                        MediaType = attachment.MediaType,
+                        Name = System.IO.Path.GetFileName(attachment.Path)
+                    });
+                }
+                _historyItems.Add(item);
+                if (message.Role == MessageRecord.UserRole)
+                {
+                    AddUserMessage(message.Text, shown);
+                }
+                else
+                {
+                    StreamingBubble bubble = AddStreamingBubble();
+                    UpdateStreamingBubble(bubble, new ChatReply(string.IsNullOrEmpty(message.Thinking)
+                        ? message.Text : "<think>" + message.Thinking + "</think>" + message.Text));
+                }
+            }
+
+            // Give the model the conversation so far (the last messages, so it fits its context).
+            if (UseAgent)
+                _agentPrimeHistory = BuildAgentHistory();
+            else if (_chat != null && _loaded == SelectedChoice)
+                _chat.LoadHistory(BuildChatHistory());
+            else
+                _pendingChatHistory = BuildChatHistory();
+            await RefreshChatListAsync();
+            ScrollToEnd();
+        }
+
+        private void AddSavedStep(string text)
+        {
+            if (_transcript.Children.Contains(_emptyLabel))
+                _transcript.Children.Remove(_emptyLabel);
+            _transcript.Children.Add(new Label
+            {
+                Text = "\U0001F50E " + text,
+                FontFamily = Theme.BodyFont,
+                FontSize = 13,
+                TextColor = Theme.SecondaryText,
+                Margin = new Thickness(6, 0)
+            });
         }
 
         // Wait for any in-flight generation before freeing the chat/engine: Chat.Send and the engine it
