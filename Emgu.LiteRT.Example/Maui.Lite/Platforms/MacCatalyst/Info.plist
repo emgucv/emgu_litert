@@ -46,6 +46,8 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>The demo takes photos to classify, detect objects in, or ask the on-device language model about.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>The LiteRT-LM chat records your voice to send it to the on-device language model.</string>
 </dict>

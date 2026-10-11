@@ -124,8 +124,9 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
   while the model loads is sent when it's ready.
 - "Think" and "Web search" (Gemma 4) are per-message switches above the message box. Web search uses Wikipedia, and
   the web with a Tavily API key (Settings); your searches leave the device.
-- The "+" button attaches images or audio, and the microphone button records a voice message, for models that accept
-  them; the first recording asks for microphone access.
+- The "+" button attaches images (from the photo library, the camera - "Take Photo", on devices with one - or the
+  samples) or audio, and the microphone button records a voice message, for models that accept them; the first photo
+  or recording asks for camera / microphone access.
 
 ## Troubleshooting
 

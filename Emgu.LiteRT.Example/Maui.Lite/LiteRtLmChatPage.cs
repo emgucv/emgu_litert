@@ -1349,6 +1349,8 @@ namespace Maui.Demo.Lite
             if (SelectedOption.AcceptsImages)
             {
                 rows.Add(("IMAGE", Theme.GlyphImage, "Photo Library", "library"));
+                if (MediaPicker.Default.IsCaptureSupported)
+                    rows.Add((null, Theme.GlyphCamera, "Take Photo", "camera"));
                 foreach (string sample in SampleImages)
                     rows.Add((null, Theme.GlyphImage, "Sample: " + System.IO.Path.GetFileNameWithoutExtension(sample).Replace('_', ' '), "image:" + sample));
             }
@@ -1369,6 +1371,14 @@ namespace Maui.Demo.Lite
                     FileResult file = (await MediaPicker.Default.PickPhotosAsync())?.FirstOrDefault();
                     if (file != null)
                         AddPendingImage(await ReadAllBytesAsync(file), file.FileName);
+                }
+                else if (action == "camera")
+                {
+                    // The device's camera app; the photo is downscaled and re-encoded like a library photo (OpenCV
+                    // applies its EXIF orientation when decoding).
+                    FileResult file = await MediaPicker.Default.CapturePhotoAsync();
+                    if (file != null)
+                        AddPendingImage(await ReadAllBytesAsync(file), "Photo");
                 }
                 else if (action.StartsWith("image:"))
                 {
