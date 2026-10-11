@@ -2,5 +2,13 @@
 
 This package contains the native Android runtime of Emgu LiteRT LM (liblitert-lm, and the prebuilt libGemmaModelConstraintProvider it depends on) for MAUI. It is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT.
 
+It also contains LiteRT's GPU (OpenCL) accelerator, libLiteRtOpenClAccelerator, for the "gpu" backend (`LanguageModel.Init(backend: "gpu")`). To use it, declare the device's OpenCL library in your app's `Platforms/Android/AndroidManifest.xml`, inside `<application>` (Android 12+ only lets apps load it when declared):
+
+```xml
+<uses-native-library android:name="libOpenCL.so" android:required="false" />
+```
+
+On the GPU, use 32-bit activations (`EngineSettings.ActivationDataType = ActivationDataType.Float32`): with the default 16-bit ones, Gemma 4 E2B answered wrongly after a long conversation on a Pixel Fold.
+
 For online documentation please visit
 <${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

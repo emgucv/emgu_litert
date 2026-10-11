@@ -69,10 +69,17 @@ BUILD_LITERT_LM=0
 if [ "$arch" = "arm64-v8a" ] || [ "$arch" = "x86_64" ]; then
     BUILD_LITERT_LM=1
     GEMMA_PREBUILT=prebuilt/android_${arch%-v8a}/libGemmaModelConstraintProvider.so
-    if ! head -c 4 "$WORKSPACE_DIR/$GEMMA_PREBUILT" | grep -q ELF; then
-        echo "$WORKSPACE_DIR/$GEMMA_PREBUILT is not an ELF library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
-        exit 1
-    fi
+    # LiteRT's GPU (OpenCL) accelerator, which libLiteRt.so loads at run time for the "gpu" backend - also a
+    # LiteRT-LM prebuilt, for the same two ABIs. Self-contained (only Android system libraries; it loads the device's
+    # libOpenCL.so itself). LiteRT-LM's GPU top-k sampler prebuilt isn't used: it added ~25 s to every engine creation
+    # on a Pixel Fold, and without it LiteRT-LM samples on the CPU at the same speed.
+    OPENCL_PREBUILT=prebuilt/android_${arch%-v8a}/libLiteRtOpenClAccelerator.so
+    for PREBUILT in $GEMMA_PREBUILT $OPENCL_PREBUILT; do
+        if ! head -c 4 "$WORKSPACE_DIR/$PREBUILT" | grep -q ELF; then
+            echo "$WORKSPACE_DIR/$PREBUILT is not an ELF library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
+            exit 1
+        fi
+    done
 fi
 
 cd $WORKSPACE_DIR
@@ -112,9 +119,11 @@ if [ "$BUILD_LITERT_LM" = "1" ]; then
     # Bazel's output folder name, so --platform_suffix keeps the two builds from overwriting each other's outputs.
     build_with_bazel --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic "${@:2}" \
         //c:litert-lm || exit 1
-    rm -f ../lib/android/$arch/liblitert-lm.so ../lib/android/$arch/libGemmaModelConstraintProvider.so
+    rm -f ../lib/android/$arch/liblitert-lm.so ../lib/android/$arch/libGemmaModelConstraintProvider.so \
+        ../lib/android/$arch/libLiteRtOpenClAccelerator.so
     cp -f bazel-bin/c/liblitert-lm.so ../lib/android/$arch/liblitert-lm.so || exit 1
     cp -f $GEMMA_PREBUILT ../lib/android/$arch/libGemmaModelConstraintProvider.so || exit 1
+    cp -f $OPENCL_PREBUILT ../lib/android/$arch/libLiteRtOpenClAccelerator.so || exit 1
 fi
 
 # libtfliteextern.so only contains the TFLite C API wrapper and links dynamically against libLiteRt.so

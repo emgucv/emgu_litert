@@ -60,6 +60,9 @@ namespace Maui.Demo.Lite
             // chat is opened or after compacting, which grows with the window: a full 4k chat took 2 minutes on a Pixel
             // Fold (8k: almost 6, with 1.5 GB of its RAM left), 8k 27 s (E2B) / 61 s (E4B) on an Apple Silicon Mac.
             public int DesktopContextTokens;
+            // Whether the model runs on the GPU on Android (when "Use the GPU" is on and the device has OpenCL), with
+            // 32-bit activations - see Performance.md. Only Gemma 4 E2B has been tested there.
+            public bool GpuOnAndroid;
             // The model file (to tell whether it is downloaded) and its download size, for the download prompt.
             public DownloadableFile File;
             public string Size;
@@ -107,7 +110,7 @@ namespace Maui.Demo.Lite
             new ModelOption { Name = "Qwen3 0.6B", File = Qwen3.ModelFile, Size = "350 MB", Detail = "~350 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
             new ModelOption { Name = "Qwen3.5 0.8B", File = Qwen35_0_8B_VL.ModelFile, Size = "1.3 GB", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
             new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B, CanSummarize = true },
-            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192 },
+            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, GpuOnAndroid = true },
             new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192 },
         };
 
@@ -174,6 +177,13 @@ namespace Maui.Demo.Lite
         private LanguageModel _model;
         private Chat _chat;
         private ModelChoice? _loaded;
+        // GPU (Android): whether the loaded model runs on it, whether the one loading will, and whether it failed to
+        // load there (then the CPU is used for the rest of the session).
+        private const string UseGpuPreference = "litert_lm_chat_use_gpu";
+        private readonly Switch _useGpuSwitch;
+        private bool _loadedOnGpu;
+        private bool _loadingOnGpu;
+        private bool _gpuUnavailable;
 
         // Saved chats (ChatStore, SQLite): the current chat's id once its first exchange is saved, and its messages,
         // used to give the model the earlier conversation when a saved chat is opened (or the agent's tools change).
@@ -369,6 +379,23 @@ namespace Maui.Demo.Lite
                 VerticalOptions = LayoutOptions.Center
             }, 0, 0);
             readAloudRow.Add(_readAloudSwitch, 1, 0);
+            bool useGpu = true;
+            try { useGpu = Preferences.Default.Get(UseGpuPreference, true); } catch (Exception) { }
+            _useGpuSwitch = new Switch { IsToggled = useGpu, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+            _useGpuSwitch.Toggled += OnUseGpuToggled;
+            var gpuRow = new Grid
+            {
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+            };
+            gpuRow.Add(new Label
+            {
+                Text = "Use the GPU",
+                FontFamily = Theme.BodyFont,
+                FontSize = 15,
+                TextColor = Theme.PrimaryText,
+                VerticalOptions = LayoutOptions.Center
+            }, 0, 0);
+            gpuRow.Add(_useGpuSwitch, 1, 0);
             _tavilyKeyEntry = new Entry
             {
                 Placeholder = "Tavily API key (optional)",
@@ -402,6 +429,17 @@ namespace Maui.Demo.Lite
                 {
                     readAloudRow,
                     Theme.Divider(),
+#if ANDROID
+                    gpuRow,
+                    new Label
+                    {
+                        Text = "Gemma 4 E2B answers many times faster on the GPU. Its first load there takes about 30 s and keeps a ~0.8 GB cache next to the model; turning this off deletes it.",
+                        FontFamily = Theme.BodyFont,
+                        FontSize = 12,
+                        TextColor = Theme.SecondaryText
+                    },
+                    Theme.Divider(),
+#endif
                     new Label { Text = "Web search", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     new Label
                     {
@@ -826,12 +864,12 @@ namespace Maui.Demo.Lite
         private Task<bool> PrepareModelAsync(bool downloadConfirmed)
         {
             ModelOption option = SelectedOption;
-            if (_model != null && _loaded == option.Choice)
+            if (ModelReady)
             {
                 HideLoadCard();
                 return Task.FromResult(true);
             }
-            if (_loadTask != null && _loadingChoice == option.Choice)
+            if (_loadTask != null && _loadingChoice == option.Choice && _loadingOnGpu == WantsGpu(option))
                 return _loadTask;
             if (!downloadConfirmed && !IsDownloaded(option))
             {
@@ -842,6 +880,7 @@ namespace Maui.Demo.Lite
             _loadCancel?.Cancel();
             _loadCancel = new CancellationTokenSource();
             _loadingChoice = option.Choice;
+            _loadingOnGpu = WantsGpu(option);
             _loadTask = LoadModelAsync(option, _loadTask, _loadCancel.Token);
             return _loadTask;
         }
@@ -856,29 +895,67 @@ namespace Maui.Demo.Lite
             {
                 try { await previousLoad; } catch (Exception) { }
             }
-            if (_model != null && _loaded != option.Choice)
+            // (PrepareModelAsync only gets here when the loaded model isn't the one wanted: another model, or the same one
+            // on another backend.)
+            if (_model != null)
                 await CleanupModelAsync();
             if (token.IsCancellationRequested)
                 return false;
 
-            LanguageModel model = CreateModel(option.Choice);
+            bool onGpu = WantsGpu(option);
+            ModelLoadStage lastStage = ModelLoadStage.CheckingFile;
+            LanguageModel NewModel()
+            {
+                LanguageModel created = CreateModel(option.Choice);
 #if MACCATALYST || WINDOWS
-            if (option.DesktopContextTokens > 0)
-                model.MaxNumTokens = option.DesktopContextTokens;
+                if (option.DesktopContextTokens > 0)
+                    created.MaxNumTokens = option.DesktopContextTokens;
 #endif
-            model.LoadStageChanged += (s, stage) => MainThread.BeginInvokeOnMainThread(() =>
-            {
-                if (!token.IsCancellationRequested)
-                    ShowLoadStage(option, stage);
-            });
-            model.OnDownloadProgressChanged += (total, received, percent) => MainThread.BeginInvokeOnMainThread(() =>
-            {
-                if (!token.IsCancellationRequested)
-                    ShowDownloadProgress(total, received);
-            });
+                created.LoadStageChanged += (s, stage) =>
+                {
+                    lastStage = stage;
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        if (!token.IsCancellationRequested)
+                            ShowLoadStage(option, stage);
+                    });
+                };
+                created.OnDownloadProgressChanged += (total, received, percent) => MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    if (!token.IsCancellationRequested)
+                        ShowDownloadProgress(total, received);
+                });
+                return created;
+            }
+            LanguageModel model = NewModel();
             try
             {
-                await model.Init(cancellationToken: token);
+                if (onGpu)
+                {
+                    try
+                    {
+                        // 32-bit activations: with LiteRT-LM's default 16-bit ones, Gemma 4 E2B answered wrongly after a
+                        // long conversation on a Pixel Fold (Performance.md).
+                        await model.Init(backend: "gpu",
+                            configureSettings: settings => settings.ActivationDataType = Emgu.LiteRT.LM.ActivationDataType.Float32,
+                            cancellationToken: token);
+                    }
+                    catch (Exception ex) when (lastStage == ModelLoadStage.LoadingEngine && !token.IsCancellationRequested)
+                    {
+                        // No usable GPU (e.g. no OpenCL driver): the CPU, for the rest of the session.
+                        UiStallWatchdog.Mark("GPU unavailable: " + ex.Message);
+                        _gpuUnavailable = true;
+                        onGpu = false;
+                        _loadingOnGpu = false;
+                        await Task.Run(() => model.Dispose());
+                        model = NewModel();
+                        await model.Init(cancellationToken: token);
+                    }
+                }
+                else
+                {
+                    await model.Init(cancellationToken: token);
+                }
             }
             catch (Exception ex)
             {
@@ -900,10 +977,63 @@ namespace Maui.Demo.Lite
             _chat = model.CreateChat();
             _chat.EnableThinking = _thinkingSwitch.IsToggled;
             _loaded = option.Choice;
+            _loadedOnGpu = onGpu;
+            // Reloaded on another backend in the middle of a chat: the new engine is given the conversation.
+            if (_historyItems.Count > 0 || _summary != null)
+                _needsPrime = true;
+            if (_gpuUnavailable && WantsGpuSetting(option))
+                SetStatus("The GPU isn't available on this device - using the CPU.");
+            if (!onGpu && option.GpuOnAndroid && !_useGpuSwitch.IsToggled)
+                _ = Task.Run(() => DeleteGpuCache(option));
             ClearLoading(option.Choice);
             HideLoadCard();
             UiStallWatchdog.Mark("Model ready: " + option.Name);
             return true;
+        }
+
+        // The selected model is loaded, on the backend it should run on.
+        private bool ModelReady => _model != null && _loaded == SelectedChoice && _loadedOnGpu == WantsGpu(SelectedOption);
+
+        // Whether the model should run on the GPU: the setting, unless the GPU failed to load this session.
+        private bool WantsGpu(ModelOption option) => WantsGpuSetting(option) && !_gpuUnavailable;
+
+        private bool WantsGpuSetting(ModelOption option)
+        {
+#if ANDROID
+            return option.GpuOnAndroid && _useGpuSwitch.IsToggled;
+#else
+            return false;
+#endif
+        }
+
+        private void OnUseGpuToggled(object sender, ToggledEventArgs e)
+        {
+            try { Preferences.Default.Set(UseGpuPreference, e.Value); } catch (Exception) { }
+            // Reload the selected model on the other backend (the chat continues); turning it off deletes the GPU cache
+            // once the model is loaded on the CPU.
+            if (_pageStarted && SelectedOption.GpuOnAndroid)
+                _ = PrepareModelAsync(false);
+            else if (!e.Value)
+                foreach (ModelOption option in Models.Where(m => m.GpuOnAndroid && !(_loaded == m.Choice && _loadedOnGpu)))
+                    _ = Task.Run(() => DeleteGpuCache(option));
+        }
+
+        // LiteRT's GPU accelerator keeps its compiled programs and converted weights next to the model
+        // (<model file>_<...>_mldrift_program_cache.bin / _mldrift_weight_cache.bin, ~0.8 GB for Gemma 4 E2B).
+        private static void DeleteGpuCache(ModelOption option)
+        {
+            try
+            {
+                string modelFile = option.File.LocalFile;
+                string folder = System.IO.Path.GetDirectoryName(modelFile);
+                if (!System.IO.Directory.Exists(folder))
+                    return;
+                foreach (string file in System.IO.Directory.GetFiles(folder, System.IO.Path.GetFileName(modelFile) + "_*_mldrift_*"))
+                    System.IO.File.Delete(file);
+            }
+            catch (Exception)
+            {
+            }
         }
 
         private static LanguageModel CreateModel(ModelChoice choice)
@@ -938,7 +1068,7 @@ namespace Maui.Demo.Lite
             _loadingChoice = null;
             _chipSpinner.IsVisible = _chipSpinner.IsRunning = false;
             ModelOption option = SelectedOption;
-            if (_model != null && _loaded == option.Choice)
+            if (ModelReady)
                 HideLoadCard();
             else if (!IsDownloaded(option))
                 ShowDownloadPrompt(option);
@@ -986,7 +1116,7 @@ namespace Maui.Demo.Lite
                     ShowLoadCard(option, "Checking the download...", null);
                     break;
                 case ModelLoadStage.LoadingEngine:
-                    ShowLoadCard(option, "Loading into memory...", null);
+                    ShowLoadCard(option, _loadingOnGpu ? "Loading onto the GPU (about 30 s the first time)..." : "Loading into memory...", null);
                     break;
             }
         }
@@ -1333,7 +1463,7 @@ namespace Maui.Demo.Lite
         // for the download first and the message isn't sent.
         private async Task<bool> EnsureModelReadyAsync()
         {
-            if (_model != null && _loaded == SelectedChoice)
+            if (ModelReady)
                 return true;
             Task<bool> load = PrepareModelAsync(false);
             if (load == null)
@@ -1344,7 +1474,7 @@ namespace Maui.Demo.Lite
             SetStatus("Waiting for the model to load...");
             bool ready = await load;
             SetStatus(null);
-            return ready && _model != null && _loaded == SelectedChoice;
+            return ready && ModelReady;
         }
 
         // ---------- Voice messages ----------

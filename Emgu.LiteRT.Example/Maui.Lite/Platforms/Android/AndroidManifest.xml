@@ -1,6 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true"></application>
+	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true">
+		<!-- LiteRT-LM chat on the GPU: LiteRT's OpenCL accelerator (libLiteRtOpenClAccelerator.so) loads the device's
+		     OpenCL driver, which Android 12+ only lets apps load when declared. Optional: without it the chat uses the CPU. -->
+		<uses-native-library android:name="libOpenCL.so" android:required="false" />
+	</application>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />
 	<!-- Taking photos (MediaPicker.CapturePhotoAsync): the image demos and the LiteRT-LM chat -->

@@ -16,6 +16,10 @@ namespace Emgu.LiteRT.LM.Models
     /// loaded when first used. They can think before answering (EnableThinking, off by default); unlike Qwen3, they
     /// report the thinking in a separate channel, which ChatReply.Thinking exposes the same way. Their chat template
     /// supports multi-turn conversations, so Chat keeps one LiteRT-LM Conversation open across messages.
+    /// On an Android GPU (Init(backend: "gpu"), with LiteRT's OpenCL accelerator from Emgu.LiteRT.LM.runtime.maui.android),
+    /// set 32-bit activations (EngineSettings.ActivationDataType = ActivationDataType.Float32 in Init's
+    /// configureSettings): with LiteRT-LM's default 16-bit ones, Gemma 4 E2B answered wrongly after a long
+    /// conversation on a Pixel Fold.
     /// </remarks>
     public abstract class Gemma4 : LanguageModel
     {

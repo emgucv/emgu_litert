@@ -1,7 +1,7 @@
 # LiteRT-LM chat performance
 
-Measurements behind the chat page's context window and compaction settings (`LiteRtLmChatPage.cs`), taken on
-2026-10-11 with LiteRT-LM v0.18.0 on the CPU backend (4 threads, LiteRT-LM's default).
+Measurements behind the chat page's context window, compaction and GPU settings (`LiteRtLmChatPage.cs`), taken on
+2026-10-11 with LiteRT-LM v0.18.0, on the CPU backend (4 threads, LiteRT-LM's default) unless marked GPU.
 
 Devices:
 
@@ -59,14 +59,68 @@ affects normal back-and-forth.
 
 ### What the demo uses
 
-| | Window |
-|---|---|
-| Gemma 4 E2B / E4B on Mac Catalyst and Windows | 8,192 (`ModelOption.DesktopContextTokens`) |
-| Everything else, and all models on phones | 4,096 |
+| | Window | Backend |
+|---|---|---|
+| Gemma 4 E2B / E4B on Mac Catalyst and Windows | 8,192 (`ModelOption.DesktopContextTokens`) | CPU |
+| Gemma 4 E2B on Android | 4,096 | GPU, fp32 (`ModelOption.GpuOnAndroid`, Settings → "Use the GPU"), CPU if unavailable |
+| Everything else | 4,096 | CPU |
 
-On a phone, even a 4k conversation takes about 2 minutes to read again (about 25 tokens per second). At 8k, opening a
-long saved chat or compacting would take about 6 minutes. Running on the GPU would be the real fix (LiteRT-LM supports
-it, but its Android GPU plugin isn't built yet).
+On a phone's CPU, even a 4k conversation takes about 2 minutes to read again (about 25 tokens per second). At 8k,
+opening a long saved chat or compacting would take about 6 minutes. On Android, Gemma 4 E2B therefore runs on the GPU
+(next section), where a full 4k conversation takes 8 s. Phones keep the 4k window anyway: at 8k it would still take
+about 30 s.
+
+## GPU (Android, Pixel Fold)
+
+LiteRT runs models on an Android GPU through its OpenCL accelerator, `libLiteRtOpenClAccelerator.so`. This is a
+LiteRT-LM prebuilt that our `libLiteRt.so` loads at run time; the app must declare the device's `libOpenCL.so` with
+`<uses-native-library>`. The Pixel Fold's Mali GPU (Tensor G2) has a public OpenCL driver.
+
+### fp16 or fp32
+
+LiteRT-LM's GPU backend computes activations in 16-bit floating point (fp16) by default. They can be set to 32-bit (fp32)
+with `EngineSettings.ActivationDataType`. Gemma 4 E2B on the Pixel Fold, compared with its CPU:
+
+| | CPU | GPU, fp16 (default) | GPU, fp32 |
+|---|---|---|---|
+| Re-reading a full 4k chat (~3,000 tokens) | 123 s | 5.3 s | 8.0 s |
+| Re-reading a full 8k chat (~7,400 tokens) | 342 s | 16.4 s | 29.2 s |
+| Re-reading a full 16k chat (~15,500 tokens) | - | 51 s | - |
+| Short follow-up in a full 4k chat | 6.4 s | 0.7 s | 1.0 s |
+| Short follow-up in a full 8k chat | 7.6 s | 0.9 s | 1.7 s |
+| "What is the code plus one?" after a full 4k chat | 7342 ✓ | **73342 ✗** | 7342 ✓ |
+| The same after a full 8k chat | 7342 ✓ | **73341 ✗** | 7342 ✓ |
+| "What is the secret code?" after a full 16k chat | - | **73411 ✗** | - |
+| Short chats (3 turns, no long history) | correct | correct | correct |
+| App memory (resident), full 4k chat | 2.6 GB | 2.2–2.4 GB | 2.9 GB |
+| App memory, full 8k chat | 4.9 GB | 2.4–2.6 GB | 3.3 GB |
+| First load (builds the GPU cache) | under 3 s | 29.5 s | 26.9 s |
+| Later loads | under 3 s | 2.6 s | 2.6 s |
+| GPU cache next to the model | - | 0.75 GB | 0.75 GB |
+
+The GPU cache files hold compiled GPU programs and converted weights (`<model>_..._mldrift_program_cache.bin` and
+`_mldrift_weight_cache.bin`). They grow when the window size changes: probe runs at several sizes in a row left 2.35 GB
+and 3.9 GB. The app always uses one size.
+
+**Why fp32:** with fp16, Gemma 4 E2B gave wrong answers once a long conversation had been loaded: it doubled digits
+("73342" for 7342, "73411" for 7341), at every window size tried. Short conversations were correct. The CPU, and the GPU
+with fp32, answered every one of these correctly. The likely cause is fp16's limited precision over a long context: in
+attention, each new token is weighed against thousands of earlier ones, and rounding errors add up. fp32 costs about 1.5×
+the time and ~0.5–0.7 GB more memory. It is still 15× faster than the CPU at reading a conversation and about 6× faster
+per reply. A model that is fast but misremembers numbers and codes from earlier in the chat is not useful, so the demo
+uses fp32. The cache is the same size either way.
+
+### Other findings
+
+- LiteRT-LM's GPU top-k sampler (`libLiteRtTopKOpenClSampler.so`) added about 25 s to every model load (3 s → 30 s even
+  with a warm cache). It didn't change speed or fix the wrong answers, so it isn't shipped: LiteRT-LM then picks the next
+  token on the CPU.
+- In the demo, with the GPU cache in place, Gemma 4 E2B loads in 2 s. Replies in a short chat took 1.1–1.8 s (the CPU
+  takes ~6 s).
+- Turning "Use the GPU" off reloads the model on the CPU in 1.3 s, continues the chat, and deletes the GPU cache.
+  Turning it on again rebuilds the cache (31.5 s).
+- Only Gemma 4 E2B was tested on the GPU. Gemma 4 E4B, the Qwen models, and images and audio (whose encoders stay on
+  the CPU) were not, nor were other phones.
 
 ## Token costs
 
