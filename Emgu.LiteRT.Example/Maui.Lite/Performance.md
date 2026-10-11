@@ -73,7 +73,8 @@ about 30 s.
 ## GPU (Android, Pixel Fold)
 
 LiteRT runs models on an Android GPU through its OpenCL accelerator, `libLiteRtOpenClAccelerator.so`. This is a
-LiteRT-LM prebuilt that our `libLiteRt.so` loads at run time; the app must declare the device's `libOpenCL.so` with
+LiteRT-LM prebuilt that our `libLiteRt.so` loads at run time, shipped in the optional
+`Emgu.LiteRT.OpenCL.runtime.maui.android` package. The app must declare the device's `libOpenCL.so` with
 `<uses-native-library>`. The Pixel Fold's Mali GPU (Tensor G2) has a public OpenCL driver.
 
 ### fp16 or fp32

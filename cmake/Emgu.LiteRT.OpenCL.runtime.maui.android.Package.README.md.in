@@ -1,0 +1,47 @@
+## About this package
+
+This optional package adds LiteRT's GPU (OpenCL) accelerator, `libLiteRtOpenClAccelerator.so`, to Emgu LiteRT for MAUI Android. It is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT.
+
+LiteRT's runtime, `libLiteRt.so` (from `Emgu.LiteRT.runtime.maui.android`, which this package depends on), loads the accelerator when a model is asked to run on the GPU:
+
+- `Emgu.LiteRT`: `new CompiledModel(environment, model, HwAccelerators.Gpu)`
+- `Emgu.LiteRT.LM` / `Emgu.LiteRT.LM.Models`: `LanguageModel.Init(backend: "gpu")`
+
+Without this package, asking for the GPU fails (LiteRT-LM's engine can't be created), so load the model on the CPU instead.
+
+## Supported architectures
+
+- `arm64-v8a`: almost all current Android phones and tablets
+- `x86_64`: Android emulators on x86_64 computers
+
+The accelerator is a LiteRT-LM prebuilt library, which Google only builds for these two ABIs. On `armeabi-v7a` and `x86` this package adds nothing, and models run on the CPU.
+
+The device also needs an OpenCL driver (`libOpenCL.so` in its vendor libraries). Many phones ship one (verified on a Google Pixel Fold); on a device without one, the GPU can't be used: catch the error and use the CPU instead.
+
+## Updating the Android manifest
+
+Since Android 12 (API 31), an app may only load a vendor library such as the OpenCL driver when it declares it. Add this to your app's `Platforms/Android/AndroidManifest.xml`, inside `<application>`:
+
+```xml
+<application ...>
+    <!-- LiteRT's GPU accelerator loads the device's OpenCL driver. Optional: the app also installs
+         on devices without one. -->
+    <uses-native-library android:name="libOpenCL.so" android:required="false" />
+</application>
+```
+
+`android:required="false"` matters: with `true`, Google Play doesn't offer the app to devices without OpenCL, and they can't install it. Without the declaration, the accelerator can't find the driver and the GPU isn't used.
+
+## Using it with LiteRT-LM
+
+On a Pixel Fold, Gemma 4 E2B answered about 6 times faster on the GPU than on the CPU, and read a long conversation about 15 times faster. Use 32-bit activations: with LiteRT-LM's default 16-bit ones, the model answered wrongly after a long conversation.
+
+```csharp
+await model.Init(backend: "gpu",
+    configureSettings: settings => settings.ActivationDataType = ActivationDataType.Float32);
+```
+
+The first load on the GPU takes about 30 s, because it compiles GPU programs and converts the weights. The result is kept as a cache next to the model file (`*_mldrift_program_cache.bin`, `*_mldrift_weight_cache.bin`, about 0.8 GB for Gemma 4 E2B), so later loads take a few seconds.
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

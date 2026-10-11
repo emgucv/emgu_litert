@@ -617,6 +617,11 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
 
   SET(EMGU_LITERT_MAUI_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.android")
   SET(EMGU_LITERT_MAUI_ANDROID_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui Android")
+  # Emgu.LiteRT.OpenCL.runtime.maui.android: LiteRT's GPU (OpenCL) accelerator plugin for Android, an optional
+  # add-on to ${EMGU_LITERT_MAUI_ANDROID_NUGET_ID} (whose libLiteRt.so loads it) that nothing depends on - see
+  # Emgu.LiteRT.Runtime/Maui/OpenCL/Android/.
+  SET(EMGU_LITERT_OPENCL_MAUI_ANDROID_NUGET_ID "${EMGU_LITERT_NUGET_ID}.OpenCL.runtime.maui.android")
+  SET(EMGU_LITERT_OPENCL_MAUI_ANDROID_NUGET_TITLE "GPU (OpenCL) accelerator of ${EMGU_LITERT_NUGET_TITLE} for Maui Android")
 
   # Emgu.LiteRT.LM.runtime.maui/.runtime.maui.android: the LiteRT-LM add-on counterparts of
   # Emgu.LiteRT.runtime.maui/.runtime.maui.android, kept as separate packages rather than folded
@@ -649,6 +654,15 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
     ENDIF()
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.maui.android.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Android/docs/README.md)
   #ENDIF()
+
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.OpenCL.runtime.maui.android.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/OpenCL/Android/Directory.Build.props)
+  IF(EMGU_SIGN_FOUND AND WIN32)
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/OpenCL/Android/SignBinary.Targets)
+  ENDIF()
+  IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/OpenCL/Android/SignPkg.Targets)
+  ENDIF()
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.OpenCL.runtime.maui.android.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/OpenCL/Android/docs/README.md)
 
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.maui.android.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Android/Directory.Build.props)
   IF(EMGU_SIGN_FOUND AND WIN32)

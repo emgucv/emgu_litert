@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<Project>
+  <!-- https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022
+       Starts the upward search two levels up (past OpenCL/), as Emgu.LiteRT.LM.runtime.maui.android does. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../../'))" />
+
+  <PropertyGroup>
+
+    <TargetFramework>net${DOTNET_VERSION_MAJOR}.0-android</TargetFramework>
+
+    <PackageId>${EMGU_LITERT_OPENCL_MAUI_ANDROID_NUGET_ID}</PackageId>
+
+	<title>${EMGU_LITERT_OPENCL_MAUI_ANDROID_NUGET_TITLE}</title>
+    <version>${CPACK_PACKAGE_VERSION}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>Optional GPU (OpenCL) accelerator of Emgu LiteRT for MAUI Android</summary>
+    <Description>LiteRT's GPU (OpenCL) accelerator plugin, libLiteRtOpenClAccelerator, for MAUI Android (arm64-v8a and x86_64): lets LiteRT's CompiledModel and LiteRT-LM run models on the device's GPU. Optional; depends on Emgu.LiteRT.runtime.maui.android (libLiteRt), which loads it. Apps must declare libOpenCL.so in their Android manifest - see the README.</Description>
+    <PackageReleaseNotes>This is the GPU (OpenCL) accelerator of Emgu LiteRT for MAUI Android, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html
+</PackageReleaseNotes>
+
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\platforms\nuget))</PackageOutputPath>
+	<PackageTags>tensorflow;emgu;emgutf;ai;android;maui;litert;gpu;opencl</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+
+  </PropertyGroup>
+
+    <ItemGroup>
+      <None Include="..\..\..\..\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="..\..\..\..\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />
+</Project>

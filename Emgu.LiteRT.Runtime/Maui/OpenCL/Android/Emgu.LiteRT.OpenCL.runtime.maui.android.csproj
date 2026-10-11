@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+
+    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+    <PropertyGroup>
+    <TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\lib))</TfLiteBinaryDir>
+  </PropertyGroup>
+    <PropertyGroup>
+
+    <EmguTfLiteLinkTarget>MAUI Android LiteRT OpenCL Library</EmguTfLiteLinkTarget>
+    <!-- LiteRT's GPU (OpenCL) accelerator plugin, libLiteRtOpenClAccelerator.so: libLiteRt.so (from
+         Emgu.LiteRT.runtime.maui.android) loads it at run time when a model asks for the GPU - LiteRT's CompiledModel
+         (HwAccelerators.Gpu) or LiteRT-LM's "gpu" backend. An optional add-on, so apps that don't use the GPU don't
+         carry it. It is a LiteRT-LM prebuilt (prebuilt/android_<abi>, built from the LiteRT commit LiteRT-LM pins, the
+         same source as our libLiteRt.so), copied to lib/android/<abi>/ by bazel_build_tflite_android, and only exists
+         for arm64-v8a and x86_64. Apps must declare <uses-native-library android:name="libOpenCL.so"
+         android:required="false" /> in their manifest for it to find the device's OpenCL driver. -->
+    <EmguTfLiteBuildAndroidArm64v8a Condition="$(AndroidSupportedAbis.Contains('arm64-v8a%3')) OR $(AndroidSupportedAbis.Contains('arm64-v8a,')) OR $(AndroidSupportedAbis.EndsWith('arm64-v8a;')) OR $(AndroidSupportedAbis.EndsWith('arm64-v8a')) OR ('$(AndroidSupportedAbis)'=='' AND '$(Platform)'=='AnyCPU')  OR ('$(Platform)'=='arm64-v8a')">True</EmguTfLiteBuildAndroidArm64v8a>
+    <EmguTfLiteBuildAndroidx8664 Condition="$(AndroidSupportedAbis.Contains('x86_64%3')) OR $(AndroidSupportedAbis.Contains('x86_64,')) OR $(AndroidSupportedAbis.Contains('x86_64;')) OR $(AndroidSupportedAbis.EndsWith('x86_64')) OR ('$(AndroidSupportedAbis)'=='' AND '$(Platform)'=='AnyCPU') OR ('$(Platform)'=='x86_64')">True</EmguTfLiteBuildAndroidx8664>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <!-- arm64-v8a -->
+  <ItemGroup Condition="'$(EmguTfLiteBuildAndroidArm64v8a)'=='True'">
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\arm64-v8a\libLiteRtOpenClAccelerator.so" Condition="Exists('$(TfLiteBinaryDir)\android\arm64-v8a\libLiteRtOpenClAccelerator.so')">
+      <Link>lib\arm64-v8a\libLiteRtOpenClAccelerator.so</Link>
+    </EmbeddedNativeLibrary>
+  </ItemGroup>
+  <!-- x86_64 -->
+  <ItemGroup Condition="'$(EmguTfLiteBuildAndroidx8664)'=='True'">
+    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\x86_64\libLiteRtOpenClAccelerator.so" Condition="Exists('$(TfLiteBinaryDir)\android\x86_64\libLiteRtOpenClAccelerator.so')">
+      <Link>lib\x86_64\libLiteRtOpenClAccelerator.so</Link>
+    </EmbeddedNativeLibrary>
+  </ItemGroup>
+    <ItemGroup>
+      <!-- Depends on Emgu.LiteRT.runtime.maui.android, whose libLiteRt.so loads the plugin. -->
+      <ProjectReference Include="..\..\Android\Emgu.LiteRT.runtime.maui.android.csproj" />
+    </ItemGroup>
+  <Target Name="EmguTfLiteOpenClMauiAndroidPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <Message Text="Emgu LiteRT OpenCL MAUI Android Compiling" Importance="High" />
+  </Target>
+</Project>

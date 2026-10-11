@@ -129,7 +129,8 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
 - The models can take in about 4,096 tokens of conversation (a few pages of text; a photo is ~270, voice ~25 per
   second) - Gemma 4 8,192 on Mac and Windows. Opening a long saved chat takes a while, since the model reads it again
   (measurements in [Performance.md](Performance.md)).
-- On Android, Gemma 4 E2B runs on the GPU (Settings → "Use the GPU"; the CPU if the device has no OpenCL driver):
+- On Android, Gemma 4 E2B runs on the GPU (Settings → "Use the GPU"; the CPU if the device has no OpenCL driver),
+  through the optional `Emgu.LiteRT.OpenCL.runtime.maui.android` package the demo references:
   replies take about a second instead of ~6, and reopening a long chat ~8 s instead of ~2 minutes. The first load on
   the GPU takes about 30 s and keeps a ~0.8 GB cache next to the model. When a chat gets longer, Gemma 4 and Qwen3.5 4B summarize the earlier messages and continue from the summary
   (this takes a few seconds); the small models drop the earliest messages instead. A line in the conversation shows

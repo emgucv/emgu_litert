@@ -86,6 +86,9 @@
 		     GemmaModelConstraintProvider.xcframework on iOS, and on Mac Catalyst the macOS liblitert-lm.dylib (with
 		     libGemmaModelConstraintProvider.dylib and libLiteRt.dylib), loaded from the app bundle. -->
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\Android\Emgu.LiteRT.LM.runtime.maui.android.csproj" />
+		<!-- Optional: LiteRT's GPU (OpenCL) accelerator, so the chat can run Gemma 4 on the GPU (Settings, "Use the GPU");
+		     needs the libOpenCL.so <uses-native-library> in Platforms/Android/AndroidManifest.xml. -->
+		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.Runtime\Maui\OpenCL\Android\Emgu.LiteRT.OpenCL.runtime.maui.android.csproj" />
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\iOS\Emgu.LiteRT.LM.runtime.maui.ios.csproj" />
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\Mac\Emgu.LiteRT.LM.runtime.maui.macos.csproj" />
 

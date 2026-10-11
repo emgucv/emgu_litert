@@ -13,10 +13,9 @@
     <EmguTfLiteLinkTarget>MAUI Android LiteRT-LM Library</EmguTfLiteLinkTarget>
     <!-- LiteRT-LM's native library (liblitert-lm.so) and the prebuilt libGemmaModelConstraintProvider.so it
          depends on only ever exist for arm64-v8a and x86_64 - see Emgu.LiteRT.runtime.maui.android.csproj's
-         own comment for why (that's where these items used to live, before being split out here). LiteRT's GPU
-         (OpenCL) accelerator plugin, libLiteRtOpenClAccelerator.so (a LiteRT-LM prebuilt too), comes with them: libLiteRt.so
-         loads it for the "gpu" backend. Apps must declare <uses-native-library android:name="libOpenCL.so"
-         android:required="false" /> in their manifest for it to find the device's OpenCL driver. -->
+         own comment for why (that's where these items used to live, before being split out here). LiteRT-LM's
+         "gpu" backend also needs LiteRT's GPU (OpenCL) accelerator, which is in the optional
+         Emgu.LiteRT.OpenCL.runtime.maui.android package (Emgu.LiteRT.Runtime/Maui/OpenCL/Android). -->
     <EmguTfLiteBuildAndroidArm64v8a Condition="$(AndroidSupportedAbis.Contains('arm64-v8a%3')) OR $(AndroidSupportedAbis.Contains('arm64-v8a,')) OR $(AndroidSupportedAbis.EndsWith('arm64-v8a;')) OR $(AndroidSupportedAbis.EndsWith('arm64-v8a')) OR ('$(AndroidSupportedAbis)'=='' AND '$(Platform)'=='AnyCPU')  OR ('$(Platform)'=='arm64-v8a')">True</EmguTfLiteBuildAndroidArm64v8a>
     <EmguTfLiteBuildAndroidx8664 Condition="$(AndroidSupportedAbis.Contains('x86_64%3')) OR $(AndroidSupportedAbis.Contains('x86_64,')) OR $(AndroidSupportedAbis.Contains('x86_64;')) OR $(AndroidSupportedAbis.EndsWith('x86_64')) OR ('$(AndroidSupportedAbis)'=='' AND '$(Platform)'=='AnyCPU') OR ('$(Platform)'=='x86_64')">True</EmguTfLiteBuildAndroidx8664>
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -29,9 +28,6 @@
     <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\arm64-v8a\libGemmaModelConstraintProvider.so" Condition="Exists('$(TfLiteBinaryDir)\android\arm64-v8a\liblitert-lm.so')">
       <Link>lib\arm64-v8a\libGemmaModelConstraintProvider.so</Link>
     </EmbeddedNativeLibrary>
-    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\arm64-v8a\libLiteRtOpenClAccelerator.so" Condition="Exists('$(TfLiteBinaryDir)\android\arm64-v8a\libLiteRtOpenClAccelerator.so')">
-      <Link>lib\arm64-v8a\libLiteRtOpenClAccelerator.so</Link>
-    </EmbeddedNativeLibrary>
   </ItemGroup>
   <!-- x86_64 -->
   <ItemGroup Condition="'$(EmguTfLiteBuildAndroidx8664)'=='True'">
@@ -40,9 +36,6 @@
     </EmbeddedNativeLibrary>
     <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\x86_64\libGemmaModelConstraintProvider.so" Condition="Exists('$(TfLiteBinaryDir)\android\x86_64\liblitert-lm.so')">
       <Link>lib\x86_64\libGemmaModelConstraintProvider.so</Link>
-    </EmbeddedNativeLibrary>
-    <EmbeddedNativeLibrary Include="$(TfLiteBinaryDir)\android\x86_64\libLiteRtOpenClAccelerator.so" Condition="Exists('$(TfLiteBinaryDir)\android\x86_64\libLiteRtOpenClAccelerator.so')">
-      <Link>lib\x86_64\libLiteRtOpenClAccelerator.so</Link>
     </EmbeddedNativeLibrary>
   </ItemGroup>
     <ItemGroup>
