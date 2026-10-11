@@ -44,6 +44,16 @@
            Unconditional - this project only ever targets android, same as the base project it references. -->
       <ProjectReference Include="..\..\Android\Emgu.LiteRT.runtime.maui.android.csproj" />
     </ItemGroup>
+  <!-- When this library is packed, the build unpacks the referenced Emgu.LiteRT.runtime.maui.android .aar
+       (obj/.../lp/<n>/jl/jni/) and adds its libLiteRt.so / libtfliteextern.so to this project's EmbeddedNativeLibrary
+       items, so this package's .aar would carry another copy of them for every ABI. They come with the
+       Emgu.LiteRT.runtime.maui.android package this one depends on, so drop the native libraries taken from referenced
+       .aar files (the ones with %(OriginalFile) set) before this project's .aar is written. -->
+  <Target Name="EmguExcludeReferencedNativeLibraries" BeforeTargets="_CreateAarCache">
+    <ItemGroup>
+      <EmbeddedNativeLibrary Remove="@(EmbeddedNativeLibrary)" Condition="'%(EmbeddedNativeLibrary.OriginalFile)' != ''" />
+    </ItemGroup>
+  </Target>
   <Target Name="EmguTfLiteLmMauiAndroidPackageBuildImports" BeforeTargets="PrepareForBuild">
     <Message Text="Emgu LiteRT LM MAUI Android Compiling" Importance="High" />
   </Target>
