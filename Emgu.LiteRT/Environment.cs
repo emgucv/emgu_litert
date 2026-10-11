@@ -22,6 +22,9 @@ namespace Emgu.LiteRT
         /// </summary>
         public Environment()
         {
+            // LiteRT registers its accelerators when the environment is created; make an installed GPU plugin
+            // findable first (see AcceleratorPlugins).
+            Emgu.LiteRT.Util.AcceleratorPlugins.Load();
             LiteRtInvoke.CheckStatus(LiteRtInvoke.LiteRtCreateEnvironment(0, IntPtr.Zero, out _ptr));
         }
 

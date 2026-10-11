@@ -7,33 +7,37 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-namespace Emgu.LiteRT.LM
+namespace Emgu.LiteRT.Util
 {
-    public static partial class LiteRtLmInvoke
+    /// <summary>
+    /// Loads LiteRT's GPU accelerator plugins that are installed next to libLiteRt, before LiteRT looks for them.
+    /// </summary>
+    /// <remarks>
+    /// libLiteRt loads its accelerator plugins with dlopen and just the file name. On macOS that only finds a plugin
+    /// on the library search path or in the current folder - not next to libLiteRt.dylib, where the
+    /// Emgu.LiteRT.Metal.runtime.* packages put libLiteRtMetalAccelerator.dylib (runtimes/osx/native in a .NET app): a
+    /// console app couldn't use the GPU unless it was started from that folder. Loading the plugin by its full path
+    /// first makes LiteRT's dlopen return the library that is already loaded. (Mac Catalyst apps found it in their
+    /// bundle either way; Android finds plugins in the app's library folder.) Emgu.LiteRT's Environment and
+    /// Emgu.LiteRT.LM's Engine call Load before LiteRT registers its accelerators.
+    /// </remarks>
+    public static class AcceleratorPlugins
     {
-        // LiteRT's GPU accelerator plugins, by platform, that may be installed next to libLiteRt.
-        private static readonly string[] MacAcceleratorPlugins = { "libLiteRtMetalAccelerator.dylib" };
+        // LiteRT's GPU accelerator plugins for macOS that may be installed next to libLiteRt.dylib.
+        private static readonly string[] MacPlugins = { "libLiteRtMetalAccelerator.dylib" };
 
-        private static int _acceleratorPluginsLoaded;
+        private static int _loaded;
 
         /// <summary>
-        /// Load LiteRT's GPU accelerator plugins that are installed next to libLiteRt, so a "gpu" engine can use them.
-        /// Called before an engine with a GPU backend is created.
+        /// Load the accelerator plugins found where .NET puts the app's native libraries (once per process; does
+        /// nothing on other platforms or if none is installed).
         /// </summary>
-        /// <remarks>
-        /// libLiteRt loads its accelerator plugins with dlopen and just the file name. On macOS that only finds a
-        /// plugin on the library search path or in the current folder - not next to libLiteRt.dylib, where the
-        /// Emgu.LiteRT.Metal.runtime.* packages put libLiteRtMetalAccelerator.dylib (runtimes/osx/native in a .NET app):
-        /// a console app couldn't use the GPU unless it was started from that folder. Loading the plugin by its full
-        /// path first makes LiteRT's dlopen return the library that is already loaded. (Mac Catalyst apps found it in
-        /// their bundle either way.)
-        /// </remarks>
-        internal static void LoadAcceleratorPlugins()
+        public static void Load()
         {
-            if (Interlocked.Exchange(ref _acceleratorPluginsLoaded, 1) != 0)
+            if (Interlocked.Exchange(ref _loaded, 1) != 0)
                 return;
 #if (__IOS__ && !__MACCATALYST__) || UNITY_IPHONE
-            // iOS links LiteRT-LM into the app (CLiteRTLM.framework); there are no plugin files to load.
+            // iOS links LiteRT into the app; there are no plugin files to load.
 #else
 #if !__MACCATALYST__
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -41,7 +45,7 @@ namespace Emgu.LiteRT.LM
 #endif
             foreach (string folder in NativeLibraryFolders())
             {
-                foreach (string plugin in MacAcceleratorPlugins)
+                foreach (string plugin in MacPlugins)
                 {
                     string path = Path.Combine(folder, plugin);
                     try

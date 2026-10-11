@@ -43,6 +43,13 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <!-- LiteRT's GPU (Metal) accelerator (Apple Silicon only), loaded by libLiteRt.dylib for GPU models. Optional. -->
+  <ItemGroup Condition="Exists('$(TFLiteBinaryDir)\runtimes\osx\native\libLiteRtMetalAccelerator.dylib')">
+    <Content Include="$(TFLiteBinaryDir)\runtimes\osx\native\libLiteRtMetalAccelerator.dylib">
+      <Link>libLiteRtMetalAccelerator.dylib</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <Target Name="EmguTFLiteMacPackageBuildImports" BeforeTargets="PrepareForBuild">
     <!-- <Message Condition="'$(EmguTFLiteMacLinkTarget)'!=''" Text="Emgu TF Lite shared project compiling against $(EmguTFLiteMacLinkTarget)" Importance="High" /> -->
     <Warning Text="'$(EmguTFLiteMacErrorMessage)'" Condition="'$(EmguTFLiteMacErrorMessage)'!=''" />

@@ -2,13 +2,16 @@
 
 This optional package adds LiteRT's GPU (Metal) accelerator, `libLiteRtMetalAccelerator.dylib`, to Emgu LiteRT for Mac OS console and asp.net applications. It is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. For a MAUI (Mac Catalyst) app, use `${EMGU_LITERT_METAL_MAUI_MACOS_NUGET_ID}` instead.
 
-It depends on `${EMGU_LITERT_MACOS_NUGET_ID}`, whose `libLiteRt.dylib` loads the accelerator when a language model runs on the GPU:
+It depends on `${EMGU_LITERT_MACOS_NUGET_ID}`, whose `libLiteRt.dylib` loads the accelerator when a model runs on the GPU:
 
 ```csharp
+// LiteRT-LM (Emgu.LiteRT.LM.Models)
 await model.Init(backend: "gpu");
+// LiteRT (Emgu.LiteRT)
+var compiledModel = new CompiledModel(environment, model, HwAccelerators.Gpu);
 ```
 
-The accelerator is installed in the same folder as `libLiteRt.dylib` and `liblitert-lm.dylib` (`runtimes/osx/native`), where LiteRT looks for it. Without this package, asking for the GPU fails (LiteRT-LM's engine can't be created), so load the model on the CPU instead.
+The accelerator is installed in the same folder as `libLiteRt.dylib` and `liblitert-lm.dylib` (`runtimes/osx/native`), where LiteRT looks for it. Without this package, asking for the GPU fails (LiteRT-LM's engine or LiteRT's compiled model can't be created), so use the CPU instead.
 
 ## Requirements
 

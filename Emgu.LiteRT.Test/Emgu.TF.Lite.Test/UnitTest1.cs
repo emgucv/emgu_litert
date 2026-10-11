@@ -43,6 +43,28 @@ namespace Emgu.TF.Lite.Test
         [TestAttribute]
         public async Task TestLiteRtMobilenet()
         {
+            await RunLiteRtMobilenet(LiteRt.HwAccelerators.Cpu, 1e-4);
+        }
+
+        // The same on the GPU, with LiteRT's GPU accelerator plugin next to libLiteRt (on macOS
+        // libLiteRtMetalAccelerator.dylib, copied by Emgu.LiteRT.Runtime/Mac when it exists): skipped without it. The
+        // GPU computes in lower precision, so the outputs only have to be close.
+        [TestAttribute]
+        public async Task TestLiteRtMobilenetGpu()
+        {
+            if (!System.IO.File.Exists(System.IO.Path.Combine(AppContext.BaseDirectory, "libLiteRtMetalAccelerator.dylib")))
+            {
+#if VS_TEST
+                Assert.Inconclusive("No LiteRT GPU accelerator plugin next to libLiteRt");
+#else
+                Assert.Ignore("No LiteRT GPU accelerator plugin next to libLiteRt");
+#endif
+            }
+            await RunLiteRtMobilenet(LiteRt.HwAccelerators.Gpu, 1e-2);
+        }
+
+        private static async Task RunLiteRtMobilenet(LiteRt.HwAccelerators accelerators, double tolerance)
+        {
             DownloadableFile modelFile = new DownloadableFile(
                 "https://github.com/emgucv/models/raw/master/mobilenet_v1_1.0_224_float_2017_11_08/mobilenet_v1_1.0_224.tflite",
                 "Mobilenet",
@@ -57,7 +79,7 @@ namespace Emgu.TF.Lite.Test
 
                 using (LiteRt.Environment environment = new LiteRt.Environment())
                 using (LiteRt.Model model = new LiteRt.Model(environment, modelFile.LocalFile))
-                using (LiteRt.CompiledModel compiledModel = new LiteRt.CompiledModel(environment, model, LiteRt.HwAccelerators.Cpu))
+                using (LiteRt.CompiledModel compiledModel = new LiteRt.CompiledModel(environment, model, accelerators))
                 {
                     LiteRt.Signature signature = model.GetSignature(0);
                     Console.WriteLine("Signature '{0}': inputs {1}, outputs {2}",
@@ -85,7 +107,7 @@ namespace Emgu.TF.Lite.Test
                         int expectedTop = Array.IndexOf(expectedOutput, expectedOutput.Max());
                         Console.WriteLine("LiteRt top class {0} ({1}): {2}; Interpreter top class {3}: {4}; max abs diff {5}",
                             top, mobilenet.Labels[top], output[top], expectedTop, expectedOutput[expectedTop], maxDiff);
-                        if (top != expectedTop || maxDiff > 1e-4)
+                        if (top != expectedTop || maxDiff > tolerance)
                             throw new Exception("LiteRt CompiledModel output does not match the Interpreter output");
                     }
                     finally
