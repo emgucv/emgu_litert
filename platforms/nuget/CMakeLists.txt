@@ -19,6 +19,7 @@ ENDIF()
 
 IF(HAVE_OSX_LITE)
   add_subdirectory(Emgu.LiteRT.runtime.macos)
+  add_subdirectory(Emgu.LiteRT.Metal.runtime.macos)
 ENDIF()
 
 #IF ( HAVE_ANDROID_LITE )

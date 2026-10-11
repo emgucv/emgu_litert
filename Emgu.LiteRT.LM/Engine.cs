@@ -23,6 +23,10 @@ namespace Emgu.LiteRT.LM
         {
             if (settings == null)
                 throw new ArgumentNullException("settings");
+            if (String.Equals(settings.Backend, "gpu", StringComparison.OrdinalIgnoreCase)
+                || String.Equals(settings.VisionBackend, "gpu", StringComparison.OrdinalIgnoreCase)
+                || String.Equals(settings.AudioBackend, "gpu", StringComparison.OrdinalIgnoreCase))
+                LiteRtLmInvoke.LoadAcceleratorPlugins();
             _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_engine_create(settings), "litert_lm_engine_create");
         }
 

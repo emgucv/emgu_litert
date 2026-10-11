@@ -1,0 +1,27 @@
+## About this package
+
+This optional package adds LiteRT's GPU (Metal) accelerator, `libLiteRtMetalAccelerator.dylib`, to Emgu LiteRT for Mac OS console and asp.net applications. It is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. For a MAUI (Mac Catalyst) app, use `${EMGU_LITERT_METAL_MAUI_MACOS_NUGET_ID}` instead.
+
+It depends on `${EMGU_LITERT_MACOS_NUGET_ID}`, whose `libLiteRt.dylib` loads the accelerator when a language model runs on the GPU:
+
+```csharp
+await model.Init(backend: "gpu");
+```
+
+The accelerator is installed in the same folder as `libLiteRt.dylib` and `liblitert-lm.dylib` (`runtimes/osx/native`), where LiteRT looks for it. Without this package, asking for the GPU fails (LiteRT-LM's engine can't be created), so load the model on the CPU instead.
+
+## Requirements
+
+- A Mac with Apple Silicon (arm64). The accelerator is a LiteRT-LM prebuilt library that Google only builds for macOS arm64, like LiteRT-LM itself.
+- macOS 14 or later.
+- Nothing else: the accelerator uses only system frameworks (Metal, Foundation).
+
+## Using it with LiteRT-LM
+
+On an Apple M1, the GPU read a 3,000-token conversation in 3.4 s with Gemma 4 E2B, against 12 s on the CPU. It also makes Gemma 4 12B, a desktop model that needs about 8 GB of memory, practical: about 8.6 tokens/s on an M1.
+
+- **32-bit activations:** use them on the GPU. With LiteRT-LM's default 16-bit ones, Gemma 4 E2B and 12B answered wrongly after a long conversation. `Emgu.LiteRT.LM.Models`' Gemma 4 classes set this themselves; elsewhere, set `EngineSettings.ActivationDataType = ActivationDataType.Float32`.
+- **First load:** the first load of a model on the GPU compiles GPU programs and converts the weights. The result is kept as a cache next to the model file (`*_mldrift_program_cache.bin`, `*_mldrift_weight_cache.bin`), so later loads take a few seconds. The cache is large: about 6 GB for Gemma 4 12B.
+
+For online documentation please visit
+<http://www.emgu.com/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/>

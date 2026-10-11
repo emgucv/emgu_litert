@@ -129,9 +129,11 @@ uses fp32. The cache is the same size either way.
 ## GPU (Mac, Apple M1)
 
 On macOS, LiteRT's GPU accelerator is the Metal one, `libLiteRtMetalAccelerator.dylib` (a LiteRT-LM prebuilt: arm64,
-macOS 14+, only system frameworks). Our `libLiteRt.dylib` loads it by name from the same folder: in the test runner's
-output folder, and in a Mac Catalyst app's `Contents/MonoBundle`, where the optional
-`Emgu.LiteRT.Metal.runtime.maui.macos` package puts it. Apple M1, 16 GB, 4k window, measured with `dotnet test`:
+macOS 14+, only system frameworks), in the optional `Emgu.LiteRT.Metal.runtime.maui.macos` (Mac Catalyst) and
+`Emgu.LiteRT.Metal.runtime.macos` (plain macOS apps) packages. Our `libLiteRt.dylib` loads it with dlopen and just its
+file name, which on macOS only finds it on the library search path or in the current folder; a plain console app
+started from another folder couldn't use the GPU, so `Emgu.LiteRT.LM` loads the plugin by its full path before
+creating a GPU engine. Apple M1, 16 GB, 4k window, measured with `dotnet test`:
 
 | Gemma 4 E2B | CPU | GPU, fp16 | GPU, fp32 |
 |---|---|---|---|

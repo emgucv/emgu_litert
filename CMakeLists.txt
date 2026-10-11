@@ -604,6 +604,11 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
 
   SET(EMGU_LITERT_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.macos")
   SET(EMGU_LITERT_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
+  # Emgu.LiteRT.Metal.runtime.macos: LiteRT's GPU (Metal) accelerator for plain macOS apps, an optional add-on to
+  # ${EMGU_LITERT_MACOS_NUGET_ID} (whose libLiteRt.dylib loads it) that nothing depends on. Only built when
+  # lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib exists (HAVE_MACOS_LITERT_METAL, below).
+  SET(EMGU_LITERT_METAL_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Metal.runtime.macos")
+  SET(EMGU_LITERT_METAL_MACOS_NUGET_TITLE "GPU (Metal) accelerator of ${EMGU_LITERT_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")
   
   SET(EMGU_LITERT_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}") 
   SET(EMGU_LITERT_UBUNTU_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
@@ -961,6 +966,21 @@ IF(HAVE_OSX_LITE)
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")	
+  # LiteRT's GPU (Metal) accelerator (a LiteRT-LM prebuilt, copied by platforms/macos/bazel_build_tflite_macos
+  # darwin_arm64), in its own optional package next to libLiteRt.dylib.
+  SET(HAVE_MACOS_LITERT_METAL OFF)
+  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib")
+    SET(HAVE_MACOS_LITERT_METAL ON)
+    SET(EMGU_LITERT_METAL_MACOS_NUGET_FILE_LIST "
+    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libLiteRtMetalAccelerator.dylib\" target=\"runtimes\\osx\\native\" />
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"README.md\" target=\"docs\\\" />")
+    SET(EMGU_LITERT_METAL_MACOS_NUGET_DEPENDENCY "
+    <dependencies>
+		<dependency id=\"${EMGU_LITERT_MACOS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+    </dependencies>")
+  ENDIF()
 ENDIF()
 
 IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
@@ -1154,6 +1174,10 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.windows.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.windows/README.md)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.macos/Package.nuspec)
+IF(HAVE_MACOS_LITERT_METAL)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Metal.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.Metal.runtime.macos/Package.nuspec)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Metal.runtime.macos.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.Metal.runtime.macos/README.md)
+ENDIF()
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.ubuntu.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.ubuntu/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.ubuntu.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.ubuntu/Package.nuspec)
