@@ -31,6 +31,15 @@ namespace Maui.Demo.Lite
         public DateTime Created { get; set; }
 
         public DateTime Updated { get; set; }
+
+        /// <summary>
+        /// When the chat outgrew the model's context window: a summary of the messages up to SummaryUpTo, given to the
+        /// model in their place; null if they were dropped without one (or the chat was never compacted)
+        /// </summary>
+        public string Summary { get; set; }
+
+        /// <summary>The id of the last message the model no longer sees (summarized or dropped); 0 for none</summary>
+        public int SummaryUpTo { get; set; }
     }
 
     /// <summary>
@@ -129,9 +138,9 @@ namespace Maui.Demo.Lite
         }
 
         /// <summary>
-        /// Add a message, saving its attachments (encoded bytes) as files.
+        /// Add a message, saving its attachments (encoded bytes) as files; returns its id.
         /// </summary>
-        public async Task AddMessageAsync(int conversationId, string role, string text, string thinking,
+        public async Task<int> AddMessageAsync(int conversationId, string role, string text, string thinking,
             IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments = null)
         {
             SQLiteAsyncConnection db = await Db;
@@ -169,6 +178,19 @@ namespace Maui.Demo.Lite
                 conversation.Updated = DateTime.UtcNow;
                 await db.UpdateAsync(conversation);
             }
+            return record.Id;
+        }
+
+        /// <summary>Record that the model sees the messages up to upToMessageId only as the summary (or not at all).</summary>
+        public async Task SetSummaryAsync(int conversationId, string summary, int upToMessageId)
+        {
+            SQLiteAsyncConnection db = await Db;
+            var conversation = await db.FindAsync<ConversationRecord>(conversationId);
+            if (conversation == null)
+                return;
+            conversation.Summary = summary;
+            conversation.SummaryUpTo = upToMessageId;
+            await db.UpdateAsync(conversation);
         }
 
         /// <summary>A saved message's attachments, with their full paths.</summary>

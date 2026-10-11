@@ -125,7 +125,11 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
 - Replies are formatted (headings, bold, italic, lists, links), and code is shown in a code block with a Copy
   button.
 - Chats are saved on the device after each reply; the history button (or the Chats list in the side panel on wide
-  screens) reopens one - the model continues from its last 20 messages - or deletes it.
+  screens) reopens or deletes one.
+- The models can take in about 4,096 tokens of conversation (a few pages of text; a photo is ~270, voice ~25 per
+  second). When a chat gets longer, Gemma 4 and Qwen3.5 4B summarize the earlier messages and continue from the summary
+  (this takes a few seconds); the small models drop the earliest messages instead. A line in the conversation shows
+  where the model's memory starts - tap it to read the summary - and Settings shows how full it is, with "Compact now".
 - "Think" and "Web search" (Gemma 4) are per-message switches above the message box. Web search uses Wikipedia, and
   the web with a Tavily API key (Settings); your searches leave the device.
 - The "+" button attaches images (from the photo library, the camera - "Take Photo", on devices with one - or the

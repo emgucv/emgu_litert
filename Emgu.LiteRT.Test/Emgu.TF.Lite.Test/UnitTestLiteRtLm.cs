@@ -385,6 +385,61 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // LanguageModel.MaxNumTokens is the context window: CountTokens measures text, and a chat whose history is
+        // larger than the window fails.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestChatContextWindow()
+        {
+            RequireLiteRtLm();
+            using (Qwen3 model = new Qwen3())
+            {
+                await model.Init();
+                if (model.MaxNumTokens != 4096)
+                    throw new Exception("The default context window should be 4096 tokens");
+                int tokens = model.CountTokens("The quick brown fox jumps over the lazy dog.");
+                Console.WriteLine("Tokens: {0}", tokens);
+                if (tokens < 8 || tokens > 14)
+                    throw new Exception("Unexpected token count " + tokens);
+
+                // A history of about 5000 tokens.
+                string filler = String.Join(" ", Enumerable.Repeat("The quick brown fox jumps over the lazy dog.", 50));
+                List<Emgu.LiteRT.LM.Models.ChatMessage> history = new List<Emgu.LiteRT.LM.Models.ChatMessage>();
+                int total = 0;
+                while (total < 5000)
+                {
+                    history.Add(new Emgu.LiteRT.LM.Models.ChatMessage("user", filler));
+                    history.Add(new Emgu.LiteRT.LM.Models.ChatMessage("assistant", "OK."));
+                    total += model.CountTokens(filler) + 10;
+                }
+                using (Chat chat = model.CreateChat())
+                {
+                    chat.MaxOutputTokens = 32;
+                    chat.EnableThinking = false;
+                    chat.LoadHistory(history);
+                    // LiteRT-LM refuses it: "Input token ids are too long. Exceeding the maximum number of tokens
+                    // allowed: 5136 >= 4096".
+                    try
+                    {
+                        ChatReply reply = await chat.SendAsync("What animal jumps?");
+                        throw new Exception("A history larger than the context window should fail, but got: " + reply.Text);
+                    }
+                    catch (LiteRtLmException e)
+                    {
+                        Console.WriteLine("Over the window (~{0} tokens): {1}", total, e.Message);
+                        if (e.Message.IndexOf("too long", StringComparison.OrdinalIgnoreCase) < 0)
+                            throw;
+                    }
+                }
+            }
+        }
+
         // Gemma 4 supports multi-turn LiteRT-LM conversations, so Chat keeps one conversation open (E2B: 2.6 GB download).
 #if !TEST_MODELS
 #if VS_TEST

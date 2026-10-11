@@ -102,6 +102,30 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
+        /// The context window: how many tokens a conversation - system message, history, the new message and the reply -
+        /// can hold, set on the engine by Init (so change it before Init); 0 leaves it to LiteRT-LM. The default, 4096,
+        /// is what LiteRT-LM picks for the models in this package anyway (Gemma 4 E2B's file allows up to ~32k, at the
+        /// cost of memory). A conversation that outgrows it stops getting replies, so chats that run long need to drop
+        /// or summarize earlier messages; CountTokens helps measure them. A configureSettings callback passed to Init
+        /// that sets EngineSettings.MaxNumTokens itself overrides this.
+        /// </summary>
+        public int MaxNumTokens { get; set; } = 4096;
+
+        /// <summary>
+        /// Count the tokens of a text with the model's tokenizer (after Init). Chat templates add a few tokens per
+        /// message, and images and audio take more (e.g. 280 tokens per image for Gemma 4), so for a conversation this
+        /// is an estimate.
+        /// </summary>
+        /// <param name="text">The text</param>
+        /// <returns>The number of tokens</returns>
+        public int CountTokens(String text)
+        {
+            if (_engine == null)
+                throw new InvalidOperationException("The model is not initialized: call Init first");
+            return _engine.Tokenize(text).Length;
+        }
+
+        /// <summary>
         /// Raised before the engine is disposed or replaced (by Dispose or another Init), so objects that created
         /// conversations on it can release them first. Chats are released automatically.
         /// </summary>
@@ -176,6 +200,8 @@ namespace Emgu.LiteRT.LM.Models
                 {
                     // Keep compiled-model caches next to the model.
                     settings.CacheDir = Path.GetDirectoryName(modelPath);
+                    if (MaxNumTokens > 0)
+                        settings.MaxNumTokens = MaxNumTokens;
                     if (configureSettings != null)
                         configureSettings(settings);
                     return new Engine(settings);

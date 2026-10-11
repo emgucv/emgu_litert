@@ -52,6 +52,9 @@ namespace Maui.Demo.Lite
             public bool CanThink = true;
             // Whether the model can call tools (LanguageModel.SupportsToolCalling), for web search.
             public bool CanUseTools;
+            // Whether the model writes useful summaries: when a chat outgrows its context window, earlier messages
+            // are summarized; otherwise (the small models) they are dropped.
+            public bool CanSummarize;
             // The model file (to tell whether it is downloaded) and its download size, for the download prompt.
             public DownloadableFile File;
             public string Size;
@@ -98,9 +101,9 @@ namespace Maui.Demo.Lite
         {
             new ModelOption { Name = "Qwen3 0.6B", File = Qwen3.ModelFile, Size = "350 MB", Detail = "~350 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
             new ModelOption { Name = "Qwen3.5 0.8B", File = Qwen35_0_8B_VL.ModelFile, Size = "1.3 GB", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
-            new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B },
-            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true },
-            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true },
+            new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B, CanSummarize = true },
+            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true },
+            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true },
         };
 
         private static readonly Color UserBubbleColor = Theme.Accent;
@@ -169,13 +172,11 @@ namespace Maui.Demo.Lite
 
         // Saved chats (ChatStore, SQLite): the current chat's id once its first exchange is saved, and its messages,
         // used to give the model the earlier conversation when a saved chat is opened (or the agent's tools change).
-        private const int MaxRestoredMessages = 20;
         private const string HistoryIconPath = "M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z";
         private readonly ChatStore _store = new ChatStore();
         private int? _conversationId;
         private readonly List<HistoryItem> _historyItems = new List<HistoryItem>();
         private List<AIChatMessage> _agentPrimeHistory;
-        private List<Emgu.LiteRT.LM.Models.ChatMessage> _pendingChatHistory;
         private readonly List<string> _sendSteps = new List<string>();
         private readonly Border _historyButton;
         private readonly VerticalStackLayout _sideChatList;
@@ -186,7 +187,39 @@ namespace Maui.Demo.Lite
             public string Role;
             public string Text;
             public List<(string Kind, string MediaType, byte[] Data)> Attachments = new List<(string, string, byte[])>();
+            // Its id in the ChatStore (0 if not saved).
+            public int MessageId;
+            // Its size in the model's context (estimated, see EstimateTokens), or -1 until counted; ExtraTokens is
+            // what the model's own conversation holds on top until it is rebuilt: the reply's thinking, tool calls
+            // and their results.
+            public int Tokens = -1;
+            public int ExtraTokens;
+            // A user message's first view in the transcript, to put a compaction divider above it.
+            public View View;
         }
+
+        // Context window: a chat that outgrows it fails ("Input token ids are too long"), so before a message is sent
+        // that would make it too long, the earlier messages are summarized by the model (CanSummarize) or dropped, and
+        // the model continues from the summary and the latest messages. The transcript keeps everything. Sizes are
+        // estimates: text is counted with the model's tokenizer, plus measured costs of images and audio.
+        private const int ReplyReserveTokens = 1024;      // room left for the reply
+        private const int ChatOverheadTokens = 50;        // chat template
+        private const int AgentOverheadTokens = 600;      // the agent's instructions and tool definitions
+        private const int MessageOverheadTokens = 8;      // per message (role markers)
+        private const int ImageTokens = 270;              // measured: Gemma 4 and Qwen3.5 VL, 1024x1024 image
+        private const int AudioTokensPerSecond = 25;      // measured: Gemma 4
+        private const int ToolStepTokens = 450;           // a tool call and its (truncated) result
+        private const int SummaryMaxTokens = 400;
+        private const string SummaryIntro = "Here is a summary of our conversation so far:\n";
+        private const string SummaryAcknowledgement = "Thanks, I have the summary and will continue from there.";
+        // The first message of _historyItems the model sees; the ones before it are covered by _summary (if any).
+        private int _contextStart;
+        private string _summary;
+        private int _summaryTokens;
+        // The model has to be given the conversation again (after compacting, or when a saved chat is opened).
+        private bool _needsPrime;
+        private readonly Label _memoryLabel;
+        private readonly Label _compactButton;
 
         // Loading: models load in the background as soon as they are selected (when already downloaded), shown in a
         // card at the top of the conversation; a message sent meanwhile waits for it.
@@ -343,6 +376,20 @@ namespace Maui.Demo.Lite
             _tavilyKeyEntry.Completed += (s, e) => OnTavilyKeyChanged();
             _tavilyKeyEntry.Unfocused += (s, e) => OnTavilyKeyChanged();
             _ = LoadTavilyKeyAsync();
+            // How full the model's context window is, and compacting it by hand.
+            _memoryLabel = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText };
+            _compactButton = new Label
+            {
+                Text = "Compact now",
+                FontFamily = Theme.TitleFont,
+                FontSize = 14,
+                TextColor = Theme.Accent,
+                Padding = new Thickness(0, 4),
+                HorizontalOptions = LayoutOptions.Start
+            };
+            SemanticProperties.SetDescription(_compactButton, "Summarize the earlier messages now");
+            _compactButton.OnTap(OnCompactTapped);
+            UpdateMemoryLabel();
             _settingsView = new VerticalStackLayout
             {
                 Spacing = 6,
@@ -358,7 +405,11 @@ namespace Maui.Demo.Lite
                         FontSize = 12,
                         TextColor = Theme.SecondaryText
                     },
-                    _tavilyKeyEntry
+                    _tavilyKeyEntry,
+                    Theme.Divider(),
+                    new Label { Text = "Conversation memory", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
+                    _memoryLabel,
+                    _compactButton
                 }
             };
 
@@ -838,11 +889,6 @@ namespace Maui.Demo.Lite
 
             _model = model;
             _chat = model.CreateChat();
-            if (_pendingChatHistory != null)
-            {
-                _chat.LoadHistory(_pendingChatHistory);
-                _pendingChatHistory = null;
-            }
             _chat.EnableThinking = _thinkingSwitch.IsToggled;
             _loaded = option.Choice;
             ClearLoading(option.Choice);
@@ -1025,7 +1071,15 @@ namespace Maui.Demo.Lite
 
                 _promptEditor.Text = string.Empty;
                 ClearPendingAttachments();
+                // Where a "summarized" divider goes if this message makes the chat compact.
+                int dividerIndex = _transcript.Children.Contains(_emptyLabel) ? 0 : _transcript.Children.Count;
                 AddUserMessage(prompt, attachments);
+                var userItem = new HistoryItem { Role = MessageRecord.UserRole, Text = prompt };
+                if (dividerIndex < _transcript.Children.Count)
+                    userItem.View = _transcript.Children[dividerIndex] as View;
+                foreach (PendingAttachment attachment in attachments)
+                    userItem.Attachments.Add((attachment.Image != null ? "image" : "audio", attachment.MediaType, attachment.Data));
+                await PrepareContextAsync(userItem, dividerIndex);
                 SetStatus("Generating...");
 
                 // Stream the reply into its own bubble as it's generated, rather than waiting for the
@@ -1051,17 +1105,36 @@ namespace Maui.Demo.Lite
                     });
                 };
 
-                // Kept so teardown (OnNavigatedFrom / switching models) can wait for it instead of
-                // freeing the chat/engine while LiteRT-LM is still generating into it.
-                Task<ChatReply> generation = UseAgent
-                    ? RunAgentAsync(prompt, attachments, bubble)
-                    : _chat.SendAsync(prompt, attachments.Select(a => a.Attachment), onChunk);
-                _generation = generation;
-                ChatReply reply = await generation;
+                ChatReply reply;
+                for (int attempt = 0; ; attempt++)
+                {
+                    // Kept so teardown (OnNavigatedFrom / switching models) can wait for it instead of
+                    // freeing the chat/engine while LiteRT-LM is still generating into it.
+                    Task<ChatReply> generation = UseAgent
+                        ? RunAgentAsync(prompt, attachments, bubble)
+                        : _chat.SendAsync(prompt, attachments.Select(a => a.Attachment), onChunk);
+                    _generation = generation;
+                    try
+                    {
+                        reply = await generation;
+                        break;
+                    }
+                    catch (Exception ex) when (attempt == 0 && IsContextFull(ex))
+                    {
+                        // The estimate was short, so don't rely on it: drop the earlier messages (a summary made before
+                        // stays) and try once more.
+                        UiStallWatchdog.Mark("Context full: " + ex.Message);
+                        streamed.Clear();
+                        _sendSteps.Clear();
+                        await CompactAsync(false, 0, dividerIndex);
+                        PrimeModel();
+                        SetStatus("Generating...");
+                    }
+                }
 
                 UpdateStreamingBubble(bubble, reply);
                 UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
-                await SaveExchangeAsync(prompt, attachments, reply);
+                await SaveExchangeAsync(userItem, reply);
                 SetStatus(null);
                 if (_readAloudSwitch.IsToggled)
                     Speak(reply.Text);
@@ -1073,6 +1146,7 @@ namespace Maui.Demo.Lite
             finally
             {
                 SetBusy(false);
+                UpdateMemoryLabel();
             }
         }
 
@@ -1240,8 +1314,7 @@ namespace Maui.Demo.Lite
             // New tools mean a new agent session; it is given the conversation so far.
             if (_session != null && !_busy)
             {
-                _session = null;
-                _agentPrimeHistory = BuildAgentHistory();
+                _needsPrime = true;
                 SetStatus(key.Length > 0 ? "Web search with Tavily is on." : "Tavily key removed.");
             }
         }
@@ -1615,33 +1688,373 @@ namespace Maui.Demo.Lite
             _conversationId = null;
             _historyItems.Clear();
             _agentPrimeHistory = null;
-            _pendingChatHistory = null;
+            _contextStart = 0;
+            _summary = null;
+            _summaryTokens = 0;
+            _needsPrime = false;
             ClearTranscript();
+            UpdateMemoryLabel();
+        }
+
+        // ---------- Context window ----------
+
+        private int ContextWindow => _model != null && _model.MaxNumTokens > 0 ? _model.MaxNumTokens : 4096;
+
+        // What the conversation may take before a message is sent: the window, less room for the reply and what the
+        // chat template - or the agent's instructions and tools - take.
+        private int ContextBudget => ContextWindow - ReplyReserveTokens - (UseAgent ? AgentOverheadTokens : ChatOverheadTokens);
+
+        // The estimated size of a message in the model's context. Runs the tokenizer: call it off the UI thread.
+        private static int EstimateTokens(LanguageModel model, HistoryItem item)
+        {
+            int tokens = model.CountTokens(item.Text ?? string.Empty) + MessageOverheadTokens;
+            foreach (var attachment in item.Attachments)
+                tokens += attachment.Kind == "image" ? ImageTokens : AudioTokens(attachment.Data);
+            return tokens;
+        }
+
+        // Audio by its length, from the WAV header; other formats (MP3, FLAC) count as the longest voice message.
+        private static int AudioTokens(byte[] data)
+        {
+            double seconds = MaxVoiceLength.TotalSeconds;
+            if (data != null && data.Length > 44
+                && Encoding.ASCII.GetString(data, 0, 4) == "RIFF" && Encoding.ASCII.GetString(data, 8, 4) == "WAVE")
+            {
+                int byteRate = BitConverter.ToInt32(data, 28);
+                if (byteRate > 0)
+                    seconds = (data.Length - 44) / (double)byteRate;
+            }
+            return (int)Math.Ceiling(seconds * AudioTokensPerSecond) + 10;
+        }
+
+        private static int Cost(HistoryItem item) => Math.Max(0, item.Tokens) + item.ExtraTokens;
+
+        // The size of what the model sees now, without the next message.
+        private int ContextTokens()
+        {
+            int tokens = _summary != null ? _summaryTokens : 0;
+            foreach (HistoryItem item in _historyItems.Skip(_contextStart))
+                tokens += Cost(item);
+            return tokens;
+        }
+
+        // Count the messages the model sees that aren't counted yet (e.g. of a saved chat that was opened), the summary,
+        // and the next message.
+        private async Task CountTokensAsync(HistoryItem next)
+        {
+            LanguageModel model = _model;
+            List<HistoryItem> items = _historyItems.Skip(_contextStart).Where(i => i.Tokens < 0).ToList();
+            if (next != null && next.Tokens < 0)
+                items.Add(next);
+            string summary = _summary != null && _summaryTokens == 0 ? _summary : null;
+            if (items.Count == 0 && summary == null)
+                return;
+            int summaryTokens = await Task.Run(() =>
+            {
+                foreach (HistoryItem item in items)
+                    item.Tokens = EstimateTokens(model, item);
+                return summary == null ? 0
+                    : model.CountTokens(SummaryIntro + summary + SummaryAcknowledgement) + 2 * MessageOverheadTokens;
+            });
+            if (summary != null && summary == _summary)
+                _summaryTokens = summaryTokens;
+        }
+
+        // Before a message is sent: compact the conversation if the message would make it too long for the model, and
+        // give the model the conversation again if it needs it.
+        private async Task PrepareContextAsync(HistoryItem next, int dividerIndex)
+        {
+            try
+            {
+                await CountTokensAsync(next);
+                int budget = ContextBudget - next.Tokens;
+                if (ContextTokens() > budget)
+                {
+                    // Summarizing keeps the latest exchanges up to a quarter of the window, so it doesn't happen again
+                    // soon; dropping keeps as many as fit.
+                    bool summarize = SelectedOption.CanSummarize;
+                    int keep = summarize
+                        ? Math.Min(budget - SummaryMaxTokens - 2 * MessageOverheadTokens, ContextWindow / 4)
+                        : budget - _summaryTokens;
+                    await CompactAsync(summarize, keep, dividerIndex);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Sent anyway; if it's too long, SendAsync drops more and retries.
+                UiStallWatchdog.Mark("Preparing the context failed: " + ex.Message);
+            }
+            if (_needsPrime)
+                PrimeModel();
+        }
+
+        // LiteRT-LM's errors for a conversation longer than the context window: "Input token ids are too long..." for a
+        // new conversation, "Prefill input length exceeds available state entries..." for one that is continued.
+        private static bool IsContextFull(Exception ex)
+        {
+            for (Exception e = ex; e != null; e = e.InnerException)
+                if (e.Message.IndexOf("too long", StringComparison.OrdinalIgnoreCase) >= 0
+                    || e.Message.IndexOf("exceeds available state", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            return false;
+        }
+
+        // Give the model the conversation: the summary and the messages since. The agent starts a new session with
+        // them; Chat replaces its history.
+        private void PrimeModel()
+        {
+            List<HistoryItem> items = ContextItems();
+            foreach (HistoryItem item in _historyItems)
+                item.ExtraTokens = 0;
+            if (UseAgent)
+            {
+                _session = null;
+                _agentPrimeHistory = ToAgentMessages(items);
+            }
+            else
+            {
+                _chat?.LoadHistory(ToChatMessages(items));
+            }
+            _needsPrime = false;
+        }
+
+        // Make room in the context: the messages before the latest exchanges that fit keepTokens are summarized - into
+        // one summary with the previous one - or dropped. dividerIndex is where the divider goes if no message is kept.
+        // Returns false if there is nothing to compact.
+        private async Task<bool> CompactAsync(bool summarize, int keepTokens, int dividerIndex)
+        {
+            await CountTokensAsync(null);
+            int keepStart = _historyItems.Count;
+            int kept = 0;
+            while (keepStart - 2 >= _contextStart)
+            {
+                int exchange = Cost(_historyItems[keepStart - 2]) + Cost(_historyItems[keepStart - 1]);
+                if (keepTokens <= 0 || kept + exchange > keepTokens)
+                    break;
+                kept += exchange;
+                keepStart -= 2;
+            }
+            if (keepStart <= _contextStart)
+                return false;
+
+            List<HistoryItem> older = _historyItems.GetRange(_contextStart, keepStart - _contextStart);
+            UiStallWatchdog.Mark(string.Format("Compacting {0} messages, summarize {1}", older.Count, summarize));
+            string summary = _summary;
+            bool summarized = false;
+            if (summarize)
+            {
+                SetStatus("Summarizing the earlier conversation...");
+                try
+                {
+                    Task<string> task = SummarizeAsync(_summary, older);
+                    _generation = task;
+                    summary = await task;
+                    summarized = true;
+                }
+                catch (Exception ex)
+                {
+                    // Dropped instead.
+                    UiStallWatchdog.Mark("Summary failed: " + ex.Message);
+                }
+            }
+            _summary = summary;
+            _summaryTokens = 0;
+            _contextStart = keepStart;
+            _needsPrime = true;
+            await CountTokensAsync(null);
+            // Above the first message the model still sees, or (when it sees none) where the next one goes.
+            View firstKept = keepStart < _historyItems.Count ? _historyItems[keepStart].View : null;
+            int index = firstKept != null ? _transcript.Children.IndexOf(firstKept) : -1;
+            AddCompactionDivider(index >= 0 ? index : dividerIndex, summarized ? summary : null);
+            int upTo = older[older.Count - 1].MessageId;
+            if (_conversationId != null && upTo > 0)
+            {
+                try
+                {
+                    await _store.SetSummaryAsync(_conversationId.Value, _summary, upTo);
+                }
+                catch (Exception ex)
+                {
+                    SetStatus("Could not save the chat: " + ex.Message);
+                }
+            }
+            UpdateMemoryLabel();
+            return true;
+        }
+
+        // Have the model summarize the messages (and the summary of those before them) in a conversation of its own.
+        private async Task<string> SummarizeAsync(string previous, List<HistoryItem> messages)
+        {
+            const string Instructions =
+                "Summarize the conversation below between a user and an assistant, so the assistant can continue it " +
+                "without seeing it again. Keep what may matter later: facts about the user, names, numbers, decisions, " +
+                "code and file names, and open questions. Write short bullet points that are full sentences starting " +
+                "with who is meant (\"The user ...\" or \"The assistant ...\"), at most 150 words, and write only the " +
+                "summary.";
+            LanguageModel model = _model;
+            // Release the chat's and the agent's conversations first; they are given the conversation again afterwards.
+            ResetAgent();
+            _chat?.LoadHistory(Array.Empty<Emgu.LiteRT.LM.Models.ChatMessage>());
+            int inputBudget = ContextWindow - SummaryMaxTokens - 200;
+            string prompt = await Task.Run(() =>
+            {
+                string head = Instructions
+                    + (previous != null ? "\n\nSummary of the conversation before this part:\n" + previous : string.Empty)
+                    + "\n\nConversation:\n";
+                List<string> lines = messages.Select(DescribeForSummary).ToList();
+                // If it's still too long for the model, the oldest messages go.
+                while (lines.Count > 1 && model.CountTokens(head + string.Join("\n", lines)) > inputBudget)
+                    lines.RemoveAt(0);
+                return head + string.Join("\n", lines);
+            });
+            Chat summarizer = model.CreateChat();
+            try
+            {
+                summarizer.MaxOutputTokens = SummaryMaxTokens;
+                summarizer.EnableThinking = false;
+                ChatReply reply = await summarizer.SendAsync(prompt);
+                string summary = reply.Text.Trim();
+                if (summary.Length == 0)
+                    throw new Exception("The summary is empty");
+                return summary;
+            }
+            finally
+            {
+                await Task.Run(() => summarizer.Dispose());
+            }
+        }
+
+        private static string DescribeForSummary(HistoryItem item)
+        {
+            string text = item.Text ?? string.Empty;
+            if (text.Length > 2000)
+                text = text.Substring(0, 2000) + "...";
+            string media = string.Concat(item.Attachments.Select(a => a.Kind == "image" ? "[image] " : "[voice message] "));
+            return (item.Role == MessageRecord.UserRole ? "User: " : "Assistant: ") + media + text;
+        }
+
+        // Compact now (Settings): everything but the latest exchange.
+        private async void OnCompactTapped()
+        {
+            if (_busy)
+            {
+                SetStatus("Hang on - still answering.");
+                return;
+            }
+            if (_model == null || _loaded != SelectedChoice)
+            {
+                SetStatus("Load the model first.");
+                return;
+            }
+            SetBusy(true);
+            try
+            {
+                await CountTokensAsync(null);
+                int count = _historyItems.Count;
+                int keep = count - 2 >= _contextStart ? Cost(_historyItems[count - 2]) + Cost(_historyItems[count - 1]) : 0;
+                if (!await CompactAsync(SelectedOption.CanSummarize, keep, _transcript.Children.Count))
+                    SetStatus("Nothing to compact yet.");
+                else
+                    SetStatus(null);
+                ScrollToEnd();
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Error: " + ex.Message);
+            }
+            finally
+            {
+                SetBusy(false);
+            }
+        }
+
+        private void UpdateMemoryLabel()
+        {
+            if (_memoryLabel == null)
+                return;
+            string text = string.Format(
+                "The model takes in about {0:N0} tokens. Longer chats are summarized - or, for the small models, their " +
+                "earliest messages are dropped - so it keeps up; the conversation here stays complete.", ContextWindow);
+            int visible = _historyItems.Count - _contextStart;
+            if (_model != null && visible > 0 && _historyItems.Skip(_contextStart).All(i => i.Tokens >= 0))
+            {
+                // With what the chat template, or the agent's instructions and tools, take.
+                int used = ContextTokens() + ContextWindow - ReplyReserveTokens - ContextBudget;
+                text += string.Format(" This chat uses about {0:N0} ({1:P0}).", used, Math.Min(1.0, used / (double)ContextWindow));
+            }
+            _memoryLabel.Text = text;
+            _compactButton.IsVisible = visible >= 4;
+        }
+
+        // A line in the transcript where the model's memory of the chat starts; tap it to read the summary.
+        private void AddCompactionDivider(int index, string summary)
+        {
+            var label = new Label
+            {
+                Text = summary != null ? "Earlier messages summarized · tap to read" : "Earlier messages dropped from the model's memory",
+                FontFamily = Theme.BodyFont,
+                FontSize = 12,
+                TextColor = Theme.SecondaryText,
+                HorizontalTextAlignment = TextAlignment.Center,
+                VerticalOptions = LayoutOptions.Center
+            };
+            var row = new Grid
+            {
+                ColumnSpacing = 8,
+                Margin = new Thickness(8, 4),
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) }
+            };
+            row.Add(new BoxView { HeightRequest = 1, Color = Theme.Chevron, VerticalOptions = LayoutOptions.Center }, 0, 0);
+            row.Add(label, 1, 0);
+            row.Add(new BoxView { HeightRequest = 1, Color = Theme.Chevron, VerticalOptions = LayoutOptions.Center }, 2, 0);
+            if (summary != null)
+            {
+                SemanticProperties.SetDescription(row, "Earlier messages were summarized. Tap to read the summary.");
+                row.OnTap(async () => await DisplayAlertAsync("Summary of earlier messages", summary, "OK"));
+            }
+            if (_transcript.Children.Contains(_emptyLabel))
+                _transcript.Children.Remove(_emptyLabel);
+            _transcript.Children.Insert(Math.Max(0, Math.Min(index, _transcript.Children.Count)), row);
         }
 
         // ---------- Saved chats ----------
 
         // Save a completed exchange: the message (with its attachments), any tool steps, and the reply.
-        private async Task SaveExchangeAsync(string prompt, List<PendingAttachment> attachments, ChatReply reply)
+        private async Task SaveExchangeAsync(HistoryItem userItem, ChatReply reply)
         {
-            var userItem = new HistoryItem { Role = MessageRecord.UserRole, Text = prompt };
-            foreach (PendingAttachment attachment in attachments)
-                userItem.Attachments.Add((attachment.Image != null ? "image" : "audio", attachment.MediaType, attachment.Data));
+            var replyItem = new HistoryItem { Role = MessageRecord.AssistantRole, Text = reply.Text };
             _historyItems.Add(userItem);
-            _historyItems.Add(new HistoryItem { Role = MessageRecord.AssistantRole, Text = reply.Text });
+            _historyItems.Add(replyItem);
+            try
+            {
+                LanguageModel model = _model;
+                int steps = _sendSteps.Count;
+                await Task.Run(() =>
+                {
+                    replyItem.Tokens = EstimateTokens(model, replyItem);
+                    // Until the conversation is rebuilt, the model's own conversation also holds the thinking and the
+                    // tool calls.
+                    replyItem.ExtraTokens = (string.IsNullOrEmpty(reply.Thinking) ? 0 : model.CountTokens(reply.Thinking))
+                        + steps * ToolStepTokens;
+                });
+            }
+            catch (Exception)
+            {
+                replyItem.Tokens = reply.Text.Length / 3 + MessageOverheadTokens;
+            }
             try
             {
                 if (_conversationId == null)
                 {
-                    string title = !string.IsNullOrWhiteSpace(prompt) ? prompt
-                        : attachments.Any(a => a.Image != null) ? "Image" : "Voice message";
+                    string title = !string.IsNullOrWhiteSpace(userItem.Text) ? userItem.Text
+                        : userItem.Attachments.Any(a => a.Kind == "image") ? "Image" : "Voice message";
                     _conversationId = await _store.CreateConversationAsync(title, SelectedChoice.ToString());
                 }
                 int id = _conversationId.Value;
-                await _store.AddMessageAsync(id, MessageRecord.UserRole, prompt, null, userItem.Attachments);
+                userItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.UserRole, userItem.Text, null, userItem.Attachments);
                 foreach (string step in _sendSteps)
                     await _store.AddMessageAsync(id, MessageRecord.StepRole, step, null);
-                await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking);
+                replyItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking);
                 await RefreshChatListAsync();
             }
             catch (Exception ex)
@@ -1650,11 +2063,24 @@ namespace Maui.Demo.Lite
             }
         }
 
-        // The conversation so far, for a new agent session (the last messages, so it fits the model's context).
-        private List<AIChatMessage> BuildAgentHistory()
+        // The conversation as the model is given it: the summary of the earlier messages (if any), then the messages
+        // from _contextStart on.
+        private List<HistoryItem> ContextItems()
+        {
+            List<HistoryItem> items = new List<HistoryItem>();
+            if (_summary != null)
+            {
+                items.Add(new HistoryItem { Role = MessageRecord.UserRole, Text = SummaryIntro + _summary });
+                items.Add(new HistoryItem { Role = MessageRecord.AssistantRole, Text = SummaryAcknowledgement });
+            }
+            items.AddRange(_historyItems.Skip(_contextStart));
+            return items;
+        }
+
+        private static List<AIChatMessage> ToAgentMessages(List<HistoryItem> items)
         {
             List<AIChatMessage> messages = new List<AIChatMessage>();
-            foreach (HistoryItem item in _historyItems.Skip(Math.Max(0, _historyItems.Count - MaxRestoredMessages)))
+            foreach (HistoryItem item in items)
             {
                 List<AIContent> contents = new List<AIContent>();
                 foreach (var attachment in item.Attachments)
@@ -1666,10 +2092,10 @@ namespace Maui.Demo.Lite
             return messages.Count > 0 ? messages : null;
         }
 
-        private List<Emgu.LiteRT.LM.Models.ChatMessage> BuildChatHistory()
+        private static List<Emgu.LiteRT.LM.Models.ChatMessage> ToChatMessages(List<HistoryItem> items)
         {
             List<Emgu.LiteRT.LM.Models.ChatMessage> messages = new List<Emgu.LiteRT.LM.Models.ChatMessage>();
-            foreach (HistoryItem item in _historyItems.Skip(Math.Max(0, _historyItems.Count - MaxRestoredMessages)))
+            foreach (HistoryItem item in items)
             {
                 List<ChatAttachment> attachments = new List<ChatAttachment>();
                 foreach (var attachment in item.Attachments)
@@ -1820,15 +2246,25 @@ namespace Maui.Demo.Lite
                 SelectModel(index);
             StartNewChat();
             _conversationId = id;
+            _summary = chat.Summary;
+            bool contextStartFound = false;
 
             foreach (MessageRecord message in await _store.GetMessagesAsync(id))
             {
+                // The model sees the messages after the last compaction (and the summary of those before).
+                if (!contextStartFound && message.Id > chat.SummaryUpTo && message.Role != MessageRecord.StepRole)
+                {
+                    contextStartFound = true;
+                    _contextStart = _historyItems.Count;
+                    if (chat.SummaryUpTo > 0)
+                        AddCompactionDivider(_transcript.Children.Count, chat.Summary);
+                }
                 if (message.Role == MessageRecord.StepRole)
                 {
                     AddSavedStep(message.Text);
                     continue;
                 }
-                var item = new HistoryItem { Role = message.Role, Text = message.Text };
+                var item = new HistoryItem { Role = message.Role, Text = message.Text, MessageId = message.Id };
                 List<PendingAttachment> shown = new List<PendingAttachment>();
                 foreach (SavedAttachment attachment in _store.GetAttachments(message))
                 {
@@ -1845,7 +2281,10 @@ namespace Maui.Demo.Lite
                 _historyItems.Add(item);
                 if (message.Role == MessageRecord.UserRole)
                 {
+                    int viewIndex = _transcript.Children.Contains(_emptyLabel) ? 0 : _transcript.Children.Count;
                     AddUserMessage(message.Text, shown);
+                    if (viewIndex < _transcript.Children.Count)
+                        item.View = _transcript.Children[viewIndex] as View;
                 }
                 else
                 {
@@ -1855,13 +2294,16 @@ namespace Maui.Demo.Lite
                 }
             }
 
-            // Give the model the conversation so far (the last messages, so it fits its context).
-            if (UseAgent)
-                _agentPrimeHistory = BuildAgentHistory();
-            else if (_chat != null && _loaded == SelectedChoice)
-                _chat.LoadHistory(BuildChatHistory());
-            else
-                _pendingChatHistory = BuildChatHistory();
+            if (!contextStartFound)
+            {
+                _contextStart = _historyItems.Count;
+                if (chat.SummaryUpTo > 0)
+                    AddCompactionDivider(_transcript.Children.Count, chat.Summary);
+            }
+            // The model is given the conversation with the next message, once its size is known (compacting it first if
+            // it doesn't fit, e.g. a long chat saved before compaction existed).
+            _needsPrime = true;
+            UpdateMemoryLabel();
             await RefreshChatListAsync();
             ScrollToEnd();
         }
