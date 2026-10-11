@@ -130,5 +130,9 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
 - **Changes to `Platforms/*/Info.plist` don't show up (Mac Catalyst / iOS):** delete
   `bin/Debug/net10.0-<platform>` and `obj/Debug/net10.0-<platform>` and rebuild; incremental builds can keep a stale
   bundled `Info.plist`.
+- **"isn't responding" / the app freezes:** Debug builds log every UI thread stall longer than a second
+  (`UiStallWatchdog.cs`), with what the app was doing and, on Android, the main thread's stack: in the log (tag
+  `UISTALL`; `adb logcat -s UISTALL`) and in `ui_stalls.log` in the app's data folder - on Android
+  `adb shell run-as com.emgu.tf.lite.maui.demo cat files/ui_stalls.log`.
 - **The chat page's model fails to load:** check that the LiteRT-LM libraries were built for the platform (step 2)
   and that `git -C LiteRT-LM lfs pull` fetched real libraries, not Git LFS pointer files.

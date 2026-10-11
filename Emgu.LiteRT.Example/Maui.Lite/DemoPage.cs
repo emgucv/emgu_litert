@@ -265,6 +265,7 @@ namespace Maui.Demo.Lite
 
         private async void OnChangePhoto()
         {
+            UiStallWatchdog.Mark("Change photo: " + Title);
             var rows = new List<(string Section, string Glyph, string Text, string Value)>();
             for (int i = 0; i < _samples.Length; i++)
                 rows.Add((i == 0 ? "SAMPLE IMAGES" : null, _samples[i].Glyph, _samples[i].Name, "sample:" + i));
@@ -349,6 +350,7 @@ namespace Maui.Demo.Lite
 
         private async void OnRunClicked(object sender, EventArgs e)
         {
+            UiStallWatchdog.Mark("Run: " + Title);
             if (_running || _currentImage == null)
                 return;
 

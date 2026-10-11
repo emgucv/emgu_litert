@@ -7,6 +7,8 @@ public partial class App : Application
 		InitializeComponent();
         Emgu.CV.Platform.Maui.MauiInvoke.Init();
         Emgu.TF.Lite.Platform.Maui.MauiInvoke.Init();
+        // Debug builds: log UI thread stalls (see UiStallWatchdog).
+        UiStallWatchdog.Start();
 
 	}
 

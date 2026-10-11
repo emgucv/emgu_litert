@@ -599,6 +599,7 @@ namespace Maui.Demo.Lite
         // Select a model (loaded on the next message) and show the controls it supports.
         private void SelectModel(int index)
         {
+            UiStallWatchdog.Mark("Select model " + Models[index].Name);
             _selectedModel = index;
             ModelOption option = SelectedOption;
             _modelChipLabel.Text = option.Name;
@@ -645,6 +646,8 @@ namespace Maui.Demo.Lite
         // the reply into the transcript.
         private async Task SendAsync(string prompt, List<PendingAttachment> attachments)
         {
+            UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, agent {3}, think {4}, web {5}",
+                prompt.Length, attachments.Count, SelectedOption.Name, UseAgent, _thinkingSwitch.IsToggled, _webSearchSwitch.IsToggled));
             StopSpeaking();
             SetBusy(true);
             try
@@ -689,6 +692,7 @@ namespace Maui.Demo.Lite
                 ChatReply reply = await generation;
 
                 UpdateStreamingBubble(bubble, reply);
+                UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
                 SetStatus(null);
                 if (_readAloudSwitch.IsToggled)
                     Speak(reply.Text);
@@ -743,10 +747,12 @@ namespace Maui.Demo.Lite
                             break;
                         case FunctionCallContent call:
                             string step = AgentTools.Describe(call);
+                            UiStallWatchdog.Mark("Tool call: " + step);
                             steps[call.CallId] = AddStepLine(bubble, step + "...");
                             SetStatus(step + "...");
                             break;
                         case FunctionResultContent result:
+                            UiStallWatchdog.Mark("Tool result" + (result.Exception != null ? ": " + result.Exception.Message : ""));
                             if (steps.TryGetValue(result.CallId, out Label line))
                                 line.Text = line.Text.TrimEnd('.') + (result.Exception != null ? " - failed: " + result.Exception.Message : "");
                             SetStatus("Generating...");
@@ -876,6 +882,7 @@ namespace Maui.Demo.Lite
                 return true;
 
             SetStatus("Preparing the model... the first run downloads it.");
+            UiStallWatchdog.Mark("Loading model " + SelectedOption.Name);
 
             LanguageModel model;
             switch (choice)
@@ -981,6 +988,7 @@ namespace Maui.Demo.Lite
 
         private async Task StopRecordingAndSendAsync()
         {
+            UiStallWatchdog.Mark("Stop recording");
             if (!_recorder.IsRecording)
                 return;
             _recordingTimer?.Cancel();
@@ -1043,11 +1051,13 @@ namespace Maui.Demo.Lite
             if (string.IsNullOrWhiteSpace(text))
                 return;
             StopSpeaking();
+            UiStallWatchdog.Mark(string.Format("Speak: {0} chars", text.Length));
             CancellationTokenSource speech = new CancellationTokenSource();
             _speech = speech;
             try
             {
-                await TextToSpeech.Default.SpeakAsync(text, cancelToken: speech.Token);
+                // With a voice for the reply's language, and without its Markdown.
+                await ReplySpeech.SpeakAsync(text, speech.Token);
             }
             catch (Exception)
             {
@@ -1127,6 +1137,7 @@ namespace Maui.Demo.Lite
         // and re-encode it as JPEG, which LiteRT-LM's image decoder (stb) reads.
         private void AddPendingImage(byte[] bytes, string name)
         {
+            UiStallWatchdog.Mark(string.Format("Attach image {0}: {1} bytes (decode on UI thread)", name, bytes.Length));
             Emgu.CV.Mat image = ImageUtil.Decode(bytes);
             if (image == null)
             {
@@ -1243,6 +1254,7 @@ namespace Maui.Demo.Lite
 
         private async void OnNewChat(object sender, EventArgs e)
         {
+            UiStallWatchdog.Mark("New chat");
             if (_busy)
             {
                 SetStatus("Hang on - still answering.");
@@ -1261,6 +1273,7 @@ namespace Maui.Demo.Lite
         // under it is a hard crash, not a catchable exception.
         private async Task CleanupModelAsync()
         {
+            UiStallWatchdog.Mark("Releasing model " + (_model == null ? "(none)" : _model.GetType().Name));
             Task pending = _generation;
             if (pending != null && !pending.IsCompleted)
             {
