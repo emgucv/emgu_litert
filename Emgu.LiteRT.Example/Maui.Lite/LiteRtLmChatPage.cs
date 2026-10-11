@@ -1630,6 +1630,9 @@ namespace Maui.Demo.Lite
             bubble.Separator.IsVisible = hasThinking;
             bubble.ThinkingLabel.Text = partial.Thinking;
             bubble.Body.SetText(partial.Text);
+            // A reply with code may use the full width, so less of the code wraps.
+            if (bubble.Body.HasCode && bubble.Row.MaximumWidthRequest < double.PositiveInfinity)
+                bubble.Row.MaximumWidthRequest = double.PositiveInfinity;
             ScrollToEnd();
         }
 
