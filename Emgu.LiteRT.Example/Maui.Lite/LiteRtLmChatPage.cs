@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Models;
+using Emgu.LiteRT.Util;
 using Emgu.LiteRT.LM.Extensions.AI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -51,6 +52,9 @@ namespace Maui.Demo.Lite
             public bool CanThink = true;
             // Whether the model can call tools (LanguageModel.SupportsToolCalling), for web search.
             public bool CanUseTools;
+            // The model file (to tell whether it is downloaded) and its download size, for the download prompt.
+            public DownloadableFile File;
+            public string Size;
         }
 
         // An image or audio file attached to the message being written.
@@ -92,11 +96,11 @@ namespace Maui.Demo.Lite
 
         private static readonly ModelOption[] Models = new[]
         {
-            new ModelOption { Name = "Qwen3 0.6B", Detail = "~500 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
-            new ModelOption { Name = "Qwen3.5 0.8B", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
-            new ModelOption { Name = "Qwen3.5 4B", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B },
-            new ModelOption { Name = "Gemma 4 E2B", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true },
-            new ModelOption { Name = "Gemma 4 E4B", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true },
+            new ModelOption { Name = "Qwen3 0.6B", File = Qwen3.ModelFile, Size = "350 MB", Detail = "~350 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
+            new ModelOption { Name = "Qwen3.5 0.8B", File = Qwen35_0_8B_VL.ModelFile, Size = "1.3 GB", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
+            new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B },
+            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true },
+            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true },
         };
 
         private static readonly Color UserBubbleColor = Theme.Accent;
@@ -162,6 +166,23 @@ namespace Maui.Demo.Lite
         private LanguageModel _model;
         private Chat _chat;
         private ModelChoice? _loaded;
+
+        // Loading: models load in the background as soon as they are selected (when already downloaded), shown in a
+        // card at the top of the conversation; a message sent meanwhile waits for it.
+        private const string LastModelPreference = "litert_lm_chat_model";
+        private Task<bool> _loadTask;
+        private ModelChoice? _loadingChoice;
+        private CancellationTokenSource _loadCancel;
+        private bool _pageStarted;
+        private readonly Border _loadCard;
+        private readonly Label _loadTitle;
+        private readonly Label _loadStage;
+        private readonly ProgressBar _loadProgress;
+        private readonly ActivityIndicator _loadSpinner;
+        private readonly Button _loadPrimaryButton;
+        private readonly Button _loadCancelButton;
+        private readonly ActivityIndicator _chipSpinner;
+        private Action _loadPrimaryAction;
         private Task _generation;
         private bool _busy;
 
@@ -180,6 +201,17 @@ namespace Maui.Demo.Lite
                 LineBreakMode = LineBreakMode.TailTruncation,
                 VerticalOptions = LayoutOptions.Center
             };
+            // Spins in the model chip while the model loads.
+            _chipSpinner = new ActivityIndicator
+            {
+                IsRunning = false,
+                IsVisible = false,
+                Color = Theme.Accent,
+                WidthRequest = 16,
+                HeightRequest = 16,
+                Margin = new Thickness(4, 0, 0, 0),
+                VerticalOptions = LayoutOptions.Center
+            };
             _modelChip = new Border
             {
                 BackgroundColor = Theme.CardBackground,
@@ -193,7 +225,7 @@ namespace Maui.Demo.Lite
                 Content = new HorizontalStackLayout
                 {
                     Spacing = 2,
-                    Children = { _modelChipLabel, Theme.MakeIcon(Theme.GlyphExpandMore, Theme.SecondaryText, 22) }
+                    Children = { _modelChipLabel, _chipSpinner, Theme.MakeIcon(Theme.GlyphExpandMore, Theme.SecondaryText, 22) }
                 }
             };
             _modelChip.OnTap(OnModelChipTapped);
@@ -443,7 +475,35 @@ namespace Maui.Demo.Lite
                 }
             };
             _mainColumn.Add(header, 0, 0);
-            _mainColumn.Add(_scroll, 0, 1);
+            _loadTitle = new Label { FontFamily = Theme.TitleFont, FontSize = 16, TextColor = Theme.PrimaryText };
+            _loadStage = new Label { FontFamily = Theme.BodyFont, FontSize = 14, TextColor = Theme.SecondaryText };
+            _loadProgress = new ProgressBar { ProgressColor = Theme.Accent, IsVisible = false };
+            _loadSpinner = new ActivityIndicator { Color = Theme.Accent, WidthRequest = 22, HeightRequest = 22, VerticalOptions = LayoutOptions.Center };
+            _loadPrimaryButton = Theme.PrimaryButton("Download", null);
+            _loadPrimaryButton.ImageSource = null;
+            _loadPrimaryButton.HeightRequest = 40;
+            _loadPrimaryButton.FontSize = 14;
+            _loadPrimaryButton.Clicked += (s, e) => _loadPrimaryAction?.Invoke();
+            _loadCancelButton = Theme.SecondaryButton("Cancel", null);
+            _loadCancelButton.ImageSource = null;
+            _loadCancelButton.HeightRequest = 40;
+            _loadCancelButton.FontSize = 14;
+            _loadCancelButton.Clicked += (s, e) => CancelLoad();
+            var loadTitleRow = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) } };
+            loadTitleRow.Add(_loadSpinner, 0, 0);
+            loadTitleRow.Add(_loadTitle, 1, 0);
+            var loadButtons = new Grid { ColumnSpacing = 8, ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) } };
+            loadButtons.Add(_loadPrimaryButton, 0, 0);
+            loadButtons.Add(_loadCancelButton, 1, 0);
+            _loadCard = Theme.Card(new VerticalStackLayout
+            {
+                Spacing = 8,
+                Children = { loadTitleRow, _loadStage, _loadProgress, loadButtons }
+            }, 14);
+            _loadCard.IsVisible = false;
+            _loadCard.VerticalOptions = LayoutOptions.Start;
+            _loadCard.Margin = new Thickness(0, 4, 0, 0);
+            _mainColumn.Add(new Grid { Children = { _scroll, _loadCard } }, 0, 1);
             _mainColumn.Add(_statusLabel, 0, 2);
             _mainColumn.Add(composerCard, 0, 3);
 
@@ -613,6 +673,257 @@ namespace Maui.Demo.Lite
             foreach (PendingAttachment attachment in _pending.ToList())
                 if (attachment.Image != null ? !option.AcceptsImages : !option.AcceptsAudio)
                     RemovePending(attachment);
+            if (_pageStarted)
+            {
+                try { Preferences.Default.Set(LastModelPreference, option.Choice.ToString()); } catch (Exception) { }
+                _ = PrepareModelAsync(false);
+            }
+        }
+
+        // ---------- Loading the model ----------
+
+        // Open with the model used last time, and start loading it if it is already downloaded.
+        protected override void OnAppearing()
+        {
+            base.OnAppearing();
+            if (_pageStarted)
+                return;
+            _pageStarted = true;
+            int index = 0;
+            try
+            {
+                string last = Preferences.Default.Get(LastModelPreference, null as string);
+                int found = Array.FindIndex(Models, m => m.Choice.ToString() == last);
+                if (found >= 0)
+                    index = found;
+            }
+            catch (Exception)
+            {
+            }
+            SelectModel(index);
+        }
+
+        private static bool IsDownloaded(ModelOption option)
+        {
+            // A file that exists but isn't verified yet (e.g. downloaded by an older version) is checked when loading.
+            string path = option.File.LocalFile;
+            return option.File.IsLocalFileVerified || (System.IO.File.Exists(path) && new System.IO.FileInfo(path).Length > 0);
+        }
+
+        // Get the selected model ready: nothing to do if it's loaded or loading; load it if it's downloaded (or the
+        // download is confirmed); otherwise offer the download. Returns the load task, or null when waiting for the
+        // user to confirm a download.
+        private Task<bool> PrepareModelAsync(bool downloadConfirmed)
+        {
+            ModelOption option = SelectedOption;
+            if (_model != null && _loaded == option.Choice)
+            {
+                HideLoadCard();
+                return Task.FromResult(true);
+            }
+            if (_loadTask != null && _loadingChoice == option.Choice)
+                return _loadTask;
+            if (!downloadConfirmed && !IsDownloaded(option))
+            {
+                CancelLoad();
+                ShowDownloadPrompt(option);
+                return null;
+            }
+            _loadCancel?.Cancel();
+            _loadCancel = new CancellationTokenSource();
+            _loadingChoice = option.Choice;
+            _loadTask = LoadModelAsync(option, _loadTask, _loadCancel.Token);
+            return _loadTask;
+        }
+
+        private async Task<bool> LoadModelAsync(ModelOption option, Task<bool> previousLoad, CancellationToken token)
+        {
+            UiStallWatchdog.Mark("Loading model " + option.Name);
+            ShowLoadCard(option, "Starting...", null);
+            // Let a cancelled load finish first (an engine being created can't be interrupted), so two models are never
+            // in memory at once, then release the model that was loaded before.
+            if (previousLoad != null)
+            {
+                try { await previousLoad; } catch (Exception) { }
+            }
+            if (_model != null && _loaded != option.Choice)
+            {
+                await CleanupModelAsync();
+                ClearTranscript();
+            }
+            if (token.IsCancellationRequested)
+                return false;
+
+            LanguageModel model = CreateModel(option.Choice);
+            model.LoadStageChanged += (s, stage) => MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (!token.IsCancellationRequested)
+                    ShowLoadStage(option, stage);
+            });
+            model.OnDownloadProgressChanged += (total, received, percent) => MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (!token.IsCancellationRequested)
+                    ShowDownloadProgress(total, received);
+            });
+            try
+            {
+                await model.Init(cancellationToken: token);
+            }
+            catch (Exception ex)
+            {
+                await Task.Run(() => model.Dispose());
+                if (token.IsCancellationRequested)
+                    return false;
+                UiStallWatchdog.Mark("Loading failed: " + ex.Message);
+                ShowLoadError(option, ex.Message);
+                ClearLoading(option.Choice);
+                return false;
+            }
+            if (token.IsCancellationRequested)
+            {
+                await Task.Run(() => model.Dispose());
+                return false;
+            }
+
+            _model = model;
+            _chat = model.CreateChat();
+            _chat.EnableThinking = _thinkingSwitch.IsToggled;
+            _loaded = option.Choice;
+            ClearLoading(option.Choice);
+            HideLoadCard();
+            UiStallWatchdog.Mark("Model ready: " + option.Name);
+            return true;
+        }
+
+        private static LanguageModel CreateModel(ModelChoice choice)
+        {
+            switch (choice)
+            {
+                case ModelChoice.Qwen3: return new Qwen3();
+                case ModelChoice.Qwen35_0_8B_VL: return new Qwen35_0_8B_VL();
+                case ModelChoice.Qwen35_4B: return new Qwen35_4B();
+                case ModelChoice.Gemma4E4B: return new Gemma4E4B();
+                default: return new Gemma4E2B();
+            }
+        }
+
+        private void ClearLoading(ModelChoice choice)
+        {
+            if (_loadingChoice == choice)
+            {
+                _loadingChoice = null;
+                _loadTask = null;
+            }
+            _chipSpinner.IsVisible = _chipSpinner.IsRunning = _loadTask != null;
+        }
+
+        // Cancel the load in progress (a download stops and its partial file is deleted).
+        private void CancelLoad()
+        {
+            if (_loadTask == null)
+                return;
+            UiStallWatchdog.Mark("Cancel loading");
+            _loadCancel?.Cancel();
+            _loadingChoice = null;
+            _chipSpinner.IsVisible = _chipSpinner.IsRunning = false;
+            ModelOption option = SelectedOption;
+            if (_model != null && _loaded == option.Choice)
+                HideLoadCard();
+            else if (!IsDownloaded(option))
+                ShowDownloadPrompt(option);
+            else
+                ShowLoadError(option, "Loading was cancelled.");
+            // _loadTask is kept until it finishes, so the next load waits for it.
+        }
+
+        private void ShowDownloadPrompt(ModelOption option)
+        {
+            bool wifi = true;
+            try
+            {
+                var profiles = Connectivity.Current.ConnectionProfiles;
+                wifi = profiles.Contains(ConnectionProfile.WiFi) || profiles.Contains(ConnectionProfile.Ethernet);
+            }
+            catch (Exception)
+            {
+            }
+            ShowLoadCard(option, string.Format("{0} needs a one-time {1} download.{2}", option.Name, option.Size,
+                wifi ? "" : " You're not on Wi-Fi - mobile data may be used."), null);
+            _loadSpinner.IsVisible = _loadSpinner.IsRunning = false;
+            _chipSpinner.IsVisible = _chipSpinner.IsRunning = false;
+            SetLoadButtons("Download " + option.Size, () => _ = PrepareModelAsync(true), "Not now");
+        }
+
+        private void ShowLoadError(ModelOption option, string message)
+        {
+            ShowLoadCard(option, "Could not load the model: " + message, null);
+            _loadSpinner.IsVisible = _loadSpinner.IsRunning = false;
+            SetLoadButtons("Retry", () => _ = PrepareModelAsync(true), null);
+        }
+
+        private void ShowLoadStage(ModelOption option, ModelLoadStage stage)
+        {
+            switch (stage)
+            {
+                case ModelLoadStage.CheckingFile:
+                    ShowLoadCard(option, "Checking the model file...", null);
+                    break;
+                case ModelLoadStage.Downloading:
+                    ShowLoadCard(option, "Downloading...", 0);
+                    break;
+                case ModelLoadStage.VerifyingFile:
+                    ShowLoadCard(option, "Checking the download...", null);
+                    break;
+                case ModelLoadStage.LoadingEngine:
+                    ShowLoadCard(option, "Loading into memory...", null);
+                    break;
+            }
+        }
+
+        private void ShowDownloadProgress(long? total, long received)
+        {
+            const double GB = 1024.0 * 1024 * 1024;
+            if (total.HasValue && total.Value > 0)
+            {
+                _loadStage.Text = string.Format("Downloading... {0:0.00} / {1:0.00} GB ({2:0}%)", received / GB, total.Value / GB, 100.0 * received / total.Value);
+                _loadProgress.IsVisible = true;
+                _loadProgress.Progress = (double)received / total.Value;
+            }
+            else
+            {
+                _loadStage.Text = string.Format("Downloading... {0:0.00} GB", received / GB);
+            }
+        }
+
+        // The card while loading: a spinner, the stage and (for a download) a progress bar, with Cancel.
+        private void ShowLoadCard(ModelOption option, string stage, double? progress)
+        {
+            _loadCard.IsVisible = true;
+            _loadTitle.Text = option.Name;
+            _loadStage.Text = stage;
+            _loadProgress.IsVisible = progress.HasValue;
+            if (progress.HasValue)
+                _loadProgress.Progress = progress.Value;
+            _loadSpinner.IsVisible = _loadSpinner.IsRunning = true;
+            _chipSpinner.IsVisible = _chipSpinner.IsRunning = true;
+            SetLoadButtons(null, null, "Cancel");
+        }
+
+        private void SetLoadButtons(string primaryText, Action primaryAction, string cancelText)
+        {
+            _loadPrimaryAction = primaryAction;
+            _loadPrimaryButton.IsVisible = primaryText != null;
+            if (primaryText != null)
+                _loadPrimaryButton.Text = primaryText;
+            _loadCancelButton.IsVisible = cancelText != null;
+            if (cancelText != null)
+                _loadCancelButton.Text = cancelText;
+        }
+
+        private void HideLoadCard()
+        {
+            _loadCard.IsVisible = false;
+            _chipSpinner.IsVisible = _chipSpinner.IsRunning = false;
         }
 
         private void OnThinkingToggled(object sender, ToggledEventArgs e)
@@ -868,66 +1179,22 @@ namespace Maui.Demo.Lite
             }
         }
 
+        // Wait for the selected model before sending: loads it if needed. If it still needs downloading, the card asks
+        // for the download first and the message isn't sent.
         private async Task<bool> EnsureModelReadyAsync()
         {
-            ModelChoice choice = SelectedChoice;
-
-            if (_model != null && _loaded != choice)
-            {
-                await CleanupModelAsync();
-                ClearTranscript();
-            }
-
-            if (_model != null)
+            if (_model != null && _loaded == SelectedChoice)
                 return true;
-
-            SetStatus("Preparing the model... the first run downloads it.");
-            UiStallWatchdog.Mark("Loading model " + SelectedOption.Name);
-
-            LanguageModel model;
-            switch (choice)
+            Task<bool> load = PrepareModelAsync(false);
+            if (load == null)
             {
-                case ModelChoice.Qwen3:
-                    model = new Qwen3();
-                    break;
-                case ModelChoice.Qwen35_0_8B_VL:
-                    model = new Qwen35_0_8B_VL();
-                    break;
-                case ModelChoice.Qwen35_4B:
-                    model = new Qwen35_4B();
-                    break;
-                case ModelChoice.Gemma4E4B:
-                    model = new Gemma4E4B();
-                    break;
-                default:
-                    model = new Gemma4E2B();
-                    break;
-            }
-            model.OnDownloadProgressChanged += OnDownloadProgressChanged;
-            try
-            {
-                await model.Init();
-            }
-            catch (Exception ex)
-            {
-                model.Dispose();
-                SetStatus("Could not load the model: " + ex.Message);
+                SetStatus("Download the model first (above).");
                 return false;
             }
-
-            _model = model;
-            _chat = model.CreateChat();
-            _chat.EnableThinking = _thinkingSwitch.IsToggled;
-            _loaded = choice;
-            return true;
-        }
-
-        private void OnDownloadProgressChanged(long? totalBytesToReceive, long bytesReceived, double? progressPercentage)
-        {
-            string message = totalBytesToReceive.HasValue
-                ? string.Format("Downloading model... {0} of {1} MB ({2}%)", bytesReceived / (1024 * 1024), totalBytesToReceive.Value / (1024 * 1024), (int)(progressPercentage ?? 0))
-                : string.Format("Downloading model... {0} MB", bytesReceived / (1024 * 1024));
-            MainThread.BeginInvokeOnMainThread(() => SetStatus(message));
+            SetStatus("Waiting for the model to load...");
+            bool ready = await load;
+            SetStatus(null);
+            return ready && _model != null && _loaded == SelectedChoice;
         }
 
         // ---------- Voice messages ----------
@@ -1288,8 +1555,12 @@ namespace Maui.Demo.Lite
             _chat = null;
             _model = null;
             _loaded = null;
-            chat?.Dispose();
-            model?.Dispose();
+            // Freeing an engine can take a moment: not on the UI thread.
+            await Task.Run(() =>
+            {
+                chat?.Dispose();
+                model?.Dispose();
+            });
         }
 
         protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
@@ -1298,6 +1569,7 @@ namespace Maui.Demo.Lite
             if (!Navigation.NavigationStack.Contains(this) && !Navigation.ModalStack.Contains(this))
             {
                 StopSpeaking();
+                _loadCancel?.Cancel();
                 _ = CancelRecordingAsync();
                 _ = CleanupModelAsync();
             }

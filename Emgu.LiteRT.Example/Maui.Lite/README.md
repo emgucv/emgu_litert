@@ -117,8 +117,11 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
 
 ## Using the chat page
 
-- The model downloads on first use (Qwen3 0.6B ~350 MB, Qwen3.5 0.8B ~1.3 GB, Gemma 4 E2B ~2.6 GB, E4B ~3.7 GB,
-  Qwen3.5 4B ~2.8 GB) into the app's data folder, and loads from there afterwards.
+- Choosing a model you haven't downloaded yet shows its download size (Qwen3 0.6B ~350 MB, Qwen3.5 0.8B ~1.3 GB,
+  Gemma 4 E2B ~2.6 GB, E4B ~3.7 GB, Qwen3.5 4B ~2.8 GB) with a Download button; models already on the device start
+  loading as soon as they are selected, and the page reopens with the model used last. The first load after a
+  download checks the file once (a few seconds for the larger models); you can type meanwhile, and a message sent
+  while the model loads is sent when it's ready.
 - "Think" and "Web search" (Gemma 4) are per-message switches above the message box. Web search uses Wikipedia, and
   the web with a Tavily API key (Settings); your searches leave the device.
 - The "+" button attaches images or audio, and the microphone button records a voice message, for models that accept

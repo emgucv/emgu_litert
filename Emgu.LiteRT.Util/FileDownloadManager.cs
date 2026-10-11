@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.IO;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Http;
 
@@ -147,23 +148,29 @@ namespace Emgu.LiteRT.Util
         /// </summary>
         /// <param name="retry">The number of retries.</param>
         /// <returns>The async Task</returns>
-        public async Task Download(int retry = 1)
+        public Task Download(int retry = 1)
         {
-            await Download(_files.ToArray(), retry, this.OnDownloadProgressChanged);
+            return Download(retry, CancellationToken.None);
         }
 
-        private static async Task Download(
-            DownloadableFile[] files,
-            int retry = 1,
-            DownloadProgressChangedEventHandler onDownloadProgressChanged = null)
+        /// <summary>
+        /// Download the files, with cancellation. A cancelled download deletes the partly downloaded file. The work
+        /// never resumes on the caller's synchronization context (e.g. a UI thread), and the progress event is raised
+        /// on a background thread.
+        /// </summary>
+        /// <param name="retry">The number of retries.</param>
+        /// <param name="cancellationToken">Cancels the download</param>
+        /// <returns>The async Task</returns>
+        public async Task Download(int retry, CancellationToken cancellationToken)
         {
-            await DownloadHelperMultiple(files, retry, onDownloadProgressChanged);
+            await DownloadHelperMultiple(_files.ToArray(), retry, this.OnDownloadProgressChanged, cancellationToken).ConfigureAwait(false);
         }
 
         private static async Task DownloadHelperMultiple(
             DownloadableFile[] downloadableFiles,
-            int retry = 1,
-            DownloadProgressChangedEventHandler onDownloadProgressChanged = null)
+            int retry,
+            DownloadProgressChangedEventHandler onDownloadProgressChanged,
+            CancellationToken cancellationToken)
         {
             if (downloadableFiles == null || downloadableFiles.Length == 0)
             {
@@ -171,16 +178,16 @@ namespace Emgu.LiteRT.Util
             }
             else if (downloadableFiles.Length == 1)
             {
-                await DownloadHelper(downloadableFiles[0], retry, onDownloadProgressChanged);
+                await DownloadHelper(downloadableFiles[0], retry, onDownloadProgressChanged, cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 DownloadableFile currentFile = downloadableFiles[0];
                 DownloadableFile[] remainingFiles = new DownloadableFile[downloadableFiles.Length - 1];
                 Array.Copy(downloadableFiles, 1, remainingFiles, 0, remainingFiles.Length);
-                await DownloadHelper(currentFile, retry, onDownloadProgressChanged);
+                await DownloadHelper(currentFile, retry, onDownloadProgressChanged, cancellationToken).ConfigureAwait(false);
 
-                await DownloadHelperMultiple(remainingFiles, retry, onDownloadProgressChanged);
+                await DownloadHelperMultiple(remainingFiles, retry, onDownloadProgressChanged, cancellationToken).ConfigureAwait(false);
 
             }
         }
@@ -207,26 +214,35 @@ namespace Emgu.LiteRT.Util
             /// <param name="downloadUrl">The download url</param>
             /// <param name="destinationFilePath">The destination file path</param>
             /// <returns>The task</returns>
-            public async Task DownloadFileTaskAsync(string downloadUrl, string destinationFilePath)
+            public Task DownloadFileTaskAsync(string downloadUrl, string destinationFilePath)
             {
-
-                //_httpClient = new HttpClient { Timeout = TimeSpan.FromDays(1) };
-
-                using (var response = await GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
-                    await DownloadFileFromHttpResponseMessage(response, destinationFilePath);
+                return DownloadFileTaskAsync(downloadUrl, destinationFilePath, CancellationToken.None);
             }
 
-            private async Task DownloadFileFromHttpResponseMessage(HttpResponseMessage response, string destinationFilePath)
+            /// <summary>
+            /// Download file asynchronously, with cancellation
+            /// </summary>
+            /// <param name="downloadUrl">The download url</param>
+            /// <param name="destinationFilePath">The destination file path</param>
+            /// <param name="cancellationToken">Cancels the download</param>
+            /// <returns>The task</returns>
+            public async Task DownloadFileTaskAsync(string downloadUrl, string destinationFilePath, CancellationToken cancellationToken)
+            {
+                using (var response = await GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false))
+                    await DownloadFileFromHttpResponseMessage(response, destinationFilePath, cancellationToken).ConfigureAwait(false);
+            }
+
+            private async Task DownloadFileFromHttpResponseMessage(HttpResponseMessage response, string destinationFilePath, CancellationToken cancellationToken)
             {
                 response.EnsureSuccessStatusCode();
 
                 var totalBytes = response.Content.Headers.ContentLength;
 
-                using (var contentStream = await response.Content.ReadAsStreamAsync())
-                    await ProcessContentStream(totalBytes, contentStream, destinationFilePath);
+                using (var contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                    await ProcessContentStream(totalBytes, contentStream, destinationFilePath, cancellationToken).ConfigureAwait(false);
             }
 
-            private async Task ProcessContentStream(long? totalDownloadSize, Stream contentStream, String destinationFilePath)
+            private async Task ProcessContentStream(long? totalDownloadSize, Stream contentStream, String destinationFilePath, CancellationToken cancellationToken)
             {
                 var totalBytesRead = 0L;
                 var readCount = 0L;
@@ -237,7 +253,7 @@ namespace Emgu.LiteRT.Util
                 {
                     do
                     {
-                        var bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+                        var bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
                         if (bytesRead == 0)
                         {
                             isMoreToRead = false;
@@ -245,7 +261,7 @@ namespace Emgu.LiteRT.Util
                             continue;
                         }
 
-                        await fileStream.WriteAsync(buffer, 0, bytesRead);
+                        await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken).ConfigureAwait(false);
 
                         totalBytesRead += bytesRead;
                         readCount += 1;
@@ -273,8 +289,9 @@ namespace Emgu.LiteRT.Util
 
         private static async Task DownloadHelper(
             DownloadableFile downloadableFile,
-            int retry = 1,
-            DownloadProgressChangedEventHandler onDownloadProgressChanged = null
+            int retry,
+            DownloadProgressChangedEventHandler onDownloadProgressChanged,
+            CancellationToken cancellationToken
             )
         {
             if (downloadableFile.Url == null)
@@ -298,8 +315,14 @@ namespace Emgu.LiteRT.Util
                     {
                         fi.Directory.Create();
                     }
-                    await downloadClient.DownloadFileTaskAsync(downloadableFile.Url, downloadableFile.LocalFile);
+                    await downloadClient.DownloadFileTaskAsync(downloadableFile.Url, downloadableFile.LocalFile, cancellationToken).ConfigureAwait(false);
 
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // A partly downloaded file can't be resumed.
+                    try { File.Delete(downloadableFile.LocalFile); } catch (Exception) { }
+                    throw;
                 }
                 catch (Exception e)
                 {
@@ -311,7 +334,7 @@ namespace Emgu.LiteRT.Util
 
                     if (retry > 0)
                     {
-                        await DownloadHelper(downloadableFile, retry - 1);
+                        await DownloadHelper(downloadableFile, retry - 1, onDownloadProgressChanged, cancellationToken).ConfigureAwait(false);
                     }
                     else
                     {

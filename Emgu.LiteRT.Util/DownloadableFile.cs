@@ -62,6 +62,12 @@ namespace Emgu.LiteRT.Util
         /// <summary>
         /// Return true if the local file exist and match the sha256hash (if specified in the constructor).
         /// </summary>
+        /// <remarks>
+        /// Computing the hash reads the whole file, which takes seconds for a large model, so once a file has matched,
+        /// a marker next to it (the local file name plus ".sha256ok") records its size, modification time and hash;
+        /// later checks of the unchanged file only compare those. Call it from a background thread when the file may
+        /// not have been verified yet.
+        /// </remarks>
         public bool IsLocalFileValid
         {
             get
@@ -74,40 +80,91 @@ namespace Emgu.LiteRT.Util
                 if (fi.Length == 0)
                     return false;
 
-                if (_sha256Hash != null)
+                if (_sha256Hash == null || IsVerifiedByMarker(fi))
+                    return true;
+
+                using (SHA256 sha256 = SHA256.Create())
                 {
-                    using (SHA256 sha256 = SHA256.Create())
+                    try
                     {
-                        try
+                        using (FileStream fileStream = fi.Open(FileMode.Open, FileAccess.Read, FileShare.Read))
                         {
-                            // Create a fileStream for the file.
-                            using (FileStream fileStream = fi.Open(FileMode.Open))
-                            {
-                                // Be sure it's positioned to the beginning of the stream.
-                                fileStream.Position = 0;
-                                // Compute the hash of the fileStream.
-                                byte[] hashValue = sha256.ComputeHash(fileStream);
-                                String hashStr = ByteArrayToString(hashValue);
-                                if (hashStr != _sha256Hash)
-                                    return false;
-                            }
-                        }
-                        catch (IOException e)
-                        {
-                            Trace.WriteLine($"I/O Exception: {e.Message}");
-                            return false;
-                        }
-                        catch (UnauthorizedAccessException e)
-                        {
-                            Trace.WriteLine($"Access Exception: {e.Message}");
-                            return false;
+                            byte[] hashValue = sha256.ComputeHash(fileStream);
+                            String hashStr = ByteArrayToString(hashValue);
+                            if (hashStr != _sha256Hash)
+                                return false;
                         }
                     }
+                    catch (IOException e)
+                    {
+                        Trace.WriteLine($"I/O Exception: {e.Message}");
+                        return false;
+                    }
+                    catch (UnauthorizedAccessException e)
+                    {
+                        Trace.WriteLine($"Access Exception: {e.Message}");
+                        return false;
+                    }
                 }
-
+                WriteVerifiedMarker(fi);
                 return true;
             }
+        }
 
+        /// <summary>
+        /// True if the local file exists and, when a sha256 hash was given, has already been verified (see
+        /// IsLocalFileValid) and not changed since. Cheap: it doesn't read the file, so it can be used on the UI thread,
+        /// e.g. to tell whether a model still needs downloading. A file that was downloaded but not verified yet
+        /// returns false.
+        /// </summary>
+        public bool IsLocalFileVerified
+        {
+            get
+            {
+                String localFile = LocalFile;
+                if (localFile == null || !File.Exists(localFile))
+                    return false;
+                FileInfo fi = new FileInfo(localFile);
+                if (fi.Length == 0)
+                    return false;
+                return _sha256Hash == null || IsVerifiedByMarker(fi);
+            }
+        }
+
+        private String MarkerFile
+        {
+            get { return LocalFile + ".sha256ok"; }
+        }
+
+        private String MarkerContent(FileInfo fi)
+        {
+            return String.Format("{0}|{1}|{2}", fi.Length, fi.LastWriteTimeUtc.Ticks, _sha256Hash);
+        }
+
+        private bool IsVerifiedByMarker(FileInfo fi)
+        {
+            try
+            {
+                return File.Exists(MarkerFile) && File.ReadAllText(MarkerFile).Trim() == MarkerContent(fi);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private void WriteVerifiedMarker(FileInfo fi)
+        {
+            try
+            {
+                fi.Refresh();
+                File.WriteAllText(MarkerFile, MarkerContent(fi));
+            }
+            catch (Exception e)
+            {
+                // Only an optimization: the next check hashes the file again.
+                Trace.WriteLine($"Could not write {MarkerFile}: {e.Message}");
+            }
         }
 
         /// <summary>
