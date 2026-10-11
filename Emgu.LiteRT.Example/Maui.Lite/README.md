@@ -129,6 +129,9 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
 - The models can take in about 4,096 tokens of conversation (a few pages of text; a photo is ~270, voice ~25 per
   second) - Gemma 4 8,192 on Mac and Windows. Opening a long saved chat takes a while, since the model reads it again
   (measurements in [Performance.md](Performance.md)).
+- Gemma 4 12B (Mac Catalyst only, ~6.9 GB download, needs a Mac with 16 GB of memory) is the most capable model, e.g. for
+  code. On a Mac, the Gemma 4 models run on the GPU through the optional `Emgu.LiteRT.Metal.runtime.maui.macos` package
+  (Settings → "Use the GPU"); the first load of a model there builds a cache next to it (~6 GB for 12B).
 - On Android, Gemma 4 E2B runs on the GPU (Settings → "Use the GPU"; the CPU if the device has no OpenCL driver),
   through the optional `Emgu.LiteRT.OpenCL.runtime.maui.android` package the demo references:
   replies take about a second instead of ~6, and reopening a long chat ~8 s instead of ~2 minutes. The first load on

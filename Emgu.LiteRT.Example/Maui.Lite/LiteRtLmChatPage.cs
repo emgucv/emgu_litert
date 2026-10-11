@@ -37,7 +37,8 @@ namespace Maui.Demo.Lite
             Qwen35_0_8B_VL,
             Qwen35_4B,
             Gemma4E2B,
-            Gemma4E4B
+            Gemma4E4B,
+            Gemma4_12B
         }
 
         private sealed class ModelOption
@@ -60,9 +61,11 @@ namespace Maui.Demo.Lite
             // chat is opened or after compacting, which grows with the window: a full 4k chat took 2 minutes on a Pixel
             // Fold (8k: almost 6, with 1.5 GB of its RAM left), 8k 27 s (E2B) / 61 s (E4B) on an Apple Silicon Mac.
             public int DesktopContextTokens;
-            // Whether the model runs on the GPU on Android (when "Use the GPU" is on and the device has OpenCL), with
-            // 32-bit activations - see Performance.md. Only Gemma 4 E2B has been tested there.
+            // Whether the model runs on the GPU (when "Use the GPU" is on): on Android with LiteRT's OpenCL accelerator
+            // (if the device has OpenCL; only Gemma 4 E2B has been tested there), on Mac Catalyst with its Metal one.
+            // Gemma4 uses 32-bit activations on the GPU - see Performance.md.
             public bool GpuOnAndroid;
+            public bool GpuOnMac;
             // The model file (to tell whether it is downloaded) and its download size, for the download prompt.
             public DownloadableFile File;
             public string Size;
@@ -110,8 +113,12 @@ namespace Maui.Demo.Lite
             new ModelOption { Name = "Qwen3 0.6B", File = Qwen3.ModelFile, Size = "350 MB", Detail = "~350 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
             new ModelOption { Name = "Qwen3.5 0.8B", File = Qwen35_0_8B_VL.ModelFile, Size = "1.3 GB", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
             new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B, CanSummarize = true },
-            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, GpuOnAndroid = true },
-            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192 },
+            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, GpuOnAndroid = true, GpuOnMac = true },
+            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, GpuOnMac = true },
+#if MACCATALYST
+            // Desktop only: ~8 GB of memory, and practical on a GPU only (Mac Catalyst has LiteRT's Metal accelerator).
+            new ModelOption { Name = "Gemma 4 12B", File = Gemma4_12B.ModelFile, Size = "6.9 GB", Detail = "~6.9 GB download. The most capable - best for code and harder questions. Needs a Mac with 16 GB of memory.", Choice = ModelChoice.Gemma4_12B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, GpuOnMac = true },
+#endif
         };
 
         private static readonly Color UserBubbleColor = Theme.Accent;
@@ -434,11 +441,15 @@ namespace Maui.Demo.Lite
                 {
                     readAloudRow,
                     Theme.Divider(),
-#if ANDROID
+#if ANDROID || MACCATALYST
                     gpuRow,
                     new Label
                     {
+#if ANDROID
                         Text = "Gemma 4 E2B answers many times faster on the GPU. Its first load there takes about 30 s and keeps a ~0.8 GB cache next to the model; turning this off deletes it.",
+#else
+                        Text = "Gemma 4 answers several times faster on the Mac's GPU. The first load of a model there takes longer and keeps a cache next to the model; turning this off deletes it.",
+#endif
                         FontFamily = Theme.BodyFont,
                         FontSize = 12,
                         TextColor = Theme.SecondaryText
@@ -939,11 +950,9 @@ namespace Maui.Demo.Lite
                 {
                     try
                     {
-                        // 32-bit activations: with LiteRT-LM's default 16-bit ones, Gemma 4 E2B answered wrongly after a
-                        // long conversation on a Pixel Fold (Performance.md).
-                        await model.Init(backend: "gpu",
-                            configureSettings: settings => settings.ActivationDataType = Emgu.LiteRT.LM.ActivationDataType.Float32,
-                            cancellationToken: token);
+                        // Gemma4 uses 32-bit activations on the GPU: with LiteRT-LM's default 16-bit ones, Gemma 4 E2B
+                        // answered wrongly after a long conversation on a Pixel Fold and an M1 Mac (Performance.md).
+                        await model.Init(backend: "gpu", cancellationToken: token);
                     }
                     catch (Exception ex) when (lastStage == ModelLoadStage.LoadingEngine && !token.IsCancellationRequested)
                     {
@@ -988,7 +997,7 @@ namespace Maui.Demo.Lite
                 _needsPrime = true;
             if (_gpuUnavailable && WantsGpuSetting(option))
                 SetStatus("The GPU isn't available on this device - using the CPU.");
-            if (!onGpu && option.GpuOnAndroid && !_useGpuSwitch.IsToggled)
+            if (!onGpu && HasGpu(option) && !_useGpuSwitch.IsToggled)
                 _ = Task.Run(() => DeleteGpuCache(option));
             ClearLoading(option.Choice);
             HideLoadCard();
@@ -1004,8 +1013,16 @@ namespace Maui.Demo.Lite
 
         private bool WantsGpuSetting(ModelOption option)
         {
+            return HasGpu(option) && _useGpuSwitch.IsToggled;
+        }
+
+        // Whether the model can run on this platform's GPU.
+        private static bool HasGpu(ModelOption option)
+        {
 #if ANDROID
-            return option.GpuOnAndroid && _useGpuSwitch.IsToggled;
+            return option.GpuOnAndroid;
+#elif MACCATALYST
+            return option.GpuOnMac;
 #else
             return false;
 #endif
@@ -1016,10 +1033,10 @@ namespace Maui.Demo.Lite
             try { Preferences.Default.Set(UseGpuPreference, e.Value); } catch (Exception) { }
             // Reload the selected model on the other backend (the chat continues); turning it off deletes the GPU cache
             // once the model is loaded on the CPU.
-            if (_pageStarted && SelectedOption.GpuOnAndroid)
+            if (_pageStarted && HasGpu(SelectedOption))
                 _ = PrepareModelAsync(false);
             else if (!e.Value)
-                foreach (ModelOption option in Models.Where(m => m.GpuOnAndroid && !(_loaded == m.Choice && _loadedOnGpu)))
+                foreach (ModelOption option in Models.Where(m => HasGpu(m) && !(_loaded == m.Choice && _loadedOnGpu)))
                     _ = Task.Run(() => DeleteGpuCache(option));
         }
 
@@ -1049,6 +1066,7 @@ namespace Maui.Demo.Lite
                 case ModelChoice.Qwen35_0_8B_VL: return new Qwen35_0_8B_VL();
                 case ModelChoice.Qwen35_4B: return new Qwen35_4B();
                 case ModelChoice.Gemma4E4B: return new Gemma4E4B();
+                case ModelChoice.Gemma4_12B: return new Gemma4_12B();
                 default: return new Gemma4E2B();
             }
         }

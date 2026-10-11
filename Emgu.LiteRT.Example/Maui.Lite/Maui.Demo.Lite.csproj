@@ -91,6 +91,8 @@
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.Runtime\Maui\OpenCL\Android\Emgu.LiteRT.OpenCL.runtime.maui.android.csproj" />
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\iOS\Emgu.LiteRT.LM.runtime.maui.ios.csproj" />
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\Mac\Emgu.LiteRT.LM.runtime.maui.macos.csproj" />
+		<!-- Optional: LiteRT's GPU (Metal) accelerator, so the chat can run Gemma 4 on the Mac's GPU (Settings, "Use the GPU"). -->
+		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.Runtime\Maui\Metal\Mac\Emgu.LiteRT.Metal.runtime.maui.macos.csproj" />
 
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Emgu.CV.runtime.maui.mini" Version="4.12.0.5764" />

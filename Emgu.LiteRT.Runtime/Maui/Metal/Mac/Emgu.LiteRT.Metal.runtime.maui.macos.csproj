@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\lib))</TfLiteBinaryDir>
+    <EmguLiteRtMetalLibrary>$(TfLiteBinaryDir)\runtimes\osx\native\libLiteRtMetalAccelerator.dylib</EmguLiteRtMetalLibrary>
+    <BaseOutputPath>$(TfLiteBinaryDir)\Build\$(MSBuildProjectName)\$(Platform)\</BaseOutputPath>
+  </PropertyGroup>
+
+  <!-- LiteRT's GPU (Metal) accelerator plugin, libLiteRtMetalAccelerator.dylib: libLiteRt.dylib loads it at run time
+       when a model asks for the GPU (LiteRT-LM's "gpu" backend). An optional add-on. It is a LiteRT-LM prebuilt
+       (prebuilt/macos_arm64: Apple Silicon only, macOS 14+, only system frameworks), copied to
+       lib/runtimes/osx/native/ by platforms/macos/bazel_build_tflite_macos. Like the macOS dylibs of
+       Emgu.LiteRT.LM.runtime.maui.macos, a Mac Catalyst app loads it at run time from Contents/MonoBundle, next to the
+       libLiteRt.dylib that package provides - the only libLiteRt.dylib a Catalyst app has, so this package depends on
+       it rather than on Emgu.LiteRT.runtime.maui.macos (whose Catalyst tfliteextern is a static library). -->
+  <ItemGroup Condition="Exists('$(EmguLiteRtMetalLibrary)')">
+    <None Include="$(EmguLiteRtMetalLibrary)">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Pack>True</Pack>
+      <PackagePath>runtimes\maccatalyst-arm64\native</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\LM\Mac\Emgu.LiteRT.LM.runtime.maui.macos.csproj" />
+  </ItemGroup>
+
+  <Target Name="EmguLiteRtMetalMauiMacPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <Message Text="LiteRT Metal accelerator included: '$(EmguLiteRtMetalLibrary)'" Importance="high" Condition="Exists('$(EmguLiteRtMetalLibrary)')" />
+    <Warning Text="LiteRT's Metal accelerator is not available: $(EmguLiteRtMetalLibrary) is missing - run platforms/macos/bazel_build_tflite_macos darwin_arm64." Condition="!Exists('$(EmguLiteRtMetalLibrary)')" />
+  </Target>
+</Project>

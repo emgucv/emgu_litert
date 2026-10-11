@@ -16,10 +16,11 @@ namespace Emgu.LiteRT.LM.Models
     /// loaded when first used. They can think before answering (EnableThinking, off by default); unlike Qwen3, they
     /// report the thinking in a separate channel, which ChatReply.Thinking exposes the same way. Their chat template
     /// supports multi-turn conversations, so Chat keeps one LiteRT-LM Conversation open across messages.
-    /// On an Android GPU (Init(backend: "gpu"), with LiteRT's OpenCL accelerator from the optional Emgu.LiteRT.OpenCL.runtime.maui.android package),
-    /// set 32-bit activations (EngineSettings.ActivationDataType = ActivationDataType.Float32 in Init's
-    /// configureSettings): with LiteRT-LM's default 16-bit ones, Gemma 4 E2B answered wrongly after a long
-    /// conversation on a Pixel Fold.
+    /// On the GPU (Init(backend: "gpu"), with LiteRT's GPU accelerator available - on Android the OpenCL one from the
+    /// optional Emgu.LiteRT.OpenCL.runtime.maui.android package, on macOS libLiteRtMetalAccelerator.dylib), the
+    /// models use 32-bit activations: with LiteRT-LM's default 16-bit ones, Gemma 4 E2B answered wrongly after a long
+    /// conversation on both a Pixel Fold and an Apple M1 (e.g. "732" for 7342), while 32-bit ones were correct at
+    /// about 1.2-1.5x the time. An Init configureSettings callback can set EngineSettings.ActivationDataType back.
     /// </remarks>
     public abstract class Gemma4 : LanguageModel
     {
@@ -70,14 +71,18 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
-        /// Create the engine settings with the vision and audio backends.
+        /// Create the engine settings with the vision and audio backends, and 32-bit activations on the GPU.
         /// </summary>
         /// <param name="modelPath">The local path of the model file</param>
         /// <param name="backend">The backend of the main model</param>
         /// <returns>The engine settings</returns>
         protected override EngineSettings CreateEngineSettings(String modelPath, String backend)
         {
-            return new EngineSettings(modelPath, backend, VisionBackend, AudioBackend);
+            EngineSettings settings = new EngineSettings(modelPath, backend, VisionBackend, AudioBackend);
+            // 32-bit activations on the GPU (see the remarks of Gemma4).
+            if (String.Equals(backend, "gpu", StringComparison.OrdinalIgnoreCase))
+                settings.ActivationDataType = ActivationDataType.Float32;
+            return settings;
         }
 
         /// <summary>

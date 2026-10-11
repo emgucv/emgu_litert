@@ -61,9 +61,12 @@ affects normal back-and-forth.
 
 | | Window | Backend |
 |---|---|---|
-| Gemma 4 E2B / E4B on Mac Catalyst and Windows | 8,192 (`ModelOption.DesktopContextTokens`) | CPU |
-| Gemma 4 E2B on Android | 4,096 | GPU, fp32 (`ModelOption.GpuOnAndroid`, Settings → "Use the GPU"), CPU if unavailable |
+| Gemma 4 E2B / E4B / 12B on Mac Catalyst | 8,192 (`ModelOption.DesktopContextTokens`) | GPU (Metal), fp32 (`ModelOption.GpuOnMac`, Settings → "Use the GPU") |
+| Gemma 4 E2B / E4B on Windows | 8,192 | CPU |
+| Gemma 4 E2B on Android | 4,096 | GPU (OpenCL), fp32 (`ModelOption.GpuOnAndroid`, Settings → "Use the GPU"), CPU if unavailable |
 | Everything else | 4,096 | CPU |
+
+Gemma 4 12B is only offered on Mac Catalyst: it needs about 8 GB of memory and is practical only on a GPU.
 
 On a phone's CPU, even a 4k conversation takes about 2 minutes to read again (about 25 tokens per second). At 8k,
 opening a long saved chat or compacting would take about 6 minutes. On Android, Gemma 4 E2B therefore runs on the GPU
@@ -122,6 +125,39 @@ uses fp32. The cache is the same size either way.
   Turning it on again rebuilds the cache (31.5 s).
 - Only Gemma 4 E2B was tested on the GPU. Gemma 4 E4B, the Qwen models, and images and audio (whose encoders stay on
   the CPU) were not, nor were other phones.
+
+## GPU (Mac, Apple M1)
+
+On macOS, LiteRT's GPU accelerator is the Metal one, `libLiteRtMetalAccelerator.dylib` (a LiteRT-LM prebuilt: arm64,
+macOS 14+, only system frameworks). Our `libLiteRt.dylib` loads it by name from the same folder: in the test runner's
+output folder, and in a Mac Catalyst app's `Contents/MonoBundle`, where the optional
+`Emgu.LiteRT.Metal.runtime.maui.macos` package puts it. Apple M1, 16 GB, 4k window, measured with `dotnet test`:
+
+| Gemma 4 E2B | CPU | GPU, fp16 | GPU, fp32 |
+|---|---|---|---|
+| Re-reading a full 4k chat (~3,000 tokens) | 12 s | 2.7 s | 3.4 s |
+| Writing a long answer | - | ~42 tokens/s | ~37 tokens/s |
+| Short follow-up in the full chat | - | 0.2 s | 0.3 s |
+| "What is the code plus one?" after the full chat | - | **732 ✗** (twice) | 7342 ✓ (twice) |
+| Later loads (GPU cache in place) | - | 1.0 s | 1.0 s |
+
+| Gemma 4 12B, GPU | fp16 | fp32 |
+|---|---|---|
+| Re-reading a full 4k chat | 37.5 s | 37.6 s |
+| Writing a long answer | ~7 tokens/s | ~8.6 tokens/s |
+| Short follow-up in the full chat | 2.2 s | 2.2 s |
+| "What is the code plus one?" after the full chat | **7341 ✗** | 7342 ✓ |
+| First load (download, hash check, GPU cache) | - | 231 s |
+| Later loads | - | 3.3 s |
+| GPU cache next to the model | - | 6.0 GB |
+
+In the Mac Catalyst demo, with the model already downloaded, Gemma 4 12B's first load on the GPU (building the cache) took
+41.7 s. Asked to write a C# palindrome check with "Think" on, it answered in 138 s with a two-pointer solution, an
+explanation and examples; Gemma 4 E2B took 51 s and built a cleaned copy of the string with LINQ instead.
+
+The Mac's GPU shows the same fp16 problem as the Pixel Fold's, and on the M1 fp32 costs little or nothing. So the
+`Gemma4` classes themselves now use fp32 on the GPU (`Gemma4.CreateEngineSettings`), for every app, not just the demo.
+Google's own numbers for Gemma 4 12B on a GPU are 15 tokens/s (M4 MacBook Air 16 GB) and 29 tokens/s (M4 Pro).
 
 ## Token costs
 

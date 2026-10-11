@@ -80,10 +80,16 @@ BUILD_LITERT_LM=0
 if [ "$BAZEL_CPU" = "darwin_arm64" ]; then
     BUILD_LITERT_LM=1
     GEMMA_PREBUILT=prebuilt/macos_arm64/libGemmaModelConstraintProvider.dylib
-    if ! file "$GEMMA_PREBUILT" | grep -q Mach-O; then
-        echo "$WORKSPACE_DIR/$GEMMA_PREBUILT is not a Mach-O library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
-        exit 1
-    fi
+    # LiteRT's GPU (Metal) accelerator, which libLiteRt.dylib loads at run time for the GPU (packaged on its own, as the
+    # optional Emgu.LiteRT.Metal.runtime.maui.macos) - also a LiteRT-LM prebuilt, arm64 only, macOS 14+, only system
+    # frameworks. LiteRT-LM's Metal top-k sampler prebuilt isn't used, as on Android (the CPU samples instead).
+    METAL_PREBUILT=prebuilt/macos_arm64/libLiteRtMetalAccelerator.dylib
+    for PREBUILT in $GEMMA_PREBUILT $METAL_PREBUILT; do
+        if ! file "$PREBUILT" | grep -q Mach-O; then
+            echo "$WORKSPACE_DIR/$PREBUILT is not a Mach-O library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
+            exit 1
+        fi
+    done
 fi
 
 # Bazel's bazel-bin symlink follows the most recent build, so each build's outputs are copied right after it.
@@ -118,8 +124,9 @@ if [ "$BUILD_LITERT_LM" = "1" ]; then
     bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS $BAZEL_XCODE_OPTS --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic $BAZEL_OPTIONS //c:litert-lm || exit 1
     cd ..
     copy_dylib c/liblitert-lm.dylib lib/runtimes/osx/native/liblitert-lm-$BAZEL_CPU.dylib
-    rm -f lib/runtimes/osx/native/libGemmaModelConstraintProvider.dylib
+    rm -f lib/runtimes/osx/native/libGemmaModelConstraintProvider.dylib lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib
     cp -f $WORKSPACE_DIR/$GEMMA_PREBUILT lib/runtimes/osx/native/libGemmaModelConstraintProvider.dylib || exit 1
+    cp -f $WORKSPACE_DIR/$METAL_PREBUILT lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib || exit 1
     cd $WORKSPACE_DIR
 fi
 
