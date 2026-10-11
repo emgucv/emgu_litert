@@ -115,6 +115,12 @@ platforms\windows\build_emgu_litert.ps1 "" nuget
 dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-windows10.0.22621.0 -t:Run
 ```
 
+## The home page
+
+Like the Emgu CV demo, the home page has two tabs: **LiteRT-LM**, with the chat, and **TF Lite**, with the TensorFlow
+Lite (Interpreter API) demos - object detection, image recognition and the model checker. The tab used last opens
+again.
+
 ## Using the chat page
 
 - Choosing a model you haven't downloaded yet shows its download size (Qwen3 0.6B ~350 MB, Qwen3.5 0.8B ~1.3 GB,
