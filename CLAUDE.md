@@ -62,12 +62,16 @@ cd platforms/windows
 .\bazel_build_litert.ps1 64 xnn
 ```
 
+Verified with LiteRT-LM v0.18.0 (`litert_windows_exports.def` unchanged: 652 live exports vs 652 listed; `TestGetVersion` passes). The scripts aren't signed, so from a shell with a restrictive execution policy run them as `powershell -NoProfile -ExecutionPolicy Bypass -File .\bazel_build_litert.ps1 64 xnn`.
+
 ### Build the .NET solution (Windows)
 ```powershell
 cd platforms/windows
 .\build_emgu_litert.ps1
 ```
 Optional args: `doc` (build docs), `nuget` (build NuGet packages), `package` (build zip packages).
+
+Building `Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj` after pulling changes needs, in order: the native build above, `build_emgu_litert.ps1` (re-runs CMake, which generates the `Directory.Build.props` of any new project, e.g. `Emgu.LiteRT.LM.Extensions.AI` — otherwise NU1201 "does not support any target frameworks") and `build_emgu_litert.ps1 "" nuget` (the demo restores `Emgu.TF.Lite.runtime.windows` at the new version from `platforms/nuget/`; otherwise NU1102). If the demo build then fails with NETSDK1152 (duplicate `msvcp140.dll`/`vcruntime140.dll`/... publish outputs), remove those MSVC runtime DLLs from `lib/runtimes/win-x64/native/` — they duplicate the `Emgu.runtime.windows.msvc.rt.x64` package. Redeploying the packaged app with `Remove-AppxPackage` also deletes its `LocalApplicationData` (the downloaded LiteRT-LM models), so they are downloaded again.
 
 ### Build native TF Lite (macOS)
 ```bash
