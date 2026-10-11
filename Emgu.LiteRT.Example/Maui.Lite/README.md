@@ -137,7 +137,9 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
   where the model's memory starts - tap it to read the summary - and Settings shows how full it is, with "Compact now".
 - "Think" and "Web search" (Gemma 4) are per-message switches above the message box. "Think" is on by default and
   keeps the last setting: the model reasons before answering, which gives better answers but takes longer and uses
-  more of its context (so long chats are compacted sooner). Web search uses Wikipedia, and
+  more of its context (so long chats are compacted sooner). While the model thinks, the reply shows "Thinking..."
+  and the last few lines of it; once the answer starts, the thinking collapses to "Thought for N s" - tap it to read
+  it all. Web search uses Wikipedia, and
   the web with a Tavily API key (Settings); your searches leave the device.
 - The "+" button attaches images (from the photo library, the camera - "Take Photo", on devices with one - or the
   samples) or audio, and the microphone button records a voice message, for models that accept them; the first photo

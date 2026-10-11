@@ -1278,7 +1278,7 @@ namespace Maui.Demo.Lite
                     }
                 }
 
-                UpdateStreamingBubble(bubble, reply);
+                UpdateStreamingBubble(bubble, reply, true);
                 UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
                 await SaveExchangeAsync(userItem, reply);
                 SetStatus(null);
@@ -2439,7 +2439,7 @@ namespace Maui.Demo.Lite
                 {
                     StreamingBubble bubble = AddStreamingBubble();
                     UpdateStreamingBubble(bubble, new ChatReply(string.IsNullOrEmpty(message.Thinking)
-                        ? message.Text : "<think>" + message.Thinking + "</think>" + message.Text));
+                        ? message.Text : "<think>" + message.Thinking + "</think>" + message.Text), true);
                 }
             }
 
@@ -2520,46 +2520,138 @@ namespace Maui.Demo.Lite
         }
 
         // The views of a model bubble that is still streaming, so each chunk can update it in place
-        // instead of adding a new bubble per chunk.
+        // instead of adding a new bubble per chunk. The thinking takes little room: while the model thinks, a
+        // "Thinking..." header and the last few lines of it; once the answer starts, only a "Thought for N s" header,
+        // which expands the whole thinking when tapped.
         private sealed class StreamingBubble
         {
+            public Grid ThinkingHeader;
+            public ActivityIndicator ThinkingSpinner;
+            public Label ThinkingTitle;
+            public Image ThinkingChevron;
             public Label ThinkingLabel;
             public BoxView Separator;
             // The answer, with code blocks shown as code (ReplyBody).
             public ReplyBody Body;
             // The bubble in the transcript, so tool steps can be inserted above it.
             public View Row;
+            // The last thinking / answer shown, whether the whole thinking is shown, and how long the thinking took
+            // (from its first text to the answer's; null if unknown, e.g. for a reopened chat).
+            public ChatReply Reply;
+            public bool Expanded;
+            public bool Done;
+            public DateTime? ThinkingStarted;
+            public TimeSpan? ThinkingTime;
         }
+
+        // While thinking, this much of the end of the thinking is shown (about three lines).
+        private const int ThinkingPreviewLength = 180;
 
         private StreamingBubble AddStreamingBubble()
         {
-            var thinkingLabel = new Label { FontFamily = Theme.BodyFont, TextColor = ThinkingTextColor, FontSize = 13, IsVisible = false };
-            var separator = new BoxView { HeightRequest = 1, Color = Theme.Chevron, IsVisible = false };
-            var body = new ReplyBody(ModelTextColor);
+            var bubbleViews = new StreamingBubble
+            {
+                ThinkingSpinner = new ActivityIndicator { IsRunning = false, IsVisible = false, Color = Theme.SecondaryText, WidthRequest = 14, HeightRequest = 14, VerticalOptions = LayoutOptions.Center },
+                ThinkingTitle = new Label { FontFamily = Theme.TitleFont, FontSize = 13, TextColor = ThinkingTextColor, VerticalOptions = LayoutOptions.Center },
+                ThinkingChevron = Theme.MakeIcon(Theme.GlyphChevronRight, Theme.SecondaryText, 16),
+                ThinkingLabel = new Label { FontFamily = Theme.BodyFont, TextColor = ThinkingTextColor, FontSize = 13, IsVisible = false },
+                Separator = new BoxView { HeightRequest = 1, Color = Theme.Chevron, IsVisible = false },
+                Body = new ReplyBody(ModelTextColor)
+            };
+            var header = new Grid
+            {
+                ColumnSpacing = 6,
+                IsVisible = false,
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto) }
+            };
+            header.Add(bubbleViews.ThinkingSpinner, 0, 0);
+            header.Add(bubbleViews.ThinkingTitle, 1, 0);
+            header.Add(bubbleViews.ThinkingChevron, 2, 0);
+            header.OnTap(() =>
+            {
+                if (!bubbleViews.ThinkingChevron.IsVisible)
+                    return;
+                bubbleViews.Expanded = !bubbleViews.Expanded;
+                ShowThinking(bubbleViews);
+            });
+            bubbleViews.ThinkingHeader = header;
 
             Border bubble = ModelBubble(new VerticalStackLayout
             {
                 Spacing = 4,
-                Children = { thinkingLabel, separator, body }
+                Children = { header, bubbleViews.ThinkingLabel, bubbleViews.Separator, bubbleViews.Body }
             });
             AddBubbleRow(bubble, false);
-
-            return new StreamingBubble { ThinkingLabel = thinkingLabel, Separator = separator, Body = body, Row = bubble };
+            bubbleViews.Row = bubble;
+            return bubbleViews;
         }
 
-        // Called on the UI thread with the thinking/answer split of everything streamed so far (or, once,
-        // with the finished reply).
-        private void UpdateStreamingBubble(StreamingBubble bubble, ChatReply partial)
+        // Called on the UI thread with the thinking/answer split of everything streamed so far, or with the finished
+        // reply (done; also for the replies of a reopened chat).
+        private void UpdateStreamingBubble(StreamingBubble bubble, ChatReply partial, bool done = false)
         {
-            bool hasThinking = !string.IsNullOrEmpty(partial.Thinking);
-            bubble.ThinkingLabel.IsVisible = hasThinking;
-            bubble.Separator.IsVisible = hasThinking;
-            bubble.ThinkingLabel.Text = partial.Thinking;
+            if (!string.IsNullOrEmpty(partial.Thinking) && bubble.ThinkingStarted == null && !done)
+                bubble.ThinkingStarted = DateTime.UtcNow;
+            if (!string.IsNullOrEmpty(partial.Text) && bubble.ThinkingStarted != null && bubble.ThinkingTime == null)
+                bubble.ThinkingTime = DateTime.UtcNow - bubble.ThinkingStarted.Value;
+            bubble.Reply = partial;
+            bubble.Done = done;
+            ShowThinking(bubble);
             bubble.Body.SetText(partial.Text);
             // A reply with code may use the full width, so less of the code wraps.
             if (bubble.Body.HasCode && bubble.Row.MaximumWidthRequest < double.PositiveInfinity)
                 bubble.Row.MaximumWidthRequest = double.PositiveInfinity;
             ScrollToEnd();
+        }
+
+        private void ShowThinking(StreamingBubble bubble)
+        {
+            string thinking = bubble.Reply?.Thinking;
+            string answer = bubble.Reply?.Text;
+            bool hasThinking = !string.IsNullOrEmpty(thinking);
+            bool hasAnswer = !string.IsNullOrEmpty(answer);
+            bubble.ThinkingHeader.IsVisible = hasThinking;
+            if (!hasThinking)
+            {
+                bubble.ThinkingLabel.IsVisible = false;
+                bubble.Separator.IsVisible = false;
+                return;
+            }
+            // Still thinking: a spinner and the end of the thinking so far.
+            bool thinkingNow = !hasAnswer && !bubble.Done;
+            bubble.ThinkingSpinner.IsVisible = bubble.ThinkingSpinner.IsRunning = thinkingNow;
+            bubble.ThinkingChevron.IsVisible = !thinkingNow;
+            if (thinkingNow)
+            {
+                bubble.ThinkingTitle.Text = "Thinking...";
+                bubble.ThinkingLabel.IsVisible = true;
+                bubble.ThinkingLabel.Text = ThinkingPreview(thinking);
+                bubble.Separator.IsVisible = false;
+                return;
+            }
+            // A reply that ended without an answer (e.g. cut off while thinking) shows its thinking.
+            bool expanded = bubble.Expanded || !hasAnswer;
+            bubble.ThinkingTitle.Text = bubble.ThinkingTime != null
+                ? string.Format("Thought for {0:N0} s", Math.Max(1, bubble.ThinkingTime.Value.TotalSeconds))
+                : "Thoughts";
+            bubble.ThinkingChevron.Source = Theme.MakeGlyphSource(expanded ? Theme.GlyphExpandMore : Theme.GlyphChevronRight, Theme.SecondaryText, 16);
+            SemanticProperties.SetDescription(bubble.ThinkingHeader, bubble.ThinkingTitle.Text + (expanded ? ", shown. Tap to hide." : ", hidden. Tap to show."));
+            bubble.ThinkingLabel.IsVisible = expanded;
+            bubble.ThinkingLabel.Text = expanded ? thinking.Trim() : string.Empty;
+            bubble.Separator.IsVisible = expanded && hasAnswer;
+        }
+
+        // The end of the thinking so far, from a word boundary.
+        private static string ThinkingPreview(string thinking)
+        {
+            string text = thinking.Trim().Replace("\r", "");
+            if (text.Length <= ThinkingPreviewLength)
+                return text;
+            string tail = text.Substring(text.Length - ThinkingPreviewLength);
+            int space = tail.IndexOfAny(new[] { ' ', '\n' });
+            if (space > 0 && space < 40)
+                tail = tail.Substring(space + 1);
+            return "\u2026" + tail;
         }
 
         private void AddUserMessage(string text, IReadOnlyList<PendingAttachment> attachments)
