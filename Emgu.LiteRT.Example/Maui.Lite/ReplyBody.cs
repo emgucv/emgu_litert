@@ -15,9 +15,10 @@ namespace Maui.Demo.Lite
     /// <summary>
     /// The answer part of a chat reply: text with basic Markdown formatting (**bold**, *italic*, `inline code`,
     /// headings, bullet and numbered lists, quotes, links), and Markdown code blocks (```lang ... ```) shown as
-    /// monospace panels with the language and a Copy button. SetText can be called with the text streamed so far: views of
-    /// earlier parts are kept and only the last one is updated, and a code block that hasn't been closed yet is shown
-    /// as code already.
+    /// monospace panels with the language and a Copy button. LaTeX maths - $...$ and \(...\) in a line, $$...$$ and
+    /// \[...\] on lines of their own (centered) - is shown as Unicode text (MathText): x² + y² = r², not $x^2 + y^2 = r^2$.
+    /// SetText can be called with the text streamed so far: views of earlier parts are kept and only the last one is
+    /// updated, and a code block (or display maths) that hasn't been closed yet is shown as such already.
     /// </summary>
     internal sealed class ReplyBody : VerticalStackLayout
     {
@@ -34,19 +35,25 @@ namespace Maui.Demo.Lite
 #endif
 
         private static readonly Regex Fence = new Regex(@"^ {0,3}```\s*([^\s`]*)\s*$");
+        // Display maths on lines of its own: $$ ... $$ or \[ ... \] (possibly over several lines).
+        private static readonly Regex DisplayMathLine = new Regex(@"^\s*(\$\$|\\\[)(.*?)(\$\$|\\\])?\s*$");
 
         private readonly Color _textColor;
+        // The size of the text; headings, maths and code are sized relative to it.
+        private readonly double _fontSize;
         private readonly List<Segment> _shown = new List<Segment>();
 
-        public ReplyBody(Color textColor)
+        public ReplyBody(Color textColor, double fontSize = 15)
         {
             _textColor = textColor;
+            _fontSize = fontSize;
             Spacing = 8;
         }
 
         private sealed class Segment
         {
             public bool IsCode;
+            public bool IsMath;
             public string Language;
             public string Text;
             public View View;
@@ -59,7 +66,8 @@ namespace Maui.Demo.Lite
             for (int i = 0; i < segments.Count; i++)
             {
                 Segment segment = segments[i];
-                if (i < _shown.Count && _shown[i].IsCode == segment.IsCode && _shown[i].Language == segment.Language)
+                if (i < _shown.Count && _shown[i].IsCode == segment.IsCode && _shown[i].IsMath == segment.IsMath
+                    && _shown[i].Language == segment.Language)
                 {
                     // Same kind of part as before: only its text may have grown.
                     if (_shown[i].Text != segment.Text)
@@ -67,6 +75,8 @@ namespace Maui.Demo.Lite
                         _shown[i].Text = segment.Text;
                         if (segment.IsCode)
                             _shown[i].TextLabel.Text = segment.Text;
+                        else if (segment.IsMath)
+                            _shown[i].TextLabel.Text = MathText.ToUnicode(segment.Text);
                         else
                             _shown[i].TextLabel.FormattedText = FormatMarkdown(segment.Text);
                     }
@@ -104,9 +114,24 @@ namespace Maui.Demo.Lite
         private static readonly Regex Quote = new Regex(@"^ {0,3}>\s?(.*)$");
         private static readonly Regex Rule = new Regex(@"^ {0,3}([-*_])(\s*\1){2,}\s*$");
         // Inline: `code`, **bold** / __bold__, [text](url), *italic* / _italic_ (underscores only at word boundaries, so
-        // snake_case stays as it is). Unclosed markup (e.g. while streaming) is shown as it is.
+        // snake_case stays as it is), and maths: \(...\), $$...$$, \[...\] and $...$. A $ only starts maths when it is
+        // followed by a non-space and closed by a $ that follows a non-space and isn't followed by a digit, so prices
+        // ("$5 and $10") stay as they are. Unclosed markup (e.g. while streaming) is shown as it is.
         private static readonly Regex Inline = new Regex(
-            @"`([^`\n]+)`|\*\*(.+?)\*\*|(?<![\w])__(.+?)__(?![\w])|\[([^\]\n]+)\]\(([^)\s]+)\)|(?<![\w*])\*(?!\s)([^*\n]+?)\*(?![\w*])|(?<![\w])_(?!\s)([^_\n]+?)_(?![\w])");
+            @"`([^`\n]+)`|\*\*(.+?)\*\*|(?<![\w])__(.+?)__(?![\w])|\[([^\]\n]+)\]\(([^)\s]+)\)|(?<![\w*])\*(?!\s)([^*\n]+?)\*(?![\w*])|(?<![\w])_(?!\s)([^_\n]+?)_(?![\w])" +
+            @"|\\\((.+?)\\\)|\$\$([^\n]+?)\$\$|\\\[(.+?)\\\]|(?<![\\$\w])\$(?![\s$])([^$\n]+?)(?<![\s\\])\$(?![\d$])");
+
+        // Just the maths alternatives of Inline, for text inside bold, italic or a link ("**Identify $a$ and $b$**"), and
+        // for read-aloud.
+        private static readonly Regex InlineMath = new Regex(
+            @"\\\((.+?)\\\)|\$\$([^\n]+?)\$\$|\\\[(.+?)\\\]|(?<![\\$\w])\$(?![\s$])([^$\n]+?)(?<![\s\\])\$(?![\d$])");
+
+        internal static string WithMath(string text)
+        {
+            return InlineMath.Replace(text, m => MathText.ToUnicode(
+                m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Success ? m.Groups[2].Value
+                : m.Groups[3].Success ? m.Groups[3].Value : m.Groups[4].Value));
+        }
 
         private FormattedString FormatMarkdown(string text)
         {
@@ -120,7 +145,7 @@ namespace Maui.Demo.Lite
                 Match m;
                 if ((m = Heading.Match(line)).Success)
                 {
-                    double size = m.Groups[1].Length <= 2 ? 19 : 17;
+                    double size = _fontSize + (m.Groups[1].Length <= 2 ? 4 : 2);
                     AddInline(formatted, m.Groups[2].Value, FontAttributes.Bold, size, null);
                 }
                 else if (Rule.IsMatch(line))
@@ -170,22 +195,28 @@ namespace Maui.Demo.Lite
                     {
                         Text = m.Groups[1].Value,
                         FontFamily = MonospaceFont,
-                        FontSize = fontSize > 0 ? fontSize - 1 : 14,
+                        FontSize = fontSize > 0 ? fontSize - 1 : _fontSize - 1,
                         BackgroundColor = Color.FromArgb("#1A1F2430"),
                         TextColor = color ?? _textColor
                     });
                 }
                 else if (m.Groups[2].Success || m.Groups[3].Success)
                 {
-                    string bold = m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value;
+                    string bold = WithMath(m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value);
                     formatted.Spans.Add(TextSpan(bold, baseAttributes | FontAttributes.Bold, fontSize, color));
+                }
+                else if (m.Groups[8].Success || m.Groups[9].Success || m.Groups[10].Success || m.Groups[11].Success)
+                {
+                    string latex = m.Groups[8].Success ? m.Groups[8].Value : m.Groups[9].Success ? m.Groups[9].Value
+                        : m.Groups[10].Success ? m.Groups[10].Value : m.Groups[11].Value;
+                    formatted.Spans.Add(TextSpan(MathText.ToUnicode(latex), baseAttributes, fontSize, color));
                 }
                 else if (m.Groups[4].Success)
                 {
                     string url = m.Groups[5].Value;
                     Span link = new Span
                     {
-                        Text = m.Groups[4].Value,
+                        Text = WithMath(m.Groups[4].Value),
                         TextColor = Theme.Accent,
                         TextDecorations = TextDecorations.Underline,
                         FontAttributes = baseAttributes
@@ -209,7 +240,7 @@ namespace Maui.Demo.Lite
                 }
                 else
                 {
-                    string italic = m.Groups[6].Success ? m.Groups[6].Value : m.Groups[7].Value;
+                    string italic = WithMath(m.Groups[6].Success ? m.Groups[6].Value : m.Groups[7].Value);
                     formatted.Spans.Add(TextSpan(italic, baseAttributes | FontAttributes.Italic, fontSize, color));
                 }
                 position = m.Index + m.Length;
@@ -235,12 +266,19 @@ namespace Maui.Demo.Lite
             List<string> lines = new List<string>();
             bool inCode = false;
             string language = null;
+            // Display maths that hasn't been closed yet: the marker that closes it ("$$" or "\]").
+            string mathClose = null;
 
             void Flush()
             {
                 string content = string.Join("\n", lines);
                 if (inCode)
                     segments.Add(new Segment { IsCode = true, Language = language ?? "", Text = content.TrimEnd('\n') });
+                else if (mathClose != null)
+                {
+                    if (content.Trim().Length > 0)
+                        segments.Add(new Segment { IsMath = true, Language = "", Text = content.Trim() });
+                }
                 else if (content.Trim().Length > 0)
                     segments.Add(new Segment { IsCode = false, Text = content.Trim('\n', '\r', ' ') });
                 lines.Clear();
@@ -248,12 +286,54 @@ namespace Maui.Demo.Lite
 
             foreach (string rawLine in text.Replace("\r\n", "\n").Split('\n'))
             {
-                Match fence = Fence.Match(rawLine);
-                if (fence.Success)
+                if (mathClose == null)
+                {
+                    Match fence = Fence.Match(rawLine);
+                    if (fence.Success)
+                    {
+                        Flush();
+                        inCode = !inCode;
+                        language = inCode ? fence.Groups[1].Value : null;
+                        continue;
+                    }
+                }
+                if (inCode)
+                {
+                    lines.Add(rawLine);
+                    continue;
+                }
+                if (mathClose != null)
+                {
+                    // Inside display maths: up to its closing marker.
+                    int end = rawLine.IndexOf(mathClose, StringComparison.Ordinal);
+                    if (end < 0)
+                    {
+                        lines.Add(rawLine);
+                        continue;
+                    }
+                    lines.Add(rawLine.Substring(0, end));
+                    Flush();
+                    mathClose = null;
+                    string rest = rawLine.Substring(end + 2).Trim();
+                    if (rest.Length > 0)
+                        lines.Add(rest);
+                    continue;
+                }
+                Match math = DisplayMathLine.Match(rawLine);
+                string close = math.Success && math.Groups[1].Value == "$$" ? "$$" : "\\]";
+                // Display maths: the line starts with the marker and either ends with the closing one or has none (it
+                // continues on the next lines); "$$x$$ and more" is maths within a line instead.
+                if (math.Success && (math.Groups[3].Success || math.Groups[2].Value.IndexOf(close, StringComparison.Ordinal) < 0))
                 {
                     Flush();
-                    inCode = !inCode;
-                    language = inCode ? fence.Groups[1].Value : null;
+                    mathClose = close;
+                    lines.Add(math.Groups[2].Value);
+                    if (math.Groups[3].Success && math.Groups[3].Value == mathClose)
+                    {
+                        // Opened and closed on this line.
+                        Flush();
+                        mathClose = null;
+                    }
                     continue;
                 }
                 lines.Add(rawLine);
@@ -264,9 +344,23 @@ namespace Maui.Demo.Lite
 
         private void CreateView(Segment segment)
         {
+            if (segment.IsMath)
+            {
+                segment.TextLabel = new Label
+                {
+                    Text = MathText.ToUnicode(segment.Text),
+                    TextColor = _textColor,
+                    FontFamily = Theme.BodyFont,
+                    FontSize = _fontSize + 2,
+                    HorizontalTextAlignment = TextAlignment.Center,
+                    Margin = new Thickness(0, 2)
+                };
+                segment.View = segment.TextLabel;
+                return;
+            }
             if (!segment.IsCode)
             {
-                segment.TextLabel = new Label { FormattedText = FormatMarkdown(segment.Text), TextColor = _textColor, FontFamily = Theme.BodyFont, FontSize = 15 };
+                segment.TextLabel = new Label { FormattedText = FormatMarkdown(segment.Text), TextColor = _textColor, FontFamily = Theme.BodyFont, FontSize = _fontSize };
                 segment.View = segment.TextLabel;
                 return;
             }

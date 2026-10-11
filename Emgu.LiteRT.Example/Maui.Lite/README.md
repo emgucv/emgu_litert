@@ -122,8 +122,9 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
   loading as soon as they are selected, and the page reopens with the model used last. The first load after a
   download checks the file once (a few seconds for the larger models); you can type meanwhile, and a message sent
   while the model loads is sent when it's ready.
-- Replies are formatted (headings, bold, italic, lists, links), and code is shown in a code block with a Copy
-  button.
+- Replies are formatted (headings, bold, italic, lists, links), code is shown in a code block with a Copy button, and
+  maths written in LaTeX ($x^2$, $$\frac{a}{b}$$) is shown as text - x², a/b, √2, ≤ - with formulas on lines of their
+  own centered.
 - Chats are saved on the device after each reply; the history button (or the Chats list in the side panel on wide
   screens) reopens or deletes one.
 - The models can take in about 4,096 tokens of conversation (a few pages of text; a photo is ~270, voice ~25 per
@@ -142,7 +143,7 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
   keeps the last setting: the model reasons before answering, which gives better answers but takes longer and uses
   more of its context (so long chats are compacted sooner). While the model thinks, the reply shows "Thinking..."
   and the last few lines of it; once the answer starts, the thinking collapses to "Thought for N s" - tap it to read
-  it all. Web search uses Wikipedia, and
+  it all, formatted like the answer (code blocks, maths). Web search uses Wikipedia, and
   the web with a Tavily API key (Settings); your searches leave the device.
 - The "+" button attaches images (from the photo library, the camera - "Take Photo", on devices with one - or the
   samples) or audio, and the microphone button records a voice message, for models that accept them; the first photo

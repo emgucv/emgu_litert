@@ -2547,7 +2547,10 @@ namespace Maui.Demo.Lite
             public ActivityIndicator ThinkingSpinner;
             public Label ThinkingTitle;
             public Image ThinkingChevron;
+            // The last few lines while the model thinks (plain text, maths converted - a tail cut out of a code block
+            // or list can't be laid out), and the whole thinking, formatted like the answer, when expanded.
             public Label ThinkingLabel;
+            public ReplyBody ThinkingBody;
             public BoxView Separator;
             // The answer, with code blocks shown as code (ReplyBody).
             public ReplyBody Body;
@@ -2573,6 +2576,7 @@ namespace Maui.Demo.Lite
                 ThinkingTitle = new Label { FontFamily = Theme.TitleFont, FontSize = 13, TextColor = ThinkingTextColor, VerticalOptions = LayoutOptions.Center },
                 ThinkingChevron = Theme.MakeIcon(Theme.GlyphChevronRight, Theme.SecondaryText, 16),
                 ThinkingLabel = new Label { FontFamily = Theme.BodyFont, TextColor = ThinkingTextColor, FontSize = 13, IsVisible = false },
+                ThinkingBody = new ReplyBody(ThinkingTextColor, 13) { IsVisible = false },
                 Separator = new BoxView { HeightRequest = 1, Color = Theme.Chevron, IsVisible = false },
                 Body = new ReplyBody(ModelTextColor)
             };
@@ -2597,7 +2601,7 @@ namespace Maui.Demo.Lite
             Border bubble = ModelBubble(new VerticalStackLayout
             {
                 Spacing = 4,
-                Children = { header, bubbleViews.ThinkingLabel, bubbleViews.Separator, bubbleViews.Body }
+                Children = { header, bubbleViews.ThinkingLabel, bubbleViews.ThinkingBody, bubbleViews.Separator, bubbleViews.Body }
             });
             AddBubbleRow(bubble, false);
             bubbleViews.Row = bubble;
@@ -2632,6 +2636,7 @@ namespace Maui.Demo.Lite
             if (!hasThinking)
             {
                 bubble.ThinkingLabel.IsVisible = false;
+                bubble.ThinkingBody.IsVisible = false;
                 bubble.Separator.IsVisible = false;
                 return;
             }
@@ -2643,7 +2648,8 @@ namespace Maui.Demo.Lite
             {
                 bubble.ThinkingTitle.Text = "Thinking...";
                 bubble.ThinkingLabel.IsVisible = true;
-                bubble.ThinkingLabel.Text = ThinkingPreview(thinking);
+                bubble.ThinkingLabel.Text = ThinkingPreview(ReplyBody.WithMath(thinking));
+                bubble.ThinkingBody.IsVisible = false;
                 bubble.Separator.IsVisible = false;
                 return;
             }
@@ -2654,15 +2660,24 @@ namespace Maui.Demo.Lite
                 : "Thoughts";
             bubble.ThinkingChevron.Source = Theme.MakeGlyphSource(expanded ? Theme.GlyphExpandMore : Theme.GlyphChevronRight, Theme.SecondaryText, 16);
             SemanticProperties.SetDescription(bubble.ThinkingHeader, bubble.ThinkingTitle.Text + (expanded ? ", shown. Tap to hide." : ", hidden. Tap to show."));
-            bubble.ThinkingLabel.IsVisible = expanded;
-            bubble.ThinkingLabel.Text = expanded ? thinking.Trim() : string.Empty;
+            bubble.ThinkingLabel.IsVisible = false;
+            bubble.ThinkingBody.IsVisible = expanded;
+            if (expanded)
+                bubble.ThinkingBody.SetText(thinking.Trim());
+            // A reply with code in its thinking may use the full width too.
+            if (expanded && bubble.ThinkingBody.HasCode && bubble.Row.MaximumWidthRequest < double.PositiveInfinity)
+                bubble.Row.MaximumWidthRequest = double.PositiveInfinity;
             bubble.Separator.IsVisible = expanded && hasAnswer;
         }
 
-        // The end of the thinking so far, from a word boundary.
+        // The end of the thinking so far, from a word boundary, without the Markdown markers (code fences, **, `, #) a
+        // tail cut out of formatted text can't be laid out with.
         private static string ThinkingPreview(string thinking)
         {
-            string text = thinking.Trim().Replace("\r", "");
+            string text = System.Text.RegularExpressions.Regex.Replace(thinking.Replace("\r", ""), @"^\s*```.*$\n?", string.Empty,
+                System.Text.RegularExpressions.RegexOptions.Multiline);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\*\*|__|`|^#{1,6}\s+", string.Empty,
+                System.Text.RegularExpressions.RegexOptions.Multiline).Trim();
             if (text.Length <= ThinkingPreviewLength)
                 return text;
             string tail = text.Substring(text.Length - ThinkingPreviewLength);
