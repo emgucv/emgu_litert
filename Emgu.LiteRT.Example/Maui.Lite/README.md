@@ -135,7 +135,9 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
   the GPU takes about 30 s and keeps a ~0.8 GB cache next to the model. When a chat gets longer, Gemma 4 and Qwen3.5 4B summarize the earlier messages and continue from the summary
   (this takes a few seconds); the small models drop the earliest messages instead. A line in the conversation shows
   where the model's memory starts - tap it to read the summary - and Settings shows how full it is, with "Compact now".
-- "Think" and "Web search" (Gemma 4) are per-message switches above the message box. Web search uses Wikipedia, and
+- "Think" and "Web search" (Gemma 4) are per-message switches above the message box. "Think" is on by default and
+  keeps the last setting: the model reasons before answering, which gives better answers but takes longer and uses
+  more of its context (so long chats are compacted sooner). Web search uses Wikipedia, and
   the web with a Tavily API key (Settings); your searches leave the device.
 - The "+" button attaches images (from the photo library, the camera - "Take Photo", on devices with one - or the
   samples) or audio, and the microphone button records a voice message, for models that accept them; the first photo

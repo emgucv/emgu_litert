@@ -239,6 +239,7 @@ namespace Maui.Demo.Lite
         // Loading: models load in the background as soon as they are selected (when already downloaded), shown in a
         // card at the top of the conversation; a message sent meanwhile waits for it.
         private const string LastModelPreference = "litert_lm_chat_model";
+        private const string ThinkPreference = "litert_lm_chat_think";
         private Task<bool> _loadTask;
         private ModelChoice? _loadingChoice;
         private CancellationTokenSource _loadCancel;
@@ -354,6 +355,10 @@ namespace Maui.Demo.Lite
 
             // ---- Per-message toggles, shown above the message box for models that support them ----
             _thinkingSwitch = new ToggleChip("\u2728 Think");
+            // On by default (thinking first gives better answers, at the cost of time and context), then as last set.
+            bool think = true;
+            try { think = Preferences.Default.Get(ThinkPreference, true); } catch (Exception) { }
+            _thinkingSwitch.IsToggled = think;
             _thinkingSwitch.Toggled += OnThinkingToggled;
             _webSearchSwitch = new ToggleChip("\U0001F50E Web search");
             _webSearchSwitch.Toggled += OnWebSearchToggled;
@@ -975,7 +980,7 @@ namespace Maui.Demo.Lite
 
             _model = model;
             _chat = model.CreateChat();
-            _chat.EnableThinking = _thinkingSwitch.IsToggled;
+            _chat.EnableThinking = _thinkingSwitch.IsToggled && option.CanThink;
             _loaded = option.Choice;
             _loadedOnGpu = onGpu;
             // Reloaded on another backend in the middle of a chat: the new engine is given the conversation.
@@ -1169,8 +1174,9 @@ namespace Maui.Demo.Lite
 
         private void OnThinkingToggled(object sender, ToggledEventArgs e)
         {
+            try { Preferences.Default.Set(ThinkPreference, e.Value); } catch (Exception) { }
             if (_chat != null)
-                _chat.EnableThinking = e.Value;
+                _chat.EnableThinking = e.Value && SelectedOption.CanThink;
         }
 
         // ---------- Sending a message ----------
@@ -1308,7 +1314,7 @@ namespace Maui.Demo.Lite
             contents.Add(new TextContent(prompt));
             ChatOptions options = new ChatOptions
             {
-                Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled ? ReasoningEffort.Medium : ReasoningEffort.None },
+                Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
                 ToolMode = _webSearchSwitch.IsToggled ? ChatToolMode.Auto : ChatToolMode.None
             };
 
