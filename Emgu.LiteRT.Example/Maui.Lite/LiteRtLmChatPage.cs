@@ -1696,6 +1696,17 @@ namespace Maui.Demo.Lite
             int id = int.Parse(action.Substring(action.IndexOf(':') + 1));
             if (action.StartsWith("delete:"))
             {
+                // A deleted chat can't be restored, and the cross is next to the row that opens it: ask first.
+                string title = (await _store.GetConversationsAsync()).FirstOrDefault(c => c.Id == id)?.Title;
+                bool confirmed = await DisplayAlertAsync("Delete this chat?",
+                    string.Format("\"{0}\" and its photos and recordings will be removed from this device.", title),
+                    "Delete", "Cancel");
+                if (!confirmed)
+                {
+                    if (reopenSheet)
+                        OnHistoryTapped();
+                    return;
+                }
                 await _store.DeleteConversationAsync(id);
                 if (_conversationId == id)
                     StartNewChat();
