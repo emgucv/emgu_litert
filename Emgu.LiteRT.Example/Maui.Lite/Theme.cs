@@ -296,6 +296,55 @@ namespace Maui.Demo.Lite
         public void SetMessage(string message) => _label.Text = message;
     }
 
+    /// <summary>
+    /// A pill that switches an option on or off (e.g. "Think" above a chat's message box): filled with the accent
+    /// colour when on.
+    /// </summary>
+    internal sealed class ToggleChip : Border
+    {
+        private readonly Label _label;
+        private bool _isToggled;
+
+        public ToggleChip(string text)
+        {
+            _label = new Label { Text = text, FontFamily = Theme.TitleFont, FontSize = 13, VerticalOptions = LayoutOptions.Center };
+            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(15) };
+            StrokeThickness = 1;
+            Padding = new Thickness(12, 6);
+            HeightRequest = 32;
+            Content = _label;
+            this.OnTap(() =>
+            {
+                if (IsEnabled)
+                    IsToggled = !IsToggled;
+            });
+            Update();
+        }
+
+        public event EventHandler<ToggledEventArgs> Toggled;
+
+        public bool IsToggled
+        {
+            get => _isToggled;
+            set
+            {
+                if (_isToggled == value)
+                    return;
+                _isToggled = value;
+                Update();
+                Toggled?.Invoke(this, new ToggledEventArgs(value));
+            }
+        }
+
+        private void Update()
+        {
+            BackgroundColor = _isToggled ? Theme.Accent : Theme.CardBackground;
+            Stroke = _isToggled ? Theme.Accent : Theme.RowBorder;
+            _label.TextColor = _isToggled ? Colors.White : Theme.PrimaryText;
+            SemanticProperties.SetDescription(this, _label.Text + (_isToggled ? ": on" : ": off"));
+        }
+    }
+
     /// <summary>In-page bottom sheet with a dimmed scrim, listing tappable rows.</summary>
     internal sealed class BottomSheet : Grid
     {
@@ -333,10 +382,7 @@ namespace Maui.Demo.Lite
         /// <summary>Rows: (section heading or null, glyph, text, value). A row with a heading starts a new section.</summary>
         public Task<string> ShowAsync(string title, IReadOnlyList<(string Section, string Glyph, string Text, string Value)> rows)
         {
-            _list.Children.Clear();
-            _list.Children.Add(new BoxView { WidthRequest = 40, HeightRequest = 5, CornerRadius = 3, Color = Color.FromArgb("#D5D8E0"), HorizontalOptions = LayoutOptions.Center, Margin = new Thickness(0, 10, 0, 6) });
-            _list.Children.Add(new Label { Text = title, FontFamily = Theme.TitleFont, FontSize = 20, TextColor = Theme.PrimaryText, HorizontalOptions = LayoutOptions.Center, Margin = new Thickness(0, 0, 0, 6) });
-
+            BeginShow(title);
             for (int i = 0; i < rows.Count; i++)
             {
                 var r = rows[i];
@@ -355,7 +401,32 @@ namespace Maui.Demo.Lite
                 bool divider = i < rows.Count - 1 && rows[i + 1].Section == null;
                 _list.Children.Add(Row(r.Glyph, r.Text, r.Value, divider));
             }
+            return EndShow("Cancel");
+        }
 
+        /// <summary>
+        /// Show custom content (e.g. settings) under a title, with a closing button. The content can close the sheet
+        /// with a value by calling Dismiss.
+        /// </summary>
+        public Task<string> ShowViewAsync(string title, View content, string closeText = "Done")
+        {
+            BeginShow(title);
+            _list.Children.Add(content);
+            return EndShow(closeText);
+        }
+
+        /// <summary>Close the sheet; ShowAsync / ShowViewAsync complete with the value.</summary>
+        public void Dismiss(string value) => Close(value);
+
+        private void BeginShow(string title)
+        {
+            _list.Children.Clear();
+            _list.Children.Add(new BoxView { WidthRequest = 40, HeightRequest = 5, CornerRadius = 3, Color = Color.FromArgb("#D5D8E0"), HorizontalOptions = LayoutOptions.Center, Margin = new Thickness(0, 10, 0, 6) });
+            _list.Children.Add(new Label { Text = title, FontFamily = Theme.TitleFont, FontSize = 20, TextColor = Theme.PrimaryText, HorizontalOptions = LayoutOptions.Center, Margin = new Thickness(0, 0, 0, 6) });
+        }
+
+        private Task<string> EndShow(string closeText)
+        {
             var cancel = new Border
             {
                 BackgroundColor = Theme.ImageBackground,
@@ -363,7 +434,7 @@ namespace Maui.Demo.Lite
                 StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(14) },
                 HeightRequest = 52,
                 Margin = new Thickness(0, 14, 0, 0),
-                Content = new Label { Text = "Cancel", FontFamily = Theme.TitleFont, FontSize = 17, TextColor = Theme.Accent, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center }
+                Content = new Label { Text = closeText, FontFamily = Theme.TitleFont, FontSize = 17, TextColor = Theme.Accent, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center }
             };
             cancel.OnTap(() => Close(null));
             _list.Children.Add(cancel);

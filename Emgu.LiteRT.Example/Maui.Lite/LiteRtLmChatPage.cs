@@ -105,12 +105,25 @@ namespace Maui.Demo.Lite
         private static readonly Color ModelTextColor = Theme.PrimaryText;
         private static readonly Color ThinkingTextColor = Theme.SecondaryText;
 
-        private readonly Picker _modelPicker;
-        private readonly Label _modelDetailLabel;
-        private readonly Switch _thinkingSwitch;
-        private readonly Label _thinkingLabel;
-        private readonly Grid _thinkingRow;
-        private readonly Button _newChatButton;
+        // Layout: a one-line header, the conversation, and the message box with per-message toggle chips. The model
+        // list and the settings open in bottom sheets on narrow screens, and sit in a side panel on wide ones.
+        private const double WideLayoutWidth = 820;
+        private const double SidePanelWidth = 300;
+        private int _selectedModel;
+        private bool? _wide;
+        private readonly Grid _pageGrid;
+        private readonly Grid _mainColumn;
+        private readonly Border _sidePanel;
+        private readonly VerticalStackLayout _sideModelList;
+        private readonly VerticalStackLayout _sideSettingsHost;
+        private readonly VerticalStackLayout _settingsView;
+        private readonly Border _modelChip;
+        private readonly Label _modelChipLabel;
+        private readonly Label _titleLabel;
+        private readonly Border _settingsButton;
+        private readonly Border _newChatButton;
+        private readonly HorizontalStackLayout _toggleRow;
+        private readonly ToggleChip _thinkingSwitch;
         private readonly VerticalStackLayout _transcript;
         private readonly Label _emptyLabel;
         private readonly ScrollView _scroll;
@@ -138,8 +151,7 @@ namespace Maui.Demo.Lite
             "You are a helpful assistant running on the user's device. You can look things up with your tools: use them " +
             "for facts you are not sure about, recent events and anything that depends on today's date. Base your answer " +
             "on what the tools return, mention where it came from, and keep it short.";
-        private readonly Switch _webSearchSwitch;
-        private readonly VerticalStackLayout _webSearchSection;
+        private readonly ToggleChip _webSearchSwitch;
         private readonly Entry _tavilyKeyEntry;
         private string _tavilyKey = string.Empty;
         private IChatClient _chatClient;
@@ -159,37 +171,70 @@ namespace Maui.Demo.Lite
             Shell.SetNavBarIsVisible(this, false);
             BackgroundColor = Theme.PageBackground;
 
-            _modelPicker = new Picker { Title = "Model", FontFamily = Theme.TitleFont, TextColor = Theme.PrimaryText, TitleColor = Theme.SecondaryText };
-            foreach (ModelOption option in Models)
-                _modelPicker.Items.Add(option.Name);
-            _modelPicker.SelectedIndex = 0;
-            _modelPicker.SelectedIndexChanged += OnModelPickerChanged;
-
-            _modelDetailLabel = new Label
+            // ---- Header: back, the model (a chip that opens the model list), new chat, settings ----
+            _modelChipLabel = new Label
             {
-                Text = Models[0].Detail,
-                FontFamily = Theme.BodyFont,
-                FontSize = 13,
-                TextColor = Theme.SecondaryText
-            };
-
-            _thinkingLabel = new Label
-            {
-                Text = "Let it think before answering",
-                FontFamily = Theme.BodyFont,
-                FontSize = 15,
+                FontFamily = Theme.TitleFont,
+                FontSize = 16,
                 TextColor = Theme.PrimaryText,
+                LineBreakMode = LineBreakMode.TailTruncation,
                 VerticalOptions = LayoutOptions.Center
             };
-            _thinkingSwitch = new Switch { IsToggled = false, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
-            _thinkingSwitch.Toggled += OnThinkingToggled;
-            _thinkingRow = new Grid
+            _modelChip = new Border
             {
-                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+                BackgroundColor = Theme.CardBackground,
+                Stroke = Theme.RowBorder,
+                StrokeThickness = 1,
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(20) },
+                Padding = new Thickness(14, 0, 8, 0),
+                HeightRequest = 40,
+                HorizontalOptions = LayoutOptions.Start,
+                VerticalOptions = LayoutOptions.Center,
+                Content = new HorizontalStackLayout
+                {
+                    Spacing = 2,
+                    Children = { _modelChipLabel, Theme.MakeIcon(Theme.GlyphExpandMore, Theme.SecondaryText, 22) }
+                }
             };
-            _thinkingRow.Add(_thinkingLabel, 0, 0);
-            _thinkingRow.Add(_thinkingSwitch, 1, 0);
+            _modelChip.OnTap(OnModelChipTapped);
+            SemanticProperties.SetDescription(_modelChip, "Choose the model");
+            _titleLabel = new Label
+            {
+                Text = "LiteRT-LM Chat",
+                FontFamily = Theme.TitleFont,
+                FontSize = 20,
+                TextColor = Theme.PrimaryText,
+                VerticalOptions = LayoutOptions.Center,
+                IsVisible = false
+            };
+            _newChatButton = Theme.CircleButton(Theme.GlyphWand, () => OnNewChat(this, EventArgs.Empty));
+            SemanticProperties.SetDescription(_newChatButton, "New chat");
+            _settingsButton = Theme.CircleButton(Theme.GlyphSettings, OnSettingsTapped);
+            SemanticProperties.SetDescription(_settingsButton, "Settings");
+            var header = new Grid
+            {
+                ColumnSpacing = 8,
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Auto)
+                }
+            };
+            header.Add(Theme.CircleButton(Theme.GlyphChevronLeft, async () => await Navigation.PopAsync()), 0, 0);
+            header.Add(new Grid { Children = { _modelChip, _titleLabel } }, 1, 0);
+            header.Add(_newChatButton, 2, 0);
+            header.Add(_settingsButton, 3, 0);
 
+            // ---- Per-message toggles, shown above the message box for models that support them ----
+            _thinkingSwitch = new ToggleChip("\u2728 Think");
+            _thinkingSwitch.Toggled += OnThinkingToggled;
+            _webSearchSwitch = new ToggleChip("\U0001F50E Web search");
+            _webSearchSwitch.Toggled += OnWebSearchToggled;
+            _toggleRow = new HorizontalStackLayout { Spacing = 8, Children = { _thinkingSwitch, _webSearchSwitch } };
+
+            // ---- Settings that are set once (a bottom sheet, or the side panel on wide screens) ----
             _readAloudSwitch = new Switch { IsToggled = false, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
             _readAloudSwitch.Toggled += (s, e) =>
             {
@@ -209,39 +254,10 @@ namespace Maui.Demo.Lite
                 VerticalOptions = LayoutOptions.Center
             }, 0, 0);
             readAloudRow.Add(_readAloudSwitch, 1, 0);
-
-            _newChatButton = Theme.SecondaryButton("New Chat", Theme.GlyphWand);
-            _newChatButton.HeightRequest = 44;
-            _newChatButton.FontSize = 15;
-            _newChatButton.Clicked += OnNewChat;
-
-            _webSearchSwitch = new Switch { IsToggled = false, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
-            _webSearchSwitch.Toggled += OnWebSearchToggled;
-            var webSearchRow = new Grid
-            {
-                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
-            };
-            webSearchRow.Add(new VerticalStackLayout
-            {
-                VerticalOptions = LayoutOptions.Center,
-                Children =
-                {
-                    new Label { Text = "Allow web search", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText },
-                    new Label
-                    {
-                        Text = "Lets the model look things up on Wikipedia (and the web, with a Tavily key). Your searches leave the device.",
-                        FontFamily = Theme.BodyFont,
-                        FontSize = 12,
-                        TextColor = Theme.SecondaryText
-                    }
-                }
-            }, 0, 0);
-            webSearchRow.Add(_webSearchSwitch, 1, 0);
             _tavilyKeyEntry = new Entry
             {
-                Placeholder = "Tavily API key (optional - free at tavily.com)",
+                Placeholder = "Tavily API key (optional)",
                 IsPassword = true,
-                IsVisible = false,
                 FontFamily = Theme.BodyFont,
                 FontSize = 14,
                 TextColor = Theme.PrimaryText,
@@ -249,19 +265,25 @@ namespace Maui.Demo.Lite
             };
             _tavilyKeyEntry.Completed += (s, e) => OnTavilyKeyChanged();
             _tavilyKeyEntry.Unfocused += (s, e) => OnTavilyKeyChanged();
-            _webSearchSection = new VerticalStackLayout
-            {
-                Spacing = 6,
-                IsVisible = Models[0].CanUseTools,
-                Children = { webSearchRow, _tavilyKeyEntry }
-            };
             _ = LoadTavilyKeyAsync();
-
-            var optionsCard = Theme.Card(new VerticalStackLayout
+            _settingsView = new VerticalStackLayout
             {
                 Spacing = 6,
-                Children = { _modelPicker, _modelDetailLabel, Theme.Divider(), _thinkingRow, readAloudRow, _webSearchSection, _newChatButton }
-            }, 14);
+                Children =
+                {
+                    readAloudRow,
+                    Theme.Divider(),
+                    new Label { Text = "Web search", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
+                    new Label
+                    {
+                        Text = "With \U0001F50E Web search on, Gemma 4 can look things up on Wikipedia - and, with a Tavily API key (free at tavily.com), on the web. Your searches leave the device.",
+                        FontFamily = Theme.BodyFont,
+                        FontSize = 12,
+                        TextColor = Theme.SecondaryText
+                    },
+                    _tavilyKeyEntry
+                }
+            };
 
             _emptyLabel = new Label
             {
@@ -403,45 +425,189 @@ namespace Maui.Demo.Lite
             };
             var composer = new VerticalStackLayout { Spacing = 8, Children = { _attachmentScroll, composerRow } };
 
-            var root = new Grid
+            var composerCard = Theme.Card(new VerticalStackLayout { Spacing = 8, Children = { _toggleRow, composer } }, 10);
+
+            // ---- Main column ----
+            _mainColumn = new Grid
             {
-                RowSpacing = 12,
+                RowSpacing = 10,
                 Padding = new Thickness(16, 12, 16, 16),
                 MaximumWidthRequest = 760,
                 HorizontalOptions = LayoutOptions.Fill,
                 RowDefinitions =
                 {
                     new RowDefinition(GridLength.Auto),
-                    new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Star),
                     new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Auto)
                 }
             };
-            root.Add(Theme.PageHeader(this, Theme.GlyphText, "LiteRT-LM Chat", "On-device language model", true, false), 0, 0);
-            root.Add(optionsCard, 0, 1);
-            root.Add(_scroll, 0, 2);
-            root.Add(_statusLabel, 0, 3);
-            root.Add(Theme.Card(composer, 10), 0, 4);
+            _mainColumn.Add(header, 0, 0);
+            _mainColumn.Add(_scroll, 0, 1);
+            _mainColumn.Add(_statusLabel, 0, 2);
+            _mainColumn.Add(composerCard, 0, 3);
+
+            // ---- Side panel (wide screens): the model list and the settings ----
+            _sideModelList = new VerticalStackLayout { Spacing = 4 };
+            _sideSettingsHost = new VerticalStackLayout();
+            _sidePanel = new Border
+            {
+                BackgroundColor = Theme.CardBackground,
+                Stroke = Colors.Transparent,
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(0) },
+                IsVisible = false,
+                Content = new ScrollView
+                {
+                    Content = new VerticalStackLayout
+                    {
+                        Padding = new Thickness(16, 20),
+                        Spacing = 10,
+                        Children =
+                        {
+                            Theme.SectionTitle("Model"),
+                            _sideModelList,
+                            Theme.Divider(),
+                            Theme.SectionTitle("Settings"),
+                            _sideSettingsHost
+                        }
+                    }
+                }
+            };
+
+            _pageGrid = new Grid
+            {
+                ColumnDefinitions = { new ColumnDefinition(new GridLength(0)), new ColumnDefinition(GridLength.Star) }
+            };
+            _pageGrid.Add(_sidePanel, 0, 0);
+            _pageGrid.Add(_mainColumn, 1, 0);
 
             _sheet = new BottomSheet();
-            Content = new Grid { Children = { root, _sheet } };
+            Content = new Grid { Children = { _pageGrid, _sheet } };
+
+            SizeChanged += (s, e) => UpdateLayout();
+            SelectModel(0);
+        }
+
+        // ---------- Layout ----------
+
+        // Wide screens (desktop, the inner screen of a foldable, tablets) show the side panel; narrow ones the header
+        // chip and settings button, which open bottom sheets.
+        private void UpdateLayout()
+        {
+            if (Width <= 0)
+                return;
+            bool wide = Width >= WideLayoutWidth;
+            if (_wide == wide)
+                return;
+            _wide = wide;
+            _pageGrid.ColumnDefinitions[0].Width = wide ? new GridLength(SidePanelWidth) : new GridLength(0);
+            _sidePanel.IsVisible = wide;
+            _modelChip.IsVisible = !wide;
+            _titleLabel.IsVisible = wide;
+            _settingsButton.IsVisible = !wide;
+            if (wide)
+            {
+                MoveTo(_settingsView, _sideSettingsHost);
+                RefreshModelList();
+            }
+        }
+
+        private static void MoveTo(View view, Layout newParent)
+        {
+            if (view.Parent is Layout oldParent)
+                oldParent.Children.Remove(view);
+            newParent.Children.Add(view);
+        }
+
+        // The model list: name, description and a check mark on the current model. Tapping a row selects it.
+        private View BuildModelList(bool inSheet)
+        {
+            var list = new VerticalStackLayout { Spacing = 4 };
+            for (int i = 0; i < Models.Length; i++)
+            {
+                int index = i;
+                ModelOption option = Models[i];
+                bool selected = index == _selectedModel;
+                var row = new Grid
+                {
+                    Padding = new Thickness(10, 8),
+                    ColumnSpacing = 8,
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+                };
+                row.Add(new VerticalStackLayout
+                {
+                    Children =
+                    {
+                        new Label { Text = option.Name, FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText },
+                        new Label { Text = option.Detail, FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText }
+                    }
+                }, 0, 0);
+                if (selected)
+                    row.Add(Theme.MakeIcon(Theme.GlyphCheck, Theme.Accent, 22), 1, 0);
+                var cell = new Border
+                {
+                    BackgroundColor = selected ? Theme.TileBackground : Colors.Transparent,
+                    Stroke = Colors.Transparent,
+                    StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
+                    Content = row
+                };
+                cell.OnTap(() =>
+                {
+                    if (inSheet)
+                        _sheet.Dismiss(index.ToString());
+                    else if (CanChangeModel)
+                        SelectModel(index);
+                });
+                list.Children.Add(cell);
+            }
+            return list;
+        }
+
+        private void RefreshModelList()
+        {
+            if (_wide != true)
+                return;
+            _sideModelList.Children.Clear();
+            _sideModelList.Children.Add(BuildModelList(false));
+        }
+
+        private bool CanChangeModel => !_busy && !_recorder.IsRecording;
+
+        private async void OnModelChipTapped()
+        {
+            if (!CanChangeModel)
+                return;
+            string choice = await _sheet.ShowViewAsync("Model", BuildModelList(true), "Cancel");
+            if (int.TryParse(choice, out int index))
+                SelectModel(index);
+        }
+
+        private async void OnSettingsTapped()
+        {
+            // The settings view may still be in the side panel (or a previous sheet).
+            if (_settingsView.Parent is Layout parent)
+                parent.Children.Remove(_settingsView);
+            await _sheet.ShowViewAsync("Settings", _settingsView);
         }
 
         private ModelChoice SelectedChoice => SelectedOption.Choice;
 
         // ---------- Model selection ----------
 
-        private ModelOption SelectedOption => Models[Math.Max(_modelPicker.SelectedIndex, 0)];
+        private ModelOption SelectedOption => Models[_selectedModel];
 
-        private void OnModelPickerChanged(object sender, EventArgs e)
+        // Select a model (loaded on the next message) and show the controls it supports.
+        private void SelectModel(int index)
         {
-            _modelDetailLabel.Text = SelectedOption.Detail;
+            _selectedModel = index;
             ModelOption option = SelectedOption;
+            _modelChipLabel.Text = option.Name;
+            RefreshModelList();
             _attachButton.IsVisible = option.AcceptsImages || option.AcceptsAudio;
             _talkButton.IsVisible = option.AcceptsAudio;
-            _thinkingRow.IsVisible = option.CanThink;
-            _webSearchSection.IsVisible = option.CanUseTools;
+            _thinkingSwitch.IsVisible = option.CanThink;
+            _webSearchSwitch.IsVisible = option.CanUseTools;
+            _toggleRow.IsVisible = option.CanThink || option.CanUseTools;
             // Drop attachments the new model can't take.
             foreach (PendingAttachment attachment in _pending.ToList())
                 if (attachment.Image != null ? !option.AcceptsImages : !option.AcceptsAudio)
@@ -539,7 +705,9 @@ namespace Maui.Demo.Lite
 
         // ---------- Web search (agent) ----------
 
-        private bool UseAgent => _webSearchSwitch.IsToggled && SelectedOption.CanUseTools;
+        // Models that can call tools always chat through the agent; the Web search chip decides per message whether it
+        // may use them (ChatToolMode.Auto or None), so switching it keeps the conversation.
+        private bool UseAgent => SelectedOption.CanUseTools;
 
         // Send a message through the agent, streaming its reply into the bubble and showing each tool call as a step
         // line above it. Runs on the UI thread (the await foreach resumes on it).
@@ -553,7 +721,8 @@ namespace Maui.Demo.Lite
             contents.Add(new TextContent(prompt));
             ChatOptions options = new ChatOptions
             {
-                Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled ? ReasoningEffort.Medium : ReasoningEffort.None }
+                Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled ? ReasoningEffort.Medium : ReasoningEffort.None },
+                ToolMode = _webSearchSwitch.IsToggled ? ChatToolMode.Auto : ChatToolMode.None
             };
 
             StringBuilder thinking = new StringBuilder();
@@ -643,18 +812,15 @@ namespace Maui.Demo.Lite
             return line;
         }
 
-        // Switching web search on or off starts a new chat: the agent keeps its own conversation.
         private void OnWebSearchToggled(object sender, ToggledEventArgs e)
         {
-            _tavilyKeyEntry.IsVisible = e.Value;
-            if (_busy)
-                return;
-            bool hadMessages = !_transcript.Children.Contains(_emptyLabel);
-            _chat?.ClearHistory();
-            _session = null;
-            ClearTranscript();
-            if (hadMessages)
-                SetStatus(e.Value ? "Web search is on - started a new chat." : "Web search is off - started a new chat.");
+            // Applies from the next message; the conversation continues.
+            if (e.Value && !_busy)
+                SetStatus(string.IsNullOrEmpty(_tavilyKey)
+                    ? "Web search on: Wikipedia. Add a Tavily key in Settings to search the web."
+                    : "Web search on: Wikipedia and the web.");
+            else if (!_busy)
+                SetStatus(null);
         }
 
         private async Task LoadTavilyKeyAsync()
@@ -857,8 +1023,8 @@ namespace Maui.Demo.Lite
             SemanticProperties.SetDescription(_talkButton, recording ? "Stop and send the voice message" : "Talk: record a voice message");
             _sendButton.IsEnabled = !recording;
             _attachButton.IsEnabled = !recording;
-            _modelPicker.IsEnabled = !recording && !_busy;
-            _newChatButton.IsEnabled = !recording && !_busy;
+            _modelChip.Opacity = CanChangeModel ? 1 : 0.5;
+            _newChatButton.Opacity = CanChangeModel ? 1 : 0.5;
         }
 
         // Discard a recording in progress (leaving the page).
@@ -1249,8 +1415,8 @@ namespace Maui.Demo.Lite
             _busyIndicator.IsVisible = busy;
             _busyIndicator.IsRunning = busy;
             _promptEditor.IsEnabled = !busy;
-            _modelPicker.IsEnabled = !busy;
-            _newChatButton.IsEnabled = !busy;
+            _modelChip.Opacity = CanChangeModel ? 1 : 0.5;
+            _newChatButton.Opacity = CanChangeModel ? 1 : 0.5;
             _attachButton.Opacity = busy ? 0.4 : 1;
             _talkButton.Opacity = busy ? 0.4 : 1;
         }
