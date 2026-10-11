@@ -104,10 +104,13 @@ namespace Emgu.LiteRT.LM.Models
         /// <summary>
         /// The context window: how many tokens a conversation - system message, history, the new message and the reply -
         /// can hold, set on the engine by Init (so change it before Init); 0 leaves it to LiteRT-LM. The default, 4096,
-        /// is what LiteRT-LM picks for the models in this package anyway (Gemma 4 E2B's file allows up to ~32k, at the
-        /// cost of memory). A conversation that outgrows it stops getting replies, so chats that run long need to drop
-        /// or summarize earlier messages; CountTokens helps measure them. A configureSettings callback passed to Init
-        /// that sets EngineSettings.MaxNumTokens itself overrides this.
+        /// is what LiteRT-LM picks for the models in this package anyway. The Qwen files are fixed at 4096; Gemma 4 E2B
+        /// and E4B allow up to ~32k, at a cost in memory and in the time it takes to read a long conversation: on an
+        /// Apple Silicon Mac's CPU, a conversation filling 8k / 16k / 32k took E2B 27 s / 82 s / 262 s (E4B: 61 s at
+        /// 8k), and on a Pixel Fold a 4k one took 2 minutes and an 8k one almost 6. A conversation that outgrows the
+        /// window fails, so chats that run long need to drop or summarize earlier messages; CountTokens helps measure
+        /// them. A configureSettings callback passed to Init that sets EngineSettings.MaxNumTokens itself overrides
+        /// this.
         /// </summary>
         public int MaxNumTokens { get; set; } = 4096;
 

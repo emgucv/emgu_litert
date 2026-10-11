@@ -127,7 +127,8 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
 - Chats are saved on the device after each reply; the history button (or the Chats list in the side panel on wide
   screens) reopens or deletes one.
 - The models can take in about 4,096 tokens of conversation (a few pages of text; a photo is ~270, voice ~25 per
-  second). When a chat gets longer, Gemma 4 and Qwen3.5 4B summarize the earlier messages and continue from the summary
+  second) - Gemma 4 8,192 on Mac and Windows. Opening a long saved chat takes a while, since the model reads it again
+  (on a phone, up to about 2 minutes; measurements in [Performance.md](Performance.md)). When a chat gets longer, Gemma 4 and Qwen3.5 4B summarize the earlier messages and continue from the summary
   (this takes a few seconds); the small models drop the earliest messages instead. A line in the conversation shows
   where the model's memory starts - tap it to read the summary - and Settings shows how full it is, with "Compact now".
 - "Think" and "Web search" (Gemma 4) are per-message switches above the message box. Web search uses Wikipedia, and

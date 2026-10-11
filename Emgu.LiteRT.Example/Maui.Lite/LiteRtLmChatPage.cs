@@ -55,6 +55,11 @@ namespace Maui.Demo.Lite
             // Whether the model writes useful summaries: when a chat outgrows its context window, earlier messages
             // are summarized; otherwise (the small models) they are dropped.
             public bool CanSummarize;
+            // The context window on desktops (Mac Catalyst, Windows), or 0 for LanguageModel's default (4096) - used on
+            // phones too. Gemma 4's files allow up to ~32k, but the model re-reads the whole conversation when a saved
+            // chat is opened or after compacting, which grows with the window: a full 4k chat took 2 minutes on a Pixel
+            // Fold (8k: almost 6, with 1.5 GB of its RAM left), 8k 27 s (E2B) / 61 s (E4B) on an Apple Silicon Mac.
+            public int DesktopContextTokens;
             // The model file (to tell whether it is downloaded) and its download size, for the download prompt.
             public DownloadableFile File;
             public string Size;
@@ -102,8 +107,8 @@ namespace Maui.Demo.Lite
             new ModelOption { Name = "Qwen3 0.6B", File = Qwen3.ModelFile, Size = "350 MB", Detail = "~350 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
             new ModelOption { Name = "Qwen3.5 0.8B", File = Qwen35_0_8B_VL.ModelFile, Size = "1.3 GB", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
             new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B, CanSummarize = true },
-            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true },
-            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true },
+            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192 },
+            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192 },
         };
 
         private static readonly Color UserBubbleColor = Theme.Accent;
@@ -857,6 +862,10 @@ namespace Maui.Demo.Lite
                 return false;
 
             LanguageModel model = CreateModel(option.Choice);
+#if MACCATALYST || WINDOWS
+            if (option.DesktopContextTokens > 0)
+                model.MaxNumTokens = option.DesktopContextTokens;
+#endif
             model.LoadStageChanged += (s, stage) => MainThread.BeginInvokeOnMainThread(() =>
             {
                 if (!token.IsCancellationRequested)
@@ -1079,8 +1088,9 @@ namespace Maui.Demo.Lite
                     userItem.View = _transcript.Children[dividerIndex] as View;
                 foreach (PendingAttachment attachment in attachments)
                     userItem.Attachments.Add((attachment.Image != null ? "image" : "audio", attachment.MediaType, attachment.Data));
-                await PrepareContextAsync(userItem, dividerIndex);
-                SetStatus("Generating...");
+                // Re-reading the earlier conversation (an opened chat, or after compacting) is what takes the time.
+                bool rereading = await PrepareContextAsync(userItem, dividerIndex);
+                SetStatus(rereading ? "Reading the conversation so far..." : "Generating...");
 
                 // Stream the reply into its own bubble as it's generated, rather than waiting for the
                 // full answer. onChunk fires on a LiteRT-LM background thread with each incremental piece
@@ -1761,8 +1771,9 @@ namespace Maui.Demo.Lite
         }
 
         // Before a message is sent: compact the conversation if the message would make it too long for the model, and
-        // give the model the conversation again if it needs it.
-        private async Task PrepareContextAsync(HistoryItem next, int dividerIndex)
+        // give the model the conversation again if it needs it. Returns true if the model has to read earlier messages
+        // again.
+        private async Task<bool> PrepareContextAsync(HistoryItem next, int dividerIndex)
         {
             try
             {
@@ -1784,8 +1795,10 @@ namespace Maui.Demo.Lite
                 // Sent anyway; if it's too long, SendAsync drops more and retries.
                 UiStallWatchdog.Mark("Preparing the context failed: " + ex.Message);
             }
-            if (_needsPrime)
-                PrimeModel();
+            if (!_needsPrime)
+                return false;
+            PrimeModel();
+            return _summary != null || _contextStart < _historyItems.Count;
         }
 
         // LiteRT-LM's errors for a conversation longer than the context window: "Input token ids are too long..." for a
