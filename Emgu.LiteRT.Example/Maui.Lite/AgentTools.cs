@@ -17,9 +17,9 @@ using Microsoft.Extensions.AI;
 namespace Maui.Demo.Lite
 {
     /// <summary>
-    /// The tools the LiteRT-LM chat page's agent can call (Microsoft.Extensions.AI functions): the date and time, a
-    /// Wikipedia search (no key needed), and - with a Tavily API key - a web search and a web page reader. Results are
-    /// cut short, since an on-device model has a small context.
+    /// The tools the LiteRT-LM chat page's agent can call (Microsoft.Extensions.AI functions): the date and time, the
+    /// user's location (when they allow it), a Wikipedia search (no key needed), and - with a Tavily API key - a web
+    /// search and a web page reader. Results are cut short, since an on-device model has a small context.
     /// </summary>
     internal static class AgentTools
     {
@@ -38,17 +38,25 @@ namespace Maui.Demo.Lite
         }
 
         /// <summary>
-        /// The tools to give the agent; the web tools only with a Tavily API key.
+        /// The tools to give the agent for a message: the date and time always; the user's location when they allow it;
+        /// the search tools with web search on - the web ones only with a Tavily API key.
         /// </summary>
-        public static IList<AITool> Create(string tavilyApiKey)
+        public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location)
         {
             List<AITool> tools = new List<AITool>
             {
                 AIFunctionFactory.Create(GetCurrentDateTime, "get_current_date_time",
-                    "Returns the current local date and time."),
-                AIFunctionFactory.Create(SearchWikipediaAsync, "search_wikipedia",
-                    "Searches English Wikipedia and returns the introductions of the best matching articles. Use it for facts about people, places, events, science and history.")
+                    "Returns the current local date and time.")
             };
+            if (location)
+            {
+                tools.Add(AIFunctionFactory.Create(GetCurrentLocationAsync, "get_current_location",
+                    "Returns where the user is now: their town or city, region and country, and approximate coordinates. Use it for questions about things near the user, local weather, or their time zone."));
+            }
+            if (!webSearch)
+                return tools;
+            tools.Add(AIFunctionFactory.Create(SearchWikipediaAsync, "search_wikipedia",
+                "Searches English Wikipedia and returns the introductions of the best matching articles. Use it for facts about people, places, events, science and history."));
             if (!string.IsNullOrWhiteSpace(tavilyApiKey))
             {
                 string key = tavilyApiKey.Trim();
@@ -76,6 +84,7 @@ namespace Maui.Demo.Lite
             switch (call.Name)
             {
                 case "get_current_date_time": return "Checking the date and time";
+                case "get_current_location": return "Getting your location";
                 case "search_wikipedia": return "Searching Wikipedia for “" + Argument("query") + "”";
                 case "search_web": return "Searching the web for “" + Argument("query") + "”";
                 case "read_web_page": return "Reading " + Argument("url");
@@ -86,6 +95,73 @@ namespace Maui.Demo.Lite
         private static string GetCurrentDateTime()
         {
             return DateTimeOffset.Now.ToString("dddd, d MMMM yyyy, HH:mm (zzz)", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        // The user's location at about city level: the device's position (a recent known one, else a quick low-accuracy
+        // fix), turned into a place name by the platform's geocoder (online: Apple / Google). Coordinates are rounded to
+        // ~1 km. Permission is asked for the first time it is used; geolocation and permissions want the UI thread.
+        private static async Task<string> GetCurrentLocationAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                PermissionStatus status = await MainThread.InvokeOnMainThreadAsync(async () =>
+                {
+                    PermissionStatus current = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
+                    return current == PermissionStatus.Granted ? current : await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+                });
+                if (status != PermissionStatus.Granted)
+                    return "The user hasn't allowed this app to use their location.";
+
+                Location location = await MainThread.InvokeOnMainThreadAsync(() => Geolocation.Default.GetLastKnownLocationAsync());
+                if (location == null || DateTimeOffset.UtcNow - location.Timestamp > TimeSpan.FromMinutes(30))
+                {
+                    GeolocationRequest request = new GeolocationRequest(GeolocationAccuracy.Low, TimeSpan.FromSeconds(15));
+                    location = await MainThread.InvokeOnMainThreadAsync(() => Geolocation.Default.GetLocationAsync(request, cancellationToken))
+                        ?? location;
+                }
+                if (location == null)
+                    return "The device couldn't determine its location.";
+
+                string coordinates = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "latitude {0:F2}, longitude {1:F2}", location.Latitude, location.Longitude);
+                string place = null;
+                try
+                {
+                    Placemark placemark = null;
+                    foreach (Placemark p in await Geocoding.Default.GetPlacemarksAsync(location.Latitude, location.Longitude))
+                    {
+                        placemark = p;
+                        break;
+                    }
+                    if (placemark != null)
+                    {
+                        List<string> parts = new List<string>();
+                        foreach (string part in new[] { placemark.SubLocality, placemark.Locality, placemark.AdminArea, placemark.CountryName })
+                            if (!string.IsNullOrWhiteSpace(part) && !parts.Contains(part))
+                                parts.Add(part);
+                        place = string.Join(", ", parts);
+                    }
+                }
+                catch (Exception)
+                {
+                    // No geocoder (e.g. Windows without a map service key) or no network: the coordinates only.
+                }
+                return string.IsNullOrEmpty(place)
+                    ? "The user is at " + coordinates + "."
+                    : "The user is in " + place + " (" + coordinates + ").";
+            }
+            catch (FeatureNotEnabledException)
+            {
+                return "Location services are turned off on this device.";
+            }
+            catch (FeatureNotSupportedException)
+            {
+                return "This device can't determine its location.";
+            }
+            catch (PermissionException)
+            {
+                return "The user hasn't allowed this app to use their location.";
+            }
         }
 
         private static async Task<string> SearchWikipediaAsync(

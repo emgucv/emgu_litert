@@ -171,14 +171,18 @@ namespace Maui.Demo.Lite
         private const string TavilyKeyStorageName = "tavily_api_key";
         private const string AgentInstructions =
             "You are a helpful assistant running on the user's device. You can look things up with your tools: use them " +
-            "for facts you are not sure about, recent events and anything that depends on today's date. Base your answer " +
-            "on what the tools return, mention where it came from, and keep it short.";
+            "for facts you are not sure about, recent events and anything that depends on today's date or, when you have the " +
+            "location tool, on where the user is. Base your answer on what the tools return, mention where it came from, " +
+            "and keep it short.";
         private readonly ToggleChip _webSearchSwitch;
         private readonly Entry _tavilyKeyEntry;
+        // Whether the agent gets the location tool (Settings, off by default): the user's town and approximate
+        // coordinates, which leave the device in web searches that use them.
+        private const string ShareLocationPreference = "litert_lm_chat_share_location";
+        private readonly Switch _shareLocationSwitch;
         private string _tavilyKey = string.Empty;
         private IChatClient _chatClient;
         private ChatClientAgent _agent;
-        private string _agentToolsKey;
         private AgentSession _session;
 
         private LanguageModel _model;
@@ -417,6 +421,26 @@ namespace Maui.Demo.Lite
                 TextColor = Theme.PrimaryText,
                 PlaceholderColor = Theme.SecondaryText
             };
+            bool shareLocation = false;
+            try { shareLocation = Preferences.Default.Get(ShareLocationPreference, false); } catch (Exception) { }
+            _shareLocationSwitch = new Switch { IsToggled = shareLocation, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+            _shareLocationSwitch.Toggled += (s, e) =>
+            {
+                try { Preferences.Default.Set(ShareLocationPreference, e.Value); } catch (Exception) { }
+            };
+            var locationRow = new Grid
+            {
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+            };
+            locationRow.Add(new Label
+            {
+                Text = "Share my location",
+                FontFamily = Theme.BodyFont,
+                FontSize = 15,
+                TextColor = Theme.PrimaryText,
+                VerticalOptions = LayoutOptions.Center
+            }, 0, 0);
+            locationRow.Add(_shareLocationSwitch, 1, 0);
             _tavilyKeyEntry.Completed += (s, e) => OnTavilyKeyChanged();
             _tavilyKeyEntry.Unfocused += (s, e) => OnTavilyKeyChanged();
             _ = LoadTavilyKeyAsync();
@@ -465,6 +489,15 @@ namespace Maui.Demo.Lite
                         TextColor = Theme.SecondaryText
                     },
                     _tavilyKeyEntry,
+                    Theme.Divider(),
+                    locationRow,
+                    new Label
+                    {
+                        Text = "Lets Gemma 4 look up your town and approximate position, for questions such as \"what's the weather here?\". Your device asks for permission the first time. The place name comes from Apple's or Google's map service, and web searches that use it leave the device.",
+                        FontFamily = Theme.BodyFont,
+                        FontSize = 12,
+                        TextColor = Theme.SecondaryText
+                    },
                     Theme.Divider(),
                     new Label { Text = "Conversation memory", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     _memoryLabel,
@@ -1316,8 +1349,8 @@ namespace Maui.Demo.Lite
 
         // ---------- Web search (agent) ----------
 
-        // Models that can call tools always chat through the agent; the Web search chip decides per message whether it
-        // may use them (ChatToolMode.Auto or None), so switching it keeps the conversation.
+        // Models that can call tools always chat through the agent, with the tools chosen per message (the date and time,
+        // the location if shared, the search tools with the Web search chip on), so changing them keeps the conversation.
         private bool UseAgent => SelectedOption.CanUseTools;
 
         // Send a message through the agent, streaming its reply into the bubble and showing each tool call as a step
@@ -1330,10 +1363,13 @@ namespace Maui.Demo.Lite
             foreach (PendingAttachment attachment in attachments)
                 contents.Add(new DataContent(attachment.Data, attachment.MediaType));
             contents.Add(new TextContent(prompt));
+            // The tools for this message: the date and time always, the location if the user shares it, and the search
+            // tools with the Web search chip on.
             ChatOptions options = new ChatOptions
             {
                 Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
-                ToolMode = _webSearchSwitch.IsToggled ? ChatToolMode.Auto : ChatToolMode.None
+                Tools = AgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled),
+                ToolMode = ChatToolMode.Auto
             };
 
             StringBuilder thinking = new StringBuilder();
@@ -1396,10 +1432,11 @@ namespace Maui.Demo.Lite
         {
             if (_chatClient == null)
                 _chatClient = _model.AsIChatClient();
-            if (_agent == null || _agentToolsKey != _tavilyKey)
+            // The tools are passed with each message (RunAgentAsync), so the settings and the Web search chip can change
+            // them during a conversation.
+            if (_agent == null)
             {
-                _agent = new ChatClientAgent(_chatClient, AgentInstructions, "Assistant", null, AgentTools.Create(_tavilyKey));
-                _agentToolsKey = _tavilyKey;
+                _agent = new ChatClientAgent(_chatClient, AgentInstructions, "Assistant", null, null);
                 _session = null;
             }
             if (_session == null)
@@ -1475,12 +1512,9 @@ namespace Maui.Demo.Lite
             {
                 // Kept for this session only.
             }
-            // New tools mean a new agent session; it is given the conversation so far.
-            if (_session != null && !_busy)
-            {
-                _needsPrime = true;
+            // The tools are chosen per message, so the conversation simply continues.
+            if (!_busy)
                 SetStatus(key.Length > 0 ? "Web search with Tavily is on." : "Tavily key removed.");
-            }
         }
 
         // Wait for the selected model before sending: loads it if needed. If it still needs downloading, the card asks
