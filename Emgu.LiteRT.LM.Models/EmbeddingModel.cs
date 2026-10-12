@@ -62,8 +62,7 @@ namespace Emgu.LiteRT.LM.Models
 
         /// <summary>
         /// The backend of the vision encoder of models that embed images, e.g. "cpu" or "gpu"; null to not load it
-        /// (images are then not supported). "cpu" by default, also when the main backend is the GPU: compiling
-        /// EmbeddingGemma 2's vision encoder for an Android GPU (OpenCL) crashed the process. Set before Init.
+        /// (images are then not supported). "cpu" by default; "gpu" is refused for now (see Init). Set before Init.
         /// </summary>
         public String VisionBackend { get; set; } = "cpu";
 
@@ -109,16 +108,27 @@ namespace Emgu.LiteRT.LM.Models
         /// Download the model file if it isn't already, and load it - on background threads.
         /// </summary>
         /// <param name="modelFile">The model file, or null for DefaultModelFile</param>
-        /// <param name="backend">The backend, e.g. "cpu" or "gpu"</param>
+        /// <param name="backend">The backend: "cpu". "gpu" is refused for now (see the remarks)</param>
         /// <param name="configureSettings">Called to adjust the settings before the engine is created, or null</param>
         /// <param name="cancellationToken">Cancels checking or downloading the file</param>
         /// <returns>A task that completes when the model is loaded</returns>
+        /// <remarks>
+        /// The GPU crashes the process with EmbeddingGemma 2 (Metal on macOS, OpenCL on Android): its weights are
+        /// external buffers, which the GPU accelerator plugins bind through LiteRT's WeightLoader interface, and the
+        /// prebuilt plugins were built after LiteRT changed that interface's return type from absl::Status to
+        /// LiteRtStatus (LiteRT commit dd3db3123, 2026-10-08), while libLiteRt is built from the LiteRT that
+        /// LiteRT-LM v0.18.0 pins, before that change. Init refuses a "gpu" backend until both match.
+        /// </remarks>
         public async Task Init(
             DownloadableFile modelFile = null,
             String backend = "cpu",
             Action<EmbeddingEngineSettings> configureSettings = null,
             CancellationToken cancellationToken = default(CancellationToken))
         {
+            if (IsGpu(backend) || (SupportsImages && IsGpu(VisionBackend)) || (SupportsAudio && IsGpu(AudioBackend)))
+                throw new NotSupportedException(
+                    "Embedding models can't run on the GPU with this LiteRT build: the prebuilt GPU accelerator crashes "
+                    + "binding their external weights (a LiteRT WeightLoader ABI mismatch). Use the \"cpu\" backend.");
             if (modelFile == null)
                 modelFile = DefaultModelFile;
             bool valid = await Task.Run(() => modelFile.IsLocalFileValid, cancellationToken).ConfigureAwait(false);
@@ -161,6 +171,11 @@ namespace Emgu.LiteRT.LM.Models
                 backend,
                 SupportsImages ? VisionBackend : null,
                 SupportsAudio ? AudioBackend : null);
+        }
+
+        private static bool IsGpu(String backend)
+        {
+            return String.Equals(backend, "gpu", StringComparison.OrdinalIgnoreCase);
         }
 
         private EmbeddingEngine CheckEngine()
