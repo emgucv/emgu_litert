@@ -37,6 +37,11 @@ namespace Emgu.LiteRT.LM
         private int _maxInputLength;
         private int _minInputLength;
         private ActivationDataType _activationDataType;
+        private int _audioNumThreads;
+        private int _visionTokensPerImage;
+        private String _litertDispatchLibDir;
+        private String _visionLitertDispatchLibDir;
+        private String _audioLitertDispatchLibDir;
 
         /// <summary>
         /// Create the settings for an embedding model file.
@@ -89,6 +94,52 @@ namespace Emgu.LiteRT.LM
         {
             get { return _numThreads; }
             set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_num_threads(_ptr, value); _numThreads = value; }
+        }
+
+        /// <summary>
+        /// The number of CPU threads of the audio encoder
+        /// </summary>
+        public int AudioNumThreads
+        {
+            get { return _audioNumThreads; }
+            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_audio_num_threads(_ptr, value); _audioNumThreads = value; }
+        }
+
+        /// <summary>
+        /// The number of vision tokens per image (EmbeddingGemma 2: 70 or 140; more tokens see more detail but take
+        /// longer); 0 for the model's default. EmbeddingOptions.VisionTokensPerImage can override it per call.
+        /// </summary>
+        public int VisionTokensPerImage
+        {
+            get { return _visionTokensPerImage; }
+            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_vision_tokens_per_image(_ptr, value); _visionTokensPerImage = value; }
+        }
+
+        /// <summary>
+        /// The folder of the LiteRT dispatch library, for the main NPU backend
+        /// </summary>
+        public String LitertDispatchLibDir
+        {
+            get { return _litertDispatchLibDir; }
+            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)); _litertDispatchLibDir = value; }
+        }
+
+        /// <summary>
+        /// The folder of the LiteRT dispatch library, for the vision NPU backend
+        /// </summary>
+        public String VisionLitertDispatchLibDir
+        {
+            get { return _visionLitertDispatchLibDir; }
+            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_vision_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)); _visionLitertDispatchLibDir = value; }
+        }
+
+        /// <summary>
+        /// The folder of the LiteRT dispatch library, for the audio NPU backend
+        /// </summary>
+        public String AudioLitertDispatchLibDir
+        {
+            get { return _audioLitertDispatchLibDir; }
+            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_audio_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)); _audioLitertDispatchLibDir = value; }
         }
 
         /// <summary>
@@ -192,6 +243,16 @@ namespace Emgu.LiteRT.LM
         }
 
         /// <summary>
+        /// The number of vision tokens per image for this call (EmbeddingGemma 2: 70 or 140); 0 for the engine's
+        /// setting
+        /// </summary>
+        public int VisionTokensPerImage
+        {
+            get { return LiteRtLmInvoke.litert_lm_embedding_options_get_vision_tokens_per_image(_ptr); }
+            set { LiteRtLmInvoke.litert_lm_embedding_options_set_vision_tokens_per_image(_ptr, value); }
+        }
+
+        /// <summary>
         /// Release the unmanaged options
         /// </summary>
         protected override void DisposeObject()
@@ -278,28 +339,55 @@ namespace Emgu.LiteRT.LM
         {
             if (texts == null || texts.Length == 0)
                 return new float[0][];
-            InputData[] inputs = new InputData[texts.Length];
-            // One input per request: an array of one LiteRtLmInputData* each, and the array of those arrays.
-            IntPtr[] requests = new IntPtr[texts.Length];
-            IntPtr batch = IntPtr.Zero;
+            InputData[][] requests = new InputData[texts.Length][];
             try
             {
                 for (int i = 0; i < texts.Length; i++)
-                {
-                    inputs[i] = new InputData(texts[i] ?? String.Empty);
-                    requests[i] = Marshal.AllocHGlobal(IntPtr.Size);
-                    Marshal.WriteIntPtr(requests[i], inputs[i].Ptr);
-                }
-                batch = Marshal.AllocHGlobal(IntPtr.Size * requests.Length);
+                    requests[i] = new[] { new InputData(texts[i] ?? String.Empty) };
+                return ComputeEmbeddings(requests, options);
+            }
+            finally
+            {
+                foreach (InputData[] request in requests)
+                    if (request != null)
+                        request[0].Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Compute the embeddings of several requests in one batch, each made of one or more inputs (text, image,
+        /// audio).
+        /// </summary>
+        /// <param name="requests">The requests, each an array of inputs</param>
+        /// <param name="options">The options, or null for the defaults</param>
+        /// <returns>The embeddings, in the order of the requests</returns>
+        public float[][] ComputeEmbeddings(InputData[][] requests, EmbeddingOptions options = null)
+        {
+            if (requests == null || requests.Length == 0)
+                return new float[0][];
+            // The C API takes an array of per-request arrays of LiteRtLmInputData*, and the number of inputs of each.
+            IntPtr[] requestPointers = new IntPtr[requests.Length];
+            IntPtr batch = IntPtr.Zero;
+            try
+            {
+                UIntPtr[] counts = new UIntPtr[requests.Length];
                 for (int i = 0; i < requests.Length; i++)
-                    Marshal.WriteIntPtr(batch, i * IntPtr.Size, requests[i]);
-                UIntPtr[] counts = new UIntPtr[texts.Length];
-                for (int i = 0; i < counts.Length; i++)
-                    counts[i] = new UIntPtr(1);
+                {
+                    InputData[] request = requests[i];
+                    if (request == null || request.Length == 0)
+                        throw new ArgumentException(String.Format("Request {0} has no input", i), "requests");
+                    requestPointers[i] = Marshal.AllocHGlobal(IntPtr.Size * request.Length);
+                    for (int j = 0; j < request.Length; j++)
+                        Marshal.WriteIntPtr(requestPointers[i], j * IntPtr.Size, request[j].Ptr);
+                    counts[i] = new UIntPtr((uint)request.Length);
+                }
+                batch = Marshal.AllocHGlobal(IntPtr.Size * requestPointers.Length);
+                for (int i = 0; i < requestPointers.Length; i++)
+                    Marshal.WriteIntPtr(batch, i * IntPtr.Size, requestPointers[i]);
 
                 IntPtr responses = LiteRtLmInvoke.CheckPtr(
                     LiteRtLmInvoke.litert_lm_embedding_engine_compute_embedding_batch(
-                        _ptr, batch, counts, new UIntPtr((uint)texts.Length), options == null ? IntPtr.Zero : options.Ptr),
+                        _ptr, batch, counts, new UIntPtr((uint)requests.Length), options == null ? IntPtr.Zero : options.Ptr),
                     "litert_lm_embedding_engine_compute_embedding_batch");
                 try
                 {
@@ -318,12 +406,10 @@ namespace Emgu.LiteRT.LM
             {
                 if (batch != IntPtr.Zero)
                     Marshal.FreeHGlobal(batch);
-                foreach (IntPtr request in requests)
+                foreach (IntPtr request in requestPointers)
                     if (request != IntPtr.Zero)
                         Marshal.FreeHGlobal(request);
-                foreach (InputData input in inputs)
-                    if (input != null)
-                        input.Dispose();
+                GC.KeepAlive(requests);
                 GC.KeepAlive(options);
             }
         }
@@ -395,6 +481,21 @@ namespace Emgu.LiteRT.LM
         internal static extern void litert_lm_embedding_engine_settings_set_activation_data_type(IntPtr settings, ActivationDataType activationDataType);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        internal static extern void litert_lm_embedding_engine_settings_set_audio_num_threads(IntPtr settings, int numThreads);
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        internal static extern void litert_lm_embedding_engine_settings_set_vision_tokens_per_image(IntPtr settings, int visionTokensPerImage);
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        internal static extern void litert_lm_embedding_engine_settings_set_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        internal static extern void litert_lm_embedding_engine_settings_set_vision_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        internal static extern void litert_lm_embedding_engine_settings_set_audio_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern IntPtr litert_lm_embedding_options_create();
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
@@ -425,6 +526,12 @@ namespace Emgu.LiteRT.LM
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern int litert_lm_embedding_options_get_output_size(IntPtr options);
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        internal static extern void litert_lm_embedding_options_set_vision_tokens_per_image(IntPtr options, int visionTokensPerImage);
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        internal static extern int litert_lm_embedding_options_get_vision_tokens_per_image(IntPtr options);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_embedding_response_delete(IntPtr response);

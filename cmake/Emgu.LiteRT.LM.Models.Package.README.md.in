@@ -28,6 +28,18 @@ using (EmbeddingGemma2 embedder = new EmbeddingGemma2())
 }
 ```
 
+`EmbeddingGemma2TextVision` (388 MB) also embeds images, and `EmbeddingGemma2Multimodal` (485 MB) images and audio, in the same space as text - so a text query finds matching photos:
+
+```csharp
+using (EmbeddingGemma2TextVision embedder = new EmbeddingGemma2TextVision())
+{
+    await embedder.Init();
+    float[][] photos = embedder.EmbedImages(new[] { File.ReadAllBytes("beach.jpg"), File.ReadAllBytes("forest.jpg") });
+    float[] query = embedder.EmbedQuery("people surfing");
+    float score = EmbeddingModel.CosineSimilarity(query, photos[0]);   // the higher of the two
+}
+```
+
 To use the models with Microsoft.Extensions.AI (`IChatClient`, tool calling) or Microsoft Agent Framework, add the ${EMGU_LITERT_LM_EXTENSIONS_AI_NUGET_ID} package.
 
 For online documentation please visit

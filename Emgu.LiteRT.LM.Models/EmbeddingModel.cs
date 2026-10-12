@@ -3,6 +3,7 @@
 //----------------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -60,6 +61,35 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
+        /// The backend of the vision encoder of models that embed images, e.g. "cpu" or "gpu"; null to not load it
+        /// (images are then not supported). "cpu" by default, also when the main backend is the GPU: compiling
+        /// EmbeddingGemma 2's vision encoder for an Android GPU (OpenCL) crashed the process. Set before Init.
+        /// </summary>
+        public String VisionBackend { get; set; } = "cpu";
+
+        /// <summary>
+        /// The backend of the audio encoder of models that embed audio, e.g. "cpu"; null to not load it (audio is
+        /// then not supported). Set before Init.
+        /// </summary>
+        public String AudioBackend { get; set; } = "cpu";
+
+        /// <summary>
+        /// True if the model can embed images (EmbedImage)
+        /// </summary>
+        public virtual bool SupportsImages
+        {
+            get { return false; }
+        }
+
+        /// <summary>
+        /// True if the model can embed audio (EmbedAudio)
+        /// </summary>
+        public virtual bool SupportsAudio
+        {
+            get { return false; }
+        }
+
+        /// <summary>
         /// The embedding engine, or null before Init
         /// </summary>
         public EmbeddingEngine Engine
@@ -104,7 +134,7 @@ namespace Emgu.LiteRT.LM.Models
             String modelPath = modelFile.LocalFile;
             EmbeddingEngine engine = await Task.Run(() =>
             {
-                using (EmbeddingEngineSettings settings = new EmbeddingEngineSettings(modelPath, backend))
+                using (EmbeddingEngineSettings settings = CreateEngineSettings(modelPath, backend))
                 {
                     settings.CacheDir = Path.GetDirectoryName(modelPath);
                     if (configureSettings != null)
@@ -115,6 +145,22 @@ namespace Emgu.LiteRT.LM.Models
             if (_engine != null)
                 _engine.Dispose();
             _engine = engine;
+        }
+
+        /// <summary>
+        /// Create the engine settings for Init, with VisionBackend and AudioBackend for the models that embed images or
+        /// audio.
+        /// </summary>
+        /// <param name="modelPath">The path of the model file</param>
+        /// <param name="backend">The main backend</param>
+        /// <returns>The settings</returns>
+        protected virtual EmbeddingEngineSettings CreateEngineSettings(String modelPath, String backend)
+        {
+            return new EmbeddingEngineSettings(
+                modelPath,
+                backend,
+                SupportsImages ? VisionBackend : null,
+                SupportsAudio ? AudioBackend : null);
         }
 
         private EmbeddingEngine CheckEngine()
@@ -155,6 +201,105 @@ namespace Emgu.LiteRT.LM.Models
         {
             using (EmbeddingOptions options = CreateOptions(outputSize))
                 return CheckEngine().ComputeEmbeddings(texts, options);
+        }
+
+        /// <summary>
+        /// The normalized embedding of one request made of several inputs - e.g. an image and a caption - as they are.
+        /// </summary>
+        /// <param name="inputs">The inputs: text, image or audio</param>
+        /// <param name="outputSize">The number of values, for models that allow shorter embeddings; 0 for all</param>
+        /// <returns>The embedding</returns>
+        public float[] Embed(InputData[] inputs, int outputSize = 0)
+        {
+            using (EmbeddingOptions options = CreateOptions(outputSize))
+                return CheckEngine().ComputeEmbedding(inputs, options);
+        }
+
+        /// <summary>
+        /// The normalized embedding of an image, optionally with a text describing it (e.g. a title or caption).
+        /// Images and texts share one embedding space, so the result can be compared with EmbedQuery's to find the
+        /// images a text describes.
+        /// </summary>
+        /// <param name="encodedImage">The image file's content: JPEG, PNG, BMP, ...</param>
+        /// <param name="text">A text that goes with the image, or null</param>
+        /// <param name="outputSize">The number of values, for models that allow shorter embeddings; 0 for all</param>
+        /// <returns>The embedding</returns>
+        public float[] EmbedImage(byte[] encodedImage, String text = null, int outputSize = 0)
+        {
+            if (!SupportsImages)
+                throw new NotSupportedException(String.Format("{0} can't embed images", GetType().Name));
+            return EmbedWithMedia(InputDataType.Image, encodedImage, text, outputSize);
+        }
+
+        /// <summary>
+        /// The normalized embedding of an image file, optionally with a text describing it.
+        /// </summary>
+        /// <param name="imageFile">The image file: JPEG, PNG, BMP, ...</param>
+        /// <param name="text">A text that goes with the image, or null</param>
+        /// <param name="outputSize">The number of values, for models that allow shorter embeddings; 0 for all</param>
+        /// <returns>The embedding</returns>
+        public float[] EmbedImageFile(String imageFile, String text = null, int outputSize = 0)
+        {
+            return EmbedImage(File.ReadAllBytes(imageFile), text, outputSize);
+        }
+
+        /// <summary>
+        /// The normalized embeddings of several images, in one batch.
+        /// </summary>
+        /// <param name="encodedImages">The image files' contents: JPEG, PNG, BMP, ...</param>
+        /// <param name="outputSize">The number of values, for models that allow shorter embeddings; 0 for all</param>
+        /// <returns>The embeddings, in the order of the images</returns>
+        public float[][] EmbedImages(IList<byte[]> encodedImages, int outputSize = 0)
+        {
+            if (!SupportsImages)
+                throw new NotSupportedException(String.Format("{0} can't embed images", GetType().Name));
+            InputData[][] requests = new InputData[encodedImages.Count][];
+            try
+            {
+                for (int i = 0; i < requests.Length; i++)
+                    requests[i] = new[] { InputData.FromImage(encodedImages[i]) };
+                using (EmbeddingOptions options = CreateOptions(outputSize))
+                    return CheckEngine().ComputeEmbeddings(requests, options);
+            }
+            finally
+            {
+                foreach (InputData[] request in requests)
+                    if (request != null)
+                        request[0].Dispose();
+            }
+        }
+
+        /// <summary>
+        /// The normalized embedding of a sound, optionally with a text that goes with it.
+        /// </summary>
+        /// <param name="encodedAudio">The audio file's content: WAV, MP3, FLAC</param>
+        /// <param name="text">A text that goes with the audio, or null</param>
+        /// <param name="outputSize">The number of values, for models that allow shorter embeddings; 0 for all</param>
+        /// <returns>The embedding</returns>
+        public float[] EmbedAudio(byte[] encodedAudio, String text = null, int outputSize = 0)
+        {
+            if (!SupportsAudio)
+                throw new NotSupportedException(String.Format("{0} can't embed audio", GetType().Name));
+            return EmbedWithMedia(InputDataType.Audio, encodedAudio, text, outputSize);
+        }
+
+        /// <summary>
+        /// The normalized embedding of an audio file, optionally with a text that goes with it.
+        /// </summary>
+        /// <param name="audioFile">The audio file: WAV, MP3, FLAC</param>
+        /// <param name="text">A text that goes with the audio, or null</param>
+        /// <param name="outputSize">The number of values, for models that allow shorter embeddings; 0 for all</param>
+        /// <returns>The embedding</returns>
+        public float[] EmbedAudioFile(String audioFile, String text = null, int outputSize = 0)
+        {
+            return EmbedAudio(File.ReadAllBytes(audioFile), text, outputSize);
+        }
+
+        private float[] EmbedWithMedia(InputDataType type, byte[] data, String text, int outputSize)
+        {
+            using (InputData media = new InputData(type, data))
+            using (InputData caption = String.IsNullOrEmpty(text) ? null : new InputData(text))
+                return Embed(caption == null ? new[] { media } : new[] { media, caption }, outputSize);
         }
 
         /// <summary>
@@ -239,6 +384,91 @@ namespace Emgu.LiteRT.LM.Models
         public override String DocumentPrefix
         {
             get { return "title: none | text: "; }
+        }
+    }
+
+    /// <summary>
+    /// EmbeddingGemma 2 Text Vision 440M (Apache 2.0): EmbeddingGemma 2 Text 270M plus a vision encoder, mapping texts
+    /// and images into one 768-value embedding space (or 512, 256, 128) - so a text query can find images (EmbedImage)
+    /// and an image can find similar images or texts. From
+    /// https://huggingface.co/litert-community/embeddinggemma-2-text-vision-440m-litert-lm
+    /// </summary>
+    public class EmbeddingGemma2TextVision : EmbeddingGemma2
+    {
+        /// <summary>
+        /// The model file for CPU and GPU (about 388 MB). The vision encoder is only loaded when an image is embedded.
+        /// </summary>
+        public new static DownloadableFile ModelFile
+        {
+            get
+            {
+                return new DownloadableFile(
+                    "https://huggingface.co/litert-community/embeddinggemma-2-text-vision-440m-litert-lm/resolve/main/embeddinggemma-2-text-vision-440m.litertlm",
+                    LanguageModel.DefaultLocalSubfolder,
+                    "92dcbea108899e5d6e30d919b0744f90d9967e80c67a4ab5503ac16d54f62eb0");
+            }
+        }
+
+        /// <summary>
+        /// The model file downloaded when Init is called without one: ModelFile
+        /// </summary>
+        public override DownloadableFile DefaultModelFile
+        {
+            get { return ModelFile; }
+        }
+
+        /// <summary>
+        /// True unless VisionBackend is null
+        /// </summary>
+        public override bool SupportsImages
+        {
+            get { return VisionBackend != null; }
+        }
+    }
+
+    /// <summary>
+    /// EmbeddingGemma 2 740M (Apache 2.0): the full multimodal EmbeddingGemma 2 - text, images and audio in one
+    /// 768-value embedding space (or 512, 256, 128). From
+    /// https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm
+    /// </summary>
+    public class EmbeddingGemma2Multimodal : EmbeddingGemma2
+    {
+        /// <summary>
+        /// The model file for CPU and GPU (about 485 MB). The vision and audio encoders are only loaded when first used.
+        /// </summary>
+        public new static DownloadableFile ModelFile
+        {
+            get
+            {
+                return new DownloadableFile(
+                    "https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm/resolve/main/embeddinggemma-2-740m.litertlm",
+                    LanguageModel.DefaultLocalSubfolder,
+                    "e7a8a2204b91e0f96e92960e84a09a89212e1633dcb7575a9bf3378b4df77f4c");
+            }
+        }
+
+        /// <summary>
+        /// The model file downloaded when Init is called without one: ModelFile
+        /// </summary>
+        public override DownloadableFile DefaultModelFile
+        {
+            get { return ModelFile; }
+        }
+
+        /// <summary>
+        /// True unless VisionBackend is null
+        /// </summary>
+        public override bool SupportsImages
+        {
+            get { return VisionBackend != null; }
+        }
+
+        /// <summary>
+        /// True unless AudioBackend is null
+        /// </summary>
+        public override bool SupportsAudio
+        {
+            get { return AudioBackend != null; }
         }
     }
 }

@@ -423,6 +423,111 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // Text-to-image search with EmbeddingGemma 2 Text Vision 440M: images and texts share one embedding space.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestEmbeddingGemma2TextVision()
+        {
+            RequireLiteRtLm();
+            using (EmbeddingGemma2TextVision model = new EmbeddingGemma2TextVision())
+            {
+                await CheckImageSearch(model);
+            }
+        }
+
+        // EmbeddingGemma 2 740M: images as above, and audio found by the text of what is said.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestEmbeddingGemma2Multimodal()
+        {
+            RequireLiteRtLm();
+            using (EmbeddingGemma2Multimodal model = new EmbeddingGemma2Multimodal())
+            {
+                await CheckImageSearch(model);
+
+                String[] texts =
+                {
+                    "Have a wonderful day!",
+                    "The Eiffel Tower is 330 metres tall.",
+                    "Shipping takes three to five business days.",
+                    "Photosynthesis turns sunlight into sugar."
+                };
+                System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+                float[] audio = model.EmbedAudioFile("have_a_wonderful_day.wav");
+                Console.WriteLine("Audio embedded in {0:F0} ms (first use loads the audio encoder)", sw.Elapsed.TotalMilliseconds);
+                float[][] textVectors = model.EmbedDocuments(texts);
+                float[] scores = textVectors.Select(t => EmbeddingModel.CosineSimilarity(audio, t)).ToArray();
+                for (int i = 0; i < texts.Length; i++)
+                    Console.WriteLine("Audio vs \"{0}\": {1:F3}", texts[i], scores[i]);
+                if (Array.IndexOf(scores, scores.Max()) != 0)
+                    throw new Exception("The spoken words didn't match their text");
+            }
+        }
+
+        private static async Task CheckImageSearch(EmbeddingModel model)
+        {
+            System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+            await model.Init();
+            Console.WriteLine("{0} loaded in {1:F1}s", model.GetType().Name, sw.Elapsed.TotalSeconds);
+
+            String[] imageFiles = { "apple.jpg", "grace_hopper.jpg", "tulips.jpg", "surfers.jpg" };
+            String[] queries =
+            {
+                "a piece of fruit",
+                "a portrait of a woman in a military uniform",
+                "a field of flowers",
+                "people with surfboards at the sea"
+            };
+            sw.Restart();
+            float[] first = model.EmbedImageFile(imageFiles[0]);
+            Console.WriteLine("First image embedded in {0:F0} ms (loads the vision encoder)", sw.Elapsed.TotalMilliseconds);
+            sw.Restart();
+            float[][] images = model.EmbedImages(imageFiles.Select(f => System.IO.File.ReadAllBytes(f)).ToList());
+            Console.WriteLine("{0} images embedded in {1:F0} ms", images.Length, sw.Elapsed.TotalMilliseconds);
+            if (images[0].Length != 768 || Math.Abs(Math.Sqrt(images[0].Sum(v => (double)v * v)) - 1) > 1e-3)
+                throw new Exception("Unexpected image embedding size or norm");
+            float batchVsSingle = EmbeddingModel.CosineSimilarity(first, images[0]);
+            Console.WriteLine("Batch vs single: {0:F5}", batchVsSingle);
+            if (batchVsSingle < 0.999f)
+                throw new Exception("The batch embedding differs from the single one");
+
+            int correct = 0;
+            for (int q = 0; q < queries.Length; q++)
+            {
+                float[] query = model.EmbedQuery(queries[q]);
+                float[] scores = images.Select(i => EmbeddingModel.CosineSimilarity(query, i)).ToArray();
+                int best = Array.IndexOf(scores, scores.Max());
+                Console.WriteLine("\"{0}\": {1} ({2})", queries[q], imageFiles[best],
+                    String.Join(", ", scores.Select(s => s.ToString("F3"))));
+                if (best == q) correct++;
+            }
+            Console.WriteLine("Correct: {0}/{1}", correct, queries.Length);
+            if (correct != queries.Length)
+                throw new Exception("Text-to-image search picked the wrong image");
+
+            // An image with a caption, at a shorter size.
+            float[] captioned = model.EmbedImageFile("apple.jpg", "A red apple on a white background.", 256);
+            if (captioned.Length != 256)
+                throw new Exception("Unexpected size of the captioned image embedding");
+
+            // Text-only embedding still works on the multimodal model.
+            float[] text = model.EmbedQuery("How tall is the Eiffel Tower?");
+            if (text.Length != 768)
+                throw new Exception("Unexpected text embedding size");
+        }
+
         // A chat continued from a saved history (Chat.LoadHistory), as after restarting an app.
 #if !TEST_MODELS
 #if VS_TEST
