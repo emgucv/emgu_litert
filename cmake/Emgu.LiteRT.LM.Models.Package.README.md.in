@@ -16,6 +16,18 @@ using (Qwen3 model = new Qwen3())
 }
 ```
 
+It also has an embedding model, `EmbeddingGemma2` (EmbeddingGemma 2 Text 270M, 165 MB), which turns text into vectors for semantic search: texts with similar meaning get a high cosine similarity.
+
+```csharp
+using (EmbeddingGemma2 embedder = new EmbeddingGemma2())
+{
+    await embedder.Init();
+    float[][] documents = embedder.EmbedDocuments(new[] { "Shipping takes three to five days.", "The store opens at 9 am." });
+    float[] query = embedder.EmbedQuery("How long does delivery take?");
+    float score = EmbeddingModel.CosineSimilarity(query, documents[0]);   // the highest of the two
+}
+```
+
 To use the models with Microsoft.Extensions.AI (`IChatClient`, tool calling) or Microsoft Agent Framework, add the ${EMGU_LITERT_LM_EXTENSIONS_AI_NUGET_ID} package.
 
 For online documentation please visit

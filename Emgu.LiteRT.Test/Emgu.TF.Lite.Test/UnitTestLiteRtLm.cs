@@ -347,6 +347,82 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // EmbeddingGemma 2 Text 270M through the EmbeddingEngine: sizes, normalization, batch vs single, and semantic
+        // search - each question's best match should be the document that answers it (165 MB download).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestEmbeddingGemma2()
+        {
+            RequireLiteRtLm();
+            using (EmbeddingGemma2 model = new EmbeddingGemma2())
+            {
+                System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+                await model.Init();
+                Console.WriteLine("Loaded in {0:F1}s", sw.Elapsed.TotalSeconds);
+
+                float[] full = model.Embed("The quick brown fox jumps over the lazy dog.");
+                float[] small = model.Embed("The quick brown fox jumps over the lazy dog.", 256);
+                double norm = Math.Sqrt(full.Sum(v => (double)v * v));
+                Console.WriteLine("Sizes {0} and {1}, norm {2:F4}", full.Length, small.Length, norm);
+                if (full.Length != 768 || small.Length != 256 || Math.Abs(norm - 1) > 1e-3)
+                    throw new Exception("Unexpected embedding size or norm");
+
+                String[] documents =
+                {
+                    "To reset your password, open Settings, choose Account and tap Forgot password.",
+                    "Our store is open from 9 am to 6 pm on weekdays and closed on Sundays.",
+                    "The Eiffel Tower is 330 metres tall and was completed in 1889.",
+                    "Photosynthesis lets plants turn sunlight, water and carbon dioxide into sugar and oxygen.",
+                    "Shipping within the country takes three to five business days."
+                };
+                String[] queries =
+                {
+                    "How do I change my password?",
+                    "When can I visit the shop?",
+                    "How high is the tower in Paris?",
+                    "How do plants make food?",
+                    "How long does delivery take?"
+                };
+                float[][] docVectors = model.EmbedDocuments(documents);
+                // The batch gives the same embeddings as one at a time.
+                float[] single = model.Embed(model.DocumentPrefix + documents[0]);
+                float batchVsSingle = EmbeddingModel.CosineSimilarity(single, docVectors[0]);
+                Console.WriteLine("Batch vs single: {0:F5}", batchVsSingle);
+                if (batchVsSingle < 0.999f)
+                    throw new Exception("The batch embedding differs from the single one");
+
+                float[][] plainDocs = model.Embed(documents);
+                int correct = 0, plainCorrect = 0;
+                for (int q = 0; q < queries.Length; q++)
+                {
+                    float[] query = model.EmbedQuery(queries[q]);
+                    float[] plainQuery = model.Embed(queries[q]);
+                    float[] scores = docVectors.Select(d => EmbeddingModel.CosineSimilarity(query, d)).ToArray();
+                    float[] plainScores = plainDocs.Select(d => EmbeddingModel.CosineSimilarity(plainQuery, d)).ToArray();
+                    int best = Array.IndexOf(scores, scores.Max());
+                    int plainBest = Array.IndexOf(plainScores, plainScores.Max());
+                    Console.WriteLine("\"{0}\": best {1} ({2:F3}, next {3:F3}); without prefixes {4} ({5:F3})", queries[q], best,
+                        scores[best], scores.Where((s, i) => i != best).Max(), plainBest, plainScores[plainBest]);
+                    if (best == q) correct++;
+                    if (plainBest == q) plainCorrect++;
+                }
+                Console.WriteLine("Correct: {0}/{1} with prefixes, {2}/{1} without", correct, queries.Length, plainCorrect);
+                if (correct != queries.Length)
+                    throw new Exception("Semantic search picked the wrong document");
+
+                sw.Restart();
+                for (int i = 0; i < 10; i++)
+                    model.EmbedQuery(queries[i % queries.Length]);
+                Console.WriteLine("Query embedding: {0:F1} ms each", sw.Elapsed.TotalMilliseconds / 10);
+            }
+        }
+
         // A chat continued from a saved history (Chat.LoadHistory), as after restarting an app.
 #if !TEST_MODELS
 #if VS_TEST
