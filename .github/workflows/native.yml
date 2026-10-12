@@ -42,7 +42,7 @@ jobs:
         sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
           /usr/local/share/boost /opt/hostedtoolcache/CodeQL
         df -h /
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
       with:
         submodules: true
     - name: Install clang
@@ -59,7 +59,7 @@ jobs:
       run: |
         env -u ANDROID_HOME -u ANDROID_SDK_ROOT -u ANDROID_NDK -u ANDROID_NDK_HOME -u ANDROID_NDK_ROOT \
           -u ANDROID_NDK_LATEST_HOME platforms/ubuntu/26.04/bazel_build_tflite
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v7
       with:
         name: native-ubuntu-${{ matrix.arch }}
         path: lib/runtimes/ubuntu-${{ matrix.arch }}/native/
@@ -84,7 +84,7 @@ jobs:
         sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
           /opt/hostedtoolcache/CodeQL
         df -h /
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
       with:
         submodules: true
     - name: Install clang
@@ -107,7 +107,7 @@ jobs:
         --include=prebuilt/android_${{ matrix.arch }}/libGemmaModelConstraintProvider.so,prebuilt/android_${{ matrix.arch }}/libLiteRtOpenClAccelerator.so
     - name: Build libLiteRt.so, libtfliteextern.so and liblitert-lm.so
       run: platforms/android/bazel_build_tflite_android ${{ matrix.arch }}
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v7
       with:
         name: native-android-${{ matrix.abi }}
         path: lib/android/${{ matrix.abi }}/
@@ -118,7 +118,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 360
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
       with:
         submodules: true
     - name: Fetch LiteRT-LM's prebuilt libraries
@@ -130,7 +130,7 @@ jobs:
         --include=prebuilt/macos_arm64/libGemmaModelConstraintProvider.dylib,prebuilt/macos_arm64/libLiteRtMetalAccelerator.dylib
     - name: Build universal libLiteRt.dylib and libtfliteextern.dylib, and arm64 liblitert-lm.dylib
       run: platforms/macos/bazel_build_tflite_macos_fat
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v7
       with:
         name: native-macos-universal
         path: |
