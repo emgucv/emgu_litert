@@ -81,6 +81,8 @@ namespace Maui.Demo.Lite
         // conversation was last compacted.
         private readonly HashSet<int> _givenPassages = new HashSet<int>();
         private readonly HashSet<int> _givenImages = new HashSet<int>();
+        // Counts compactions, so a send can tell that its own compaction dropped excerpts it left out as already given.
+        private int _compactions;
 
         private static bool IsToolStep(string step) => !step.StartsWith(DocumentStepPrefix, StringComparison.Ordinal);
 
@@ -334,8 +336,11 @@ namespace Maui.Demo.Lite
             Match pageMatch = PageReference.Match(prompt);
             string askedPage = pageMatch.Success ? "page " + pageMatch.Groups[1].Value : null;
 
+            // A summary covers the document, not just what this message adds: its passages are sent even if given before
+            // (otherwise a summary asked right after other questions only covered the newly attached page image).
+            bool overview = OverviewQuestion.IsMatch(prompt);
             List<DocumentPassage> candidates;
-            if (index.TextLength <= budget || OverviewQuestion.IsMatch(prompt))
+            if (index.TextLength <= budget || overview)
             {
                 // A short document whole, or the beginning of a long one for a summary.
                 candidates = index.Passages.ToList();
@@ -358,14 +363,15 @@ namespace Maui.Demo.Lite
                     break;
                 length += passage.Text.Length;
                 referenced.Add(passage);
-                if (!_givenPassages.Contains(passage.Index))
+                if (overview || !_givenPassages.Contains(passage.Index))
                     context.Passages.Add(passage);
             }
 
             // A picture or page image: the one on a page the message names, or with the caption of a figure it names;
             // for a question about a picture, one on the page of the best-matching text; else the best match if it
-            // matches well - always for a document that is all images (scans).
-            if (SelectedOption.AcceptsImages && result.Images.Count > 0)
+            // matches well - always for a document that is all images (scans). Not for a summary of a document with
+            // text: given one page's image with "Summarize this document", Gemma 4 E2B summarized just that page.
+            if (SelectedOption.AcceptsImages && result.Images.Count > 0 && !(overview && index.Passages.Count > 0))
             {
                 DocumentMatch<DocumentImage> image = askedPage != null
                     ? result.Images.Where(m => m.Item.Location == askedPage).OrderBy(m => m.Item.IsPage ? 0 : 1).FirstOrDefault()
@@ -412,6 +418,34 @@ namespace Maui.Demo.Lite
             context.Step = DocumentStep(state, referenced, context.ImageItem);
             SetStatus(null);
             return context;
+        }
+
+        // The message's excerpts were chosen before compacting the conversation, leaving out passages given earlier - which
+        // compacting may just have summarized or dropped (a question about one then got no excerpt and was answered from
+        // the summary alone). Search again, now that nothing counts as given; a picture already attached is kept.
+        private async Task<DocumentContext> RefreshDocumentContextAsync(string prompt, DocumentContext document,
+            HistoryItem userItem, List<PendingAttachment> attachments)
+        {
+            DocumentContext again = await GetDocumentContextAsync(prompt);
+            if (again == null)
+                return document;
+            if (document.ImageItem != null)
+            {
+                // Already shown with the message and in its attachments.
+                again.ImageItem = document.ImageItem;
+                again.Image = document.Image;
+                again.Text = DocumentPrompt(_document, again);
+                again.Step = document.Step;
+            }
+            else if (again.Image != null)
+            {
+                attachments.Add(again.Image);
+                userItem.Attachments.Add(("image", again.Image.MediaType, again.Image.Data));
+            }
+            userItem.Context = again.Text;
+            // Counted again before sending.
+            userItem.Tokens = -1;
+            return again;
         }
 
         // What the model is given before the message.

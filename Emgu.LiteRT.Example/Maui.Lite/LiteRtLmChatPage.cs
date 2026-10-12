@@ -1335,7 +1335,10 @@ namespace Maui.Demo.Lite
                 foreach (PendingAttachment attachment in attachments)
                     userItem.Attachments.Add((attachment.Image != null ? "image" : "audio", attachment.MediaType, attachment.Data));
                 // Re-reading the earlier conversation (an opened chat, or after compacting) is what takes the time.
+                int compactions = _compactions;
                 bool rereading = await PrepareContextAsync(userItem, dividerIndex);
+                if (document != null && _compactions != compactions)
+                    document = await RefreshDocumentContextAsync(prompt, document, userItem, attachments);
                 SetStatus(rereading ? "Reading the conversation so far..." : "Generating...");
 
                 // Stream the reply into its own bubble as it's generated, rather than waiting for the
@@ -2155,6 +2158,7 @@ namespace Maui.Demo.Lite
             _needsPrime = true;
             // Excerpts given with the messages that were summarized or dropped are no longer in the model's context.
             ResetDocumentContext();
+            _compactions++;
             await CountTokensAsync(null);
             // Above the first message the model still sees, or (when it sees none) where the next one goes.
             View firstKept = keepStart < _historyItems.Count ? _historyItems[keepStart].View : null;
