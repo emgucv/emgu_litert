@@ -66,6 +66,12 @@ namespace Maui.Demo.Lite
         public string Thinking { get; set; }
 
         /// <summary>
+        /// What the model was given with a user message besides its text: excerpts of an attached document (null if
+        /// none). The model sees it before the message; the transcript shows only the message.
+        /// </summary>
+        public string Context { get; set; }
+
+        /// <summary>
         /// Attachments, one per line: "image|audio", the media type and the file's name in the conversation's folder,
         /// separated by '|'
         /// </summary>
@@ -156,7 +162,7 @@ namespace Maui.Demo.Lite
         /// Add a message, saving its attachments (encoded bytes) as files; returns its id.
         /// </summary>
         public async Task<int> AddMessageAsync(int conversationId, string role, string text, string thinking,
-            IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments = null)
+            IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments = null, string context = null)
         {
             SQLiteAsyncConnection db = await Db;
             var record = new MessageRecord
@@ -165,6 +171,7 @@ namespace Maui.Demo.Lite
                 Role = role,
                 Text = text ?? string.Empty,
                 Thinking = string.IsNullOrEmpty(thinking) ? null : thinking,
+                Context = string.IsNullOrEmpty(context) ? null : context,
                 Created = DateTime.UtcNow
             };
             await db.InsertAsync(record);

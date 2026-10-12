@@ -161,6 +161,11 @@ again.
 - The "+" button attaches images (from the photo library, the camera - "Take Photo", on devices with one - or the
   samples) or audio, and the microphone button records a voice message, for models that accept them; the first photo
   or recording asks for camera / microphone access.
+- "+" → Document attaches a PDF, Word (.docx) or text file to the chat, with any model. The first time, a 388 MB
+  search model (EmbeddingGemma 2) is downloaded; the document is then indexed on the device (a few seconds on a Mac,
+  longer on a phone), and each question is sent with the parts of the document that match it - and, for Gemma 4 and
+  Qwen3.5 0.8B, a matching picture or an image of a scanned page. A grey line above the reply says which pages were
+  used. New chat removes the document.
 
 ## Troubleshooting
 

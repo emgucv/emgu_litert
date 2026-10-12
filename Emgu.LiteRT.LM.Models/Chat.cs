@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -346,7 +347,16 @@ namespace Emgu.LiteRT.LM.Models
                 if (!String.IsNullOrEmpty(SystemMessage))
                     resources.Config.SystemMessage = SystemMessage;
                 if (_history.Count > 0)
+                {
                     resources.Config.MessagesJson = ChatMessage.ToJson(_history);
+                    // LiteRT-LM v0.18.0: after a reply with thinking, the next message rewinds the conversation and
+                    // re-reads it without the thinking ("filter channel content from the KV cache"); when it re-reads
+                    // the initial messages it doesn't pass their images or audio, and fails with "Provided less images
+                    // than expected in the prompt" (Conversation::RewindAndGetInputDataVector). Keep the thinking in
+                    // the KV cache instead when the initial messages have attachments.
+                    if (_history.Any(m => m.Attachments.Count > 0))
+                        resources.Config.FilterChannelContentFromKvCache = false;
+                }
                 resources.Conversation = engine.CreateConversation(resources.Config);
                 _model.RegisterChat(this);
                 return resources;

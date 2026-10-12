@@ -40,6 +40,17 @@ using (EmbeddingGemma2TextVision embedder = new EmbeddingGemma2TextVision())
 }
 ```
 
+`DocumentIndex` is the search part of asking questions about a document that is too long for the model's context: add its text (and pictures), build the index, and give the model only the passages that match each question:
+
+```csharp
+DocumentIndex index = new DocumentIndex();
+index.AddText(pageText, "page 1");                 // split into passages
+await Task.Run(() => index.Build(embedder));       // embed them
+DocumentSearchResult result = index.Search(embedder, question);
+string excerpts = string.Join("\n\n", result.Passages.Take(3).Select(m => m.Item.Text));
+// ...send the excerpts and the question to a LanguageModel's Chat
+```
+
 To use the models with Microsoft.Extensions.AI (`IChatClient`, tool calling) or Microsoft Agent Framework, add the ${EMGU_LITERT_LM_EXTENSIONS_AI_NUGET_ID} package.
 
 For online documentation please visit

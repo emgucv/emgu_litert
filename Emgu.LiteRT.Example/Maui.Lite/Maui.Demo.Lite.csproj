@@ -80,6 +80,8 @@
 		<PackageReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="Microsoft.Agents.AI" Version="1.24.0" />
 		<!-- The chat page's saved chats (ChatStore.cs): SQLite. -->
 		<PackageReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="sqlite-net-pcl" Version="1.11.285" />
+		<!-- The chat page's documents (DocumentReader.cs): text and pictures of PDF files. -->
+		<PackageReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="PdfPig" Version="0.1.16" />
 		<!-- On Android, iOS and Mac Catalyst, LiteRT-LM's native library comes from the separate LiteRT-LM add-on
 		     runtimes (the base Emgu.LiteRT.runtime.maui.android/.ios/.macos only carry tfliteextern/libLiteRt):
 		     liblitert-lm.so and libGemmaModelConstraintProvider.so on Android, CLiteRTLM.xcframework and

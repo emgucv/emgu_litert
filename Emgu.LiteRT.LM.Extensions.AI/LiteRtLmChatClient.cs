@@ -308,7 +308,14 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                 if (constrained)
                     open.Config.EnableConstrainedDecoding = true;
                 if (history.Count > 0)
+                {
                     open.Config.MessagesJson = "[" + String.Join(",", history.Select(ToLiteRtLmJson)) + "]";
+                    // LiteRT-LM v0.18.0 drops the images and audio of the initial messages when it re-reads them to
+                    // remove the previous reply's thinking from the KV cache, and the next message fails ("Provided
+                    // less images than expected in the prompt"): keep the thinking in the KV cache instead.
+                    if (history.Any(m => m.Contents.OfType<DataContent>().Any()))
+                        open.Config.FilterChannelContentFromKvCache = false;
+                }
                 open.Conversation = engine.CreateConversation(open.Config);
                 return open;
             }

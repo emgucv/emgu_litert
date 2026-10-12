@@ -29,7 +29,7 @@ namespace Maui.Demo.Lite
     /// search" on (Gemma 4), messages go through a Microsoft Agent Framework agent over the model's IChatClient
     /// (Emgu.LiteRT.LM.Extensions.AI), which can search Wikipedia and - with a Tavily API key - the web (AgentTools).
     /// </summary>
-    public class LiteRtLmChatPage : ContentPage
+    public partial class LiteRtLmChatPage : ContentPage
     {
         private enum ModelChoice
         {
@@ -219,6 +219,9 @@ namespace Maui.Demo.Lite
         {
             public string Role;
             public string Text;
+            // Given to the model before the text of a user message: excerpts of the attached document (or null).
+            public string Context;
+            public string ModelText => string.IsNullOrEmpty(Context) ? Text : Context + Text;
             public List<(string Kind, string MediaType, byte[] Data)> Attachments = new List<(string, string, byte[])>();
             // Its id in the ChatStore (0 if not saved).
             public int MessageId;
@@ -620,7 +623,6 @@ namespace Maui.Demo.Lite
                 Stroke = Colors.Transparent,
                 StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(22) },
                 VerticalOptions = LayoutOptions.End,
-                IsVisible = Models[0].AcceptsImages || Models[0].AcceptsAudio,
                 Content = new Label
                 {
                     Text = "+",
@@ -632,7 +634,7 @@ namespace Maui.Demo.Lite
                 }
             };
             _attachButton.OnTap(OnAttachClicked);
-            SemanticProperties.SetDescription(_attachButton, "Attach an image or audio");
+            SemanticProperties.SetDescription(_attachButton, "Attach a document, an image or audio");
 
             _micIcon = new Microsoft.Maui.Controls.Shapes.Path
             {
@@ -691,7 +693,8 @@ namespace Maui.Demo.Lite
                 IsVisible = false,
                 Content = _attachmentStrip
             };
-            var composer = new VerticalStackLayout { Spacing = 8, Children = { _attachmentScroll, composerRow } };
+            _documentBar = new HorizontalStackLayout { Spacing = 8, IsVisible = false };
+            var composer = new VerticalStackLayout { Spacing = 8, Children = { _documentBar, _attachmentScroll, composerRow } };
 
             var composerCard = Theme.Card(new VerticalStackLayout { Spacing = 8, Children = { _toggleRow, composer } }, 10);
 
@@ -909,7 +912,6 @@ namespace Maui.Demo.Lite
             ModelOption option = SelectedOption;
             _modelChipLabel.Text = option.Name;
             RefreshModelList();
-            _attachButton.IsVisible = option.AcceptsImages || option.AcceptsAudio;
             _talkButton.IsVisible = option.AcceptsAudio;
             _thinkingSwitch.IsVisible = option.CanThink;
             _webSearchSwitch.IsVisible = option.CanUseTools;
@@ -1290,7 +1292,11 @@ namespace Maui.Demo.Lite
             if (string.IsNullOrEmpty(prompt))
             {
                 if (attachments.Count == 0)
-                    return;
+                {
+                    if (_document == null)
+                        return;
+                    prompt = "Summarize this document.";
+                }
                 // Attachments without a question: ask for the obvious.
                 prompt = attachments.Any(a => a.Image != null)
                     ? (attachments.All(a => a.Image != null) ? "Describe this image." : "Describe the image and transcribe the audio.")
@@ -1315,10 +1321,14 @@ namespace Maui.Demo.Lite
 
                 _promptEditor.Text = string.Empty;
                 ClearPendingAttachments();
+                // With a document attached: the excerpts (and maybe a picture or page) most related to the message.
+                DocumentContext document = await GetDocumentContextAsync(prompt);
+                if (document?.Image != null)
+                    attachments.Add(document.Image);
                 // Where a "summarized" divider goes if this message makes the chat compact.
                 int dividerIndex = _transcript.Children.Contains(_emptyLabel) ? 0 : _transcript.Children.Count;
                 AddUserMessage(prompt, attachments);
-                var userItem = new HistoryItem { Role = MessageRecord.UserRole, Text = prompt };
+                var userItem = new HistoryItem { Role = MessageRecord.UserRole, Text = prompt, Context = document?.Text };
                 if (dividerIndex < _transcript.Children.Count)
                     userItem.View = _transcript.Children[dividerIndex] as View;
                 foreach (PendingAttachment attachment in attachments)
@@ -1333,6 +1343,12 @@ namespace Maui.Demo.Lite
                 // so far through ChatReply on every chunk gives the same thinking/answer split a finished
                 // reply would show, just filled in live.
                 StreamingBubble bubble = AddStreamingBubble();
+                if (document?.Step != null)
+                {
+                    AddStepLine(bubble, document.Step);
+                    _sendSteps.Add(document.Step);
+                }
+                string modelPrompt = userItem.ModelText;
                 StringBuilder streamed = new StringBuilder();
                 bool firstChunk = true;
                 Action<string> onChunk = chunk =>
@@ -1356,8 +1372,8 @@ namespace Maui.Demo.Lite
                     // Kept so teardown (OnNavigatedFrom / switching models) can wait for it instead of
                     // freeing the chat/engine while LiteRT-LM is still generating into it.
                     Task<ChatReply> generation = UseAgent
-                        ? RunAgentAsync(prompt, attachments, bubble)
-                        : _chat.SendAsync(prompt, attachments.Select(a => a.Attachment), onChunk);
+                        ? RunAgentAsync(modelPrompt, attachments, bubble)
+                        : _chat.SendAsync(modelPrompt, attachments.Select(a => a.Attachment), onChunk);
                     _generation = generation;
                     try
                     {
@@ -1378,6 +1394,7 @@ namespace Maui.Demo.Lite
                 }
 
                 UpdateStreamingBubble(bubble, reply, true);
+                MarkDocumentContextGiven(document);
                 UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
                 await SaveExchangeAsync(userItem, reply);
                 SetStatus(null);
@@ -1748,6 +1765,7 @@ namespace Maui.Demo.Lite
                 return;
 
             var rows = new List<(string Section, string Glyph, string Text, string Value)>();
+            rows.Add(("DOCUMENT (PDF, WORD, TEXT)", Theme.GlyphText, "Document", "document"));
             if (SelectedOption.AcceptsImages)
             {
                 rows.Add(("IMAGE", Theme.GlyphImage, "Photo Library", "library"));
@@ -1768,7 +1786,13 @@ namespace Maui.Demo.Lite
 
             try
             {
-                if (action == "library")
+                if (action == "document")
+                {
+                    FileResult file = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Choose a document", FileTypes = DocumentReader.FileTypes });
+                    if (file != null)
+                        AttachDocument(await ReadAllBytesAsync(file), file.FileName);
+                }
+                else if (action == "library")
                 {
                     FileResult file = (await MediaPicker.Default.PickPhotosAsync())?.FirstOrDefault();
                     if (file != null)
@@ -1940,6 +1964,7 @@ namespace Maui.Demo.Lite
                 return;
             }
             StartNewChat();
+            RemoveDocument();
         }
 
         // Clear the transcript and the model's conversation; the next message starts a new saved chat.
@@ -1954,6 +1979,7 @@ namespace Maui.Demo.Lite
             _summary = null;
             _summaryTokens = 0;
             _needsPrime = false;
+            ResetDocumentContext();
             ClearTranscript();
             UpdateMemoryLabel();
         }
@@ -1969,7 +1995,7 @@ namespace Maui.Demo.Lite
         // The estimated size of a message in the model's context. Runs the tokenizer: call it off the UI thread.
         private static int EstimateTokens(LanguageModel model, HistoryItem item)
         {
-            int tokens = model.CountTokens(item.Text ?? string.Empty) + MessageOverheadTokens;
+            int tokens = model.CountTokens(item.ModelText ?? string.Empty) + MessageOverheadTokens;
             foreach (var attachment in item.Attachments)
                 tokens += attachment.Kind == "image" ? ImageTokens : AudioTokens(attachment.Data);
             return tokens;
@@ -2126,6 +2152,8 @@ namespace Maui.Demo.Lite
             _summaryTokens = 0;
             _contextStart = keepStart;
             _needsPrime = true;
+            // Excerpts given with the messages that were summarized or dropped are no longer in the model's context.
+            ResetDocumentContext();
             await CountTokensAsync(null);
             // Above the first message the model still sees, or (when it sees none) where the next one goes.
             View firstKept = keepStart < _historyItems.Count ? _historyItems[keepStart].View : null;
@@ -2377,7 +2405,8 @@ namespace Maui.Demo.Lite
             try
             {
                 LanguageModel model = _model;
-                int steps = _sendSteps.Count;
+                // The document step line isn't a tool call: its excerpts are counted with the message.
+                int steps = _sendSteps.Count(IsToolStep);
                 await Task.Run(() =>
                 {
                     replyItem.Tokens = EstimateTokens(model, replyItem);
@@ -2400,7 +2429,7 @@ namespace Maui.Demo.Lite
                     _conversationId = await _store.CreateConversationAsync(title, SelectedChoice.ToString());
                 }
                 int id = _conversationId.Value;
-                userItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.UserRole, userItem.Text, null, userItem.Attachments);
+                userItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.UserRole, userItem.Text, null, userItem.Attachments, userItem.Context);
                 foreach (string step in _sendSteps)
                     await _store.AddMessageAsync(id, MessageRecord.StepRole, step, null);
                 replyItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking);
@@ -2435,7 +2464,7 @@ namespace Maui.Demo.Lite
                 foreach (var attachment in item.Attachments)
                     if (attachment.Data != null)
                         contents.Add(new DataContent(attachment.Data, attachment.MediaType));
-                contents.Add(new TextContent(item.Text ?? string.Empty));
+                contents.Add(new TextContent(item.ModelText ?? string.Empty));
                 messages.Add(new AIChatMessage(item.Role == MessageRecord.UserRole ? ChatRole.User : ChatRole.Assistant, contents));
             }
             return messages.Count > 0 ? messages : null;
@@ -2450,7 +2479,7 @@ namespace Maui.Demo.Lite
                 foreach (var attachment in item.Attachments)
                     if (attachment.Data != null)
                         attachments.Add(attachment.Kind == "image" ? ChatAttachment.Image(attachment.Data) : ChatAttachment.Audio(attachment.Data));
-                messages.Add(new Emgu.LiteRT.LM.Models.ChatMessage(item.Role, item.Text ?? string.Empty, attachments));
+                messages.Add(new Emgu.LiteRT.LM.Models.ChatMessage(item.Role, item.ModelText ?? string.Empty, attachments));
             }
             return messages;
         }
@@ -2594,6 +2623,8 @@ namespace Maui.Demo.Lite
             if (index >= 0 && index != _selectedModel)
                 SelectModel(index);
             StartNewChat();
+            // The document belongs to the chat it was attached to (what the model was given of it is saved with it).
+            RemoveDocument();
             _conversationId = id;
             _summary = chat.Summary;
             bool contextStartFound = false;
@@ -2613,7 +2644,7 @@ namespace Maui.Demo.Lite
                     AddSavedStep(message.Text);
                     continue;
                 }
-                var item = new HistoryItem { Role = message.Role, Text = message.Text, MessageId = message.Id };
+                var item = new HistoryItem { Role = message.Role, Text = message.Text, Context = message.Context, MessageId = message.Id };
                 List<PendingAttachment> shown = new List<PendingAttachment>();
                 foreach (SavedAttachment attachment in _store.GetAttachments(message))
                 {
@@ -2707,7 +2738,9 @@ namespace Maui.Demo.Lite
                 StopSpeaking();
                 _loadCancel?.Cancel();
                 _ = CancelRecordingAsync();
+                RemoveDocument();
                 _ = CleanupModelAsync();
+                _ = ReleaseEmbedderAsync();
             }
         }
 

@@ -423,6 +423,174 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // A conversation rebuilt from a history with an image (a reopened chat, or after compaction), continued with
+        // thinking on: LiteRT-LM v0.18.0 drops the history's images when it re-reads the conversation to remove the
+        // previous thinking, and the second message failed ("Provided less images than expected in the prompt") until
+        // Chat and LiteRtLmChatClient kept the thinking in the KV cache for such conversations.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestHistoryWithImageAndThinking()
+        {
+            RequireLiteRtLm();
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                await model.Init();
+                byte[] apple = System.IO.File.ReadAllBytes("apple.jpg");
+                byte[] tulips = System.IO.File.ReadAllBytes("tulips.jpg");
+
+                using (Chat chat = model.CreateChat())
+                {
+                    chat.MaxOutputTokens = 1024;
+                    chat.EnableThinking = true;
+                    chat.LoadHistory(new List<Emgu.LiteRT.LM.Models.ChatMessage>
+                    {
+                        new Emgu.LiteRT.LM.Models.ChatMessage("user", "What fruit is this?", new[] { ChatAttachment.Image(apple) }),
+                        new Emgu.LiteRT.LM.Models.ChatMessage("assistant", "An apple.")
+                    });
+                    ChatReply first = chat.Send("What colour was it? One word.");
+                    ChatReply second = chat.Send("What flowers are these? One word.", ChatAttachment.Image(tulips));
+                    Console.WriteLine("Chat: \"{0}\" (thinking {1} chars), then \"{2}\" (thinking {3} chars)",
+                        first.Text, first.Thinking.Length, second.Text, second.Thinking.Length);
+                    if (first.Text.IndexOf("red", StringComparison.OrdinalIgnoreCase) < 0
+                        || second.Text.IndexOf("tulip", StringComparison.OrdinalIgnoreCase) < 0)
+                        throw new Exception("Wrong answers after a history with an image");
+                }
+
+                using (IChatClient client = model.AsIChatClient())
+                {
+                    ChatOptions options = new ChatOptions { MaxOutputTokens = 1024, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Medium } };
+                    List<Microsoft.Extensions.AI.ChatMessage> messages = new List<Microsoft.Extensions.AI.ChatMessage>
+                    {
+                        new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, new List<AIContent> { new DataContent(apple, "image/jpeg"), new TextContent("What fruit is this?") }),
+                        new Microsoft.Extensions.AI.ChatMessage(ChatRole.Assistant, "An apple."),
+                        new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, "What colour was it? One word.")
+                    };
+                    ChatResponse first = await client.GetResponseAsync(messages, options);
+                    messages.AddRange(first.Messages);
+                    messages.Add(new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, new List<AIContent> { new DataContent(tulips, "image/jpeg"), new TextContent("What flowers are these? One word.") }));
+                    ChatResponse second = await client.GetResponseAsync(messages, options);
+                    Console.WriteLine("IChatClient: \"{0}\", then \"{1}\"", first.Text, second.Text);
+                    if (first.Text.IndexOf("red", StringComparison.OrdinalIgnoreCase) < 0
+                        || second.Text.IndexOf("tulip", StringComparison.OrdinalIgnoreCase) < 0)
+                        throw new Exception("Wrong answers after a history with an image (IChatClient)");
+                }
+            }
+        }
+
+        // DocumentIndex.SplitText: passages within the limit, at sentence ends, overlapping, covering the whole text.
+        [TestAttribute]
+        public void TestDocumentSplitText()
+        {
+            StringBuilder text = new StringBuilder();
+            for (int i = 1; i <= 40; i++)
+            {
+                text.AppendFormat("Sentence number {0} talks about topic {0} in some detail, e.g. its history.", i);
+                text.Append(i % 7 == 0 ? "\n\n" : (i % 3 == 0 ? "\n" : " "));
+            }
+            text.Append("\nA heading line\nAnother paragraph starts here. It ends here.\n");
+            text.Append(new String('x', 1600));
+            List<String> passages = DocumentIndex.SplitText(text.ToString(), 400, 100);
+            Console.WriteLine("{0} passages", passages.Count);
+            foreach (String passage in passages)
+                Console.WriteLine("[{0}] {1}...", passage.Length, passage.Substring(0, Math.Min(60, passage.Length)).Replace("\n", " / "));
+            if (passages.Any(p => p.Length > 400))
+                throw new Exception("A passage is longer than the limit");
+            for (int i = 1; i <= 40; i++)
+                if (!passages.Any(p => p.Contains("Sentence number " + i + " talks")))
+                    throw new Exception("Sentence " + i + " is missing");
+            // Sentences aren't cut (except the over-long run of x), and consecutive passages overlap.
+            if (passages.Where(p => !p.StartsWith("x")).Any(p => !p.StartsWith("Sentence") && !p.StartsWith("A heading") && !p.StartsWith("Another")))
+                throw new Exception("A passage starts mid-sentence");
+            int overlapping = 0;
+            for (int i = 1; i < passages.Count; i++)
+            {
+                String firstSentence = passages[i].Split(new[] { ". " }, StringSplitOptions.None)[0];
+                if (passages[i - 1].Contains(firstSentence))
+                    overlapping++;
+            }
+            Console.WriteLine("{0} of {1} passages start with the end of the one before", overlapping, passages.Count - 1);
+            if (overlapping < (passages.Count - 1) / 2)
+                throw new Exception("Passages don't overlap");
+            if (!passages.Any(p => p.StartsWith("Another paragraph")) && !passages.Any(p => p.Contains("A heading line\nAnother paragraph")))
+                throw new Exception("The heading line wasn't kept apart");
+            if (DocumentIndex.SplitText("  \n ", 400, 100).Count != 0)
+                throw new Exception("White space should give no passages");
+        }
+
+        // DocumentIndex: a "document" of pages and pictures, searched by questions (EmbeddingGemma 2 Text Vision 440M).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestDocumentIndex()
+        {
+            RequireLiteRtLm();
+            using (EmbeddingGemma2TextVision model = new EmbeddingGemma2TextVision())
+            {
+                await model.Init();
+                DocumentIndex index = new DocumentIndex();
+                String[] pages =
+                {
+                    "Annual report 2025. Contoso Bakery opened two new shops this year, in Leeds and in York. "
+                        + "Revenue grew by 12 percent to 4.2 million pounds, mostly from wholesale bread.",
+                    "Staff. The bakery now employs 58 people. Every new baker spends six weeks in training "
+                        + "with a senior baker before working a shift alone.",
+                    "Equipment. In March we replaced the old deck oven with a stone-floor oven that bakes 300 loaves "
+                        + "an hour and uses 20 percent less gas.",
+                    "Outlook. Next year we plan a shop in Durham and a range of gluten-free cakes."
+                };
+                for (int i = 0; i < pages.Length; i++)
+                    index.AddText(pages[i], "page " + (i + 1));
+                index.AddImage(System.IO.File.ReadAllBytes("tulips.jpg"), "image/jpeg", "page 2");
+                index.AddImage(System.IO.File.ReadAllBytes("surfers.jpg"), "image/jpeg", "page 4");
+                List<DocumentIndexProgress> reports = new List<DocumentIndexProgress>();
+                System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+                await Task.Run(() => index.Build(model, new SynchronousProgress<DocumentIndexProgress>(reports.Add)));
+                Console.WriteLine("Built {0} passages and {1} images in {2:F1}s", index.Passages.Count, index.Images.Count, sw.Elapsed.TotalSeconds);
+                if (!index.IsBuilt || reports.Count == 0 || reports.Last().ImagesDone != 2)
+                    throw new Exception("The index wasn't built");
+
+                (String Question, String Location)[] questions =
+                {
+                    ("How much money did the bakery make?", "page 1"),
+                    ("How long is the training for new bakers?", "page 2"),
+                    ("What oven did they buy?", "page 3"),
+                    ("Where will the next shop open?", "page 4")
+                };
+                foreach (var q in questions)
+                {
+                    DocumentSearchResult result = index.Search(model, q.Question);
+                    DocumentMatch<DocumentPassage> best = result.Passages[0];
+                    Console.WriteLine("\"{0}\": {1} ({2:F3}, next {3:F3}); best image {4} ({5:F3})", q.Question, best.Item.Location,
+                        best.Score, result.Passages[1].Score, result.Images[0].Item.Location, result.Images[0].Score);
+                    if (best.Item.Location != q.Location)
+                        throw new Exception("The wrong passage was found for: " + q.Question);
+                }
+                DocumentSearchResult flowers = index.Search(model, "Is there a picture of flowers?");
+                Console.WriteLine("Flowers: {0} ({1:F3}), other {2:F3}", flowers.Images[0].Item.Location, flowers.Images[0].Score, flowers.Images[1].Score);
+                if (flowers.Images[0].Item.Location != "page 2")
+                    throw new Exception("The wrong picture was found");
+            }
+        }
+
+        // Reports on the calling thread (Progress<T> posts to the thread pool).
+        private sealed class SynchronousProgress<T> : IProgress<T>
+        {
+            private readonly Action<T> _report;
+            public SynchronousProgress(Action<T> report) { _report = report; }
+            public void Report(T value) { _report(value); }
+        }
+
         // Text-to-image search with EmbeddingGemma 2 Text Vision 440M: images and texts share one embedding space.
 #if !TEST_MODELS
 #if VS_TEST
