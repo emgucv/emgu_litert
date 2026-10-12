@@ -145,6 +145,10 @@ again.
   the GPU takes about 30 s and keeps a ~0.8 GB cache next to the model. When a chat gets longer, Gemma 4 and Qwen3.5 4B summarize the earlier messages and continue from the summary
   (this takes a few seconds); the small models drop the earliest messages instead. A line in the conversation shows
   where the model's memory starts - tap it to read the summary - and Settings shows how full it is, with "Compact now".
+- Gemma 4 has tools: a calculator for exact arithmetic; memories - tell it something about yourself ("I'm
+  vegetarian") and it remembers it in later chats (Settings → "Memories about you" lists them, each with a delete
+  button; they stay on the device); and with Web search on, the weather (Open-Meteo), Wikipedia and - with a Tavily
+  key - the web.
 - With "Share my location" on (Settings, off by default), Gemma 4 can look up your town and approximate position,
   e.g. for "what's the weather here?" (with Web search on). The device asks for location permission the first time;
   the place name comes from Apple's or Google's map service.

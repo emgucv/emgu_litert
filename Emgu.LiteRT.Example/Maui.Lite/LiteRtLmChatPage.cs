@@ -172,14 +172,21 @@ namespace Maui.Demo.Lite
         private const string AgentInstructions =
             "You are a helpful assistant running on the user's device. You can look things up with your tools: use them " +
             "for facts you are not sure about, recent events and anything that depends on today's date or, when you have the " +
-            "location tool, on where the user is. Base your answer on what the tools return, mention where it came from, " +
-            "and keep it short.";
+            "location tool, on where the user is. Use the calculate tool for any arithmetic. When the user tells you " +
+            "something lasting about themselves, save it with the remember tool. Base your answer on what the tools " +
+            "return, mention where it came from, and keep it short.";
         private readonly ToggleChip _webSearchSwitch;
         private readonly Entry _tavilyKeyEntry;
         // Whether the agent gets the location tool (Settings, off by default): the user's town and approximate
         // coordinates, which leave the device in web searches that use them.
         private const string ShareLocationPreference = "litert_lm_chat_share_location";
         private readonly Switch _shareLocationSwitch;
+        // Memories about the user (ChatStore): with "Remember things about me" on (the default; they stay on the device),
+        // the agent can save and delete them, and the latest are given to it with every message.
+        private const string MemoryPreference = "litert_lm_chat_memory";
+        private const int MaxMemoryLength = 1200;
+        private readonly Switch _memorySwitch;
+        private readonly Label _memoryCountLabel;
         private string _tavilyKey = string.Empty;
         private IChatClient _chatClient;
         private ChatClientAgent _agent;
@@ -230,7 +237,7 @@ namespace Maui.Demo.Lite
         // estimates: text is counted with the model's tokenizer, plus measured costs of images and audio.
         private const int ReplyReserveTokens = 1024;      // room left for the reply
         private const int ChatOverheadTokens = 50;        // chat template
-        private const int AgentOverheadTokens = 600;      // the agent's instructions and tool definitions
+        private const int AgentOverheadTokens = 900;      // the agent's instructions, tool definitions and memories
         private const int MessageOverheadTokens = 8;      // per message (role markers)
         private const int ImageTokens = 270;              // measured: Gemma 4 and Qwen3.5 VL, 1024x1024 image
         private const int AudioTokensPerSecond = 25;      // measured: Gemma 4
@@ -441,6 +448,36 @@ namespace Maui.Demo.Lite
                 VerticalOptions = LayoutOptions.Center
             }, 0, 0);
             locationRow.Add(_shareLocationSwitch, 1, 0);
+            bool memoryOn = true;
+            try { memoryOn = Preferences.Default.Get(MemoryPreference, true); } catch (Exception) { }
+            _memorySwitch = new Switch { IsToggled = memoryOn, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+            _memorySwitch.Toggled += (s, e) =>
+            {
+                try { Preferences.Default.Set(MemoryPreference, e.Value); } catch (Exception) { }
+            };
+            var memoryRow = new Grid
+            {
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+            };
+            memoryRow.Add(new Label
+            {
+                Text = "Remember things about me",
+                FontFamily = Theme.BodyFont,
+                FontSize = 15,
+                TextColor = Theme.PrimaryText,
+                VerticalOptions = LayoutOptions.Center
+            }, 0, 0);
+            memoryRow.Add(_memorySwitch, 1, 0);
+            _memoryCountLabel = new Label
+            {
+                FontFamily = Theme.TitleFont,
+                FontSize = 14,
+                TextColor = Theme.Accent,
+                Padding = new Thickness(0, 4),
+                HorizontalOptions = LayoutOptions.Start
+            };
+            _memoryCountLabel.OnTap(OnMemoriesTapped);
+            _ = RefreshMemoryCountAsync();
             _tavilyKeyEntry.Completed += (s, e) => OnTavilyKeyChanged();
             _tavilyKeyEntry.Unfocused += (s, e) => OnTavilyKeyChanged();
             _ = LoadTavilyKeyAsync();
@@ -498,6 +535,17 @@ namespace Maui.Demo.Lite
                         FontSize = 12,
                         TextColor = Theme.SecondaryText
                     },
+                    Theme.Divider(),
+                    new Label { Text = "Memories about you", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
+                    memoryRow,
+                    new Label
+                    {
+                        Text = "Gemma 4 saves lasting facts you tell it - your name, preferences, plans - and knows them in later chats. They stay on this device; ask it to forget something, or delete it here.",
+                        FontFamily = Theme.BodyFont,
+                        FontSize = 12,
+                        TextColor = Theme.SecondaryText
+                    },
+                    _memoryCountLabel,
                     Theme.Divider(),
                     new Label { Text = "Conversation memory", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     _memoryLabel,
@@ -1344,6 +1392,8 @@ namespace Maui.Demo.Lite
             {
                 SetBusy(false);
                 UpdateMemoryLabel();
+                // The agent may have saved or deleted a memory.
+                _ = RefreshMemoryCountAsync();
             }
         }
 
@@ -1368,7 +1418,9 @@ namespace Maui.Demo.Lite
             ChatOptions options = new ChatOptions
             {
                 Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
-                Tools = AgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled),
+                Tools = AgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
+                    _memorySwitch.IsToggled ? _store : null),
+                Instructions = await MemoryInstructionsAsync(),
                 ToolMode = ChatToolMode.Auto
             };
 
@@ -1406,7 +1458,19 @@ namespace Maui.Demo.Lite
                         case FunctionResultContent result:
                             UiStallWatchdog.Mark("Tool result" + (result.Exception != null ? ": " + result.Exception.Message : ""));
                             if (steps.TryGetValue(result.CallId, out Label line))
-                                line.Text = line.Text.TrimEnd('.') + (result.Exception != null ? " - failed: " + result.Exception.Message : "");
+                            {
+                                // A fact the model tried to save again isn't a new memory: say so instead of "Remembering".
+                                string resultText = result.Result?.ToString() ?? string.Empty;
+                                if (resultText.StartsWith("Already remembered", StringComparison.Ordinal))
+                                {
+                                    line.Text = "\U0001F50E Already remembered";
+                                    int index = _sendSteps.FindIndex(t => t.StartsWith("Remembering", StringComparison.Ordinal));
+                                    if (index >= 0)
+                                        _sendSteps[index] = "Already remembered";
+                                }
+                                else
+                                    line.Text = line.Text.TrimEnd('.') + (result.Exception != null ? " - failed: " + result.Exception.Message : "");
+                            }
                             SetStatus("Generating...");
                             break;
                     }
@@ -2216,6 +2280,90 @@ namespace Maui.Demo.Lite
             if (_transcript.Children.Contains(_emptyLabel))
                 _transcript.Children.Remove(_emptyLabel);
             _transcript.Children.Insert(Math.Max(0, Math.Min(index, _transcript.Children.Count)), row);
+        }
+
+        // ---------- Memories about the user ----------
+
+        // The memories, for the agent's instructions: the latest that fit MaxMemoryLength, oldest first.
+        private async Task<string> MemoryInstructionsAsync()
+        {
+            if (!_memorySwitch.IsToggled)
+                return null;
+            List<MemoryRecord> memories;
+            try
+            {
+                memories = await _store.GetMemoriesAsync();
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+            List<string> lines = new List<string>();
+            int length = 0;
+            for (int i = memories.Count - 1; i >= 0; i--)
+            {
+                string line = "- " + memories[i].Text;
+                if (length + line.Length > MaxMemoryLength)
+                    break;
+                lines.Insert(0, line);
+                length += line.Length + 1;
+            }
+            return lines.Count == 0 ? null
+                : "What you know about the user from earlier chats - already saved, so don't save these again; use them when they " +
+                  "help, without repeating them back unasked:\n" + string.Join("\n", lines);
+        }
+
+        private async Task RefreshMemoryCountAsync()
+        {
+            int count = 0;
+            try
+            {
+                count = (await _store.GetMemoriesAsync()).Count;
+            }
+            catch (Exception)
+            {
+            }
+            _memoryCountLabel.Text = count == 0 ? "No memories yet" : count == 1 ? "1 memory - show" : count + " memories - show";
+        }
+
+        // The memories in a sheet, each with a button to delete it.
+        private async void OnMemoriesTapped()
+        {
+            List<MemoryRecord> memories = await _store.GetMemoriesAsync();
+            if (memories.Count == 0)
+                return;
+            var list = new VerticalStackLayout { Spacing = 2 };
+            foreach (MemoryRecord memory in memories)
+            {
+                var row = new Grid
+                {
+                    Padding = new Thickness(10, 7),
+                    ColumnSpacing = 6,
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+                };
+                row.Add(new Label { Text = memory.Text, FontFamily = Theme.BodyFont, FontSize = 14, TextColor = Theme.PrimaryText, VerticalOptions = LayoutOptions.Center }, 0, 0);
+                var delete = new Label
+                {
+                    Text = Theme.GlyphClose,
+                    FontFamily = Theme.IconFont,
+                    FontSize = 18,
+                    TextColor = Theme.SecondaryText,
+                    Padding = new Thickness(6),
+                    VerticalOptions = LayoutOptions.Center
+                };
+                SemanticProperties.SetDescription(delete, "Delete this memory");
+                int id = memory.Id;
+                delete.OnTap(async () =>
+                {
+                    await _store.DeleteMemoryAsync(id);
+                    list.Children.Remove(row);
+                    await RefreshMemoryCountAsync();
+                });
+                row.Add(delete, 1, 0);
+                list.Children.Add(row);
+            }
+            await _sheet.ShowViewAsync("Memories about you", list, "Close");
+            await RefreshMemoryCountAsync();
         }
 
         // ---------- Saved chats ----------

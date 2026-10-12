@@ -75,6 +75,20 @@ namespace Maui.Demo.Lite
     }
 
     /// <summary>
+    /// Something the chat agent remembers about the user ("The user is vegetarian"), kept across chats.
+    /// </summary>
+    [Table("Memory")]
+    public class MemoryRecord
+    {
+        [PrimaryKey, AutoIncrement]
+        public int Id { get; set; }
+
+        public string Text { get; set; }
+
+        public DateTime Created { get; set; }
+    }
+
+    /// <summary>
     /// An attachment of a saved message: its kind ("image" or "audio"), media type and file.
     /// </summary>
     public sealed class SavedAttachment
@@ -105,6 +119,7 @@ namespace Maui.Demo.Lite
                     SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache);
                 await connection.CreateTableAsync<ConversationRecord>();
                 await connection.CreateTableAsync<MessageRecord>();
+                await connection.CreateTableAsync<MemoryRecord>();
                 return connection;
             });
         }
@@ -226,6 +241,31 @@ namespace Maui.Demo.Lite
             catch (Exception)
             {
             }
+        }
+
+        /// <summary>The memories, oldest first.</summary>
+        public async Task<List<MemoryRecord>> GetMemoriesAsync()
+        {
+            return await (await Db).Table<MemoryRecord>().OrderBy(m => m.Id).ToListAsync();
+        }
+
+        /// <summary>Remember something; returns false if the same text is already remembered.</summary>
+        public async Task<bool> AddMemoryAsync(string text)
+        {
+            text = (text ?? string.Empty).Trim();
+            if (text.Length == 0)
+                return false;
+            SQLiteAsyncConnection db = await Db;
+            foreach (MemoryRecord existing in await db.Table<MemoryRecord>().ToListAsync())
+                if (string.Equals(existing.Text, text, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            await db.InsertAsync(new MemoryRecord { Text = text, Created = DateTime.UtcNow });
+            return true;
+        }
+
+        public async Task DeleteMemoryAsync(int id)
+        {
+            await (await Db).DeleteAsync<MemoryRecord>(id);
         }
 
         private static string Extension(string mediaType)

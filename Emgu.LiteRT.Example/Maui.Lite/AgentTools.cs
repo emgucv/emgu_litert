@@ -17,9 +17,10 @@ using Microsoft.Extensions.AI;
 namespace Maui.Demo.Lite
 {
     /// <summary>
-    /// The tools the LiteRT-LM chat page's agent can call (Microsoft.Extensions.AI functions): the date and time, the
-    /// user's location (when they allow it), a Wikipedia search (no key needed), and - with a Tavily API key - a web
-    /// search and a web page reader. Results are cut short, since an on-device model has a small context.
+    /// The tools the LiteRT-LM chat page's agent can call (Microsoft.Extensions.AI functions): the date and time, a
+    /// calculator, memories about the user (when memory is on), the user's location (when they allow it), and with web
+    /// search on the weather (Open-Meteo, no key needed), a Wikipedia search, and - with a Tavily API key - a web search
+    /// and a web page reader. Results are cut short, since an on-device model has a small context.
     /// </summary>
     internal static class AgentTools
     {
@@ -38,16 +39,30 @@ namespace Maui.Demo.Lite
         }
 
         /// <summary>
-        /// The tools to give the agent for a message: the date and time always; the user's location when they allow it;
-        /// the search tools with web search on - the web ones only with a Tavily API key.
+        /// The tools to give the agent for a message: the date and time and the calculator always; remember / forget
+        /// with memory on (memories not null); the user's location when they allow it; the weather and search tools with
+        /// web search on - the web ones only with a Tavily API key.
         /// </summary>
-        public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location)
+        public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location, ChatStore memories)
         {
             List<AITool> tools = new List<AITool>
             {
                 AIFunctionFactory.Create(GetCurrentDateTime, "get_current_date_time",
-                    "Returns the current local date and time.")
+                    "Returns the current local date and time."),
+                AIFunctionFactory.Create(Calculate, "calculate",
+                    "Calculates an arithmetic expression exactly, e.g. \"17 * 24.3\", \"(3 + 4) ^ 2\", \"sqrt(2)\", \"15% * 80\". Always use it for arithmetic instead of working it out yourself.")
             };
+            if (memories != null)
+            {
+                tools.Add(AIFunctionFactory.Create(
+                    ([Description("The fact, as a short sentence about the user, e.g. \"The user is vegetarian.\"")] string fact) => RememberAsync(memories, fact),
+                    "remember",
+                    "Saves a new lasting fact about the user - their name, preferences, family, work, plans - so you know it in later chats. Use it only when the user tells you something about themselves you don't already know, or asks you to remember something."));
+                tools.Add(AIFunctionFactory.Create(
+                    ([Description("Words from the memory to delete")] string text) => ForgetAsync(memories, text),
+                    "forget",
+                    "Deletes saved facts about the user that contain the given words, when the user asks you to forget something or it is no longer true."));
+            }
             if (location)
             {
                 tools.Add(AIFunctionFactory.Create(GetCurrentLocationAsync, "get_current_location",
@@ -55,6 +70,8 @@ namespace Maui.Demo.Lite
             }
             if (!webSearch)
                 return tools;
+            tools.Add(AIFunctionFactory.Create(GetWeatherAsync, "get_weather",
+                "Returns the current weather and a 3-day forecast for a place (give its name, e.g. \"Paris\") or for coordinates (e.g. from get_current_location)."));
             tools.Add(AIFunctionFactory.Create(SearchWikipediaAsync, "search_wikipedia",
                 "Searches English Wikipedia and returns the introductions of the best matching articles. Use it for facts about people, places, events, science and history."));
             if (!string.IsNullOrWhiteSpace(tavilyApiKey))
@@ -85,6 +102,12 @@ namespace Maui.Demo.Lite
             {
                 case "get_current_date_time": return "Checking the date and time";
                 case "get_current_location": return "Getting your location";
+                case "calculate": return "Calculating " + Argument("expression");
+                case "get_weather":
+                    string place = Argument("place");
+                    return "Checking the weather" + (place.Length > 0 ? " in " + place : "");
+                case "remember": return "Remembering: " + Argument("fact");
+                case "forget": return "Forgetting “" + Argument("text") + "”";
                 case "search_wikipedia": return "Searching Wikipedia for “" + Argument("query") + "”";
                 case "search_web": return "Searching the web for “" + Argument("query") + "”";
                 case "read_web_page": return "Reading " + Argument("url");
@@ -95,6 +118,163 @@ namespace Maui.Demo.Lite
         private static string GetCurrentDateTime()
         {
             return DateTimeOffset.Now.ToString("dddd, d MMMM yyyy, HH:mm (zzz)", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static string Calculate([Description("The expression, e.g. \"(12.5 + 7) * 3 / 4\"")] string expression)
+        {
+            try
+            {
+                return expression + " = " + Calculator.Format(Calculator.Evaluate(expression));
+            }
+            catch (Exception e) when (e is FormatException || e is ArithmeticException)
+            {
+                return "Couldn't calculate \"" + expression + "\": " + e.Message;
+            }
+        }
+
+        private static async Task<string> RememberAsync(ChatStore memories, string fact)
+        {
+            if (string.IsNullOrWhiteSpace(fact))
+                return "Nothing to remember.";
+            // Small models re-save known facts in other words ("My daughter's name is Mia." after "The user's daughter is
+            // called Mia."): skip a fact whose words are all in one already saved.
+            HashSet<string> words = ContentWords(fact);
+            foreach (MemoryRecord existing in await memories.GetMemoriesAsync())
+                if (words.Count > 0 && words.IsSubsetOf(ContentWords(existing.Text)))
+                    return "Already remembered: " + existing.Text;
+            return await memories.AddMemoryAsync(fact) ? "Saved: " + fact.Trim() : "Already remembered: " + fact.Trim();
+        }
+
+        private static readonly HashSet<string> MemoryStopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "the", "user", "users", "user's", "their", "they", "and", "are", "his", "her", "has", "have", "that", "this",
+            "name", "named", "called", "with", "for", "who", "was", "will", "you", "your", "i'm", "my"
+        };
+
+        private static HashSet<string> ContentWords(string text)
+        {
+            HashSet<string> words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string raw in (text ?? string.Empty).Split(new[] { ' ', ',', '.', ';', ':', '!', '?', '"', '(', ')' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string word = raw.Trim('\'', '’');
+                if (word.EndsWith("'s", StringComparison.OrdinalIgnoreCase) || word.EndsWith("’s", StringComparison.OrdinalIgnoreCase))
+                    word = word.Substring(0, word.Length - 2);
+                if (word.Length >= 3 && !MemoryStopWords.Contains(word))
+                    words.Add(word.ToLowerInvariant());
+            }
+            return words;
+        }
+
+        private static async Task<string> ForgetAsync(ChatStore memories, string text)
+        {
+            List<string> removed = new List<string>();
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                foreach (MemoryRecord memory in await memories.GetMemoriesAsync())
+                {
+                    if (memory.Text.IndexOf(text.Trim(), StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        await memories.DeleteMemoryAsync(memory.Id);
+                        removed.Add(memory.Text);
+                    }
+                }
+            }
+            return removed.Count == 0 ? "No saved fact contains \"" + text + "\"." : "Deleted: " + string.Join("; ", removed);
+        }
+
+        // Open-Meteo (https://open-meteo.com, free, no key): a place name is looked up with its geocoding API first.
+        private static async Task<string> GetWeatherAsync(
+            [Description("The place, e.g. \"Paris\" or \"Shibuya, Tokyo\"; empty when giving coordinates")] string place,
+            [Description("The latitude, when not giving a place")] double? latitude,
+            [Description("The longitude, when not giving a place")] double? longitude,
+            CancellationToken cancellationToken)
+        {
+            string name = place;
+            if (latitude == null || longitude == null)
+            {
+                if (string.IsNullOrWhiteSpace(place))
+                    return "Give a place or coordinates.";
+                // The geocoder matches a single name: try the whole text, then its first part ("Shibuya, Tokyo" -> "Shibuya").
+                JsonElement? found = null;
+                foreach (string candidate in new[] { place.Trim(), place.Split(',')[0].Trim() })
+                {
+                    string geoUrl = "https://geocoding-api.open-meteo.com/v1/search?count=1&format=json&name=" + Uri.EscapeDataString(candidate);
+                    using (JsonDocument geo = JsonDocument.Parse(await Http.GetStringAsync(geoUrl, cancellationToken)))
+                    {
+                        if (geo.RootElement.TryGetProperty("results", out JsonElement results) && results.GetArrayLength() > 0)
+                        {
+                            found = results[0].Clone();
+                            break;
+                        }
+                    }
+                }
+                if (found == null)
+                    return "Couldn't find a place called \"" + place + "\".";
+                latitude = found.Value.GetProperty("latitude").GetDouble();
+                longitude = found.Value.GetProperty("longitude").GetDouble();
+                name = found.Value.GetProperty("name").GetString();
+                if (found.Value.TryGetProperty("country", out JsonElement country))
+                    name += ", " + country.GetString();
+            }
+            string url = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                "https://api.open-meteo.com/v1/forecast?latitude={0:F3}&longitude={1:F3}&timezone=auto&forecast_days=3" +
+                "&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m" +
+                "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+                latitude.Value, longitude.Value);
+            using (JsonDocument weather = JsonDocument.Parse(await Http.GetStringAsync(url, cancellationToken)))
+            {
+                JsonElement root = weather.RootElement;
+                JsonElement current = root.GetProperty("current");
+                StringBuilder text = new StringBuilder();
+                text.AppendFormat(System.Globalization.CultureInfo.InvariantCulture,
+                    "Weather in {0} now: {1}, {2:F0} °C (feels like {3:F0} °C), humidity {4:F0}%, wind {5:F0} km/h, precipitation {6:F1} mm.",
+                    string.IsNullOrWhiteSpace(name) ? "the requested place" : name,
+                    WeatherDescription(current.GetProperty("weather_code").GetInt32()),
+                    current.GetProperty("temperature_2m").GetDouble(), current.GetProperty("apparent_temperature").GetDouble(),
+                    current.GetProperty("relative_humidity_2m").GetDouble(), current.GetProperty("wind_speed_10m").GetDouble(),
+                    current.GetProperty("precipitation").GetDouble());
+                JsonElement daily = root.GetProperty("daily");
+                JsonElement days = daily.GetProperty("time");
+                for (int i = 0; i < days.GetArrayLength(); i++)
+                {
+                    JsonElement rain = daily.GetProperty("precipitation_probability_max")[i];
+                    text.AppendFormat(System.Globalization.CultureInfo.InvariantCulture, " {0}: {1}, {2:F0} to {3:F0} °C{4}.",
+                        i == 0 ? "Today" : DateTime.Parse(days[i].GetString(), System.Globalization.CultureInfo.InvariantCulture).ToString("dddd", System.Globalization.CultureInfo.InvariantCulture),
+                        WeatherDescription(daily.GetProperty("weather_code")[i].GetInt32()),
+                        daily.GetProperty("temperature_2m_min")[i].GetDouble(), daily.GetProperty("temperature_2m_max")[i].GetDouble(),
+                        rain.ValueKind == JsonValueKind.Number ? string.Format(", {0}% chance of rain", rain.GetInt32()) : "");
+                }
+                text.Append(" (Open-Meteo)");
+                return text.ToString();
+            }
+        }
+
+        // WMO weather interpretation codes, as Open-Meteo reports them.
+        private static string WeatherDescription(int code)
+        {
+            switch (code)
+            {
+                case 0: return "clear sky";
+                case 1: return "mainly clear";
+                case 2: return "partly cloudy";
+                case 3: return "overcast";
+                case 45: case 48: return "fog";
+                case 51: case 53: case 55: return "drizzle";
+                case 56: case 57: return "freezing drizzle";
+                case 61: return "light rain";
+                case 63: return "rain";
+                case 65: return "heavy rain";
+                case 66: case 67: return "freezing rain";
+                case 71: return "light snow";
+                case 73: return "snow";
+                case 75: return "heavy snow";
+                case 77: return "snow grains";
+                case 80: case 81: case 82: return "rain showers";
+                case 85: case 86: return "snow showers";
+                case 95: return "thunderstorm";
+                case 96: case 99: return "thunderstorm with hail";
+                default: return "weather code " + code;
+            }
         }
 
         // The user's location at about city level: the device's position (a recent known one, else a quick low-accuracy
