@@ -32,6 +32,7 @@ Directory.Build.props
 /Emgu.LiteRT.LM/NetStandard/docs/
 /Emgu.LiteRT.LM.Models/NetStandard/docs/
 /Emgu.LiteRT.LM.Extensions.AI/NetStandard/docs/
+/Emgu.LiteRT.LM.Agents/NetStandard/docs/
 /Emgu.TF.Lite.Models/NetStandard/docs/
 /Emgu.LiteRT.Models/NetStandard/docs/
 /Emgu.LiteRT.Runtime/Maui/*/docs/

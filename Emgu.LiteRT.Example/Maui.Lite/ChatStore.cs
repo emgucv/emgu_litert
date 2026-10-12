@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Agents;
 using SQLite;
 
 namespace Maui.Demo.Lite
@@ -109,7 +110,7 @@ namespace Maui.Demo.Lite
     /// audio stored as files in chats/attachments/{conversation id}/ and only their names in the database. (A
     /// subfolder, since the app data folder of an unsandboxed Mac Catalyst app is ~/Library itself.)
     /// </summary>
-    internal sealed class ChatStore
+    internal sealed class ChatStore : IAgentMemoryStore
     {
         private readonly string _attachmentRoot;
         private readonly Lazy<Task<SQLiteAsyncConnection>> _connection;
@@ -273,6 +274,17 @@ namespace Maui.Demo.Lite
         public async Task DeleteMemoryAsync(int id)
         {
             await (await Db).DeleteAsync<MemoryRecord>(id);
+        }
+
+        // The memories for the agent's remember / forget tools (Emgu.LiteRT.LM.Agents).
+        async Task<IList<AgentMemory>> IAgentMemoryStore.GetMemoriesAsync()
+        {
+            return (await GetMemoriesAsync()).Select(m => new AgentMemory(m.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), m.Text)).ToList();
+        }
+
+        Task IAgentMemoryStore.DeleteMemoryAsync(string id)
+        {
+            return DeleteMemoryAsync(int.Parse(id, System.Globalization.CultureInfo.InvariantCulture));
         }
 
         private static string Extension(string mediaType)

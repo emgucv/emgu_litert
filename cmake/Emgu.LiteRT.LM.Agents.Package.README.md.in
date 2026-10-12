@@ -1,0 +1,43 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Agents.dll`: ready-made tools for chat agents, as [Microsoft.Extensions.AI](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-ai) functions (`AgentTools`):
+
+| Tool | Factory | What it does |
+|---|---|---|
+| `get_current_date_time` | `AgentTools.CurrentDateTime()` | The local date and time, with the time zone |
+| `calculate` | `AgentTools.Calculate()` | Evaluates arithmetic exactly (`Calculator`) - small models get arithmetic wrong |
+| `remember`, `forget` | `AgentTools.Memory(store)` | Save and delete facts about the user in an `IAgentMemoryStore` (e.g. your app's database; `InMemoryAgentMemoryStore` for a quick start); `AgentTools.MemoryInstructionsAsync(store)` gives the agent the saved ones |
+| `get_current_location` | `AgentTools.Location(lookup)` | Where the user is, from a lookup your app provides (e.g. MAUI's Geolocation and Geocoding) |
+| `get_weather` | `AgentTools.Weather()` | Current weather and a 3-day forecast from [Open-Meteo](https://open-meteo.com) (no key needed) |
+| `search_wikipedia` | `AgentTools.Wikipedia()` | Introductions of the best matching English Wikipedia articles |
+| `search_web`, `read_web_page` | `AgentTools.TavilySearch(key)`, `AgentTools.TavilyReadPage(key)` | Web search and page text from [Tavily](https://tavily.com) (an API key is needed) |
+
+The tools don't use LiteRT-LM: they work with any `IChatClient` that calls tools, and with [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework/) agents. They were made for the on-device `${EMGU_LITERT_LM_MODELS_NUGET_ID}` language models (through `${EMGU_LITERT_LM_EXTENSIONS_AI_NUGET_ID}`), so their results are kept short. The web tools send what they look up (places, search terms, page addresses) to those services.
+
+```csharp
+using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Extensions.AI;
+using Emgu.LiteRT.LM.Models;
+using Microsoft.Extensions.AI;
+
+using (Gemma4E2B model = new Gemma4E2B())
+{
+    await model.Init();
+    using (IChatClient client = new ChatClientBuilder(model.AsIChatClient()).UseFunctionInvocation().Build())
+    {
+        ChatOptions options = new ChatOptions
+        {
+            Tools = new List<AITool> { AgentTools.CurrentDateTime(), AgentTools.Calculate(), AgentTools.Weather(), AgentTools.Wikipedia() }
+        };
+        ChatResponse response = await client.GetResponseAsync("What's the weather in Paris, and what is 17 * 24.3?", options);
+        Console.WriteLine(response.Text);
+    }
+}
+```
+
+`AgentTools.Describe(call)` describes a tool call (e.g. "Searching Wikipedia for “Ada Lovelace”"), to show while it runs.
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

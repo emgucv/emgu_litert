@@ -2,23 +2,28 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if WINDOWS || IOS || ANDROID || MACCATALYST
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 
-namespace Maui.Demo.Lite
+namespace Emgu.LiteRT.LM.Agents
 {
     /// <summary>
-    /// Evaluates arithmetic for the chat agent's calculate tool, since small language models get arithmetic wrong:
-    /// + - * / ^ (power) % (remainder), parentheses, unary minus, the constants pi and e, and the functions sqrt, cbrt,
-    /// abs, exp, ln, log (base 10), log2, sin/cos/tan/asin/acos/atan (radians), sinh/cosh/tanh, floor, ceil, round,
-    /// min, max, pow, hypot. Also accepts × ÷ − and · as the models write them, and a trailing % ("15% of 80" is
-    /// written 15% * 80 or 0.15 * 80).
+    /// Evaluates arithmetic exactly, for the calculate tool (AgentTools.Calculator), since small language models get
+    /// arithmetic wrong: + - * / ^ (power) % (remainder), parentheses, unary minus, the constants pi and e, and the
+    /// functions sqrt, cbrt, abs, exp, ln, log (base 10, or log(x, base)), log10, log2, sin/cos/tan/asin/acos/atan
+    /// (radians), sinh/cosh/tanh, floor, ceil, round (round(x, digits)), min, max, pow, hypot. Also accepts × ÷ − and ·
+    /// as models write them, ** for power, and a trailing % as percent ("15% of 80" is written 15% * 80).
     /// </summary>
-    internal static class Calculator
+    public static class Calculator
     {
+        /// <summary>
+        /// Evaluate an expression.
+        /// </summary>
+        /// <param name="expression">The expression, e.g. "(12.5 + 7) * 3 / 4"</param>
+        /// <returns>The value</returns>
+        /// <exception cref="FormatException">The expression can't be read</exception>
+        /// <exception cref="ArithmeticException">The result is not a number</exception>
         public static double Evaluate(string expression)
         {
             Parser parser = new Parser(Normalize(expression));
@@ -34,6 +39,8 @@ namespace Maui.Demo.Lite
         /// <summary>
         /// The value as text: up to 12 significant digits, without exponent for ordinary sizes.
         /// </summary>
+        /// <param name="value">The value</param>
+        /// <returns>The text</returns>
         public static string Format(double value)
         {
             if (double.IsInfinity(value))
@@ -97,20 +104,20 @@ namespace Maui.Demo.Lite
                 }
             }
 
-            // term = power { ("*" | "/" | "%") power }
+            // term = unary { ("*" | "/" | "%") unary }
             private double ParseTerm()
             {
-                double value = ParsePower();
+                double value = ParseUnary();
                 while (true)
                 {
                     if (Accept('*'))
-                        value *= ParsePower();
+                        value *= ParseUnary();
                     else if (Accept('/'))
-                        value /= ParsePower();
+                        value /= ParseUnary();
                     else if (PeekRemainder())
                     {
                         _i++;
-                        value %= ParsePower();
+                        value %= ParseUnary();
                     }
                     else
                         return value;
@@ -129,22 +136,28 @@ namespace Maui.Demo.Lite
                 return j < _s.Length && (char.IsLetterOrDigit(_s[j]) || _s[j] == '(' || _s[j] == '.');
             }
 
-            // power = unary [ "^" power ]   (right-associative)
-            private double ParsePower()
-            {
-                double value = ParseUnary();
-                if (Accept('^'))
-                    value = Math.Pow(value, ParsePower());
-                return value;
-            }
-
-            // unary = ("-" | "+") unary | primary [ "%" ]
+            // unary = ("-" | "+") unary | power   - so -2 ^ 2 is -(2 ^ 2), as in mathematics
             private double ParseUnary()
             {
                 if (Accept('-'))
                     return -ParseUnary();
                 if (Accept('+'))
                     return ParseUnary();
+                return ParsePower();
+            }
+
+            // power = postfix [ "^" unary ]   (right-associative; the exponent may be negative: 2 ^ -1)
+            private double ParsePower()
+            {
+                double value = ParsePostfix();
+                if (Accept('^'))
+                    value = Math.Pow(value, ParseUnary());
+                return value;
+            }
+
+            // postfix = primary [ "%" ]   (a percent sign)
+            private double ParsePostfix()
+            {
                 double value = ParsePrimary();
                 SkipSpaces();
                 if (_i < _s.Length && _s[_i] == '%' && !PeekRemainder())
@@ -236,13 +249,13 @@ namespace Maui.Demo.Lite
                 switch (name)
                 {
                     case "sqrt": return Math.Sqrt(One());
-                    case "cbrt": return Math.Cbrt(One());
+                    case "cbrt": { double x = One(); return x < 0 ? -Math.Pow(-x, 1.0 / 3) : Math.Pow(x, 1.0 / 3); }
                     case "abs": return Math.Abs(One());
                     case "exp": return Math.Exp(One());
                     case "ln": return Math.Log(One());
                     case "log": return a.Count == 2 ? Math.Log(a[0], a[1]) : Math.Log10(One());
                     case "log10": return Math.Log10(One());
-                    case "log2": return Math.Log2(One());
+                    case "log2": return Math.Log(One(), 2);
                     case "sin": return Math.Sin(One());
                     case "cos": return Math.Cos(One());
                     case "tan": return Math.Tan(One());
@@ -282,4 +295,3 @@ namespace Maui.Demo.Lite
     }
 }
 
-#endif

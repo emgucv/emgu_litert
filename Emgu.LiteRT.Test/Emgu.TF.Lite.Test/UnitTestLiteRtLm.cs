@@ -483,6 +483,145 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // Emgu.LiteRT.LM.Agents' Calculator, which the calculate tool uses.
+        [TestAttribute]
+        public void TestCalculator()
+        {
+            (String Expression, double Value)[] cases =
+            {
+                ("1234.5 * 678.9", 838102.05),
+                ("(3 + 4) ^ 2", 49),
+                ("2 ^ 3 ^ 2", 512),
+                ("-2 ^ 2", -4),
+                ("2 ^ -1", 0.5),
+                ("-3 * -2", 6),
+                ("15% * 80", 12),
+                ("17 % 5", 2),
+                ("12 \u00D7 3 \u00F7 4 \u2212 1", 8),
+                ("2 ** 10", 1024),
+                ("sqrt(16) + cbrt(-27) + abs(-2)", 3),
+                ("log(1000) + log2(8) + ln(e)", 7),
+                ("round(2.345, 2) + floor(1.9) + ceil(1.1)", 5.35),
+                ("min(3, 1, 2) + max(3, 1, 2) + pow(2, 3) + hypot(3, 4)", 17),
+                ("sin(pi / 2) + cos(0)", 2),
+                ("1e3 + 2.5E-1", 1000.25)
+            };
+            foreach (var c in cases)
+            {
+                double value = Emgu.LiteRT.LM.Agents.Calculator.Evaluate(c.Expression);
+                Console.WriteLine("{0} = {1}", c.Expression, Emgu.LiteRT.LM.Agents.Calculator.Format(value));
+                if (Math.Abs(value - c.Value) > 1e-9 * Math.Max(1, Math.Abs(c.Value)))
+                    throw new Exception(String.Format("{0} gave {1}, expected {2}", c.Expression, value, c.Value));
+            }
+            if (Emgu.LiteRT.LM.Agents.Calculator.Format(0.1 + 0.2) != "0.3")
+                throw new Exception("Format should hide floating-point noise");
+            foreach (String bad in new[] { "2 +", "(1 + 2", "foo(3)", "1 / 0 - 1 / 0", "2 $ 3" })
+            {
+                try
+                {
+                    Emgu.LiteRT.LM.Agents.Calculator.Evaluate(bad);
+                    throw new Exception("No error for " + bad);
+                }
+                catch (FormatException e) { Console.WriteLine("{0}: {1}", bad, e.Message); }
+                catch (ArithmeticException e) { Console.WriteLine("{0}: {1}", bad, e.Message); }
+            }
+        }
+
+        // The remember / forget tools with an in-memory store: a fact already saved in other words isn't saved again.
+        [TestAttribute]
+        public async Task TestAgentMemoryTools()
+        {
+            Emgu.LiteRT.LM.Agents.InMemoryAgentMemoryStore store = new Emgu.LiteRT.LM.Agents.InMemoryAgentMemoryStore();
+            IList<AIFunction> tools = Emgu.LiteRT.LM.Agents.AgentTools.Memory(store);
+            AIFunction remember = tools.First(t => t.Name == "remember");
+            AIFunction forget = tools.First(t => t.Name == "forget");
+            Func<AIFunction, String, String, Task<String>> call = async (f, name, value) =>
+                (await f.InvokeAsync(new AIFunctionArguments { [name] = value }))?.ToString();
+
+            String saved = await call(remember, "fact", "The user's daughter is called Mia.");
+            String again = await call(remember, "fact", "My daughter's name is Mia.");
+            String other = await call(remember, "fact", "The user is vegetarian.");
+            Console.WriteLine("{0} | {1} | {2}", saved, again, other);
+            if (!saved.StartsWith("Saved") || !again.StartsWith("Already remembered") || !other.StartsWith("Saved"))
+                throw new Exception("Unexpected remember results");
+            String instructions = await Emgu.LiteRT.LM.Agents.AgentTools.MemoryInstructionsAsync(store);
+            Console.WriteLine(instructions);
+            if (instructions == null || !instructions.Contains("Mia") || !instructions.Contains("vegetarian"))
+                throw new Exception("The memories are missing from the instructions");
+            String forgotten = await call(forget, "text", "vegetarian");
+            Console.WriteLine(forgotten);
+            if ((await store.GetMemoriesAsync()).Count != 1 || !forgotten.StartsWith("Deleted"))
+                throw new Exception("forget didn't delete the memory");
+            if (!(await call(forget, "text", "pizza")).StartsWith("No saved fact"))
+                throw new Exception("forget should report nothing to delete");
+            // The model words what to forget its own way.
+            await call(remember, "fact", "The user loves hiking in the Alps.");
+            String hiking = await call(forget, "text", "I love hiking in the Alps");
+            Console.WriteLine(hiking);
+            if (!hiking.StartsWith("Deleted") || (await store.GetMemoriesAsync()).Any(m => m.Text.Contains("hiking")))
+                throw new Exception("forget didn't match the reworded fact");
+        }
+
+        // The web tools against the real services (Open-Meteo, Wikipedia): needs the network, so off by default.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestAgentWebTools()
+        {
+            String weather = (await Emgu.LiteRT.LM.Agents.AgentTools.Weather().InvokeAsync(
+                new AIFunctionArguments { ["place"] = "Paris" }))?.ToString();
+            Console.WriteLine(weather);
+            if (weather == null || !weather.Contains("Paris") || !weather.Contains("\u00B0C"))
+                throw new Exception("Unexpected weather result");
+            String wikipedia = (await Emgu.LiteRT.LM.Agents.AgentTools.Wikipedia().InvokeAsync(
+                new AIFunctionArguments { ["query"] = "Ada Lovelace" }))?.ToString();
+            Console.WriteLine(wikipedia);
+            if (wikipedia == null || !wikipedia.Contains("Ada Lovelace") || !wikipedia.Contains("wikipedia.org"))
+                throw new Exception("Unexpected Wikipedia result");
+        }
+
+        // Gemma 4 E2B using Emgu.LiteRT.LM.Agents' tools through UseFunctionInvocation(): the calculator for arithmetic
+        // and the weather tool for a place.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestAgentTools()
+        {
+            RequireLiteRtLm();
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                await model.Init();
+                using (IChatClient client = new ChatClientBuilder(model.AsIChatClient()).UseFunctionInvocation().Build())
+                {
+                    ChatOptions options = new ChatOptions
+                    {
+                        Tools = new List<AITool> { Emgu.LiteRT.LM.Agents.AgentTools.CurrentDateTime(), Emgu.LiteRT.LM.Agents.AgentTools.Calculate(),
+                            Emgu.LiteRT.LM.Agents.AgentTools.Weather(), Emgu.LiteRT.LM.Agents.AgentTools.Wikipedia() },
+                        Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }
+                    };
+                    foreach (var q in new[] { ("What is 1234.5 times 678.9?", "calculate", "838"), ("What's the weather in Paris right now?", "get_weather", "\u00B0") })
+                    {
+                        ChatResponse response = await client.GetResponseAsync(q.Item1, options);
+                        List<FunctionCallContent> calls = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
+                        Console.WriteLine("{0} -> {1}: {2}", q.Item1,
+                            String.Join(", ", calls.Select(Emgu.LiteRT.LM.Agents.AgentTools.Describe)), response.Text);
+                        if (!calls.Any(c => c.Name == q.Item2) || response.Text.IndexOf(q.Item3, StringComparison.Ordinal) < 0)
+                            throw new Exception("The tool wasn't used, or its result isn't in the answer: " + q.Item1);
+                    }
+                }
+            }
+        }
+
         // DocumentIndex.SplitText: passages within the limit, at sentence ends, overlapping, covering the whole text.
         [TestAttribute]
         public void TestDocumentSplitText()

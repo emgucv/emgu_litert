@@ -1,0 +1,523 @@
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Globalization;
+using System.IO;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
+
+namespace Emgu.LiteRT.LM.Agents
+{
+    /// <summary>
+    /// Ready-made tools for chat agents, as Microsoft.Extensions.AI functions: give them to an IChatClient that calls
+    /// tools (ChatOptions.Tools with ChatClientBuilder.UseFunctionInvocation(), or a Microsoft Agent Framework agent).
+    /// The date and time, a calculator, memories about the user, the user's location (from a lookup the app provides),
+    /// and on the web: the weather (Open-Meteo, no key needed), Wikipedia and - with a Tavily API key - a web search and
+    /// a web page reader. The web tools send what they look up to those services. Results are kept short, since an
+    /// on-device model has a small context.
+    /// </summary>
+    public static class AgentTools
+    {
+        private const int MaxResultLength = 1500;
+        private const int TopArticleLength = 1100;
+        private const int OtherArticleLength = 300;
+
+        private static readonly Lazy<HttpClient> SharedHttp = new Lazy<HttpClient>(() =>
+        {
+            HttpClient client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+            // Wikipedia asks API clients to identify themselves.
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Emgu.LiteRT.LM.Agents/1.0 (https://www.emgu.com)");
+            return client;
+        });
+
+        /// <summary>
+        /// The HttpClient the web tools use when given none: 20 s timeout, a User-Agent naming this package.
+        /// </summary>
+        public static HttpClient DefaultHttpClient
+        {
+            get { return SharedHttp.Value; }
+        }
+
+        /// <summary>
+        /// get_current_date_time: the local date and time, with the time zone.
+        /// </summary>
+        public static AIFunction CurrentDateTime()
+        {
+            return AIFunctionFactory.Create(
+                () => DateTimeOffset.Now.ToString("dddd, d MMMM yyyy, HH:mm (zzz)", CultureInfo.InvariantCulture),
+                "get_current_date_time",
+                "Returns the current local date and time.");
+        }
+
+        /// <summary>
+        /// calculate: evaluates an arithmetic expression exactly (Calculator), so the model doesn't have to.
+        /// </summary>
+        public static AIFunction Calculate()
+        {
+            return AIFunctionFactory.Create(
+                ([Description("The expression, e.g. \"(12.5 + 7) * 3 / 4\"")] string expression) => CalculateText(expression),
+                "calculate",
+                "Calculates an arithmetic expression exactly, e.g. \"17 * 24.3\", \"(3 + 4) ^ 2\", \"sqrt(2)\", \"15% * 80\". Always use it for arithmetic instead of working it out yourself.");
+        }
+
+        private static string CalculateText(string expression)
+        {
+            try
+            {
+                return expression + " = " + Calculator.Format(Calculator.Evaluate(expression));
+            }
+            catch (Exception e) when (e is FormatException || e is ArithmeticException)
+            {
+                return "Couldn't calculate \"" + expression + "\": " + e.Message;
+            }
+        }
+
+        /// <summary>
+        /// remember and forget: save and delete lasting facts about the user. Give the agent the saved ones with each
+        /// message too (MemoryInstructionsAsync), so it uses them without being asked.
+        /// </summary>
+        /// <param name="store">Where the facts are kept</param>
+        public static IList<AIFunction> Memory(IAgentMemoryStore store)
+        {
+            if (store == null)
+                throw new ArgumentNullException("store");
+            return new List<AIFunction>
+            {
+                AIFunctionFactory.Create(
+                    ([Description("The fact, as a short sentence about the user, e.g. \"The user is vegetarian.\"")] string fact) => RememberAsync(store, fact),
+                    "remember",
+                    "Saves a new lasting fact about the user - their name, preferences, family, work, plans - so you know it in later chats. Use it only when the user tells you something about themselves you don't already know, or asks you to remember something."),
+                AIFunctionFactory.Create(
+                    ([Description("Words from the fact to delete, e.g. \"hiking\"")] string text) => ForgetAsync(store, text),
+                    "forget",
+                    "Deletes saved facts about the user that contain the given words, when the user asks you to forget something or it is no longer true.")
+            };
+        }
+
+        /// <summary>
+        /// The latest saved facts about the user that fit maxLength, oldest first, as instructions for the agent (e.g.
+        /// ChatOptions.Instructions), or null if there are none.
+        /// </summary>
+        /// <param name="store">Where the facts are kept</param>
+        /// <param name="maxLength">The most characters of facts to include</param>
+        public static async Task<string> MemoryInstructionsAsync(IAgentMemoryStore store, int maxLength = 1200)
+        {
+            if (store == null)
+                return null;
+            IList<AgentMemory> memories = await store.GetMemoriesAsync().ConfigureAwait(false);
+            List<string> lines = new List<string>();
+            int length = 0;
+            for (int i = memories.Count - 1; i >= 0; i--)
+            {
+                string line = "- " + memories[i].Text;
+                if (length + line.Length > maxLength)
+                    break;
+                lines.Insert(0, line);
+                length += line.Length + 1;
+            }
+            return lines.Count == 0 ? null
+                : "What you know about the user from earlier chats - already saved, so don't save these again; use them when they " +
+                  "help, without repeating them back unasked:\n" + string.Join("\n", lines);
+        }
+
+        private static async Task<string> RememberAsync(IAgentMemoryStore store, string fact)
+        {
+            if (string.IsNullOrWhiteSpace(fact))
+                return "Nothing to remember.";
+            // Small models re-save known facts in other words ("My daughter's name is Mia." after "The user's daughter is
+            // called Mia."): skip a fact whose words are all in one already saved.
+            HashSet<string> words = ContentWords(fact);
+            foreach (AgentMemory existing in await store.GetMemoriesAsync().ConfigureAwait(false))
+                if (words.Count > 0 && words.IsSubsetOf(ContentWords(existing.Text)))
+                    return "Already remembered: " + existing.Text;
+            return await store.AddMemoryAsync(fact.Trim()).ConfigureAwait(false) ? "Saved: " + fact.Trim() : "Already remembered: " + fact.Trim();
+        }
+
+        private static readonly HashSet<string> MemoryStopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "the", "user", "users", "user's", "their", "they", "and", "are", "his", "her", "has", "have", "that", "this",
+            "name", "named", "called", "with", "for", "who", "was", "will", "you", "your", "i'm", "my"
+        };
+
+        private static HashSet<string> ContentWords(string text)
+        {
+            HashSet<string> words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string raw in (text ?? string.Empty).Split(new[] { ' ', ',', '.', ';', ':', '!', '?', '"', '(', ')' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string word = raw.Trim('\'', '’');
+                if (word.EndsWith("'s", StringComparison.OrdinalIgnoreCase) || word.EndsWith("’s", StringComparison.OrdinalIgnoreCase))
+                    word = word.Substring(0, word.Length - 2);
+                if (word.Length < 3 || MemoryStopWords.Contains(word))
+                    continue;
+                word = word.ToLowerInvariant();
+                // A crude singular, so "loves" matches "love" and "Alps" "Alp".
+                if (word.Length > 3 && word.EndsWith("s", StringComparison.Ordinal) && !word.EndsWith("ss", StringComparison.Ordinal))
+                    word = word.Substring(0, word.Length - 1);
+                words.Add(word);
+            }
+            return words;
+        }
+
+        private static async Task<string> ForgetAsync(IAgentMemoryStore store, string text)
+        {
+            List<string> removed = new List<string>();
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                // The model words the fact its own way ("I love hiking" for "The user loves hiking in the Alps."): delete
+                // the memories that contain the text, or all its content words.
+                HashSet<string> words = ContentWords(text);
+                foreach (AgentMemory memory in await store.GetMemoriesAsync().ConfigureAwait(false))
+                {
+                    if (memory.Text.IndexOf(text.Trim(), StringComparison.OrdinalIgnoreCase) >= 0
+                        || (words.Count > 0 && words.IsSubsetOf(ContentWords(memory.Text))))
+                    {
+                        await store.DeleteMemoryAsync(memory.Id).ConfigureAwait(false);
+                        removed.Add(memory.Text);
+                    }
+                }
+            }
+            return removed.Count == 0 ? "No saved fact contains \"" + text + "\"." : "Deleted: " + string.Join("; ", removed);
+        }
+
+        /// <summary>
+        /// get_current_location: where the user is, from a lookup the app provides - the platform's location services
+        /// differ (e.g. MAUI's Geolocation and Geocoding). It should return a sentence such as "The user is in Shibuya,
+        /// Tokyo, Japan (latitude 35.66, longitude 139.70).", or why it can't ("Location services are turned off.").
+        /// </summary>
+        /// <param name="getLocation">The app's location lookup</param>
+        public static AIFunction Location(Func<CancellationToken, Task<string>> getLocation)
+        {
+            if (getLocation == null)
+                throw new ArgumentNullException("getLocation");
+            return AIFunctionFactory.Create(
+                (CancellationToken cancellationToken) => getLocation(cancellationToken),
+                "get_current_location",
+                "Returns where the user is now: their town or city, region and country, and approximate coordinates. Use it for questions about things near the user, local weather, or their time zone.");
+        }
+
+        /// <summary>
+        /// get_weather: the current weather and a 3-day forecast from Open-Meteo (https://open-meteo.com, free, no key),
+        /// for a place name (looked up with its geocoding API) or coordinates.
+        /// </summary>
+        /// <param name="http">The HttpClient to use, or null for DefaultHttpClient</param>
+        public static AIFunction Weather(HttpClient http = null)
+        {
+            HttpClient client = http ?? DefaultHttpClient;
+            return AIFunctionFactory.Create(
+                ([Description("The place, e.g. \"Paris\" or \"Shibuya, Tokyo\"; empty when giving coordinates")] string place = null,
+                 [Description("The latitude, when not giving a place")] double? latitude = null,
+                 [Description("The longitude, when not giving a place")] double? longitude = null,
+                 CancellationToken cancellationToken = default(CancellationToken)) => GetWeatherAsync(client, place, latitude, longitude, cancellationToken),
+                "get_weather",
+                "Returns the current weather and a 3-day forecast for a place (give its name, e.g. \"Paris\") or for coordinates (e.g. from get_current_location).");
+        }
+
+        private static async Task<string> GetWeatherAsync(HttpClient http, string place, double? latitude, double? longitude,
+            CancellationToken cancellationToken)
+        {
+            string name = place;
+            if (latitude == null || longitude == null)
+            {
+                if (string.IsNullOrWhiteSpace(place))
+                    return "Give a place or coordinates.";
+                // The geocoder matches a single name: try the whole text, then its first part ("Shibuya, Tokyo" -> "Shibuya").
+                JsonElement? found = null;
+                foreach (string candidate in new[] { place.Trim(), place.Split(',')[0].Trim() })
+                {
+                    string geoUrl = "https://geocoding-api.open-meteo.com/v1/search?count=1&format=json&name=" + Uri.EscapeDataString(candidate);
+                    using (JsonDocument geo = await GetJsonAsync(http, geoUrl, cancellationToken).ConfigureAwait(false))
+                    {
+                        if (geo.RootElement.TryGetProperty("results", out JsonElement results) && results.GetArrayLength() > 0)
+                        {
+                            found = results[0].Clone();
+                            break;
+                        }
+                    }
+                }
+                if (found == null)
+                    return "Couldn't find a place called \"" + place + "\".";
+                latitude = found.Value.GetProperty("latitude").GetDouble();
+                longitude = found.Value.GetProperty("longitude").GetDouble();
+                name = found.Value.GetProperty("name").GetString();
+                if (found.Value.TryGetProperty("country", out JsonElement country))
+                    name += ", " + country.GetString();
+            }
+            string url = string.Format(CultureInfo.InvariantCulture,
+                "https://api.open-meteo.com/v1/forecast?latitude={0:F3}&longitude={1:F3}&timezone=auto&forecast_days=3" +
+                "&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m" +
+                "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+                latitude.Value, longitude.Value);
+            using (JsonDocument weather = await GetJsonAsync(http, url, cancellationToken).ConfigureAwait(false))
+            {
+                JsonElement root = weather.RootElement;
+                JsonElement current = root.GetProperty("current");
+                StringBuilder text = new StringBuilder();
+                text.AppendFormat(CultureInfo.InvariantCulture,
+                    "Weather in {0} now: {1}, {2:F0} °C (feels like {3:F0} °C), humidity {4:F0}%, wind {5:F0} km/h, precipitation {6:F1} mm.",
+                    string.IsNullOrWhiteSpace(name) ? "the requested place" : name,
+                    WeatherDescription(current.GetProperty("weather_code").GetInt32()),
+                    current.GetProperty("temperature_2m").GetDouble(), current.GetProperty("apparent_temperature").GetDouble(),
+                    current.GetProperty("relative_humidity_2m").GetDouble(), current.GetProperty("wind_speed_10m").GetDouble(),
+                    current.GetProperty("precipitation").GetDouble());
+                JsonElement daily = root.GetProperty("daily");
+                JsonElement days = daily.GetProperty("time");
+                for (int i = 0; i < days.GetArrayLength(); i++)
+                {
+                    JsonElement rain = daily.GetProperty("precipitation_probability_max")[i];
+                    text.AppendFormat(CultureInfo.InvariantCulture, " {0}: {1}, {2:F0} to {3:F0} °C{4}.",
+                        i == 0 ? "Today" : DateTime.Parse(days[i].GetString(), CultureInfo.InvariantCulture).ToString("dddd", CultureInfo.InvariantCulture),
+                        WeatherDescription(daily.GetProperty("weather_code")[i].GetInt32()),
+                        daily.GetProperty("temperature_2m_min")[i].GetDouble(), daily.GetProperty("temperature_2m_max")[i].GetDouble(),
+                        rain.ValueKind == JsonValueKind.Number ? string.Format(CultureInfo.InvariantCulture, ", {0}% chance of rain", rain.GetInt32()) : "");
+                }
+                text.Append(" (Open-Meteo)");
+                return text.ToString();
+            }
+        }
+
+        // WMO weather interpretation codes, as Open-Meteo reports them.
+        private static string WeatherDescription(int code)
+        {
+            switch (code)
+            {
+                case 0: return "clear sky";
+                case 1: return "mainly clear";
+                case 2: return "partly cloudy";
+                case 3: return "overcast";
+                case 45: case 48: return "fog";
+                case 51: case 53: case 55: return "drizzle";
+                case 56: case 57: return "freezing drizzle";
+                case 61: return "light rain";
+                case 63: return "rain";
+                case 65: return "heavy rain";
+                case 66: case 67: return "freezing rain";
+                case 71: return "light snow";
+                case 73: return "snow";
+                case 75: return "heavy snow";
+                case 77: return "snow grains";
+                case 80: case 81: case 82: return "rain showers";
+                case 85: case 86: return "snow showers";
+                case 95: return "thunderstorm";
+                case 96: case 99: return "thunderstorm with hail";
+                default: return "weather code " + code;
+            }
+        }
+
+        /// <summary>
+        /// search_wikipedia: searches English Wikipedia and returns the introductions of the best matching articles,
+        /// most of the room going to the best match.
+        /// </summary>
+        /// <param name="http">The HttpClient to use, or null for DefaultHttpClient</param>
+        public static AIFunction Wikipedia(HttpClient http = null)
+        {
+            HttpClient client = http ?? DefaultHttpClient;
+            return AIFunctionFactory.Create(
+                ([Description("What to search for, e.g. a name or a topic")] string query, CancellationToken cancellationToken) =>
+                    SearchWikipediaAsync(client, query, cancellationToken),
+                "search_wikipedia",
+                "Searches English Wikipedia and returns the introductions of the best matching articles. Use it for facts about people, places, events, science and history.");
+        }
+
+        private static async Task<string> SearchWikipediaAsync(HttpClient http, string query, CancellationToken cancellationToken)
+        {
+            // Find the best matching articles, then get their introductions as plain text.
+            string searchUrl = "https://en.wikipedia.org/w/api.php?action=query&list=search&srlimit=3&format=json&srsearch="
+                + Uri.EscapeDataString(query ?? string.Empty);
+            List<string> titles = new List<string>();
+            using (JsonDocument search = await GetJsonAsync(http, searchUrl, cancellationToken).ConfigureAwait(false))
+            {
+                foreach (JsonElement result in search.RootElement.GetProperty("query").GetProperty("search").EnumerateArray())
+                    titles.Add(result.GetProperty("title").GetString());
+            }
+            if (titles.Count == 0)
+                return "No Wikipedia articles found for \"" + query + "\".";
+
+            string extractsUrl = "https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&redirects=1&format=json&titles="
+                + Uri.EscapeDataString(string.Join("|", titles));
+            Dictionary<string, string> extracts = new Dictionary<string, string>();
+            using (JsonDocument pages = await GetJsonAsync(http, extractsUrl, cancellationToken).ConfigureAwait(false))
+            {
+                foreach (JsonProperty page in pages.RootElement.GetProperty("query").GetProperty("pages").EnumerateObject())
+                {
+                    if (page.Value.TryGetProperty("extract", out JsonElement extract))
+                        extracts[page.Value.GetProperty("title").GetString()] = extract.GetString();
+                }
+            }
+
+            // Most of the room goes to the best match: the answer is often further into its introduction.
+            StringBuilder text = new StringBuilder();
+            for (int i = 0; i < titles.Count; i++)
+            {
+                string title = titles[i];
+                if (!extracts.TryGetValue(title, out string extract) || string.IsNullOrWhiteSpace(extract))
+                    continue;
+                text.Append("Article: ").Append(title)
+                    .Append(" (https://en.wikipedia.org/wiki/").Append(Uri.EscapeDataString(title.Replace(' ', '_'))).Append(")\n")
+                    .Append(Shorten(extract, i == 0 ? TopArticleLength : OtherArticleLength)).Append("\n\n");
+            }
+            return text.Length > 0 ? text.ToString().TrimEnd() : "No Wikipedia articles found for \"" + query + "\".";
+        }
+
+        /// <summary>
+        /// search_web: searches the web with Tavily (https://tavily.com, an API key is needed; free for about 1,000
+        /// searches a month) and returns extracts of the best matching pages.
+        /// </summary>
+        /// <param name="apiKey">The Tavily API key</param>
+        /// <param name="http">The HttpClient to use, or null for DefaultHttpClient</param>
+        public static AIFunction TavilySearch(string apiKey, HttpClient http = null)
+        {
+            string key = CheckKey(apiKey);
+            HttpClient client = http ?? DefaultHttpClient;
+            return AIFunctionFactory.Create(
+                ([Description("What to search for")] string query, CancellationToken cancellationToken) => SearchWebAsync(client, key, query, cancellationToken),
+                "search_web",
+                "Searches the web and returns extracts of the best matching pages. Use it for news, recent events and anything Wikipedia doesn't cover.");
+        }
+
+        /// <summary>
+        /// read_web_page: the text of a web page, extracted by Tavily (an API key is needed).
+        /// </summary>
+        /// <param name="apiKey">The Tavily API key</param>
+        /// <param name="http">The HttpClient to use, or null for DefaultHttpClient</param>
+        public static AIFunction TavilyReadPage(string apiKey, HttpClient http = null)
+        {
+            string key = CheckKey(apiKey);
+            HttpClient client = http ?? DefaultHttpClient;
+            return AIFunctionFactory.Create(
+                ([Description("The address of the page")] string url, CancellationToken cancellationToken) => ReadWebPageAsync(client, key, url, cancellationToken),
+                "read_web_page",
+                "Returns the text of a web page.");
+        }
+
+        private static string CheckKey(string apiKey)
+        {
+            if (string.IsNullOrWhiteSpace(apiKey))
+                throw new ArgumentException("A Tavily API key is needed", "apiKey");
+            return apiKey.Trim();
+        }
+
+        private static async Task<string> SearchWebAsync(HttpClient http, string apiKey, string query, CancellationToken cancellationToken)
+        {
+            string body = WriteJson(writer =>
+            {
+                writer.WriteString("query", query ?? string.Empty);
+                writer.WriteNumber("max_results", 3);
+                writer.WriteString("search_depth", "basic");
+            });
+            using (JsonDocument response = await PostTavilyAsync(http, apiKey, "search", body, cancellationToken).ConfigureAwait(false))
+            {
+                StringBuilder text = new StringBuilder();
+                JsonElement results = response.RootElement.GetProperty("results");
+                int count = Math.Max(1, results.GetArrayLength());
+                foreach (JsonElement result in results.EnumerateArray())
+                {
+                    text.Append("Page: ").Append(result.GetProperty("title").GetString())
+                        .Append(" (").Append(result.GetProperty("url").GetString()).Append(")\n")
+                        .Append(Shorten(result.GetProperty("content").GetString(), MaxResultLength / count)).Append("\n\n");
+                }
+                return text.Length > 0 ? text.ToString().TrimEnd() : "No results found for \"" + query + "\".";
+            }
+        }
+
+        private static async Task<string> ReadWebPageAsync(HttpClient http, string apiKey, string url, CancellationToken cancellationToken)
+        {
+            string body = WriteJson(writer =>
+            {
+                writer.WriteStartArray("urls");
+                writer.WriteStringValue(url ?? string.Empty);
+                writer.WriteEndArray();
+            });
+            using (JsonDocument response = await PostTavilyAsync(http, apiKey, "extract", body, cancellationToken).ConfigureAwait(false))
+            {
+                foreach (JsonElement result in response.RootElement.GetProperty("results").EnumerateArray())
+                    return Shorten(result.GetProperty("raw_content").GetString(), MaxResultLength);
+                return "Could not read " + url + ".";
+            }
+        }
+
+        // A JSON object written by Utf8JsonWriter (no reflection-based serialization, so it survives trimming).
+        private static string WriteJson(Action<Utf8JsonWriter> writeProperties)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                using (Utf8JsonWriter writer = new Utf8JsonWriter(stream))
+                {
+                    writer.WriteStartObject();
+                    writeProperties(writer);
+                    writer.WriteEndObject();
+                }
+                return Encoding.UTF8.GetString(stream.ToArray());
+            }
+        }
+
+        private static async Task<JsonDocument> PostTavilyAsync(HttpClient http, string apiKey, string endpoint, string body, CancellationToken cancellationToken)
+        {
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "https://api.tavily.com/" + endpoint))
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+                request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                using (HttpResponseMessage response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false))
+                {
+                    string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    if (!response.IsSuccessStatusCode)
+                        throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, "Tavily returned {0}", (int)response.StatusCode));
+                    return JsonDocument.Parse(json);
+                }
+            }
+        }
+
+        private static async Task<JsonDocument> GetJsonAsync(HttpClient http, string url, CancellationToken cancellationToken)
+        {
+            using (HttpResponseMessage response = await http.GetAsync(url, cancellationToken).ConfigureAwait(false))
+            {
+                response.EnsureSuccessStatusCode();
+                return JsonDocument.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+            }
+        }
+
+        private static string Shorten(string text, int maxLength)
+        {
+            text = (text ?? "").Trim();
+            return text.Length <= maxLength ? text : text.Substring(0, maxLength).TrimEnd() + "...";
+        }
+
+        /// <summary>
+        /// A short description of a call of one of these tools, e.g. "Searching Wikipedia for “Ada Lovelace”", to show
+        /// while it runs; "Calling name" for other tools.
+        /// </summary>
+        /// <param name="call">The tool call</param>
+        /// <returns>The description</returns>
+        public static string Describe(FunctionCallContent call)
+        {
+            if (call == null)
+                throw new ArgumentNullException("call");
+            string Argument(string name) =>
+                call.Arguments != null && call.Arguments.TryGetValue(name, out object value) && value != null
+                    ? (value is JsonElement element && element.ValueKind == JsonValueKind.String ? element.GetString() : value.ToString())
+                    : "";
+            switch (call.Name)
+            {
+                case "get_current_date_time": return "Checking the date and time";
+                case "get_current_location": return "Getting your location";
+                case "calculate": return "Calculating " + Argument("expression");
+                case "get_weather":
+                    string place = Argument("place");
+                    return "Checking the weather" + (place.Length > 0 ? " in " + place : "");
+                case "remember": return "Remembering: " + Argument("fact");
+                case "forget": return "Forgetting “" + Argument("text") + "”";
+                case "search_wikipedia": return "Searching Wikipedia for “" + Argument("query") + "”";
+                case "search_web": return "Searching the web for “" + Argument("query") + "”";
+                case "read_web_page": return "Reading " + Argument("url");
+                default: return "Calling " + call.Name;
+            }
+        }
+    }
+}

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<AssemblyName>Emgu.LiteRT.LM.Agents</AssemblyName>
+	<TargetName>$(AssemblyName)</TargetName>
+	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
+	<LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TensorflowBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\lib))</TensorflowBinaryDir>
+	<OutputPath>$(TensorflowBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <Import Project="..\Emgu.LiteRT.LM.Agents.Shared.projitems" Label="Shared" />
+
+  <!--
+  Emgu.LiteRT.LM.Agents holds ready-made tools for chat agents (Microsoft.Extensions.AI functions): a calculator, the
+  date and time, the weather, Wikipedia and Tavily web search, memories and the location. They don't use LiteRT-LM, so
+  they work with any IChatClient - e.g. the Emgu.LiteRT.LM.Models language models through Emgu.LiteRT.LM.Extensions.AI.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.10.1" />
+  </ItemGroup>
+  <!-- System.Text.Json: part of the .NET runtime for net8.0; for netstandard2.0 Microsoft.Extensions.AI.Abstractions
+       brings the package. -->
+</Project>

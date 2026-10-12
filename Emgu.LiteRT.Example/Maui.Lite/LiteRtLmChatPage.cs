@@ -14,6 +14,7 @@ using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.Util;
 using Emgu.LiteRT.LM.Extensions.AI;
+using Emgu.LiteRT.LM.Agents;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
@@ -167,7 +168,7 @@ namespace Maui.Demo.Lite
         private CancellationTokenSource _recordingTimer;
         private CancellationTokenSource _speech;
 
-        // Web search: an agent (Microsoft Agent Framework) over the model's IChatClient, with the AgentTools.
+        // Web search: an agent (Microsoft Agent Framework) over the model's IChatClient, with the tools of ChatAgentTools.
         private const string TavilyKeyStorageName = "tavily_api_key";
         private const string AgentInstructions =
             "You are a helpful assistant running on the user's device. You can look things up with your tools: use them " +
@@ -1435,7 +1436,7 @@ namespace Maui.Demo.Lite
             ChatOptions options = new ChatOptions
             {
                 Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
-                Tools = AgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
+                Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
                     _memorySwitch.IsToggled ? _store : null),
                 Instructions = await MemoryInstructionsAsync(),
                 ToolMode = ChatToolMode.Auto
@@ -2317,28 +2318,14 @@ namespace Maui.Demo.Lite
         {
             if (!_memorySwitch.IsToggled)
                 return null;
-            List<MemoryRecord> memories;
             try
             {
-                memories = await _store.GetMemoriesAsync();
+                return await AgentTools.MemoryInstructionsAsync(_store, MaxMemoryLength);
             }
             catch (Exception)
             {
                 return null;
             }
-            List<string> lines = new List<string>();
-            int length = 0;
-            for (int i = memories.Count - 1; i >= 0; i--)
-            {
-                string line = "- " + memories[i].Text;
-                if (length + line.Length > MaxMemoryLength)
-                    break;
-                lines.Insert(0, line);
-                length += line.Length + 1;
-            }
-            return lines.Count == 0 ? null
-                : "What you know about the user from earlier chats - already saved, so don't save these again; use them when they " +
-                  "help, without repeating them back unasked:\n" + string.Join("\n", lines);
         }
 
         private async Task RefreshMemoryCountAsync()

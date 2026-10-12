@@ -16,7 +16,7 @@ using (Gemma4E2B model = new Gemma4E2B())
     {
         ChatOptions options = new ChatOptions
         {
-            Tools = { AIFunctionFactory.Create(() => DateTime.Now.ToString("D"), "get_date", "Returns today's date") }
+            Tools = new List<AITool> { AIFunctionFactory.Create(() => DateTime.Now.ToString("D"), "get_date", "Returns today's date") }
         };
         ChatResponse response = await client.GetResponseAsync("What day is it today?", options);
         Console.WriteLine(response.Text);
