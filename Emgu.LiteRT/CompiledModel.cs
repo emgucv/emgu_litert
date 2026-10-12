@@ -89,10 +89,98 @@ namespace Emgu.LiteRT
         /// <returns>The output buffer</returns>
         public TensorBuffer CreateOutputBuffer(int signatureIndex, int outputIndex)
         {
+            RankedTensorType tensorType = _model.GetSignature(signatureIndex).GetOutputTensorType(outputIndex);
+            if (!HasKnownShape(tensorType))
+            {
+                // The model file doesn't record this output's shape (e.g. the outputs of a custom op such as
+                // TFLite_Detection_PostProcess, "Float32[]"), so the buffer requirements are for a single value; the
+                // compiled model knows the actual shape.
+                RankedTensorType resolved = GetOutputTensorTypes(signatureIndex, true)[outputIndex];
+                if (HasKnownShape(resolved) && resolved.Rank > 0)
+                {
+                    long size = resolved.ElementCount * ElementSize(resolved.ElementType);
+                    LiteRtInvoke.CheckStatus(LiteRtInvoke.LiteRtCreateManagedTensorBuffer(
+                        _environment, TensorBufferType.HostMemory, ref resolved, new UIntPtr((ulong)size), out IntPtr buffer));
+                    return new TensorBuffer(buffer);
+                }
+            }
             LiteRtInvoke.CheckStatus(LiteRtInvoke.LiteRtGetCompiledModelOutputBufferRequirements(
                 _ptr, new UIntPtr((uint)signatureIndex), new UIntPtr((uint)outputIndex), out IntPtr requirements));
-            RankedTensorType tensorType = _model.GetSignature(signatureIndex).GetOutputTensorType(outputIndex);
             return CreateBufferFromRequirements(tensorType, requirements);
+        }
+
+        /// <summary>
+        /// The types of a signature's outputs with the shapes the compiled model resolved, which the model file may not
+        /// record (Signature.GetOutputTensorType then has no dimensions).
+        /// </summary>
+        /// <param name="signatureIndex">The signature index</param>
+        /// <param name="updateAllocation">Whether LiteRT should (re)allocate the model's tensors first, so shapes that are
+        /// only known once they are allocated - e.g. the outputs of TFLite_Detection_PostProcess, before the first run -
+        /// are resolved</param>
+        /// <returns>The output tensor types, in the signature's output order</returns>
+        public RankedTensorType[] GetOutputTensorTypes(int signatureIndex = 0, bool updateAllocation = false)
+        {
+            Signature signature = _model.GetSignature(signatureIndex);
+            int count = signature.OutputCount;
+            RankedTensorType[] types = new RankedTensorType[count];
+            if (count == 0)
+                return types;
+            // LiteRtLayout: rank:7 + has_strides:1 bits in a 32-bit unit, int32 dimensions[8], uint32 strides[8].
+            const int layoutSize = 4 + 4 * RankedTensorType.MaxRank * 2;
+            IntPtr layouts = Marshal.AllocHGlobal(layoutSize * count);
+            try
+            {
+                LiteRtInvoke.CheckStatus(LiteRtInvoke.LiteRtGetCompiledModelOutputTensorLayouts(
+                    _ptr, new UIntPtr((uint)signatureIndex), new UIntPtr((uint)count), layouts, updateAllocation));
+                for (int i = 0; i < count; i++)
+                {
+                    IntPtr layout = layouts + i * layoutSize;
+                    int rank = Marshal.ReadInt32(layout) & 0x7F;
+                    int[] dimensions = new int[rank];
+                    for (int d = 0; d < rank; d++)
+                        dimensions[d] = Marshal.ReadInt32(layout, 4 + 4 * d);
+                    types[i] = new RankedTensorType(signature.GetOutputTensorType(i).ElementType, dimensions);
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(layouts);
+            }
+            return types;
+        }
+
+        // A shape with a known rank and no dynamic (negative) dimension.
+        private static bool HasKnownShape(RankedTensorType tensorType)
+        {
+            if (tensorType.Rank == 0)
+                return false;
+            foreach (int dimension in tensorType.Dimensions)
+                if (dimension < 0)
+                    return false;
+            return true;
+        }
+
+        private static long ElementSize(ElementType elementType)
+        {
+            switch (elementType)
+            {
+                case ElementType.Bool:
+                case ElementType.Int8:
+                case ElementType.UInt8:
+                    return 1;
+                case ElementType.Int16:
+                case ElementType.UInt16:
+                case ElementType.Float16:
+                case ElementType.BFloat16:
+                    return 2;
+                case ElementType.Int64:
+                case ElementType.UInt64:
+                case ElementType.Float64:
+                case ElementType.Complex64:
+                    return 8;
+                default:
+                    return 4;
+            }
         }
 
         /// <summary>
@@ -193,6 +281,11 @@ namespace Emgu.LiteRT
         [DllImport(LiteRtLibrary, CallingConvention = LiteRtCallingConvention)]
         internal static extern Status LiteRtGetCompiledModelOutputBufferRequirements(
             IntPtr compiledModel, UIntPtr signatureIndex, UIntPtr outputIndex, out IntPtr bufferRequirements);
+
+        [DllImport(LiteRtLibrary, CallingConvention = LiteRtCallingConvention)]
+        internal static extern Status LiteRtGetCompiledModelOutputTensorLayouts(
+            IntPtr compiledModel, UIntPtr signatureIndex, UIntPtr numLayouts, IntPtr layouts,
+            [MarshalAs(BoolMarshalType)] bool updateAllocation);
 
         [DllImport(LiteRtLibrary, CallingConvention = LiteRtCallingConvention)]
         internal static extern Status LiteRtRunCompiledModel(

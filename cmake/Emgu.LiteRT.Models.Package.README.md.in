@@ -1,0 +1,28 @@
+## About this package
+
+Ready-to-use image models for Emgu LiteRT, run with LiteRT's CompiledModel API (`Emgu.LiteRT`): each downloads its `.tflite` model and labels on first use, compiles it for the CPU or GPU, and recognizes or detects what is in an image file. It is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT.
+
+- `Mobilenet`: image classification, 1001 ImageNet classes
+- `Inception`: flower species (an Inception model retrained on flowers)
+- `CocoSsdMobilenetV1`, `CocoSsdMobilenetV3`: object detection, 80 COCO classes
+
+These are the same models as in `Emgu.TF.Lite.Models`, which runs them with TensorFlow Lite's Interpreter API instead.
+
+```csharp
+using (var mobilenet = new Emgu.LiteRT.Models.Mobilenet())
+{
+    await mobilenet.Init();                      // or Init(accelerators: HwAccelerators.Gpu)
+    var best = mobilenet.Recognize("grace_hopper.jpg")[0];
+    Console.WriteLine($"{best.Label}: {best.Probability:P0}");
+}
+```
+
+On the GPU, the outputs differ slightly from the CPU's (it computes in lower precision). The GPU needs LiteRT's GPU accelerator: the optional `${EMGU_LITERT_NUGET_ID}.Metal.runtime.macos` / `${EMGU_LITERT_NUGET_ID}.Metal.runtime.maui.macos` (Apple Silicon) or `${EMGU_LITERT_NUGET_ID}.OpenCL.runtime.maui.android` packages.
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
+
+## Note
+
+To deploy Emgu LiteRT to a specific platform, you will also need to add one of the ${EMGU_LITERT_NUGET_ID}.runtime.{platform} nuget packages to your executable project, use the following link to search for an ${EMGU_LITERT_NUGET_ID}.runtime nuget packages:
+<https://www.nuget.org/packages?q=${EMGU_LITERT_NUGET_ID}.runtime>

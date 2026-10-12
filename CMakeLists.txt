@@ -577,6 +577,9 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # Interpreter API (Emgu.TF.Lite), not LiteRT's own CompiledModel API.
   SET(EMGU_TFLITE_MODELS_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.Models")
   SET(EMGU_TFLITE_MODELS_NUGET_TITLE "${EMGU_TFLITE_NUGET_TITLE} Models")
+  # Emgu.LiteRT.Models/: the same models run with LiteRT's CompiledModel API (Emgu.LiteRT).
+  SET(EMGU_LITERT_MODELS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Models")
+  SET(EMGU_LITERT_MODELS_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Models")
 
   SET(EMGU_LITERT_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.windows")  
   IF (HAVE_WINDESKTOP_X64_LITE_XNN)
@@ -1164,6 +1167,17 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.TF.Lite.Models/NetStandard/docs/README.md)
 
+# Emgu.LiteRT.Models: the same image models on LiteRT's CompiledModel API. Its own nuget package, depending on
+# Emgu.LiteRT, Emgu.LiteRT.Util and Emgu.TF.Lite.ImageIO.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models/NetStandard/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models/NetStandard/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models/NetStandard/docs/README.md)
+
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/README.md)
 
@@ -1218,6 +1232,7 @@ IF(HAVE_LITE_BUILD)
   # (Emgu.TF.Lite.Toolbox), so must come after it and stay inside this HAVE_LITE_BUILD block.
   ADD_SUBDIRECTORY(Emgu.TF.Lite.ImageIO)
   ADD_SUBDIRECTORY(Emgu.TF.Lite.Models)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.Models)
 ENDIF()
 
 IF (HAVE_LITE_BUILD)

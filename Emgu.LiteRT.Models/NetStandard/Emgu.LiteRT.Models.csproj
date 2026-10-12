@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<AssemblyName>Emgu.LiteRT.Models</AssemblyName>
+	<LangVersion>latest</LangVersion>
+	<Configurations>Release;Debug</Configurations>
+    <TensorflowBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\lib))</TensorflowBinaryDir>
+	<OutputPath>$(TensorflowBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- LiteRT's CompiledModel API (Emgu.LiteRT) for the models; Emgu.TF.Lite.ImageIO's NativeImageIO to read images
+         into the input buffers (it calls tfliteextern's pixel conversion, so this package depends on Emgu.TF.Lite
+         through it, as Emgu.TF.Lite.Models does). Plain ProjectReferences, so the package depends on them. -->
+    <ProjectReference Include="..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />
+    <ProjectReference Include="..\..\Emgu.TF.Lite.ImageIO\NetStandard\Emgu.TF.Lite.ImageIO.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\Emgu.LiteRT.Models.Shared.projitems" Label="Shared" />
+</Project>
