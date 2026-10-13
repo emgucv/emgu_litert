@@ -26,6 +26,8 @@ namespace Maui.Demo.Lite
         // The attached document: what is indexed so far, and its chip above the message box.
         private sealed class DocumentState
         {
+            // The SHA-256 of the file: its saved index in the chat database (DocumentRecord).
+            public string Id;
             public string Name;
             public int PageCount;
             public DocumentIndex Index;
@@ -92,14 +94,39 @@ namespace Maui.Demo.Lite
 
         private void AttachDocument(byte[] bytes, string name)
         {
-            RemoveDocument();
             UiStallWatchdog.Mark(string.Format("Attach document {0}: {1} bytes", name, bytes.Length));
+            ShowDocument(name, state => IndexDocumentAsync(state, bytes, null));
+        }
+
+        // A saved chat's document, from its saved index (no file needed).
+        private async Task RestoreDocumentAsync(string documentId)
+        {
+            DocumentRecord saved = await _store.GetDocumentAsync(documentId);
+            if (saved == null)
+                return;
+            UiStallWatchdog.Mark("Restore document " + saved.Name);
+            ShowDocument(saved.Name, state => IndexDocumentAsync(state, null, documentId));
+        }
+
+        private void ShowDocument(string name, Func<DocumentState, Task<bool>> index)
+        {
+            RemoveDocument();
             DocumentState state = new DocumentState { Name = name };
             BuildDocumentChip(state);
             _document = state;
             _documentBar.Children.Add(state.Chip);
             _documentBar.IsVisible = true;
-            state.Ready = IndexDocumentAsync(state, bytes);
+            state.Ready = index(state);
+        }
+
+        // What an index is built with: another value rebuilds a newly attached file's index (a saved chat's document
+        // keeps the one it was given).
+        private static string IndexSettings(bool images)
+        {
+            DocumentIndex defaults = new DocumentIndex();
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture, "v1|{0}|passages {1}/{2}|images {3}|pages {4}",
+                System.IO.Path.GetFileName(EmbeddingGemma2TextVision.ModelFile.Url), defaults.MaxPassageLength, defaults.PassageOverlap,
+                images ? MaxDocumentImages : 0, DocumentReader.MaxPages);
         }
 
         private void BuildDocumentChip(DocumentState state)
@@ -169,7 +196,10 @@ namespace Maui.Demo.Lite
 
         // Read the document, load the embedding model (downloading it the first time) and index the document - all in
         // the background, with progress in the chip. Returns false if it failed or was cancelled.
-        private async Task<bool> IndexDocumentAsync(DocumentState state, byte[] bytes)
+        // Read the document, load the embedding model (downloading it the first time) and index the document - all in
+        // the background, with progress in the chip - or load its saved index: the same file indexed with the same
+        // settings before, or (savedId) a saved chat's document. Returns false if it failed or was cancelled.
+        private async Task<bool> IndexDocumentAsync(DocumentState state, byte[] bytes, string savedId)
         {
             CancellationToken cancel = state.Cancel.Token;
             Progress<string> stage = new Progress<string>(text =>
@@ -182,49 +212,85 @@ namespace Maui.Demo.Lite
                 System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
                 // Pictures only for models that take images; a model chosen later gets the text only.
                 int maxImages = SelectedOption.AcceptsImages ? MaxDocumentImages : 0;
-                DocumentContent content = await DocumentReader.ReadAsync(bytes, state.Name, maxImages, stage, cancel);
-                state.PageCount = content.PageCount;
-                DocumentIndex index = new DocumentIndex();
-                foreach (var text in content.Texts)
-                    index.AddText(text.Text, text.Location);
-                foreach (var image in content.Images)
-                    index.AddImage(image.Jpeg, "image/jpeg", image.Location, image.IsPage);
-                if (index.Passages.Count == 0 && index.Images.Count == 0)
-                    throw new InvalidOperationException(content.PageCount > 0 && maxImages == 0
-                        ? "it has no text (scanned pages need a model that understands images, e.g. Gemma 4)"
-                        : "no text was found in it");
-                UiStallWatchdog.Mark(string.Format("Document read in {0:F1}s: {1} passages, {2} images, {3} pages ({4} skipped), {5} images skipped",
-                    watch.Elapsed.TotalSeconds, index.Passages.Count, index.Images.Count, content.PageCount, content.PagesSkipped, content.ImagesSkipped));
+                string settings = IndexSettings(maxImages > 0);
+                state.Id = savedId ?? await Task.Run(() => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), cancel);
+                DocumentRecord saved = await _store.GetDocumentAsync(state.Id);
+                DocumentIndex index;
+                string summary;
+                if (saved != null && (savedId != null || saved.Settings == settings))
+                {
+                    ((IProgress<string>)stage).Report("Loading the saved index...");
+                    List<DocumentItemRecord> items = await _store.GetDocumentItemsAsync(state.Id);
+                    index = new DocumentIndex();
+                    foreach (DocumentItemRecord item in items)
+                    {
+                        if (item.IsImage)
+                            index.AddImage(item.Data, item.MediaType, item.Location, item.IsPage, ToFloats(item.Embedding));
+                        else
+                            index.AddPassage(item.Text, item.Location, ToFloats(item.Embedding));
+                    }
+                    state.PageCount = saved.PageCount;
+                    summary = saved.Summary;
+                    // The model embeds the questions.
+                    await EnsureEmbedderAsync(stage, cancel);
+                    UiStallWatchdog.Mark(string.Format("Document index loaded in {0:F1}s: {1} passages, {2} images",
+                        watch.Elapsed.TotalSeconds, index.Passages.Count, index.Images.Count));
+                }
+                else
+                {
+                    if (bytes == null)
+                        throw new InvalidOperationException("its saved index is missing");
+                    DocumentContent content = await DocumentReader.ReadAsync(bytes, state.Name, maxImages, stage, cancel);
+                    state.PageCount = content.PageCount;
+                    index = new DocumentIndex();
+                    foreach (var text in content.Texts)
+                        index.AddText(text.Text, text.Location);
+                    foreach (var image in content.Images)
+                        index.AddImage(image.Jpeg, "image/jpeg", image.Location, image.IsPage);
+                    if (index.Passages.Count == 0 && index.Images.Count == 0)
+                        throw new InvalidOperationException(content.PageCount > 0 && maxImages == 0
+                            ? "it has no text (scanned pages need a model that understands images, e.g. Gemma 4)"
+                            : "no text was found in it");
+                    UiStallWatchdog.Mark(string.Format("Document read in {0:F1}s: {1} passages, {2} images, {3} pages ({4} skipped), {5} images skipped",
+                        watch.Elapsed.TotalSeconds, index.Passages.Count, index.Images.Count, content.PageCount, content.PagesSkipped, content.ImagesSkipped));
 
-                EmbeddingGemma2TextVision embedder = await EnsureEmbedderAsync(stage, cancel);
-                watch.Restart();
-                Progress<DocumentIndexProgress> indexed = new Progress<DocumentIndexProgress>(p =>
-                {
-                    if (_document == state)
-                        state.Detail.Text = p.PassagesDone < p.PassageCount
-                            ? string.Format("Indexing the text: {0}%", 100 * p.PassagesDone / Math.Max(1, p.PassageCount))
-                            : string.Format("Indexing pictures: {0} of {1}", p.ImagesDone, p.ImageCount);
-                });
-                await _embedderGate.WaitAsync(cancel);
-                try
-                {
-                    await Task.Run(() => index.Build(embedder, indexed, cancel), cancel);
+                    EmbeddingGemma2TextVision embedder = await EnsureEmbedderAsync(stage, cancel);
+                    watch.Restart();
+                    Progress<DocumentIndexProgress> indexed = new Progress<DocumentIndexProgress>(p =>
+                    {
+                        if (_document == state)
+                            state.Detail.Text = p.PassagesDone < p.PassageCount
+                                ? string.Format("Indexing the text: {0}%", 100 * p.PassagesDone / Math.Max(1, p.PassageCount))
+                                : string.Format("Indexing pictures: {0} of {1}", p.ImagesDone, p.ImageCount);
+                    });
+                    await _embedderGate.WaitAsync(cancel);
+                    try
+                    {
+                        await Task.Run(() => index.Build(embedder, indexed, cancel), cancel);
+                    }
+                    finally
+                    {
+                        _embedderGate.Release();
+                    }
+                    UiStallWatchdog.Mark(string.Format("Document indexed in {0:F1}s", watch.Elapsed.TotalSeconds));
+                    summary = DocumentSummary(state, content, index);
+                    if (content.PagesSkipped > 0)
+                        summary += string.Format(" (first {0} read)", DocumentReader.MaxPages);
+                    await SaveDocumentIndexAsync(state, index, settings, summary);
                 }
-                finally
-                {
-                    _embedderGate.Release();
-                }
-                UiStallWatchdog.Mark(string.Format("Document indexed in {0:F1}s", watch.Elapsed.TotalSeconds));
 
                 state.Index = index;
                 if (_document == state)
                 {
                     state.Spinner.IsRunning = state.Spinner.IsVisible = false;
-                    state.Detail.Text = DocumentSummary(state, content);
-                    if (!_busy)
-                        SetStatus(content.PagesSkipped > 0
-                            ? string.Format("Only the first {0} pages were read. Ask about them.", DocumentReader.MaxPages)
-                            : "Ask about the document.");
+                    state.Detail.Text = summary;
+                    if (savedId != null)
+                        MarkGivenFromHistory(index);
+                    else if (!_busy)
+                        SetStatus("Ask about the document.");
+                    // A chat already saved now uses this document.
+                    if (_conversationId != null)
+                        await _store.SetConversationDocumentAsync(_conversationId.Value, state.Id);
                 }
                 return true;
             }
@@ -244,7 +310,80 @@ namespace Maui.Demo.Lite
             }
         }
 
-        private static string DocumentSummary(DocumentState state, DocumentContent content)
+        // Save the index in the chat database, so the same file - or a chat that used it - needn't be indexed again.
+        private async Task SaveDocumentIndexAsync(DocumentState state, DocumentIndex index, string settings, string summary)
+        {
+            List<DocumentItemRecord> items = new List<DocumentItemRecord>();
+            foreach (DocumentPassage passage in index.Passages)
+                items.Add(new DocumentItemRecord
+                {
+                    DocumentId = state.Id,
+                    Position = passage.Index,
+                    Text = passage.Text,
+                    Location = passage.Location,
+                    Embedding = ToBytes(passage.Embedding)
+                });
+            foreach (DocumentImage image in index.Images)
+                items.Add(new DocumentItemRecord
+                {
+                    DocumentId = state.Id,
+                    Position = image.Index,
+                    IsImage = true,
+                    Location = image.Location,
+                    IsPage = image.IsPage,
+                    MediaType = image.MediaType,
+                    Data = image.Data,
+                    Embedding = ToBytes(image.Embedding)
+                });
+            try
+            {
+                await _store.SaveDocumentAsync(new DocumentRecord
+                {
+                    Id = state.Id,
+                    Name = state.Name,
+                    PageCount = state.PageCount,
+                    Settings = settings,
+                    Summary = summary,
+                    Created = DateTime.UtcNow
+                }, items);
+            }
+            catch (Exception ex)
+            {
+                // Still usable, just not saved.
+                UiStallWatchdog.Mark("Saving the document index failed: " + ex.Message);
+            }
+        }
+
+        // A reopened chat already gave the model the excerpts in its messages: don't send them again.
+        private void MarkGivenFromHistory(DocumentIndex index)
+        {
+            List<string> contexts = _historyItems.Skip(_contextStart).Select(i => i.Context).Where(c => !string.IsNullOrEmpty(c)).ToList();
+            if (contexts.Count == 0)
+                return;
+            foreach (DocumentPassage passage in index.Passages)
+                if (contexts.Any(c => c.Contains(passage.Text)))
+                    _givenPassages.Add(passage.Index);
+        }
+
+        private static byte[] ToBytes(float[] values)
+        {
+            if (values == null)
+                return null;
+            byte[] bytes = new byte[values.Length * sizeof(float)];
+            Buffer.BlockCopy(values, 0, bytes, 0, bytes.Length);
+            return bytes;
+        }
+
+        private static float[] ToFloats(byte[] bytes)
+        {
+            if (bytes == null)
+                return null;
+            float[] values = new float[bytes.Length / sizeof(float)];
+            Buffer.BlockCopy(bytes, 0, values, 0, values.Length * sizeof(float));
+            return values;
+        }
+
+        private static string DocumentSummary(DocumentState state, DocumentContent content, DocumentIndex index)
         {
             List<string> parts = new List<string>();
             if (content.PageCount > 0)
@@ -256,7 +395,7 @@ namespace Maui.Demo.Lite
             if (pageImages > 0)
                 parts.Add(pageImages == 1 ? "1 page as image" : pageImages + " pages as images");
             if (parts.Count == 0)
-                parts.Add(state.Index.Passages.Count == 1 ? "1 passage" : state.Index.Passages.Count + " passages");
+                parts.Add(index.Passages.Count == 1 ? "1 passage" : index.Passages.Count + " passages");
             return string.Join(" · ", parts);
         }
 

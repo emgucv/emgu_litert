@@ -41,6 +41,65 @@ namespace Maui.Demo.Lite
 
         /// <summary>The id of the last message the model no longer sees (summarized or dropped); 0 for none</summary>
         public int SummaryUpTo { get; set; }
+
+        /// <summary>The attached document (DocumentRecord.Id), restored when the chat is opened; null if none</summary>
+        public string DocumentId { get; set; }
+    }
+
+    /// <summary>
+    /// A document attached to a chat, indexed for its questions (LiteRtLmChatPage.Documents.cs): kept so attaching the
+    /// same file again, or opening a chat that used it, doesn't index it again. Deleted with the last chat that uses it.
+    /// </summary>
+    [Table("Document")]
+    public class DocumentRecord
+    {
+        /// <summary>The SHA-256 of the file, in hex</summary>
+        [PrimaryKey]
+        public string Id { get; set; }
+
+        public string Name { get; set; }
+
+        public int PageCount { get; set; }
+
+        /// <summary>What the index was built with (passage size, embedding model, images...): another value rebuilds it</summary>
+        public string Settings { get; set; }
+
+        /// <summary>The chip's description, e.g. "5 pages · 2 pictures"</summary>
+        public string Summary { get; set; }
+
+        public DateTime Created { get; set; }
+    }
+
+    /// <summary>
+    /// A passage or image of a saved document, with its embedding (floats).
+    /// </summary>
+    [Table("DocumentItem")]
+    public class DocumentItemRecord
+    {
+        [PrimaryKey, AutoIncrement]
+        public int Id { get; set; }
+
+        [Indexed]
+        public string DocumentId { get; set; }
+
+        /// <summary>Its position among the document's passages or images</summary>
+        public int Position { get; set; }
+
+        public bool IsImage { get; set; }
+
+        /// <summary>A passage's text</summary>
+        public string Text { get; set; }
+
+        public string Location { get; set; }
+
+        /// <summary>An image: whether it is a whole page, its media type and bytes</summary>
+        public bool IsPage { get; set; }
+
+        public string MediaType { get; set; }
+
+        public byte[] Data { get; set; }
+
+        public byte[] Embedding { get; set; }
     }
 
     /// <summary>
@@ -167,6 +226,8 @@ namespace Maui.Demo.Lite
                 await connection.CreateTableAsync<MessageRecord>();
                 await connection.CreateTableAsync<MemoryRecord>();
                 await connection.CreateTableAsync<PhotoEmbeddingRecord>();
+                await connection.CreateTableAsync<DocumentRecord>();
+                await connection.CreateTableAsync<DocumentItemRecord>();
                 return connection;
             });
         }
@@ -254,6 +315,59 @@ namespace Maui.Demo.Lite
             conversation.Summary = summary;
             conversation.SummaryUpTo = upToMessageId;
             await db.UpdateAsync(conversation);
+        }
+
+        // ---------- Documents ----------
+
+        public async Task<DocumentRecord> GetDocumentAsync(string id)
+        {
+            return await (await Db).FindAsync<DocumentRecord>(id);
+        }
+
+        public async Task<List<DocumentItemRecord>> GetDocumentItemsAsync(string id)
+        {
+            return await (await Db).Table<DocumentItemRecord>().Where(i => i.DocumentId == id).OrderBy(i => i.Position).ToListAsync();
+        }
+
+        /// <summary>Save a document's index, replacing an older one of the same file.</summary>
+        public async Task SaveDocumentAsync(DocumentRecord document, IEnumerable<DocumentItemRecord> items)
+        {
+            SQLiteAsyncConnection db = await Db;
+            List<DocumentItemRecord> list = items.ToList();
+            await db.RunInTransactionAsync(connection =>
+            {
+                connection.Execute("DELETE FROM DocumentItem WHERE DocumentId = ?", document.Id);
+                connection.InsertOrReplace(document);
+                connection.InsertAll(list);
+            });
+        }
+
+        /// <summary>Record the document a chat uses (null for none).</summary>
+        public async Task SetConversationDocumentAsync(int conversationId, string documentId)
+        {
+            SQLiteAsyncConnection db = await Db;
+            var conversation = await db.FindAsync<ConversationRecord>(conversationId);
+            if (conversation == null || conversation.DocumentId == documentId)
+                return;
+            conversation.DocumentId = documentId;
+            await db.UpdateAsync(conversation);
+        }
+
+        /// <summary>Delete the documents no saved chat uses, except keepId (e.g. the one attached now).</summary>
+        public async Task DeleteUnusedDocumentsAsync(string keepId = null)
+        {
+            SQLiteAsyncConnection db = await Db;
+            HashSet<string> used = new HashSet<string>((await db.Table<ConversationRecord>().ToListAsync())
+                .Where(c => c.DocumentId != null).Select(c => c.DocumentId));
+            if (keepId != null)
+                used.Add(keepId);
+            foreach (DocumentRecord document in await db.Table<DocumentRecord>().ToListAsync())
+            {
+                if (used.Contains(document.Id))
+                    continue;
+                await db.ExecuteAsync("DELETE FROM DocumentItem WHERE DocumentId = ?", document.Id);
+                await db.DeleteAsync<DocumentRecord>(document.Id);
+            }
         }
 
         /// <summary>A saved message's attachments, with their full paths.</summary>

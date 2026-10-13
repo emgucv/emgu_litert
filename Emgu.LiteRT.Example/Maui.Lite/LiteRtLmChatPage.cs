@@ -992,6 +992,8 @@ namespace Maui.Demo.Lite
             SelectModel(index);
             // Photo search: index photos added since the app last ran.
             StartPhotoIndexing();
+            // Saved document indexes no chat uses (attached, then the chat was never saved).
+            _ = _store.DeleteUnusedDocumentsAsync();
         }
 
         private static bool IsDownloaded(ModelOption option)
@@ -2559,6 +2561,8 @@ namespace Maui.Demo.Lite
                 foreach (string step in _sendSteps)
                     await _store.AddMessageAsync(id, MessageRecord.StepRole, step, null);
                 replyItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking);
+                // The document the chat uses now (or none), restored when it is opened again.
+                await _store.SetConversationDocumentAsync(id, _document?.Index != null ? _document.Id : null);
                 await RefreshChatListAsync();
             }
             catch (Exception ex)
@@ -2639,7 +2643,12 @@ namespace Maui.Demo.Lite
                 }
                 await _store.DeleteConversationAsync(id);
                 if (_conversationId == id)
+                {
                     StartNewChat();
+                    RemoveDocument();
+                }
+                // Its document, unless another chat (or the one open now) uses it.
+                await _store.DeleteUnusedDocumentsAsync(_document?.Id);
                 await RefreshChatListAsync();
                 if (reopenSheet)
                     OnHistoryTapped();
@@ -2806,6 +2815,9 @@ namespace Maui.Demo.Lite
                 if (chat.SummaryUpTo > 0)
                     AddCompactionDivider(_transcript.Children.Count, chat.Summary);
             }
+            // The document the chat used, from its saved index.
+            if (!string.IsNullOrEmpty(chat.DocumentId))
+                _ = RestoreDocumentAsync(chat.DocumentId);
             // The model is given the conversation with the next message, once its size is known (compacting it first if
             // it doesn't fit, e.g. a long chat saved before compaction existed).
             _needsPrime = true;

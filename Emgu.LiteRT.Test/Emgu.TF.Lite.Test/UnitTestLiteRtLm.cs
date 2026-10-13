@@ -904,6 +904,19 @@ namespace Emgu.TF.Lite.Test
                 Console.WriteLine("Flowers: {0} ({1:F3}), other {2:F3}", flowers.Images[0].Item.Location, flowers.Images[0].Score, flowers.Images[1].Score);
                 if (flowers.Images[0].Item.Location != "page 2")
                     throw new Exception("The wrong picture was found");
+
+                // An index rebuilt from saved passages and embeddings (AddPassage / AddImage with embeddings) needs no
+                // Build and finds the same.
+                DocumentIndex restored = new DocumentIndex();
+                foreach (DocumentPassage passage in index.Passages)
+                    restored.AddPassage(passage.Text, passage.Location, passage.Embedding);
+                foreach (DocumentImage image in index.Images)
+                    restored.AddImage(image.Data, image.MediaType, image.Location, image.IsPage, image.Embedding);
+                if (!restored.IsBuilt)
+                    throw new Exception("The restored index should not need building");
+                DocumentSearchResult again = restored.Search(model, questions[1].Question);
+                if (again.Passages[0].Item.Location != questions[1].Location)
+                    throw new Exception("The restored index found another passage");
             }
         }
 

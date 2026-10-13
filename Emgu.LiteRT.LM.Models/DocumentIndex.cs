@@ -212,24 +212,43 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
+        /// Add one passage as it is (not split), e.g. one of a saved index, with its embedding if it has one.
+        /// </summary>
+        /// <param name="text">The passage</param>
+        /// <param name="location">Where it is in the document, e.g. "page 3"; or null</param>
+        /// <param name="embedding">Its embedding, or null to compute it in Build</param>
+        /// <returns>The passage</returns>
+        public DocumentPassage AddPassage(String text, String location = null, float[] embedding = null)
+        {
+            DocumentPassage passage = new DocumentPassage { Index = _passages.Count, Text = text ?? String.Empty, Location = location, Embedding = embedding };
+            _passages.Add(passage);
+            return passage;
+        }
+
+        /// <summary>
         /// Add an image.
         /// </summary>
         /// <param name="encodedImage">The encoded image: JPEG, PNG, BMP, ...</param>
         /// <param name="mediaType">Its media type, e.g. "image/jpeg"</param>
         /// <param name="location">Where it is in the document, e.g. "page 3"; or null</param>
         /// <param name="isPage">True if it is a whole page (e.g. a scan), false for a picture</param>
-        public void AddImage(byte[] encodedImage, String mediaType, String location = null, bool isPage = false)
+        /// <param name="embedding">Its embedding (e.g. of a saved index), or null to compute it in Build</param>
+        /// <returns>The image</returns>
+        public DocumentImage AddImage(byte[] encodedImage, String mediaType, String location = null, bool isPage = false, float[] embedding = null)
         {
             if (encodedImage == null)
                 throw new ArgumentNullException("encodedImage");
-            _images.Add(new DocumentImage
+            DocumentImage image = new DocumentImage
             {
                 Index = _images.Count,
                 Data = encodedImage,
                 MediaType = mediaType,
                 Location = location,
-                IsPage = isPage
-            });
+                IsPage = isPage,
+                Embedding = embedding
+            };
+            _images.Add(image);
+            return image;
         }
 
         /// <summary>
