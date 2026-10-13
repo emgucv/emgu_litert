@@ -144,7 +144,7 @@ namespace Maui.Demo.Lite
         // Index the new photos in the background (incremental: only photos not yet indexed, or edited since).
         private void StartPhotoIndexing()
         {
-            if (!PhotoSearchOn || (_photoIndexTask != null && !_photoIndexTask.IsCompleted))
+            if (_reloadingCpuThreads || !PhotoSearchOn || (_photoIndexTask != null && !_photoIndexTask.IsCompleted))
                 return;
             _photoIndexStarted = DateTime.UtcNow;
             _photoIndexing = new CancellationTokenSource();

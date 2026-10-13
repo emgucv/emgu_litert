@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace Maui.Demo.Lite;
 
@@ -8,6 +9,8 @@ internal static class CpuThreadSettings
 {
     private const string PreferenceKey = "model_cpu_threads";
     public static int Maximum { get; } = GetCoreCount();
+    public static int ReloadVersion { get; private set; }
+    public static void RequestReload() => ReloadVersion++;
 
     public static int Count
     {
@@ -15,7 +18,7 @@ internal static class CpuThreadSettings
         set => Preferences.Default.Set(PreferenceKey, Math.Clamp(value, 1, Maximum));
     }
 
-    public static View CreateView()
+    public static View CreateView(Func<Task> reloadModels)
     {
         var label = new Label
         {
@@ -34,17 +37,37 @@ internal static class CpuThreadSettings
             label.Text = $"CPU threads: {Count} of {Maximum}";
         };
         slider.DragCompleted += (sender, args) => slider.Value = Count;
+        var note = new Label
+        {
+            Text = "Choose a thread count, then apply it to reload models without restarting the app.",
+            FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText
+        };
+        var apply = new Button { Text = "Apply and reload models" };
+        apply.Clicked += async (sender, args) =>
+        {
+            apply.IsEnabled = slider.IsEnabled = false;
+            note.Text = "Waiting for active work, then reloading models...";
+            try
+            {
+                await reloadModels();
+                note.Text = $"Models now use {Count} CPU threads. TF Lite demos reload on their next run.";
+            }
+            catch (Exception ex)
+            {
+                note.Text = "Could not reload models: " + ex.Message + " You can try again.";
+            }
+            finally
+            {
+                apply.IsEnabled = true;
+                slider.IsEnabled = Maximum > 1;
+            }
+        };
         return new VerticalStackLayout
         {
             Spacing = 6,
             Children =
             {
-                label, slider,
-                new Label
-                {
-                    Text = "Applies to all models the next time they load. Restart the app to update models already loaded.",
-                    FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText
-                }
+                label, slider, apply, note
             }
         };
     }

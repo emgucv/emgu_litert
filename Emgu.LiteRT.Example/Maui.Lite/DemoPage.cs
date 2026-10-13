@@ -212,6 +212,8 @@ namespace Maui.Demo.Lite
             _content.Children.Insert(_content.Children.IndexOf(_runButton), card);
         }
 
+        private int _cpuReloadVersion = CpuThreadSettings.ReloadVersion;
+
         /// <summary>Run the model on the image. Called on the UI thread; push heavy work to a background thread.</summary>
         protected abstract Task<DemoResult> RunAsync(Mat input);
 
@@ -359,6 +361,11 @@ namespace Maui.Demo.Lite
             _loading.Show("Preparing...");
             try
             {
+                if (_cpuReloadVersion != CpuThreadSettings.ReloadVersion)
+                {
+                    ReleaseModel();
+                    _cpuReloadVersion = CpuThreadSettings.ReloadVersion;
+                }
                 DemoResult result = await RunAsync(_currentImage);
 
                 _resultsRows.Children.Clear();

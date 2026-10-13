@@ -542,7 +542,7 @@ namespace Maui.Demo.Lite
                 Spacing = 6,
                 Children =
                 {
-                    CpuThreadSettings.CreateView(),
+                    CpuThreadSettings.CreateView(ReloadCpuModelsAsync),
                     Theme.Divider(),
                     readAloudRow,
                     Theme.Divider(),
@@ -644,6 +644,9 @@ namespace Maui.Demo.Lite
                 MaximumHeightRequest = 120
             };
 
+#if WINDOWS
+            ConfigurePromptKeyboard();
+#endif
             _busyIndicator = new ActivityIndicator { IsVisible = false, IsRunning = false, WidthRequest = 36, Color = Theme.Accent };
             _sendButton = new Button
             {
@@ -922,7 +925,7 @@ namespace Maui.Demo.Lite
             _sideModelList.Children.Add(BuildModelList(false));
         }
 
-        private bool CanChangeModel => !_busy && !_recorder.IsRecording;
+        private bool CanChangeModel => !_busy && !_reloadingCpuThreads && !_recorder.IsRecording;
 
         private async void OnModelChipTapped()
         {
@@ -1437,7 +1440,7 @@ namespace Maui.Demo.Lite
 
         private async void OnSendClicked(object sender, EventArgs e)
         {
-            if (_busy || _recorder.IsRecording)
+            if (_busy || _reloadingCpuThreads || _recorder.IsRecording)
                 return;
 
             string prompt = _promptEditor.Text?.Trim();
@@ -1795,7 +1798,7 @@ namespace Maui.Demo.Lite
                 await StopRecordingAndSendAsync();
                 return;
             }
-            if (_busy)
+            if (_busy || _reloadingCpuThreads)
                 return;
 
             StopSpeaking();
@@ -1929,7 +1932,7 @@ namespace Maui.Demo.Lite
 
         private async void OnAttachClicked()
         {
-            if (_busy)
+            if (_busy || _reloadingCpuThreads)
                 return;
 
             var rows = new List<(string Section, string Glyph, string Text, string Value)>();
@@ -2126,7 +2129,7 @@ namespace Maui.Demo.Lite
         private async void OnNewChat(object sender, EventArgs e)
         {
             UiStallWatchdog.Mark("New chat");
-            if (_busy)
+            if (_busy || _reloadingCpuThreads)
             {
                 SetStatus("Hang on - still answering.");
                 return;
@@ -2398,7 +2401,7 @@ namespace Maui.Demo.Lite
         // Compact now (Settings): everything but the latest exchange.
         private async void OnCompactTapped()
         {
-            if (_busy)
+            if (_busy || _reloadingCpuThreads)
             {
                 SetStatus("Hang on - still answering.");
                 return;
@@ -2915,9 +2918,7 @@ namespace Maui.Demo.Lite
                 _ = CancelRecordingAsync();
                 RemoveDocument();
                 _photoIndexing?.Cancel();
-                _ = CleanupModelAsync();
-                _ = ReleaseEmbedderAsync();
-                _ = ReleaseImageModelAsync();
+                _ = CleanupAfterCpuReloadAsync();
             }
         }
 
