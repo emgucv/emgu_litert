@@ -90,11 +90,20 @@ namespace Maui.Demo.Lite
                 // Send the next ping.
                 Volatile.Write(ref _pingPending, true);
                 pingSent = Stopwatch.GetTimestamp();
-                MainThread.BeginInvokeOnMainThread(() =>
+                try
                 {
-                    Interlocked.Exchange(ref _lastResponseTicks, Stopwatch.GetTimestamp());
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        Interlocked.Exchange(ref _lastResponseTicks, Stopwatch.GetTimestamp());
+                        Volatile.Write(ref _pingPending, false);
+                    });
+                }
+                catch (InvalidOperationException)
+                {
+                    // Windows may not have a main thread dispatcher during app startup.
+                    // Retry on the next interval without treating startup as a UI stall.
                     Volatile.Write(ref _pingPending, false);
-                });
+                }
             }
         }
 
