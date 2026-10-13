@@ -15,27 +15,37 @@ namespace Maui.Demo.Lite
 {
     /// <summary>
     /// The tools the LiteRT-LM chat page's agent gets with a message, from Emgu.LiteRT.LM.Agents' AgentTools: the date and
-    /// time and the calculator always, memories about the user (ChatStore) when memory is on, the user's location (this
-    /// file's MAUI lookup) when they allow it, and with web search on the weather, Wikipedia and - with a Tavily API key -
-    /// a web search and a web page reader.
+    /// time, the calculator and unit conversion always, memories about the user (ChatStore) when memory is on, the user's
+    /// location (this file's MAUI lookup) when they allow it, and with web search on the weather, Wikipedia, currency
+    /// conversion and a web page reader (Tavily's, with a Tavily API key, which also adds a web search).
     /// </summary>
     internal static class ChatAgentTools
     {
-        public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location, ChatStore memories)
+        public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location, ChatStore memories,
+            Func<string, CancellationToken, Task<string>> findPhotos = null)
         {
-            List<AITool> tools = new List<AITool> { AgentTools.CurrentDateTime(), AgentTools.Calculate() };
+            List<AITool> tools = new List<AITool> { AgentTools.CurrentDateTime(), AgentTools.Calculate(), AgentTools.ConvertUnits() };
             if (memories != null)
                 tools.AddRange(AgentTools.Memory(memories));
             if (location)
                 tools.Add(AgentTools.Location(GetCurrentLocationAsync));
+            // Photo search (on the device): the page's index of the photo library.
+            if (findPhotos != null)
+                tools.Add(AgentTools.FindPhotos(findPhotos));
             if (!webSearch)
                 return tools;
             tools.Add(AgentTools.Weather());
             tools.Add(AgentTools.Wikipedia());
+            tools.Add(AgentTools.ConvertCurrency());
             if (!string.IsNullOrWhiteSpace(tavilyApiKey))
             {
                 tools.Add(AgentTools.TavilySearch(tavilyApiKey));
+                // Tavily's reader also reads pages built by scripts.
                 tools.Add(AgentTools.TavilyReadPage(tavilyApiKey));
+            }
+            else
+            {
+                tools.Add(AgentTools.ReadWebPage());
             }
             return tools;
         }

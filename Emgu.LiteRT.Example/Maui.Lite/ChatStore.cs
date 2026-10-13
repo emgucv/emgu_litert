@@ -96,6 +96,45 @@ namespace Maui.Demo.Lite
     }
 
     /// <summary>
+    /// A photo's embedding, for the chat's photo search (PhotoIndex): its id in the photo library, the version it was
+    /// computed from, when it was taken, and the embedding (floats).
+    /// </summary>
+    [Table("PhotoEmbedding")]
+    public class PhotoEmbeddingRecord
+    {
+        [PrimaryKey]
+        public string PhotoId { get; set; }
+
+        public long Version { get; set; }
+
+        public DateTime Taken { get; set; }
+
+        /// <summary>The vision tokens the embedding was made with (EmbeddingGemma 2: 70 or 140)</summary>
+        public int VisionTokens { get; set; }
+
+        // The photo's details (PhotoItem), read when it was indexed; DetailsVersion changes when what is read changes.
+        public int DetailsVersion { get; set; }
+
+        public double? Latitude { get; set; }
+
+        public double? Longitude { get; set; }
+
+        /// <summary>The nearest town to where it was taken: "Town, Region, Country" (PlaceLookup), or null</summary>
+        public string Place { get; set; }
+
+        public string Camera { get; set; }
+
+        public int Width { get; set; }
+
+        public int Height { get; set; }
+
+        /// <summary>Comma-separated: screenshot, selfie, panorama, portrait, favorite</summary>
+        public string Kinds { get; set; }
+
+        public byte[] Embedding { get; set; }
+    }
+
+    /// <summary>
     /// An attachment of a saved message: its kind ("image" or "audio"), media type and file.
     /// </summary>
     public sealed class SavedAttachment
@@ -127,6 +166,7 @@ namespace Maui.Demo.Lite
                 await connection.CreateTableAsync<ConversationRecord>();
                 await connection.CreateTableAsync<MessageRecord>();
                 await connection.CreateTableAsync<MemoryRecord>();
+                await connection.CreateTableAsync<PhotoEmbeddingRecord>();
                 return connection;
             });
         }
@@ -269,6 +309,30 @@ namespace Maui.Demo.Lite
                     return false;
             await db.InsertAsync(new MemoryRecord { Text = text, Created = DateTime.UtcNow });
             return true;
+        }
+
+        // ---------- Photo search ----------
+
+        public async Task<List<PhotoEmbeddingRecord>> GetPhotoEmbeddingsAsync()
+        {
+            return await (await Db).Table<PhotoEmbeddingRecord>().ToListAsync();
+        }
+
+        public async Task SavePhotoEmbeddingAsync(PhotoEmbeddingRecord record)
+        {
+            await (await Db).InsertOrReplaceAsync(record);
+        }
+
+        public async Task DeletePhotoEmbeddingsAsync(IEnumerable<string> photoIds)
+        {
+            SQLiteAsyncConnection db = await Db;
+            foreach (string id in photoIds)
+                await db.DeleteAsync<PhotoEmbeddingRecord>(id);
+        }
+
+        public async Task ClearPhotoEmbeddingsAsync()
+        {
+            await (await Db).DeleteAllAsync<PhotoEmbeddingRecord>();
         }
 
         public async Task DeleteMemoryAsync(int id)

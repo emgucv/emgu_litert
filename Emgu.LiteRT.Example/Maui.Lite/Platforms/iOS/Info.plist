@@ -49,6 +49,8 @@
 	<string>The demo takes photos to classify, detect objects in, or ask the on-device language model about.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>The LiteRT-LM chat records your voice to send it to the on-device language model.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>With "Search my photos" on, the LiteRT-LM chat indexes your photos on this device so it can find them by what is in them. The photos and their index stay on the device.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>With "Share my location" on, the LiteRT-LM chat tells the on-device language model which town you are in, for questions such as the local weather.</string>
 </dict>

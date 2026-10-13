@@ -176,7 +176,7 @@ namespace Maui.Demo.Lite
         private const string AgentInstructions =
             "You are a helpful assistant running on the user's device. You can look things up with your tools: use them " +
             "for facts you are not sure about, recent events and anything that depends on today's date or, when you have the " +
-            "location tool, on where the user is. Use the calculate tool for any arithmetic. When the user tells you " +
+            "location tool, on where the user is. Use the calculate tool for any arithmetic, and the convert tools for units and money. When the user gives a link, read it with read_web_page. When the user tells you " +
             "something lasting about themselves, save it with the remember tool. Base your answer on what the tools " +
             "return, mention where it came from, and keep it short.";
         private readonly ToggleChip _webSearchSwitch;
@@ -561,7 +561,7 @@ namespace Maui.Demo.Lite
                     new Label { Text = "Web search", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     new Label
                     {
-                        Text = "With \U0001F50E Web search on, Gemma 4 can look things up on Wikipedia - and, with a Tavily API key (free at tavily.com), on the web. Your searches leave the device.",
+                        Text = "With \U0001F50E Web search on, Gemma 4 can look things up on Wikipedia, read links you give it, check the weather and convert currencies - and, with a Tavily API key (free at tavily.com), search the web. Your searches leave the device.",
                         FontFamily = Theme.BodyFont,
                         FontSize = 12,
                         TextColor = Theme.SecondaryText
@@ -576,6 +576,8 @@ namespace Maui.Demo.Lite
                         FontSize = 12,
                         TextColor = Theme.SecondaryText
                     },
+                    Theme.Divider(),
+                    BuildPhotoSection(),
                     Theme.Divider(),
                     new Label { Text = "Memories about you", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     memoryRow,
@@ -988,6 +990,8 @@ namespace Maui.Demo.Lite
             {
             }
             SelectModel(index);
+            // Photo search: index photos added since the app last ran.
+            StartPhotoIndexing();
         }
 
         private static bool IsDownloaded(ModelOption option)
@@ -1552,6 +1556,7 @@ namespace Maui.Demo.Lite
         // line above it. Runs on the UI thread (the await foreach resumes on it).
         private async Task<ChatReply> RunAgentAsync(string prompt, List<PendingAttachment> attachments, StreamingBubble bubble)
         {
+            _agentBubble = bubble;
             await EnsureAgentAsync();
 
             List<AIContent> contents = new List<AIContent>();
@@ -1564,8 +1569,8 @@ namespace Maui.Demo.Lite
             {
                 Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
-                    _memorySwitch.IsToggled ? _store : null),
-                Instructions = await MemoryInstructionsAsync(),
+                    _memorySwitch.IsToggled ? _store : null, PhotoSearchOn ? FindPhotosAsync : null),
+                Instructions = JoinInstructions(await MemoryInstructionsAsync(), PhotoSearchOn ? PhotoInstructions : null),
                 ToolMode = ChatToolMode.Auto
             };
 
@@ -1628,6 +1633,12 @@ namespace Maui.Demo.Lite
                 }
             }
             return ToReply(thinking, answer);
+        }
+
+        private static string JoinInstructions(params string[] parts)
+        {
+            string joined = string.Join("\n\n", parts.Where(p => !string.IsNullOrEmpty(p)));
+            return joined.Length > 0 ? joined : null;
         }
 
         private static ChatReply ToReply(StringBuilder thinking, StringBuilder answer)
@@ -2854,6 +2865,7 @@ namespace Maui.Demo.Lite
                 _loadCancel?.Cancel();
                 _ = CancelRecordingAsync();
                 RemoveDocument();
+                _photoIndexing?.Cancel();
                 _ = CleanupModelAsync();
                 _ = ReleaseEmbedderAsync();
             }

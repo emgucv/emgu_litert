@@ -8,7 +8,11 @@ This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSI
 |---|---|---|
 | `get_current_date_time` | `AgentTools.CurrentDateTime()` | The local date and time, with the time zone |
 | `calculate` | `AgentTools.Calculate()` | Evaluates arithmetic exactly (`Calculator`) - small models get arithmetic wrong |
+| `convert_units` | `AgentTools.ConvertUnits()` | Converts length, mass, volume, temperature, speed, area, time, data, energy and pressure (`UnitConverter`) |
+| `convert_currency` | `AgentTools.ConvertCurrency()` | Converts money with the European Central Bank's daily rates, from [Frankfurter](https://frankfurter.dev) (no key needed) |
+| `read_web_page` | `AgentTools.ReadWebPage()` | The title and main text of a web page (`HtmlText`), fetched directly (no key needed) |
 | `remember`, `forget` | `AgentTools.Memory(store)` | Save and delete facts about the user in an `IAgentMemoryStore` (e.g. your app's database; `InMemoryAgentMemoryStore` for a quick start); `AgentTools.MemoryInstructionsAsync(store)` gives the agent the saved ones |
+| `find_photos` | `AgentTools.FindPhotos(search)` | Finds the user's photos, given the request in their words; your app's search turns it into what, where, when, kind and camera with `PhotoRequest.Parse`, e.g. over an index built with `EmbeddingGemma2TextVision`, with place names from `PlaceLookup` (offline reverse geocoding from a list of towns) |
 | `get_current_location` | `AgentTools.Location(lookup)` | Where the user is, from a lookup your app provides (e.g. MAUI's Geolocation and Geocoding) |
 | `get_weather` | `AgentTools.Weather()` | Current weather and a 3-day forecast from [Open-Meteo](https://open-meteo.com) (no key needed) |
 | `search_wikipedia` | `AgentTools.Wikipedia()` | Introductions of the best matching English Wikipedia articles |

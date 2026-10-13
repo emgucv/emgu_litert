@@ -16,6 +16,14 @@
 	<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 	<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 	<uses-feature android:name="android.hardware.location" android:required="false" />
+	<!-- LiteRT-LM chat: "Search my photos" (the agent's find_photos tool reads the photo library to index it on the
+	     device): READ_MEDIA_IMAGES on Android 13+, READ_MEDIA_VISUAL_USER_SELECTED when the user allows only some photos
+	     (Android 14+), READ_EXTERNAL_STORAGE before Android 13 -->
+	<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+	<uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+	<!-- Photo search: where photos were taken (Android 10+ removes their GPS position for apps without it). Optional. -->
+	<uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
 	<!-- LiteRT-LM chat: reading replies aloud (TextToSpeech, Android 11+ package visibility) -->
 	<queries>
 		<intent>

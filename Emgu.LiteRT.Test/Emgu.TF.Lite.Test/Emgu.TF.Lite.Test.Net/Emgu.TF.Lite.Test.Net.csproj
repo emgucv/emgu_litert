@@ -29,6 +29,10 @@
     <Content Include="..\..\..\LiteRT-LM\runtime\testdata\have_a_wonderful_day.wav" Link="have_a_wonderful_day.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- The offline place list the MAUI demo's photo search uses (GeoNames, CC BY 4.0), for TestPlaceLookup. -->
+    <Content Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\Resources\Raw\places.tsv.gz" Link="places.tsv.gz">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="..\grace_hopper.jpg" Link="grace_hopper.jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

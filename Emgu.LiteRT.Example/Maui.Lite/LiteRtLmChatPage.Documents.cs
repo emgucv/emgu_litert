@@ -76,6 +76,8 @@ namespace Maui.Demo.Lite
         private readonly HorizontalStackLayout _documentBar;
         private DocumentState _document;
         private EmbeddingGemma2TextVision _embedder;
+        // One embedding at a time: document search and photo search (PhotoIndex) share the model.
+        private readonly SemaphoreSlim _embedderGate = new SemaphoreSlim(1, 1);
         private Task<EmbeddingGemma2TextVision> _embedderLoad;
         // What the model's conversation already holds: passages and images given with earlier messages since the
         // conversation was last compacted.
@@ -203,7 +205,15 @@ namespace Maui.Demo.Lite
                             ? string.Format("Indexing the text: {0}%", 100 * p.PassagesDone / Math.Max(1, p.PassageCount))
                             : string.Format("Indexing pictures: {0} of {1}", p.ImagesDone, p.ImageCount);
                 });
-                await Task.Run(() => index.Build(embedder, indexed, cancel), cancel);
+                await _embedderGate.WaitAsync(cancel);
+                try
+                {
+                    await Task.Run(() => index.Build(embedder, indexed, cancel), cancel);
+                }
+                finally
+                {
+                    _embedderGate.Release();
+                }
                 UiStallWatchdog.Mark(string.Format("Document indexed in {0:F1}s", watch.Elapsed.TotalSeconds));
 
                 state.Index = index;
@@ -328,7 +338,16 @@ namespace Maui.Demo.Lite
             SetStatus("Searching the document...");
             DocumentIndex index = state.Index;
             EmbeddingModel embedder = _embedder;
-            DocumentSearchResult result = await Task.Run(() => index.Search(embedder, prompt));
+            DocumentSearchResult result;
+            await _embedderGate.WaitAsync();
+            try
+            {
+                result = await Task.Run(() => index.Search(embedder, prompt));
+            }
+            finally
+            {
+                _embedderGate.Release();
+            }
 
             DocumentContext context = new DocumentContext();
             // About 400 tokens of excerpts with a 4k window, 800 with 8k.

@@ -19,9 +19,9 @@ namespace Emgu.LiteRT.LM.Agents
     /// <summary>
     /// Ready-made tools for chat agents, as Microsoft.Extensions.AI functions: give them to an IChatClient that calls
     /// tools (ChatOptions.Tools with ChatClientBuilder.UseFunctionInvocation(), or a Microsoft Agent Framework agent).
-    /// The date and time, a calculator, memories about the user, the user's location (from a lookup the app provides),
-    /// and on the web: the weather (Open-Meteo, no key needed), Wikipedia and - with a Tavily API key - a web search and
-    /// a web page reader. The web tools send what they look up to those services. Results are kept short, since an
+    /// The date and time, a calculator and unit conversion, memories about the user, the user's location (from a lookup
+    /// the app provides), and on the web: currency conversion (Frankfurter), a web page reader, the weather (Open-Meteo),
+    /// Wikipedia - none of these need a key - and, with a Tavily API key, a web search and Tavily's page reader. The web tools send what they look up to those services. Results are kept short, since an
     /// on-device model has a small context.
     /// </summary>
     public static class AgentTools
@@ -77,6 +77,147 @@ namespace Emgu.LiteRT.LM.Agents
             catch (Exception e) when (e is FormatException || e is ArithmeticException)
             {
                 return "Couldn't calculate \"" + expression + "\": " + e.Message;
+            }
+        }
+
+        /// <summary>
+        /// convert_units: converts between units of length, mass, volume, temperature, speed, area, time, data, energy and
+        /// pressure (UnitConverter), so the model doesn't have to.
+        /// </summary>
+        public static AIFunction ConvertUnits()
+        {
+            return AIFunctionFactory.Create(
+                ([Description("The value to convert")] double value,
+                 [Description("The unit it is in, e.g. \"miles\", \"°F\", \"cups\", \"kg\"")] string from,
+                 [Description("The unit to convert to, e.g. \"km\", \"°C\", \"ml\", \"lb\"")] string to) => ConvertUnitsText(value, from, to),
+                "convert_units",
+                "Converts a value between units of length, mass, volume, temperature, speed, area, time, data size, energy or pressure, e.g. 26.2 miles to km, 350 °F to °C, 2 cups to ml. Always use it for unit conversions. For money use convert_currency.");
+        }
+
+        private static string ConvertUnitsText(double value, string from, string to)
+        {
+            try
+            {
+                double result = UnitConverter.Convert(value, from, to);
+                return string.Format(CultureInfo.InvariantCulture, "{0} {1} = {2} {3}",
+                    Calculator.Format(value), UnitConverter.Symbol(from), Calculator.Format(result), UnitConverter.Symbol(to));
+            }
+            catch (ArgumentException e)
+            {
+                return "Couldn't convert: " + e.Message + ". Supported units - " + UnitConverter.Supported;
+            }
+        }
+
+        /// <summary>
+        /// convert_currency: converts money with the European Central Bank's daily reference rates, from Frankfurter
+        /// (https://frankfurter.dev, free, no key; about 30 currencies, by ISO code - common names and symbols are mapped).
+        /// </summary>
+        /// <param name="http">The HttpClient to use, or null for DefaultHttpClient</param>
+        public static AIFunction ConvertCurrency(HttpClient http = null)
+        {
+            HttpClient client = http ?? DefaultHttpClient;
+            return AIFunctionFactory.Create(
+                ([Description("The amount of money")] double amount,
+                 [Description("Its currency, as a code, e.g. \"USD\", \"EUR\", \"JPY\"")] string from,
+                 [Description("The currency to convert to, as a code")] string to,
+                 CancellationToken cancellationToken) => ConvertCurrencyAsync(client, amount, from, to, cancellationToken),
+                "convert_currency",
+                "Converts an amount of money between currencies with today's European Central Bank exchange rates. Always use it for currency conversions.");
+        }
+
+        // Names and symbols models write instead of ISO codes.
+        private static readonly Dictionary<string, string> CurrencyNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "$", "USD" }, { "dollar", "USD" }, { "dollars", "USD" }, { "us dollar", "USD" }, { "us dollars", "USD" },
+            { "€", "EUR" }, { "euro", "EUR" }, { "euros", "EUR" },
+            { "£", "GBP" }, { "pound", "GBP" }, { "pounds", "GBP" }, { "pound sterling", "GBP" }, { "sterling", "GBP" },
+            { "¥", "JPY" }, { "yen", "JPY" }, { "yuan", "CNY" }, { "renminbi", "CNY" }, { "rmb", "CNY" },
+            { "₹", "INR" }, { "rupee", "INR" }, { "rupees", "INR" }, { "won", "KRW" }, { "₩", "KRW" },
+            { "franc", "CHF" }, { "swiss franc", "CHF" }, { "swiss francs", "CHF" },
+            { "canadian dollar", "CAD" }, { "canadian dollars", "CAD" }, { "australian dollar", "AUD" }, { "australian dollars", "AUD" },
+            { "hong kong dollar", "HKD" }, { "hong kong dollars", "HKD" }, { "peso", "MXN" }, { "mexican peso", "MXN" },
+            { "real", "BRL" }, { "reais", "BRL" }, { "krona", "SEK" }, { "swedish krona", "SEK" }, { "krone", "NOK" },
+            { "norwegian krone", "NOK" }, { "danish krone", "DKK" }, { "zloty", "PLN" }, { "rand", "ZAR" }, { "lira", "TRY" },
+            { "baht", "THB" }, { "ringgit", "MYR" }, { "singapore dollar", "SGD" }, { "new zealand dollar", "NZD" }
+        };
+
+        private static string CurrencyCode(string currency)
+        {
+            string text = (currency ?? string.Empty).Trim();
+            return CurrencyNames.TryGetValue(text, out string code) ? code : text.ToUpperInvariant();
+        }
+
+        private static async Task<string> ConvertCurrencyAsync(HttpClient http, double amount, string from, string to,
+            CancellationToken cancellationToken)
+        {
+            string source = CurrencyCode(from);
+            string target = CurrencyCode(to);
+            if (source.Length != 3 || target.Length != 3)
+                return "Give the currencies as three-letter codes, e.g. USD, EUR, GBP, JPY.";
+            if (source == target)
+                return string.Format(CultureInfo.InvariantCulture, "{0} {1} = {0} {1}", Calculator.Format(amount), source);
+            string url = string.Format(CultureInfo.InvariantCulture, "https://api.frankfurter.dev/v1/latest?amount={0}&from={1}&to={2}",
+                amount.ToString("R", CultureInfo.InvariantCulture), Uri.EscapeDataString(source), Uri.EscapeDataString(target));
+            using (HttpResponseMessage response = await http.GetAsync(url, cancellationToken).ConfigureAwait(false))
+            {
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                    return string.Format(CultureInfo.InvariantCulture,
+                        "No exchange rate for {0} to {1}: the European Central Bank publishes rates for about 30 major currencies.", source, target);
+                using (JsonDocument document = JsonDocument.Parse(json))
+                {
+                    JsonElement root = document.RootElement;
+                    double value = root.GetProperty("rates").GetProperty(target).GetDouble();
+                    return string.Format(CultureInfo.InvariantCulture, "{0} {1} = {2:N2} {3} (European Central Bank reference rate of {4}, via Frankfurter)",
+                        Calculator.Format(amount), source, value, target, root.GetProperty("date").GetString());
+                }
+            }
+        }
+
+        /// <summary>
+        /// read_web_page: the title and main text of a web page (HtmlText), fetched directly - no key needed. Pages built
+        /// by scripts, or behind a login or a paywall, may give little text; TavilyReadPage reads more of those.
+        /// </summary>
+        /// <param name="http">The HttpClient to use, or null for DefaultHttpClient</param>
+        /// <param name="maxLength">The most characters of text to return</param>
+        public static AIFunction ReadWebPage(HttpClient http = null, int maxLength = 2000)
+        {
+            HttpClient client = http ?? DefaultHttpClient;
+            return AIFunctionFactory.Create(
+                ([Description("The address of the page, starting with http:// or https://")] string url, CancellationToken cancellationToken) =>
+                    ReadWebPageDirectAsync(client, url, maxLength, cancellationToken),
+                "read_web_page",
+                "Returns the title and text of a web page. Use it when the user gives a link, or to read a page a search found.");
+        }
+
+        private const int MaxPageBytes = 3 * 1024 * 1024;
+
+        private static async Task<string> ReadWebPageDirectAsync(HttpClient http, string url, int maxLength, CancellationToken cancellationToken)
+        {
+            if (!Uri.TryCreate((url ?? string.Empty).Trim(), UriKind.Absolute, out Uri uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                return "\"" + url + "\" isn't a web address (http:// or https://).";
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, uri))
+            {
+                request.Headers.Accept.ParseAdd("text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5");
+                using (HttpResponseMessage response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false))
+                {
+                    if (!response.IsSuccessStatusCode)
+                        return string.Format(CultureInfo.InvariantCulture, "Couldn't read {0}: the site answered {1} ({2}).", uri, (int)response.StatusCode, response.ReasonPhrase);
+                    string mediaType = response.Content.Headers.ContentType?.MediaType ?? "text/html";
+                    bool html = mediaType.IndexOf("html", StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (!html && !mediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
+                        return string.Format(CultureInfo.InvariantCulture, "{0} isn't a web page or text ({1}).", uri, mediaType);
+                    if (response.Content.Headers.ContentLength > MaxPageBytes)
+                        return string.Format(CultureInfo.InvariantCulture, "{0} is too large to read.", uri);
+                    string content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    if (content.Length > MaxPageBytes)
+                        content = content.Substring(0, MaxPageBytes);
+                    string title = null;
+                    string text = html ? HtmlText.Extract(content, out title) : content.Trim();
+                    if (text.Length == 0)
+                        return string.Format(CultureInfo.InvariantCulture, "{0} has no readable text (it may be built by scripts).", uri);
+                    return (title != null ? "Page: " + title + " (" + uri + ")\n" : "Page: " + uri + "\n") + Shorten(text, maxLength);
+                }
             }
         }
 
@@ -201,6 +342,26 @@ namespace Emgu.LiteRT.LM.Agents
                 (CancellationToken cancellationToken) => getLocation(cancellationToken),
                 "get_current_location",
                 "Returns where the user is now: their town or city, region and country, and approximate coordinates. Use it for questions about things near the user, local weather, or their time zone.");
+        }
+
+        /// <summary>
+        /// find_photos: finds the user's photos with a search the app provides, given the request in the user's words
+        /// ("beach photos from Spain last summer") - PhotoRequest.Parse turns it into what is in the photos, where and when
+        /// they were taken, their kind and camera. The search should show the photos it finds to the user and return a
+        /// short text about them for the model, which doesn't see the photos themselves. One text rather than separate
+        /// fields: Gemma 4 E2B filled those unreliably (a beach as the place, an invented camera, asking for dates) but
+        /// passed the request on faithfully.
+        /// </summary>
+        /// <param name="search">The app's photo search, given the request</param>
+        public static AIFunction FindPhotos(Func<string, CancellationToken, Task<string>> search)
+        {
+            if (search == null)
+                throw new ArgumentNullException("search");
+            return AIFunctionFactory.Create(
+                ([Description("What to look for, in the user's words, e.g. \"beach photos from Spain last summer\", \"selfies\", \"photos from Paris\"")] string request,
+                 CancellationToken cancellationToken) => search(request ?? string.Empty, cancellationToken),
+                "find_photos",
+                "Finds the user's own photos on this device - by what is in them, where and when they were taken, or their kind (selfie, screenshot...) - and shows them to the user. Use it whenever the user asks to find, show or look for their photos or pictures.");
         }
 
         /// <summary>
@@ -507,7 +668,7 @@ namespace Emgu.LiteRT.LM.Agents
             {
                 case "get_current_date_time": return "Checking the date and time";
                 case "get_current_location": return "Getting your location";
-                case "calculate": return "Calculating " + Argument("expression");
+                case "find_photos": return "Looking for \u201C" + Argument("request") + "\u201D";
                 case "get_weather":
                     string place = Argument("place");
                     return "Checking the weather" + (place.Length > 0 ? " in " + place : "");

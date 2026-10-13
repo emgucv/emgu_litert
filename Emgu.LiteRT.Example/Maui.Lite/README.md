@@ -165,6 +165,12 @@ again.
   Mac or PC, 4k on a phone), 4k, 8k, 16k or 32k. A larger window summarizes the chat less often, but reading it again
   (opening a saved chat, after summarizing) takes longer and needs more memory. Changing it reloads the model; the chat
   continues.
+- Settings → Search my photos (Gemma 4; off by default) indexes your most recent photos on the device in the
+  background - nothing leaves it - with when, where and how they were taken, so you can ask "show me my photos of the
+  beach", "selfies from Spain last summer" or "photos taken with my Pixel in 2025"; the matches appear as thumbnails
+  above the reply. Places come from GPS positions and a list of towns in the app, `Resources/Raw/places.tsv.gz`
+  (from [GeoNames](https://www.geonames.org), CC BY 4.0; rebuilt by `tools/make_places.py`). On Android the app also
+  asks to read the photos' locations; without it, search works without places. Turning it off deletes the index.
 - "+" → Document attaches a PDF, Word (.docx) or text file to the chat, with any model. The first time, a 388 MB
   search model (EmbeddingGemma 2) is downloaded; the document is then indexed on the device (a few seconds on a Mac,
   longer on a phone), and each question is sent with the parts of the document that match it - and, for Gemma 4 and

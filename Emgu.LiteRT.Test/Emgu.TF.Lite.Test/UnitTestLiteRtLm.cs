@@ -527,6 +527,153 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // Emgu.LiteRT.LM.Agents' UnitConverter, which the convert_units tool uses.
+        [TestAttribute]
+        public void TestUnitConverter()
+        {
+            (double Value, String From, String To, double Expected)[] cases =
+            {
+                (26.2, "miles", "km", 42.164813),
+                (350, "°F", "°C", 176.666667),
+                (100, "degrees Celsius", "fahrenheit", 212),
+                (0, "K", "C", -273.15),
+                (2, "cups", "ml", 473.176473),
+                (1, "imperial gallon", "litres", 4.54609),
+                (5, "kg", "lbs", 11.023113),
+                (12, "stone", "kg", 76.203518),
+                (60, "mph", "km/h", 96.56064),
+                (1, "acre", "m2", 4046.856422),
+                (2, "hours", "minutes", 120),
+                (1, "GiB", "MB", 1073.741824),
+                (500, "kcal", "kJ", 2092),
+                (32, "psi", "bar", 2.206322),
+                (6, "feet", "metres", 1.8288),
+                (10, "inches", "cm", 25.4)
+            };
+            foreach (var c in cases)
+            {
+                double result = Emgu.LiteRT.LM.Agents.UnitConverter.Convert(c.Value, c.From, c.To);
+                Console.WriteLine("{0} {1} = {2} {3}", c.Value, c.From, result, c.To);
+                if (Math.Abs(result - c.Expected) > 1e-5 * Math.Max(1, Math.Abs(c.Expected)))
+                    throw new Exception(String.Format("{0} {1} to {2} gave {3}, expected {4}", c.Value, c.From, c.To, result, c.Expected));
+            }
+            foreach (var bad in new[] { ("kg", "km"), ("furlongs", "m"), ("m", "parsecs") })
+            {
+                try
+                {
+                    Emgu.LiteRT.LM.Agents.UnitConverter.Convert(1, bad.Item1, bad.Item2);
+                    throw new Exception("No error for " + bad);
+                }
+                catch (ArgumentException e) { Console.WriteLine(e.Message); }
+            }
+        }
+
+        // Emgu.LiteRT.LM.Agents' HtmlText, which the read_web_page tool uses: the article's text without the page's
+        // navigation, scripts and footer.
+        [TestAttribute]
+        public void TestHtmlText()
+        {
+            String filler = String.Join(" ", Enumerable.Repeat("The bakery's ovens run from four in the morning.", 6));
+            String html = "<html><head><title>Contoso &amp; Co news</title><style>p{color:red}</style>" +
+                "<script>var menu = 'Home';</script></head><body>" +
+                "<nav><ul><li><a href='/'>Home</a></li><li><a href='/shop'>Shop</a></li></ul></nav>" +
+                "<header><h1>Site header</h1></header>" +
+                "<article data-mw='{\"a\":\"<b>x</b>\"}'><h1>New shop opens in York</h1><table class='infobox'><tr><td>Founded</td><td>1990</td></tr></table>" +
+                "<p>Contoso Bakery opened its second shop on Monday.[1]&nbsp;Queues formed early.</p>" +
+                "<p>" + filler + "</p><ul><li>Bread from 1.20 pounds</li></ul></article>" +
+                "<footer><p>Copyright Contoso 2026. All rights reserved by the company and its partners worldwide.</p></footer>" +
+                "</body></html>";
+            String text = Emgu.LiteRT.LM.Agents.HtmlText.Extract(html, out String title);
+            Console.WriteLine("Title: {0}\n{1}", title, text);
+            if (title != "Contoso & Co news")
+                throw new Exception("Wrong title: " + title);
+            if (!text.Contains("New shop opens in York") || !text.Contains("second shop on Monday. Queues formed early.")
+                || !text.Contains("Bread from 1.20 pounds"))
+                throw new Exception("The article text is missing");
+            if (text.Contains("Shop\n") || text.Contains("var menu") || text.Contains("color:red") || text.Contains("Copyright") || text.Contains("Site header")
+                || text.Contains("Founded") || text.Contains("\"a\"") || text.Contains("[1]"))
+                throw new Exception("Navigation, scripts, styles, header or footer were kept");
+
+            // Without an article element: the paragraphs, not the short link lists.
+            String plain = "<html><body><div><a href='/a'>Link one</a> | <a href='/b'>Link two</a></div>" +
+                "<p>" + filler + "</p><p>Short.</p><h2>Opening hours</h2><p>The shop is open from nine until six every weekday, and until four on Saturdays.</p></body></html>";
+            String plainText = Emgu.LiteRT.LM.Agents.HtmlText.Extract(plain, out String noTitle);
+            Console.WriteLine(plainText);
+            if (noTitle != null || plainText.Contains("Link one") || !plainText.Contains("Opening hours") || !plainText.Contains("until four on Saturdays"))
+                throw new Exception("Unexpected text of a page without an article element");
+        }
+
+        // Emgu.LiteRT.LM.Agents' PlaceLookup with the MAUI demo's place list (GeoNames' towns of 5,000+ people).
+        [TestAttribute]
+        public void TestPlaceLookup()
+        {
+            Emgu.LiteRT.LM.Agents.PlaceLookup places;
+            System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+            using (System.IO.Stream stream = System.IO.File.OpenRead("places.tsv.gz"))
+                places = Emgu.LiteRT.LM.Agents.PlaceLookup.Load(stream);
+            Console.WriteLine("{0} towns loaded in {1} ms", places.Count, sw.ElapsedMilliseconds);
+            (double Lat, double Lon, String Expected)[] cases =
+            {
+                (48.8584, 2.2945, "Paris, Île-de-France, France"),          // the Eiffel Tower
+                (36.9741, -122.0308, "Santa Cruz, California, United States"),
+                (35.6595, 139.7005, "Tokyo, Japan"),                         // Shibuya: a ward, named after the city
+                (52.3600, 4.8852, "Amsterdam, North Holland, The Netherlands"),
+                (-33.8568, 151.2153, "Sydney, New South Wales, Australia"),  // the Opera House
+                (48.8049, 2.1204, "Versailles, Île-de-France, France"),     // the palace: its own town, not Paris
+                (-16.5, 179.9, null)                                        // near the date line: Fiji or nothing
+            };
+            sw.Restart();
+            foreach (var c in cases)
+            {
+                Emgu.LiteRT.LM.Agents.Place place = places.FindNearest(c.Lat, c.Lon);
+                Console.WriteLine("{0}, {1}: {2} ({3:F1} km)", c.Lat, c.Lon, place, place?.DistanceKm ?? 0);
+                if (c.Expected != null && place?.ToString() != c.Expected)
+                    throw new Exception(String.Format("{0}, {1}: expected {2}, got {3}", c.Lat, c.Lon, c.Expected, place));
+            }
+            Console.WriteLine("{0} lookups in {1} ms", cases.Length, sw.ElapsedMilliseconds);
+            if (places.FindNearest(0, -30) != null)
+                throw new Exception("The middle of the Atlantic should have no town");
+            if (!Emgu.LiteRT.LM.Agents.PlaceLookup.Matches("Paris, Île-de-France, France", "ile de france")
+                || !Emgu.LiteRT.LM.Agents.PlaceLookup.Matches("Paris, Île-de-France, France", "FRANCE")
+                || Emgu.LiteRT.LM.Agents.PlaceLookup.Matches("Paris, Île-de-France, France", "Par"))
+                throw new Exception("Unexpected place matching");
+        }
+
+        // PhotoRequest.Parse turns find_photos' request (the user's words, as Gemma passes them on) into a PhotoQuery.
+        [TestAttribute]
+        public void TestPhotoRequest()
+        {
+            DateTime now = new DateTime(2026, 10, 12, 15, 0, 0);   // a Monday
+            String[] places = { "Paris, Île-de-France, France", "Santa Cruz, California, United States", "Valencia, Valencia, Spain" };
+            String[] cameras = { "Google Pixel 8", "Apple iPhone 15" };
+            DateTime End(int y, int m, int d) => new DateTime(y, m, d).AddDays(1).AddTicks(-1);
+            (String Request, String Description, String Place, DateTime? From, DateTime? To, String Kind, String Camera)[] cases =
+            {
+                ("beach photos from Spain last summer", "beach", "Spain", new DateTime(2026, 6, 1), End(2026, 8, 31), null, null),
+                ("selfies", null, null, null, null, "selfie", null),
+                ("photos from Paris", null, "Paris", null, null, null, null),
+                ("screenshots from last week", null, null, new DateTime(2026, 10, 5), End(2026, 10, 11), "screenshot", null),
+                ("dog in the snow", "dog snow", null, null, null, null, null),
+                ("trip to Japan in 2024", null, "Japan", new DateTime(2024, 1, 1), End(2024, 12, 31), null, null),
+                ("photos taken with Pixel", null, null, null, null, null, "Pixel"),
+                ("sunset in California in March", "sunset", "California", new DateTime(2026, 3, 1), End(2026, 3, 31), null, null),
+                ("my favourite photos from the USA", null, "United States", null, null, "favorite", null),
+                ("pictures of the Eiffel Tower", "Eiffel Tower", null, null, null, null, null),
+                ("photos from 3 weeks ago", null, null, new DateTime(2026, 9, 18), End(2026, 9, 24), null, null),
+                ("Christmas 2025", "Christmas", null, new DateTime(2025, 1, 1), End(2025, 12, 31), null, null),
+                ("my iPhone photos from last winter", null, null, new DateTime(2025, 12, 1), End(2026, 2, 28), null, "iPhone"),
+                ("valencia beach in august", "beach", "Valencia", new DateTime(2026, 8, 1), End(2026, 8, 31), null, null)
+            };
+            foreach (var c in cases)
+            {
+                Emgu.LiteRT.LM.Agents.PhotoQuery q = Emgu.LiteRT.LM.Agents.PhotoRequest.Parse(c.Request, now, places, cameras);
+                Console.WriteLine("\"{0}\" -> {1}", c.Request, q);
+                if (q.Description != c.Description || q.Place != c.Place || q.From != c.From || q.To != c.To || q.Kind != c.Kind || q.Camera != c.Camera)
+                    throw new Exception(String.Format("\"{0}\": got description {1}, place {2}, {3:yyyy-MM-dd} to {4:yyyy-MM-dd}, kind {5}, camera {6}",
+                        c.Request, q.Description, q.Place, q.From, q.To, q.Kind, q.Camera));
+            }
+        }
+
         // The remember / forget tools with an in-memory store: a fact already saved in other words isn't saved again.
         [TestAttribute]
         public async Task TestAgentMemoryTools()
@@ -583,6 +730,17 @@ namespace Emgu.TF.Lite.Test
             Console.WriteLine(wikipedia);
             if (wikipedia == null || !wikipedia.Contains("Ada Lovelace") || !wikipedia.Contains("wikipedia.org"))
                 throw new Exception("Unexpected Wikipedia result");
+            String currency = (await Emgu.LiteRT.LM.Agents.AgentTools.ConvertCurrency().InvokeAsync(
+                new AIFunctionArguments { ["amount"] = 100.0, ["from"] = "US dollars", ["to"] = "EUR" }))?.ToString();
+            Console.WriteLine(currency);
+            if (currency == null || !currency.StartsWith("100 USD = ") || !currency.Contains(" EUR (European Central Bank"))
+                throw new Exception("Unexpected currency result");
+            String page = (await Emgu.LiteRT.LM.Agents.AgentTools.ReadWebPage().InvokeAsync(
+                new AIFunctionArguments { ["url"] = "https://en.wikipedia.org/wiki/Ada_Lovelace" }))?.ToString();
+            Console.WriteLine(page);
+            if (page == null || !page.StartsWith("Page: Ada Lovelace") || !page.Contains("Babbage") || page.Contains("Jump to content")
+                || page.Contains("{{") || page.Contains("\"wt\"") || System.Text.RegularExpressions.Regex.IsMatch(page, @"\[\d+\]"))
+                throw new Exception("Unexpected web page result");
         }
 
         // Gemma 4 E2B using Emgu.LiteRT.LM.Agents' tools through UseFunctionInvocation(): the calculator for arithmetic
@@ -609,14 +767,41 @@ namespace Emgu.TF.Lite.Test
                             Emgu.LiteRT.LM.Agents.AgentTools.Weather(), Emgu.LiteRT.LM.Agents.AgentTools.Wikipedia() },
                         Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }
                     };
-                    foreach (var q in new[] { ("What is 1234.5 times 678.9?", "calculate", "838"), ("What's the weather in Paris right now?", "get_weather", "\u00B0") })
+                    // A stand-in photo search, recording what Gemma asks for.
+                    List<String> photoRequests = new List<String>();
+                    options.Tools.Add(Emgu.LiteRT.LM.Agents.AgentTools.FindPhotos((request, cancel) =>
+                    {
+                        photoRequests.Add(request);
+                        Emgu.LiteRT.LM.Agents.PhotoQuery query = Emgu.LiteRT.LM.Agents.PhotoRequest.Parse(request, DateTime.Now);
+                        Console.WriteLine("  find_photos \"{0}\" -> {1}", request, query);
+                        return Task.FromResult("Found 3 photos " + query + ": taken 2 Aug 2026 in Valencia, Spain; taken 5 Aug 2026 in Valencia, Spain; taken 9 Aug 2026 in Alicante, Spain. They are now shown to the user above your reply. You can't see them: say briefly what you found (when and where, if known), without describing them.");
+                    }));
+                    options.Tools.Add(Emgu.LiteRT.LM.Agents.AgentTools.ConvertUnits());
+                    options.Tools.Add(Emgu.LiteRT.LM.Agents.AgentTools.ConvertCurrency());
+                    options.Tools.Add(Emgu.LiteRT.LM.Agents.AgentTools.ReadWebPage());
+                    foreach (var q in new[]
+                    {
+                        ("What is 1234.5 times 678.9?", "calculate", "838"),
+                        ("What's the weather in Paris right now?", "get_weather", "\u00B0"),
+                        ("How many kilometres is a marathon of 26.2 miles?", "convert_units", "42.1"),
+                        ("What is 100 US dollars in euros today?", "convert_currency", "euro"),
+                        ("In one sentence, what is https://www.python.org/about/ about?", "read_web_page", "Python"),
+("Show me my photos of the beach.", "find_photos", "3"),
+                        ("Show me my beach photos from Spain last summer.", "find_photos", "Spain")
+                    })
                     {
                         ChatResponse response = await client.GetResponseAsync(q.Item1, options);
                         List<FunctionCallContent> calls = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
                         Console.WriteLine("{0} -> {1}: {2}", q.Item1,
                             String.Join(", ", calls.Select(Emgu.LiteRT.LM.Agents.AgentTools.Describe)), response.Text);
-                        if (!calls.Any(c => c.Name == q.Item2) || response.Text.IndexOf(q.Item3, StringComparison.Ordinal) < 0)
+                        if (!calls.Any(c => c.Name == q.Item2) || response.Text.IndexOf(q.Item3, StringComparison.OrdinalIgnoreCase) < 0)
                             throw new Exception("The tool wasn't used, or its result isn't in the answer: " + q.Item1);
+                    }
+                    // The last question's place and dates reached the search.
+                    Emgu.LiteRT.LM.Agents.PhotoQuery spain = Emgu.LiteRT.LM.Agents.PhotoRequest.Parse(photoRequests.Last(), DateTime.Now);
+                    if (spain.Place == null || spain.Place.IndexOf("Spain", StringComparison.OrdinalIgnoreCase) < 0 || spain.From == null)
+                        throw new Exception("find_photos didn't get the place and dates: " + photoRequests.Last());
+                    {
                     }
                 }
             }
