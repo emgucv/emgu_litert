@@ -324,6 +324,65 @@ namespace Maui.Demo.Lite
         /// A JPEG of the photo at most maxSize pixels on its longer side, or null if it can't be read (deleted, or only in
         /// iCloud). Runs on a background thread.
         /// </summary>
+        /// <summary>
+        /// Which of these photos are still in the library, or null if that can't be told (no access to the photos). Runs on
+        /// a background thread.
+        /// </summary>
+        public static Task<HashSet<string>> GetExistingAsync(IReadOnlyCollection<string> ids)
+        {
+            return Task.Run(() =>
+            {
+                try
+                {
+                    if (!HasAccess())
+                        return null;
+                    HashSet<string> existing = new HashSet<string>();
+                    if (ids.Count == 0)
+                        return existing;
+#if ANDROID
+                    string selection = "_id IN (" + string.Join(",", ids.Select(_ => "?")) + ")";
+                    using (Android.Database.ICursor cursor = Android.App.Application.Context.ContentResolver.Query(
+                        Android.Provider.MediaStore.Images.Media.ExternalContentUri, new[] { "_id" }, selection, ids.ToArray(), null))
+                    {
+                        while (cursor != null && cursor.MoveToNext())
+                            existing.Add(cursor.GetLong(0).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    }
+#elif IOS || MACCATALYST
+                    Photos.PHFetchResult result = Photos.PHAsset.FetchAssetsUsingLocalIdentifiers(ids.ToArray(), null);
+                    for (nint i = 0; i < (nint)result.Count; i++)
+                        if (result[i] is Photos.PHAsset asset)
+                            existing.Add(asset.LocalIdentifier);
+#else
+                    foreach (string id in ids)
+                        if (File.Exists(id))
+                            existing.Add(id);
+#endif
+                    return existing;
+                }
+                catch (Exception)
+                {
+                    return null;
+                }
+            });
+        }
+
+        // Whether the app may read the photos now (the user can take access away in the system settings at any time).
+        private static bool HasAccess()
+        {
+#if ANDROID
+            Android.Content.Context context = Android.App.Application.Context;
+            foreach (string permission in new[] { "android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_VISUAL_USER_SELECTED", "android.permission.READ_EXTERNAL_STORAGE" })
+                if (AndroidX.Core.Content.ContextCompat.CheckSelfPermission(context, permission) == Android.Content.PM.Permission.Granted)
+                    return true;
+            return false;
+#elif IOS || MACCATALYST
+            Photos.PHAuthorizationStatus status = Photos.PHPhotoLibrary.GetAuthorizationStatus(Photos.PHAccessLevel.ReadWrite);
+            return status == Photos.PHAuthorizationStatus.Authorized || status == Photos.PHAuthorizationStatus.Limited;
+#else
+            return true;
+#endif
+        }
+
         public static Task<byte[]> LoadImageAsync(string id, int maxSize)
         {
             return Task.Run(() =>

@@ -316,6 +316,17 @@ namespace Maui.Demo.Lite
         }
 
         /// <summary>
+        /// Forget photos that are no longer in the library (deleted since the last indexing pass).
+        /// </summary>
+        public async Task RemoveAsync(IReadOnlyCollection<string> photoIds)
+        {
+            await _store.DeletePhotoEmbeddingsAsync(photoIds);
+            lock (_entries)
+                _entries.RemoveAll(e => photoIds.Contains(e.Id));
+            Changed?.Invoke();
+        }
+
+        /// <summary>
         /// Forget every photo (when photo search is turned off).
         /// </summary>
         public async Task ClearAsync()

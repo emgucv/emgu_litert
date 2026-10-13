@@ -280,6 +280,7 @@ namespace Maui.Demo.Lite
         private ModelChoice? _loadingChoice;
         private CancellationTokenSource _loadCancel;
         private bool _pageStarted;
+        private bool _pageVisible;
         private readonly Border _loadCard;
         private readonly Label _loadTitle;
         private readonly Label _loadStage;
@@ -975,8 +976,12 @@ namespace Maui.Demo.Lite
         protected override void OnAppearing()
         {
             base.OnAppearing();
+            _pageVisible = true;
             if (_pageStarted)
+            {
+                RefreshPhotoIndex();
                 return;
+            }
             _pageStarted = true;
             int index = 0;
             try
@@ -994,6 +999,12 @@ namespace Maui.Demo.Lite
             StartPhotoIndexing();
             // Saved document indexes no chat uses (attached, then the chat was never saved).
             _ = _store.DeleteUnusedDocumentsAsync();
+        }
+
+        protected override void OnDisappearing()
+        {
+            base.OnDisappearing();
+            _pageVisible = false;
         }
 
         private static bool IsDownloaded(ModelOption option)

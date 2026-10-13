@@ -102,11 +102,51 @@ namespace Maui.Demo.Lite
             }
         }
 
+        // When an indexing pass last started; returning to the page or the app starts another at most this often.
+        private DateTime _photoIndexStarted = DateTime.MinValue;
+        private static readonly TimeSpan PhotoReindexInterval = TimeSpan.FromMinutes(1);
+        private Window _resumeWindow;
+
+        // The page is shown again, or the app came back to the foreground: photos taken, edited or deleted in the meantime
+        // are indexed or forgotten (a pass over unchanged photos only reads the library's list).
+        private void RefreshPhotoIndex()
+        {
+            if (DateTime.UtcNow - _photoIndexStarted >= PhotoReindexInterval)
+                StartPhotoIndexing();
+        }
+
+        // Window.Resumed: the app returns to the foreground (on desktops also when its window is activated). The page's
+        // Window is set after OnAppearing when it is pushed in the Shell, so this follows the property.
+        protected override void OnPropertyChanged(string propertyName = null)
+        {
+            base.OnPropertyChanged(propertyName);
+            if (propertyName == nameof(Window))
+                WatchAppResume();
+        }
+
+        private void WatchAppResume()
+        {
+            if (Window == _resumeWindow)
+                return;
+            if (_resumeWindow != null)
+                _resumeWindow.Resumed -= OnAppResumed;
+            _resumeWindow = Window;
+            if (_resumeWindow != null)
+                _resumeWindow.Resumed += OnAppResumed;
+        }
+
+        private void OnAppResumed(object sender, EventArgs e)
+        {
+            if (_pageVisible)
+                RefreshPhotoIndex();
+        }
+
         // Index the new photos in the background (incremental: only photos not yet indexed, or edited since).
         private void StartPhotoIndexing()
         {
             if (!PhotoSearchOn || (_photoIndexTask != null && !_photoIndexTask.IsCompleted))
                 return;
+            _photoIndexStarted = DateTime.UtcNow;
             _photoIndexing = new CancellationTokenSource();
             CancellationToken cancel = _photoIndexing.Token;
             _photoIndexTask = IndexPhotosAsync(cancel);
@@ -163,6 +203,20 @@ namespace Maui.Demo.Lite
             // What, where, when, kind and camera, from the request; places and cameras as the indexed photos name them.
             PhotoQuery query = PhotoRequest.Parse(request, DateTime.Now, _photoIndex.KnownPlaces(), _photoIndex.KnownCameras());
             (List<(IndexedPhoto Photo, float Score)> found, int matching) = await _photoIndex.SearchAsync(_embedder, _embedderGate, query, cancel);
+            // Photos deleted since the last indexing pass: forgotten, and the search run again, since the scores of the
+            // rest count relative to the best one.
+            for (int attempt = 0; attempt < 3 && found.Count > 0; attempt++)
+            {
+                HashSet<string> existing = await PhotoLibrary.GetExistingAsync(found.Select(f => f.Photo.Id).ToList());
+                if (existing == null)
+                    break;
+                List<string> gone = found.Select(f => f.Photo.Id).Where(id => !existing.Contains(id)).ToList();
+                if (gone.Count == 0)
+                    break;
+                UiStallWatchdog.Mark(string.Format("find_photos: {0} found photos no longer in the library", gone.Count));
+                await _photoIndex.RemoveAsync(gone);
+                (found, matching) = await _photoIndex.SearchAsync(_embedder, _embedderGate, query, cancel);
+            }
             UiStallWatchdog.Mark(string.Format("find_photos {0}: {1} found of {2} matching{3}", query, found.Count, matching,
                 found.Count > 0 && query.Description != null ? string.Format(CultureInfo.InvariantCulture, ", best {0:F3}", found[0].Score) : ""));
             if (found.Count == 0)
