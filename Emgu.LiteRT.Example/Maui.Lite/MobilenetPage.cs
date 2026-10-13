@@ -69,7 +69,7 @@ namespace Maui.Demo.Lite
         {
             if (_mobilenet == null)
             {
-                _mobilenet = new Mobilenet();
+                _mobilenet = new Mobilenet { NumThreads = CpuThreadSettings.Count };
                 _mobilenet.OnDownloadProgressChanged += OnDownloadProgress;
             }
             ShowProgress("Preparing the Mobilenet model...\n(the first run downloads it)");

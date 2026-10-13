@@ -47,7 +47,7 @@ namespace Maui.Demo.Lite
         {
             if (_mobilenet == null)
             {
-                _mobilenet = new CocoSsdMobilenetV3();
+                _mobilenet = new CocoSsdMobilenetV3 { NumThreads = CpuThreadSettings.Count };
                 _mobilenet.OnDownloadProgressChanged += OnDownloadProgress;
             }
             ShowProgress("Preparing the Coco SSD model...\n(the first run downloads it)");

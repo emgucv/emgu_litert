@@ -415,7 +415,12 @@ namespace Maui.Demo.Lite
             stage?.Report(EmbeddingGemma2TextVision.ModelFile.IsLocalFileVerified ? "Loading the search model..." : "Downloading the search model (388 MB)...");
             try
             {
-                await embedder.Init(cancellationToken: cancel);
+                await embedder.Init(configureSettings: settings =>
+                {
+                    int count = CpuThreadSettings.Count;
+                    settings.NumThreads = count;
+                    settings.AudioNumThreads = count;
+                }, cancellationToken: cancel);
             }
             catch (Exception)
             {

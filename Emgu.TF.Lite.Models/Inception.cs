@@ -27,6 +27,9 @@ namespace Emgu.TF.Lite.Models
     {
         private FileDownloadManager _downloadManager;
         
+        /// <summary>CPU thread count to use when initializing the interpreter; null uses the runtime default.</summary>
+        public int? NumThreads { get; set; }
+
         private Interpreter _interpreter = null;
         private String[] _labels = null;
         private FlatBufferModel _model = null;
@@ -179,6 +182,8 @@ namespace Emgu.TF.Lite.Models
             if (_interpreter == null)
             {
                 _interpreter = new Interpreter(_model);
+                if (NumThreads.HasValue)
+                    _interpreter.SetNumThreads(NumThreads.Value);
                 /*
                 using (NNAPIDelegate d = new NNAPIDelegate())
                 {

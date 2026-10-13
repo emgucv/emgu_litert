@@ -213,7 +213,10 @@ namespace Maui.Demo.Lite
         private Task EnsureImageModelAsync()
         {
             if (_zimageInit == null || _zimageInit.IsFaulted)
+            {
+                _zimage.NumThreads = CpuThreadSettings.Count;
                 _zimageInit = _zimage.Init();
+            }
             return _zimageInit;
         }
 

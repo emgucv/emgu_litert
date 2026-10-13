@@ -35,6 +35,9 @@ namespace Emgu.TF.Lite.Models
     {
         private FileDownloadManager _downloadManager;
 
+        /// <summary>CPU thread count to use when initializing the interpreter; null uses the runtime default.</summary>
+        public int? NumThreads { get; set; }
+
         private Interpreter _interpreter = null;
         private String[] _labels = null;
         private FlatBufferModel _model = null;
@@ -170,6 +173,8 @@ namespace Emgu.TF.Lite.Models
             if (_interpreter == null)
             {
                 _interpreter = new Interpreter(_model);
+                if (NumThreads.HasValue)
+                    _interpreter.SetNumThreads(NumThreads.Value);
 
                 bool isAndroid = false;
 #if UNITY_ANDROID && (!UNITY_EDITOR)
@@ -186,7 +191,8 @@ namespace Emgu.TF.Lite.Models
                     //_interpreter.ModifyGraphWithDelegate(TfLiteInvoke.DefaultGpuDelegateV2);
                     _interpreter.ModifyGraphWithDelegate(TfLiteInvoke.DefaultNnApiDelegate);
                     //_interpreter.UseNNAPI(false);
-                    _interpreter.SetNumThreads(4);
+                    if (!NumThreads.HasValue)
+                        _interpreter.SetNumThreads(4);
                 }
                 //_interpreter.Build(_model);
                 if (optDelegate != null)

@@ -87,6 +87,7 @@ namespace Maui.Demo.Lite
 
                     using (Interpreter interpreter = new Interpreter(fbm))
                     {
+                        interpreter.SetNumThreads(CpuThreadSettings.Count);
 
                         Status allocateTensorStatus = interpreter.AllocateTensors();
                         if (allocateTensorStatus == Status.Error)

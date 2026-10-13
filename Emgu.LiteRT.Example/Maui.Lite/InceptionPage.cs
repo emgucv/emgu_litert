@@ -44,7 +44,7 @@ namespace Maui.Demo.Lite
         {
             if (_inception == null)
             {
-                _inception = new Inception();
+                _inception = new Inception { NumThreads = CpuThreadSettings.Count };
                 _inception.OnDownloadProgressChanged += OnDownloadProgress;
             }
             ShowProgress("Preparing the Inception model...\n(the first run downloads it)");

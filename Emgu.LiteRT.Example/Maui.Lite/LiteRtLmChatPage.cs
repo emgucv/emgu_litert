@@ -542,6 +542,8 @@ namespace Maui.Demo.Lite
                 Spacing = 6,
                 Children =
                 {
+                    CpuThreadSettings.CreateView(),
+                    Theme.Divider(),
                     readAloudRow,
                     Theme.Divider(),
 #if ANDROID || MACCATALYST
@@ -1045,6 +1047,13 @@ namespace Maui.Demo.Lite
             return _loadTask;
         }
 
+        private static void ConfigureCpuThreads(Emgu.LiteRT.LM.EngineSettings settings)
+        {
+            int count = CpuThreadSettings.Count;
+            settings.NumThreads = count;
+            settings.AudioNumThreads = count;
+        }
+
         private async Task<bool> LoadModelAsync(ModelOption option, Task<bool> previousLoad, CancellationToken token)
         {
             UiStallWatchdog.Mark("Loading model " + option.Name);
@@ -1095,7 +1104,7 @@ namespace Maui.Demo.Lite
                     {
                         // Gemma4 uses 32-bit activations on the GPU: with LiteRT-LM's default 16-bit ones, Gemma 4 E2B
                         // answered wrongly after a long conversation on a Pixel Fold and an M1 Mac (Performance.md).
-                        await model.Init(backend: "gpu", cancellationToken: token);
+                        await model.Init(backend: "gpu", configureSettings: ConfigureCpuThreads, cancellationToken: token);
                     }
                     catch (Exception ex) when (lastStage == ModelLoadStage.LoadingEngine && !token.IsCancellationRequested)
                     {
@@ -1106,12 +1115,12 @@ namespace Maui.Demo.Lite
                         _loadingOnGpu = false;
                         await Task.Run(() => model.Dispose());
                         model = NewModel();
-                        await model.Init(cancellationToken: token);
+                        await model.Init(configureSettings: ConfigureCpuThreads, cancellationToken: token);
                     }
                 }
                 else
                 {
-                    await model.Init(cancellationToken: token);
+                    await model.Init(configureSettings: ConfigureCpuThreads, cancellationToken: token);
                 }
             }
             catch (Exception ex)
