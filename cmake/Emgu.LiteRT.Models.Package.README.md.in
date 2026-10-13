@@ -19,6 +19,17 @@ using (var mobilenet = new Emgu.LiteRT.Models.Mobilenet())
 
 On the GPU, the outputs differ slightly from the CPU's (it computes in lower precision). The GPU needs LiteRT's GPU accelerator: the optional `${EMGU_LITERT_NUGET_ID}.Metal.runtime.macos` / `${EMGU_LITERT_NUGET_ID}.Metal.runtime.maui.macos` (Apple Silicon) or `${EMGU_LITERT_NUGET_ID}.OpenCL.runtime.maui.android` packages.
 
+`ZImageTurbo` is text-to-image with [Z-Image-Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo) (Alibaba Tongyi-MAI, 6B, Apache-2.0) on the CPU: 256x256 images from prompts of up to 24 tokens. It downloads the 13 graphs of [litert-community/Z-Image-Turbo-LiteRT](https://huggingface.co/litert-community/Z-Image-Turbo-LiteRT) (9.8 GB) and 0.78 GB of host tensors from the original checkpoint, and its first image writes 9 GB of weight caches, so it needs about 21 GB of storage; an image then takes about 23 s on an Apple M1.
+
+```csharp
+using (var zimage = new Emgu.LiteRT.Models.ZImageTurbo())
+{
+    await zimage.Init();                         // downloads 10.6 GB the first time
+    var image = await zimage.Generate("a red apple on a wooden table, studio lighting", seed: 42);
+    // image.Rgb: 256 x 256 pixels, 8-bit RGB
+}
+```
+
 For online documentation please visit
 <${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
 

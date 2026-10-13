@@ -18,5 +18,16 @@
     <ProjectReference Include="..\..\Emgu.TF.Lite.ImageIO\NetStandard\Emgu.TF.Lite.ImageIO.csproj" />
   </ItemGroup>
 
+  <!-- ZImageTurbo reads its tokenizer and safetensors headers as JSON. System.Text.Json is part of the .NET runtime
+       for the net*-ios / -android / -maccatalyst targets; netstandard2.0 needs the package. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="System.Text.Json" Version="10.0.9" />
+  </ItemGroup>
+
+  <!-- The tests check ZImageTurbo's internal math and tokenizer against the reference's golden fixtures. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Emgu.TF.Lite.Test.Net" />
+  </ItemGroup>
+
   <Import Project="..\Emgu.LiteRT.Models.Shared.projitems" Label="Shared" />
 </Project>
