@@ -47,7 +47,7 @@ target frameworks") or after switching .NET SDKs.
 
 ```bash
 dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false
-open "Emgu.LiteRT.Example/Maui.Lite/bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/Emgu TF Lite Maui Demo.app"
+open "Emgu.LiteRT.Example/Maui.Lite/bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/Emgu LiteRT.app"
 ```
 
 `-p:ValidateXcodeVersion=false` is needed when the .NET Mac Catalyst SDK pack doesn't match the installed Xcode
@@ -59,7 +59,7 @@ running its executable from a terminal) makes macOS ask for microphone access fo
 ```bash
 dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug -p:ValidateXcodeVersion=false -p:RuntimeIdentifier=iossimulator-arm64
 xcrun simctl install booted Emgu.LiteRT.Example/Maui.Lite/bin/Debug/net10.0-ios/iossimulator-arm64/Maui.Demo.Lite.app
-xcrun simctl launch booted com.emgu.tf.lite.maui.demo
+xcrun simctl launch booted com.emgu.litert
 ```
 
 Boot a simulator first (Simulator app, or `xcrun simctl boot "<device name>"`); the LiteRT-LM chat needs an iOS 26.4
@@ -88,7 +88,7 @@ dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-andr
 - With more than one device connected (`adb devices`), pick one with `-p:AdbTarget="-s <serial>"`; `-t:Install`
   installs without launching.
 - If the app doesn't start after installing, launch it with
-  `adb shell am start -n com.emgu.tf.lite.maui.demo/crc64f6b2cafaa50b22b8.MainActivity`.
+  `adb shell am start -n com.emgu.litert/crc64f6b2cafaa50b22b8.MainActivity`.
 - A headless emulator: `$ANDROID_HOME/emulator/emulator -avd <name> -no-window -no-audio`; wait for
   `adb shell getprop sys.boot_completed` to print `1`.
 
@@ -180,6 +180,6 @@ again.
 - **"isn't responding" / the app freezes:** Debug builds log every UI thread stall longer than a second
   (`UiStallWatchdog.cs`), with what the app was doing and, on Android, the main thread's stack: in the log (tag
   `UISTALL`; `adb logcat -s UISTALL`) and in `ui_stalls.log` in the app's data folder - on Android
-  `adb shell run-as com.emgu.tf.lite.maui.demo cat files/ui_stalls.log`.
+  `adb shell run-as com.emgu.litert cat files/ui_stalls.log`.
 - **The chat page's model fails to load:** check that the LiteRT-LM libraries were built for the platform (step 2)
   and that `git -C LiteRT-LM lfs pull` fetched real libraries, not Git LFS pointer files.

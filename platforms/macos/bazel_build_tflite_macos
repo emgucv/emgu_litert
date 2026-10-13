@@ -110,7 +110,8 @@ copy_dylib() {
     done
     # install_name_tool invalidates the signature, which arm64 requires - re-sign ad hoc.
     codesign -f -s - $OUT
-    chmod u-w $OUT
+    # Left writable (bazel-bin outputs are read-only): the .NET Mac Catalyst SDK copies these dylibs into the app and
+    # runs install_name_tool on its copy, which failed with "Permission denied" on a read-only one in a clean build.
 }
 
 if [ "$BUILD_LITERT_LM" = "1" ]; then
@@ -153,12 +154,13 @@ done
 
 #make fat binary
 cd lib/runtimes/osx/native
-# The previous fat binaries are read-only (bazel-bin outputs are), and lipo refuses to
-# overwrite them - remove them first. liblitert-lm.dylib only ever has the arm64 slice (see above).
+# Older builds left read-only fat binaries, which lipo refuses to overwrite - remove them first.
+# liblitert-lm.dylib only ever has the arm64 slice (see above).
 for LIB in libtfliteextern libLiteRt liblitert-lm; do
     if ls $LIB-*.dylib >/dev/null 2>&1; then
         rm -f $LIB.dylib
         lipo -create -output $LIB.dylib $LIB-*.dylib || exit 1
+        chmod u+w $LIB.dylib
     fi
 done
 cd ../../../../

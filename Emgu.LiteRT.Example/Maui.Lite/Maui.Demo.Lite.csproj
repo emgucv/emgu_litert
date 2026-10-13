@@ -8,10 +8,10 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 
 		<!-- Display name -->
-		<ApplicationTitle>Emgu TF Lite Maui Demo</ApplicationTitle>
+		<ApplicationTitle>Emgu LiteRT</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.emgu.tf.lite.maui.demo</ApplicationId>
+		<ApplicationId>com.emgu.litert</ApplicationId>
 		<ApplicationIdGuid>f725d173-ae14-4a50-a033-127ffb80d906</ApplicationIdGuid>
 
 		<!-- Versions -->
@@ -116,4 +116,17 @@
 	  <PackageReference Update="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
 	</ItemGroup>
 
+	<!-- Mac Catalyst: the Metal add-on (Emgu.LiteRT.Metal.runtime.maui.macos) references the LiteRT-LM add-on, which
+	     this project references too, so liblitert-lm.dylib, libLiteRt.dylib and libGemmaModelConstraintProvider.dylib
+	     reach the app twice, and the SDK's install_name_tool runs on each copy at once - a clean build failed with
+	     "cannot rename ... .tmp" (incremental builds skip that step). Keep one of each. -->
+	<Target Name="EmguRemoveDuplicateNativeReferences" BeforeTargets="_ComputeDynamicLibrariesToReidentify" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+		<RemoveDuplicates Inputs="@(_FileNativeReference)">
+			<Output TaskParameter="Filtered" ItemName="_EmguUniqueFileNativeReference" />
+		</RemoveDuplicates>
+		<ItemGroup>
+			<_FileNativeReference Remove="@(_FileNativeReference)" />
+			<_FileNativeReference Include="@(_EmguUniqueFileNativeReference)" />
+		</ItemGroup>
+	</Target>
 </Project>

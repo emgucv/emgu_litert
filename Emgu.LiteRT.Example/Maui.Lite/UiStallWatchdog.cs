@@ -16,7 +16,7 @@ namespace Maui.Demo.Lite
     /// responding" after 5), with what the app was doing - the breadcrumbs pages leave with Mark - and, on Android,
     /// the main thread's Java stack. Written to the debug output / logcat (tag "UISTALL") and appended to
     /// ui_stalls.log in the app's data folder, which survives the log being cleared
-    /// (adb shell run-as com.emgu.tf.lite.maui.demo cat files/ui_stalls.log).
+    /// (adb shell run-as com.emgu.litert cat files/ui_stalls.log).
     /// </summary>
     internal static class UiStallWatchdog
     {
