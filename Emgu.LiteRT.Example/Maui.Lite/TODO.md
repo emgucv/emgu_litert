@@ -2,12 +2,13 @@
 
 Planned work on the MAUI demo's LiteRT-LM chat page (`LiteRtLmChatPage*.cs`).
 
-Sorted by priority: the download items first, since every model the chat offers depends on them (item 2 shows the
-paused state item 1 makes possible); then the small layout fix; then GPU work - Windows (packaging and testing of a
-plugin LiteRT-LM already ships) and the embedding models (waiting for a LiteRT-LM release); then new agent tools - the
-two searches build on the saved document indexes and embedding model that exist, device actions need platform code
-and a confirmation step, the clipboard is small but less useful; then the two largest: MCP, and serving the Mac's
-models to phones.
+Sorted by priority. First what every model depends on - resumable downloads and showing what is downloaded - and
+testing what was built but never run. Then small, visible fixes (the Model section, the app icon), and safety nets
+that make the rest less risky (model-free tests in CI, an agent regression test). Then storage and the platform: a
+Storage page, the next LiteRT-LM release, the GPU on Windows and for the embedding models (which needs that release),
+the Pixel Fold freeze, being gentle with phones, background downloads. Then chat features and new agent tools,
+smallest and most useful first, and last the largest: other system models, MCP, serving the Mac's models to phones,
+and image generation on iOS.
 
 ## 1. Resume partial downloads
 
@@ -41,7 +42,23 @@ or a card offers the download).
 - [ ] Optionally: delete a downloaded model from its row (with its GPU caches, `*_cache.bin` next to it), asking first.
 - [ ] The same for the image model (Settings > Image generation) and the search model used for documents and photos.
 
-## 3. Collapsible "Model" section in settings
+## 3. Test the paths that were never run
+
+Features that were built and compiled but never run on some platforms (see CLAUDE.md), each checked once on a
+device and fixed or noted:
+
+- [ ] Image generation on Android (a Pixel Fold / Galaxy Z Fold3: ~21 GB free needed, time per picture, memory next to
+      Gemma 4 on the GPU) and Windows; the settings switch's download prompt, progress, resume and "Delete the image
+      model" on any platform.
+- [ ] Recording a voice message live (`VoiceRecorder.cs`: AVAudioRecorder, Android AudioRecord, Windows MediaCapture) -
+      only `say`-generated WAV files were tried.
+- [ ] Windows: the PDF page renderer (`PdfPageRenderer`, `Windows.Data.Pdf`) and the photo library (`StorageFile`
+      details).
+- [ ] Tavily web search and page reading (needs a Tavily key).
+- [ ] Photo search on a real phone's library (only the emulator's test photos so far), on a phone whose owner agrees
+      to have their photos indexed for the test.
+
+## 4. Collapsible "Model" section in settings
 
 In wide windows (desktop, a foldable's inner screen) the side panel shows Chats, Model and Settings
 (`_sidePanel` in `LiteRtLmChatPage.cs`); the model list takes a lot of room.
@@ -52,7 +69,68 @@ In wide windows (desktop, a foldable's inner screen) the side panel shows Chats,
 - [ ] Phones are unaffected: there the model list opens in a sheet from the model chip.
 - [ ] Check on Mac Catalyst and a foldable's inner screen.
 
-## 4. GPU on Windows
+## 5. A new app icon
+
+The demo ("Emgu LiteRT", `com.emgu.litert`) still has the .NET MAUI template's icon and splash screen: the ".NET" logo
+on purple (`#512BD4`, `Resources/AppIcon/appicon.svg` + `appiconfg.svg`, `Resources/Splash/splash.svg`), which says
+nothing about the app and doesn't match its blue theme (`Theme.Accent`, `#3D7BF7`).
+
+- [ ] Design: something for on-device AI - e.g. a chat bubble with a spark - in the app's colours, recognisable at
+      small sizes (16 px on Windows, the Android status bar) and in light and dark mode.
+- [ ] `MauiIcon`: a background (`appicon.svg` or `Color`) and a foreground (`ForegroundFile`) kept inside the middle
+      ~66% of the canvas, since Android's adaptive icons crop it to a circle, squircle or square depending on the
+      launcher; optionally a monochrome layer for Android 13+ themed icons.
+- [ ] iOS and Mac Catalyst need an opaque icon (no transparency); check the Mac's Dock and Finder sizes.
+- [ ] Splash screen (`MauiSplashScreen`) to match: the same mark on the same background colour.
+- [ ] Check on Android (Pixel launcher and Samsung One UI), iOS, Mac Catalyst and Windows (taskbar, Start menu).
+      Launchers cache icons: uninstall first on phones, and on the Mac the Dock may need the app moved or the icon
+      cache refreshed.
+
+## 6. Run the model-free tests in CI
+
+The GitHub Actions workflows only build. Many tests need no model or device and take seconds.
+
+- [ ] Run them on every push: `TestZImageMath`, `TestDocumentSplitText`, `TestPlaceLookup`, `TestPhotoRequest`,
+      `TestCalculator`, `TestUnitConverter`, `TestHtmlText`, `TestAgentMemoryTools` (some fetch small files from the
+      network; mark or skip those if the runner can't).
+- [ ] Needs the natives the tests load (or a filter for the managed-only ones on runners without them).
+
+## 7. An agent regression test
+
+Small models are sensitive to tool wording: the first `generate_image` result text made Gemma 4 E2B end its turn with
+no answer, which only a run with the model showed.
+
+- [ ] A fixed set of prompts, each with the tool(s) Gemma 4 E2B should call and argument checks, e.g. "what's 17% of
+      230?" -> `calculate`; "weather in Paris" -> `get_weather`; "draw a cat" -> `generate_image`; "show my beach
+      photos" -> `find_photos`; "remember I'm vegetarian" -> `remember`; plus "the reply isn't empty".
+- [ ] Run with fake tools (fixed results) so it needs no network, photos or image model; `TEST_MODELS`-gated.
+- [ ] Run it after every LiteRT-LM update, model change or tool description change; record pass rates.
+
+## 8. A Storage page in settings
+
+The app can use a lot of space: chat models (0.35-6.9 GB each), their GPU caches (0.8-6 GB), the image model
+(~21 GB with its caches), the search model, saved document indexes and attachments, the photo index.
+
+- [ ] One list: each item with its size on disk and Delete (asking first): chat models with their GPU caches, the
+      image model, the search model, saved documents, the photo index, chats' attachments; the total, and the device's
+      free space.
+- [ ] Deleting a model the chat is using releases it first; deleting the search model turns document/photo search off
+      until it is downloaded again.
+- [ ] Replaces the per-row delete in item 2 (or both open the same action).
+
+## 9. Update to the next LiteRT-LM release
+
+LiteRT-LM v0.18.0 is the current pin. The next release brings upstream fixes and unblocks the embedding models' GPU
+(item 11: its `main` already pins a LiteRT with `dd3db3123`).
+
+- [ ] Move `LiteRT-LM` to the release and `litert` to its `LITERT_REF` (CLAUDE.md, "The `litert` submodule must match
+      LiteRT-LM's LiteRT version").
+- [ ] Rebuild the natives for macOS, Mac Catalyst, iOS, Android (all four ABIs) and Windows; check the Windows export
+      list (`litert_windows_exports.def`) and the C API wrappers against header changes.
+- [ ] Re-run the model tests, check every model file in the demo still loads and answers correctly (some community files
+      broke with v0.18.0), and the agent regression test (item 7).
+
+## 10. GPU on Windows
 
 On Windows LiteRT runs on the CPU only: there is no GPU accelerator next to our `libLiteRt.dll`, so Gemma 4 can't use the
 GPU there as it does on Mac Catalyst (Metal) and Android (OpenCL). LiteRT-LM v0.18.0 ships the pieces in
@@ -73,10 +151,10 @@ Direct3D 12 through Google's Dawn), Dawn itself (`libwebgpu_dawn.dll` / `webgpu_
       on Metal and OpenCL); the demo's "Use the GPU" setting and the GPU fallback (`_gpuUnavailable`) on Windows too;
       compare speed and answers with the CPU over a long chat, and record them in `Performance.md`.
 - [ ] The GPU program/weight caches next to the model (as on Android and Mac); delete them when the GPU is turned off.
-- [ ] Known limit: the embedding models stay on the CPU until item 5; Z-Image-Turbo is no faster on a GPU.
+- [ ] Known limit: the embedding models stay on the CPU until item 11; Z-Image-Turbo is no faster on a GPU.
 - [ ] Needs a Windows machine with a Direct3D 12 GPU (it can't be tested from the Mac).
 
-## 5. GPU for the embedding models (document and photo search)
+## 11. GPU for the embedding models (document and photo search)
 
 The embedding models (`EmbeddingGemma2*`, used for document questions and photo search) run on the CPU only:
 `EmbeddingModel.Init` refuses "gpu", because they crash the process on every prebuilt GPU plugin (Metal on the Mac, OpenCL
@@ -85,7 +163,7 @@ in LiteRT `dd3db3123` ("Make the WeightLoader interface ABI-stable across the ac
 prebuilt plugins were built after it, our `libLiteRt` (LiteRT `26895c9f`) before (details in CLAUDE.md). On the GPU,
 photo indexing (~5.7 s per photo on a Pixel Fold's CPU, ~1 s on an M1) and document indexing would be much faster.
 
-- [ ] Blocked until LiteRT-LM releases a version whose `LITERT_REF` contains `dd3db3123`. As of 2026-10-13 its `main`
+- [ ] Blocked until LiteRT-LM releases a version whose `LITERT_REF` contains `dd3db3123` (item 9). As of 2026-10-13 its `main`
       already pins LiteRT `ca21dc99`, which does; the latest release, v0.18.0, doesn't. Either wait for the next release
       or move both submodules to a `main` commit (riskier: untested LiteRT-LM, and every native build redone).
 - [ ] Update `LiteRT-LM` and `litert` together (CLAUDE.md, "The `litert` submodule must match LiteRT-LM's LiteRT
@@ -98,9 +176,36 @@ photo indexing (~5.7 s per photo on a Pixel Fold's CPU, ~1 s on an M1) and docum
 - [ ] Demo: use the GPU for the search model when the chat's "Use the GPU" is on, with a CPU fallback; check that the
       chat model and the search model can share the GPU's memory on a phone (Gemma 4 E2B already uses ~0.8 GB of GPU
       caches), and re-time photo and document indexing.
-- [ ] Windows: the same with the WebGPU plugin of item 4.
+- [ ] Windows: the same with the WebGPU plugin of item 10.
 
-## 6. Agent tool: search documents (`search_documents`)
+## 12. The unexplained Pixel Fold freeze
+
+A Pixel Fold "isn't responding" at 20:17 on 2026-10-10 is still unexplained (CLAUDE.md); streaming, model
+downloads and TTS voice listing were measured and ruled out.
+
+- [ ] Use the Debug build's `UiStallWatchdog` deliberately: long chats, compaction, opening saved chats, attaching
+      documents, photo indexing and image generation in the background, while switching apps and folding/unfolding;
+      collect `ui_stalls.log` and the main thread's stacks.
+- [ ] Fix what it finds; if nothing shows up, keep the watchdog and close the item with the notes.
+
+## 13. Be gentle with phones
+
+Photo indexing (~20 minutes for 200 photos on a phone's CPU), document indexing and image generation keep the CPU busy.
+
+- [ ] Pause background work (photo indexing first) when the battery is low and not charging, or the phone is hot
+      (Android's thermal status, iOS `ProcessInfo.thermalState`); resume later; say so in the settings status.
+- [ ] Optionally index photos only while charging.
+
+## 14. Downloads that continue in the background
+
+A multi-GB download stops when the app goes to the background or the phone sleeps.
+
+- [ ] Android: a foreground service with a progress notification for model downloads.
+- [ ] iOS / Mac Catalyst: a background `URLSession` transfer, or at least finishing the current file in a background
+      task.
+- [ ] Builds on item 1 (resumable downloads): whatever is interrupted resumes.
+
+## 15. Agent tool: search documents (`search_documents`)
 
 A document only helps the chat it is attached to, and its excerpts go with every message whether they are needed or not.
 Its index is saved in the chat database (`Document` / `DocumentItem` tables), so every document ever attached can be
@@ -113,9 +218,9 @@ searched.
       within the excerpt budget the attached-document path uses.
 - [ ] Keep attaching a document to a chat as it is; the tool adds "in any of my documents" and lets the model decide
       when to look.
-- [ ] Settings: list the saved documents with their size, and delete them.
+- [ ] Saved documents with their size and delete: in the Storage page (item 8).
 
-## 7. Agent tool: search past chats (`search_chats`)
+## 16. Agent tool: search past chats (`search_chats`)
 
 "What did we decide about the trip last week?" Memories only keep the facts the model chose to save; the saved
 messages have everything.
@@ -127,7 +232,32 @@ messages have everything.
 - [ ] Optional date filter ("last week") with the same parsing as `PhotoRequest`.
 - [ ] Setting to turn it off (and delete its index), like photo search.
 
-## 8. Agent tools: device actions, confirmed by the user
+## 17. Image generation extras
+
+- [ ] "Draw it again" with a new seed (a button on the picture, or the model calls the tool again with the same
+      description).
+- [ ] Save the picture to Photos / the gallery, and share it (MAUI `Share`).
+- [ ] Show the description and seed under the picture (tap), so a picture can be made again.
+
+## 18. A private chat
+
+- [ ] A "private chat" option: not saved, no memories read or written, no chat search; its pictures and documents are
+      discarded when it ends. Shown clearly in the header while on.
+
+## 19. Export or share a chat
+
+- [ ] Export a chat as Markdown (or text) with its pictures and attachments, through the share sheet; from the chat
+      list and the chat's header.
+- [ ] Optionally import it back.
+
+## 20. Accessibility
+
+- [ ] Screen-reader labels for the newer controls: image tiles, step lines, thinking headers, the settings switches and
+      download states, photo thumbnails (`SemanticProperties`).
+- [ ] Large text: check the chat, settings and sheets with the largest font sizes on Android and iOS.
+- [ ] Contrast of the secondary text in light and dark mode.
+
+## 21. Agent tools: device actions, confirmed by the user
 
 Tools that change something outside the app, so each shows a card with what it will do and Confirm / Cancel before
 anything happens (the model can get a date or time wrong).
@@ -140,7 +270,7 @@ anything happens (the model can get a date or time wrong).
 - [ ] The confirmation card in the transcript; the tool returns what the user chose, so the model can say so.
 - [ ] Permissions and manifest entries per platform; step lines and saved chats show what was done.
 
-## 9. Agent tool: clipboard (`read_clipboard`)
+## 22. Agent tool: clipboard (`read_clipboard`)
 
 "Summarize what I just copied", "translate the text I copied".
 
@@ -149,7 +279,17 @@ anything happens (the model can get a date or time wrong).
 - [ ] Only when a message asks for it (the tool description says so), since a clipboard can hold passwords; show a step
       line "Reading the clipboard" so the user sees it happened.
 
-## 10. MCP support
+## 23. More models: Gemini Nano and Apple's on-device model
+
+System models, offered in the model picker only where the device has them (detected at run time):
+
+- [ ] Gemini Nano through ML Kit GenAI's Prompt API (Android: Pixel 9/10, Galaxy Z Fold7 and other recent flagships;
+      not the emulator, the Pixel Fold or the Z Fold3): a .NET for Android binding of `com.google.mlkit:genai-prompt`,
+      wrapped as an `IChatClient`; check whether it supports tool calling.
+- [ ] Apple's Foundation Models through `Microsoft.Maui.Essentials.AI` (an `IChatClient`), once the repo moves to
+      .NET 11 (iOS / Mac Catalyst with Apple Intelligence).
+
+## 24. MCP support
 
 Let the chat's agent use tools from Model Context Protocol (MCP) servers, next to its built-in ones
 (`ChatAgentTools.Create`).
@@ -168,7 +308,7 @@ Let the chat's agent use tools from Model Context Protocol (MCP) servers, next t
       show which server a result came from. Tool results are untrusted text.
 - [ ] Docs and a test against a public MCP server.
 
-## 11. Serve the Mac's models to phones ("Server" option)
+## 25. Serve the Mac's models to phones ("Server" option)
 
 The Mac Catalyst app serves the model it runs (e.g. Gemma 4 12B on the Metal GPU, which no phone can hold) over the
 local network, and phone apps - this demo, or any other - use it as if it were a local language model.
@@ -236,3 +376,13 @@ local network, and phone apps - this demo, or any other - use it as if it were a
       `Microsoft.Extensions.AI.OpenAI` and compares with calling `LiteRtLmChatClient` directly.
 - [ ] End to end: the Catalyst app serving Gemma 4 12B, the demo on a Pixel Fold / Galaxy Z Fold3 using it with its
       own tools (location, photos), over Wi-Fi and over Tailscale.
+
+## 26. Image generation on iOS
+
+The iOS app has no `libLiteRt` (LiteRT-LM comes as the `CLiteRTLM` framework, which only exports its C API, and the
+static `tfliteextern` has its own TFLite), so image generation is hidden there.
+
+- [ ] Build LiteRT's runtime as an iOS framework (`LiteRt.framework`, LiteRT and TFLite C APIs) that both CLiteRTLM and
+      `Emgu.LiteRT` use, without duplicating TFLite symbols in the app - or a second, self-contained framework if the
+      symbols can be kept apart.
+- [ ] Memory: Z-Image-Turbo's graphs on an iPhone (the text encoder alone maps 3.5 GB).
