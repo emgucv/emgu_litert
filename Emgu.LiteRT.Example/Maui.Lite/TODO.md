@@ -7,8 +7,9 @@ testing what was built but never run. Then small, visible fixes (the Model secti
 that make the rest less risky (model-free tests in CI, an agent regression test). Then storage and the platform: a
 Storage page, the next LiteRT-LM release, the GPU on Windows and for the embedding models (which needs that release),
 the Pixel Fold freeze, being gentle with phones, background downloads. Then chat features and new agent tools,
-smallest and most useful first, and last the largest: other system models, MCP, serving the Mac's models to phones,
-and image generation on iOS.
+smallest and most useful first - with a hands-free voice mode and a task mode before the tools that act outside the
+app - and last the largest: other system models, MCP, serving the Mac's models to phones, background tasks (which work
+best through that server), and image generation on iOS.
 
 ## 1. Resume partial downloads
 
@@ -239,25 +240,66 @@ messages have everything.
 - [ ] Save the picture to Photos / the gallery, and share it (MAUI `Share`).
 - [ ] Show the description and seed under the picture (tap), so a picture can be made again.
 
-## 18. A private chat
+## 18. Agent tool: create documents (`create_document`)
+
+"Make me a packing list as a document", "write that up as a Word file".
+
+- [ ] Tool in `Emgu.LiteRT.LM.Agents` (`AgentTools.CreateDocument(save)`, the app saves and shows the file): a title, the
+      content in Markdown, and a format - Word (.docx), PDF or Markdown.
+- [ ] Writing: Markdown as is; .docx with the Open XML basics (headings, paragraphs, lists, bold/italic, tables) -
+      the document reader already parses `word/document.xml`; PDF with a small writer, or left out at first.
+- [ ] Demo: the file appears as a card in the reply (name, size, format) with Open and Share (MAUI `Launcher` / `Share`),
+      saved with the chat like the generated pictures (a new attachment kind, never given back to the model).
+- [ ] Long content: the model writes it in its reply budget (`MaxOutputTokens`); for longer documents, ask it to write
+      section by section.
+
+## 19. A private chat
 
 - [ ] A "private chat" option: not saved, no memories read or written, no chat search; its pictures and documents are
       discarded when it ends. Shown clearly in the header while on.
 
-## 19. Export or share a chat
+## 20. Export or share a chat
 
 - [ ] Export a chat as Markdown (or text) with its pictures and attachments, through the share sheet; from the chat
       list and the chat's header.
 - [ ] Optionally import it back.
 
-## 20. Accessibility
+## 21. Accessibility
 
 - [ ] Screen-reader labels for the newer controls: image tiles, step lines, thinking headers, the settings switches and
       download states, photo thumbnails (`SemanticProperties`).
 - [ ] Large text: check the chat, settings and sheets with the largest font sizes on Android and iOS.
 - [ ] Contrast of the secondary text in light and dark mode.
 
-## 21. Agent tools: device actions, confirmed by the user
+## 22. Hands-free voice conversation
+
+Voice messages and "Read replies aloud" exist, but each turn needs a tap. A conversation mode: speak, hear the reply,
+speak again.
+
+- [ ] A voice-mode button: listens, detects the end of speech (voice activity detection on the recorder's 16 kHz
+      samples - energy and silence length, or a small VAD model), sends the audio to Gemma 4 directly (it understands
+      speech), and reads the reply aloud.
+- [ ] Read aloud while the reply streams, sentence by sentence, instead of after it ends; skip thinking, code and
+      tables (`ReplySpeech`).
+- [ ] Interrupt: speaking (or a tap) stops the read-aloud and the reply, and listens.
+- [ ] A full-screen voice view (a pulsing circle while listening and speaking) with the transcript kept in the chat.
+- [ ] Gemma 4 only (the models that take audio); test on a phone and the Mac, with and without headphones (echo of the
+      read-aloud must not be taken as speech).
+
+## 23. Task mode: multi-step tasks with a visible plan
+
+Gemma 4 already chains tools within a message, out of sight. For longer tasks ("plan a weekend in Paris: the weather,
+three museums open on Sunday, and a packing list as a document"), a task mode that shows the work.
+
+- [ ] The model first writes a short numbered plan (an instruction plus a structured output), shown as a checklist card.
+- [ ] Each step runs in turn (its tool calls as step lines), ticking the checklist; the user can stop, skip a step or
+      edit the plan.
+- [ ] Steps that change something outside the app (device actions, item 24, MCP tools with side effects) wait for the
+      user's approval in the card.
+- [ ] The context window: each step gets the plan and the earlier steps' short results, not their full tool output.
+- [ ] Turned on per message (a chip like "Think" / "Web search") or proposed by the model for long requests.
+
+## 24. Agent tools: device actions, confirmed by the user
 
 Tools that change something outside the app, so each shows a card with what it will do and Confirm / Cancel before
 anything happens (the model can get a date or time wrong).
@@ -270,7 +312,18 @@ anything happens (the model can get a date or time wrong).
 - [ ] The confirmation card in the transcript; the tool returns what the user chose, so the model can say so.
 - [ ] Permissions and manifest entries per platform; step lines and saved chats show what was done.
 
-## 22. Agent tool: clipboard (`read_clipboard`)
+## 25. Goals and check-ins
+
+"I want to run three times a week", "read 20 pages a day".
+
+- [ ] A goals list kept like memories (`ChatStore`, local only): the goal, its target and period, and progress entries;
+      tools `add_goal`, `log_progress`, `get_goals` (`Emgu.LiteRT.LM.Agents`, with an app-provided store like
+      `IAgentMemoryStore`).
+- [ ] The goals go into the agent's instructions with the memories, so "I ran today" is logged without asking.
+- [ ] Settings: the goals with their progress, edit and delete.
+- [ ] Check-ins: a reminder (device actions, item 24) or a scheduled task (item 30) asks how it went.
+
+## 26. Agent tool: clipboard (`read_clipboard`)
 
 "Summarize what I just copied", "translate the text I copied".
 
@@ -279,7 +332,7 @@ anything happens (the model can get a date or time wrong).
 - [ ] Only when a message asks for it (the tool description says so), since a clipboard can hold passwords; show a step
       line "Reading the clipboard" so the user sees it happened.
 
-## 23. More models: Gemini Nano and Apple's on-device model
+## 27. More models: Gemini Nano and Apple's on-device model
 
 System models, offered in the model picker only where the device has them (detected at run time):
 
@@ -289,7 +342,7 @@ System models, offered in the model picker only where the device has them (detec
 - [ ] Apple's Foundation Models through `Microsoft.Maui.Essentials.AI` (an `IChatClient`), once the repo moves to
       .NET 11 (iOS / Mac Catalyst with Apple Intelligence).
 
-## 24. MCP support
+## 28. MCP support
 
 Let the chat's agent use tools from Model Context Protocol (MCP) servers, next to its built-in ones
 (`ChatAgentTools.Create`).
@@ -308,7 +361,7 @@ Let the chat's agent use tools from Model Context Protocol (MCP) servers, next t
       show which server a result came from. Tool results are untrusted text.
 - [ ] Docs and a test against a public MCP server.
 
-## 25. Serve the Mac's models to phones ("Server" option)
+## 29. Serve the Mac's models to phones ("Server" option)
 
 The Mac Catalyst app serves the model it runs (e.g. Gemma 4 12B on the Metal GPU, which no phone can hold) over the
 local network, and phone apps - this demo, or any other - use it as if it were a local language model.
@@ -377,7 +430,24 @@ local network, and phone apps - this demo, or any other - use it as if it were a
 - [ ] End to end: the Catalyst app serving Gemma 4 12B, the demo on a Pixel Fold / Galaxy Z Fold3 using it with its
       own tools (location, photos), over Wi-Fi and over Tailscale.
 
-## 26. Image generation on iOS
+## 30. Background tasks and monitoring
+
+"Every morning, summarise the weather and my reminders", "tell me when this page mentions a new release": tasks the
+agent runs on a schedule, with a notification when there is something to say.
+
+- [ ] Tasks: a description, a schedule (daily at a time, every N hours) and a condition for notifying; created by the
+      model (`schedule_task` tool) or in the settings, listed there with their last run and result.
+- [ ] A run: a new agent conversation with the task's description and its tools (web, weather, memories...), then a
+      local notification with the answer if the condition holds; the run is saved like a chat, tapping the
+      notification opens it.
+- [ ] Mac Catalyst: runs while the app is open (or a login item); the model is already loaded or loads for the run.
+- [ ] Phones: Android WorkManager / iOS `BGTaskScheduler` only give short, occasional runs, and loading a 2.6 GB model
+      on a phone's CPU takes most of that - so run tasks on the Mac when a phone is paired with it (item 29), or
+      limit phones to light tasks while charging.
+- [ ] Limits: at most a few runs a day per task; web tasks only with Web search allowed; nothing that changes things
+      outside the app without approval.
+
+## 31. Image generation on iOS
 
 The iOS app has no `libLiteRt` (LiteRT-LM comes as the `CLiteRTLM` framework, which only exports its C API, and the
 static `tfliteextern` has its own TFLite), so image generation is hidden there.
