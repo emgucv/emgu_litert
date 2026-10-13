@@ -62,6 +62,9 @@ namespace Maui.Demo.Lite
             // chat is opened or after compacting, which grows with the window: a full 4k chat took 2 minutes on a Pixel
             // Fold (8k: almost 6, with 1.5 GB of its RAM left), 8k 27 s (E2B) / 61 s (E4B) on an Apple Silicon Mac.
             public int DesktopContextTokens;
+            // The largest context window the model's file allows, which Settings > Context window can choose up to; 0 for
+            // a model with a fixed window (the Qwen files: 4096).
+            public int MaxContextTokens;
             // Whether the model runs on the GPU (when "Use the GPU" is on): on Android with LiteRT's OpenCL accelerator
             // (if the device has OpenCL; only Gemma 4 E2B has been tested there), on Mac Catalyst with its Metal one.
             // Gemma4 uses 32-bit activations on the GPU - see Performance.md.
@@ -114,11 +117,11 @@ namespace Maui.Demo.Lite
             new ModelOption { Name = "Qwen3 0.6B", File = Qwen3.ModelFile, Size = "350 MB", Detail = "~350 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
             new ModelOption { Name = "Qwen3.5 0.8B", File = Qwen35_0_8B_VL.ModelFile, Size = "1.3 GB", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
             new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B, CanSummarize = true },
-            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, GpuOnAndroid = true, GpuOnMac = true },
-            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, GpuOnMac = true },
+            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnAndroid = true, GpuOnMac = true },
+            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnMac = true },
 #if MACCATALYST
             // Desktop only: ~8 GB of memory, and practical on a GPU only (Mac Catalyst has LiteRT's Metal accelerator).
-            new ModelOption { Name = "Gemma 4 12B", File = Gemma4_12B.ModelFile, Size = "6.9 GB", Detail = "~6.9 GB download. The most capable - best for code and harder questions. Needs a Mac with 16 GB of memory.", Choice = ModelChoice.Gemma4_12B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, GpuOnMac = true },
+            new ModelOption { Name = "Gemma 4 12B", File = Gemma4_12B.ModelFile, Size = "6.9 GB", Detail = "~6.9 GB download. The most capable - best for code and harder questions. Needs a Mac with 16 GB of memory.", Choice = ModelChoice.Gemma4_12B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnMac = true },
 #endif
         };
 
@@ -202,6 +205,17 @@ namespace Maui.Demo.Lite
         private readonly Switch _useGpuSwitch;
         private bool _loadedOnGpu;
         private bool _loadingOnGpu;
+        // Context window (Settings, Gemma 4): Automatic (0: 8k on desktops, 4k on phones) or a size; the loaded model's
+        // and the loading one's, to reload the model when it changes.
+        private const string ContextWindowPreference = "litert_lm_chat_context_tokens";
+        private static readonly int[] ContextWindowChoices = { 0, 4096, 8192, 16384, 32000 };
+        private int _contextSetting;
+        private int _loadedContextTokens;
+        private int _loadingContextTokens;
+        private readonly List<ToggleChip> _contextChips = new List<ToggleChip>();
+        private readonly VerticalStackLayout _contextSection;
+        private readonly Label _contextNote;
+        private bool _updatingContextChips;
         private bool _gpuUnavailable;
 
         // Saved chats (ChatStore, SQLite): the current chat's id once its first exchange is saved, and its messages,
@@ -499,6 +513,29 @@ namespace Maui.Demo.Lite
             SemanticProperties.SetDescription(_compactButton, "Summarize the earlier messages now");
             _compactButton.OnTap(OnCompactTapped);
             UpdateMemoryLabel();
+            try { _contextSetting = Preferences.Default.Get(ContextWindowPreference, 0); } catch (Exception) { }
+            if (Array.IndexOf(ContextWindowChoices, _contextSetting) < 0)
+                _contextSetting = 0;
+            var contextChips = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
+            foreach (int choice in ContextWindowChoices)
+            {
+                int value = choice;
+                ToggleChip chip = new ToggleChip(ContextWindowName(value)) { Margin = new Thickness(0, 0, 6, 6), IsToggled = value == _contextSetting };
+                chip.Toggled += (s, e) => OnContextWindowChipToggled(value, e.Value);
+                _contextChips.Add(chip);
+                contextChips.Children.Add(chip);
+            }
+            _contextNote = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText };
+            _contextSection = new VerticalStackLayout
+            {
+                Spacing = 6,
+                Children =
+                {
+                    new Label { Text = "Context window", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
+                    contextChips,
+                    _contextNote
+                }
+            };
             _settingsView = new VerticalStackLayout
             {
                 Spacing = 6,
@@ -553,7 +590,8 @@ namespace Maui.Demo.Lite
                     Theme.Divider(),
                     new Label { Text = "Conversation memory", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     _memoryLabel,
-                    _compactButton
+                    _compactButton,
+                    _contextSection
                 }
             };
 
@@ -917,6 +955,7 @@ namespace Maui.Demo.Lite
             _thinkingSwitch.IsVisible = option.CanThink;
             _webSearchSwitch.IsVisible = option.CanUseTools;
             _toggleRow.IsVisible = option.CanThink || option.CanUseTools;
+            UpdateContextSection();
             // Drop attachments the new model can't take.
             foreach (PendingAttachment attachment in _pending.ToList())
                 if (attachment.Image != null ? !option.AcceptsImages : !option.AcceptsAudio)
@@ -969,7 +1008,8 @@ namespace Maui.Demo.Lite
                 HideLoadCard();
                 return Task.FromResult(true);
             }
-            if (_loadTask != null && _loadingChoice == option.Choice && _loadingOnGpu == WantsGpu(option))
+            if (_loadTask != null && _loadingChoice == option.Choice && _loadingOnGpu == WantsGpu(option)
+                && _loadingContextTokens == ContextTokensFor(option))
                 return _loadTask;
             if (!downloadConfirmed && !IsDownloaded(option))
             {
@@ -981,6 +1021,7 @@ namespace Maui.Demo.Lite
             _loadCancel = new CancellationTokenSource();
             _loadingChoice = option.Choice;
             _loadingOnGpu = WantsGpu(option);
+            _loadingContextTokens = ContextTokensFor(option);
             _loadTask = LoadModelAsync(option, _loadTask, _loadCancel.Token);
             return _loadTask;
         }
@@ -1003,14 +1044,13 @@ namespace Maui.Demo.Lite
                 return false;
 
             bool onGpu = WantsGpu(option);
+            int contextTokens = ContextTokensFor(option);
             ModelLoadStage lastStage = ModelLoadStage.CheckingFile;
             LanguageModel NewModel()
             {
                 LanguageModel created = CreateModel(option.Choice);
-#if MACCATALYST || WINDOWS
-                if (option.DesktopContextTokens > 0)
-                    created.MaxNumTokens = option.DesktopContextTokens;
-#endif
+                if (contextTokens > 0)
+                    created.MaxNumTokens = contextTokens;
                 created.LoadStageChanged += (s, stage) =>
                 {
                     lastStage = stage;
@@ -1076,6 +1116,7 @@ namespace Maui.Demo.Lite
             _chat.EnableThinking = _thinkingSwitch.IsToggled && option.CanThink;
             _loaded = option.Choice;
             _loadedOnGpu = onGpu;
+            _loadedContextTokens = contextTokens;
             // Reloaded on another backend in the middle of a chat: the new engine is given the conversation.
             if (_historyItems.Count > 0 || _summary != null)
                 _needsPrime = true;
@@ -1085,12 +1126,14 @@ namespace Maui.Demo.Lite
                 _ = Task.Run(() => DeleteGpuCache(option));
             ClearLoading(option.Choice);
             HideLoadCard();
+            UpdateMemoryLabel();
             UiStallWatchdog.Mark("Model ready: " + option.Name);
             return true;
         }
 
         // The selected model is loaded, on the backend it should run on.
-        private bool ModelReady => _model != null && _loaded == SelectedChoice && _loadedOnGpu == WantsGpu(SelectedOption);
+        private bool ModelReady => _model != null && _loaded == SelectedChoice && _loadedOnGpu == WantsGpu(SelectedOption)
+            && _loadedContextTokens == ContextTokensFor(SelectedOption);
 
         // Whether the model should run on the GPU: the setting, unless the GPU failed to load this session.
         private bool WantsGpu(ModelOption option) => WantsGpuSetting(option) && !_gpuUnavailable;
@@ -1122,6 +1165,87 @@ namespace Maui.Demo.Lite
             else if (!e.Value)
                 foreach (ModelOption option in Models.Where(m => HasGpu(m) && !(_loaded == m.Choice && _loadedOnGpu)))
                     _ = Task.Run(() => DeleteGpuCache(option));
+        }
+
+        // ---------- Context window ----------
+
+        // The context window to load a model with, or 0 for LanguageModel's default (4096): the setting, or Automatic -
+        // the model's desktop size on Mac Catalyst and Windows, the default on phones (re-reading a full 8k chat took a
+        // Pixel Fold almost 6 minutes and left it 1.5 GB of memory) - capped at what the model's file allows.
+        private int ContextTokensFor(ModelOption option)
+        {
+            if (option.MaxContextTokens <= 0)
+                return 0;
+            int wanted = _contextSetting > 0 ? _contextSetting : AutomaticContextTokens(option);
+            return wanted > 0 ? Math.Min(wanted, option.MaxContextTokens) : 0;
+        }
+
+        private static int AutomaticContextTokens(ModelOption option)
+        {
+#if MACCATALYST || WINDOWS
+            return option.DesktopContextTokens;
+#else
+            return 0;
+#endif
+        }
+
+        private static string ContextWindowName(int tokens)
+        {
+            // Thousands, as people say them: 4096 is "4k", 32000 "32k".
+            return tokens <= 0 ? "Automatic" : (int)Math.Round(tokens / 1000.0) + "k";
+        }
+
+        // The chips act as one choice: tapping the selected one keeps it selected.
+        private void OnContextWindowChipToggled(int value, bool on)
+        {
+            if (_updatingContextChips)
+                return;
+            if (!on && value == _contextSetting)
+            {
+                SetContextChips();
+                return;
+            }
+            if (!on)
+                return;
+            _contextSetting = value;
+            try { Preferences.Default.Set(ContextWindowPreference, value); } catch (Exception) { }
+            SetContextChips();
+            UpdateContextSection();
+            UiStallWatchdog.Mark("Context window: " + ContextWindowName(value));
+            // Reload the selected model with the new window; the chat continues (compacted on the next message if it no
+            // longer fits).
+            if (_pageStarted && SelectedOption.MaxContextTokens > 0 && (_model != null || _loadTask != null))
+                _ = PrepareModelAsync(false);
+        }
+
+        private void SetContextChips()
+        {
+            _updatingContextChips = true;
+            for (int i = 0; i < _contextChips.Count; i++)
+                _contextChips[i].IsToggled = ContextWindowChoices[i] == _contextSetting;
+            _updatingContextChips = false;
+        }
+
+        // Shown for the models whose window can change; the note says what Automatic means here and what a size costs.
+        private void UpdateContextSection()
+        {
+            if (_contextSection == null)
+                return;
+            ModelOption option = SelectedOption;
+            _contextSection.IsVisible = option.MaxContextTokens > 0;
+            int automatic = AutomaticContextTokens(option);
+            _contextChips[0].Text = "Automatic (" + ContextWindowName(automatic > 0 ? automatic : 4096) + ")";
+            string note = "How much of the chat the model keeps in mind. A larger window summarizes the chat less often, " +
+                "but the model takes longer to read it again (when a saved chat is opened, or after summarizing) and needs " +
+                "more memory. Changing it reloads the model; the chat continues.";
+#if ANDROID || IOS
+            if (_contextSetting >= 16384)
+                note += " On a phone, 16k and more can take many minutes to read a long chat again, and may run out of memory.";
+#else
+            if (_contextSetting >= 32000)
+                note += " At 32k, reading a full chat again took about 4 minutes on an Apple Silicon Mac's CPU.";
+#endif
+            _contextNote.Text = note;
         }
 
         // LiteRT's GPU accelerator keeps its compiled programs and converted weights next to the model

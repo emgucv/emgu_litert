@@ -323,6 +323,16 @@ namespace Maui.Demo.Lite
 
         public event EventHandler<ToggledEventArgs> Toggled;
 
+        public string Text
+        {
+            get => _label.Text;
+            set
+            {
+                _label.Text = value;
+                Update();
+            }
+        }
+
         public bool IsToggled
         {
             get => _isToggled;
@@ -345,12 +355,22 @@ namespace Maui.Demo.Lite
         }
     }
 
-    /// <summary>In-page bottom sheet with a dimmed scrim, listing tappable rows.</summary>
+    /// <summary>
+    /// In-page bottom sheet with a dimmed scrim, listing tappable rows or showing a view. The title and the closing
+    /// button stay put; what's between them scrolls when it is taller than the screen allows (e.g. the chat's settings
+    /// on a phone, whose end - the context window - was cut off before).
+    /// </summary>
     internal sealed class BottomSheet : Grid
     {
+        // Room the sheet leaves above itself, and what its title and closing button take.
+        private const double TopGap = 40;
+        private const double HeaderAndFooterHeight = 170;
         private readonly BoxView _scrim;
         private readonly Border _card;
+        private readonly VerticalStackLayout _header = new VerticalStackLayout();
         private readonly VerticalStackLayout _list = new VerticalStackLayout();
+        private readonly ScrollView _scroll;
+        private readonly VerticalStackLayout _footer = new VerticalStackLayout();
         private TaskCompletionSource<string> _tcs;
         private bool _animating;
 
@@ -366,14 +386,17 @@ namespace Maui.Demo.Lite
                 VerticalOptions = LayoutOptions.End,
                 HorizontalOptions = LayoutOptions.Center,
                 MaximumWidthRequest = 560,
-                Content = _list
             };
+            _scroll = new ScrollView { Content = _list, VerticalScrollBarVisibility = ScrollBarVisibility.Default };
+            _card.Content = new VerticalStackLayout { Children = { _header, _scroll, _footer } };
             _scrim = new BoxView { Color = Color.FromArgb("#66000000"), Opacity = 0 };
             _scrim.OnTap(() => Close(null));
             SizeChanged += (s, e) =>
             {
                 if (Width > 0)
                     _card.WidthRequest = Math.Min(560, Width);
+                if (Height > 0)
+                    _scroll.MaximumHeightRequest = Math.Max(120, Height - TopGap - HeaderAndFooterHeight);
             };
             Children.Add(_scrim);
             Children.Add(_card);
@@ -421,8 +444,10 @@ namespace Maui.Demo.Lite
         private void BeginShow(string title)
         {
             _list.Children.Clear();
-            _list.Children.Add(new BoxView { WidthRequest = 40, HeightRequest = 5, CornerRadius = 3, Color = Color.FromArgb("#D5D8E0"), HorizontalOptions = LayoutOptions.Center, Margin = new Thickness(0, 10, 0, 6) });
-            _list.Children.Add(new Label { Text = title, FontFamily = Theme.TitleFont, FontSize = 20, TextColor = Theme.PrimaryText, HorizontalOptions = LayoutOptions.Center, Margin = new Thickness(0, 0, 0, 6) });
+            _header.Children.Clear();
+            _footer.Children.Clear();
+            _header.Children.Add(new BoxView { WidthRequest = 40, HeightRequest = 5, CornerRadius = 3, Color = Color.FromArgb("#D5D8E0"), HorizontalOptions = LayoutOptions.Center, Margin = new Thickness(0, 10, 0, 6) });
+            _header.Children.Add(new Label { Text = title, FontFamily = Theme.TitleFont, FontSize = 20, TextColor = Theme.PrimaryText, HorizontalOptions = LayoutOptions.Center, Margin = new Thickness(0, 0, 0, 6) });
         }
 
         private Task<string> EndShow(string closeText)
@@ -437,7 +462,8 @@ namespace Maui.Demo.Lite
                 Content = new Label { Text = closeText, FontFamily = Theme.TitleFont, FontSize = 17, TextColor = Theme.Accent, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center }
             };
             cancel.OnTap(() => Close(null));
-            _list.Children.Add(cancel);
+            _footer.Children.Add(cancel);
+            _ = _scroll.ScrollToAsync(0, 0, false);
 
             _tcs = new TaskCompletionSource<string>();
             IsVisible = true;
