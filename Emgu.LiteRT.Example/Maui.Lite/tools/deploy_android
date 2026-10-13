@@ -1,0 +1,116 @@
+#!/bin/bash
+# Build the MAUI demo for Android, install and start it on each given device (adb serials; all connected devices if
+# none are given), then copy the LiteRT-LM models already downloaded on this Mac - by the Mac Catalyst demo
+# (~/Documents/LiteRT-LM) or the test runner (~/Library/Application Support/LiteRT-LM) - into the app's model folder
+# (files/LiteRT-LM in its private storage), so the app doesn't download them again. A model already on the device
+# with the same size is skipped. The file's modification time and its ".sha256ok" marker are copied too, so the app
+# doesn't hash it again either (if the marker doesn't match, it just hashes once).
+#
+# Needs a Debug build (run-as only works for debuggable apps) and ANDROID_HOME. Usage:
+#   Emgu.LiteRT.Example/Maui.Lite/tools/deploy_android [serial ...]
+#   NO_BUILD=1 .../deploy_android [serial ...]   # only copy the models
+set -e
+
+APP_ID=com.emgu.litert
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PROJECT="$HERE/../Maui.Demo.Lite.csproj"
+ADB="${ANDROID_HOME:?set ANDROID_HOME}/platform-tools/adb"
+
+# The models the Android demo offers (LiteRtLmChatPage's list without the Mac-only Gemma 4 12B) and the document and
+# photo search model.
+MODELS=(
+  Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm
+  Qwen3.5-0.8B-VL_int8.litertlm
+  Qwen3.5-4B_mixed_int4.litertlm
+  gemma-4-E2B-it.litertlm
+  gemma-4-E4B-it.litertlm
+  embeddinggemma-2-text-vision-440m.litertlm
+)
+SOURCES=("$HOME/Documents/LiteRT-LM" "$HOME/Library/Application Support/LiteRT-LM")
+
+if [ $# -gt 0 ]; then
+  DEVICES=("$@")
+else
+  DEVICES=($("$ADB" devices | awk 'NR > 1 && $2 == "device" { print $1 }'))
+fi
+if [ ${#DEVICES[@]} -eq 0 ]; then
+  echo "No Android device connected." >&2
+  exit 1
+fi
+
+# The model file on this Mac (following links), or nothing.
+find_source() {
+  for dir in "${SOURCES[@]}"; do
+    if [ -s "$dir/$1" ]; then
+      echo "$dir/$1"
+      return
+    fi
+  done
+}
+
+copy_models() {
+  local serial="$1"
+  local adb=("$ADB" -s "$serial")
+  "${adb[@]}" shell run-as $APP_ID mkdir -p files/LiteRT-LM
+  for name in "${MODELS[@]}"; do
+    local src
+    src="$(find_source "$name")"
+    if [ -z "$src" ]; then
+      continue
+    fi
+    local size
+    size=$(/usr/bin/stat -L -f %z "$src")
+    local device_size
+    device_size=$("${adb[@]}" shell run-as $APP_ID stat -c %s "files/LiteRT-LM/$name" 2>/dev/null | tr -d '\r' || true)
+    if [ "$device_size" = "$size" ]; then
+      echo "  $name: already there"
+      continue
+    fi
+    local free_kb
+    free_kb=$("${adb[@]}" shell df -k /data | awk 'NR == 2 { print $4 }' | tr -d '\r')
+    if [ -n "$free_kb" ] && [ $((free_kb * 1024)) -lt $((size + 512 * 1024 * 1024)) ]; then
+      echo "  $name: skipped, not enough free space on the device ($((free_kb / 1024)) MB free)"
+      continue
+    fi
+    echo "  $name: copying $((size / 1024 / 1024)) MB..."
+    # Streamed into the app's private folder through run-as (adb push can't write there), under a temporary name.
+    "${adb[@]}" exec-in run-as $APP_ID sh -c "cat > 'files/LiteRT-LM/$name.copying'" < "$src"
+    # exec-in returns once it has sent the data, while the device may still be writing it: wait until the file is
+    # complete or stops growing.
+    local last=-1 still=0
+    while true; do
+      device_size=$("${adb[@]}" shell run-as $APP_ID stat -c %s "files/LiteRT-LM/$name.copying" | tr -d '\r')
+      if [ "$device_size" = "$size" ]; then
+        break
+      fi
+      if [ "$device_size" = "$last" ]; then
+        still=$((still + 1))
+        [ $still -ge 10 ] && break
+      else
+        still=0
+      fi
+      last=$device_size
+      sleep 1
+    done
+    if [ "$device_size" != "$size" ]; then
+      echo "  $name: copy incomplete ($device_size of $size bytes)" >&2
+      "${adb[@]}" shell run-as $APP_ID rm -f "files/LiteRT-LM/$name.copying"
+      continue
+    fi
+    "${adb[@]}" shell run-as $APP_ID mv "files/LiteRT-LM/$name.copying" "files/LiteRT-LM/$name"
+    # The verified-hash marker records the size and modification time, so give the copy the original's time.
+    local mtime
+    mtime=$(/usr/bin/stat -L -f %Fm "$src")
+    if "${adb[@]}" shell run-as $APP_ID touch -m -d "@$mtime" "files/LiteRT-LM/$name" && [ -f "$src.sha256ok" ]; then
+      "${adb[@]}" exec-in run-as $APP_ID sh -c "cat > 'files/LiteRT-LM/$name.sha256ok'" < "$src.sha256ok"
+    fi
+  done
+}
+
+for serial in "${DEVICES[@]}"; do
+  echo "== $serial"
+  if [ -z "$NO_BUILD" ]; then
+    dotnet build "$PROJECT" -f net10.0-android -c Debug -p:RuntimeIdentifier=android-arm64 -t:Run -p:AdbTarget="-s $serial"
+  fi
+  copy_models "$serial"
+done

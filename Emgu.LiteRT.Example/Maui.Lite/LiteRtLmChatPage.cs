@@ -1582,8 +1582,9 @@ namespace Maui.Demo.Lite
             {
                 Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
-                    _memorySwitch.IsToggled ? _store : null, PhotoSearchOn ? FindPhotosAsync : null),
-                Instructions = JoinInstructions(await MemoryInstructionsAsync(), PhotoSearchOn ? PhotoInstructions : null),
+                    _memorySwitch.IsToggled ? _store : null, FindPhotosAsync),
+                // find_photos even with photo search off, so the model can tell the user how to turn it on.
+                Instructions = JoinInstructions(await MemoryInstructionsAsync(), PhotoInstructions),
                 ToolMode = ChatToolMode.Auto
             };
 

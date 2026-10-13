@@ -16,9 +16,9 @@ using Emgu.LiteRT.LM.Agents;
 namespace Maui.Demo.Lite
 {
     // Photo search: with Settings > "Search my photos" on (off by default), the most recent photos are indexed in the
-    // background with the document search's embedding model (PhotoIndex), and Gemma 4 gets the find_photos tool
-    // (Emgu.LiteRT.LM.Agents' AgentTools.FindPhotos), whose matches are shown as thumbnails above the reply - the model
-    // doesn't see them. Everything stays on the device; turning it off deletes the index.
+    // background with the document search's embedding model (PhotoIndex), and Gemma 4's find_photos tool
+    // (Emgu.LiteRT.LM.Agents' AgentTools.FindPhotos) shows the matches as thumbnails above the reply - the model
+    // doesn't see them. The tool is offered with the setting off too, and then tells the model where to turn it on. Everything stays on the device; turning it off deletes the index.
     public partial class LiteRtLmChatPage
     {
         private const string PhotoSearchPreference = "litert_lm_chat_photo_search";
@@ -196,6 +196,10 @@ namespace Maui.Demo.Lite
         // The find_photos tool: search the index, show the matches above the reply, and tell the model what was found.
         private async Task<string> FindPhotosAsync(string request, CancellationToken cancel)
         {
+            if (!PhotoSearchOn)
+                return string.Format(CultureInfo.InvariantCulture,
+                    "Photo search is turned off, so the user's photos can't be searched. Tell the user they can turn on \"Search my photos\" in {0}: their recent photos are then indexed on this device (the first time takes a while), and nothing leaves it.",
+                    _settingsButton.IsVisible ? "this chat's settings (the gear button at the top)" : "the settings panel beside the chat");
             if (_embedder == null || _photoIndex.Count == 0)
                 return _photoIndex.IsIndexing
                     ? "The photos are still being indexed - try again in a few minutes."

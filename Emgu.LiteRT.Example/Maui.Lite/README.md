@@ -92,6 +92,15 @@ dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-andr
 - A headless emulator: `$ANDROID_HOME/emulator/emulator -avd <name> -no-window -no-audio`; wait for
   `adb shell getprop sys.boot_completed` to print `1`.
 
+**Reusing the Mac's models**: `tools/deploy_android [serial ...]` (all connected devices if none are given) builds,
+installs and starts the Debug app on each device, then copies the LiteRT-LM models this Mac already has - downloaded by
+the Mac Catalyst demo (`~/Documents/LiteRT-LM`) or the tests (`~/Library/Application Support/LiteRT-LM`) - into the
+app's model folder, so the phone doesn't download them again. Only the models the Android app offers are copied (not
+Gemma 4 12B), only if missing (by size) and if the phone keeps 512 MB free; each is streamed through `adb exec-in run-as`
+(the app's folder is private, so it needs the debuggable Debug build), and the file's time and `.sha256ok` marker go
+with it, so the app doesn't hash it again either. Gemma 4 E2B (2.6 GB) takes a few minutes over Wi-Fi. `NO_BUILD=1`
+only copies the models.
+
 **A phone over Wi-Fi** (Android 11+): on the phone, open Settings → Developer options → Wireless debugging, then
 "Pair device with pairing code". On the computer:
 
