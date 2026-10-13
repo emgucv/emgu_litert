@@ -180,6 +180,11 @@ again.
   above the reply. Places come from GPS positions and a list of towns in the app, `Resources/Raw/places.tsv.gz`
   (from [GeoNames](https://www.geonames.org), CC BY 4.0; rebuilt by `tools/make_places.py`). On Android the app also
   asks to read the photos' locations; without it, search works without places. Turning it off deletes the index.
+- Settings → Image generation (Gemma 4; off by default; not on iOS) lets Gemma 4 draw pictures - "draw a red fox in
+  the snow, watercolor" - with [Z-Image-Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo) on the device: 256 x 256,
+  shown above the reply and saved with the chat. Turning it on downloads the 10.6 GB model (`Emgu.LiteRT.Models`'
+  `ZImageTurbo`), and the first picture prepares about 9 GB of caches, so it needs about 21 GB of free space; "Delete
+  the image model" removes it all. A picture takes about 25-40 s on an Apple M1, longer on a phone.
 - "+" → Document attaches a PDF, Word (.docx) or text file to the chat, with any model. The first time, a 388 MB
   search model (EmbeddingGemma 2) is downloaded; the document is then indexed on the device (a few seconds on a Mac,
   longer on a phone), and each question is sent with the parts of the document that match it - and, for Gemma 4 and

@@ -580,6 +580,8 @@ namespace Maui.Demo.Lite
                     Theme.Divider(),
                     BuildPhotoSection(),
                     Theme.Divider(),
+                    BuildImageSection(),
+                    Theme.Divider(),
                     new Label { Text = "Memories about you", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     memoryRow,
                     new Label
@@ -1452,6 +1454,8 @@ namespace Maui.Demo.Lite
         private async Task SendAsync(string prompt, List<PendingAttachment> attachments)
         {
             _sendSteps.Clear();
+            lock (_sendImages)
+                _sendImages.Clear();
             UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, agent {3}, think {4}, web {5}",
                 prompt.Length, attachments.Count, SelectedOption.Name, UseAgent, _thinkingSwitch.IsToggled, _webSearchSwitch.IsToggled));
             StopSpeaking();
@@ -1582,9 +1586,11 @@ namespace Maui.Demo.Lite
             {
                 Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
-                    _memorySwitch.IsToggled ? _store : null, FindPhotosAsync),
-                // find_photos even with photo search off, so the model can tell the user how to turn it on.
-                Instructions = JoinInstructions(await MemoryInstructionsAsync(), PhotoInstructions),
+                    _memorySwitch.IsToggled ? _store : null, FindPhotosAsync, ImageGenerationSupported ? GenerateImageAsync : null),
+                // find_photos and generate_image even with their settings off, so the model can tell the user how to
+                // turn them on.
+                Instructions = JoinInstructions(await MemoryInstructionsAsync(), PhotoInstructions,
+                    ImageGenerationSupported ? ImageInstructions : null),
                 ToolMode = ChatToolMode.Auto
             };
 
@@ -2572,7 +2578,11 @@ namespace Maui.Demo.Lite
                 userItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.UserRole, userItem.Text, null, userItem.Attachments, userItem.Context);
                 foreach (string step in _sendSteps)
                     await _store.AddMessageAsync(id, MessageRecord.StepRole, step, null);
-                replyItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking);
+                // Pictures the reply drew are kept with it (shown again when the chat is reopened, not given to the model).
+                List<(string Kind, string MediaType, byte[] Data)> drawn;
+                lock (_sendImages)
+                    drawn = _sendImages.Select(png => (GeneratedKind, "image/png", png)).ToList();
+                replyItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking, drawn);
                 // The document the chat uses now (or none), restored when it is opened again.
                 await _store.SetConversationDocumentAsync(id, _document?.Index != null ? _document.Id : null);
                 await RefreshChatListAsync();
@@ -2796,6 +2806,12 @@ namespace Maui.Demo.Lite
                 foreach (SavedAttachment attachment in _store.GetAttachments(message))
                 {
                     byte[] data = await System.IO.File.ReadAllBytesAsync(attachment.Path);
+                    if (attachment.Kind == GeneratedKind)
+                    {
+                        // A picture the reply drew: shown above it, not part of what the model is given.
+                        AddSavedGeneratedImage(data);
+                        continue;
+                    }
                     item.Attachments.Add((attachment.Kind, attachment.MediaType, data));
                     shown.Add(new PendingAttachment
                     {
@@ -2892,6 +2908,7 @@ namespace Maui.Demo.Lite
                 _photoIndexing?.Cancel();
                 _ = CleanupModelAsync();
                 _ = ReleaseEmbedderAsync();
+                _ = ReleaseImageModelAsync();
             }
         }
 

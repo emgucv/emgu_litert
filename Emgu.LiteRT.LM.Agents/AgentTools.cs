@@ -365,6 +365,24 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         /// <summary>
+        /// generate_image: draws a picture with an image generator the app provides (e.g. Emgu.LiteRT.Models'
+        /// ZImageTurbo), given an English description the model writes. The generator should show the picture to the
+        /// user and return a short text for the model, which doesn't see it - or, if the description is too long for it,
+        /// say so, and the model can call it again with a shorter one.
+        /// </summary>
+        /// <param name="generate">The app's image generator, given the description</param>
+        public static AIFunction GenerateImage(Func<string, CancellationToken, Task<string>> generate)
+        {
+            if (generate == null)
+                throw new ArgumentNullException("generate");
+            return AIFunctionFactory.Create(
+                ([Description("What to draw, in English, at most about 20 words: the subject, the setting, the style and the lighting, e.g. \"a red fox in fresh snow at dawn, watercolor\"")] string prompt,
+                 CancellationToken cancellationToken) => generate(prompt ?? string.Empty, cancellationToken),
+                "generate_image",
+                "Draws a new picture from a description and shows it to the user. Use it whenever the user asks you to draw, paint, create, generate or imagine an image or a picture.");
+        }
+
+        /// <summary>
         /// get_weather: the current weather and a 3-day forecast from Open-Meteo (https://open-meteo.com, free, no key),
         /// for a place name (looked up with its geocoding API) or coordinates.
         /// </summary>
@@ -669,6 +687,7 @@ namespace Emgu.LiteRT.LM.Agents
                 case "get_current_date_time": return "Checking the date and time";
                 case "get_current_location": return "Getting your location";
                 case "find_photos": return "Looking for \u201C" + Argument("request") + "\u201D";
+                case "generate_image": return "Drawing \u201C" + Argument("prompt") + "\u201D";
                 case "get_weather":
                     string place = Argument("place");
                     return "Checking the weather" + (place.Length > 0 ? " in " + place : "");
