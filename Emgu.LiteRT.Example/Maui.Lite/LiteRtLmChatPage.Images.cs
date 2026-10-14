@@ -372,9 +372,37 @@ namespace Maui.Demo.Lite
             {
                 Source = ImageUtil.ToImageSource(png),
                 Aspect = Aspect.AspectFit,
-                HeightRequest = Math.Max(240, Math.Min(Width, Height) * 0.8)
+                HeightRequest = Math.Max(240, Math.Min(Width, Height) * 0.65)
             };
-            await _sheet.ShowViewAsync("Picture", image, "Close");
+            var save = new Button { Text = "Save image…", FontFamily = Theme.TitleFont, HorizontalOptions = LayoutOptions.Fill };
+            var status = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText, IsVisible = false };
+            SemanticProperties.SetDescription(save, "Save the original generated image as a PNG file");
+            string fileName = "generated-image-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".png";
+            save.Clicked += async (_, _) =>
+            {
+                if (!save.IsEnabled) return;
+                save.IsEnabled = false;
+                status.IsVisible = false;
+                try
+                {
+                    using var stream = new System.IO.MemoryStream(png, writable: false);
+                    var result = await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream);
+                    if (result.IsSuccessful)
+                    {
+                        status.Text = "Saved to " + result.FilePath;
+                        status.IsVisible = true;
+                    }
+                    else if (result.Exception is not OperationCanceledException)
+                        throw result.Exception ?? new System.IO.IOException("The image could not be saved.");
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    await DisplayAlertAsync("Couldn't save image", ex.Message, "OK");
+                }
+                finally { save.IsEnabled = true; }
+            };
+            await _sheet.ShowViewAsync("Picture", new VerticalStackLayout { Spacing = 10, Children = { image, save, status } }, "Close");
         }
 
         private async Task ReleaseImageModelAsync()

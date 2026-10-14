@@ -200,7 +200,9 @@ again.
   remains unavailable on iOS; GPU execution is not offered because the complete Windows GPU pipeline failed testing.
 - Settings → Image generation (Gemma 4; off by default; not on iOS) lets Gemma 4 draw pictures - "draw a red fox in
   the snow, watercolor" - with [Z-Image-Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo) on the device: 256 x 256,
-  shown above the reply and saved with the chat. Turning it on downloads the 10.6 GB model (`Emgu.LiteRT.Models`'
+  shown above the reply and saved with the chat. Tap a generated picture to enlarge it, then **Save image…** to
+  export the original PNG through the platform's save dialog. This also works for pictures reopened from saved chats.
+  Turning it on downloads the 10.6 GB model (`Emgu.LiteRT.Models`'
   `ZImageTurbo`), and the first picture prepares about 9 GB of caches, so it needs about 21 GB of free space; "Delete
   the image model" removes it all. A picture takes about 25-40 s on an Apple M1, longer on a phone.
 - "+" → Document attaches a PDF, Word (.docx) or text file to the chat, with any model. The selected embedding
