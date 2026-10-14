@@ -1,0 +1,43 @@
+--- a/ml_drift_delegate/delegate/serialization_weight_cache/BUILD
++++ b/ml_drift_delegate/delegate/serialization_weight_cache/BUILD
+@@ -126,7 +126,7 @@
+     name = "generate_build_identifier_py",
+     srcs = ["generate_build_identifier.py"],
+     main = "generate_build_identifier.py",
+-    strict_deps = False,
++
+     tags = ["notap"],  # This should only be built as part of the related genrule.
+ )
+ 
+--- a/ml_drift_delegate/delegate/composite/BUILD
++++ b/ml_drift_delegate/delegate/composite/BUILD
+@@ -149,7 +149,7 @@
+         "@ml_drift//ml_drift/common/kernels:conv_wave_matrix",
+         "@ml_drift//ml_drift/common/kernels:conv_wave_memory",
+         "@ml_drift//ml_drift/common/kernels:fully_connected",
+-        "@ml_drift//ml_drift/common/kernels/google/custom:experts_remap",
++        "@ml_drift//ml_drift/common/kernels/special:experts_remap",
+         "@ml_drift//ml_drift/common/task:gpu_operation",
+         "@ml_drift//ml_drift/common/task:tensor_desc",
+     ],
+--- a/ml_drift_delegate/delegate/composite/experts_remap_builder.cc
++++ b/ml_drift_delegate/delegate/composite/experts_remap_builder.cc
+@@ -30,7 +30,7 @@
+ #include "ml_drift/common/kernels/conv_wave_matrix.h"  // from @ml_drift
+ #include "ml_drift/common/kernels/conv_wave_memory.h"  // from @ml_drift
+ #include "ml_drift/common/kernels/fully_connected.h"  // from @ml_drift
+-#include "ml_drift/common/kernels/google/custom/experts_remap.h"  // from @ml_drift
++#include "ml_drift/common/kernels/special/experts_remap.h"  // from @ml_drift
+ #include "ml_drift/common/operations.h"  // from @ml_drift
+ #include "ml_drift/common/precision.h"  // from @ml_drift
+ #include "ml_drift/common/shape.h"  // from @ml_drift
+--- a/tflite/core/BUILD
++++ b/tflite/core/BUILD
+@@ -195,6 +195,7 @@
+     ],
+     compatible_with = get_compatible_with_portable(),
+     visibility = [
++        "//ml_drift_delegate/tflite:__pkg__",
+         "//tflite:__subpackages__",
+         "@org_tensorflow//third_party/deepmind/lyria_live/internal/odml:__subpackages__",
+         "@org_tensorflow//third_party/odml/litert:__subpackages__",
