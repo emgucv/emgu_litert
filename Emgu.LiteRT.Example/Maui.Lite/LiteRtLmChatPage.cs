@@ -203,7 +203,8 @@ namespace Maui.Demo.Lite
         // GPU (Android): whether the loaded model runs on it, whether the one loading will, and whether it failed to
         // load there (then the CPU is used for the rest of the session).
         private const string UseGpuPreference = "litert_lm_chat_use_gpu";
-        private readonly Switch _useGpuSwitch;
+        private bool _selectedGpu;
+        private static string BackendPreference => UseGpuPreference + "_" + DeviceInfo.Platform;
         private bool _loadedOnGpu;
         private bool _loadingOnGpu;
         // Context window (Settings, Gemma 4): Automatic (0: 8k on desktops, 4k on phones) or a size; the loaded model's
@@ -422,26 +423,6 @@ namespace Maui.Demo.Lite
                 VerticalOptions = LayoutOptions.Center
             }, 0, 0);
             readAloudRow.Add(_readAloudSwitch, 1, 0);
-            bool useGpu = DeviceInfo.Platform != DevicePlatform.WinUI;
-            try { useGpu = Preferences.Default.Get(UseGpuPreference, useGpu); } catch (Exception) { }
-            _useGpuSwitch = new Switch { IsToggled = useGpu, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
-#if WINDOWS && !WINDOWS_WEBGPU
-            _useGpuSwitch.IsEnabled = false;
-#endif
-            _useGpuSwitch.Toggled += OnUseGpuToggled;
-            var gpuRow = new Grid
-            {
-                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
-            };
-            gpuRow.Add(new Label
-            {
-                Text = "Use the GPU",
-                FontFamily = Theme.BodyFont,
-                FontSize = 15,
-                TextColor = Theme.PrimaryText,
-                VerticalOptions = LayoutOptions.Center
-            }, 0, 0);
-            gpuRow.Add(_useGpuSwitch, 1, 0);
             _tavilyKeyEntry = new Entry
             {
                 Placeholder = "Tavily API key (optional)",
@@ -550,25 +531,6 @@ namespace Maui.Demo.Lite
                     Theme.Divider(),
                     readAloudRow,
                     Theme.Divider(),
-#if ANDROID || MACCATALYST || WINDOWS
-                    gpuRow,
-                    new Label
-                    {
-#if ANDROID
-                        Text = "Gemma 4 E2B answers many times faster on the GPU. Its first load there takes about 30 s and keeps a ~0.8 GB cache next to the model; turning this off deletes it.",
-#elif MACCATALYST
-                        Text = "Gemma 4 answers several times faster on the Mac's GPU. The first load of a model there takes longer and keeps a cache next to the model; turning this off deletes it.",
-#elif WINDOWS_WEBGPU
-                        Text = "Run chat models on the GPU. Switching reloads the model and keeps the conversation. Loading can take several minutes, especially for Qwen3.5. A compatible Direct3D 12 GPU with enough memory is required.",
-#else
-                        Text = "GPU support is not included in this build. Models use the CPU.",
-#endif
-                        FontFamily = Theme.BodyFont,
-                        FontSize = 12,
-                        TextColor = Theme.SecondaryText
-                    },
-                    Theme.Divider(),
-#endif
                     new Label { Text = "Web search", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     new Label
                     {
@@ -887,42 +849,48 @@ namespace Maui.Demo.Lite
         private View BuildModelList(bool inSheet)
         {
             var list = new VerticalStackLayout { Spacing = 4 };
-            for (int i = 0; i < Models.Length; i++)
+            foreach (bool gpu in new[] { false, true })
             {
-                int index = i;
-                ModelOption option = Models[i];
-                bool selected = index == _selectedModel;
-                var row = new Grid
+                if (gpu && !Models.Any(HasGpu)) continue;
+                list.Children.Add(Theme.SectionTitle(gpu ? "GPU models" : "CPU models"));
+                for (int i = 0; i < Models.Length; i++)
                 {
-                    Padding = new Thickness(10, 8),
-                    ColumnSpacing = 8,
-                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
-                };
-                row.Add(new VerticalStackLayout
-                {
-                    Children =
+                    int index = i;
+                    ModelOption option = Models[i];
+                    if (gpu && !HasGpu(option)) continue;
+                    bool selected = index == _selectedModel && gpu == _selectedGpu;
+                    var row = new Grid
                     {
-                        new Label { Text = option.Name, FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText },
-                        new Label { Text = option.Detail, FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText }
-                    }
-                }, 0, 0);
-                if (selected)
-                    row.Add(Theme.MakeIcon(Theme.GlyphCheck, Theme.Accent, 22), 1, 0);
-                var cell = new Border
-                {
-                    BackgroundColor = selected ? Theme.TileBackground : Colors.Transparent,
-                    Stroke = Colors.Transparent,
-                    StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
-                    Content = row
-                };
-                cell.OnTap(() =>
-                {
-                    if (inSheet)
-                        _sheet.Dismiss(index.ToString());
-                    else if (CanChangeModel)
-                        SelectModel(index);
-                });
-                list.Children.Add(cell);
+                        Padding = new Thickness(10, 8),
+                        ColumnSpacing = 8,
+                        ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+                    };
+                    row.Add(new VerticalStackLayout
+                    {
+                        Children =
+                        {
+                            new Label { Text = option.Name + (gpu ? " · GPU" : " · CPU"), FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText },
+                            new Label { Text = option.Detail, FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText }
+                        }
+                    }, 0, 0);
+                    if (selected)
+                        row.Add(Theme.MakeIcon(Theme.GlyphCheck, Theme.Accent, 22), 1, 0);
+                    var cell = new Border
+                    {
+                        BackgroundColor = selected ? Theme.TileBackground : Colors.Transparent,
+                        Stroke = Colors.Transparent,
+                        StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
+                        Content = row
+                    };
+                    cell.OnTap(() =>
+                    {
+                        if (inSheet)
+                            _sheet.Dismiss(index + (gpu ? ":gpu" : ":cpu"));
+                        else if (CanChangeModel)
+                            SelectModel(index, gpu);
+                    });
+                    list.Children.Add(cell);
+                }
             }
             return list;
         }
@@ -942,8 +910,9 @@ namespace Maui.Demo.Lite
             if (!CanChangeModel)
                 return;
             string choice = await _sheet.ShowViewAsync("Model", BuildModelList(true), "Cancel");
-            if (int.TryParse(choice, out int index))
-                SelectModel(index);
+            string[] parts = choice?.Split(':');
+            if (parts?.Length == 2 && int.TryParse(parts[0], out int index) && CanChangeModel)
+                SelectModel(index, parts[1] == "gpu");
         }
 
         private async void OnSettingsTapped()
@@ -961,7 +930,7 @@ namespace Maui.Demo.Lite
         private ModelOption SelectedOption => Models[_selectedModel];
 
         // Select a model (loaded on the next message) and show the controls it supports.
-        private void SelectModel(int index)
+        private void SelectModel(int index, bool? gpu = null)
         {
             UiStallWatchdog.Mark("Select model " + Models[index].Name);
             // A chat belongs to a model: another model starts a new chat.
@@ -969,7 +938,10 @@ namespace Maui.Demo.Lite
                 StartNewChat();
             _selectedModel = index;
             ModelOption option = SelectedOption;
-            _modelChipLabel.Text = option.Name;
+            _selectedGpu = (gpu ?? _selectedGpu) && HasGpu(option);
+            _gpuUnavailable = false;
+            try { Preferences.Default.Set(BackendPreference, _selectedGpu); } catch (Exception) { }
+            _modelChipLabel.Text = option.Name + (_selectedGpu ? " · GPU" : " · CPU");
             RefreshModelList();
             _talkButton.IsVisible = option.AcceptsAudio;
             _thinkingSwitch.IsVisible = option.CanThink;
@@ -1011,6 +983,8 @@ namespace Maui.Demo.Lite
             catch (Exception)
             {
             }
+            try { _selectedGpu = Preferences.Default.Get(BackendPreference,
+                Preferences.Default.Get(UseGpuPreference, DeviceInfo.Platform != DevicePlatform.WinUI)); } catch (Exception) { }
             SelectModel(index);
             // Photo search: index photos added since the app last ran.
             StartPhotoIndexing();
@@ -1121,9 +1095,17 @@ namespace Maui.Demo.Lite
                     }
                     catch (Exception ex) when (lastStage == ModelLoadStage.LoadingEngine && !token.IsCancellationRequested)
                     {
-                        // No usable GPU (e.g. no OpenCL driver): the CPU, for the rest of the session.
                         UiStallWatchdog.Mark("GPU unavailable: " + ex.Message);
-                        _gpuUnavailable = true;
+                        bool useCpu = await MainThread.InvokeOnMainThreadAsync(() => DisplayAlertAsync(
+                            "GPU model could not load", ex.Message + "\n\nRun this model on CPU instead?", "Run on CPU", "Cancel"));
+                        if (!useCpu) throw;
+                        await MainThread.InvokeOnMainThreadAsync(() =>
+                        {
+                            _selectedGpu = false;
+                            try { Preferences.Default.Set(BackendPreference, false); } catch (Exception) { }
+                            _modelChipLabel.Text = option.Name + " · CPU";
+                            RefreshModelList();
+                        });
                         onGpu = false;
                         _loadingOnGpu = false;
                         await Task.Run(() => model.Dispose());
@@ -1163,8 +1145,6 @@ namespace Maui.Demo.Lite
                 _needsPrime = true;
             if (_gpuUnavailable && WantsGpuSetting(option))
                 SetStatus("The GPU isn't available on this device - using the CPU.");
-            if (!onGpu && HasGpu(option) && !_useGpuSwitch.IsToggled)
-                _ = Task.Run(() => DeleteGpuCache(option));
             ClearLoading(option.Choice);
             HideLoadCard();
             UpdateMemoryLabel();
@@ -1181,7 +1161,7 @@ namespace Maui.Demo.Lite
 
         private bool WantsGpuSetting(ModelOption option)
         {
-            return HasGpu(option) && _useGpuSwitch.IsToggled;
+            return HasGpu(option) && _selectedGpu;
         }
 
         // Whether the model can run on this platform's GPU.
@@ -1196,20 +1176,6 @@ namespace Maui.Demo.Lite
 #else
             return false;
 #endif
-        }
-
-        private void OnUseGpuToggled(object sender, ToggledEventArgs e)
-        {
-            try { Preferences.Default.Set(UseGpuPreference, e.Value); } catch (Exception) { }
-            if (e.Value)
-                _gpuUnavailable = false;
-            // Reload the selected model on the other backend (the chat continues); turning it off deletes the GPU cache
-            // once the model is loaded on the CPU.
-            if (_pageStarted && HasGpu(SelectedOption))
-                _ = PrepareModelAsync(false);
-            else if (!e.Value)
-                foreach (ModelOption option in Models.Where(m => HasGpu(m) && !(_loaded == m.Choice && _loadedOnGpu)))
-                    _ = Task.Run(() => DeleteGpuCache(option));
         }
 
         // ---------- Context window ----------
@@ -3172,9 +3138,6 @@ namespace Maui.Demo.Lite
         private void SetBusy(bool busy)
         {
             _busy = busy;
-#if !WINDOWS || WINDOWS_WEBGPU
-            _useGpuSwitch.IsEnabled = !busy && !_reloadingCpuThreads;
-#endif
             _sendButton.IsVisible = !busy;
             _busyIndicator.IsVisible = busy;
             _busyIndicator.IsRunning = busy;

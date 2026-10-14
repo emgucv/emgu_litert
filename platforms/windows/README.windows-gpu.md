@@ -120,10 +120,11 @@ build, or `-p:EnableWindowsGpu=true` to require the GPU package even when the
 source bundle is not on this machine. The CPU-only build displays the GPU setting as unavailable. The Debug
 GPU executable is `Emgu.LiteRT.Example/Maui.Lite/bin/Debug/webgpu/net10.0-windows10.0.22621.0/win-x64/Maui.Demo.Lite.exe`.
 
-In Chat → Settings, enable **Use the GPU**, then select any of the five chat models.
-Windows defaults to CPU until this setting is enabled. Switching backend reloads
-the model and retains the conversation. GPU initialization failure falls back to CPU with a status message;
-turn the switch off and on to retry. A Direct3D 12 GPU with enough memory is
+In Chat's model picker, choose an entry under **CPU models** or **GPU models**.
+All five Windows chat models have GPU entries when the GPU runtime is included.
+Windows defaults to CPU; the chosen backend is remembered per platform. Switching backend reloads
+the model and retains the conversation. GPU initialization failure shows the reason and offers CPU fallback;
+select the GPU entry again to retry. A Direct3D 12 GPU with enough memory is
 required. The vision/audio encoders and token sampling continue to use CPU.
 
 ## Options

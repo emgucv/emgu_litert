@@ -126,8 +126,8 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
 
 For GPU chat on Windows, first build the matching runtime bundle with
 `platforms/windows/bazel_build_windows_gpu.ps1`. The demo includes that bundle
-automatically, and Chat → Settings → **Use the GPU** enables GPU inference for
-all five Windows chat models. Switching reloads the model while retaining the conversation.
+automatically. The chat model picker has **CPU models** and **GPU models** sections;
+select a GPU entry to use GPU inference. Switching backend reloads the model while retaining the conversation.
 Qwen3.5 loading can take several minutes. See [Windows GPU build instructions](../../platforms/windows/README.windows-gpu.md)
 for output locations, alternate bundle directories, and CPU-only builds.
 
@@ -154,8 +154,8 @@ again.
   (measurements in [Performance.md](Performance.md)).
 - Gemma 4 12B (Mac Catalyst only, ~6.9 GB download, needs a Mac with 16 GB of memory) is the most capable model, e.g. for
   code. On a Mac, the Gemma 4 models run on the GPU through the optional `Emgu.LiteRT.Metal.runtime.maui.macos` package
-  (Settings → "Use the GPU"); the first load of a model there builds a cache next to it (~6 GB for 12B).
-- On Android, Gemma 4 E2B runs on the GPU (Settings → "Use the GPU"; the CPU if the device has no OpenCL driver),
+  (select an entry under "GPU models"); the first load of a model there builds a cache next to it (~6 GB for 12B).
+- On Android, Gemma 4 E2B can be selected under "GPU models" (CPU fallback is offered if GPU initialization fails),
   through the optional `Emgu.LiteRT.OpenCL.runtime.maui.android` package the demo references:
   replies take about a second instead of ~6, and reopening a long chat ~8 s instead of ~2 minutes. The first load on
   the GPU takes about 30 s and keeps a ~0.8 GB cache next to the model. When a chat gets longer, Gemma 4 and Qwen3.5 4B summarize the earlier messages and continue from the summary
