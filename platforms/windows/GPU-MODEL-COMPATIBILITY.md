@@ -2,9 +2,9 @@
 
 Verified October 14, 2026 on an NVIDIA GeForce RTX 3070 (8 GB), using the
 source-built WebGPU / Dawn Direct3D 12 bundle and Windows runtime packages
-2.3.0.1964. This covers the **five chat models offered by the Windows picker**,
+2.3.0.1964. This covers the **six chat models offered by the Windows picker**,
 both multimodal embedding models, and GPU compilation checks for image generation.
-Gemma 4 12B is Mac-only; the text-only 270M embedding model and TF Lite demo models are
+The text-only 270M embedding model and TF Lite demo models are
 outside this verification.
 
 ## Results
@@ -16,6 +16,7 @@ outside this verification.
 | Qwen3.5 4B, mixed int4 | 4,096 | Passed after precision correction | Text | Float32 required in this build |
 | Gemma 4 E2B | 8,192 | Passed | Image and audio | Float32, existing wrapper default |
 | Gemma 4 E4B | 8,192 | Passed | Image and audio | Float32, existing wrapper default |
+| Gemma 4 12B | 8,192 and 4,096 | Text chat passed; image reply corrupted, not accepted as GPU-compatible | Image failed; GPU audio not completed | Float32, existing wrapper default |
 
 Each passing run created an engine with `backend: "gpu"`, returned a greeting,
 then answered `2 + 3` with `5` in the same conversation. Logs confirmed WebGPU
@@ -30,6 +31,43 @@ Long chats, thinking, tools, larger contexts, and other GPU vendors were not
 exhaustively tested.
 
 ## Fixes found
+
+### Gemma 4 12B on Windows
+
+The existing `Gemma4_12B` wrapper is now exposed in the Windows picker under
+**CPU Models**, alongside its existing Mac Catalyst entry. The downloaded full
+multimodal model is 6,883,278,368 bytes and matched SHA256
+`58fd31b778ca2c21c80d634fb34fc5a89d11d563a38dfd3cbf1b40dbf252a8b6`.
+
+CPU at 8,192 tokens loaded in 46.86 s (including first-run file verification),
+returned `Hello!` and `5`, correctly described the Buran shuttle image, and
+processed the audio. It answered the audio's spoken question instead of obeying
+the transcription instruction, so this is audio-input smoke coverage, not a
+successful transcription-accuracy test. The four requests took 175.39 s with
+four CPU threads. This machine has about 191 GiB system RAM; this does not
+establish a minimum RAM requirement.
+
+On the RTX 3070 (8 GB, driver 610.88), the 8,192-token GPU engine loaded in
+73.71 s and passed the two text turns. The image response was dominated by
+`<unused...>` and tool-control tokens, unlike the valid CPU description. This
+is a **failed multimodal GPU result**, even though a non-empty string was
+returned. The harness now rejects these special-token outputs. The original
+GPU run was stopped after the image failure, while audio was still pending.
+No GPU audio result is claimed for that run.
+
+A second GPU run at **4,096 tokens** loaded in 81.81 s and again returned
+`Hello!` and `5`, followed by the **same corrupted image response**. The stricter
+harness rejected it with `Invalid image reply` and did not proceed to audio.
+Reducing the context did not fix this failure.
+
+The test used the same matched runtime bundle, FP32 activations, CPU image/audio
+encoders and CPU token sampling as the demo. Total GPU memory usage sampled
+peaked at **7,553 MiB** at 8k and **7,577 MiB** at 4k, including other applications;
+some shared GPU memory was also
+allocated. There were no Dawn validation or allocation errors in the log. A
+memory-related cause has **not** been established; a larger GPU is not yet
+verified as a fix. Logs and sampled memory data are in
+`.tmp/wgpu/model-gpu-check/gemma12b-*` (ignored test artifacts).
 
 ### Auxiliary models: document embedding and image generation
 

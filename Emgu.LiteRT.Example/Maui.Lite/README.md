@@ -154,8 +154,10 @@ again.
 - The models can take in about 4,096 tokens of conversation (a few pages of text; a photo is ~270, voice ~25 per
   second) - Gemma 4 8,192 on Mac and Windows. Opening a long saved chat takes a while, since the model reads it again
   (measurements in [Performance.md](Performance.md)).
-- Gemma 4 12B (Mac Catalyst only, ~6.9 GB download, needs a Mac with 16 GB of memory) is the most capable model, e.g. for
-  code. On a Mac, the Gemma 4 models run on the GPU through the optional `Emgu.LiteRT.Metal.runtime.maui.macos` package
+- Gemma 4 12B (~6.9 GB download) is available on Windows and Mac Catalyst for code and harder questions.
+  Windows currently offers it under CPU Models: CPU text/image/audio input passed, but GPU image inference on
+  an RTX 3070 returned corrupted special tokens despite working text chat. It needs substantial system memory;
+  CPU inference can be slow. On a Mac, the Gemma 4 models run on the GPU through the optional `Emgu.LiteRT.Metal.runtime.maui.macos` package
   (select an entry under "GPU models"); the first load of a model there builds a cache next to it (~6 GB for 12B).
 - On Android, Gemma 4 E2B can be selected under "GPU models" (CPU fallback is offered if GPU initialization fails),
   through the optional `Emgu.LiteRT.OpenCL.runtime.maui.android` package the demo references:

@@ -121,7 +121,9 @@ source bundle is not on this machine. The CPU-only build displays the GPU settin
 GPU executable is `Emgu.LiteRT.Example/Maui.Lite/bin/Debug/webgpu/net10.0-windows10.0.22621.0/win-x64/Maui.Demo.Lite.exe`.
 
 In Chat's model picker, choose an entry under **CPU models** or **GPU models**.
-All five Windows chat models have GPU entries when the GPU runtime is included.
+The five verified GPU chat models have GPU entries when the GPU runtime is included.
+Gemma 4 12B is available under CPU Models; its GPU text chat passed on the RTX 3070,
+but image inference returned corrupted special tokens, so it is not offered as a Windows GPU model.
 Windows defaults to CPU; the chosen backend is remembered per platform. Switching backend reloads
 the model and retains the conversation. GPU initialization failure shows the reason and offers CPU fallback;
 select the GPU entry again to retry. A Direct3D 12 GPU with enough memory is
