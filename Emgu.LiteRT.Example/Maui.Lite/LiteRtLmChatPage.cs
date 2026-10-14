@@ -857,6 +857,7 @@ namespace Maui.Demo.Lite
         // The model list: collapsible backend groups, with a check mark on the current model.
         private View BuildModelList(bool inSheet)
         {
+            _modelDownloadRows.RemoveAll(row => row.InSheet == inSheet);
             var list = new VerticalStackLayout { Spacing = 4 };
             foreach (bool gpu in new[] { true, false })
             {
@@ -899,6 +900,20 @@ namespace Maui.Demo.Lite
                     ModelOption option = Models[i];
                     if (gpu && !HasGpu(option)) continue;
                     bool selected = index == _selectedModel && gpu == _selectedGpu;
+                    var detail = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText };
+                    var status = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.Accent };
+                    var resume = new Button { Text = "Continue", FontFamily = Theme.TitleFont, FontSize = 12, HorizontalOptions = LayoutOptions.Start };
+                    var downloadRow = new ModelDownloadRow { Option = option, Detail = detail, Status = status, Continue = resume, InSheet = inSheet };
+                    _modelDownloadRows.Add(downloadRow);
+                    UpdateModelDownloadRow(downloadRow);
+                    SemanticProperties.SetDescription(resume, "Continue downloading " + option.Name);
+                    resume.Clicked += (_, _) =>
+                    {
+                        if (!CanChangeModel) return;
+                        if (inSheet) _sheet.Dismiss(index + (gpu ? ":gpu" : ":cpu"));
+                        SelectModel(index, gpu);
+                        _ = PrepareModelAsync(true);
+                    };
                     var row = new Grid
                     {
                         Padding = new Thickness(10, 8),
@@ -910,7 +925,9 @@ namespace Maui.Demo.Lite
                         Children =
                         {
                             new Label { Text = option.Name + (gpu ? " · GPU" : " · CPU"), FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText },
-                            new Label { Text = option.Detail, FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText }
+                            status,
+                            detail,
+                            resume
                         }
                     }, 0, 0);
                     if (selected)
@@ -1044,8 +1061,13 @@ namespace Maui.Demo.Lite
         private static bool IsDownloaded(ModelOption option)
         {
             // A file that exists but isn't verified yet (e.g. downloaded by an older version) is checked when loading.
-            string path = option.File.LocalFile;
-            return option.File.IsLocalFileVerified || (System.IO.File.Exists(path) && new System.IO.FileInfo(path).Length > 0);
+            try
+            {
+                string path = option.File.LocalFile;
+                return option.File.IsLocalFileVerified || (System.IO.File.Exists(path) && new System.IO.FileInfo(path).Length > 0);
+            }
+            catch (System.IO.IOException) { return false; }
+            catch (UnauthorizedAccessException) { return false; }
         }
 
         // Get the selected model ready: nothing to do if it's loaded or loading; load it if it's downloaded (or the
@@ -1165,7 +1187,13 @@ namespace Maui.Demo.Lite
             {
                 await Task.Run(() => model.Dispose());
                 if (token.IsCancellationRequested)
+                {
+                    if (_downloadingChoice == option.Choice) _downloadingChoice = null;
+                    UpdateModelDownloadRows();
+                    if (SelectedChoice == option.Choice && _loadingChoice == null && !IsDownloaded(option))
+                        ShowDownloadPrompt(option);
                     return false;
+                }
                 UiStallWatchdog.Mark("Loading failed: " + ex.Message);
                 ShowLoadError(option, ex.Message);
                 ClearLoading(option.Choice);
@@ -1340,16 +1368,20 @@ namespace Maui.Demo.Lite
                 _loadingChoice = null;
                 _loadTask = null;
             }
+            if (_downloadingChoice == choice) _downloadingChoice = null;
+            UpdateModelDownloadRows();
             _chipSpinner.IsVisible = _chipSpinner.IsRunning = _loadTask != null;
         }
 
-        // Cancel the load in progress (a download stops and its partial file is deleted).
+        // Cancel the load in progress; downloaded bytes remain available for Continue.
         private void CancelLoad()
         {
             if (_loadTask == null)
                 return;
             UiStallWatchdog.Mark("Cancel loading");
             _loadCancel?.Cancel();
+            _downloadingChoice = null;
+            UpdateModelDownloadRows();
             _loadingChoice = null;
             _chipSpinner.IsVisible = _chipSpinner.IsRunning = false;
             ModelOption option = SelectedOption;
@@ -1373,18 +1405,22 @@ namespace Maui.Demo.Lite
             catch (Exception)
             {
             }
-            ShowLoadCard(option, string.Format("{0} needs a one-time {1} download.{2}", option.Name, option.Size,
-                wifi ? "" : " You're not on Wi-Fi - mobile data may be used."), null);
+            bool paused = option.File.PartialDownloadBytes > 0;
+            string message = paused ? PausedDownload(option) : string.Format("{0} needs a one-time {1} download.", option.Name, option.Size);
+            ShowLoadCard(option, message + (wifi ? "" : " You're not on Wi-Fi - mobile data may be used."), null);
             _loadSpinner.IsVisible = _loadSpinner.IsRunning = false;
             _chipSpinner.IsVisible = _chipSpinner.IsRunning = false;
-            SetLoadButtons("Download " + option.Size, () => _ = PrepareModelAsync(true), "Not now");
+            SetLoadButtons(paused ? "Continue" : "Download " + option.Size, () => _ = PrepareModelAsync(true), "Not now");
         }
 
         private void ShowLoadError(ModelOption option, string message)
         {
-            ShowLoadCard(option, "Could not load the model: " + message, null);
+            if (_downloadingChoice == option.Choice) _downloadingChoice = null;
+            UpdateModelDownloadRows();
+            bool paused = option.File.PartialDownloadBytes > 0;
+            ShowLoadCard(option, (paused ? PausedDownload(option) + "\n" : "") + "Could not load the model: " + message, null);
             _loadSpinner.IsVisible = _loadSpinner.IsRunning = false;
-            SetLoadButtons("Retry", () => _ = PrepareModelAsync(true), null);
+            SetLoadButtons(paused ? "Continue" : "Retry", () => _ = PrepareModelAsync(true), null);
         }
 
         private void ShowLoadStage(ModelOption option, ModelLoadStage stage)
@@ -1395,9 +1431,15 @@ namespace Maui.Demo.Lite
                     ShowLoadCard(option, "Checking the model file...", null);
                     break;
                 case ModelLoadStage.Downloading:
+                    _downloadingChoice = option.Choice;
+                    _downloadReceived = option.File.PartialDownloadBytes;
+                    _downloadTotal = option.File.PartialDownloadTotalBytes;
+                    UpdateModelDownloadRows();
                     ShowLoadCard(option, "Downloading...", 0);
                     break;
                 case ModelLoadStage.VerifyingFile:
+                    _downloadingChoice = null;
+                    UpdateModelDownloadRows();
                     ShowLoadCard(option, "Checking the download...", null);
                     break;
                 case ModelLoadStage.LoadingEngine:
@@ -1412,6 +1454,9 @@ namespace Maui.Demo.Lite
 
         private void ShowDownloadProgress(long? total, long received)
         {
+            _downloadReceived = received;
+            _downloadTotal = total;
+            UpdateModelDownloadRows();
             const double GB = 1024.0 * 1024 * 1024;
             if (total.HasValue && total.Value > 0)
             {
@@ -3181,6 +3226,7 @@ namespace Maui.Demo.Lite
         private void SetBusy(bool busy)
         {
             _busy = busy;
+            UpdateModelDownloadRows();
             _sendButton.IsVisible = !busy;
             _busyIndicator.IsVisible = busy;
             _busyIndicator.IsRunning = busy;

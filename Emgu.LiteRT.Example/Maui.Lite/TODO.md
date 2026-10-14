@@ -5,41 +5,42 @@ Planned work on the MAUI demo's LiteRT-LM chat page (`LiteRtLmChatPage*.cs`).
 Sorted by priority. First what every model depends on - resumable downloads and showing what is downloaded - and
 testing what was built but never run. Then small, visible fixes (the Model section, the app icon), and safety nets
 that make the rest less risky (model-free tests in CI, an agent regression test). Then storage and the platform: a
-Storage page, the next LiteRT-LM release, the GPU on Windows and for the embedding models (which needs that release),
+Storage page, the next LiteRT-LM release, and GPU follow-ups on platforms not yet verified,
 the Pixel Fold freeze, being gentle with phones, background downloads. Then chat features and new agent tools,
 smallest and most useful first - with a hands-free voice mode and a task mode before the tools that act outside the
 app - and last the largest: other system models, MCP, serving the Mac's models to phones, background tasks (which work
 best through that server), and image generation on iOS.
 
-## 1. Resume partial downloads
+## 1. Resume partial downloads — completed (.NET / MAUI)
 
-`FileDownloadManager` (`Emgu.LiteRT.Util`, used by every LiteRT-LM model) writes straight into the model file and deletes
-it when the download is cancelled; a download cut off by the app closing or the phone sleeping leaves a partial file
-under the model's name, which fails the hash check and is downloaded again from the start. A 2.6 GB Gemma 4 download
-stopped at 90% starts over.
+`FileDownloadManager` now keeps `.part` files and strong ETag metadata, resumes with `Range` / `If-Range`,
+checks the expected SHA-256 before publishing the final file, and preserves bytes on cancellation/network failure.
+Servers without a strong ETag restart safely; interrupted legacy final files have no resume metadata and start over.
+The Unity coroutine downloader is separate and is not changed by this MAUI task.
 
-- [ ] Download into `<file>.part` and rename it when complete.
-- [ ] Resume with an HTTP Range request for the missing bytes (Hugging Face supports it; `Emgu.LiteRT.Models`'
-      `RangeDownloader` already does this for Z-Image-Turbo); start over if the server answers 200 instead of 206.
-- [ ] Keep the `.part` file when the download is cancelled, fails or the app closes.
-- [ ] Make sure the bytes come from the same file: pin the URLs to a revision, or keep the server's ETag with the
-      `.part` file and send it as If-Range.
-- [ ] Check the SHA-256 once complete, as now; on a mismatch delete the file and start over.
-- [ ] Demo: a partly downloaded model shows "Download paused · 1.2 of 2.6 GB" with Continue (in its row, item 2, and
-      in the download card).
+- [x] Download into `<file>.part` and rename it when complete.
+- [x] Resume with an HTTP Range request for the missing bytes; start over on 200 instead of appending it.
+- [x] Keep the `.part` file when cancelled, interrupted, or the app closes.
+- [x] Store the strong ETag with the partial file and send it as If-Range; reject inconsistent ranges/validators.
+- [x] Check SHA-256 before publishing; discard checksum failures and retry from zero.
+- [x] Demo: "Download paused · 1.2 of 2.6 GB" and Continue in model rows and the download card.
+- [x] Local HTTP regression tests: interruption/restart, cancellation, progress including retained bytes, ignored ranges,
+      changed validators/checksums, bad ranges, complete partials (416), and publish-after-verification.
+- [x] Real Hugging Face pause/resume probe: resumed from the saved offset; retained prefix matched an already verified
+      model. Windows MAUI build checked; interactive Continue/cancel UI still needs device verification.
 
 ## 2. Show which models are downloaded
 
-Today every row of the model list (the side panel and the phone's model sheet, `BuildModelList`) reads the same way -
-name, then "~2.6 GB download. ..." - whether the file is on the device or not; only selecting a model tells (it loads,
-or a card offers the download).
-
-- [ ] Mark each row: "Downloaded" (a check or device icon) versus "Download · 2.6 GB" (a cloud icon), using
+Chat model rows now show downloaded/downloading/paused state and size. Remaining work is deletion and equivalent
+controls for image/search models.
+- [x] Mark each row with "Downloaded · size on disk" versus "Download · 2.6 GB", using
       `IsDownloaded(option)`, which only looks at the file and never hashes it.
-- [ ] Drop "~2.6 GB download." from the description of downloaded models; show the size on disk instead.
-- [ ] A row for a model that is downloading shows its progress, and a partly downloaded one "Download paused"
+- [ ] Optional device/cloud icons alongside the text download states.
+- [x] Drop "~2.6 GB download." from the description of downloaded models; show the size on disk instead.
+- [x] A row for a model that is downloading shows its progress, and a partly downloaded one "Download paused"
       with its progress (item 1).
-- [ ] Refresh the list when a download finishes, is cancelled or a model is deleted.
+- [x] Refresh status when a download finishes, fails, or is cancelled.
+- [ ] Refresh after model deletion once chat-model deletion is added.
 - [ ] Optionally: delete a downloaded model from its row (with its GPU caches, `*_cache.bin` next to it), asking first.
 - [ ] The same for the image model (Settings > Image generation) and the search model used for documents and photos.
 
@@ -64,10 +65,15 @@ device and fixed or noted:
 In wide windows (desktop, a foldable's inner screen) the side panel shows Chats, Model and Settings
 (`_sidePanel` in `LiteRtLmChatPage.cs`); the model list takes a lot of room.
 
-- [ ] Make the "Model" title a tappable header with a chevron that shows or hides `_sideModelList`.
+- [x] Make CPU Models and GPU Models separately collapsible (implemented in both sheet and sidebar).
+- [ ] Make the outer "Model" title a tappable header with a chevron that shows or hides `_sideModelList`.
 - [ ] When collapsed, show the selected model on the header line (e.g. "Model · Gemma 4 E2B"), so it is still visible.
 - [ ] Remember the state in Preferences.
-- [ ] Phones are unaffected: there the model list opens in a sheet from the model chip.
+- [x] Preserve access from the model chip on phones; the sheet also has collapsible CPU/GPU groups.
+
+The group expansion state is currently retained only while the page is open; the outer Model header, selected-model
+summary when collapsed, Preferences persistence, and device checks remain unfinished.
+
 - [ ] Check on Mac Catalyst and a foldable's inner screen.
 
 ## 5. A new app icon
@@ -131,53 +137,46 @@ LiteRT-LM v0.18.0 is the current pin. The next release brings upstream fixes and
 - [ ] Re-run the model tests, check every model file in the demo still loads and answers correctly (some community files
       broke with v0.18.0), and the agent regression test (item 7).
 
-## 10. GPU on Windows
+## 10. GPU on Windows — core support completed; follow-ups remain
 
-On Windows LiteRT runs on the CPU only: there is no GPU accelerator next to our `libLiteRt.dll`, so Gemma 4 can't use the
-GPU there as it does on Mac Catalyst (Metal) and Android (OpenCL). LiteRT-LM v0.18.0 ships the pieces in
-`LiteRT-LM/prebuilt/windows_x86_64/`: the WebGPU accelerator `libLiteRtWebGpuAccelerator.dll` (LiteRT's GPU on
-Direct3D 12 through Google's Dawn), Dawn itself (`libwebgpu_dawn.dll` / `webgpu_dawn.dll`) and the WebGPU top-k sampler.
+The original prebuilt accelerator did not match our core's private C++ ABI. A reproducible source build now supplies
+matching core/WebGPU/Dawn DLLs. See the [Windows GPU guide](../../platforms/windows/README.windows-gpu.md),
+[investigation](../../platforms/windows/INVESTIGATION.md), and
+[compatibility report](../../platforms/windows/GPU-MODEL-COMPATIBILITY.md) for build pins, packaging and hardware results.
 
-- [ ] Check the plugin works with our `libLiteRt.dll` (built from LiteRT `26895c9f`): `dumpbin /imports` of the plugin
-      against the exports in `litert_windows_exports.def` (add any it needs and is missing), then run MobileNet through
-      `CompiledModel` with `HwAccelerators.Gpu` (a Windows `TestLiteRtMobilenetGpu`) and compare with the CPU.
-- [ ] `bazel_build_litert.ps1` copies the plugin and Dawn to `lib/runtimes/win-x64/native/`, as the macOS and Android
-      scripts do for Metal and OpenCL.
-- [ ] Loading: libLiteRt loads plugins by file name; check Windows finds them next to the app (the DLL search path
-      includes the app folder) or extend `Emgu.LiteRT.Util.AcceleratorPlugins.Load()` to load them by full path as on
-      macOS.
-- [ ] Package: an optional `Emgu.LiteRT.WebGpu.runtime.windows` NuGet package (like `Emgu.LiteRT.Metal.runtime.macos`),
-      depending on `Emgu.LiteRT.runtime.windows`; the demo references it on Windows.
-- [ ] LiteRT-LM: Gemma 4 with `backend: "gpu"` on Windows, with `ActivationDataType.Float32` (fp16 got digits wrong
-      on Metal and OpenCL); the demo's "Use the GPU" setting and the GPU fallback (`_gpuUnavailable`) on Windows too;
-      compare speed and answers with the CPU over a long chat, and record them in `Performance.md`.
-- [ ] The GPU program/weight caches next to the model (as on Android and Mac); delete them when the GPU is turned off.
-- [ ] Known limit: the embedding models stay on the CPU until item 11; Z-Image-Turbo is no faster on a GPU.
-- [ ] Needs a Windows machine with a Direct3D 12 GPU (it can't be tested from the Mac).
+- [x] Build a matching core/WebGPU/Dawn bundle with `bazel_build_windows_gpu.ps1`, isolated from CPU build outputs.
+- [x] Verify plugin discovery beside the Windows app and standalone apphost executables.
+- [x] Package GPU DLLs as optional `Emgu.LiteRT.GPU.runtime.windows`, depending on the matching
+      `Emgu.LiteRT.runtime.windows` core package; the demo references it in GPU builds.
+- [x] Expose verified models in a GPU Models section above CPU Models, replacing the global GPU switch;
+      retain the selected model/backend across restarts and offer explicit CPU fallback on GPU loading failure.
+- [x] Test five chat models on RTX 3070 with FP32 where required; record results and Qwen fixes in the compatibility
+      report. Gemma 4 12B is CPU-only on Windows after GPU image replies failed at 8k and 4k contexts.
+- [x] Retain GPU program/weight caches next to the model across CPU/GPU selection changes (the old proposal to delete
+      them on switching off GPU is superseded).
+- [x] Verify Windows multimodal embedding GPU support (item 11) and investigate Z-Image-Turbo: the complete Windows GPU
+      image-generation pipeline failed compilation; CPU remains available.
+- [x] Build/run the Windows MAUI demo on a Direct3D 12 GPU machine.
+- [ ] Compare MobileNet CPU/GPU outputs in an automated Windows `TestLiteRtMobilenetGpu`.
+- [ ] Long-chat CPU/GPU accuracy and performance comparisons in `Performance.md` beyond the current smoke tests.
 
-## 11. GPU for the embedding models (document and photo search)
+## 11. GPU for the embedding models — Windows completed; Apple/Android pending
 
-The embedding models (`EmbeddingGemma2*`, used for document questions and photo search) run on the CPU only:
-`EmbeddingModel.Init` refuses "gpu", because they crash the process on every prebuilt GPU plugin (Metal on the Mac, OpenCL
-on Android). Their weights are external buffers, which the plugin binds through `WeightLoader`, whose interface changed
-in LiteRT `dd3db3123` ("Make the WeightLoader interface ABI-stable across the accelerator boundary"); LiteRT-LM v0.18.0's
-prebuilt plugins were built after it, our `libLiteRt` (LiteRT `26895c9f`) before (details in CLAUDE.md). On the GPU,
-photo indexing (~5.7 s per photo on a Pixel Fold's CPU, ~1 s on an M1) and document indexing would be much faster.
+Windows now uses a matched source-built core/accelerator pair, avoiding the old prebuilt WeightLoader mismatch.
+Apple/Android still retain the default GPU refusal until their runtimes match. No submodule update was needed for
+the Windows source-built bundle.
 
-- [ ] Blocked until LiteRT-LM releases a version whose `LITERT_REF` contains `dd3db3123` (item 9). As of 2026-10-13 its `main`
-      already pins LiteRT `ca21dc99`, which does; the latest release, v0.18.0, doesn't. Either wait for the next release
-      or move both submodules to a `main` commit (riskier: untested LiteRT-LM, and every native build redone).
-- [ ] Update `LiteRT-LM` and `litert` together (CLAUDE.md, "The `litert` submodule must match LiteRT-LM's LiteRT
-      version"), confirm with `git -C litert merge-base --is-ancestor dd3db3123 HEAD`, and rebuild the natives for
-      macOS, Mac Catalyst, iOS, Android and Windows.
-- [ ] Remove the "gpu" check from `EmbeddingModel.Init`; run `EmbeddingGemma2Multimodal` with `backend: "gpu"` and
-      `VisionBackend = "gpu"` on the Mac (Metal) and a phone (OpenCL): embeddings within cosine 0.99 of the CPU's, the
-      same text, image and audio search results, and the speed per text / image.
-- [ ] A GPU embedding test, skipped without the accelerator plugin (like `TestLiteRtMobilenetGpu`).
-- [ ] Demo: use the GPU for the search model when the chat's "Use the GPU" is on, with a CPU fallback; check that the
-      chat model and the search model can share the GPU's memory on a phone (Gemma 4 E2B already uses ~0.8 GB of GPU
-      caches), and re-time photo and document indexing.
-- [ ] Windows: the same with the WebGPU plugin of item 10.
+- [x] Add an explicit `EmbeddingModel.EnableWindowsWebGpu` opt-in, honored only on Windows; keep other platforms guarded.
+- [x] Test Text Vision 440M and Multimodal 740M on Windows GPU: text/images, plus 740M audio, finite normalized vectors,
+      cosine similarity > 0.997 against CPU, matching retrieval rankings, no Dawn validation errors.
+- [x] Demo: independent embedding model/backend selector with CPU fallback, reload and correct document/photo cache
+      handling. Only multimodal models are offered; Windows GPU entries appear first.
+- [x] Regression test for the default GPU guard and platform restriction; local GPU test harness and results recorded
+      in `platforms/windows/GPU-MODEL-COMPATIBILITY.md`.
+- [ ] Update LiteRT-LM/LiteRT together for matching prebuilt Metal/OpenCL accelerators (item 9); rebuild Apple/Android.
+- [ ] Verify CPU/GPU text/image/audio embeddings and search on Mac and a real Android phone before enabling them.
+- [ ] Add a persistent automated GPU embedding test skipped without the matching accelerator plugin.
+- [ ] Verify simultaneous chat/search GPU memory use and indexing performance on phones.
 
 ## 12. The unexplained Pixel Fold freeze
 
@@ -237,7 +236,11 @@ messages have everything.
 
 - [ ] "Draw it again" with a new seed (a button on the picture, or the model calls the tool again with the same
       description).
-- [ ] Save the picture to Photos / the gallery, and share it (MAUI `Share`).
+- [x] Save the original PNG to a user-selected file from the enlarged image view, including images reopened from saved
+      chats (`CommunityToolkit.Maui.Core` FileSaver). Windows build/startup checked; save-dialog interaction still needs
+      platform verification.
+- [ ] Save the picture to Photos / the gallery.
+- [ ] Share the picture (MAUI `Share`).
 - [ ] Show the description and seed under the picture (tap), so a picture can be made again.
 
 ## 18. Agent tool: create documents (`create_document`)

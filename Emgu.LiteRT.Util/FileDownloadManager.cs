@@ -1,4 +1,4 @@
-﻿//----------------------------------------------------------------------------
+//----------------------------------------------------------------------------
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.       
 //----------------------------------------------------------------------------
 
@@ -11,6 +11,10 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Http;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Globalization;
+using System.Collections.Concurrent;
 
 #if UNITY_EDITOR || UNITY_IOS || UNITY_ANDROID || UNITY_STANDALONE
 using UnityEngine;
@@ -154,7 +158,7 @@ namespace Emgu.LiteRT.Util
         }
 
         /// <summary>
-        /// Download the files, with cancellation. A cancelled download deletes the partly downloaded file. The work
+        /// Download the files, with cancellation. Interrupted downloads retain a .part file for resuming. The work
         /// never resumes on the caller's synchronization context (e.g. a UI thread), and the progress event is raised
         /// on a background thread.
         /// </summary>
@@ -226,51 +230,149 @@ namespace Emgu.LiteRT.Util
             /// <param name="destinationFilePath">The destination file path</param>
             /// <param name="cancellationToken">Cancels the download</param>
             /// <returns>The task</returns>
-            public async Task DownloadFileTaskAsync(string downloadUrl, string destinationFilePath, CancellationToken cancellationToken)
+            public Task DownloadFileTaskAsync(string downloadUrl, string destinationFilePath, CancellationToken cancellationToken)
             {
-                using (var response = await GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false))
-                    await DownloadFileFromHttpResponseMessage(response, destinationFilePath, cancellationToken).ConfigureAwait(false);
+                return DownloadFileTaskAsync(downloadUrl, destinationFilePath, null, cancellationToken);
             }
 
-            private async Task DownloadFileFromHttpResponseMessage(HttpResponseMessage response, string destinationFilePath, CancellationToken cancellationToken)
+            internal async Task DownloadFileTaskAsync(string downloadUrl, string destinationFilePath, string sha256, CancellationToken cancellationToken)
             {
-                response.EnsureSuccessStatusCode();
-
-                var totalBytes = response.Content.Headers.ContentLength;
-
-                using (var contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
-                    await ProcessContentStream(totalBytes, contentStream, destinationFilePath, cancellationToken).ConfigureAwait(false);
-            }
-
-            private async Task ProcessContentStream(long? totalDownloadSize, Stream contentStream, String destinationFilePath, CancellationToken cancellationToken)
-            {
-                var totalBytesRead = 0L;
-                var readCount = 0L;
-                var buffer = new byte[8192];
-                var isMoreToRead = true;
-
-                using (var fileStream = new FileStream(destinationFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+                DownloadableFile file = new DownloadableFile(downloadUrl, null, sha256) { LocalFile = destinationFilePath };
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(destinationFilePath)));
+                while (true)
                 {
-                    do
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string[] metadata = file.ReadResumeMetadata();
+                    EntityTagHeaderValue validator;
+                    long offset = file.PartialDownloadBytes;
+                    bool resume = offset > 0 && metadata != null
+                        && EntityTagHeaderValue.TryParse(metadata[1], out validator) && !validator.IsWeak;
+                    if (!resume) offset = 0;
+                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, downloadUrl))
                     {
-                        var bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
-                        if (bytesRead == 0)
+                        request.Headers.AcceptEncoding.ParseAdd("identity");
+                        if (resume)
                         {
-                            isMoreToRead = false;
-                            TriggerProgressChanged(totalDownloadSize, totalBytesRead);
-                            continue;
+                            request.Headers.Range = new RangeHeaderValue(offset, null);
+                            request.Headers.IfRange = new RangeConditionHeaderValue(EntityTagHeaderValue.Parse(metadata[1]));
                         }
+                        using (HttpResponseMessage response = await SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false))
+                        {
+                            ContentRangeHeaderValue range = response.Content.Headers.ContentRange;
+                            string etag = response.Headers.ETag != null && !response.Headers.ETag.IsWeak ? response.Headers.ETag.ToString() : "";
+                            if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable && resume)
+                            {
+                                // A cancellation can leave all bytes present but not yet verified/published.
+                                if (range != null && range.Unit == "bytes" && range.Length == offset
+                                    && (sha256 != null || etag == metadata[1]))
+                                {
+                                    PublishDownload(file, cancellationToken);
+                                    TriggerProgressChanged(offset, offset);
+                                    return;
+                                }
+                                DiscardPartial(file);
+                                throw new IOException("The server rejected the saved download range. Retry starts a fresh download.");
+                            }
+                            response.EnsureSuccessStatusCode();
+                            foreach (string encoding in response.Content.Headers.ContentEncoding)
+                                if (!String.Equals(encoding, "identity", StringComparison.OrdinalIgnoreCase))
+                                    throw new IOException("Encoded download responses cannot be safely resumed.");
+                            long? total = response.Content.Headers.ContentLength;
+                            long? segmentLength = total;
+                            if (response.StatusCode == HttpStatusCode.PartialContent)
+                            {
+                                long savedLength;
+                                bool changedLength = resume && long.TryParse(metadata[2], out savedLength)
+                                    && range != null && range.Length.HasValue && savedLength != range.Length.Value;
+                                if (range == null || range.Unit != "bytes" || range.From != offset || !range.To.HasValue || range.To.Value < offset
+                                    || !range.Length.HasValue || range.To.Value >= range.Length.Value || changedLength
+                                    || (resume && etag != "" && etag != metadata[1])
+                                    || (segmentLength.HasValue && segmentLength.Value != range.To.Value - offset + 1))
+                                {
+                                    DiscardPartial(file);
+                                    throw new IOException("The server returned an inconsistent download range.");
+                                }
+                                total = range.Length;
+                                segmentLength = range.To.Value - offset + 1;
+                                // A compliant If-Range 206 may omit ETag; retain the strong validator we sent.
+                                if (etag == "" && resume) etag = metadata[1];
+                            }
+                            else if (response.StatusCode == HttpStatusCode.OK)
+                            {
+                                // Range ignored or If-Range did not match: replace, never append, the body.
+                                offset = 0;
+                            }
+                            else throw new IOException("Unexpected download response: " + response.StatusCode);
 
-                        await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken).ConfigureAwait(false);
-
-                        totalBytesRead += bytesRead;
-                        readCount += 1;
-
-                        if (readCount % 100 == 0)
-                            TriggerProgressChanged(totalDownloadSize, totalBytesRead);
+                            long received = offset;
+                            using (FileStream output = new FileStream(file.PartialFile, offset == 0 ? FileMode.Create : FileMode.Append,
+                                FileAccess.Write, FileShare.Read, 81920, true))
+                            {
+                                File.WriteAllLines(file.ResumeMetadataFile, new[] { file.ResumeIdentity, etag,
+                                    total.HasValue ? total.Value.ToString(CultureInfo.InvariantCulture) : "" });
+                                TriggerProgressChanged(total, received);
+                                using (var input = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                                {
+                                    byte[] buffer = new byte[81920];
+                                    long lastProgress = received;
+                                    int count;
+                                    while ((count = await input.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false)) != 0)
+                                    {
+                                        if (segmentLength.HasValue && received - offset + count > segmentLength.Value)
+                                        {
+                                            // Do not retain bytes outside the response's declared range.
+                                            throw new IOException("The server sent more data than the declared download range.");
+                                        }
+                                        await output.WriteAsync(buffer, 0, count, cancellationToken).ConfigureAwait(false);
+                                        received += count;
+                                        if (received - lastProgress >= 819200)
+                                        {
+                                            TriggerProgressChanged(total, received);
+                                            lastProgress = received;
+                                        }
+                                    }
+                                }
+                            }
+                            TriggerProgressChanged(total, received);
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (segmentLength.HasValue && received - offset != segmentLength.Value)
+                                throw new IOException("The download ended before the declared response length.");
+                            if (total.HasValue && received < total.Value)
+                            {
+                                if (etag == "") throw new IOException("An incomplete response has no strong ETag for resuming.");
+                                continue; // The server may send a bounded subset of the requested range.
+                            }
+                            PublishDownload(file, cancellationToken);
+                            return;
+                        }
                     }
-                    while (isMoreToRead);
                 }
+            }
+
+            private static void PublishDownload(DownloadableFile file, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                DownloadableFile candidate = new DownloadableFile(file.Url, null, file.Sha256Hash) { LocalFile = file.PartialFile };
+                if (!candidate.IsLocalFileValid)
+                {
+                    DiscardPartial(file);
+                    throw new InvalidDataException("The completed download did not match its SHA-256 checksum.");
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+                // The old API replaced an existing destination too; never expose an incomplete replacement.
+                if (File.Exists(file.LocalFile)) File.Delete(file.LocalFile);
+                File.Move(file.PartialFile, file.LocalFile);
+                File.Delete(file.LocalFile + ".sha256ok");
+                if (File.Exists(file.PartialFile + ".sha256ok"))
+                    File.Move(file.PartialFile + ".sha256ok", file.LocalFile + ".sha256ok");
+                File.Delete(file.ResumeMetadataFile);
+            }
+
+            private static void DiscardPartial(DownloadableFile file)
+            {
+                File.Delete(file.PartialFile);
+                File.Delete(file.PartialFile + ".sha256ok");
+                File.Delete(file.ResumeMetadataFile);
             }
 
             private void TriggerProgressChanged(long? totalDownloadSize, long totalBytesRead)
@@ -287,63 +389,43 @@ namespace Emgu.LiteRT.Util
 
         }
 
+        private static readonly ConcurrentDictionary<string, SemaphoreSlim> DownloadLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
+
         private static async Task DownloadHelper(
             DownloadableFile downloadableFile,
             int retry,
             DownloadProgressChangedEventHandler onDownloadProgressChanged,
-            CancellationToken cancellationToken
-            )
+            CancellationToken cancellationToken)
         {
-            if (downloadableFile.Url == null)
-                return;
-
-            //uncomment the following line to force re-download every time.
-            //File.Delete(downloadableFile.LocalFile);
-            if (!downloadableFile.IsLocalFileValid)
+            if (downloadableFile.Url == null) return;
+            SemaphoreSlim gate = DownloadLocks.GetOrAdd(Path.GetFullPath(downloadableFile.LocalFile), _ => new SemaphoreSlim(1, 1));
+            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                try
+                if (downloadableFile.IsLocalFileValid) return;
+                // A legacy partial/corrupt final file must not look downloaded in the UI.
+                File.Delete(downloadableFile.LocalFile);
+                File.Delete(downloadableFile.LocalFile + ".sha256ok");
+                for (int attempt = 0; ; attempt++)
                 {
-                    //Download the file
-                    Trace.WriteLine("downloading file from:" + downloadableFile.Url + " to: " + downloadableFile.LocalFile);
-
-                    HttpClientWithProgress downloadClient = new HttpClientWithProgress();
-                    if (onDownloadProgressChanged != null)
-                        downloadClient.DownloadProgressChanged += onDownloadProgressChanged;
-
-                    FileInfo fi = new FileInfo(downloadableFile.LocalFile);
-                    if (!fi.Directory.Exists)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
                     {
-                        fi.Directory.Create();
+                        using (HttpClientWithProgress client = new HttpClientWithProgress())
+                        {
+                            if (onDownloadProgressChanged != null) client.DownloadProgressChanged += onDownloadProgressChanged;
+                            await client.DownloadFileTaskAsync(downloadableFile.Url, downloadableFile.LocalFile,
+                                downloadableFile.Sha256Hash, cancellationToken).ConfigureAwait(false);
+                        }
+                        return;
                     }
-                    await downloadClient.DownloadFileTaskAsync(downloadableFile.Url, downloadableFile.LocalFile, cancellationToken).ConfigureAwait(false);
-
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    // A partly downloaded file can't be resumed.
-                    try { File.Delete(downloadableFile.LocalFile); } catch (Exception) { }
-                    throw;
-                }
-                catch (Exception e)
-                {
-                    if (!downloadableFile.IsLocalFileValid)
-                    {
-                        //The downloaded file may be corrupted, should delete it
-                        File.Delete(downloadableFile.LocalFile);
-                    }
-
-                    if (retry > 0)
-                    {
-                        await DownloadHelper(downloadableFile, retry - 1, onDownloadProgressChanged, cancellationToken).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        Trace.WriteLine(e);
-                        throw;
-                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+                    catch (Exception) when (attempt < retry) { /* Retain bytes and retry with Range/If-Range. */ }
                 }
             }
+            finally { gate.Release(); }
         }
+
 #endif
     }
 

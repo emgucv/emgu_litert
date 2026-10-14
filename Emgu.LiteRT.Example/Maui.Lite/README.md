@@ -133,6 +133,11 @@ the model while retaining the conversation.
 Qwen3.5 loading can take several minutes. See [Windows GPU build instructions](../../platforms/windows/README.windows-gpu.md)
 for output locations, alternate bundle directories, and CPU-only builds.
 
+Model downloads retain their progress when cancelled or interrupted. The picker and download card show
+**Download paused** and **Continue**; resuming uses the server's strong ETag so different file revisions are never
+appended together. Servers without a strong validator restart safely. Completed downloads are checked against
+SHA-256 before becoming model files. Rows also show downloaded state and size on disk.
+
 ## The home page
 
 Like the Emgu CV demo, the home page has two tabs: **LiteRT-LM**, with the chat, and **TF Lite**, with the TensorFlow

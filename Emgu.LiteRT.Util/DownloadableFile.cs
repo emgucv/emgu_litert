@@ -48,6 +48,48 @@ namespace Emgu.LiteRT.Util
             get { return _url; }
         }
 
+        /// <summary>The expected SHA-256, or null when no checksum was supplied.</summary>
+        public String Sha256Hash { get { return _sha256Hash; } }
+
+        /// <summary>The temporary download, published as LocalFile only after verification.</summary>
+        public String PartialFile { get { return LocalFile + ".part"; } }
+
+        /// <summary>Bytes retained from an interrupted download. Does not hash the file.</summary>
+        public long PartialDownloadBytes
+        {
+            get
+            {
+                try { return File.Exists(PartialFile) ? new FileInfo(PartialFile).Length : 0; }
+                catch (IOException) { return 0; }
+                catch (UnauthorizedAccessException) { return 0; }
+            }
+        }
+
+        /// <summary>The total download size recorded by the server, if known.</summary>
+        public long? PartialDownloadTotalBytes
+        {
+            get
+            {
+                String[] metadata = ReadResumeMetadata();
+                long length;
+                return metadata != null && long.TryParse(metadata[2], out length) && length > 0 ? (long?)length : null;
+            }
+        }
+
+        internal String ResumeMetadataFile { get { return PartialFile + ".etag"; } }
+        internal String ResumeIdentity { get { return Convert.ToBase64String(Encoding.UTF8.GetBytes(Url ?? "")) + "|" + _sha256Hash; } }
+
+        internal String[] ReadResumeMetadata()
+        {
+            try
+            {
+                String[] lines = File.ReadAllLines(ResumeMetadataFile);
+                return lines.Length == 3 && lines[0] == ResumeIdentity ? lines : null;
+            }
+            catch (IOException) { return null; }
+            catch (UnauthorizedAccessException) { return null; }
+        }
+
         private static String ByteArrayToString(byte[] array)
         {
             StringBuilder sb = new StringBuilder();
