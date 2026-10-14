@@ -982,7 +982,6 @@ namespace Maui.Demo.Lite
             if (_selectedGpu) _gpuModelsExpanded = true;
             else _cpuModelsExpanded = true;
             _gpuUnavailable = false;
-            try { Preferences.Default.Set(BackendPreference, _selectedGpu); } catch (Exception) { }
             _modelChipLabel.Text = option.Name + (_selectedGpu ? " · GPU" : " · CPU");
             RefreshModelList();
             _talkButton.IsVisible = option.AcceptsAudio;
@@ -996,6 +995,8 @@ namespace Maui.Demo.Lite
                     RemovePending(attachment);
             if (_pageStarted)
             {
+                // Constructor UI setup must not overwrite the saved backend before OnAppearing restores it.
+                try { Preferences.Default.Set(BackendPreference, _selectedGpu); } catch (Exception) { }
                 try { Preferences.Default.Set(LastModelPreference, option.Choice.ToString()); } catch (Exception) { }
                 _ = PrepareModelAsync(false);
             }
