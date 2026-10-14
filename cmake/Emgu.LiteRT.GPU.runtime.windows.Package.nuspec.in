@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>${EMGU_LITERT_GPU_WINDOWS_NUGET_ID}</id>
+    <title>GPU (WebGPU / Direct3D 12) runtime of Emgu LiteRT for Windows x64</title>
+    <version>${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+    <license type="file">${EMGU_LITERT_LICENSE_FILE}</license>
+    <projectUrl>${EMGUTF_MAIN_WEB_URL}</projectUrl>
+    <repository type="git" url="${GITHUB_REPO_URL}" />
+    <icon>icon.png</icon>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>Optional Windows x64 GPU runtime for Emgu LiteRT and LiteRT-LM. Includes the matching LiteRT core, WebGPU accelerator, Dawn Direct3D 12 backend, and shader compiler DLLs. Supports desktop and Windows MAUI apps. GPU inference requires a compatible Direct3D 12 GPU; LiteRT-LM token sampling remains on CPU.</description>
+    <readme>docs/README.md</readme>
+    <dependencies>
+      <dependency id="${EMGU_LITERT_NUGET_ID}" version="[${CPACK_PACKAGE_DEPENDENCY_VERSION}${TENSORFLOW_VERSION_SUFFIX}]" />
+      <dependency id="${EMGU_WINDOWS_MSVCRT_X64_NUGET_ID}" version="${EMGU_WINDOWS_MSVCRT_VERSION}" />
+    </dependencies>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+    <tags>litert litert-lm emgu gpu webgpu direct3d windows</tags>
+  </metadata>
+  <files>
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/libLiteRt.dll" target="runtimes/win-x64/native" />
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/libLiteRtWebGpuAccelerator.dll" target="runtimes/win-x64/native" />
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/webgpu_dawn.dll" target="runtimes/win-x64/native" />
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/dxcompiler.dll" target="runtimes/win-x64/native" />
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/dxil.dll" target="runtimes/win-x64/native" />
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/d3dcompiler_47.dll" target="runtimes/win-x64/native" />
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/gpu-build.json" target="docs" />
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/licenses/LiteRT.txt" target="docs/licenses" />
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/licenses/ML-Drift.txt" target="docs/licenses" />
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/licenses/Dawn.txt" target="docs/licenses" />
+    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/licenses/DXC.txt" target="docs/licenses" />
+    <file src="Emgu.LiteRT.GPU.runtime.windows.targets" target="buildTransitive" />
+    <file src="../../../${EMGU_LITERT_LICENSE_FILE}" target="" />
+    <file src="../../../miscellaneous/nuget_icon.png" target="icon.png" />
+    <file src="README.md" target="docs" />
+  </files>
+</package>

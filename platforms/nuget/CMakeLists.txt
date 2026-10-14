@@ -22,6 +22,10 @@ IF(HAVE_OSX_LITE)
   add_subdirectory(Emgu.LiteRT.Metal.runtime.macos)
 ENDIF()
 
+IF(HAVE_WINDOWS_LITERT_GPU)
+  add_subdirectory(Emgu.LiteRT.GPU.runtime.windows)
+ENDIF()
+
 #IF ( HAVE_ANDROID_LITE )
 #  add_subdirectory(Emgu.LiteRT.runtime.xamarin.android)
 #ENDIF()

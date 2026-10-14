@@ -70,6 +70,7 @@ namespace Maui.Demo.Lite
             // Gemma4 uses 32-bit activations on the GPU - see Performance.md.
             public bool GpuOnAndroid;
             public bool GpuOnMac;
+            public bool GpuOnWindows;
             // The model file (to tell whether it is downloaded) and its download size, for the download prompt.
             public DownloadableFile File;
             public string Size;
@@ -117,7 +118,7 @@ namespace Maui.Demo.Lite
             new ModelOption { Name = "Qwen3 0.6B", File = Qwen3.ModelFile, Size = "350 MB", Detail = "~350 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
             new ModelOption { Name = "Qwen3.5 0.8B", File = Qwen35_0_8B_VL.ModelFile, Size = "1.3 GB", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
             new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B, CanSummarize = true },
-            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnAndroid = true, GpuOnMac = true },
+            new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnAndroid = true, GpuOnMac = true, GpuOnWindows = true },
             new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnMac = true },
 #if MACCATALYST
             // Desktop only: ~8 GB of memory, and practical on a GPU only (Mac Catalyst has LiteRT's Metal accelerator).
@@ -421,9 +422,12 @@ namespace Maui.Demo.Lite
                 VerticalOptions = LayoutOptions.Center
             }, 0, 0);
             readAloudRow.Add(_readAloudSwitch, 1, 0);
-            bool useGpu = true;
-            try { useGpu = Preferences.Default.Get(UseGpuPreference, true); } catch (Exception) { }
+            bool useGpu = DeviceInfo.Platform != DevicePlatform.WinUI;
+            try { useGpu = Preferences.Default.Get(UseGpuPreference, useGpu); } catch (Exception) { }
             _useGpuSwitch = new Switch { IsToggled = useGpu, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+#if WINDOWS && !WINDOWS_WEBGPU
+            _useGpuSwitch.IsEnabled = false;
+#endif
             _useGpuSwitch.Toggled += OnUseGpuToggled;
             var gpuRow = new Grid
             {
@@ -546,14 +550,18 @@ namespace Maui.Demo.Lite
                     Theme.Divider(),
                     readAloudRow,
                     Theme.Divider(),
-#if ANDROID || MACCATALYST
+#if ANDROID || MACCATALYST || WINDOWS
                     gpuRow,
                     new Label
                     {
 #if ANDROID
                         Text = "Gemma 4 E2B answers many times faster on the GPU. Its first load there takes about 30 s and keeps a ~0.8 GB cache next to the model; turning this off deletes it.",
-#else
+#elif MACCATALYST
                         Text = "Gemma 4 answers several times faster on the Mac's GPU. The first load of a model there takes longer and keeps a cache next to the model; turning this off deletes it.",
+#elif WINDOWS_WEBGPU
+                        Text = "Use the GPU for Gemma 4 E2B. Other models use the CPU. Switching reloads the model and keeps the conversation. The first GPU load takes longer; a compatible Direct3D 12 GPU is required.",
+#else
+                        Text = "GPU support is not included in this build. Models use the CPU.",
 #endif
                         FontFamily = Theme.BodyFont,
                         FontSize = 12,
@@ -1181,6 +1189,8 @@ namespace Maui.Demo.Lite
             return option.GpuOnAndroid;
 #elif MACCATALYST
             return option.GpuOnMac;
+#elif WINDOWS_WEBGPU
+            return option.GpuOnWindows;
 #else
             return false;
 #endif
@@ -1189,6 +1199,8 @@ namespace Maui.Demo.Lite
         private void OnUseGpuToggled(object sender, ToggledEventArgs e)
         {
             try { Preferences.Default.Set(UseGpuPreference, e.Value); } catch (Exception) { }
+            if (e.Value)
+                _gpuUnavailable = false;
             // Reload the selected model on the other backend (the chat continues); turning it off deletes the GPU cache
             // once the model is loaded on the CPU.
             if (_pageStarted && HasGpu(SelectedOption))
@@ -3154,6 +3166,9 @@ namespace Maui.Demo.Lite
         private void SetBusy(bool busy)
         {
             _busy = busy;
+#if !WINDOWS || WINDOWS_WEBGPU
+            _useGpuSwitch.IsEnabled = !busy && !_reloadingCpuThreads;
+#endif
             _sendButton.IsVisible = !busy;
             _busyIndicator.IsVisible = busy;
             _busyIndicator.IsRunning = busy;

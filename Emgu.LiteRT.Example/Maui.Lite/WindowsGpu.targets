@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <WindowsGpuRuntimeDirectory Condition="'$(WindowsGpuRuntimeDirectory)' == ''">$(MSBuildThisFileDirectory)..\..\.tmp\wgpu\artifacts</WindowsGpuRuntimeDirectory>
+    <EnableWindowsGpu Condition="'$(EnableWindowsGpu)' == '' and Exists('$(WindowsGpuRuntimeDirectory)\gpu-build.json')">true</EnableWindowsGpu>
+    <DefineConstants Condition="'$(EnableWindowsGpu)' == 'true'">$(DefineConstants);WINDOWS_WEBGPU</DefineConstants>
+    <!-- Keep GPU and CPU builds apart so incremental builds cannot leave a stale accelerator beside another core. -->
+    <OutputPath Condition="'$(EnableWindowsGpu)' == 'true'">bin\$(Configuration)\webgpu\</OutputPath>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(EnableWindowsGpu)' == 'true'">
+    <PackageReference Include="Emgu.LiteRT.GPU.runtime.windows" Version="$(WindowsGpuRuntimePackageVersion)" />
+  </ItemGroup>
+</Project>

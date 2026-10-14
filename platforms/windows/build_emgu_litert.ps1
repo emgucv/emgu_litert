@@ -14,6 +14,10 @@
 .PARAMETER NugetFlag
     Pass "nuget" to also build the NuGet package - matches the .bat's %2.
 
+.PARAMETER GpuBundleDirectory
+    Optional Windows WebGPU bundle directory. Defaults to .tmp/wgpu/artifacts;
+    a validated gpu-build.json enables the Emgu.LiteRT.GPU.runtime.windows package.
+
 .PARAMETER PackageFlag
     Pass "package" to also build the CPack zip package - matches the .bat's %3.
 
@@ -23,7 +27,8 @@
 param(
     [Parameter(Position = 0)][string]$DocFlag = "",
     [Parameter(Position = 1)][string]$NugetFlag = "",
-    [Parameter(Position = 2)][string]$PackageFlag = ""
+    [Parameter(Position = 2)][string]$PackageFlag = "",
+    [string]$GpuBundleDirectory = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -42,6 +47,8 @@ Set-Location (Join-Path $ScriptDir "..\..")
 
 $HasTfLite = (Test-Path "lib\runtimes\win-x86\native\tfliteextern.dll") -or (Test-Path "lib\runtimes\win-x64\native\tfliteextern.dll")
 $HasLitertLm = Test-Path "lib\runtimes\win-x64\native\liblitert-lm.dll"
+if (!$GpuBundleDirectory) { $GpuBundleDirectory = Join-Path (Get-Location) '.tmp/wgpu/artifacts' }
+$GpuBundleDirectory = [IO.Path]::GetFullPath($GpuBundleDirectory)
 
 # If we're a 32-bit process on 64-bit Windows, PROCESSOR_ARCHITEW6432 is set.
 $Arch = $env:PROCESSOR_ARCHITECTURE
@@ -130,6 +137,7 @@ if ($Devenv -eq $VS2026) { $CmakeConf = @("Visual Studio 18") + $BuildArch }
 
 # build EMGU TF
 $CmakeConfFlags = @()
+$CmakeConfFlags += "-DEMGU_WINDOWS_GPU_BUNDLE_DIR:PATH=$GpuBundleDirectory"
 if ($DocFlag -eq "doc") { $CmakeConfFlags += "-DEMGU_LITERT_DOCUMENTATION_BUILD:BOOL=TRUE" }
 
 if (-not (Test-Path "b")) { New-Item -ItemType Directory -Path "b" | Out-Null }
@@ -166,6 +174,10 @@ if ($DocFlag -eq "doc") {
 
 $DoMoveNuget = $false
 if ($NugetFlag -eq "nuget") {
+    if (Test-Path (Join-Path $GpuBundleDirectory 'gpu-build.json')) {
+        $CmakeBuildTarget2 += 'Emgu.LiteRT.GPU.runtime.windows.nuget'
+        $DoMoveNuget = $true
+    }
     if ($HasTfLite) {
         $CmakeBuildTarget2 += "Emgu.LiteRT.runtime.windows.nuget"
         # tfliteextern.dll's own package, depending on the libLiteRt one above.

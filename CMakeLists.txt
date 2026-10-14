@@ -1195,6 +1195,24 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.Package.READ
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/README.md)
 
+# WebGPU needs the core and accelerator built together; keep this bundle isolated
+# from the ordinary CPU native output and validate it before packaging.
+SET(EMGU_LITERT_GPU_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.GPU.runtime.windows")
+SET(EMGU_WINDOWS_GPU_BUNDLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.tmp/wgpu/artifacts" CACHE PATH "Source-built Windows WebGPU bundle")
+SET(HAVE_WINDOWS_LITERT_GPU OFF)
+IF(WIN32 AND EXISTS "${EMGU_WINDOWS_GPU_BUNDLE_DIR}/gpu-build.json")
+  EXECUTE_PROCESS(COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+    "${CMAKE_CURRENT_SOURCE_DIR}/platforms/windows/validate_windows_gpu.ps1"
+    -BundleDirectory "${EMGU_WINDOWS_GPU_BUNDLE_DIR}"
+    RESULT_VARIABLE EMGU_GPU_VALIDATE_RESULT)
+  IF(NOT EMGU_GPU_VALIDATE_RESULT EQUAL 0)
+    MESSAGE(FATAL_ERROR "Windows GPU bundle validation failed; rebuild it with bazel_build_windows_gpu.ps1")
+  ENDIF()
+  SET(HAVE_WINDOWS_LITERT_GPU ON)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.GPU.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.GPU.runtime.windows/Package.nuspec)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.GPU.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.GPU.runtime.windows/README.md)
+ENDIF()
+
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.windows/README.md)
 

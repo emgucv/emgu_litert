@@ -49,6 +49,7 @@ Directory.Build.props
 /platforms/nuget/Emgu.TF.Lite.runtime.windows/README.md
 /platforms/nuget/Emgu.LiteRT.LM.runtime.windows/README.md
 /platforms/nuget/Emgu.LiteRT.Metal.runtime.macos/README.md
+/platforms/nuget/Emgu.LiteRT.GPU.runtime.windows/README.md
 
 # NuGet packages produced by the build
 /platforms/nuget/*.nupkg

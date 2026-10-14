@@ -293,6 +293,13 @@ alias(name = "libdawn_proc", actual = ":webgpu_dawn")
         artifacts = @($artifacts)
     }
     Write-Utf8 (Join-Path $OutputDirectory 'gpu-build.json') ($manifest | ConvertTo-Json -Depth 5)
+    # Native source license notices are shipped alongside the DLL bundle.
+    $licenseOutput = Join-Path $OutputDirectory 'licenses'
+    New-Item -ItemType Directory -Force -Path $licenseOutput | Out-Null
+    foreach ($notice in @(@($sourceLiteRt, 'LiteRT'), @($sourceDrift, 'ML-Drift'), @($sourceDawn, 'Dawn'))) {
+        Copy-Item -LiteralPath (Join-Path $notice[0] 'LICENSE') -Destination (Join-Path $licenseOutput ($notice[1] + '.txt')) -Force
+    }
+    Copy-Item -LiteralPath (Join-Path $sourceDawn 'third_party/directx-shader-compiler/LICENSE') -Destination (Join-Path $licenseOutput 'DXC.txt') -Force
     Write-Host "Windows GPU build completed: $OutputDirectory"
 } finally {
     Pop-Location

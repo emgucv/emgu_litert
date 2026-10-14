@@ -131,4 +131,5 @@
 			<_FileNativeReference Include="@(_EmguUniqueFileNativeReference)" />
 		</ItemGroup>
 	</Target>
+    <Import Project="WindowsGpu.targets" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
 </Project>

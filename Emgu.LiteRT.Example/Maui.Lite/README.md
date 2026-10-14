@@ -124,6 +124,13 @@ platforms\windows\build_emgu_litert.ps1 "" nuget
 dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-windows10.0.22621.0 -t:Run
 ```
 
+For GPU chat on Windows, first build the matching runtime bundle with
+`platforms/windows/bazel_build_windows_gpu.ps1`. The demo includes that bundle
+automatically, and Chat → Settings → **Use the GPU** enables GPU inference for
+**Gemma 4 E2B**. Switching reloads the model while retaining the conversation;
+other models continue on CPU. See [Windows GPU build instructions](../../platforms/windows/README.windows-gpu.md)
+for output locations, alternate bundle directories, and CPU-only builds.
+
 ## The home page
 
 Like the Emgu CV demo, the home page has two tabs: **LiteRT-LM**, with the chat, and **TF Lite**, with the TensorFlow
