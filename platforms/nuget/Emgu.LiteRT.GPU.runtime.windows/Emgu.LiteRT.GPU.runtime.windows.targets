@@ -3,21 +3,20 @@
     <EmguWindowsGpuBundle>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\runtimes\win-x64\native\'))</EmguWindowsGpuBundle>
   </PropertyGroup>
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' or ('$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows')))">
-    <Content Include="$(EmguWindowsGpuBundle)libLiteRt.dll;$(EmguWindowsGpuBundle)libLiteRtWebGpuAccelerator.dll;$(EmguWindowsGpuBundle)webgpu_dawn.dll;$(EmguWindowsGpuBundle)dxcompiler.dll;$(EmguWindowsGpuBundle)dxil.dll;$(EmguWindowsGpuBundle)d3dcompiler_47.dll">
+    <Content Include="$(EmguWindowsGpuBundle)libLiteRtWebGpuAccelerator.dll;$(EmguWindowsGpuBundle)webgpu_dawn.dll;$(EmguWindowsGpuBundle)dxcompiler.dll;$(EmguWindowsGpuBundle)dxil.dll;$(EmguWindowsGpuBundle)d3dcompiler_47.dll">
       <Link>%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <CopyToPublishDirectory>Always</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
-  <!-- Deploy the complete matching bundle together, even if another runtime
-       package wins NuGet's duplicate-native-asset resolution for libLiteRt.dll. -->
+  <!-- Keep the five plugin dependencies together beside the application. -->
   <Target Name="EmguSelectWindowsGpuRuntime" BeforeTargets="AssignTargetPaths" AfterTargets="ResolvePackageAssets"
           Condition="'$(RuntimeIdentifier)' == 'win-x64' or ('$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows')))">
     <ItemGroup>
-      <RuntimeCopyLocalItems Remove="@(RuntimeCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'libLiteRt.dll' or '%(NuGetPackageId)' == 'Emgu.LiteRT.GPU.runtime.windows'" />
-      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'libLiteRt.dll' or '%(NuGetPackageId)' == 'Emgu.LiteRT.GPU.runtime.windows'" />
-      <RuntimeTargetsCopyLocalItems Remove="@(RuntimeTargetsCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'libLiteRt.dll' or '%(NuGetPackageId)' == 'Emgu.LiteRT.GPU.runtime.windows'" />
-      <Content Remove="@(Content)" Condition="('%(Filename)%(Extension)' == 'libLiteRt.dll' and '%(FullPath)' != '$(EmguWindowsGpuBundle)libLiteRt.dll') or '%(Filename)%(Extension)' == 'libLiteRtTopKWebGpuSampler.dll'" />
+      <RuntimeCopyLocalItems Remove="@(RuntimeCopyLocalItems)" Condition="'%(NuGetPackageId)' == 'Emgu.LiteRT.GPU.runtime.windows'" />
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)" Condition="'%(NuGetPackageId)' == 'Emgu.LiteRT.GPU.runtime.windows'" />
+      <RuntimeTargetsCopyLocalItems Remove="@(RuntimeTargetsCopyLocalItems)" Condition="'%(NuGetPackageId)' == 'Emgu.LiteRT.GPU.runtime.windows'" />
+      <Content Remove="@(Content)" Condition="'%(Filename)%(Extension)' == 'libLiteRtTopKWebGpuSampler.dll'" />
     </ItemGroup>
   </Target>
 </Project>

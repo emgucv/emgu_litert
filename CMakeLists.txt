@@ -299,28 +299,7 @@ ELSEIF(HAVE_WINDESKTOP_X64_LITE)
     SET(WINDESKTOP_LITE_LABEL "-windesktop_x64")
 ENDIF()   
   
-# The Windows build scripts record the tflite_with_xnnpack define (TFLITE_ENABLE_XNNPACK for
-# the CMake build) next to tfliteextern.dll. XNNPACK's sources are compiled either way, so the
-# Bazel output folder can't tell whether it was enabled.
-SET(TFLITE_WITH_XNNPACK_MARKER "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/tflite_with_xnnpack.txt")
-SET(EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK_DEFAULT OFF)
-IF(HAVE_WINDESKTOP_X64_LITE AND EXISTS "${TFLITE_WITH_XNNPACK_MARKER}")
-  FILE(READ "${TFLITE_WITH_XNNPACK_MARKER}" TFLITE_WITH_XNNPACK_VALUE)
-  STRING(STRIP "${TFLITE_WITH_XNNPACK_VALUE}" TFLITE_WITH_XNNPACK_VALUE)
-  STRING(TOLOWER "${TFLITE_WITH_XNNPACK_VALUE}" TFLITE_WITH_XNNPACK_VALUE)
-  IF("${TFLITE_WITH_XNNPACK_VALUE}" STREQUAL "true")
-    SET(EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK_DEFAULT ON)
-  ENDIF()
-ENDIF()
-OPTION(EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK "The Windows x64 tfliteextern.dll is built with tflite_with_xnnpack=true" ${EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK_DEFAULT})
-MESSAGE(STATUS "EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK: ${EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK}")
-
-IF(HAVE_WINDESKTOP_X64_LITE AND EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK)
-  SET(HAVE_WINDESKTOP_X64_LITE_XNN ON)
-  SET(WINDESKTOP_LITE_LABEL "${WINDESKTOP_LITE_LABEL}_xnn")
-ENDIF()
-
-# Same for Ubuntu: platforms/ubuntu/24.04/bazel_build_tflite records the tflite_with_xnnpack
+# Ubuntu's build script records the tflite_with_xnnpack
 # define next to libtfliteextern.so.
 SET(UBUNTU_LITE_LABEL "")
 SET(EMGU_TF_LITE_UBUNTU_XNNPACK_DEFAULT OFF)
@@ -584,10 +563,20 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   SET(EMGU_LITERT_MODELS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Models")
   SET(EMGU_LITERT_MODELS_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Models")
 
-  SET(EMGU_LITERT_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.windows")  
-  IF (HAVE_WINDESKTOP_X64_LITE_XNN)
-    SET(EMGU_LITERT_WINDOWS_NUGET_ID "${EMGU_LITERT_WINDOWS_NUGET_ID}.xnn")  
+  # Select the paired core before configuring dependent runtime package IDs.
+  SET(EMGU_LITERT_GPU_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.GPU.runtime.windows")
+  SET(EMGU_WINDOWS_GPU_BUNDLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.tmp/wgpu/artifacts" CACHE PATH "Source-built Windows WebGPU bundle")
+  SET(HAVE_WINDOWS_LITERT_GPU OFF)
+  IF(WIN32 AND EXISTS "${EMGU_WINDOWS_GPU_BUNDLE_DIR}/gpu-build.json")
+    EXECUTE_PROCESS(COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+      "${CMAKE_CURRENT_SOURCE_DIR}/platforms/windows/validate_windows_gpu.ps1"
+      -BundleDirectory "${EMGU_WINDOWS_GPU_BUNDLE_DIR}" RESULT_VARIABLE EMGU_GPU_VALIDATE_RESULT)
+    IF(NOT EMGU_GPU_VALIDATE_RESULT EQUAL 0)
+      MESSAGE(FATAL_ERROR "Windows GPU bundle validation failed; rebuild it with bazel_build_windows_gpu.ps1")
+    ENDIF()
+    SET(HAVE_WINDOWS_LITERT_GPU ON)
   ENDIF()
+  SET(EMGU_LITERT_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.windows")
   #IF ("${LICENSE_TYPE}" STREQUAL "Commercial")
   #  SET(EMGU_LITERT_WINDOWS_NUGET_ID "${EMGU_LITERT_WINDOWS_NUGET_ID}-CR")  
   #ENDIF()
@@ -886,9 +875,13 @@ IF (HAVE_WINDESKTOP_LITE)
   # (cmake_build_litert.ps1) only ever produces tfliteextern.dll. Guard on EXISTS, the same way
   # the macOS packaging below treats libLiteRt.dylib as optional, so a CMake-only build doesn't
   # fail to pack ${EMGU_LITERT_WINDOWS_NUGET_ID} over a file that was never built.
-  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/libLiteRt.dll")
+  SET(EMGU_WINDOWS_LITERT_CORE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/libLiteRt.dll")
+  IF(HAVE_WINDOWS_LITERT_GPU)
+    SET(EMGU_WINDOWS_LITERT_CORE_FILE "${EMGU_WINDOWS_GPU_BUNDLE_DIR}/libLiteRt.dll")
+  ENDIF()
+  IF(EXISTS "${EMGU_WINDOWS_LITERT_CORE_FILE}")
   SET(EMGU_LITERT_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_WINDOWS_NUGET_FILE_LIST}
-    <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libLiteRt.dll\" target=\"runtimes\\win-x64\\native\" />
+    <file src=\"${EMGU_WINDOWS_LITERT_CORE_FILE}\" target=\"runtimes\\win-x64\\native\" />
 	")
   ENDIF()
   SET(EMGU_TFLITE_WINDOWS_NUGET_FILE_LIST "${EMGU_TFLITE_WINDOWS_NUGET_FILE_LIST}
@@ -922,6 +915,12 @@ IF (HAVE_WINDESKTOP_LITE)
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"README.md\" target=\"docs\\\" />")
+  IF(HAVE_WINDOWS_LITERT_GPU)
+    SET(EMGU_LITERT_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_WINDOWS_NUGET_FILE_LIST}
+    <file src=\"Emgu.LiteRT.runtime.windows.targets\" target=\"buildTransitive\" />
+    <file src=\"${EMGU_WINDOWS_GPU_BUNDLE_DIR}/gpu-build.json\" target=\"docs\" />
+    <file src=\"${EMGU_WINDOWS_GPU_BUNDLE_DIR}/licenses/LiteRT.txt\" target=\"docs/licenses\" />")
+  ENDIF()
   SET(EMGU_LITERT_WINDOWS_NUGET_DEPENDENCY "
     <dependencies>
 	    ${EMGU_LITERT_WINDOWS_NUGET_DEPENDENCY}
@@ -1195,20 +1194,7 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.Package.READ
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/README.md)
 
-# WebGPU needs the core and accelerator built together; keep this bundle isolated
-# from the ordinary CPU native output and validate it before packaging.
-SET(EMGU_LITERT_GPU_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.GPU.runtime.windows")
-SET(EMGU_WINDOWS_GPU_BUNDLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.tmp/wgpu/artifacts" CACHE PATH "Source-built Windows WebGPU bundle")
-SET(HAVE_WINDOWS_LITERT_GPU OFF)
-IF(WIN32 AND EXISTS "${EMGU_WINDOWS_GPU_BUNDLE_DIR}/gpu-build.json")
-  EXECUTE_PROCESS(COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
-    "${CMAKE_CURRENT_SOURCE_DIR}/platforms/windows/validate_windows_gpu.ps1"
-    -BundleDirectory "${EMGU_WINDOWS_GPU_BUNDLE_DIR}"
-    RESULT_VARIABLE EMGU_GPU_VALIDATE_RESULT)
-  IF(NOT EMGU_GPU_VALIDATE_RESULT EQUAL 0)
-    MESSAGE(FATAL_ERROR "Windows GPU bundle validation failed; rebuild it with bazel_build_windows_gpu.ps1")
-  ENDIF()
-  SET(HAVE_WINDOWS_LITERT_GPU ON)
+IF(HAVE_WINDOWS_LITERT_GPU)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.GPU.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.GPU.runtime.windows/Package.nuspec)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.GPU.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.GPU.runtime.windows/README.md)
 ENDIF()

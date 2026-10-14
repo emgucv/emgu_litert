@@ -86,6 +86,7 @@ namespace Maui.Demo.Lite
                 Spacing = 6,
                 Children =
                 {
+                    BuildImageModelSelector(),
                     row,
                     new Label
                     {

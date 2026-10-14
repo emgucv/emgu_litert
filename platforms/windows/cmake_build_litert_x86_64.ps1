@@ -6,4 +6,4 @@
 .EXAMPLE
     .\cmake_build_litert_x86_64.ps1
 #>
-& (Join-Path $PSScriptRoot "cmake_build_litert.ps1") 64 xnn
+& (Join-Path $PSScriptRoot "cmake_build_litert.ps1") 64

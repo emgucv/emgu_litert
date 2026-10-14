@@ -18,6 +18,18 @@ use a fresh build directory after updating and validating the patches.
 
 ## Prerequisites
 
+Windows runtime packages use the ID `Emgu.LiteRT.runtime.windows` without an
+`.xnn` suffix. Windows builds no longer generate or read `tflite_with_xnnpack.txt`.
+The CMake wrapper also defaults to XNNPACK (`cmake_build_litert.ps1 64`); its
+existing `no_xnn` argument remains available as an explicit opt-out.
+
+The ordinary Windows Bazel build now uses `bazel_build_litert.ps1 64`, with no
+XNNPACK flags; upstream enables the TFLite default delegate. Use
+`bazel_build_litert.ps1 64 -DisableXnn` to pass `tflite_with_xnnpack=false`.
+This opt-out also disables LiteRT's built-in CPU accelerator in the pinned source.
+The separate GPU build script continues to enable its validated
+XNNPACK configuration explicitly.
+
 - Windows x64.
 - Git for Windows, including Bash.
 - Bazel **7.6.1** or Bazelisk, which selects the workspace's pinned version.
@@ -57,29 +69,36 @@ still needed for chat. This script does not build managed code.
 
 The script's default output is isolated; it does not replace
 `lib/runtimes/win-x64/native`. Treat the bundle as the source-build candidate
-documented in [INVESTIGATION.md](INVESTIGATION.md). Other model families still
-need validation before enabling their Windows GPU backend.
+documented in [INVESTIGATION.md](INVESTIGATION.md). Results for the Windows chat
+catalog are in [GPU-MODEL-COMPATIBILITY.md](GPU-MODEL-COMPATIBILITY.md).
 
 ## NuGet package
 
-The validated six-DLL bundle is packaged as **Emgu.LiteRT.GPU.runtime.windows**,
-along with its build manifest and targets that select the matching LiteRT core
-when CPU runtime packages are also referenced. The package supports Windows x64
-desktop and MAUI applications, depends on the managed `Emgu.LiteRT` package and
-x64 MSVC runtime, and excludes the optional GPU sampler.
+The validated source bundle produces two packages:
+
+- **Emgu.LiteRT.runtime.windows** contains the matching `libLiteRt.dll`, including
+  XNNPACK CPU support. It can run CPU inference without the GPU add-on.
+- **Emgu.LiteRT.GPU.runtime.windows** contains the five GPU DLLs and depends on
+  the exact version of the core package. It excludes the core and optional GPU sampler.
+
+Both support Windows x64 desktop and MAUI applications. Their build targets
+deploy the core and optional plugins beside the executable and select the paired
+core over legacy XNN runtime assets. The ordinary native files in `lib/` are not replaced.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File platforms/windows/build_emgu_litert.ps1 -NugetFlag nuget
 ```
 
-This produces `platforms/nuget/Emgu.LiteRT.GPU.runtime.windows.<version>.nupkg`
+This produces both packages under `platforms/nuget/`
 when `.tmp/wgpu/artifacts/gpu-build.json` exists. Use `-GpuBundleDirectory <path>`
 for a custom source bundle. CMake validates source revisions and DLL checksums
 at configure and before each package build. Without a GPU bundle, CPU packages
 continue to build and the GPU package target is omitted.
 
-The equivalent CMake option is `-DEMGU_WINDOWS_GPU_BUNDLE_DIR=<path>`; the target
-is `Emgu.LiteRT.GPU.runtime.windows.nuget`.
+The equivalent CMake option is `-DEMGU_WINDOWS_GPU_BUNDLE_DIR=<path>`; the targets
+are `Emgu.LiteRT.runtime.windows.nuget` and `Emgu.LiteRT.GPU.runtime.windows.nuget`.
+The GPU target builds its core package first. TF Lite and LiteRT-LM runtime
+packages generated in the same build also depend on that paired core.
 
 ## Windows MAUI chat
 
@@ -101,10 +120,9 @@ build, or `-p:EnableWindowsGpu=true` to require the GPU package even when the
 source bundle is not on this machine. The CPU-only build displays the GPU setting as unavailable. The Debug
 GPU executable is `Emgu.LiteRT.Example/Maui.Lite/bin/Debug/webgpu/net10.0-windows10.0.22621.0/win-x64/Maui.Demo.Lite.exe`.
 
-In Chat → Settings, enable **Use the GPU**, then select **Gemma 4 E2B**.
+In Chat → Settings, enable **Use the GPU**, then select any of the five chat models.
 Windows defaults to CPU until this setting is enabled. Switching backend reloads
-the model and retains the conversation. Qwen and Gemma 4 E4B currently use CPU on
-Windows. GPU initialization failure falls back to CPU with a status message;
+the model and retains the conversation. GPU initialization failure falls back to CPU with a status message;
 turn the switch off and on to retry. A Direct3D 12 GPU with enough memory is
 required. The vision/audio encoders and token sampling continue to use CPU.
 
@@ -150,3 +168,9 @@ the package and deployed DLL hashes matched the source manifest. The standalone
 apphost and published app returned `Hello!` on GPU with no shader validation
 errors, and a published CPU control also passed. The MAUI demo now restores this
 package and its build passed with the same verified DLLs.
+
+After splitting the packages, a fresh consumer of only the core and LiteRT-LM
+runtime returned `Hello!` on CPU with none of the five GPU DLLs deployed. A GPU
+consumer of both packages also returned `Hello!` with no shader validation
+errors, including when the legacy `.xnn` package was referenced. Core-only and
+GPU publishes and the MAUI build passed with the matching core checksum.

@@ -2,15 +2,15 @@
 
 `${EMGU_LITERT_GPU_WINDOWS_NUGET_ID}` adds Windows x64 GPU inference through
 LiteRT's WebGPU accelerator and Dawn's Direct3D 12 backend. It works with desktop
-and Windows MAUI applications. It includes all six DLLs from the validated
-source build: `libLiteRt.dll`, `libLiteRtWebGpuAccelerator.dll`, `webgpu_dawn.dll`,
+and Windows MAUI applications. It includes five DLLs from the validated
+source build: `libLiteRtWebGpuAccelerator.dll`, `webgpu_dawn.dll`,
 `dxcompiler.dll`, `dxil.dll`, and `d3dcompiler_47.dll`.
 
-The matching LiteRT core must stay with this accelerator. The package's
-`buildTransitive` targets select this core when CPU runtime dependencies also
-bring in `libLiteRt.dll`, and copy the bundle beside the executable for build and
-publish. Keep build/buildTransitive assets enabled. The usual CPU runtime output
-in the repository is not modified.
+The matching `libLiteRt.dll` is supplied by the exact-version dependency
+`${EMGU_LITERT_WINDOWS_NUGET_ID}`. That core includes XNNPACK CPU support and
+runs on CPU without this GPU add-on. Both packages' `buildTransitive` targets
+copy their DLLs beside the executable for build and publish. Keep those assets
+enabled. The usual CPU native output in the repository is not modified.
 
 ## Usage
 
@@ -19,7 +19,7 @@ in the repository is not modified.
 ```
 
 Build for `win-x64`. A compatible Direct3D 12 GPU with sufficient memory is
-required. This package depends on `Emgu.LiteRT` and the x64 MSVC runtime;
+required. The core package brings in `Emgu.LiteRT` and the MSVC runtime;
 LiteRT-LM applications also need `Emgu.LiteRT.LM.runtime.windows`.
 
 ```csharp
@@ -27,17 +27,19 @@ await model.Init(backend: "gpu"); // Emgu.LiteRT.LM.Models
 // Or use HwAccelerators.Gpu with Emgu.LiteRT.CompiledModel.
 ```
 
-Gemma 4 E2B has been validated on an NVIDIA RTX 3070. Its model wrapper selects
-32-bit GPU activations; set `EngineSettings.ActivationDataType = ActivationDataType.Float32` when
-using the lower-level API. Other model families still require validation.
+The five Windows demo chat models have been validated on an NVIDIA RTX 3070:
+Qwen3 0.6B, Qwen3.5 0.8B VL, Qwen3.5 4B, and Gemma 4 E2B/E4B. The Gemma 4 and
+Qwen3.5 4B wrappers select 32-bit GPU activations. Set
+`EngineSettings.ActivationDataType = ActivationDataType.Float32` for those models
+when using the lower-level API. Qwen3.5 model loading can take several minutes.
 Vision/audio encoders and token sampling remain on CPU. The first GPU load
 prepares caches next to the model; subsequent loads reuse them.
 
 GPU initialization can fail on unsupported hardware; catch that failure and
 retry with CPU. The Windows MAUI demo does this automatically and offers
-Chat → Settings → **Use the GPU** for Gemma 4 E2B.
+Chat → Settings → **Use the GPU** for all five chat models.
 
-This package contains no GPU sampler DLL and no LiteRT-LM engine DLL. Source
+This package contains no LiteRT core, GPU sampler DLL, or LiteRT-LM engine DLL. Source
 versions and bundle checksums are recorded in `docs/gpu-build.json`.
 
 Launch the application's executable. When hosting with `dotnet app.dll`, plugin

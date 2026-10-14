@@ -34,6 +34,9 @@
     LiteRT commit LiteRT-LM pins as the external repository @litert), same as this script's
     $LitertLmDir default.
 
+.PARAMETER DisableXnn
+    Query the configuration built with bazel_build_litert.ps1 -DisableXnn.
+
 .EXAMPLE
     cd platforms/windows
     .\bazel_build_litert.ps1 64
@@ -44,7 +47,8 @@ param(
     [string]$LitertLmDir = "$PSScriptRoot\..\..\..\LiteRT-LM",
     [string]$OutputBaseDir = "$PSScriptRoot\..\..\..\platforms\windows\output_base",
     [string]$OutputUserRootDir = "$PSScriptRoot\..\..\..\platforms\windows\output_user_root",
-    [string]$OutFile = "$PSScriptRoot\litert_windows_exports.def"
+    [string]$OutFile = "$PSScriptRoot\litert_windows_exports.def",
+    [switch]$DisableXnn
 )
 
 $ErrorActionPreference = "Stop"
@@ -84,11 +88,11 @@ try {
         "aquery",
         "--repo_env=BAZEL_LLVM=$BazelLlvm",
         "--config=windows",
-        "--define", "tflite_with_xnnpack=true",
         "-c", "opt",
         "mnemonic('CppLink', //tfliteextern:libLiteRt)",
         "--output=jsonproto"
     )
+    if ($DisableXnn) { $aqueryArgs += '--define=tflite_with_xnnpack=false' }
     Write-Host "Querying the //tfliteextern:libLiteRt link action..."
     $aqueryOut = & $BazelCommand @aqueryArgs 2>$null
 } finally {

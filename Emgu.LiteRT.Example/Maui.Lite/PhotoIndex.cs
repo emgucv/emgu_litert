@@ -19,6 +19,7 @@ namespace Maui.Demo.Lite
     /// </summary>
     internal sealed class IndexedPhoto
     {
+        public string EmbeddingModel;
         public string Id;
         public DateTimeOffset Taken;
         public float[] Embedding;
@@ -137,6 +138,7 @@ namespace Maui.Demo.Lite
             IndexedPhoto entry = new IndexedPhoto
             {
                 Id = record.PhotoId,
+                EmbeddingModel = record.EmbeddingModel,
                 Taken = new DateTimeOffset(DateTime.SpecifyKind(record.Taken, DateTimeKind.Utc)),
                 Embedding = ToFloats(record.Embedding),
                 Latitude = record.Latitude,
@@ -185,7 +187,8 @@ namespace Maui.Demo.Lite
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     known.TryGetValue(photo.Id, out PhotoEmbeddingRecord record);
-                    bool embeddingCurrent = record != null && record.Version == photo.Version && record.VisionTokens == VisionTokens;
+                    string embeddingModel = System.IO.Path.GetFileName(embedder.DefaultModelFile.Url);
+                    bool embeddingCurrent = record != null && record.Version == photo.Version && record.EmbeddingModel == embeddingModel && record.VisionTokens == VisionTokens;
                     if (embeddingCurrent && record.DetailsVersion == DetailsVersion)
                         continue;
                     while (waitWhile != null && waitWhile())
@@ -218,6 +221,7 @@ namespace Maui.Demo.Lite
                     {
                         PhotoId = photo.Id,
                         Version = photo.Version,
+                        EmbeddingModel = embeddingModel,
                         Taken = photo.Taken.UtcDateTime,
                         VisionTokens = VisionTokens,
                         Embedding = embedding,
@@ -258,7 +262,7 @@ namespace Maui.Demo.Lite
             await LoadAsync();
             List<IndexedPhoto> candidates;
             lock (_entries)
-                candidates = _entries.Where(e => MatchesDetails(e, query)).ToList();
+                candidates = _entries.Where(e => e.EmbeddingModel == System.IO.Path.GetFileName(embedder.DefaultModelFile.Url) && MatchesDetails(e, query)).ToList();
             if (candidates.Count == 0)
                 return (new List<(IndexedPhoto, float)>(), 0);
             if (query.Description == null)

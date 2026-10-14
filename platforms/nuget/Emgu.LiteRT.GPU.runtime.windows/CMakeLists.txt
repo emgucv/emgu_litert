@@ -11,6 +11,7 @@ BUILD_NUGET_PACKAGE(${PROJECT_NAME}
   "${CMAKE_CURRENT_SOURCE_DIR}/Package.nuspec"
   "${NUGET_OUTPUT_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
 ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.GPU.runtime.windows.validate)
+ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.runtime.windows.nuget)
 IF(TARGET Emgu.runtime.windows.msvc.rt.x64.nuget)
   ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.runtime.windows.msvc.rt.x64.nuget)
 ENDIF()

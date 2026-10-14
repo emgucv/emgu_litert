@@ -77,10 +77,10 @@ namespace Maui.Demo.Lite
 
         private readonly HorizontalStackLayout _documentBar;
         private DocumentState _document;
-        private EmbeddingGemma2TextVision _embedder;
+        private EmbeddingModel _embedder;
         // One embedding at a time: document search and photo search (PhotoIndex) share the model.
         private readonly SemaphoreSlim _embedderGate = new SemaphoreSlim(1, 1);
-        private Task<EmbeddingGemma2TextVision> _embedderLoad;
+        private Task<EmbeddingModel> _embedderLoad;
         // What the model's conversation already holds: passages and images given with earlier messages since the
         // conversation was last compacted.
         private readonly HashSet<int> _givenPassages = new HashSet<int>();
@@ -121,11 +121,11 @@ namespace Maui.Demo.Lite
 
         // What an index is built with: another value rebuilds a newly attached file's index (a saved chat's document
         // keeps the one it was given).
-        private static string IndexSettings(bool images)
+        private string IndexSettings(bool images)
         {
             DocumentIndex defaults = new DocumentIndex();
             return string.Format(System.Globalization.CultureInfo.InvariantCulture, "v1|{0}|passages {1}/{2}|images {3}|pages {4}",
-                System.IO.Path.GetFileName(EmbeddingGemma2TextVision.ModelFile.Url), defaults.MaxPassageLength, defaults.PassageOverlap,
+                SelectedEmbeddingFile, defaults.MaxPassageLength, defaults.PassageOverlap,
                 images ? MaxDocumentImages : 0, DocumentReader.MaxPages);
         }
 
@@ -211,7 +211,7 @@ namespace Maui.Demo.Lite
             {
                 System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
                 // Pictures only for models that take images; a model chosen later gets the text only.
-                int maxImages = SelectedOption.AcceptsImages ? MaxDocumentImages : 0;
+                int maxImages = SelectedOption.AcceptsImages && EmbeddingSupportsImages ? MaxDocumentImages : 0;
                 string settings = IndexSettings(maxImages > 0);
                 state.Id = savedId ?? await Task.Run(() => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), cancel);
                 DocumentRecord saved = await _store.GetDocumentAsync(state.Id);
@@ -221,18 +221,35 @@ namespace Maui.Demo.Lite
                 {
                     ((IProgress<string>)stage).Report("Loading the saved index...");
                     List<DocumentItemRecord> items = await _store.GetDocumentItemsAsync(state.Id);
+                    bool rebuild = saved.Settings?.Split('|').ElementAtOrDefault(1) != SelectedEmbeddingFile;
                     index = new DocumentIndex();
                     foreach (DocumentItemRecord item in items)
                     {
-                        if (item.IsImage)
-                            index.AddImage(item.Data, item.MediaType, item.Location, item.IsPage, ToFloats(item.Embedding));
+                        if (item.IsImage && EmbeddingSupportsImages)
+                            index.AddImage(item.Data, item.MediaType, item.Location, item.IsPage, rebuild ? null : ToFloats(item.Embedding));
+                        else if (item.IsImage)
+                            continue;
                         else
-                            index.AddPassage(item.Text, item.Location, ToFloats(item.Embedding));
+                            index.AddPassage(item.Text, item.Location, rebuild ? null : ToFloats(item.Embedding));
                     }
                     state.PageCount = saved.PageCount;
                     summary = saved.Summary;
+                    if (!EmbeddingSupportsImages && items.Any(i => i.IsImage))
+                        summary = index.Passages.Count + " passages · text-only embedding model";
+                    if (index.Passages.Count == 0 && index.Images.Count == 0)
+                        throw new InvalidOperationException("this document needs an embedding model that supports images");
                     // The model embeds the questions.
-                    await EnsureEmbedderAsync(stage, cancel);
+                    EmbeddingModel savedEmbedder = await EnsureEmbedderAsync(stage, cancel);
+                    if (rebuild)
+                    {
+                        ((IProgress<string>)stage).Report("Rebuilding the document embeddings...");
+                        await _embedderGate.WaitAsync(cancel);
+                        try { await Task.Run(() => index.Build(savedEmbedder, cancellationToken: cancel), cancel); }
+                        finally { _embedderGate.Release(); }
+                        // Keep saved pictures for a later switch back to a vision model.
+                        if (EmbeddingSupportsImages || !items.Any(i => i.IsImage))
+                            await SaveDocumentIndexAsync(state, index, settings, summary);
+                    }
                     UiStallWatchdog.Mark(string.Format("Document index loaded in {0:F1}s: {1} passages, {2} images",
                         watch.Elapsed.TotalSeconds, index.Passages.Count, index.Images.Count));
                 }
@@ -254,7 +271,7 @@ namespace Maui.Demo.Lite
                     UiStallWatchdog.Mark(string.Format("Document read in {0:F1}s: {1} passages, {2} images, {3} pages ({4} skipped), {5} images skipped",
                         watch.Elapsed.TotalSeconds, index.Passages.Count, index.Images.Count, content.PageCount, content.PagesSkipped, content.ImagesSkipped));
 
-                    EmbeddingGemma2TextVision embedder = await EnsureEmbedderAsync(stage, cancel);
+                    EmbeddingModel embedder = await EnsureEmbedderAsync(stage, cancel);
                     watch.Restart();
                     Progress<DocumentIndexProgress> indexed = new Progress<DocumentIndexProgress>(p =>
                     {
@@ -400,19 +417,19 @@ namespace Maui.Demo.Lite
         }
 
         // The embedding model is loaded once (downloaded the first time) and kept while the page is open.
-        private Task<EmbeddingGemma2TextVision> EnsureEmbedderAsync(IProgress<string> stage, CancellationToken cancel)
+        private Task<EmbeddingModel> EnsureEmbedderAsync(IProgress<string> stage, CancellationToken cancel)
         {
             if (_embedderLoad == null || _embedderLoad.IsFaulted || _embedderLoad.IsCanceled)
                 _embedderLoad = LoadEmbedderAsync(stage, cancel);
             return _embedderLoad;
         }
 
-        private async Task<EmbeddingGemma2TextVision> LoadEmbedderAsync(IProgress<string> stage, CancellationToken cancel)
+        private async Task<EmbeddingModel> LoadEmbedderAsync(IProgress<string> stage, CancellationToken cancel)
         {
-            EmbeddingGemma2TextVision embedder = new EmbeddingGemma2TextVision();
+            EmbeddingModel embedder = CreateEmbeddingModel();
             embedder.OnDownloadProgressChanged += (total, received, percent) =>
-                stage?.Report(string.Format("Downloading the search model (388 MB): {0:F0}%", percent));
-            stage?.Report(EmbeddingGemma2TextVision.ModelFile.IsLocalFileVerified ? "Loading the search model..." : "Downloading the search model (388 MB)...");
+                stage?.Report(string.Format("Downloading {0}: {1:F0}%", SelectedEmbeddingName, percent));
+            stage?.Report(embedder.DefaultModelFile.IsLocalFileVerified ? "Loading the search model..." : "Downloading " + SelectedEmbeddingName + "...");
             try
             {
                 await embedder.Init(configureSettings: settings =>
@@ -433,13 +450,13 @@ namespace Maui.Demo.Lite
 
         private async Task ReleaseEmbedderAsync()
         {
-            Task<EmbeddingGemma2TextVision> load = _embedderLoad;
+            Task<EmbeddingModel> load = _embedderLoad;
             _embedderLoad = null;
             if (load == null)
                 return;
             try
             {
-                EmbeddingGemma2TextVision embedder = await load;
+                EmbeddingModel embedder = await load;
                 _embedder = null;
                 await Task.Run(() => embedder.Dispose());
             }

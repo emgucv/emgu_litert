@@ -18,6 +18,13 @@ PROJECT(Emgu.LiteRT.runtime.windows.nuget)
   IF (EMGU_NUGET_SIGN_FOUND)
     EMGU_SIGN_NUGET(${PROJECT_NAME} "${NUGET_OUTPUT_DIR}/${EMGU_LITERT_WINDOWS_NUGET_ID}.${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}.nupkg")
   ENDIF()
+  IF(HAVE_WINDOWS_LITERT_GPU)
+    ADD_CUSTOM_TARGET(Emgu.LiteRT.runtime.windows.validate
+      COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../windows/validate_windows_gpu.ps1"
+        -BundleDirectory "${EMGU_WINDOWS_GPU_BUNDLE_DIR}" VERBATIM)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.runtime.windows.validate)
+  ENDIF()
   
   IF (TARGET Emgu.runtime.windows.msvc.rt.x64.nuget)
   	ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.runtime.windows.msvc.rt.x64.nuget)

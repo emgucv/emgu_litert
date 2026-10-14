@@ -23,7 +23,7 @@ found - use your version's number otherwise).
 | Mac Catalyst | `platforms/ios/cmake_build_tflite_catalyst arm64` (and `x86_64` for Intel / universal builds), plus `platforms/macos/bazel_build_tflite_macos_fat` for LiteRT-LM | `lib/ios/libtfliteextern_darwin_<arch>.a`, `lib/runtimes/osx/native/*.dylib` |
 | iOS | `cd platforms/ios && ./bazel_build_xcframework && ./bazel_build_litert_lm_ios` | `lib/ios/libtfliteextern_ios.xcframework`, `CLiteRTLM.xcframework`, `GemmaModelConstraintProvider.xcframework` |
 | Android | `platforms/android/bazel_build_tflite_android arm64` (also `x86_64`, `arm`, `x86` as needed); on macOS set `ANDROID_HOME` first, e.g. `export ANDROID_HOME=~/Library/Android/sdk` | `lib/android/<abi>/*.so` |
-| Windows | `platforms\windows\bazel_build_litert.ps1 64 xnn` | `lib/runtimes/win-x64/native/` |
+| Windows | `platforms\windows\bazel_build_litert.ps1 64` | `lib/runtimes/win-x64/native/` |
 
 Notes:
 
@@ -127,8 +127,8 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
 For GPU chat on Windows, first build the matching runtime bundle with
 `platforms/windows/bazel_build_windows_gpu.ps1`. The demo includes that bundle
 automatically, and Chat → Settings → **Use the GPU** enables GPU inference for
-**Gemma 4 E2B**. Switching reloads the model while retaining the conversation;
-other models continue on CPU. See [Windows GPU build instructions](../../platforms/windows/README.windows-gpu.md)
+all five Windows chat models. Switching reloads the model while retaining the conversation.
+Qwen3.5 loading can take several minutes. See [Windows GPU build instructions](../../platforms/windows/README.windows-gpu.md)
 for output locations, alternate bundle directories, and CPU-only builds.
 
 ## The home page
@@ -187,13 +187,19 @@ again.
   above the reply. Places come from GPS positions and a list of towns in the app, `Resources/Raw/places.tsv.gz`
   (from [GeoNames](https://www.geonames.org), CC BY 4.0; rebuilt by `tools/make_places.py`). On Android the app also
   asks to read the photos' locations; without it, search works without places. Turning it off deletes the index.
+- Settings → Embedding model selects Text Vision 440M (388 MB, default) or Multimodal 740M
+  (485 MB). The choice is remembered and models download on first use. Switching releases the previous model,
+  rebuilds an attached document's vectors, and reindexes photos. Only multimodal models are offered; a previous
+  Text 270M selection uses Text Vision 440M instead. These entries use CPU.
+- Settings → Image-generation model lists Z-Image-Turbo · CPU, currently the only image model. Image generation
+  remains unavailable on iOS; GPU execution is not offered because the complete Windows GPU pipeline failed testing.
 - Settings → Image generation (Gemma 4; off by default; not on iOS) lets Gemma 4 draw pictures - "draw a red fox in
   the snow, watercolor" - with [Z-Image-Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo) on the device: 256 x 256,
   shown above the reply and saved with the chat. Turning it on downloads the 10.6 GB model (`Emgu.LiteRT.Models`'
   `ZImageTurbo`), and the first picture prepares about 9 GB of caches, so it needs about 21 GB of free space; "Delete
   the image model" removes it all. A picture takes about 25-40 s on an Apple M1, longer on a phone.
-- "+" → Document attaches a PDF, Word (.docx) or text file to the chat, with any model. The first time, a 388 MB
-  search model (EmbeddingGemma 2) is downloaded; the document is then indexed on the device (a few seconds on a Mac,
+- "+" → Document attaches a PDF, Word (.docx) or text file to the chat, with any model. The selected embedding
+  model is downloaded on first use; the document is then indexed on the device (a few seconds on a Mac,
   longer on a phone), and each question is sent with the parts of the document that match it - and, for Gemma 4 and
   Qwen3.5 0.8B, a matching picture or an image of a scanned page. A grey line above the reply says which pages were
   used. New chat removes the document.

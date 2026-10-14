@@ -115,11 +115,11 @@ namespace Maui.Demo.Lite
 
         private static readonly ModelOption[] Models = new[]
         {
-            new ModelOption { Name = "Qwen3 0.6B", File = Qwen3.ModelFile, Size = "350 MB", Detail = "~350 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3 },
-            new ModelOption { Name = "Qwen3.5 0.8B", File = Qwen35_0_8B_VL.ModelFile, Size = "1.3 GB", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false },
-            new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B, CanSummarize = true },
+            new ModelOption { Name = "Qwen3 0.6B", File = Qwen3.ModelFile, Size = "350 MB", Detail = "~350 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3, GpuOnWindows = true },
+            new ModelOption { Name = "Qwen3.5 0.8B", File = Qwen35_0_8B_VL.ModelFile, Size = "1.3 GB", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false, GpuOnWindows = true },
+            new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B, CanSummarize = true, GpuOnWindows = true },
             new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnAndroid = true, GpuOnMac = true, GpuOnWindows = true },
-            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnMac = true },
+            new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnMac = true, GpuOnWindows = true },
 #if MACCATALYST
             // Desktop only: ~8 GB of memory, and practical on a GPU only (Mac Catalyst has LiteRT's Metal accelerator).
             new ModelOption { Name = "Gemma 4 12B", File = Gemma4_12B.ModelFile, Size = "6.9 GB", Detail = "~6.9 GB download. The most capable - best for code and harder questions. Needs a Mac with 16 GB of memory.", Choice = ModelChoice.Gemma4_12B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnMac = true },
@@ -559,7 +559,7 @@ namespace Maui.Demo.Lite
 #elif MACCATALYST
                         Text = "Gemma 4 answers several times faster on the Mac's GPU. The first load of a model there takes longer and keeps a cache next to the model; turning this off deletes it.",
 #elif WINDOWS_WEBGPU
-                        Text = "Use the GPU for Gemma 4 E2B. Other models use the CPU. Switching reloads the model and keeps the conversation. The first GPU load takes longer; a compatible Direct3D 12 GPU is required.",
+                        Text = "Run chat models on the GPU. Switching reloads the model and keeps the conversation. Loading can take several minutes, especially for Qwen3.5. A compatible Direct3D 12 GPU with enough memory is required.",
 #else
                         Text = "GPU support is not included in this build. Models use the CPU.",
 #endif
@@ -587,6 +587,8 @@ namespace Maui.Demo.Lite
                         FontSize = 12,
                         TextColor = Theme.SecondaryText
                     },
+                    Theme.Divider(),
+                    BuildEmbeddingModelSection(),
                     Theme.Divider(),
                     BuildPhotoSection(),
                     Theme.Divider(),
@@ -1390,7 +1392,11 @@ namespace Maui.Demo.Lite
                     ShowLoadCard(option, "Checking the download...", null);
                     break;
                 case ModelLoadStage.LoadingEngine:
+#if WINDOWS
+                    ShowLoadCard(option, _loadingOnGpu ? "Loading onto the GPU (this can take several minutes)..." : "Loading into memory...", null);
+#else
                     ShowLoadCard(option, _loadingOnGpu ? "Loading onto the GPU (about 30 s the first time)..." : "Loading into memory...", null);
+#endif
                     break;
             }
         }

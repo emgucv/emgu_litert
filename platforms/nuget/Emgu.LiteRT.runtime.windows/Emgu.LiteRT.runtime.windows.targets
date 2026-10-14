@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <EmguWindowsCoreDll>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../runtimes/win-x64/native/libLiteRt.dll'))</EmguWindowsCoreDll>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' or ('$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows')))">
+    <Content Include="$(EmguWindowsCoreDll)">
+      <Link>libLiteRt.dll</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+  <!-- Prefer this core when legacy XNN packages or repository content also supply it. -->
+  <Target Name="EmguSelectWindowsCoreRuntime" BeforeTargets="AssignTargetPaths" AfterTargets="ResolvePackageAssets"
+          Condition="'$(RuntimeIdentifier)' == 'win-x64' or ('$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows')))">
+    <ItemGroup>
+      <RuntimeCopyLocalItems Remove="@(RuntimeCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'libLiteRt.dll'" />
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'libLiteRt.dll'" />
+      <RuntimeTargetsCopyLocalItems Remove="@(RuntimeTargetsCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'libLiteRt.dll'" />
+      <Content Remove="@(Content)" Condition="'%(Filename)%(Extension)' == 'libLiteRt.dll' and '%(FullPath)' != '$(EmguWindowsCoreDll)'" />
+    </ItemGroup>
+  </Target>
+</Project>

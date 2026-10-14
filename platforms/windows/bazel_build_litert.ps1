@@ -3,10 +3,10 @@
     PowerShell port of bazel_build_tflite_x86_64.bat - builds tfliteextern for Windows via Bazel.
 
 .DESCRIPTION
-    Mirrors bazel_build_tflite_x86_64.bat line-for-line, including its quirks (the VS2022/VS2026
+    Based on bazel_build_tflite_x86_64.bat, retaining its toolchain quirks (the VS2022/VS2026
     redist fall-through, and the dead BUILDTOOLS branch that compares against a variable the
-    original .bat never actually sets - see the comments at each spot below). The one genuine
-    functional addition is importing the vcvars*.bat environment into this process: a plain
+    original .bat never actually sets - see the comments at each spot below). It imports
+    the vcvars*.bat environment into this process: a plain
     PowerShell `&` call to a .bat file does not persist environment changes back to the caller
     the way `call` does within another .bat file, so that import is done explicitly via a
     `cmd.exe /c "<vcvars> && set"` + parse, immediately after the point where the original does
@@ -30,19 +30,24 @@
 .PARAMETER Arch
     "32", "64" (default), "ARM", or "ARM64" - matches the .bat's %1.
 
-.PARAMETER XnnFlag
-    Pass "xnn" to enable XNNPACK - matches the .bat's %2.
+.PARAMETER DisableXnn
+    Disable XNNPACK with tflite_with_xnnpack=false.
+    Without this switch, no XNNPACK flags are passed; upstream enables it by default.
+    The pinned LiteRT also uses this define to disable its built-in CPU accelerator.
 
 .PARAMETER DockerFlag
-    Pass "docker" to build via the Bazel docker/remote executor - matches the .bat's %3.
+    Pass "docker" as the second positional argument to use the Bazel docker/remote executor.
 
 .EXAMPLE
-    .\bazel_build_litert.ps1 64 xnn
+    .\bazel_build_litert.ps1 64
+.EXAMPLE
+    .\bazel_build_litert.ps1 64 -DisableXnn
 #>
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [Parameter(Position = 0)][string]$Arch = "64",
-    [Parameter(Position = 1)][string]$XnnFlag = "",
-    [Parameter(Position = 2)][string]$DockerFlag = ""
+    [Parameter(Position = 1)][ValidateSet('', 'docker')][string]$DockerFlag = "",
+    [switch]$DisableXnn
 )
 
 $ErrorActionPreference = "Continue"
@@ -113,9 +118,11 @@ if ($EnvSetupScript) {
     }
 }
 
-$TfliteWithXnnpack = "false"
-if ($XnnFlag -eq "xnn") { $TfliteWithXnnpack = "true" }
-$BazelXnnFlags = @("--define", "tflite_with_xnnpack=$TfliteWithXnnpack")
+# The pinned upstream TFLite target enables XNNPACK when no define is supplied.
+$BazelXnnFlags = @()
+if ($DisableXnn) {
+    $BazelXnnFlags = @("--define=tflite_with_xnnpack=false")
+}
 
 if ($DockerFlag -eq "docker") {
     $DockerFlags = @("--define=EXECUTOR=remote", "--experimental_docker_verbose", "--experimental_enable_docker_sandbox")
@@ -323,9 +330,6 @@ if ($BuildLitertLm) {
     Copy-Item (Join-Path $WorkspaceDir "bazel-bin\c\litert-lm.dll") "$NativeOutDir\liblitert-lm.dll" -Force
     Copy-Item $GemmaPrebuilt "$NativeOutDir\libGemmaModelConstraintProvider.dll" -Force
 }
-# Record the tflite_with_xnnpack define next to the dll. The top level CMakeLists.txt reads it
-# to set EMGU_TF_LITE_WINDESKTOP_X64_XNNPACK, and it travels with the binary in the zip package.
-Set-Content -Path "$NativeOutDir\tflite_with_xnnpack.txt" -Value $TfliteWithXnnpack -NoNewline:$false
 # Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
 # dll. The top level CMakeLists.txt reads it to version the Emgu.TF.Lite, Emgu.LiteRT.Tflite.Models and Emgu.TF.Lite.runtime.windows nuget packages.
 $TfVersionBzl = Join-Path $OutputBaseDir "external\org_tensorflow\tensorflow\tf_version.bzl"

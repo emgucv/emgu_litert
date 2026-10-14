@@ -15,18 +15,17 @@
     omitted) builds 32-bit x86 - matches the .bat's %1.
 
 .PARAMETER XnnFlag
-    Pass "xnn" (case-sensitive) to enable XNNPACK; anything else disables it - matches the
-    .bat's %2.
+    Defaults to "xnn" (XNNPACK enabled). Pass "no_xnn" to disable it.
 
 .PARAMETER ProcessCountFlag
     Optional MSBuild parallel compile process count (e.g. "4") - matches the .bat's %3.
 
 .EXAMPLE
-    .\cmake_build_litert.ps1 64 xnn
+    .\cmake_build_litert.ps1 64
 #>
 param(
     [Parameter(Position = 0)][string]$ArchFlag = "",
-    [Parameter(Position = 1)][string]$XnnFlag = "",
+    [Parameter(Position = 1)][string]$XnnFlag = "xnn",
     [Parameter(Position = 2)][string]$ProcessCountFlag = ""
 )
 

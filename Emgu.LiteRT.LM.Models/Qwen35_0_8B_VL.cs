@@ -27,7 +27,7 @@ namespace Emgu.LiteRT.LM.Models
                 return new DownloadableFile(
                     "https://huggingface.co/litert-community/Qwen3.5-0.8B/resolve/main/Qwen3.5-0.8B-VL_int8.litertlm",
                     DefaultLocalSubfolder,
-                    "e3360b658c929ff35ab740a21f5e4b688096a72e351b8d347e26ccda314121b7");
+                    "5e6d69e55f92d21799fe0a2552da979c95a2533b64e4f0ed73fe87dd9d759ab9");
             }
         }
 

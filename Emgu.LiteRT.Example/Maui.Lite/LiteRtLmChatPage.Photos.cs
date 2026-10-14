@@ -45,7 +45,7 @@ namespace Maui.Demo.Lite
             _photoIndex.Changed += () => MainThread.BeginInvokeOnMainThread(UpdatePhotoStatus);
             bool on = false;
             try { on = Preferences.Default.Get(PhotoSearchPreference, false); } catch (Exception) { }
-            _photoSwitch = new Switch { IsToggled = on, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+            _photoSwitch = new Switch { IsToggled = on && EmbeddingSupportsImages, IsEnabled = EmbeddingSupportsImages, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
             _photoSwitch.Toggled += OnPhotoSearchToggled;
             var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
             row.Add(new Label
@@ -144,7 +144,7 @@ namespace Maui.Demo.Lite
         // Index the new photos in the background (incremental: only photos not yet indexed, or edited since).
         private void StartPhotoIndexing()
         {
-            if (_reloadingCpuThreads || !PhotoSearchOn || (_photoIndexTask != null && !_photoIndexTask.IsCompleted))
+            if (_reloadingCpuThreads || !EmbeddingSupportsImages || !PhotoSearchOn || (_photoIndexTask != null && !_photoIndexTask.IsCompleted))
                 return;
             _photoIndexStarted = DateTime.UtcNow;
             _photoIndexing = new CancellationTokenSource();

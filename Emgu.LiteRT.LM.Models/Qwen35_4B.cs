@@ -14,6 +14,8 @@ namespace Emgu.LiteRT.LM.Models
     /// <remarks>
     /// Much more capable than the 0.8B model, but several times slower on the CPU. Thinking is reported in a separate
     /// channel, which ChatReply.Thinking exposes.
+    /// GPU inference uses 32-bit activations: the Windows WebGPU backend's 16-bit path produced buffer validation
+    /// errors and an empty second reply during multi-turn testing. CPU inference is unchanged.
     /// </remarks>
     public class Qwen35_4B : Qwen35
     {
@@ -38,6 +40,15 @@ namespace Emgu.LiteRT.LM.Models
         public override DownloadableFile DefaultModelFile
         {
             get { return ModelFile; }
+        }
+
+        /// <summary>Use 32-bit activations for reliable GPU multi-turn inference.</summary>
+        protected override EngineSettings CreateEngineSettings(String modelPath, String backend)
+        {
+            EngineSettings settings = base.CreateEngineSettings(modelPath, backend);
+            if (String.Equals(backend, "gpu", StringComparison.OrdinalIgnoreCase))
+                settings.ActivationDataType = ActivationDataType.Float32;
+            return settings;
         }
 
         /// <summary>

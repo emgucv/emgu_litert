@@ -11,24 +11,21 @@
     <repository type="git" url="${GITHUB_REPO_URL}" />
     <icon>icon.png</icon>
     <requireLicenseAcceptance>true</requireLicenseAcceptance>
-    <description>Optional Windows x64 GPU runtime for Emgu LiteRT and LiteRT-LM. Includes the matching LiteRT core, WebGPU accelerator, Dawn Direct3D 12 backend, and shader compiler DLLs. Supports desktop and Windows MAUI apps. GPU inference requires a compatible Direct3D 12 GPU; LiteRT-LM token sampling remains on CPU.</description>
+    <description>Optional Windows x64 GPU accelerator for Emgu LiteRT and LiteRT-LM. Includes the WebGPU accelerator, Dawn Direct3D 12 backend, and shader compiler DLLs. Depends on the matching Emgu.LiteRT.runtime.windows core. Supports desktop and Windows MAUI apps. LiteRT-LM token sampling remains on CPU.</description>
     <readme>docs/README.md</readme>
     <dependencies>
-      <dependency id="${EMGU_LITERT_NUGET_ID}" version="[${CPACK_PACKAGE_DEPENDENCY_VERSION}${TENSORFLOW_VERSION_SUFFIX}]" />
-      <dependency id="${EMGU_WINDOWS_MSVCRT_X64_NUGET_ID}" version="${EMGU_WINDOWS_MSVCRT_VERSION}" />
+      <dependency id="${EMGU_LITERT_WINDOWS_NUGET_ID}" version="[${CPACK_PACKAGE_DEPENDENCY_VERSION}${TENSORFLOW_VERSION_SUFFIX}]" />
     </dependencies>
     <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
     <tags>litert litert-lm emgu gpu webgpu direct3d windows</tags>
   </metadata>
   <files>
-    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/libLiteRt.dll" target="runtimes/win-x64/native" />
     <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/libLiteRtWebGpuAccelerator.dll" target="runtimes/win-x64/native" />
     <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/webgpu_dawn.dll" target="runtimes/win-x64/native" />
     <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/dxcompiler.dll" target="runtimes/win-x64/native" />
     <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/dxil.dll" target="runtimes/win-x64/native" />
     <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/d3dcompiler_47.dll" target="runtimes/win-x64/native" />
     <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/gpu-build.json" target="docs" />
-    <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/licenses/LiteRT.txt" target="docs/licenses" />
     <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/licenses/ML-Drift.txt" target="docs/licenses" />
     <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/licenses/Dawn.txt" target="docs/licenses" />
     <file src="${EMGU_WINDOWS_GPU_BUNDLE_DIR}/licenses/DXC.txt" target="docs/licenses" />

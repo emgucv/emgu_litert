@@ -161,6 +161,8 @@ namespace Maui.Demo.Lite
     [Table("PhotoEmbedding")]
     public class PhotoEmbeddingRecord
     {
+        public string EmbeddingModel { get; set; }
+
         [PrimaryKey]
         public string PhotoId { get; set; }
 

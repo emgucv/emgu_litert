@@ -2,6 +2,16 @@
 
 This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu TF Lite. 
 
+It supplies `libLiteRt.dll`, the native core used by `Emgu.LiteRT` and LiteRT-LM.
+When generated from the validated Windows GPU source build, this package is
+named `Emgu.LiteRT.runtime.windows` and includes the matching core with XNNPACK
+CPU support. CPU inference works without any GPU accelerator, Dawn, or shader
+compiler DLLs. Its build targets select this core over legacy XNN runtime assets.
+
+To enable GPU inference, add the same-version `Emgu.LiteRT.GPU.runtime.windows`
+package. That optional add-on depends on this core and supplies the five GPU
+DLLs. LiteRT-LM applications also need `Emgu.LiteRT.LM.runtime.windows`.
+
 For online documentation please visit
 <${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/index.html>
 
