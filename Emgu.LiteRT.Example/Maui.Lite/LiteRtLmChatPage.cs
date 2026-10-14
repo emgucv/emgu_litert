@@ -284,6 +284,7 @@ namespace Maui.Demo.Lite
         // card at the top of the conversation; a message sent meanwhile waits for it.
         private const string LastModelPreference = "litert_lm_chat_model";
         private const string ThinkPreference = "litert_lm_chat_think";
+        private const string WebSearchPreference = "litert_lm_chat_web_search";
         private Task<bool> _loadTask;
         private ModelChoice? _loadingChoice;
         private CancellationTokenSource _loadCancel;
@@ -406,6 +407,9 @@ namespace Maui.Demo.Lite
             _thinkingSwitch.IsToggled = think;
             _thinkingSwitch.Toggled += OnThinkingToggled;
             _webSearchSwitch = new ToggleChip("\U0001F50E Web search");
+            bool webSearch = false;
+            try { webSearch = Preferences.Default.Get(WebSearchPreference, false); } catch (Exception) { }
+            _webSearchSwitch.IsToggled = webSearch;
             _webSearchSwitch.Toggled += OnWebSearchToggled;
             _toggleRow = new HorizontalStackLayout { Spacing = 8, Children = { _thinkingSwitch, _webSearchSwitch } };
 
@@ -1797,6 +1801,7 @@ namespace Maui.Demo.Lite
 
         private void OnWebSearchToggled(object sender, ToggledEventArgs e)
         {
+            try { Preferences.Default.Set(WebSearchPreference, e.Value); } catch (Exception) { }
             // Applies from the next message; the conversation continues.
             if (e.Value && !_busy)
                 SetStatus(string.IsNullOrEmpty(_tavilyKey)
