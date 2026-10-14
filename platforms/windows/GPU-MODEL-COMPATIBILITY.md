@@ -3,8 +3,8 @@
 Verified October 14, 2026 on an NVIDIA GeForce RTX 3070 (8 GB), using the
 source-built WebGPU / Dawn Direct3D 12 bundle and Windows runtime packages
 2.3.0.1964. This covers the **five chat models offered by the Windows picker**,
-the document embedding model, and GPU compilation checks for image generation.
-Gemma 4 12B is Mac-only; other embedding variants and TF Lite demo models are
+both multimodal embedding models, and GPU compilation checks for image generation.
+Gemma 4 12B is Mac-only; the text-only 270M embedding model and TF Lite demo models are
 outside this verification.
 
 ## Results
@@ -35,7 +35,8 @@ exhaustively tested.
 
 | Model / component | Windows GPU result | Application behavior |
 |---|---|---|
-| EmbeddingGemma 2 Text Vision 440M, document embedding | Passed text and image checks, including GPU vision encoder | Still CPU; managed wrapper currently refuses GPU |
+| EmbeddingGemma 2 Text Vision 440M, document embedding | Passed text and image checks, including GPU vision encoder | CPU and Windows GPU entries available |
+| EmbeddingGemma 2 Multimodal 740M | Passed text, image and audio checks, including GPU vision/audio encoders | CPU and Windows GPU entries available |
 | Z-Image-Turbo, complete GPU pipeline | Not compatible with the tested bundle: required text encoder fails compilation | Still CPU |
 | Z-Image `z_embx` input graph | GPU FP32 compiled and ran with finite outputs | Direct graph test only |
 | Z-Image `zc_main0` denoising graph | GPU FP32 compiled and ran with finite outputs | Direct graph test only |
@@ -54,9 +55,27 @@ The passing GPU runs had no Dawn validation errors.
 The matched source-built Windows core and accelerator avoid the external-weight
 ABI mismatch described in `EmbeddingModel.cs`. This result does **not** establish
 compatibility with the newer prebuilt Metal/OpenCL accelerators on other
-platforms. The cross-platform guard and the demo's CPU default remain unchanged;
-enabling embedding GPU needs a suitably scoped follow-up. The text-only 270M
-and audio-capable 740M embedding variants were not tested here.
+platforms. The cross-platform guard remains the default.
+`EmbeddingModel.EnableWindowsWebGpu` explicitly opts in to the matching source-built
+Windows runtime and cannot enable GPU on other platforms. The demo enables it only
+in a `WINDOWS_WEBGPU` build, offering CPU/GPU entries for both multimodal models.
+The selected backend is remembered; switching reloads the model and retains cached
+vectors for the same model. Initialization failure offers CPU fallback; accepting
+it changes the displayed selection to CPU. CPU remains the default. Audio search
+is not exposed in the demo's tools.
+
+The 740M download (484,622,336 bytes) matched SHA256
+`e7a8a2204b91e0f96e92960e84a09a89212e1633dcb7575a9bf3378b4df77f4c`.
+Wrapper-level tests used `EmbeddingModel.Init`, rather than bypassing the guard,
+on CPU/CPU/CPU, GPU/GPU/CPU, and GPU/GPU/GPU (main/vision/audio). All nine vectors
+were finite, normalized and 768 values long; CPU-versus-GPU similarity was
+**0.9971–0.9991**. Text and image retrieval rankings matched CPU. For
+`have_a_wonderful_day.wav`, the all-GPU audio embedding matched "Have a wonderful
+day!" at **0.9245**, versus **0.6297** for barking and **0.6147** for a car engine;
+CPU ranked the same phrase first at **0.9215**. GPU runs had no Dawn validation
+errors. The 440M model also passed through the new wrapper opt-in. A regression
+test checks that text, vision and audio GPU requests remain refused without the
+opt-in, and that the Windows opt-in cannot enable other platforms.
 
 Z-Image used the cached graphs for LiteRT model revision
 `09ea3ae2ef44d04d0ad1591de36d1c13504e1521`. Its required `qwen_enc.tflite`
@@ -80,6 +99,8 @@ per-process logs in that folder. Run the apphost executable with arguments
 `z_embx gpu fp32`, `zc_main0 gpu fp32`, `qwen_enc gpu fp32`, or `qwen_enc cpu`.
 Embedding vectors are retained as JSON alongside the logs. These local harness
 files are ignored build artifacts.
+The wrapper-level harness additionally accepts `embedding740 cpu cpu cpu`,
+`embedding740 gpu gpu cpu` and `embedding740 gpu gpu gpu`.
 
 ### Qwen3.5 0.8B vision-model download checksum
 

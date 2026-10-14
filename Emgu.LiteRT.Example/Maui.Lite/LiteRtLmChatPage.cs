@@ -845,14 +845,48 @@ namespace Maui.Demo.Lite
             newParent.Children.Add(view);
         }
 
-        // The model list: name, description and a check mark on the current model. Tapping a row selects it.
+        private bool? _cpuModelsExpanded;
+        private bool? _gpuModelsExpanded;
+
+        // The model list: collapsible backend groups, with a check mark on the current model.
         private View BuildModelList(bool inSheet)
         {
             var list = new VerticalStackLayout { Spacing = 4 };
-            foreach (bool gpu in new[] { false, true })
+            foreach (bool gpu in new[] { true, false })
             {
                 if (gpu && !Models.Any(HasGpu)) continue;
-                list.Children.Add(Theme.SectionTitle(gpu ? "GPU models" : "CPU models"));
+                string title = gpu ? "GPU Models" : "CPU Models";
+                var models = new VerticalStackLayout
+                {
+                    Spacing = 4,
+                    IsVisible = (gpu ? _gpuModelsExpanded : _cpuModelsExpanded) ?? (gpu == _selectedGpu)
+                };
+                var header = new Button
+                {
+                    FontFamily = Theme.TitleFont,
+                    FontSize = 15,
+                    TextColor = Theme.PrimaryText,
+                    BackgroundColor = Colors.Transparent,
+                    HorizontalOptions = LayoutOptions.Fill,
+                    Padding = new Thickness(10, 8)
+                };
+                void UpdateHeader()
+                {
+                    header.Text = (models.IsVisible ? "▼ " : "▶ ") + title;
+                    SemanticProperties.SetDescription(header, title + (models.IsVisible ? ", expanded" : ", collapsed"));
+                    SemanticProperties.SetHint(header, models.IsVisible ? "Collapse model list" : "Expand model list");
+                }
+                UpdateHeader();
+                header.Clicked += (_, _) =>
+                {
+                    models.IsVisible = !models.IsVisible;
+                    if (gpu) _gpuModelsExpanded = models.IsVisible;
+                    else _cpuModelsExpanded = models.IsVisible;
+                    UpdateHeader();
+                    if (inSheet) RefreshModelList();
+                };
+                list.Children.Add(header);
+                list.Children.Add(models);
                 for (int i = 0; i < Models.Length; i++)
                 {
                     int index = i;
@@ -889,7 +923,7 @@ namespace Maui.Demo.Lite
                         else if (CanChangeModel)
                             SelectModel(index, gpu);
                     });
-                    list.Children.Add(cell);
+                    models.Children.Add(cell);
                 }
             }
             return list;
@@ -939,6 +973,8 @@ namespace Maui.Demo.Lite
             _selectedModel = index;
             ModelOption option = SelectedOption;
             _selectedGpu = (gpu ?? _selectedGpu) && HasGpu(option);
+            if (_selectedGpu) _gpuModelsExpanded = true;
+            else _cpuModelsExpanded = true;
             _gpuUnavailable = false;
             try { Preferences.Default.Set(BackendPreference, _selectedGpu); } catch (Exception) { }
             _modelChipLabel.Text = option.Name + (_selectedGpu ? " · GPU" : " · CPU");

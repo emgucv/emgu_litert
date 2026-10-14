@@ -347,6 +347,34 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // The safety guard must reject every GPU entry point before downloading or calling native code.
+        [TestAttribute]
+        public async Task TestEmbeddingGpuRequiresExplicitWindowsOptIn()
+        {
+            foreach (string component in new[] { "text", "vision", "audio" })
+            {
+                using (EmbeddingGemma2Multimodal model = new EmbeddingGemma2Multimodal())
+                {
+                    if (component == "vision") model.VisionBackend = "gpu";
+                    if (component == "audio") model.AudioBackend = "gpu";
+                    bool refused = false;
+                    try { await model.Init(backend: component == "text" ? "gpu" : "cpu"); }
+                    catch (NotSupportedException) { refused = true; }
+                    if (!refused) throw new Exception("Embedding GPU guard did not reject " + component);
+                }
+            }
+            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+            {
+                using (EmbeddingGemma2Multimodal model = new EmbeddingGemma2Multimodal { EnableWindowsWebGpu = true })
+                {
+                    bool refused = false;
+                    try { await model.Init(backend: "gpu"); }
+                    catch (NotSupportedException) { refused = true; }
+                    if (!refused) throw new Exception("Windows GPU opt-in enabled another platform");
+                }
+            }
+        }
+
         // EmbeddingGemma 2 Text 270M through the EmbeddingEngine: sizes, normalization, batch vs single, and semantic
         // search - each question's best match should be the document that answers it (165 MB download).
 #if !TEST_MODELS

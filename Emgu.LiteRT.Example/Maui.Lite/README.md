@@ -127,7 +127,9 @@ dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-wind
 For GPU chat on Windows, first build the matching runtime bundle with
 `platforms/windows/bazel_build_windows_gpu.ps1`. The demo includes that bundle
 automatically. The chat model picker has **CPU models** and **GPU models** sections;
-select a GPU entry to use GPU inference. Switching backend reloads the model while retaining the conversation.
+select a GPU entry to use GPU inference. Tap either section heading to expand or collapse its models; the selected
+model's section opens by default, and expansion choices are kept while the page is open. Switching backend reloads
+the model while retaining the conversation.
 Qwen3.5 loading can take several minutes. See [Windows GPU build instructions](../../platforms/windows/README.windows-gpu.md)
 for output locations, alternate bundle directories, and CPU-only builds.
 
@@ -190,7 +192,10 @@ again.
 - Settings → Embedding model selects Text Vision 440M (388 MB, default) or Multimodal 740M
   (485 MB). The choice is remembered and models download on first use. Switching releases the previous model,
   rebuilds an attached document's vectors, and reindexes photos. Only multimodal models are offered; a previous
-  Text 270M selection uses Text Vision 440M instead. These entries use CPU.
+  Text 270M selection uses Text Vision 440M instead. Windows builds with the matched WebGPU runtime also offer
+  GPU entries for both models (text and vision, plus audio for 740M). Other platforms retain CPU entries.
+  Switching backend reloads the embedder while retaining vectors for the same model; GPU loading failures offer
+  CPU fallback. The demo's search tools currently use only text and images.
 - Settings → Image-generation model lists Z-Image-Turbo · CPU, currently the only image model. Image generation
   remains unavailable on iOS; GPU execution is not offered because the complete Windows GPU pipeline failed testing.
 - Settings → Image generation (Gemma 4; off by default; not on iOS) lets Gemma 4 draw pictures - "draw a red fox in

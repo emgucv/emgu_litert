@@ -432,12 +432,31 @@ namespace Maui.Demo.Lite
             stage?.Report(embedder.DefaultModelFile.IsLocalFileVerified ? "Loading the search model..." : "Downloading " + SelectedEmbeddingName + "...");
             try
             {
-                await embedder.Init(configureSettings: settings =>
+                Action<Emgu.LiteRT.LM.EmbeddingEngineSettings> configure = settings =>
                 {
                     int count = CpuThreadSettings.Count;
                     settings.NumThreads = count;
                     settings.AudioNumThreads = count;
-                }, cancellationToken: cancel);
+                };
+                try
+                {
+                    await embedder.Init(backend: SelectedEmbeddingBackend, configureSettings: configure, cancellationToken: cancel);
+                }
+                catch (Exception ex) when (_selectedEmbeddingGpu && !cancel.IsCancellationRequested)
+                {
+                    bool useCpu = await MainThread.InvokeOnMainThreadAsync(() => DisplayAlertAsync(
+                        "GPU embedding model could not load", ex.Message + "\n\nRun this model on CPU instead?", "Run on CPU", "Cancel"));
+                    if (!useCpu) throw;
+                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    {
+                        _selectedEmbeddingGpu = false;
+                        try { Preferences.Default.Set(EmbeddingGpuPreference, false); } catch (Exception) { }
+                        UpdateEmbeddingModelDetail();
+                    });
+                    embedder.Dispose();
+                    embedder = CreateEmbeddingModel();
+                    await embedder.Init(configureSettings: configure, cancellationToken: cancel);
+                }
             }
             catch (Exception)
             {

@@ -127,6 +127,13 @@ the model and retains the conversation. GPU initialization failure shows the rea
 select the GPU entry again to retry. A Direct3D 12 GPU with enough memory is
 required. The vision/audio encoders and token sampling continue to use CPU.
 
+Settings → **Embedding model** also offers CPU and GPU entries for Text Vision
+440M and Multimodal 740M. These Windows GPU entries use the matched source-built
+runtime for the text and vision encoders, and for 740M's audio encoder. Both models
+passed CPU/GPU vector comparisons and retrieval checks; the demo's search tools
+currently use text and images. Embedding CPU remains the default. Z-Image-Turbo
+image generation remains CPU-only.
+
 ## Options
 
 ```powershell
