@@ -46,7 +46,7 @@ namespace Maui.Demo.Lite
         // and matched 6 of 6 test photos as well, but sees less detail. Changing it re-embeds every photo (VisionTokens is
         // kept with each embedding).
         private const int EmbedImageSize = 512;
-        private const int VisionTokens = 140;
+        internal const int VisionTokens = 140;
         // Raised when what LoadDetailsAsync reads changes: the details are read again (without embedding again).
         private const int DetailsVersion = 3;
         // A photo is shown if it matches the description at least this well, and not much worse than the best match
@@ -158,16 +158,17 @@ namespace Maui.Demo.Lite
         /// forget the ones no longer among them.
         /// </summary>
         /// <param name="embedder">The image embedding model</param>
-        /// <param name="gate">Held while the model embeds a photo: the model is shared with document search</param>
+        /// <param name="embedImage">Schedules an image embedding using the shared model</param>
         /// <param name="maxPhotos">How many of the most recent photos to keep indexed</param>
         /// <param name="waitWhile">Indexing pauses while this is true (e.g. while the chat is answering)</param>
-        public async Task IndexAsync(EmbeddingModel embedder, SemaphoreSlim gate, int maxPhotos, Func<bool> waitWhile,
-            CancellationToken cancellationToken)
+        public async Task IndexAsync(EmbeddingModel embedder, Func<byte[], CancellationToken, Task<float[]>> embedImage, int maxPhotos, Func<bool> waitWhile,
+            CancellationToken cancellationToken, Func<CancellationToken, Task> waitForWork = null)
         {
             IsIndexing = true;
             Changed?.Invoke();
             try
             {
+                if (waitForWork != null) await waitForWork(cancellationToken);
                 await LoadAsync();
                 PlaceLookup places = null;
                 try { places = await Places(); } catch (Exception) { }
@@ -194,6 +195,7 @@ namespace Maui.Demo.Lite
                     while (waitWhile != null && waitWhile())
                         await Task.Delay(1000, cancellationToken);
 
+                    if (waitForWork != null) await waitForWork(cancellationToken);
                     await PhotoLibrary.LoadDetailsAsync(photo);
                     string place = null;
                     if (places != null && photo.Latitude.HasValue && photo.Longitude.HasValue)
@@ -205,17 +207,7 @@ namespace Maui.Demo.Lite
                         byte[] image = await PhotoLibrary.LoadImageAsync(photo.Id, EmbedImageSize);
                         if (image == null)
                             continue;
-                        float[] values;
-                        await gate.WaitAsync(cancellationToken);
-                        try
-                        {
-                            values = await Task.Run(() => embedder.EmbedImage(image, visionTokensPerImage: VisionTokens), cancellationToken);
-                        }
-                        finally
-                        {
-                            gate.Release();
-                        }
-                        embedding = ToBytes(values);
+                        embedding = ToBytes(await embedImage(image, cancellationToken));
                     }
                     PhotoEmbeddingRecord updated = new PhotoEmbeddingRecord
                     {

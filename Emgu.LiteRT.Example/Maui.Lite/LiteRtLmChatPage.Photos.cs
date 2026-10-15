@@ -73,6 +73,8 @@ namespace Maui.Demo.Lite
                         FontSize = 12,
                         TextColor = Theme.SecondaryText
                     },
+                    BuildPhotoChargingSetting(),
+                    new Label { Text = "On phones and tablets, indexing pauses at 20% battery or lower without power. It also pauses if the device reports excessive heat, and resumes automatically when conditions improve.", FontSize = 12, TextColor = Theme.SecondaryText },
                     _photoStatus
                 }
             };
@@ -180,9 +182,13 @@ namespace Maui.Demo.Lite
                     _photoStatus.IsVisible = true;
                     _photoStatus.Text = text;
                 });
+                await WaitForPhotoWorkAsync(cancel);
                 var embedder = await EnsureEmbedderAsync(stage, cancel);
                 // Waits while the chat answers, so indexing doesn't slow the reply down.
-                await _photoIndex.IndexAsync(embedder, _embedderGate, MaxIndexedPhotos, () => _busy, cancel);
+                await _photoIndex.IndexAsync(embedder, (image, token) => RunIndexEmbeddingAsync(
+                    () => embedder.EmbedImage(image, visionTokensPerImage: PhotoIndex.VisionTokens),
+                    reason => MainThread.BeginInvokeOnMainThread(() => { _photoPauseReason = reason; UpdatePhotoStatus(); }),
+                    token, photos: true), MaxIndexedPhotos, () => _busy, cancel, WaitForPhotoWorkAsync);
                 UiStallWatchdog.Mark(string.Format("Photos indexed: {0}", _photoIndex.Count));
             }
             catch (OperationCanceledException)
@@ -207,6 +213,11 @@ namespace Maui.Demo.Lite
                 return;
             }
             _photoStatus.IsVisible = true;
+            if (_photoPauseReason != null)
+            {
+                _photoStatus.Text = $"Photo indexing paused: {_photoPauseReason}. {_photoIndex.Count} photos indexed.";
+                return;
+            }
             _photoStatus.Text = _photoIndex.IsIndexing && _photoIndex.Total > 0
                 ? string.Format(CultureInfo.InvariantCulture, "Indexing photos: {0} of {1}", _photoIndex.Count, _photoIndex.Total)
                 : string.Format(CultureInfo.InvariantCulture, "{0} photos indexed, {1} with a place", _photoIndex.Count, _photoIndex.WithPlaceCount);

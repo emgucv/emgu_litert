@@ -203,13 +203,25 @@ downloads and TTS voice listing were measured and ruled out.
       collect `ui_stalls.log` and the main thread's stacks.
 - [ ] Fix what it finds; if nothing shows up, keep the watchdog and close the item with the notes.
 
-## 13. Be gentle with phones
+## 13. Be gentle with phones — implemented
 
 Photo indexing (~20 minutes for 200 photos on a phone's CPU), document indexing and image generation keep the CPU busy.
 
-- [ ] Pause background work (photo indexing first) when the battery is low and not charging, or the phone is hot
-      (Android's thermal status, iOS `ProcessInfo.thermalState`); resume later; say so in the settings status.
-- [ ] Optionally index photos only while charging.
+- [x] Photo, past-chat and document indexing, plus image generation, pause at 20% battery or lower without external power. Resume on power
+      or at 25% to avoid repeatedly pausing near the threshold. Unknown battery levels do not count as low.
+- [x] Pause at Android severe-or-higher thermal status and Apple serious/critical thermal state, including while
+      charging. Mac Catalyst also checks thermal state; phone battery restrictions do not apply to desktops.
+- [x] Settings show the photo/chat/image pause reason; document chips and image tiles also explain the pause.
+      Work resumes automatically at the next check (about one second while paused), and cancellation remains usable.
+- [x] Optional persistent "Index photos only while charging" switch on Android/iOS, off by default.
+- [x] Check between photos, document batches/images and image-generation stages. Finish the active native call
+      before pausing; retain completed embeddings and image-generation state. Release the shared embedder while
+      waiting so interactive searches remain available. Downloads and normal chat replies use their existing behavior.
+- [x] Eight model-free tests cover battery thresholds/recovery, charging preference, heat, cancellation and retained
+      document embeddings. Related download/chat-index regressions also pass.
+- [x] Android API 35 emulator: native thermal/battery readings triggered heat and low-battery pauses; external power
+      resumed work, charging-only indexing waited at 80% until power was connected, and a paused wait was cancellable.
+- [ ] Extended real-device indexing/generation checks under heat and low battery; iOS battery APIs need a physical device.
 
 ## 14. Downloads that continue in the background — implemented with bounded Apple completion time
 

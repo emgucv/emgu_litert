@@ -266,6 +266,27 @@ namespace Emgu.LiteRT.LM.Models
             if (_images.Any(i => i.Embedding == null) && !model.SupportsImages)
                 throw new NotSupportedException(String.Format("{0} can't embed images", model.GetType().Name));
 
+            BuildAsync((texts, cancel) => Task.FromResult(model.EmbedDocuments(texts)),
+                (image, cancel) => Task.FromResult(model.EmbedImage(image)), progress, cancellationToken)
+                .GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Build using asynchronous embedding callbacks. A caller can wait for suitable device conditions and acquire
+        /// its shared model separately for each batch; completed embeddings are retained across pauses or retries.
+        /// Callbacks must dispatch synchronous inference off the UI thread when necessary.
+        /// </summary>
+        /// <param name="embedDocuments">Embed a batch of text passages</param>
+        /// <param name="embedImage">Embed one image; required only for images without embeddings</param>
+        /// <param name="progress">Reports completed batches</param>
+        /// <param name="cancellationToken">Stops between batches</param>
+        public async Task BuildAsync(Func<string[], CancellationToken, Task<float[][]>> embedDocuments,
+            Func<byte[], CancellationToken, Task<float[]>> embedImage,
+            IProgress<DocumentIndexProgress> progress = null, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (embedDocuments == null) throw new ArgumentNullException(nameof(embedDocuments));
+            if (_images.Any(i => i.Embedding == null) && embedImage == null)
+                throw new ArgumentNullException(nameof(embedImage));
             DocumentIndexProgress state = new DocumentIndexProgress
             {
                 PassageCount = _passages.Count,
@@ -280,7 +301,7 @@ namespace Emgu.LiteRT.LM.Models
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 List<DocumentPassage> batch = pending.Skip(start).Take(BatchSize).ToList();
-                float[][] embeddings = model.EmbedDocuments(batch.Select(p => p.Text).ToArray());
+                float[][] embeddings = await embedDocuments(batch.Select(p => p.Text).ToArray(), cancellationToken).ConfigureAwait(false);
                 for (int i = 0; i < batch.Count; i++)
                     batch[i].Embedding = embeddings[i];
                 state.PassagesDone += batch.Count;
@@ -290,7 +311,7 @@ namespace Emgu.LiteRT.LM.Models
             foreach (DocumentImage image in _images.Where(i => i.Embedding == null))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                image.Embedding = model.EmbedImage(image.Data);
+                image.Embedding = await embedImage(image.Data, cancellationToken).ConfigureAwait(false);
                 state.ImagesDone++;
                 if (progress != null)
                     progress.Report(state);

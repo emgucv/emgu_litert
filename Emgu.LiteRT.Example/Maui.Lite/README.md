@@ -156,6 +156,18 @@ Chat, search/embedding and image-model downloads now keep a platform download li
 Protection ends before native model loading or inference. The existing resumable downloader still owns Range/ETag
 handling and checksum verification. Interrupted transfers restart safely if their server cannot validate a resume.
 
+Photo, past-chat and document indexing, plus image generation, pause when a phone/tablet is at 20% battery or lower without
+external power. They resume when connected to power or when the battery reaches 25%. Indexing and image generation
+also pause when Android reports severe heat or Apple reports a serious/critical thermal state, even while charging.
+Settings show why work is waiting; document chips and image tiles show the pause too. Work resumes automatically
+when conditions improve. The current photo, document batch or generation stage finishes before pausing, keeping its
+completed work in memory (photo embeddings already saved remain on disk). Cancelling a paused operation still works.
+Interactive searches and ordinary chat replies remain available. Mac Catalyst checks heat but has no phone battery limit.
+
+On Android/iOS, **Index photos only while charging** in the photo-search settings optionally waits for external power
+before indexing; it is off by default and saved across launches. Turning it off lets pending indexing continue when
+the battery and temperature allow. It does not restrict document indexing, image generation or model downloads.
+
 ## The home page
 
 Like the Emgu CV demo, the home page has two tabs: **LiteRT-LM**, with the chat, and **TF Lite**, with the TensorFlow

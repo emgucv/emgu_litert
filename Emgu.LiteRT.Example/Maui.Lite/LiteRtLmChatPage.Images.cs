@@ -185,7 +185,12 @@ namespace Maui.Demo.Lite
             bool downloaded = _zimage.IsDownloaded;
             long present = _zimage.DownloadedBytes;
             _imageDeleteButton.IsVisible = present > 0;
-            if (_zimageDownload != null)
+            if (_imagePauseReason != null)
+            {
+                _imageStatus.IsVisible = true;
+                _imageStatus.Text = "Image generation paused: " + _imagePauseReason;
+            }
+            else if (_zimageDownload != null)
             {
                 _imageStatus.IsVisible = true;
                 _imageStatus.Text = string.Format(CultureInfo.InvariantCulture, "Downloading the image model: {0:P0} of {1:F1} GB",
@@ -237,6 +242,12 @@ namespace Maui.Demo.Lite
             if (prompt.Length == 0)
                 return "The description was empty: call generate_image again with what to draw.";
 
+            Action<string> modelPaused = reason => MainThread.BeginInvokeOnMainThread(() =>
+            {
+                _imagePauseReason = reason;
+                UpdateImageStatus();
+            });
+            await WaitForWorkAsync(false, modelPaused, cancel);
             await EnsureImageModelAsync();
             int tokens = _zimage.CountPromptTokens(prompt);
             if (tokens > ZImageTurbo.MaxPromptTokens)
@@ -254,6 +265,15 @@ namespace Maui.Demo.Lite
                 // The tool runs off the UI thread, so the progress is marshalled to it here.
                 ZImageResult result = await _zimage.Generate(prompt, seed, 8, new InlineProgress<ZImageProgress>(p =>
                 {
+                    // Generate reports each stage synchronously on its worker thread, before the native graph runs.
+                    // Keep the current latent state while waiting; cancellation still stops the pending generation.
+                    if (p.Stage != "Done")
+                        WaitForWorkAsync(false, reason => MainThread.BeginInvokeOnMainThread(() =>
+                        {
+                            _imagePauseReason = reason;
+                            UpdateImageStatus();
+                            tile.Stage.Text = reason == null ? p.Stage : "Image generation paused: " + reason;
+                        }), cancel).GetAwaiter().GetResult();
                     string text = p.Stage + string.Format(CultureInfo.InvariantCulture, " ({0:F0} s)", watch.Elapsed.TotalSeconds);
                     MainThread.BeginInvokeOnMainThread(() => tile.Stage.Text = text);
                 }), cancel);

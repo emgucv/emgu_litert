@@ -19,6 +19,8 @@
     <Compile Include="..\UnitTestZImageTurbo.cs" Link="UnitTestZImageTurbo.cs" />
     <Compile Include="..\UnitTestDownloads.cs" Link="UnitTestDownloads.cs" />
     <Compile Include="..\UnitTestBackgroundDownloads.cs" Link="UnitTestBackgroundDownloads.cs" />
+    <Compile Include="..\UnitTestWorkloadPolicy.cs" Link="UnitTestWorkloadPolicy.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\WorkloadPolicy.cs" Link="WorkloadPolicy.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\DownloadActivity.cs" Link="DownloadActivity.cs" />
     <Compile Include="..\UnitTestChatSearch.cs" Link="UnitTestChatSearch.cs" />
     <Compile Include="..\UnitTestChatExport.cs" Link="UnitTestChatExport.cs" />

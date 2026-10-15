@@ -99,10 +99,11 @@ namespace Maui.Demo.Lite
                         async (text, token) =>
                         {
                             while (_busy) await Task.Delay(250, token);
+                            Action<string> paused = reason => MainThread.BeginInvokeOnMainThread(() =>
+                                ChatIndexStatus(reason == null ? "Indexing chats..." : "Chat indexing paused: " + reason));
+                            await WaitForWorkAsync(false, paused, token);
                             var embedder = await EnsureEmbedderAsync(new Progress<string>(ChatIndexStatus), token);
-                            await _embedderGate.WaitAsync(token);
-                            try { return await Task.Run(() => embedder.EmbedDocuments(new[] { text })[0], token); }
-                            finally { _embedderGate.Release(); }
+                            return await RunIndexEmbeddingAsync(() => embedder.EmbedDocuments(new[] { text })[0], paused, token);
                         }, (done, total) => ChatIndexStatus(done == total ? $"{done} messages indexed."
                             : $"Indexing chats: {done} of {total} messages."), cancel);
                 }

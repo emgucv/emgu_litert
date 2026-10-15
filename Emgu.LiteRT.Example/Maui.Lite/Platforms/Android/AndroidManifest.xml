@@ -6,6 +6,7 @@
 		<uses-native-library android:name="libOpenCL.so" android:required="false" />
 	</application>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+	<uses-permission android:name="android.permission.BATTERY_STATS" />
 	<uses-permission android:name="android.permission.INTERNET" />
 	<!-- User-requested model transfers continue with the screen off; the service owns its wake lock. -->
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

@@ -247,9 +247,7 @@ namespace Maui.Demo.Lite
                     if (rebuild)
                     {
                         ((IProgress<string>)stage).Report("Rebuilding the document embeddings...");
-                        await _embedderGate.WaitAsync(cancel);
-                        try { await Task.Run(() => index.Build(savedEmbedder, cancellationToken: cancel), cancel); }
-                        finally { _embedderGate.Release(); }
+                        await BuildDocumentIndexAsync(index, savedEmbedder, state, null, cancel);
                         // Keep saved pictures for a later switch back to a vision model.
                         if (EmbeddingSupportsImages || !items.Any(i => i.IsImage))
                             await SaveDocumentIndexAsync(state, index, settings, summary);
@@ -261,6 +259,8 @@ namespace Maui.Demo.Lite
                 {
                     if (bytes == null)
                         throw new InvalidOperationException("its saved index is missing");
+                    await WaitForWorkAsync(false, reason => ((IProgress<string>)stage).Report(reason == null
+                        ? "Reading the document..." : "Document indexing paused: " + reason), cancel);
                     DocumentContent content = await DocumentReader.ReadAsync(bytes, state.Name, maxImages, stage, cancel);
                     state.PageCount = content.PageCount;
                     index = new DocumentIndex();
@@ -284,15 +284,7 @@ namespace Maui.Demo.Lite
                                 ? string.Format("Indexing the text: {0}%", 100 * p.PassagesDone / Math.Max(1, p.PassageCount))
                                 : string.Format("Indexing pictures: {0} of {1}", p.ImagesDone, p.ImageCount);
                     });
-                    await _embedderGate.WaitAsync(cancel);
-                    try
-                    {
-                        await Task.Run(() => index.Build(embedder, indexed, cancel), cancel);
-                    }
-                    finally
-                    {
-                        _embedderGate.Release();
-                    }
+                    await BuildDocumentIndexAsync(index, embedder, state, indexed, cancel);
                     UiStallWatchdog.Mark(string.Format("Document indexed in {0:F1}s", watch.Elapsed.TotalSeconds));
                     summary = DocumentSummary(state, content, index);
                     if (content.PagesSkipped > 0)
@@ -329,6 +321,19 @@ namespace Maui.Demo.Lite
                 }
                 return false;
             }
+        }
+
+        private Task BuildDocumentIndexAsync(DocumentIndex index, EmbeddingModel model, DocumentState state,
+            IProgress<DocumentIndexProgress> progress, CancellationToken cancel)
+        {
+            Action<string> paused = reason => MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (_document == state) state.Detail.Text = reason == null
+                    ? "Indexing the document..." : "Document indexing paused: " + reason;
+            });
+            return index.BuildAsync(
+                (texts, token) => RunIndexEmbeddingAsync(() => model.EmbedDocuments(texts), paused, token),
+                (image, token) => RunIndexEmbeddingAsync(() => model.EmbedImage(image), paused, token), progress, cancel);
         }
 
         // Save the index in the chat database, so the same file - or a chat that used it - needn't be indexed again.
