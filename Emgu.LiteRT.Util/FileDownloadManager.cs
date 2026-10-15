@@ -419,7 +419,12 @@ namespace Emgu.LiteRT.Util
                         }
                         return;
                     }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+                    // Apple's native HTTP stream can report a cancelled read as TimeoutException.
+                    // Keep cancellation distinguishable from a network failure on every platform.
+                    catch (Exception ex) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException("The download was cancelled.", ex, cancellationToken);
+                    }
                     catch (Exception) when (attempt < retry) { /* Retain bytes and retry with Range/If-Range. */ }
                 }
             }

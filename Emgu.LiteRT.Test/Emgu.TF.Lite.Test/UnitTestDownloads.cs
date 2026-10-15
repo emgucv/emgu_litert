@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.Util;
 using NUnit.Framework;
+using Maui.Demo.Lite;
 
 namespace Emgu.TF.Lite.Test;
 
@@ -98,6 +99,31 @@ public class UnitTestDownloads
         Check(server.Requests[1].Offset == saved && server.Requests[1].IfRange == "\"v1\"", "Missing Range/If-Range");
         Check(progress[0] == saved, "Progress did not include retained bytes");
         Complete(file);
+    }
+
+    [Test, CancelAfter(20000)]
+    public async Task TestBackgroundPauseRetainsVerifiedResumeState()
+    {
+        using var server = new Server((r, n) => r.Offset > 0 ? Response.Range(Data, r.Offset) : Response.Full(Data));
+        var file = FileFor(server);
+        var registry = new DownloadActivityRegistry();
+        using (var activity = registry.Begin("model", TestContext.CurrentContext.CancellationToken))
+        {
+            var manager = Manager(file);
+            manager.OnDownloadProgressChanged += (total, received, percent) =>
+            {
+                activity.Report(total, received);
+                if (received >= 524288) registry.PauseAll();
+            };
+            await Interrupted(manager, activity.Token);
+        }
+        long saved = file.PartialDownloadBytes;
+        Check(saved >= 524288 && saved < Data.Length, "Background pause lost partial bytes");
+        using (var activity = registry.Begin("model", TestContext.CurrentContext.CancellationToken))
+            await Manager(file).Download(0, activity.Token);
+        Check(server.Requests.Last().Offset == saved && server.Requests.Last().IfRange == "\"v1\"", "Resume after background expiration did not use validators");
+        Complete(file);
+        Check(registry.Snapshot().Length == 0, "Completed background download still active");
     }
 
     [Test, CancelAfter(20000)]

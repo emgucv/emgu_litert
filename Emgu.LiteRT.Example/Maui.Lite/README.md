@@ -138,6 +138,24 @@ Model downloads retain their progress when cancelled or interrupted. The picker 
 appended together. Servers without a strong validator restart safely. Completed downloads are checked against
 SHA-256 before becoming model files. Rows also show downloaded state and size on disk.
 
+Chat, search/embedding and image-model downloads now keep a platform download lifetime for the transfer itself:
+
+- **Android:** a `dataSync` foreground service shows aggregate progress and a **Pause** action, and holds a partial
+  wake lock only while transfers are active. Allow notification permission to see progress in the notification
+  drawer; denying it does not prevent Android's foreground service. Opening the notification returns to the app.
+  Pause affects all active model downloads. Completion, cancellation, errors and Android's service timeout release
+  the service and wake lock. Start or continue downloads while the app is in the foreground.
+- **iOS:** a finite UIKit background task gives an active download time to finish after switching apps or locking
+  the phone. If that time expires, the transfer is cancelled and its partial bytes are kept. Return to the app and
+  choose **Continue** (or retry the search-model operation); for image models, turn Image generation off and on.
+  Keep the app open for multi-GB transfers. This is bounded completion time, not a durable background URLSession
+  transfer, and does not relaunch a force-quit app.
+- **Mac Catalyst:** the same bounded background task plus a process activity keeps a user-requested transfer active
+  while the app is in the background. Explicit sleep, network loss or quitting can still interrupt it; resume later.
+
+Protection ends before native model loading or inference. The existing resumable downloader still owns Range/ETag
+handling and checksum verification. Interrupted transfers restart safely if their server cannot validate a resume.
+
 ## The home page
 
 Like the Emgu CV demo, the home page has two tabs: **LiteRT-LM**, with the chat, and **TF Lite**, with the TensorFlow

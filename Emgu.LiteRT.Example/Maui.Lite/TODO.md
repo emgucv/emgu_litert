@@ -211,14 +211,30 @@ Photo indexing (~20 minutes for 200 photos on a phone's CPU), document indexing 
       (Android's thermal status, iOS `ProcessInfo.thermalState`); resume later; say so in the settings status.
 - [ ] Optionally index photos only while charging.
 
-## 14. Downloads that continue in the background
+## 14. Downloads that continue in the background — implemented with bounded Apple completion time
 
-A multi-GB download stops when the app goes to the background or the phone sleeps.
+- [x] Android: a non-exported `dataSync` foreground service with aggregate progress, notification permission request,
+      a Pause action and an app-opening content intent. A partial wake lock keeps transfers moving with the screen
+      off; completion, cancellation, failure, service shutdown and Android 15+ timeout release it and stop the service.
+- [x] iOS / Mac Catalyst: UIKit background-task lifetime around transfers, expiring into resumable cancellation.
+      Mac Catalyst also holds a process activity. The app explains Apple's finite finishing time and Continue/retry.
+- [x] Chat, search/embedding (including Storage restore), and image-model downloads use the shared lifetime;
+      engine loading/inference does not keep a service or background task running.
+- [x] Builds on item 1: Range/strong-ETag resume and checksum verification remain in the existing downloader.
+      Apple's native HTTP handler can report cancellation as a timeout; normalize this to cancellation so it is
+      presented as a paused transfer. Image downloads also recognize platform cancellation.
+- [x] Model-free tests cover concurrent lifetimes, cancellation isolation, pause/complete races, progress snapshots
+      and a real loopback transfer paused then resumed with its retained offset and validator (19 focused tests).
+- [x] Android API 35 emulator: local 16 MB transfer continued with the app backgrounded and screen asleep, resumed
+      retained bytes, verified SHA-256, and released service/wake lock. Notification Pause action verified through UI.
+- [x] iOS 27 simulator: a throttled transfer continued behind Settings; cancellation retained bytes, and a later
+      attempt resumed with Range/If-Range and verified the final SHA-256.
+- [x] Mac Catalyst: a throttled transfer continued behind Finder; pausing retained bytes, and a later attempt
+      resumed and verified the final SHA-256 with all download activities released.
+- [ ] Extended screen-off / battery-policy checks on physical Android and iOS devices.
 
-- [ ] Android: a foreground service with a progress notification for model downloads.
-- [ ] iOS / Mac Catalyst: a background `URLSession` transfer, or at least finishing the current file in a background
-      task.
-- [ ] Builds on item 1 (resumable downloads): whatever is interrupted resumes.
+Apple support uses the explicitly allowed bounded-task approach. Durable background URLSession transfers that can
+finish arbitrarily large files while suspended remain a separate follow-up, not a guarantee of this implementation.
 
 ## 15. Agent tool: search documents (`search_documents`)
 

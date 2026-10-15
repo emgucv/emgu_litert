@@ -439,6 +439,8 @@ namespace Maui.Demo.Lite
             stage?.Report(embedder.DefaultModelFile.IsLocalFileVerified ? "Loading the search model..." : "Downloading " + SelectedEmbeddingName + "...");
             try
             {
+                await BackgroundDownloads.DownloadFileAsync(embedder.DefaultModelFile, SelectedEmbeddingName,
+                    (total, received, percent) => stage?.Report($"Downloading {SelectedEmbeddingName}: {percent:0}%"), cancel);
                 Action<Emgu.LiteRT.LM.EmbeddingEngineSettings> configure = settings =>
                 {
                     int count = CpuThreadSettings.Count;

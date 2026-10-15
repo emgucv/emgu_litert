@@ -31,6 +31,7 @@ namespace Maui.Demo.Lite
             UpdateSearchStorageState();
             return new VerticalStackLayout { Spacing = 6, Children = { Theme.SectionTitle("Storage"), open,
                 new Label { Text = "See sizes and free space, and remove models, caches, saved documents or chat attachments.", FontSize = 12, TextColor = Theme.SecondaryText },
+                new Label { Text = BackgroundDownloads.Hint, FontSize = 12, TextColor = Theme.SecondaryText },
                 _restoreSearchButton } };
         }
 
@@ -205,10 +206,8 @@ namespace Maui.Demo.Lite
             _restoreSearchButton.IsEnabled = false;
             try
             {
-                var download = new FileDownloadManager();
-                download.AddFile(file);
-                download.OnDownloadProgressChanged += (total, received, percent) => SetStatus($"Downloading search model: {percent:0}%");
-                await Task.Run(() => download.Download(1, cancel), cancel);
+                await BackgroundDownloads.DownloadFileAsync(file, name,
+                    (total, received, percent) => SetStatus($"Downloading search model: {percent:0}%"), cancel);
                 if (!await Task.Run(() => file.IsLocalFileValid, cancel)) throw new IOException("The search model failed verification.");
                 Preferences.Default.Set(SearchDeletedPreference + Path.GetFileName(file.LocalFile), false);
                 SetStatus("Search model downloaded. You can enable photo/chat search or attach a document again.");

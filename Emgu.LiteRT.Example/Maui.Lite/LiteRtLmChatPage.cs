@@ -1201,6 +1201,13 @@ namespace Maui.Demo.Lite
             LanguageModel model = NewModel();
             try
             {
+                if (!option.File.IsLocalFileVerified)
+                    ShowLoadStage(option, ModelLoadStage.Downloading);
+                await BackgroundDownloads.DownloadFileAsync(option.File, option.Name,
+                    (total, received, percent) => MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        if (!token.IsCancellationRequested) ShowDownloadProgress(total, received);
+                    }), token);
                 if (onGpu)
                 {
                     try
@@ -1237,9 +1244,10 @@ namespace Maui.Demo.Lite
             catch (Exception ex)
             {
                 await Task.Run(() => model.Dispose());
-                if (token.IsCancellationRequested)
+                if (token.IsCancellationRequested || ex is OperationCanceledException)
                 {
                     if (_downloadingChoice == option.Choice) _downloadingChoice = null;
+                    ClearLoading(option.Choice);
                     UpdateModelDownloadRows();
                     if (SelectedChoice == option.Choice && _loadingChoice == null && !IsDownloaded(option))
                         ShowDownloadPrompt(option);
@@ -1458,6 +1466,7 @@ namespace Maui.Demo.Lite
             }
             bool paused = option.File.PartialDownloadBytes > 0;
             string message = paused ? PausedDownload(option) : string.Format("{0} needs a one-time {1} download.", option.Name, option.Size);
+            message += " " + BackgroundDownloads.Hint;
             ShowLoadCard(option, message + (wifi ? "" : " You're not on Wi-Fi - mobile data may be used."), null);
             _loadSpinner.IsVisible = _loadSpinner.IsRunning = false;
             _chipSpinner.IsVisible = _chipSpinner.IsRunning = false;

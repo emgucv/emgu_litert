@@ -139,16 +139,22 @@ namespace Maui.Demo.Lite
             _zimageDownloadTask = Task.Run(async () =>
             {
                 string error = null;
+                bool paused = false;
+                BackgroundDownloads downloadLease = null;
                 try
                 {
+                    await using var lease = await BackgroundDownloads.BeginAsync("Image model", cancel.Token);
+                    downloadLease = lease;
                     await _zimage.Download(new InlineProgress<ZImageDownloadProgress>(p =>
                     {
+                        lease.Report(p.TotalBytes, p.BytesDone);
                         _zimageDownloadFraction = (double)p.BytesDone / p.TotalBytes;
                         UpdateImageStatus();
-                    }), cancel.Token);
+                    }), lease.Token);
                 }
-                catch (OperationCanceledException)
+                catch (Exception) when (cancel.IsCancellationRequested || downloadLease?.Token.IsCancellationRequested == true)
                 {
+                    paused = true;
                 }
                 catch (Exception ex)
                 {
@@ -161,6 +167,8 @@ namespace Maui.Demo.Lite
                     UpdateImageStatus();
                     if (error != null)
                         _imageStatus.Text = "Download stopped: " + error + " (turn the switch off and on to retry)";
+                    else if (paused && _imageSwitch.IsToggled)
+                        _imageStatus.Text = "Download paused. Turn Image generation off and on to continue from the saved bytes.";
                 });
             });
         }
