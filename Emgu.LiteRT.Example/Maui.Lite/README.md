@@ -171,6 +171,10 @@ the battery and temperature allow. It does not restrict document indexing, image
 The opt-in [agent regression suite](../../Emgu.LiteRT.Test/Emgu.TF.Lite.Test/AgentRegression.md) checks Gemma 4 E2B's
 tool selection, arguments and final replies with offline fake tools. Run it after runtime/model or tool wording changes.
 
+Saved chats restore in short UI batches with one final scroll; streamed replies share a coalesced scroll request.
+The [Pixel Fold investigation](PixelFoldFreeze.md) records the measured stalls, device checks and remaining limits.
+Debug builds retain `UiStallWatchdog` logs in the app data folder as `ui_stalls.log`.
+
 ## The home page
 
 Like the Emgu CV demo, the home page has two tabs: **LiteRT-LM**, with the chat, and **TF Lite**, with the TensorFlow

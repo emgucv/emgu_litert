@@ -202,15 +202,23 @@ the Windows source-built bundle.
 - [ ] Add a persistent automated GPU embedding test skipped without the matching accelerator plugin.
 - [ ] Verify simultaneous chat/search GPU memory use and indexing performance on phones.
 
-## 12. The unexplained Pixel Fold freeze
+## 12. Pixel Fold freeze — rendering stalls fixed; original ANR unconfirmed
 
-A Pixel Fold "isn't responding" at 20:17 on 2026-10-10 is still unexplained (CLAUDE.md); streaming, model
-downloads and TTS voice listing were measured and ruled out.
+A Pixel Fold "isn't responding" at 20:17 on 2026-10-10 has no retained matching trace (CLAUDE.md). The
+[2026-10-15 investigation](PixelFoldFreeze.md) reproduced a separate, concrete long-chat rendering problem.
 
-- [ ] Use the Debug build's `UiStallWatchdog` deliberately: long chats, compaction, opening saved chats, attaching
-      documents, photo indexing and image generation in the background, while switching apps and folding/unfolding;
-      collect `ui_stalls.log` and the main thread's stacks.
-- [ ] Fix what it finds; if nothing shows up, keep the watchdog and close the item with the notes.
+- [x] Collect app watchdog logs/Java main-thread stacks and Android exit history on the physical Pixel Fold (Android 17).
+      Exercise a synthetic 160-message saved chat, streaming, drop/summary compaction, document/photo indexing,
+      app background/return and shell-requested folded/unfolded configurations, using a separate cache database.
+- [x] Fix reproduced 4,767 ms opening and 4,159 ms layout stalls: yield between short restore slices, suppress
+      per-row animated scrolling and coalesce subsequent scrolling. Prevent other chat actions during restoration.
+- [x] Fixed comparison: no one-second watchdog event through opening, streaming, compaction, document indexing,
+      four completed photo embeddings and a repeated 162-message reopen. Keep the Debug watchdog; remove probe data.
+      Android/Mac Catalyst builds and 13 private/workload tests pass. Total large-history rendering time remains a limit.
+- [ ] Extended manual hinge testing and full native image-generation stress (model absent; only ~22 GB free, near
+      the model/cache requirement). Shell fold-state transitions do not cover all physical hinge behavior.
+- [ ] Capture a matching trace if the original dialog recurs. Exit history also has un-attributed non-user-perceptible
+      job-start ANR annotations without a retrievable trace; the rendering fix does not prove those resolved.
 
 ## 13. Be gentle with phones — implemented
 

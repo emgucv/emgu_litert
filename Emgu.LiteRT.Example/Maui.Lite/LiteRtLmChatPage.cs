@@ -3007,90 +3007,114 @@ namespace Maui.Demo.Lite
         // Open a saved chat: switch to its model, show its messages, and give the model the conversation so far.
         private async Task OpenConversationAsync(int id)
         {
-            if (!CanChangeModel)
-                return;
-            if (!await LeavePrivateChatAsync()) return;
-            ConversationRecord chat = (await _store.GetConversationsAsync()).FirstOrDefault(c => c.Id == id);
-            if (chat == null)
-                return;
-            UiStallWatchdog.Mark("Open saved chat " + id);
-            int index = Array.FindIndex(Models, m => m.Choice.ToString() == chat.Model);
-            if (index >= 0 && index != _selectedModel)
-                SelectModel(index);
-            StartNewChat();
-            // The document belongs to the chat it was attached to (what the model was given of it is saved with it).
-            RemoveDocument();
-            _conversationId = id;
-            UpdateExportChatButton();
-            _summary = chat.Summary;
-            bool contextStartFound = false;
-
-            foreach (MessageRecord message in await _store.GetMessagesAsync(id))
+            if (!CanChangeModel || !await LeavePrivateChatAsync()) return;
+            // Ending a private chat can await confirmation; another action may have started in the meantime.
+            if (!CanChangeModel) return;
+            SetBusy(true);
+            _restoringTranscript = true;
+            try
             {
-                // The model sees the messages after the last compaction (and the summary of those before).
-                if (!contextStartFound && message.Id > chat.SummaryUpTo && message.Role != MessageRecord.StepRole)
+                ConversationRecord chat = (await _store.GetConversationsAsync()).FirstOrDefault(c => c.Id == id);
+                if (chat == null)
+                    return;
+                UiStallWatchdog.Mark("Open saved chat " + id);
+                int index = Array.FindIndex(Models, m => m.Choice.ToString() == chat.Model);
+                if (index >= 0 && index != _selectedModel)
+                    SelectModel(index);
+                StartNewChat();
+                // The document belongs to the chat it was attached to (what the model was given of it is saved with it).
+                RemoveDocument();
+                _conversationId = id;
+                UpdateExportChatButton();
+                _summary = chat.Summary;
+                bool contextStartFound = false;
+
+                var messages = await _store.GetMessagesAsync(id);
+                var slice = System.Diagnostics.Stopwatch.StartNew();
+                int rendered = 0;
+                foreach (MessageRecord message in messages)
                 {
-                    contextStartFound = true;
+                    // Native view attachment and Markdown formatting belong on the UI thread, but a whole saved
+                    // conversation must not monopolize it. Let input/layout run between short rendering slices.
+                    if (slice.ElapsedMilliseconds >= 16)
+                    {
+                        SetStatus($"Opening conversation: {rendered} of {messages.Count} messages...");
+                        await Task.Delay(16);
+                        slice.Restart();
+                    }
+                    rendered++;
+                    // The model sees the messages after the last compaction (and the summary of those before).
+                    if (!contextStartFound && message.Id > chat.SummaryUpTo && message.Role != MessageRecord.StepRole)
+                    {
+                        contextStartFound = true;
+                        _contextStart = _historyItems.Count;
+                        if (chat.SummaryUpTo > 0)
+                            AddCompactionDivider(_transcript.Children.Count, chat.Summary);
+                    }
+                    if (message.Role == MessageRecord.StepRole)
+                    {
+                        AddSavedStep(message.Text);
+                        continue;
+                    }
+                    var item = new HistoryItem { Role = message.Role, Text = message.Text, Context = message.Context, MessageId = message.Id };
+                    List<PendingAttachment> shown = new List<PendingAttachment>();
+                    foreach (SavedAttachment attachment in _store.GetAttachments(message))
+                    {
+                        byte[] data = await System.IO.File.ReadAllBytesAsync(attachment.Path);
+                        if (attachment.Kind == GeneratedKind)
+                        {
+                            // A picture the reply drew: shown above it, not part of what the model is given.
+                            AddSavedGeneratedImage(data);
+                            continue;
+                        }
+                        item.Attachments.Add((attachment.Kind, attachment.MediaType, data));
+                        shown.Add(new PendingAttachment
+                        {
+                            Image = attachment.Kind == "image" ? data : null,
+                            Data = data,
+                            MediaType = attachment.MediaType,
+                            Name = System.IO.Path.GetFileName(attachment.Path)
+                        });
+                    }
+                    _historyItems.Add(item);
+                    if (message.Role == MessageRecord.UserRole)
+                    {
+                        int viewIndex = _transcript.Children.Contains(_emptyLabel) ? 0 : _transcript.Children.Count;
+                        AddUserMessage(message.Text, shown);
+                        if (viewIndex < _transcript.Children.Count)
+                            item.View = _transcript.Children[viewIndex] as View;
+                    }
+                    else
+                    {
+                        StreamingBubble bubble = AddStreamingBubble();
+                        UpdateStreamingBubble(bubble, new ChatReply(string.IsNullOrEmpty(message.Thinking)
+                            ? message.Text : "<think>" + message.Thinking + "</think>" + message.Text), true);
+                    }
+                }
+
+                if (!contextStartFound)
+                {
                     _contextStart = _historyItems.Count;
                     if (chat.SummaryUpTo > 0)
                         AddCompactionDivider(_transcript.Children.Count, chat.Summary);
                 }
-                if (message.Role == MessageRecord.StepRole)
-                {
-                    AddSavedStep(message.Text);
-                    continue;
-                }
-                var item = new HistoryItem { Role = message.Role, Text = message.Text, Context = message.Context, MessageId = message.Id };
-                List<PendingAttachment> shown = new List<PendingAttachment>();
-                foreach (SavedAttachment attachment in _store.GetAttachments(message))
-                {
-                    byte[] data = await System.IO.File.ReadAllBytesAsync(attachment.Path);
-                    if (attachment.Kind == GeneratedKind)
-                    {
-                        // A picture the reply drew: shown above it, not part of what the model is given.
-                        AddSavedGeneratedImage(data);
-                        continue;
-                    }
-                    item.Attachments.Add((attachment.Kind, attachment.MediaType, data));
-                    shown.Add(new PendingAttachment
-                    {
-                        Image = attachment.Kind == "image" ? data : null,
-                        Data = data,
-                        MediaType = attachment.MediaType,
-                        Name = System.IO.Path.GetFileName(attachment.Path)
-                    });
-                }
-                _historyItems.Add(item);
-                if (message.Role == MessageRecord.UserRole)
-                {
-                    int viewIndex = _transcript.Children.Contains(_emptyLabel) ? 0 : _transcript.Children.Count;
-                    AddUserMessage(message.Text, shown);
-                    if (viewIndex < _transcript.Children.Count)
-                        item.View = _transcript.Children[viewIndex] as View;
-                }
-                else
-                {
-                    StreamingBubble bubble = AddStreamingBubble();
-                    UpdateStreamingBubble(bubble, new ChatReply(string.IsNullOrEmpty(message.Thinking)
-                        ? message.Text : "<think>" + message.Thinking + "</think>" + message.Text), true);
-                }
+                // The document the chat used, from its saved index.
+                if (!string.IsNullOrEmpty(chat.DocumentId))
+                    _ = RestoreDocumentAsync(chat.DocumentId);
+                // The model is given the conversation with the next message, once its size is known (compacting it first if
+                // it doesn't fit, e.g. a long chat saved before compaction existed).
+                _needsPrime = true;
+                UpdateMemoryLabel();
+                await RefreshChatListAsync();
+                SetStatus(null);
+                UiStallWatchdog.Mark($"Opened saved chat: {messages.Count} messages");
             }
-
-            if (!contextStartFound)
+            finally
             {
-                _contextStart = _historyItems.Count;
-                if (chat.SummaryUpTo > 0)
-                    AddCompactionDivider(_transcript.Children.Count, chat.Summary);
+                _restoringTranscript = false;
+                SetBusy(false);
+                ScrollToEnd(false);
             }
-            // The document the chat used, from its saved index.
-            if (!string.IsNullOrEmpty(chat.DocumentId))
-                _ = RestoreDocumentAsync(chat.DocumentId);
-            // The model is given the conversation with the next message, once its size is known (compacting it first if
-            // it doesn't fit, e.g. a long chat saved before compaction existed).
-            _needsPrime = true;
-            UpdateMemoryLabel();
-            await RefreshChatListAsync();
-            ScrollToEnd();
         }
 
         private void AddSavedStep(string text)
@@ -3367,19 +3391,36 @@ namespace Maui.Demo.Lite
             };
         }
 
-        private async void ScrollToEnd()
+        private bool _restoringTranscript;
+        private bool _scrollQueued;
+        private bool _scrollRequested;
+        private bool _animateScroll;
+
+        private async void ScrollToEnd(bool animated = true)
         {
+            if (_restoringTranscript) return;
+            _scrollRequested = true;
+            _animateScroll = animated;
+            if (_scrollQueued) return;
+            _scrollQueued = true;
             try
             {
-                await Task.Yield();
-                // Scroll to the actual bottom: Android doesn't clamp the offset, so scrolling to
-                // double.MaxValue would scroll the whole transcript out of view.
-                double bottom = Math.Max(0, _transcript.Height - _scroll.Height);
-                await _scroll.ScrollToAsync(0, bottom, true);
+                // One request per frame/animation, rather than one animated scroll per restored row or token.
+                // Remember updates arriving during an animation so the final token still reaches the bottom.
+                while (_scrollRequested)
+                {
+                    await Task.Delay(16);
+                    if (_restoringTranscript) return;
+                    _scrollRequested = false;
+                    // Android doesn't clamp double.MaxValue; use the actual bottom of the laid-out transcript.
+                    double bottom = Math.Max(0, _transcript.Height - _scroll.Height);
+                    await _scroll.ScrollToAsync(0, bottom, _animateScroll);
+                }
             }
             catch (Exception)
             {
             }
+            finally { _scrollQueued = false; }
         }
 
         // ---------- Busy / status ----------
