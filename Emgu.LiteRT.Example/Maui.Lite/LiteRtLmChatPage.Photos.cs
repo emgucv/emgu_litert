@@ -84,11 +84,21 @@ namespace Maui.Demo.Lite
             if (e.Value)
             {
                 bool allowed = false;
-                try { allowed = await PhotoLibrary.RequestAccessAsync(); } catch (Exception) { }
+                try { allowed = await PhotoLibrary.RequestAccessAsync(); }
+                catch (Exception ex)
+                {
+                    SetPhotoSearchOff();
+                    ShowPhotoAccessError("Could not request photo access: " + ex.Message);
+                    return;
+                }
                 if (!allowed)
                 {
-                    _photoSwitch.IsToggled = false;
-                    SetStatus("Photo search needs access to your photos.");
+                    SetPhotoSearchOff();
+#if MACCATALYST
+                    ShowPhotoAccessError("Allow Emgu LiteRT in System Settings > Privacy & Security > Photos, then turn on Search my photos again.");
+#else
+                    ShowPhotoAccessError("Photo search needs access to your photos. Allow photo access in your device's settings, then try again.");
+#endif
                     return;
                 }
                 StartPhotoIndexing();
@@ -100,6 +110,13 @@ namespace Maui.Demo.Lite
                 await _photoIndex.ClearAsync();
                 UpdatePhotoStatus();
             }
+        }
+
+        private void ShowPhotoAccessError(string message)
+        {
+            _photoStatus.Text = message;
+            _photoStatus.IsVisible = true;
+            SetStatus(message);
         }
 
         // When an indexing pass last started; returning to the page or the app starts another at most this often.

@@ -25,6 +25,15 @@
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 	</PropertyGroup>
 
+	<Import Project="MacCatalyst.Signing.props" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' and Exists('MacCatalyst.Signing.props')" />
+
+	<!-- Keychain entitlements require a matching Mac Catalyst provisioning profile. Keep ordinary ad-hoc builds
+	     runnable; they report session-only API keys. Pass CodesignKey and CodesignProvision for persistence. -->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' and '$(CodesignProvision)' != ''">
+		<EnableCodeSigning>true</EnableCodeSigning>
+		<CodesignEntitlements Condition="'$(CodesignEntitlements)' == ''">Platforms/MacCatalyst/Keychain.entitlements.plist</CodesignEntitlements>
+	</PropertyGroup>
+
 	<!--
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0-ios|AnyCPU'">
 	  <CreatePackage>false</CreatePackage>

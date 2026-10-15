@@ -209,8 +209,38 @@ again.
   keeps the last setting: the model reasons before answering, which gives better answers but takes longer and uses
   more of its context (so long chats are compacted sooner). While the model thinks, the reply shows "Thinking..."
   and the last few lines of it; once the answer starts, the thinking collapses to "Thought for N s" - tap it to read
-  it all, formatted like the answer (code blocks, maths). Web search uses Wikipedia, and
-  the web with a Tavily API key (Settings); your searches leave the device.
+  it all, formatted like the answer (code blocks, maths). General web search (including news) requires a Tavily API
+  key in Settings > Web search. Without a key, Wikipedia, reading supplied links, weather and currency conversion
+  remain available. A notice above the message box explains the missing key when Web search is enabled; the agent
+  also receives this limitation so it can explain how to enable general search. Your searches leave the device.
+  In Settings, select **Save API key** (leaving the key field also saves). The app verifies the value in secure
+  storage before reporting success. If saving fails, it shows a persistent session-only warning and allows retrying
+  the same key. Clear the field and save to remove a stored key; the app reports removal failures too.
+
+  **Mac Catalyst key persistence:** MAUI SecureStorage uses the data-protection Keychain, which requires a signed
+  app and a matching Mac Catalyst provisioning profile. Ad-hoc builds remain usable with session-only keys.
+  Obtain a Mac Catalyst development profile for `com.emgu.litert` using your Apple developer team, then build with:
+
+  ```bash
+  dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: Your Name (CERTIFICATE_ID)" -p:CodesignProvision="PROFILE_UUID"
+  ```
+
+  The project includes `Platforms/MacCatalyst/Keychain.entitlements.plist` when `CodesignProvision` is supplied; its Keychain
+  access group uses the provisioning profile's App ID prefix and this app's bundle identifier. Use the same team
+  and bundle identifier on subsequent builds to retain access. API keys are never saved to plain-text preferences.
+  To reuse signing settings for ordinary local builds, create the gitignored `MacCatalyst.Signing.props` beside
+  `Maui.Demo.Lite.csproj`:
+
+  ```xml
+  <Project>
+    <PropertyGroup>
+      <CodesignKey>Apple Development: Your Name (CERTIFICATE_ID)</CodesignKey>
+      <CodesignProvision>PROFILE_UUID</CodesignProvision>
+    </PropertyGroup>
+  </Project>
+  ```
+
+  Keep this local file up to date when the development certificate or provisioning profile expires.
 - The "+" button attaches images (from the photo library, the camera - "Take Photo", on devices with one - or the
   samples) or audio, and the microphone button records a voice message, for models that accept them; the first photo
   or recording asks for camera / microphone access.

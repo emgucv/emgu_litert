@@ -187,7 +187,12 @@ namespace Maui.Demo.Lite
             "something lasting about themselves, save it with the remember tool. Base your answer on what the tools " +
             "return, mention where it came from, and keep it short.";
         private readonly ToggleChip _webSearchSwitch;
+        private readonly Label _webSearchNotice;
         private readonly Entry _tavilyKeyEntry;
+        private readonly Label _tavilyKeyStatus;
+        private readonly Button _saveTavilyKeyButton;
+        private readonly SemaphoreSlim _tavilyKeySaveGate = new SemaphoreSlim(1, 1);
+        private string _savedTavilyKey;
         // Whether the agent gets the location tool (Settings, off by default): the user's town and approximate
         // coordinates, which leave the device in web searches that use them.
         private const string ShareLocationPreference = "litert_lm_chat_share_location";
@@ -419,6 +424,14 @@ namespace Maui.Demo.Lite
             _webSearchSwitch.IsToggled = webSearch;
             _webSearchSwitch.Toggled += OnWebSearchToggled;
             _toggleRow = new HorizontalStackLayout { Spacing = 8, Children = { _thinkingSwitch, _webSearchSwitch } };
+            _webSearchNotice = new Label
+            {
+                Text = "Web search requires a Tavily API key. Add one in Settings > Web search. Without a key, Wikipedia, links you provide, weather and currency tools are still available.",
+                FontFamily = Theme.BodyFont,
+                FontSize = 12,
+                TextColor = Theme.SecondaryText,
+                IsVisible = false
+            };
 
             // ---- Settings that are set once (a bottom sheet, or the side panel on wide screens) ----
             _readAloudSwitch = new Switch { IsToggled = false, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
@@ -442,13 +455,23 @@ namespace Maui.Demo.Lite
             readAloudRow.Add(_readAloudSwitch, 1, 0);
             _tavilyKeyEntry = new Entry
             {
-                Placeholder = "Tavily API key (optional)",
+                Placeholder = "Tavily API key (required for web search)",
+                IsEnabled = false,
                 IsPassword = true,
                 FontFamily = Theme.BodyFont,
                 FontSize = 14,
                 TextColor = Theme.PrimaryText,
                 PlaceholderColor = Theme.SecondaryText
             };
+            _tavilyKeyStatus = new Label
+            {
+                Text = "Loading saved API key...",
+                FontFamily = Theme.BodyFont,
+                FontSize = 12,
+                TextColor = Theme.SecondaryText
+            };
+            _saveTavilyKeyButton = new Button { Text = "Save API key", IsEnabled = false };
+            _saveTavilyKeyButton.Clicked += (s, e) => OnTavilyKeyChanged();
             bool shareLocation = false;
             try { shareLocation = Preferences.Default.Get(ShareLocationPreference, false); } catch (Exception) { }
             _shareLocationSwitch = new Switch { IsToggled = shareLocation, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
@@ -551,12 +574,14 @@ namespace Maui.Demo.Lite
                     new Label { Text = "Web search", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     new Label
                     {
-                        Text = "With \U0001F50E Web search on, Gemma 4 can look things up on Wikipedia, read links you give it, check the weather and convert currencies - and, with a Tavily API key (free at tavily.com), search the web. Your searches leave the device.",
+                        Text = "Searching the web for news and recent events requires a Tavily API key from tavily.com. With \U0001F50E Web search on, Wikipedia, reading links you provide, weather and currency conversion work without a key. Your searches leave the device.",
                         FontFamily = Theme.BodyFont,
                         FontSize = 12,
                         TextColor = Theme.SecondaryText
                     },
                     _tavilyKeyEntry,
+                    _saveTavilyKeyButton,
+                    _tavilyKeyStatus,
                     Theme.Divider(),
                     locationRow,
                     new Label
@@ -740,7 +765,7 @@ namespace Maui.Demo.Lite
             _documentBar = new HorizontalStackLayout { Spacing = 8, IsVisible = false };
             var composer = new VerticalStackLayout { Spacing = 8, Children = { _documentBar, _attachmentScroll, composerRow } };
 
-            var composerCard = Theme.Card(new VerticalStackLayout { Spacing = 8, Children = { _toggleRow, composer } }, 10);
+            var composerCard = Theme.Card(new VerticalStackLayout { Spacing = 8, Children = { _toggleRow, _webSearchNotice, composer } }, 10);
 
             // ---- Main column ----
             _mainColumn = new Grid
@@ -1022,6 +1047,7 @@ namespace Maui.Demo.Lite
             _thinkingSwitch.IsVisible = option.CanThink;
             _webSearchSwitch.IsVisible = option.CanUseTools;
             _toggleRow.IsVisible = option.CanThink || option.CanUseTools;
+            UpdateWebSearchNotice();
             UpdateContextSection();
             // Drop attachments the new model can't take.
             foreach (PendingAttachment attachment in _pending.ToList())
@@ -1692,7 +1718,7 @@ namespace Maui.Demo.Lite
                     IsPrivateChat ? null : SearchChatsAsync, privateChat: IsPrivateChat),
                 // Local search and generation tools remain available with their settings off, so the model can explain how to
                 // turn them on.
-                Instructions = JoinInstructions(await MemoryInstructionsAsync(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions,
+                Instructions = JoinInstructions(await MemoryInstructionsAsync(), WebSearchInstructions(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions,
                     ImageGenerationSupported ? ImageInstructions : null),
                 ToolMode = ChatToolMode.Auto
             };
@@ -1817,13 +1843,29 @@ namespace Maui.Demo.Lite
         private void OnWebSearchToggled(object sender, ToggledEventArgs e)
         {
             try { Preferences.Default.Set(WebSearchPreference, e.Value); } catch (Exception) { }
+            UpdateWebSearchNotice();
             // Applies from the next message; the conversation continues.
             if (e.Value && !_busy)
                 SetStatus(string.IsNullOrEmpty(_tavilyKey)
-                    ? "Web search on: Wikipedia. Add a Tavily key in Settings to search the web."
+                    ? "Web search requires a Tavily API key in Settings > Web search. Wikipedia and other keyless tools are available."
                     : "Web search on: Wikipedia and the web.");
             else if (!_busy)
                 SetStatus(null);
+        }
+
+        private void UpdateWebSearchNotice()
+        {
+            _webSearchNotice.IsVisible = SelectedOption.CanUseTools && _webSearchSwitch.IsToggled
+                && string.IsNullOrWhiteSpace(_tavilyKey);
+        }
+
+        private string WebSearchInstructions()
+        {
+            if (!_webSearchSwitch.IsToggled)
+                return "Web search is turned off. If a request needs current online information, explain that the user must enable Web search; general web search also requires a Tavily API key in Settings > Web search. Do not invent current facts.";
+            if (string.IsNullOrWhiteSpace(_tavilyKey))
+                return "General web search is unavailable because no Tavily API key is configured. Wikipedia, reading URLs the user supplies, weather and currency conversion are available without a key. For news, recent stock movements or other requests needing general web search, explicitly tell the user: Add a Tavily API key in Settings > Web search, then retry. Do not merely say you lack internet or real-time access, and do not invent current facts.";
+            return "General web search is available through search_web. Use it for news and recent events, and cite the sources returned.";
         }
 
         private async Task LoadTavilyKeyAsync()
@@ -1831,34 +1873,69 @@ namespace Maui.Demo.Lite
             try
             {
                 _tavilyKey = await SecureStorage.Default.GetAsync(TavilyKeyStorageName) ?? string.Empty;
+                _savedTavilyKey = _tavilyKey;
                 _tavilyKeyEntry.Text = _tavilyKey;
+                _tavilyKeyStatus.Text = _tavilyKey.Length > 0 ? "API key loaded from secure storage." : "No API key saved.";
             }
             catch (Exception)
             {
-                // No secure storage (e.g. no keychain access): the key is kept for this session only.
+                _tavilyKeyStatus.Text = "Could not load the saved API key from secure storage. Enter it again and select Save API key to retry.";
             }
+            _tavilyKeyEntry.IsEnabled = true;
+            _saveTavilyKeyButton.IsEnabled = true;
+            UpdateWebSearchNotice();
         }
 
         private async void OnTavilyKeyChanged()
         {
-            string key = _tavilyKeyEntry.Text?.Trim() ?? string.Empty;
-            if (key == _tavilyKey)
-                return;
-            _tavilyKey = key;
+            await _tavilyKeySaveGate.WaitAsync();
             try
             {
+                string key = _tavilyKeyEntry.Text?.Trim() ?? string.Empty;
+                if (key == _savedTavilyKey) return;
+                _tavilyKey = key;
+                UpdateWebSearchNotice();
+                _saveTavilyKeyButton.IsEnabled = false;
+                _tavilyKeyStatus.Text = "Saving API key to secure storage...";
                 if (key.Length > 0)
                     await SecureStorage.Default.SetAsync(TavilyKeyStorageName, key);
                 else
-                    SecureStorage.Default.Remove(TavilyKeyStorageName);
+                {
+                    bool removed = SecureStorage.Default.Remove(TavilyKeyStorageName);
+                    if (!removed && !string.IsNullOrEmpty(_savedTavilyKey))
+                        throw new InvalidOperationException("Secure storage removal failed.");
+                }
+
+                // Read back before reporting success: some platform keychain failures don't throw.
+                string stored = await SecureStorage.Default.GetAsync(TavilyKeyStorageName) ?? string.Empty;
+                if (!string.Equals(stored, key, StringComparison.Ordinal))
+                    throw new InvalidOperationException("Secure storage verification failed.");
+                _savedTavilyKey = key;
+                _tavilyKeyStatus.Text = key.Length > 0
+                    ? "API key saved securely. It will be available after restarting the app."
+                    : "API key removed from secure storage.";
+                if (!_busy)
+                    SetStatus(key.Length > 0
+                        ? (_webSearchSwitch.IsToggled ? "Tavily API key saved. Web search is on." : "Tavily API key saved. Enable Web search to use it.")
+                        : "Tavily key removed. General web search requires a Tavily API key.");
             }
             catch (Exception)
             {
-                // Kept for this session only.
+                // Never include the key or the exception in UI, logs or ordinary preferences.
+                _savedTavilyKey = null;
+                _tavilyKeyStatus.Text = _tavilyKey.Length > 0
+                    ? "API key could not be saved securely. It is available for this session only. Select Save API key to retry."
+                    : "Could not confirm removal from secure storage. A previously saved key may return after restarting. Select Save API key to retry.";
+#if MACCATALYST
+                _tavilyKeyStatus.Text += " This Mac build needs code signing and a provisioning profile with Keychain access enabled.";
+#endif
+                SetStatus(_tavilyKeyStatus.Text);
             }
-            // The tools are chosen per message, so the conversation simply continues.
-            if (!_busy)
-                SetStatus(key.Length > 0 ? "Web search with Tavily is on." : "Tavily key removed.");
+            finally
+            {
+                _saveTavilyKeyButton.IsEnabled = true;
+                _tavilyKeySaveGate.Release();
+            }
         }
 
         // Wait for the selected model before sending: loads it if needed. If it still needs downloading, the card asks

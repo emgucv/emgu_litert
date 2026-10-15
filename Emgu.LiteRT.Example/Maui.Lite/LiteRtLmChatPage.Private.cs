@@ -14,6 +14,7 @@ namespace Maui.Demo.Lite
         private IDisposable _privateDiagnostics;
         private readonly List<Task> _privateDocumentTasks = new();
         private int _sessionVersion;
+        private bool _changingPrivateMode;
         private bool IsPrivateChat => _store.IsPrivateSession;
         private const string PrivateInstructions = "This is a private chat. Do not claim to remember or save anything for future chats. " +
             "You cannot access saved memories or past conversations. Use only this conversation and the available tools.";
@@ -42,10 +43,28 @@ namespace Maui.Demo.Lite
         private async void OnPrivateChatToggled(object sender, ToggledEventArgs e)
         {
             bool requested = e.Value;
-            SetPrivateSwitch(IsPrivateChat);
-            if (requested == IsPrivateChat || !CanChangeModel || _exportingChat) return;
-            if (!requested && !await ConfirmEndPrivateChatAsync()) return;
-            await ChangePrivateModeAsync(requested);
+            if (_changingPrivateMode || requested == IsPrivateChat) return;
+            if (!CanChangeModel || _exportingChat)
+            {
+                SetPrivateSwitch(IsPrivateChat);
+                SetStatus("Wait for active work to finish before changing Private chat.");
+                return;
+            }
+            // Keep the requested value while handling the native switch event. Resetting it here can cause
+            // Catalyst to deliver a second change event that immediately reverses the accepted transition.
+            _changingPrivateMode = true;
+            _privateChatSwitch.IsEnabled = false;
+            try
+            {
+                if (!requested && !await ConfirmEndPrivateChatAsync()) return;
+                await ChangePrivateModeAsync(requested);
+            }
+            finally
+            {
+                SetPrivateSwitch(IsPrivateChat);
+                _privateChatSwitch.IsEnabled = true;
+                _changingPrivateMode = false;
+            }
         }
 
         private Task<bool> ConfirmEndPrivateChatAsync()
