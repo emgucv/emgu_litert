@@ -76,22 +76,27 @@ summary when collapsed, Preferences persistence, and device checks remain unfini
 
 - [ ] Check on Mac Catalyst and a foldable's inner screen.
 
-## 5. A new app icon
+## 5. A new app icon — implemented; Windows visual check remains
 
-The demo ("Emgu LiteRT", `com.emgu.litert`) still has the .NET MAUI template's icon and splash screen: the ".NET" logo
-on purple (`#512BD4`, `Resources/AppIcon/appicon.svg` + `appiconfg.svg`, `Resources/Splash/splash.svg`), which says
-nothing about the app and doesn't match its blue theme (`Theme.Accent`, `#3D7BF7`).
+The demo ("Emgu LiteRT", `com.emgu.litert`) now uses a white chat bubble with a spark cutout on the app's accent blue
+(`#3D7BF7`). The editable SVGs replace the .NET template artwork; the foreground and splash share the same mark.
 
-- [ ] Design: something for on-device AI - e.g. a chat bubble with a spark - in the app's colours, recognisable at
-      small sizes (16 px on Windows, the Android status bar) and in light and dark mode.
-- [ ] `MauiIcon`: a background (`appicon.svg` or `Color`) and a foreground (`ForegroundFile`) kept inside the middle
-      ~66% of the canvas, since Android's adaptive icons crop it to a circle, squircle or square depending on the
-      launcher; optionally a monochrome layer for Android 13+ themed icons.
-- [ ] iOS and Mac Catalyst need an opaque icon (no transparency); check the Mac's Dock and Finder sizes.
-- [ ] Splash screen (`MauiSplashScreen`) to match: the same mark on the same background colour.
-- [ ] Check on Android (Pixel launcher and Samsung One UI), iOS, Mac Catalyst and Windows (taskbar, Start menu).
-      Launchers cache icons: uninstall first on phones, and on the Mac the Dock may need the app moved or the icon
-      cache refreshed.
+- [x] Simple high-contrast design, checked at 16 px and 32 px and against light and dark surroundings.
+- [x] Separate opaque background (`Resources/AppIcon/appicon.svg`) and transparent foreground (`appiconfg.svg`),
+      centred with safe margins for Android's adaptive circle and squircle crops.
+- [x] Android 13+ monochrome layer: MAUI's generated adaptive icon references the foreground's white alpha mask;
+      the spark is a transparent cutout so it survives launcher tinting.
+- [x] Opaque 1024 px Apple icon assets verified; the updated Mac Finder/Dock artwork was checked through NSWorkspace.
+- [x] Matching `MauiSplashScreen` mark and blue background; Android theme colours updated to match.
+- [x] Android builds/install/launch and launcher icons checked on the Pixel API 35 emulator and Samsung Galaxy Z Fold3
+      (One UI), preserving existing app data. Circular adaptive-icon rendering checked from generated assets.
+- [x] iOS simulator build/install/launch, Home Screen icon and matching splash checked on iPhone 18 Pro (iOS 27).
+- [x] Signed Mac Catalyst build and launch verified.
+- [ ] Windows taskbar and Start menu visual check on a Windows machine.
+
+Launchers cache icons: reinstall the updated app without clearing its data; on Mac, re-register the app with Launch
+Services and relaunch if needed. Do not uninstall just to refresh an icon, since that removes downloaded models and
+saved chats. Older demos with the separate `com.emgu.tf.lite.maui.demo` identifier keep their own original icons.
 
 ## 6. Run the model-free tests in CI
 
