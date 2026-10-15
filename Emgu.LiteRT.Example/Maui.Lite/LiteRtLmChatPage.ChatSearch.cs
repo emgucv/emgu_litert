@@ -59,12 +59,12 @@ namespace Maui.Demo.Lite
                 _chatSearchStatus.IsVisible = false;
             }
             catch (Exception ex) { SetStatus("Could not delete the chat search index: " + ex.Message); }
-            finally { _chatSearchSwitch.IsEnabled = !SearchDownloadRequired; }
+            finally { _chatSearchSwitch.IsEnabled = !IsPrivateChat && !SearchDownloadRequired; }
         }
 
         private void StartChatIndexing()
         {
-            if (!ChatSearchOn || !_pageVisible || _reloadingCpuThreads)
+            if (IsPrivateChat || !ChatSearchOn || !_pageVisible || _reloadingCpuThreads)
                 return;
             _chatIndexRequested = true;
             if (_chatIndexTask != null && !_chatIndexTask.IsCompleted)
@@ -113,6 +113,7 @@ namespace Maui.Demo.Lite
 
         private async Task<string> SearchChatsAsync(string request, CancellationToken cancel)
         {
+            if (IsPrivateChat) return "Past-chat search is unavailable in private chats.";
             if (!ChatSearchOn)
                 return "Past-chat search is off. The user can enable Search past chats in the chat settings. Nothing was searched.";
             if (string.IsNullOrWhiteSpace(request))

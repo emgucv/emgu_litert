@@ -36,7 +36,16 @@ namespace Maui.Demo.Lite
             if (status != PermissionStatus.Granted)
                 return false;
 
-            await StartPlatformAsync();
+            try { await StartPlatformAsync(); }
+            catch
+            {
+#if IOS || MACCATALYST
+                _recorder?.Dispose();
+                _recorder = null;
+                if (_path != null) File.Delete(_path);
+#endif
+                throw;
+            }
             IsRecording = true;
             return true;
         }
@@ -97,9 +106,8 @@ namespace Maui.Demo.Lite
             _recorder.Stop();
             _recorder.Dispose();
             _recorder = null;
-            byte[] wav = File.ReadAllBytes(_path);
-            File.Delete(_path);
-            return Task.FromResult(wav);
+            try { return Task.FromResult(File.ReadAllBytes(_path)); }
+            finally { File.Delete(_path); _path = null; }
         }
 #elif ANDROID
         private Android.Media.AudioRecord _record;

@@ -156,6 +156,12 @@ again.
   own centered.
 - Chats are saved on the device after each reply; the history button (or the Chats list in the side panel on wide
   screens) reopens or deletes one.
+- **Chat settings → Private chat** starts a fresh session marked **Private · Not saved** in the header. Messages,
+  pictures, recordings, document indexes and summaries are not saved. Memories and past-chat search are unavailable.
+  Starting another chat, ending private mode or closing the chat page discards its session content; opening saved
+  history asks to end the private session first. Private mode resets when the app restarts. Web search still follows
+  its own toggle and may send requests online, and images you explicitly save stay saved. Downloaded models and
+  prepared weight caches are kept; private document embeddings stay in memory.
 - **Chat settings → Storage** lists model files (including partial downloads and CPU/GPU caches), Z-Image data,
   saved documents, photo/past-chat search indexes, chat attachments and shared export copies, with sizes, a managed
   storage total and free space. Delete asks for confirmation and releases loaded models before removing their files.

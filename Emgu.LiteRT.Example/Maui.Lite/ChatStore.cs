@@ -237,6 +237,9 @@ namespace Maui.Demo.Lite
         private readonly Lazy<Task<SQLiteAsyncConnection>> _connection;
 
         public event Action ChatsChanged;
+        // Per-page/session state, never persisted. Enforce the boundary here as well as in the UI/tool selection.
+        private volatile bool _isPrivateSession;
+        public bool IsPrivateSession { get => _isPrivateSession; set => _isPrivateSession = value; }
 
         internal ChatStore(string folder)
         {
@@ -273,6 +276,7 @@ namespace Maui.Demo.Lite
 
         public async Task<List<MessageRecord>> GetMessagesAsync(int conversationId)
         {
+            if (IsPrivateSession) return new List<MessageRecord>();
             return await (await Db).Table<MessageRecord>().Where(m => m.ConversationId == conversationId)
                 .OrderBy(m => m.Id).ToListAsync();
         }
@@ -280,6 +284,7 @@ namespace Maui.Demo.Lite
         /// <summary>Start a saved chat; returns its id.</summary>
         public async Task<int> CreateConversationAsync(string title, string model)
         {
+            if (IsPrivateSession) throw new InvalidOperationException("Private chats cannot be saved.");
             var conversation = new ConversationRecord
             {
                 Title = Shorten(title, 60),
@@ -297,6 +302,7 @@ namespace Maui.Demo.Lite
         public async Task<int> AddMessageAsync(int conversationId, string role, string text, string thinking,
             IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments = null, string context = null)
         {
+            if (IsPrivateSession) throw new InvalidOperationException("Private chats cannot be saved.");
             SQLiteAsyncConnection db = await Db;
             var record = new MessageRecord
             {
@@ -339,6 +345,7 @@ namespace Maui.Demo.Lite
 
         public async Task<List<MessageRecord>> GetSearchMessagesAsync()
         {
+            if (IsPrivateSession) return new List<MessageRecord>();
             return await (await Db).QueryAsync<MessageRecord>(
                 "SELECT m.* FROM Message m INNER JOIN Conversation c ON c.Id = m.ConversationId " +
                 "WHERE m.Role IN ('user', 'assistant') AND length(trim(m.Text)) > 0 ORDER BY m.Id");
@@ -346,6 +353,7 @@ namespace Maui.Demo.Lite
 
         public async Task<List<ChatSearchRecord>> GetChatEmbeddingsAsync()
         {
+            if (IsPrivateSession) return new List<ChatSearchRecord>();
             return await (await Db).QueryAsync<ChatSearchRecord>(
                 "SELECT e.*, m.ConversationId, m.Role, m.Created, c.Title FROM ChatEmbedding e " +
                 "INNER JOIN Message m ON m.Id = e.MessageId INNER JOIN Conversation c ON c.Id = m.ConversationId");
@@ -354,6 +362,7 @@ namespace Maui.Demo.Lite
         // Never resurrect an index entry if the chat was deleted while its embedding was computed.
         public async Task SaveChatEmbeddingsAsync(int messageId, List<ChatEmbeddingRecord> passages)
         {
+            if (IsPrivateSession) return;
             await (await Db).RunInTransactionAsync(connection =>
             {
                 connection.Execute("DELETE FROM ChatEmbedding WHERE MessageId = ?", messageId);
@@ -370,6 +379,7 @@ namespace Maui.Demo.Lite
         /// <summary>Record that the model sees the messages up to upToMessageId only as the summary (or not at all).</summary>
         public async Task SetSummaryAsync(int conversationId, string summary, int upToMessageId)
         {
+            if (IsPrivateSession) return;
             SQLiteAsyncConnection db = await Db;
             var conversation = await db.FindAsync<ConversationRecord>(conversationId);
             if (conversation == null)
@@ -383,17 +393,20 @@ namespace Maui.Demo.Lite
 
         public async Task<DocumentRecord> GetDocumentAsync(string id)
         {
+            if (IsPrivateSession) return null;
             return await (await Db).FindAsync<DocumentRecord>(id);
         }
 
         public async Task<List<DocumentItemRecord>> GetDocumentItemsAsync(string id)
         {
+            if (IsPrivateSession) return new List<DocumentItemRecord>();
             return await (await Db).Table<DocumentItemRecord>().Where(i => i.DocumentId == id).OrderBy(i => i.Position).ToListAsync();
         }
 
         /// <summary>Save a document's index, replacing an older one of the same file.</summary>
         public async Task SaveDocumentAsync(DocumentRecord document, IEnumerable<DocumentItemRecord> items)
         {
+            if (IsPrivateSession) return;
             SQLiteAsyncConnection db = await Db;
             List<DocumentItemRecord> list = items.ToList();
             await db.RunInTransactionAsync(connection =>
@@ -407,6 +420,7 @@ namespace Maui.Demo.Lite
         /// <summary>Record the document a chat uses (null for none).</summary>
         public async Task SetConversationDocumentAsync(int conversationId, string documentId)
         {
+            if (IsPrivateSession) return;
             SQLiteAsyncConnection db = await Db;
             var conversation = await db.FindAsync<ConversationRecord>(conversationId);
             if (conversation == null || conversation.DocumentId == documentId)
@@ -418,6 +432,7 @@ namespace Maui.Demo.Lite
         /// <summary>Delete the documents no saved chat uses, except keepId (e.g. the one attached now).</summary>
         public async Task DeleteUnusedDocumentsAsync(string keepId = null)
         {
+            if (IsPrivateSession) return;
             SQLiteAsyncConnection db = await Db;
             HashSet<string> used = new HashSet<string>((await db.Table<ConversationRecord>().ToListAsync())
                 .Where(c => c.DocumentId != null).Select(c => c.DocumentId));
@@ -476,12 +491,14 @@ namespace Maui.Demo.Lite
         /// <summary>The memories, oldest first.</summary>
         public async Task<List<MemoryRecord>> GetMemoriesAsync()
         {
+            if (IsPrivateSession) return new List<MemoryRecord>();
             return await (await Db).Table<MemoryRecord>().OrderBy(m => m.Id).ToListAsync();
         }
 
         /// <summary>Remember something; returns false if the same text is already remembered.</summary>
         public async Task<bool> AddMemoryAsync(string text)
         {
+            if (IsPrivateSession) return false;
             text = (text ?? string.Empty).Trim();
             if (text.Length == 0)
                 return false;
@@ -519,6 +536,7 @@ namespace Maui.Demo.Lite
 
         public async Task DeleteMemoryAsync(int id)
         {
+            if (IsPrivateSession) return;
             await (await Db).DeleteAsync<MemoryRecord>(id);
         }
 

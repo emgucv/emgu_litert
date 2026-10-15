@@ -19,26 +19,16 @@ namespace Maui.Demo.Lite
     /// location (this file's MAUI lookup) when they allow it, and with web search on the weather, Wikipedia, currency
     /// conversion and a web page reader (Tavily's, with a Tavily API key, which also adds a web search).
     /// </summary>
-    internal static class ChatAgentTools
+    internal static partial class ChatAgentTools
     {
         public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location, ChatStore memories,
             Func<string, CancellationToken, Task<string>> findPhotos = null,
             Func<string, CancellationToken, Task<string>> generateImage = null,
-            Func<string, CancellationToken, Task<string>> searchChats = null)
+            Func<string, CancellationToken, Task<string>> searchChats = null, bool privateChat = false)
         {
-            List<AITool> tools = new List<AITool> { AgentTools.CurrentDateTime(), AgentTools.Calculate(), AgentTools.ConvertUnits() };
-            if (memories != null)
-                tools.AddRange(AgentTools.Memory(memories));
+            var tools = new List<AITool>(SessionTools(privateChat, memories, findPhotos, generateImage, searchChats));
             if (location)
                 tools.Add(AgentTools.Location(GetCurrentLocationAsync));
-            // Photo search (on the device): the page's index of the photo library.
-            if (findPhotos != null)
-                tools.Add(AgentTools.FindPhotos(findPhotos));
-            // Image generation (on the device): the page's Z-Image-Turbo.
-            if (generateImage != null)
-                tools.Add(AgentTools.GenerateImage(generateImage));
-            if (searchChats != null)
-                tools.Add(AgentTools.SearchChats(searchChats));
             if (!webSearch)
                 return tools;
             tools.Add(AgentTools.Weather());

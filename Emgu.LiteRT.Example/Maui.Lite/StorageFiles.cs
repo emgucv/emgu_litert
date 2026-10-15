@@ -57,6 +57,14 @@ namespace Maui.Demo.Lite
             }
         }
 
+        public static void DeleteTemporaryFile(string cacheRoot, string file)
+        {
+            // Picker originals may be anywhere; only remove app-owned cache copies, never library/user originals.
+            if (string.IsNullOrWhiteSpace(file) || !IsWithin(cacheRoot, file) || !File.Exists(file)) return;
+            RejectLinkedParents(cacheRoot, file);
+            if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) == 0) File.Delete(file);
+        }
+
         public static void DeleteDirectory(string root, string target)
         {
             if (!IsWithin(root, target)) throw new InvalidOperationException("The folder is outside its storage root.");

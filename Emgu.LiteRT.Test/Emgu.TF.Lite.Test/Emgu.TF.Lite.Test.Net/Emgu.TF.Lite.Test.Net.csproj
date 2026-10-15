@@ -21,8 +21,10 @@
     <Compile Include="..\UnitTestChatSearch.cs" Link="UnitTestChatSearch.cs" />
     <Compile Include="..\UnitTestChatExport.cs" Link="UnitTestChatExport.cs" />
     <Compile Include="..\UnitTestStorage.cs" Link="UnitTestStorage.cs" />
+    <Compile Include="..\UnitTestPrivateChat.cs" Link="UnitTestPrivateChat.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatExporter.cs" Link="ChatExporter.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatStore.cs" Link="ChatStore.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatAgentTools.Session.cs" Link="ChatAgentTools.Session.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatStore.Storage.cs" Link="ChatStore.Storage.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\StorageFiles.cs" Link="StorageFiles.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\StorageCatalog.cs" Link="StorageCatalog.cs" />

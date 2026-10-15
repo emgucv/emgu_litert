@@ -382,6 +382,9 @@ namespace Maui.Demo.Lite
             _historyButton.OnTap(OnHistoryTapped);
             SemanticProperties.SetDescription(_historyButton, "Saved chats");
             _exportChatButton = BuildExportChatButton();
+            _privateChatBadge = new Label { Text = "Private · Not saved", FontFamily = Theme.TitleFont, FontSize = 12,
+                TextColor = Theme.Accent, IsVisible = false };
+            SemanticProperties.SetDescription(_privateChatBadge, "Private chat. Messages are not saved. Memories and past-chat search are unavailable.");
             var header = new Grid
             {
                 ColumnSpacing = 8,
@@ -396,7 +399,8 @@ namespace Maui.Demo.Lite
                 }
             };
             header.Add(Theme.CircleButton(Theme.GlyphChevronLeft, async () => await Navigation.PopAsync()), 0, 0);
-            header.Add(new Grid { Children = { _modelChip, _titleLabel } }, 1, 0);
+            header.Add(new VerticalStackLayout { Spacing = 2, VerticalOptions = LayoutOptions.Center,
+                Children = { new Grid { Children = { _modelChip, _titleLabel } }, _privateChatBadge } }, 1, 0);
             header.Add(_historyButton, 2, 0);
             header.Add(_newChatButton, 3, 0);
             header.Add(_exportChatButton, 4, 0);
@@ -572,6 +576,8 @@ namespace Maui.Demo.Lite
                     BuildImageSection(),
                     Theme.Divider(),
                     BuildStorageSection(),
+                    Theme.Divider(),
+                    BuildPrivateChatSection(),
                     Theme.Divider(),
                     new Label { Text = "Memories about you", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     memoryRow,
@@ -1682,11 +1688,11 @@ namespace Maui.Demo.Lite
             {
                 Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
-                    _memorySwitch.IsToggled ? _store : null, FindPhotosAsync, ImageGenerationSupported ? GenerateImageAsync : null,
-                    SearchChatsAsync),
+                    !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, FindPhotosAsync, ImageGenerationSupported ? GenerateImageAsync : null,
+                    IsPrivateChat ? null : SearchChatsAsync, privateChat: IsPrivateChat),
                 // Local search and generation tools remain available with their settings off, so the model can explain how to
                 // turn them on.
-                Instructions = JoinInstructions(await MemoryInstructionsAsync(), PhotoInstructions, ChatSearchInstructions,
+                Instructions = JoinInstructions(await MemoryInstructionsAsync(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions,
                     ImageGenerationSupported ? ImageInstructions : null),
                 ToolMode = ChatToolMode.Auto
             };
@@ -1773,7 +1779,7 @@ namespace Maui.Demo.Lite
             // them during a conversation.
             if (_agent == null)
             {
-                _agent = new ChatClientAgent(_chatClient, AgentInstructions, "Assistant", null, null);
+                _agent = new ChatClientAgent(_chatClient, IsPrivateChat ? PrivateInstructions : AgentInstructions, "Assistant", null, null);
                 _session = null;
             }
             if (_session == null)
@@ -1931,6 +1937,7 @@ namespace Maui.Demo.Lite
 
         private async Task StopRecordingAndSendAsync()
         {
+            int sessionVersion = _sessionVersion;
             UiStallWatchdog.Mark("Stop recording");
             if (!_recorder.IsRecording)
                 return;
@@ -1948,6 +1955,7 @@ namespace Maui.Demo.Lite
                 return;
             }
             SetRecording(false);
+            if (sessionVersion != _sessionVersion) return;
             SetStatus(null);
             if (wav == null || length < TimeSpan.FromSeconds(0.5))
             {
@@ -2020,6 +2028,8 @@ namespace Maui.Demo.Lite
         {
             if (_busy || _reloadingCpuThreads)
                 return;
+            int sessionVersion = _sessionVersion;
+            bool privateRead = IsPrivateChat;
 
             var rows = new List<(string Section, string Glyph, string Text, string Value)>();
             rows.Add(("DOCUMENT (PDF, WORD, TEXT)", Theme.GlyphText, "Document", "document"));
@@ -2038,7 +2048,7 @@ namespace Maui.Demo.Lite
             }
 
             string action = await _sheet.ShowAsync("Attach", rows);
-            if (string.IsNullOrEmpty(action))
+            if (sessionVersion != _sessionVersion || string.IsNullOrEmpty(action))
                 return;
 
             try
@@ -2047,13 +2057,13 @@ namespace Maui.Demo.Lite
                 {
                     FileResult file = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Choose a document", FileTypes = DocumentReader.FileTypes });
                     if (file != null)
-                        AttachDocument(await ReadAllBytesAsync(file), file.FileName);
+                        AttachDocument(await ReadAllBytesAsync(file, sessionVersion, privateRead), file.FileName);
                 }
                 else if (action == "library")
                 {
                     FileResult file = (await MediaPicker.Default.PickPhotosAsync())?.FirstOrDefault();
                     if (file != null)
-                        AddPendingImage(await ReadAllBytesAsync(file), file.FileName);
+                        AddPendingImage(await ReadAllBytesAsync(file, sessionVersion, privateRead), file.FileName);
                 }
                 else if (action == "camera")
                 {
@@ -2061,7 +2071,7 @@ namespace Maui.Demo.Lite
                     // applies its EXIF orientation when decoding).
                     FileResult file = await MediaPicker.Default.CapturePhotoAsync();
                     if (file != null)
-                        AddPendingImage(await ReadAllBytesAsync(file), "Photo");
+                        AddPendingImage(await ReadAllBytesAsync(file, sessionVersion, privateRead), "Photo");
                 }
                 else if (action.StartsWith("image:"))
                 {
@@ -2072,25 +2082,37 @@ namespace Maui.Demo.Lite
                 {
                     FileResult file = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Choose an audio file", FileTypes = AudioFileTypes });
                     if (file != null)
-                        AddPendingAudio(await ReadAllBytesAsync(file), file.FileName);
+                        AddPendingAudio(await ReadAllBytesAsync(file, sessionVersion, privateRead), file.FileName);
                 }
                 else if (action == "sampleaudio")
                 {
                     AddPendingAudio(await ImageUtil.ReadAppFileAsync(SampleAudio), SampleAudio);
                 }
             }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 SetStatus("Could not attach the file: " + ex.Message);
             }
         }
 
-        private static async Task<byte[]> ReadAllBytesAsync(FileResult file)
+        private async Task<byte[]> ReadAllBytesAsync(FileResult file, int sessionVersion, bool privateRead)
         {
-            using System.IO.Stream stream = await file.OpenReadAsync();
-            using System.IO.MemoryStream ms = new System.IO.MemoryStream();
-            await stream.CopyToAsync(ms);
-            return ms.ToArray();
+            try
+            {
+                if (sessionVersion != _sessionVersion) throw new OperationCanceledException();
+                using System.IO.Stream stream = await file.OpenReadAsync();
+                using System.IO.MemoryStream ms = new System.IO.MemoryStream();
+                await stream.CopyToAsync(ms);
+                if (sessionVersion != _sessionVersion) throw new OperationCanceledException();
+                return ms.ToArray();
+            }
+            finally
+            {
+                if (privateRead)
+                    try { StorageFiles.DeleteTemporaryFile(FileSystem.CacheDirectory, file.FullPath); }
+                    catch (Exception ex) { SetStatus("Could not remove a temporary picker copy: " + ex.Message); }
+            }
         }
 
         // Decode the image here (any format the platform's photo picker returns that OpenCV reads), downscale it
@@ -2227,6 +2249,8 @@ namespace Maui.Demo.Lite
         // Clear the transcript and the model's conversation; the next message starts a new saved chat.
         private void StartNewChat()
         {
+            _sessionVersion++;
+            if (IsPrivateChat) { ClearPrivateSessionContent(); ResetAgent(); }
             _chat?.ClearHistory();
             _session = null;
             _conversationId = null;
@@ -2574,7 +2598,7 @@ namespace Maui.Demo.Lite
         // The memories, for the agent's instructions: the latest that fit MaxMemoryLength, oldest first.
         private async Task<string> MemoryInstructionsAsync()
         {
-            if (!_memorySwitch.IsToggled)
+            if (IsPrivateChat || !_memorySwitch.IsToggled)
                 return null;
             try
             {
@@ -2588,6 +2612,7 @@ namespace Maui.Demo.Lite
 
         private async Task RefreshMemoryCountAsync()
         {
+            if (IsPrivateChat) return;
             int count = 0;
             try
             {
@@ -2602,6 +2627,7 @@ namespace Maui.Demo.Lite
         // The memories in a sheet, each with a button to delete it.
         private async void OnMemoriesTapped()
         {
+            if (IsPrivateChat) return;
             List<MemoryRecord> memories = await _store.GetMemoriesAsync();
             if (memories.Count == 0)
                 return;
@@ -2665,6 +2691,7 @@ namespace Maui.Demo.Lite
             {
                 replyItem.Tokens = reply.Text.Length / 3 + MessageOverheadTokens;
             }
+            if (IsPrivateChat) return; // Keep in-session history/token counts above; write nothing to SQLite or attachments.
             try
             {
                 if (_conversationId == null)
@@ -2740,6 +2767,7 @@ namespace Maui.Demo.Lite
         {
             if (!CanChangeModel)
                 return;
+            if (!await LeavePrivateChatAsync()) return;
             List<ConversationRecord> chats = await _store.GetConversationsAsync();
             string action = await _sheet.ShowViewAsync("Chats", BuildChatList(chats, true), "Close");
             await HandleChatListActionAsync(action, true);
@@ -2888,6 +2916,7 @@ namespace Maui.Demo.Lite
         {
             if (!CanChangeModel)
                 return;
+            if (!await LeavePrivateChatAsync()) return;
             ConversationRecord chat = (await _store.GetConversationsAsync()).FirstOrDefault(c => c.Id == id);
             if (chat == null)
                 return;
@@ -3018,15 +3047,18 @@ namespace Maui.Demo.Lite
             base.OnNavigatedFrom(args);
             if (!Navigation.NavigationStack.Contains(this) && !Navigation.ModalStack.Contains(this))
             {
+                _sessionVersion++;
+                if (_resumeWindow != null) { _resumeWindow.Resumed -= OnAppResumed; _resumeWindow = null; }
                 StopSpeaking();
                 _loadCancel?.Cancel();
-                _ = CancelRecordingAsync();
+                if (!IsPrivateChat) _ = CancelRecordingAsync();
                 RemoveDocument();
                 _photoIndexing?.Cancel();
                 _chatIndexing?.Cancel();
                 _chatExportCancel?.Cancel();
                 _searchRestoreCancel?.Cancel();
-                _ = CleanupAfterCpuReloadAsync();
+                if (IsPrivateChat) _ = CleanupPrivateChatAsync();
+                else _ = CleanupAfterCpuReloadAsync();
             }
         }
 

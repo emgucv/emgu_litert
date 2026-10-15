@@ -41,7 +41,7 @@ namespace Maui.Demo.Lite
             if (blocked && _photoSwitch?.IsToggled == true) { SetPhotoSearchOff(); _photoIndexing?.Cancel(); }
             if (blocked && _chatSearchSwitch?.IsToggled == true) { SetChatSearchOff(); _chatIndexing?.Cancel(); }
             if (_photoSwitch != null) _photoSwitch.IsEnabled = !blocked && EmbeddingSupportsImages;
-            if (_chatSearchSwitch != null) _chatSearchSwitch.IsEnabled = !blocked;
+            if (_chatSearchSwitch != null) _chatSearchSwitch.IsEnabled = !IsPrivateChat && !blocked;
         }
 
         private StorageCatalog CreateStorageCatalog()

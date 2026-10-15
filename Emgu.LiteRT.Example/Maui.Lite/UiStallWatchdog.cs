@@ -29,6 +29,28 @@ namespace Maui.Demo.Lite
         private static long _lastResponseTicks;
         private static bool _pingPending;
         private static string _logPath;
+        private static int _privateScopes;
+
+        public static IDisposable SuppressPrivateDetails()
+        {
+            lock (Sync) { _privateScopes++; Breadcrumbs.Clear(); }
+            return new PrivateScope();
+        }
+
+        private sealed class PrivateScope : IDisposable
+        {
+            private bool _disposed;
+            public void Dispose()
+            {
+                lock (Sync)
+                {
+                    if (_disposed) return;
+                    _disposed = true;
+                    _privateScopes--;
+                    Breadcrumbs.Clear();
+                }
+            }
+        }
 
         /// <summary>
         /// Record what the app is doing (kept in a short history and reported with a stall). No-op in Release builds.
@@ -38,7 +60,7 @@ namespace Maui.Demo.Lite
         {
             lock (Sync)
             {
-                Breadcrumbs.Enqueue(DateTime.Now.ToString("HH:mm:ss.fff") + " " + activity);
+                Breadcrumbs.Enqueue(DateTime.Now.ToString("HH:mm:ss.fff") + " " + (_privateScopes > 0 ? "Private chat activity" : activity));
                 while (Breadcrumbs.Count > MaxBreadcrumbs)
                     Breadcrumbs.Dequeue();
             }

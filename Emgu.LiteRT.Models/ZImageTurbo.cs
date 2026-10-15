@@ -599,6 +599,13 @@ namespace Emgu.LiteRT.Models
             }
         }
 
+        /// <summary>Forget the last prompt and its text embedding. Call only when generation is idle.</summary>
+        public void ClearPromptCache()
+        {
+            _cachedCaption = null;
+            _cachedPrompt = null;
+        }
+
         /// <summary>
         /// Release the LiteRT environment
         /// </summary>
@@ -609,8 +616,7 @@ namespace Emgu.LiteRT.Models
                 _environment.Dispose();
                 _environment = null;
             }
-            _cachedCaption = null;
-            _cachedPrompt = null;
+            ClearPromptCache();
         }
     }
 }

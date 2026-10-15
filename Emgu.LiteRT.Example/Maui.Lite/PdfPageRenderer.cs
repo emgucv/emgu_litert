@@ -28,8 +28,17 @@ namespace Maui.Demo.Lite
         {
             _path = Path.Combine(FileSystem.CacheDirectory, "render_" + Guid.NewGuid().ToString("N") + ".pdf");
             File.WriteAllBytes(_path, pdf);
-            _descriptor = Android.OS.ParcelFileDescriptor.Open(new Java.IO.File(_path), Android.OS.ParcelFileMode.ReadOnly);
-            _renderer = new Android.Graphics.Pdf.PdfRenderer(_descriptor);
+            try
+            {
+                _descriptor = Android.OS.ParcelFileDescriptor.Open(new Java.IO.File(_path), Android.OS.ParcelFileMode.ReadOnly);
+                _renderer = new Android.Graphics.Pdf.PdfRenderer(_descriptor);
+            }
+            catch
+            {
+                _descriptor?.Dispose();
+                File.Delete(_path);
+                throw;
+            }
         }
 
         public Task<byte[]> RenderAsync(int pageIndex, int maxSize)

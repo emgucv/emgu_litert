@@ -503,6 +503,10 @@ namespace Maui.Demo.Lite
                 _scrim.FadeToAsync(0, 180, Easing.CubicIn),
                 _card.TranslateToAsync(0, 700, 220, Easing.CubicIn));
             IsVisible = false;
+            // Release custom content (notably enlarged private images), not just its visibility.
+            _list.Children.Clear();
+            _header.Children.Clear();
+            _footer.Children.Clear();
             _animating = false;
             _tcs?.TrySetResult(value);
         }

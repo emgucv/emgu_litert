@@ -276,8 +276,21 @@ the correct saved chats, and Gemma called `search_chats` and answered from the r
 
 ## 19. A private chat
 
-- [ ] A "private chat" option: not saved, no memories read or written, no chat search; its pictures and documents are
+- [x] A "private chat" option: not saved, no memories read or written, no chat search; its pictures and documents are
       discarded when it ends. Shown clearly in the header while on.
+
+Implemented a per-session **Private chat** switch in chat settings and a **Private · Not saved** header badge.
+Changing modes starts a fresh conversation; opening saved history ends the private chat after confirmation.
+Private messages, summaries, tool steps, pictures, recordings and document indexes are not saved to the chat
+database or attachment folders. Memory and past-chat tools are omitted, with store-level read/write guards as a
+second boundary; private documents do not reuse saved indexes. New-chat/mode/navigation cleanup clears transcript,
+pending media, native conversations, generated-image prompt caches and document references, and waits for private
+document tasks before releasing their embedding model. App-cache picker copies and normal recorder/renderer
+temporary files are cleaned up; user originals are retained. Debug breadcrumbs redact activity details while the
+private session is active. Web tools retain their separate toggle, and explicitly saved images remain saved.
+Private mode is not persisted across app restarts. Regression tests verify storage isolation, memory/tool/search
+boundaries, regular saving after leaving private mode, and cache-copy cleanup. Windows build checked; interactive
+mode transitions and Apple/Android media cleanup still need device verification.
 
 ## 20. Export or share a chat
 

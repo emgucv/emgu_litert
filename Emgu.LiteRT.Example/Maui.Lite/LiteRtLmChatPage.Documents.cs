@@ -28,6 +28,7 @@ namespace Maui.Demo.Lite
         {
             // The SHA-256 of the file: its saved index in the chat database (DocumentRecord).
             public string Id;
+            public bool IsPrivate;
             public string Name;
             public int PageCount;
             public DocumentIndex Index;
@@ -113,12 +114,13 @@ namespace Maui.Demo.Lite
         private void ShowDocument(string name, Func<DocumentState, Task<bool>> index)
         {
             RemoveDocument();
-            DocumentState state = new DocumentState { Name = name };
+            DocumentState state = new DocumentState { Name = name, IsPrivate = IsPrivateChat };
             BuildDocumentChip(state);
             _document = state;
             _documentBar.Children.Add(state.Chip);
             _documentBar.IsVisible = true;
             state.Ready = index(state);
+            if (state.IsPrivate) _privateDocumentTasks.Add(state.Ready);
         }
 
         // What an index is built with: another value rebuilds a newly attached file's index (a saved chat's document
@@ -216,7 +218,7 @@ namespace Maui.Demo.Lite
                 int maxImages = SelectedOption.AcceptsImages && EmbeddingSupportsImages ? MaxDocumentImages : 0;
                 string settings = IndexSettings(maxImages > 0);
                 state.Id = savedId ?? await Task.Run(() => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), cancel);
-                DocumentRecord saved = await _store.GetDocumentAsync(state.Id);
+                DocumentRecord saved = state.IsPrivate ? null : await _store.GetDocumentAsync(state.Id);
                 DocumentIndex index;
                 string summary;
                 if (saved != null && (savedId != null || saved.Settings == settings))
@@ -308,7 +310,7 @@ namespace Maui.Demo.Lite
                     else if (!_busy)
                         SetStatus("Ask about the document.");
                     // A chat already saved now uses this document.
-                    if (_conversationId != null)
+                    if (!state.IsPrivate && !IsPrivateChat && _conversationId != null)
                         await _store.SetConversationDocumentAsync(_conversationId.Value, state.Id);
                 }
                 return true;
@@ -332,6 +334,7 @@ namespace Maui.Demo.Lite
         // Save the index in the chat database, so the same file - or a chat that used it - needn't be indexed again.
         private async Task SaveDocumentIndexAsync(DocumentState state, DocumentIndex index, string settings, string summary)
         {
+            if (state.IsPrivate || IsPrivateChat) return;
             List<DocumentItemRecord> items = new List<DocumentItemRecord>();
             foreach (DocumentPassage passage in index.Passages)
                 items.Add(new DocumentItemRecord

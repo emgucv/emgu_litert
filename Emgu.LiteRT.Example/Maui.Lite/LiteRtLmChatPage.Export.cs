@@ -39,13 +39,14 @@ namespace Maui.Demo.Lite
         private void UpdateExportChatButton()
         {
             if (_exportChatButton == null) return;
-            _exportChatButton.IsVisible = _conversationId.HasValue;
+            _exportChatButton.IsVisible = !IsPrivateChat && _conversationId.HasValue;
             _exportChatButton.IsEnabled = CanChangeModel && !_exportingChat;
             _exportChatButton.Opacity = _exportChatButton.IsEnabled ? 1 : 0.5;
         }
 
         private async Task ExportChatAsync(int id)
         {
+            if (IsPrivateChat) { SetStatus("End the private chat before exporting saved chats."); return; }
             if (!CanChangeModel || _exportingChat) return;
             _exportingChat = true;
             _chatExportCancel?.Dispose();
