@@ -571,6 +571,8 @@ namespace Maui.Demo.Lite
                     Theme.Divider(),
                     BuildImageSection(),
                     Theme.Divider(),
+                    BuildStorageSection(),
+                    Theme.Divider(),
                     new Label { Text = "Memories about you", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     memoryRow,
                     new Label
@@ -3023,6 +3025,7 @@ namespace Maui.Demo.Lite
                 _photoIndexing?.Cancel();
                 _chatIndexing?.Cancel();
                 _chatExportCancel?.Cancel();
+                _searchRestoreCancel?.Cancel();
                 _ = CleanupAfterCpuReloadAsync();
             }
         }

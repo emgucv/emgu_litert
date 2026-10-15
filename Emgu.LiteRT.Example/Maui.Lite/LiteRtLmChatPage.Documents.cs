@@ -94,6 +94,7 @@ namespace Maui.Demo.Lite
 
         private void AttachDocument(byte[] bytes, string name)
         {
+            if (SearchDownloadRequired) { SetStatus("The search model was deleted. Download it again in Settings > Storage before attaching documents."); return; }
             UiStallWatchdog.Mark(string.Format("Attach document {0}: {1} bytes", name, bytes.Length));
             ShowDocument(name, state => IndexDocumentAsync(state, bytes, null));
         }
@@ -101,6 +102,7 @@ namespace Maui.Demo.Lite
         // A saved chat's document, from its saved index (no file needed).
         private async Task RestoreDocumentAsync(string documentId)
         {
+            if (SearchDownloadRequired) return;
             DocumentRecord saved = await _store.GetDocumentAsync(documentId);
             if (saved == null)
                 return;
@@ -419,6 +421,8 @@ namespace Maui.Demo.Lite
         // The embedding model is loaded once (downloaded the first time) and kept while the page is open.
         private Task<EmbeddingModel> EnsureEmbedderAsync(IProgress<string> stage, CancellationToken cancel)
         {
+            if (SearchDownloadRequired)
+                return Task.FromException<EmbeddingModel>(new InvalidOperationException("The search model was deleted. Download it again in Settings > Storage."));
             if (_embedderLoad == null || _embedderLoad.IsFaulted || _embedderLoad.IsCanceled)
                 _embedderLoad = LoadEmbedderAsync(stage, cancel);
             return _embedderLoad;

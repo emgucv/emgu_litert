@@ -78,6 +78,7 @@ public partial class LiteRtLmChatPage
             _embeddingModelDetail.Text += (_selectedEmbedding == 2
                 ? " Text, vision and audio embeddings use Windows GPU."
                 : " Text and vision embeddings use Windows GPU.") + " A compatible Direct3D 12 GPU is required.";
+        UpdateSearchStorageState();
     }
 
     private async void OnEmbeddingModelTapped(object sender, EventArgs e)
@@ -119,7 +120,7 @@ public partial class LiteRtLmChatPage
             if (modelChanged) await _photoIndex.ClearAsync();
             if (!EmbeddingSupportsImages && _photoSwitch.IsToggled)
                 _photoSwitch.IsToggled = false;
-            _photoSwitch.IsEnabled = EmbeddingSupportsImages;
+            _photoSwitch.IsEnabled = EmbeddingSupportsImages && !SearchDownloadRequired;
             string documentId = _document?.Id;
             RemoveDocument();
             if (documentId != null) await RestoreDocumentAsync(documentId);

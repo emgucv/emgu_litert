@@ -59,7 +59,7 @@ namespace Maui.Demo.Lite
                 _chatSearchStatus.IsVisible = false;
             }
             catch (Exception ex) { SetStatus("Could not delete the chat search index: " + ex.Message); }
-            finally { _chatSearchSwitch.IsEnabled = true; }
+            finally { _chatSearchSwitch.IsEnabled = !SearchDownloadRequired; }
         }
 
         private void StartChatIndexing()

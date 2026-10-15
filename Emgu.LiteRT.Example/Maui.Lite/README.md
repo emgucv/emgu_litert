@@ -156,6 +156,14 @@ again.
   own centered.
 - Chats are saved on the device after each reply; the history button (or the Chats list in the side panel on wide
   screens) reopens or deletes one.
+- **Chat settings → Storage** lists model files (including partial downloads and CPU/GPU caches), Z-Image data,
+  saved documents, photo/past-chat search indexes, chat attachments and shared export copies, with sizes, a managed
+  storage total and free space. Delete asks for confirmation and releases loaded models before removing their files.
+  Database entries show stored-data estimates; the database's disk size is counted once in the total. Deleting an
+  index keeps chats/photos; deleting attachments keeps chat text; deleting a document detaches it from saved chats
+  but keeps excerpts already used in answers. SQLite is compacted after these deletions. Removing the selected
+  search model turns document/photo/chat search off until you explicitly download it again from Storage; search
+  switches can then be enabled again. The image-model settings link opens the same Storage page.
 - Use the chat header's export button, or **Export** beside a saved chat, to open the system share sheet with a ZIP
   containing `chat.md` and its saved pictures and recordings. Extract the ZIP and open the Markdown file to follow
   its relative attachment links. The export includes thinking, tool steps and document excerpts; missing files are

@@ -37,6 +37,7 @@ namespace Maui.Demo.Lite
         private ZImageTurbo _zimage;
         private Task _zimageInit;
         private CancellationTokenSource _zimageDownload;
+        private Task _zimageDownloadTask;
         private double _zimageDownloadFraction = -1;
         // The pictures drawn for the reply being written, saved with it.
         private readonly List<byte[]> _sendImages = new List<byte[]>();
@@ -67,7 +68,7 @@ namespace Maui.Demo.Lite
             _imageStatus = new Label { FontFamily = Theme.TitleFont, FontSize = 13, TextColor = Theme.Accent, IsVisible = false };
             _imageDeleteButton = new Button
             {
-                Text = "Delete the image model",
+                Text = "Manage image model storage...",
                 FontFamily = Theme.BodyFont,
                 FontSize = 13,
                 TextColor = Theme.Accent,
@@ -135,7 +136,7 @@ namespace Maui.Demo.Lite
             _zimageDownload = cancel;
             _zimageDownloadFraction = (double)_zimage.DownloadedBytes / ZImageTurbo.DownloadSize;
             UpdateImageStatus();
-            _ = Task.Run(async () =>
+            _zimageDownloadTask = Task.Run(async () =>
             {
                 string error = null;
                 try
@@ -175,7 +176,7 @@ namespace Maui.Demo.Lite
             }
             bool downloaded = _zimage.IsDownloaded;
             long present = _zimage.DownloadedBytes;
-            _imageDeleteButton.IsVisible = present > 0 && _zimageDownload == null && _zimageInit == null;
+            _imageDeleteButton.IsVisible = present > 0;
             if (_zimageDownload != null)
             {
                 _imageStatus.IsVisible = true;
@@ -195,20 +196,7 @@ namespace Maui.Demo.Lite
 
         private async void OnDeleteImageModelClicked(object sender, EventArgs e)
         {
-            if (!await DisplayAlertAsync("Image generation",
-                    string.Format(CultureInfo.InvariantCulture, "Delete the image model ({0:F1} GB) and its caches?", _zimage.DownloadedBytes / 1e9),
-                    "Delete", "Cancel"))
-                return;
-            _imageSwitch.IsToggled = false;
-            ZImageTurbo old = _zimage;
-            _zimage = new ZImageTurbo();
-            _zimageInit = null;
-            await Task.Run(() =>
-            {
-                old.Dispose();
-                try { System.IO.Directory.Delete(old.Folder, true); } catch (Exception) { }
-            });
-            UpdateImageStatus();
+            await OpenStorageAsync();
         }
 
         private Task EnsureImageModelAsync()
@@ -408,6 +396,7 @@ namespace Maui.Demo.Lite
         private async Task ReleaseImageModelAsync()
         {
             _zimageDownload?.Cancel();
+            try { await (_zimageDownloadTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
             ZImageTurbo model = _zimage;
             if (model == null)
                 return;

@@ -31,8 +31,8 @@ The Unity coroutine downloader is separate and is not changed by this MAUI task.
 
 ## 2. Show which models are downloaded
 
-Chat model rows now show downloaded/downloading/paused state and size. Remaining work is deletion and equivalent
-controls for image/search models.
+Chat model rows show downloaded/downloading/paused state and size. Storage (item 8) provides centralized sizes and
+confirmed deletion for chat, image and search models, including caches and partial downloads.
 - [x] Mark each row with "Downloaded · size on disk" versus "Download · 2.6 GB", using
       `IsDownloaded(option)`, which only looks at the file and never hashes it.
 - [ ] Optional device/cloud icons alongside the text download states.
@@ -40,9 +40,9 @@ controls for image/search models.
 - [x] A row for a model that is downloading shows its progress, and a partly downloaded one "Download paused"
       with its progress (item 1).
 - [x] Refresh status when a download finishes, fails, or is cancelled.
-- [ ] Refresh after model deletion once chat-model deletion is added.
-- [ ] Optionally: delete a downloaded model from its row (with its GPU caches, `*_cache.bin` next to it), asking first.
-- [ ] The same for the image model (Settings > Image generation) and the search model used for documents and photos.
+- [x] Refresh after model deletion.
+- [x] Centralized model deletion with caches and confirmation in Settings > Storage, replacing optional per-row deletion.
+- [x] Equivalent size and delete controls for image and search models in Storage; the image settings link opens it.
 
 ## 3. Test the paths that were never run
 
@@ -118,12 +118,22 @@ no answer, which only a run with the model showed.
 The app can use a lot of space: chat models (0.35-6.9 GB each), their GPU caches (0.8-6 GB), the image model
 (~21 GB with its caches), the search model, saved document indexes and attachments, the photo index.
 
-- [ ] One list: each item with its size on disk and Delete (asking first): chat models with their GPU caches, the
+- [x] One list: each item with its size on disk and Delete (asking first): chat models with their GPU caches, the
       image model, the search model, saved documents, the photo index, chats' attachments; the total, and the device's
       free space.
-- [ ] Deleting a model the chat is using releases it first; deleting the search model turns document/photo search off
+- [x] Deleting a model the chat is using releases it first; deleting the search model turns document/photo search off
       until it is downloaded again.
-- [ ] Replaces the per-row delete in item 2 (or both open the same action).
+- [x] Replaces the per-row delete in item 2 (or both open the same action).
+
+Implemented **Settings > Storage**, including partial downloads, CPU/GPU caches, legacy models, Z-Image's host data
+and caches, documents, photo/past-chat indexes, attachments and shared export copies. The total counts the SQLite
+database once; individual database items show stored-data estimates since their disk pages are shared. Deletion
+stops indexing/download work and releases the relevant native model first. Removing the selected search model
+persists a block on automatic reloads, turns photo/chat search off, and removes the current document from the page;
+Storage offers an explicit Download action to restore the search model. Deleting documents detaches all saved-chat
+references, while keeping messages and their saved excerpts. Database deletions compact SQLite to reclaim space.
+Tests use temporary files/databases to verify accounting, cache boundaries, deletion and space recovery. Windows
+build checked; interactive confirmations and native-model unload/delete behavior still need device verification.
 
 ## 9. Update to the next LiteRT-LM release
 
@@ -218,7 +228,7 @@ searched.
       within the excerpt budget the attached-document path uses.
 - [ ] Keep attaching a document to a chat as it is; the tool adds "in any of my documents" and lets the model decide
       when to look.
-- [ ] Saved documents with their size and delete: in the Storage page (item 8).
+- [x] Saved documents with their size and delete: in the Storage page (item 8).
 
 ## 16. Agent tool: search past chats (`search_chats`)
 
