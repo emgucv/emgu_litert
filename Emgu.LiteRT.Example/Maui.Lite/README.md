@@ -204,6 +204,9 @@ again.
 - With "Share my location" on (Settings, off by default), Gemma 4 can look up your town and approximate position,
   e.g. for "what's the weather here?" (with Web search on). The device asks for location permission the first time;
   the place name comes from Apple's or Google's map service.
+- On Mac Catalyst and Windows, Enter sends the message and Shift+Enter inserts a new line. Mac Catalyst also
+  supports Option+Return for a new line, like Apple's Messages. Enter still confirms
+  input-method composition instead of sending while text is being composed.
 - "Think" and "Web search" (Gemma 4) are per-message switches above the message box. Both keep their last setting
   across app restarts; Web search defaults to off. "Think" is on by default and
   keeps the last setting: the model reasons before answering, which gives better answers but takes longer and uses

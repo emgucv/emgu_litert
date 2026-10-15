@@ -28,6 +28,10 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 #endif
 
+#if MACCATALYST
+        builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<ChatPromptEditor, ChatPromptEditorHandler>());
+#endif
+
 		return builder.Build();
 	}
 }

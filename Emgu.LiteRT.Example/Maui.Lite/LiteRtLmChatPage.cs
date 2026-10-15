@@ -643,7 +643,11 @@ namespace Maui.Demo.Lite
                 FontSize = 14
             };
 
+#if MACCATALYST
+            _promptEditor = new ChatPromptEditor
+#else
             _promptEditor = new Editor
+#endif
             {
                 Placeholder = "Type your message...",
                 FontFamily = Theme.BodyFont,
@@ -666,6 +670,9 @@ namespace Maui.Demo.Lite
 
 #if WINDOWS
             ConfigurePromptKeyboard();
+#elif MACCATALYST
+            SemanticProperties.SetHint(_promptEditor, "Return sends your message. Shift+Return or Option+Return adds a new line.");
+            ((ChatPromptEditor)_promptEditor).SendRequested += OnSendClicked;
 #endif
             _busyIndicator = new ActivityIndicator { IsVisible = false, IsRunning = false, WidthRequest = 36, Color = Theme.Accent };
             _sendButton = new Button
