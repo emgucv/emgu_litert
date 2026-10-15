@@ -156,6 +156,12 @@ again.
   own centered.
 - Chats are saved on the device after each reply; the history button (or the Chats list in the side panel on wide
   screens) reopens or deletes one.
+- Use the chat header's export button, or **Export** beside a saved chat, to open the system share sheet with a ZIP
+  containing `chat.md` and its saved pictures and recordings. Extract the ZIP and open the Markdown file to follow
+  its relative attachment links. The export includes thinking, tool steps and document excerpts; missing files are
+  noted. An attached document exports its saved text and images, since the app does not retain the original PDF.
+  Only the selected chat is exported; global memories, credentials and search indexes are excluded. Exports stay in
+  the app cache for recipients to read and are cleaned up on a later export after a day. Import is not yet supported.
 - Enable "Search past chats" in chat settings to let Gemma 4 use `search_chats` for previous discussions and decisions.
   Saved user and assistant text is indexed locally in the background using the selected embedding model. Searches
   support dates such as "last week", return excerpts with titles and dates, and show buttons above the reply to open

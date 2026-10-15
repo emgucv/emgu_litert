@@ -381,6 +381,7 @@ namespace Maui.Demo.Lite
             };
             _historyButton.OnTap(OnHistoryTapped);
             SemanticProperties.SetDescription(_historyButton, "Saved chats");
+            _exportChatButton = BuildExportChatButton();
             var header = new Grid
             {
                 ColumnSpacing = 8,
@@ -390,6 +391,7 @@ namespace Maui.Demo.Lite
                     new ColumnDefinition(GridLength.Star),
                     new ColumnDefinition(GridLength.Auto),
                     new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Auto),
                     new ColumnDefinition(GridLength.Auto)
                 }
             };
@@ -397,7 +399,8 @@ namespace Maui.Demo.Lite
             header.Add(new Grid { Children = { _modelChip, _titleLabel } }, 1, 0);
             header.Add(_historyButton, 2, 0);
             header.Add(_newChatButton, 3, 0);
-            header.Add(_settingsButton, 4, 0);
+            header.Add(_exportChatButton, 4, 0);
+            header.Add(_settingsButton, 5, 0);
 
             // ---- Per-message toggles, shown above the message box for models that support them ----
             _thinkingSwitch = new ToggleChip("\u2728 Think");
@@ -2225,6 +2228,7 @@ namespace Maui.Demo.Lite
             _chat?.ClearHistory();
             _session = null;
             _conversationId = null;
+            UpdateExportChatButton();
             _historyItems.Clear();
             _agentPrimeHistory = null;
             _contextStart = 0;
@@ -2678,6 +2682,7 @@ namespace Maui.Demo.Lite
                 replyItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking, drawn);
                 // The document the chat uses now (or none), restored when it is opened again.
                 await _store.SetConversationDocumentAsync(id, _document?.Index != null ? _document.Id : null);
+                UpdateExportChatButton();
                 await RefreshChatListAsync();
             }
             catch (Exception ex)
@@ -2743,6 +2748,11 @@ namespace Maui.Demo.Lite
             if (string.IsNullOrEmpty(action))
                 return;
             int id = int.Parse(action.Substring(action.IndexOf(':') + 1));
+            if (action.StartsWith("export:", StringComparison.Ordinal))
+            {
+                await ExportChatAsync(id);
+                return;
+            }
             if (action.StartsWith("delete:"))
             {
                 // A deleted chat can't be restored, and the cross is next to the row that opens it: ask first.
@@ -2798,16 +2808,27 @@ namespace Maui.Demo.Lite
                 {
                     Padding = new Thickness(10, 7),
                     ColumnSpacing = 6,
-                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto) }
                 };
-                row.Add(new VerticalStackLayout
+                var details = new VerticalStackLayout
                 {
                     Children =
                     {
                         new Label { Text = chat.Title, FontFamily = Theme.TitleFont, FontSize = 14, TextColor = Theme.PrimaryText, LineBreakMode = LineBreakMode.TailTruncation },
                         new Label { Text = modelName + " \u00B7 " + chat.Updated.ToLocalTime().ToString("g"), FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText }
                     }
-                }, 0, 0);
+                };
+                row.Add(details, 0, 0);
+                var export = new Button { Text = "Export", FontFamily = Theme.BodyFont, FontSize = 12,
+                    Padding = new Thickness(6), MinimumHeightRequest = 44, VerticalOptions = LayoutOptions.Center,
+                    BackgroundColor = Colors.Transparent, TextColor = Theme.Accent };
+                SemanticProperties.SetDescription(export, "Export chat " + chat.Title + " with attachments");
+                export.Clicked += (_, _) =>
+                {
+                    if (inSheet) _sheet.Dismiss("export:" + id);
+                    else if (CanChangeModel) _ = HandleChatListActionAsync("export:" + id, false);
+                };
+                row.Add(export, 1, 0);
                 var delete = new Label
                 {
                     Text = Theme.GlyphClose,
@@ -2818,7 +2839,7 @@ namespace Maui.Demo.Lite
                     VerticalOptions = LayoutOptions.Center
                 };
                 SemanticProperties.SetDescription(delete, "Delete this chat");
-                row.Add(delete, 1, 0);
+                row.Add(delete, 2, 0);
                 var cell = new Border
                 {
                     BackgroundColor = id == _conversationId ? Theme.TileBackground : Colors.Transparent,
@@ -2833,7 +2854,7 @@ namespace Maui.Demo.Lite
                     else if (CanChangeModel)
                         _ = HandleChatListActionAsync("delete:" + id, false);
                 });
-                cell.OnTap(() =>
+                details.OnTap(() =>
                 {
                     if (inSheet)
                         _sheet.Dismiss("open:" + id);
@@ -2876,6 +2897,7 @@ namespace Maui.Demo.Lite
             // The document belongs to the chat it was attached to (what the model was given of it is saved with it).
             RemoveDocument();
             _conversationId = id;
+            UpdateExportChatButton();
             _summary = chat.Summary;
             bool contextStartFound = false;
 
@@ -3000,6 +3022,7 @@ namespace Maui.Demo.Lite
                 RemoveDocument();
                 _photoIndexing?.Cancel();
                 _chatIndexing?.Cancel();
+                _chatExportCancel?.Cancel();
                 _ = CleanupAfterCpuReloadAsync();
             }
         }
@@ -3236,6 +3259,7 @@ namespace Maui.Demo.Lite
         private void SetBusy(bool busy)
         {
             _busy = busy;
+            UpdateExportChatButton();
             UpdateModelDownloadRows();
             _sendButton.IsVisible = !busy;
             _busyIndicator.IsVisible = busy;

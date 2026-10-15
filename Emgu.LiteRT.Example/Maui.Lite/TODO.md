@@ -271,9 +271,17 @@ the correct saved chats, and Gemma called `search_chats` and answered from the r
 
 ## 20. Export or share a chat
 
-- [ ] Export a chat as Markdown (or text) with its pictures and attachments, through the share sheet; from the chat
+- [x] Export a chat as Markdown (or text) with its pictures and attachments, through the share sheet; from the chat
       list and the chat's header.
 - [ ] Optionally import it back.
+
+Export creates a ZIP containing `chat.md` and byte-for-byte copies of saved images (including generated pictures)
+and audio, linked with relative paths. Full saved messages survive context compaction; thinking, tool steps and
+saved document excerpts are included. The currently attached document's stored text and images are exported too;
+the original PDF is not retained and cannot be recreated. Missing files are noted in the transcript. Sharing uses
+MAUI's native share sheet; ZIPs remain in a dedicated cache folder so recipients can read them after the sheet
+closes, with old exports removed on a later export. Automated archive tests and a Windows build verify the export;
+interactive share-sheet behavior still needs platform verification. Import remains optional follow-up work.
 
 ## 21. Accessibility
 

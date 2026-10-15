@@ -433,7 +433,7 @@ namespace Maui.Demo.Lite
         }
 
         /// <summary>A saved message's attachments, with their full paths.</summary>
-        public List<SavedAttachment> GetAttachments(MessageRecord message)
+        public List<SavedAttachment> GetAttachments(MessageRecord message, bool includeMissing = false)
         {
             List<SavedAttachment> result = new List<SavedAttachment>();
             if (string.IsNullOrEmpty(message.Attachments))
@@ -441,10 +441,11 @@ namespace Maui.Demo.Lite
             foreach (string line in message.Attachments.Split('\n'))
             {
                 string[] parts = line.Split('|');
-                if (parts.Length != 3)
+                if (parts.Length != 3 || string.IsNullOrWhiteSpace(parts[2])
+                    || parts[2].IndexOfAny(new[] { '/', '\\', ':' }) >= 0 || parts[2] == "." || parts[2] == "..")
                     continue;
                 string path = Path.Combine(_attachmentRoot, message.ConversationId.ToString(), parts[2]);
-                if (File.Exists(path))
+                if (includeMissing || File.Exists(path))
                     result.Add(new SavedAttachment { Kind = parts[0], MediaType = parts[1], Path = path });
             }
             return result;
