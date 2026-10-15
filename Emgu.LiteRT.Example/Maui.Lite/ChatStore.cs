@@ -2,8 +2,6 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if WINDOWS || IOS || ANDROID || MACCATALYST
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -140,6 +138,29 @@ namespace Maui.Demo.Lite
         public DateTime Created { get; set; }
     }
 
+    /// <summary>A passage of a saved message, embedded with the selected search model.</summary>
+    [Table("ChatEmbedding")]
+    public class ChatEmbeddingRecord
+    {
+        [PrimaryKey]
+        public string Id { get; set; }
+        [Indexed]
+        public int MessageId { get; set; }
+        public int Position { get; set; }
+        public string Model { get; set; }
+        public string Text { get; set; }
+        public byte[] Embedding { get; set; }
+    }
+
+    /// <summary>A search passage joined to its still-existing message and conversation.</summary>
+    public class ChatSearchRecord : ChatEmbeddingRecord
+    {
+        public int ConversationId { get; set; }
+        public string Title { get; set; }
+        public string Role { get; set; }
+        public DateTime Created { get; set; }
+    }
+
     /// <summary>
     /// Something the chat agent remembers about the user ("The user is vegetarian"), kept across chats.
     /// </summary>
@@ -210,14 +231,15 @@ namespace Maui.Demo.Lite
     /// audio stored as files in chats/attachments/{conversation id}/ and only their names in the database. (A
     /// subfolder, since the app data folder of an unsandboxed Mac Catalyst app is ~/Library itself.)
     /// </summary>
-    internal sealed class ChatStore : IAgentMemoryStore
+    internal sealed partial class ChatStore : IAgentMemoryStore
     {
         private readonly string _attachmentRoot;
         private readonly Lazy<Task<SQLiteAsyncConnection>> _connection;
 
-        public ChatStore()
+        public event Action ChatsChanged;
+
+        internal ChatStore(string folder)
         {
-            string folder = Path.Combine(FileSystem.AppDataDirectory, "chats");
             Directory.CreateDirectory(folder);
             _attachmentRoot = Path.Combine(folder, "attachments");
             _connection = new Lazy<Task<SQLiteAsyncConnection>>(async () =>
@@ -226,6 +248,7 @@ namespace Maui.Demo.Lite
                     SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache);
                 await connection.CreateTableAsync<ConversationRecord>();
                 await connection.CreateTableAsync<MessageRecord>();
+                await connection.CreateTableAsync<ChatEmbeddingRecord>();
                 await connection.CreateTableAsync<MemoryRecord>();
                 await connection.CreateTableAsync<PhotoEmbeddingRecord>();
                 await connection.CreateTableAsync<DocumentRecord>();
@@ -235,6 +258,12 @@ namespace Maui.Demo.Lite
         }
 
         private Task<SQLiteAsyncConnection> Db => _connection.Value;
+
+        internal async Task CloseAsync()
+        {
+            if (_connection.IsValueCreated)
+                await (await Db).CloseAsync();
+        }
 
         /// <summary>The saved chats, most recently updated first.</summary>
         public async Task<List<ConversationRecord>> GetConversationsAsync()
@@ -304,7 +333,38 @@ namespace Maui.Demo.Lite
                 conversation.Updated = DateTime.UtcNow;
                 await db.UpdateAsync(conversation);
             }
+            ChatsChanged?.Invoke();
             return record.Id;
+        }
+
+        public async Task<List<MessageRecord>> GetSearchMessagesAsync()
+        {
+            return await (await Db).QueryAsync<MessageRecord>(
+                "SELECT m.* FROM Message m INNER JOIN Conversation c ON c.Id = m.ConversationId " +
+                "WHERE m.Role IN ('user', 'assistant') AND length(trim(m.Text)) > 0 ORDER BY m.Id");
+        }
+
+        public async Task<List<ChatSearchRecord>> GetChatEmbeddingsAsync()
+        {
+            return await (await Db).QueryAsync<ChatSearchRecord>(
+                "SELECT e.*, m.ConversationId, m.Role, m.Created, c.Title FROM ChatEmbedding e " +
+                "INNER JOIN Message m ON m.Id = e.MessageId INNER JOIN Conversation c ON c.Id = m.ConversationId");
+        }
+
+        // Never resurrect an index entry if the chat was deleted while its embedding was computed.
+        public async Task SaveChatEmbeddingsAsync(int messageId, List<ChatEmbeddingRecord> passages)
+        {
+            await (await Db).RunInTransactionAsync(connection =>
+            {
+                connection.Execute("DELETE FROM ChatEmbedding WHERE MessageId = ?", messageId);
+                if (connection.Find<MessageRecord>(messageId) != null)
+                    connection.InsertAll(passages);
+            });
+        }
+
+        public async Task ClearChatEmbeddingsAsync()
+        {
+            await (await Db).DeleteAllAsync<ChatEmbeddingRecord>();
         }
 
         /// <summary>Record that the model sees the messages up to upToMessageId only as the summary (or not at all).</summary>
@@ -394,8 +454,13 @@ namespace Maui.Demo.Lite
         public async Task DeleteConversationAsync(int conversationId)
         {
             SQLiteAsyncConnection db = await Db;
-            await db.ExecuteAsync("DELETE FROM Message WHERE ConversationId = ?", conversationId);
-            await db.DeleteAsync<ConversationRecord>(conversationId);
+            await db.RunInTransactionAsync(connection =>
+            {
+                connection.Execute("DELETE FROM ChatEmbedding WHERE MessageId IN (SELECT Id FROM Message WHERE ConversationId = ?)", conversationId);
+                connection.Execute("DELETE FROM Message WHERE ConversationId = ?", conversationId);
+                connection.Delete<ConversationRecord>(conversationId);
+            });
+            ChatsChanged?.Invoke();
             string folder = Path.Combine(_attachmentRoot, conversationId.ToString());
             try
             {
@@ -486,5 +551,3 @@ namespace Maui.Demo.Lite
         }
     }
 }
-
-#endif

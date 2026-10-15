@@ -102,6 +102,7 @@ public partial class LiteRtLmChatPage
         try
         {
             _photoIndexing?.Cancel();
+            await StopChatIndexingAsync();
             try { await (_photoIndexTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
             if (_document?.Ready != null) await _document.Ready;
             SetBusy(true);
@@ -132,6 +133,7 @@ public partial class LiteRtLmChatPage
             _settingsView.IsEnabled = true;
             SetBusy(false);
             if (_pageVisible) StartPhotoIndexing();
+            if (_pageVisible) StartChatIndexing();
         }
     }
 

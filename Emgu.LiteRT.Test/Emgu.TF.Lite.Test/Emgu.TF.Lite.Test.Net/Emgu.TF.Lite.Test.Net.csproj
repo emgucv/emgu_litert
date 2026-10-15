@@ -18,6 +18,9 @@
     <Compile Include="..\UnitTestLiteRtModels.cs" Link="UnitTestLiteRtModels.cs" />
     <Compile Include="..\UnitTestZImageTurbo.cs" Link="UnitTestZImageTurbo.cs" />
     <Compile Include="..\UnitTestDownloads.cs" Link="UnitTestDownloads.cs" />
+    <Compile Include="..\UnitTestChatSearch.cs" Link="UnitTestChatSearch.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatStore.cs" Link="ChatStore.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatSearchIndex.cs" Link="ChatSearchIndex.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -51,6 +54,7 @@
     <PackageReference Include="Emgu.CV.runtime.mini.windows" Version="4.13.0.5924" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
     <PackageReference Include="Emgu.CV.runtime.mini.macos" Version="4.13.0.5924" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
     <PackageReference Include="NUnit" Version="4.3.2" />
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4">

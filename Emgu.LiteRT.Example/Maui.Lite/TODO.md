@@ -225,12 +225,20 @@ searched.
 "What did we decide about the trip last week?" Memories only keep the facts the model chose to save; the saved
 messages have everything.
 
-- [ ] Embed the saved messages (user and assistant, chunked) in the background with the same embedding model, like the
+- [x] Embed the saved messages (user and assistant, chunked) in the background with the same embedding model, like the
       photo index; a table of message embeddings, updated when exchanges are saved and pruned when chats are deleted.
-- [ ] Tool (`AgentTools.SearchChats(search)`): returns matching snippets with the chat's title and date; the demo
+- [x] Tool (`AgentTools.SearchChats(search)`): returns matching snippets with the chat's title and date; the demo
       also shows them as tappable links that open the chat.
-- [ ] Optional date filter ("last week") with the same parsing as `PhotoRequest`.
-- [ ] Setting to turn it off (and delete its index), like photo search.
+- [x] Optional date filter ("last week") with the same parsing as `PhotoRequest`.
+- [x] Setting to turn it off (and delete its index), like photo search.
+
+Implemented with an opt-in, persisted **Search past chats** setting, incremental SQLite passage embeddings,
+model-specific rebuilding, and links above the reply. Indexing pauses between passages while the chat is busy and
+is cancelled before embedding-model reloads. The current conversation, tool steps, reasoning and attachments are
+excluded from search. Automated tests cover tool invocation, date parsing, chunking, incremental/cancelled indexing,
+model changes, filtering, and deletion. Interactive link/setting behavior still needs platform verification.
+Windows CPU verification with EmbeddingGemma 2 Text Vision 440M and Gemma 4 E2B passed: semantic queries retrieved
+the correct saved chats, and Gemma called `search_chats` and answered from the returned travel decision.
 
 ## 17. Image generation extras
 

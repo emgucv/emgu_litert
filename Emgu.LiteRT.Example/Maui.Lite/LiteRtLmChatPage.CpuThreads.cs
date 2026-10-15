@@ -32,6 +32,7 @@ public partial class LiteRtLmChatPage
             // Prevent new work while allowing the current send (including its tools) to finish.
             _settingsView.IsEnabled = false;
             _photoIndexing?.Cancel();
+            await StopChatIndexingAsync();
             while (_busy)
                 await Task.Delay(100);
             SetBusy(true);
@@ -73,6 +74,8 @@ public partial class LiteRtLmChatPage
             _settingsView.IsEnabled = true;
             SetBusy(false);
             if (_pageVisible)
+                StartChatIndexing();
+            if (_pageVisible)
                 StartPhotoIndexing();
         }
     }
@@ -80,6 +83,7 @@ public partial class LiteRtLmChatPage
     private async Task CleanupAfterCpuReloadAsync()
     {
         try { await (_cpuReloadTask ?? Task.CompletedTask); } catch (Exception) { }
+        await StopChatIndexingAsync();
         await CleanupModelAsync();
         await ReleaseEmbedderAsync();
         await ReleaseImageModelAsync();

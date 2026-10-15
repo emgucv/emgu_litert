@@ -564,6 +564,8 @@ namespace Maui.Demo.Lite
                     Theme.Divider(),
                     BuildPhotoSection(),
                     Theme.Divider(),
+                    BuildChatSearchSection(),
+                    Theme.Divider(),
                     BuildImageSection(),
                     Theme.Divider(),
                     new Label { Text = "Memories about you", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
@@ -1030,6 +1032,7 @@ namespace Maui.Demo.Lite
         {
             base.OnAppearing();
             _pageVisible = true;
+            StartChatIndexing();
             if (_pageStarted)
             {
                 RefreshPhotoIndex();
@@ -1674,10 +1677,11 @@ namespace Maui.Demo.Lite
             {
                 Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
-                    _memorySwitch.IsToggled ? _store : null, FindPhotosAsync, ImageGenerationSupported ? GenerateImageAsync : null),
-                // find_photos and generate_image even with their settings off, so the model can tell the user how to
+                    _memorySwitch.IsToggled ? _store : null, FindPhotosAsync, ImageGenerationSupported ? GenerateImageAsync : null,
+                    SearchChatsAsync),
+                // Local search and generation tools remain available with their settings off, so the model can explain how to
                 // turn them on.
-                Instructions = JoinInstructions(await MemoryInstructionsAsync(), PhotoInstructions,
+                Instructions = JoinInstructions(await MemoryInstructionsAsync(), PhotoInstructions, ChatSearchInstructions,
                     ImageGenerationSupported ? ImageInstructions : null),
                 ToolMode = ChatToolMode.Auto
             };
@@ -2995,6 +2999,7 @@ namespace Maui.Demo.Lite
                 _ = CancelRecordingAsync();
                 RemoveDocument();
                 _photoIndexing?.Cancel();
+                _chatIndexing?.Cancel();
                 _ = CleanupAfterCpuReloadAsync();
             }
         }

@@ -156,6 +156,13 @@ again.
   own centered.
 - Chats are saved on the device after each reply; the history button (or the Chats list in the side panel on wide
   screens) reopens or deletes one.
+- Enable "Search past chats" in chat settings to let Gemma 4 use `search_chats` for previous discussions and decisions.
+  Saved user and assistant text is indexed locally in the background using the selected embedding model. Searches
+  support dates such as "last week", return excerpts with titles and dates, and show buttons above the reply to open
+  matching chats after the reply finishes. The current chat is excluded. Initial results can be incomplete while
+  indexing runs. Changing embedding models rebuilds the index; deleting a chat removes its entries. The setting is
+  off by default and is saved across restarts. Turning it off deletes the index and keeps the saved conversations.
+  This works independently of Web search and Memories; attachments, reasoning, and tool steps are not indexed.
 - The models can take in about 4,096 tokens of conversation (a few pages of text; a photo is ~270, voice ~25 per
   second) - Gemma 4 8,192 on Mac and Windows. Opening a long saved chat takes a while, since the model reads it again
   (measurements in [Performance.md](Performance.md)).

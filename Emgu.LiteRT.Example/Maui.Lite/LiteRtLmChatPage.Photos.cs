@@ -138,6 +138,8 @@ namespace Maui.Demo.Lite
         private void OnAppResumed(object sender, EventArgs e)
         {
             if (_pageVisible)
+                StartChatIndexing();
+            if (_pageVisible)
                 RefreshPhotoIndex();
         }
 

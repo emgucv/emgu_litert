@@ -201,7 +201,11 @@ namespace Emgu.LiteRT.LM.Agents
 
         // ---------- Dates ----------
 
-        private static String ParseDates(String text, DateTime now, PhotoQuery query)
+        /// <summary>Extract date bounds, returning the remaining text. Bounds are inclusive, in local time.</summary>
+        /// <param name="text">The request text.</param>
+        /// <param name="now">The local date used for relative dates.</param>
+        /// <param name="query">Receives the date bounds.</param>
+        public static String ParseDates(String text, DateTime now, PhotoQuery query)
         {
             DateTime today = now.Date;
             Match m;

@@ -23,7 +23,8 @@ namespace Maui.Demo.Lite
     {
         public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location, ChatStore memories,
             Func<string, CancellationToken, Task<string>> findPhotos = null,
-            Func<string, CancellationToken, Task<string>> generateImage = null)
+            Func<string, CancellationToken, Task<string>> generateImage = null,
+            Func<string, CancellationToken, Task<string>> searchChats = null)
         {
             List<AITool> tools = new List<AITool> { AgentTools.CurrentDateTime(), AgentTools.Calculate(), AgentTools.ConvertUnits() };
             if (memories != null)
@@ -36,6 +37,8 @@ namespace Maui.Demo.Lite
             // Image generation (on the device): the page's Z-Image-Turbo.
             if (generateImage != null)
                 tools.Add(AgentTools.GenerateImage(generateImage));
+            if (searchChats != null)
+                tools.Add(AgentTools.SearchChats(searchChats));
             if (!webSearch)
                 return tools;
             tools.Add(AgentTools.Weather());
