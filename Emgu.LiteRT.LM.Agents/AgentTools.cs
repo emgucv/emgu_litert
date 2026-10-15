@@ -278,9 +278,13 @@ namespace Emgu.LiteRT.LM.Agents
             HashSet<string> words = ContentWords(fact);
             foreach (AgentMemory existing in await store.GetMemoriesAsync().ConfigureAwait(false))
                 if (words.Count > 0 && words.IsSubsetOf(ContentWords(existing.Text)))
-                    return "Already remembered: " + existing.Text;
-            return await store.AddMemoryAsync(fact.Trim()).ConfigureAwait(false) ? "Saved: " + fact.Trim() : "Already remembered: " + fact.Trim();
+                    return "Already remembered: " + existing.Text + MemoryReplyInstruction;
+            return (await store.AddMemoryAsync(fact.Trim()).ConfigureAwait(false) ? "Saved: " : "Already remembered: ")
+                + fact.Trim() + MemoryReplyInstruction;
         }
+
+        // Without an explicit acknowledgement instruction, Gemma 4 E2B can end the turn after saving with no text.
+        private const string MemoryReplyInstruction = "\nNow acknowledge this fact to the user in one short sentence.";
 
         private static readonly HashSet<string> MemoryStopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -393,6 +397,19 @@ namespace Emgu.LiteRT.LM.Agents
                  CancellationToken cancellationToken) => generate(prompt ?? string.Empty, cancellationToken),
                 "generate_image",
                 "Draws a new picture from a description and shows it to the user. Use it whenever the user asks you to draw, paint, create, generate or imagine an image or a picture.");
+        }
+
+        /// <summary>
+        /// The generate_image success result, after the app has displayed the image. The explicit reply instruction
+        /// prevents small models from ending their turn without text. Shared with the agent regression suite.
+        /// </summary>
+        /// <param name="prompt">The description that was drawn</param>
+        /// <returns>The tool result for the model</returns>
+        public static string ImageGeneratedResult(string prompt)
+        {
+            return string.Format(CultureInfo.InvariantCulture,
+                "Done: the picture of \"{0}\" is now shown to the user. Now answer the user in one short sentence that says what you drew, e.g. \"Here is {0}.\"",
+                prompt);
         }
 
         /// <summary>

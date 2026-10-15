@@ -168,6 +168,9 @@ On Android/iOS, **Index photos only while charging** in the photo-search setting
 before indexing; it is off by default and saved across launches. Turning it off lets pending indexing continue when
 the battery and temperature allow. It does not restrict document indexing, image generation or model downloads.
 
+The opt-in [agent regression suite](../../Emgu.LiteRT.Test/Emgu.TF.Lite.Test/AgentRegression.md) checks Gemma 4 E2B's
+tool selection, arguments and final replies with offline fake tools. Run it after runtime/model or tool wording changes.
+
 ## The home page
 
 Like the Emgu CV demo, the home page has two tabs: **LiteRT-LM**, with the chat, and **TF Lite**, with the TensorFlow

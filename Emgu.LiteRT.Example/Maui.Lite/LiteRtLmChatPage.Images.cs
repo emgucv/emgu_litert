@@ -283,9 +283,7 @@ namespace Maui.Demo.Lite
                 await MainThread.InvokeOnMainThreadAsync(() => ShowGeneratedImage(tile, png,
                     string.Format(CultureInfo.InvariantCulture, "{0:F0} s", result.Elapsed.TotalSeconds)));
                 UiStallWatchdog.Mark(string.Format(CultureInfo.InvariantCulture, "generate_image done in {0:F1} s", result.Elapsed.TotalSeconds));
-                return string.Format(CultureInfo.InvariantCulture,
-                    "Done: the picture of \"{0}\" is now shown to the user. Now answer the user in one short sentence that says what you drew, e.g. \"Here is {0}.\"",
-                    prompt);
+                return Emgu.LiteRT.LM.Agents.AgentTools.ImageGeneratedResult(prompt);
             }
             catch (OperationCanceledException)
             {

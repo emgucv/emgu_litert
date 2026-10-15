@@ -107,16 +107,25 @@ The GitHub Actions workflows only build. Many tests need no model or device and 
       network; mark or skip those if the runner can't).
 - [ ] Needs the natives the tests load (or a filter for the managed-only ones on runners without them).
 
-## 7. An agent regression test
+## 7. An agent regression test — implemented
 
 Small models are sensitive to tool wording: the first `generate_image` result text made Gemma 4 E2B end its turn with
 no answer, which only a run with the model showed.
 
-- [ ] A fixed set of prompts, each with the tool(s) Gemma 4 E2B should call and argument checks, e.g. "what's 17% of
+- [x] A fixed set of prompts, each with the tool(s) Gemma 4 E2B should call and argument checks, e.g. "what's 17% of
       230?" -> `calculate`; "weather in Paris" -> `get_weather`; "draw a cat" -> `generate_image`; "show my beach
       photos" -> `find_photos`; "remember I'm vegetarian" -> `remember`; plus "the reply isn't empty".
-- [ ] Run with fake tools (fixed results) so it needs no network, photos or image model; `TEST_MODELS`-gated.
-- [ ] Run it after every LiteRT-LM update, model change or tool description change; record pass rates.
+- [x] Run with fake external tools (fixed results) and isolated in-memory memories so it needs no network after
+      caching Gemma, no photos or image model; `TEST_MODELS`-gated. Real tool schemas/descriptions are retained.
+- [x] [Run guide and baselines](../../Emgu.LiteRT.Test/Emgu.TF.Lite.Test/AgentRegression.md) for LiteRT-LM updates,
+      model changes and tool wording edits. JSON/TRX reports preserve calls, arguments, results, final replies and pass rates.
+
+Eight scenarios include unit conversion, past-chat search and disabled image generation, with fresh sessions and a
+nonempty final assistant message required after tool execution. Image-success wording is shared with the demo; memory
+tools use the real result text. The first 3-repeat run caught empty replies after `remember` (21/24 scenarios passed);
+its result now explicitly asks for a brief acknowledgement, including the already-remembered case.
+The corrected 3-repeat baseline passed 24/24 scenarios on macOS arm64 CPU with LiteRT-LM v0.18.0; all three
+model-free harness checks and the existing memory-tool test passed too.
 
 ## 8. A Storage page in settings
 
