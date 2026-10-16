@@ -34,14 +34,14 @@ public partial class LiteRtLmChatPage
     {
         _cameraPreview = new LiveCameraPreview { Aspect = Aspect.AspectFit, HeightRequest = 170, BackgroundColor = Colors.Black };
         _cameraLabel = new Label { Text = "Live camera", FontFamily = Theme.TitleFont, FontSize = 13,
-            TextColor = Theme.PrimaryText, VerticalOptions = LayoutOptions.Center };
+            TextColor = Theme.PrimaryText, VerticalTextAlignment = TextAlignment.Center, MinimumHeightRequest = 40 };
         var close = new Button { Text = "Close", FontSize = 12, Padding = new Thickness(8, 0), MinimumHeightRequest = 40 };
         close.Clicked += async (_, _) => await CloseCameraAsync();
         SemanticProperties.SetDescription(close, "Close live camera and stop capture");
         var header = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
         header.Add(_cameraLabel, 0); header.Add(close, 1);
-        _cameraPanel = Theme.Card(new VerticalStackLayout { Spacing = 4, Children = { header, _cameraPreview,
-            new Label { Text = "Drag to move · Ask what you see", FontSize = 11, TextColor = Theme.SecondaryText } } }, 8);
+        var hint = new Label { Text = "Drag to move · Ask what you see", FontSize = 11, TextColor = Theme.SecondaryText };
+        _cameraPanel = Theme.Card(new VerticalStackLayout { Spacing = 4, Children = { header, _cameraPreview, hint } }, 8);
         _cameraPanel.WidthRequest = 270;
         _cameraPanel.HorizontalOptions = LayoutOptions.End;
         _cameraPanel.VerticalOptions = LayoutOptions.Start;
@@ -51,7 +51,72 @@ public partial class LiteRtLmChatPage
         _mainColumn.Add(_cameraPanel, 0, 1);
         SemanticProperties.SetDescription(_cameraPreview, "Live camera preview. Only requested snapshots are sent to the model.");
         SemanticProperties.SetHint(_cameraPreview, "Drag the preview to move it. Ask what you see in the camera to capture a frame.");
+        AttachCameraDrag(_cameraPreview);
+        AttachCameraDrag(_cameraLabel);
+        AttachCameraDrag(hint);
+        _scroll.SizeChanged += (_, _) =>
+        {
+            _cameraPanel.WidthRequest = Math.Min(270, Math.Max(180, _mainColumn.Width - 16));
+            _cameraPreview.HeightRequest = Math.Min(170, Math.Max(70, _scroll.Height - 100));
+            MoveCameraPanel(_cameraPanel.TranslationX, _cameraPanel.TranslationY);
+        };
+    }
+
+    private void MoveCameraPanel(double x, double y)
+    {
+        _cameraPanel.TranslationX = Math.Clamp(x, -Math.Max(0, _mainColumn.Width - _cameraPanel.Width - 16), 0);
+        _cameraPanel.TranslationY = Math.Clamp(y, 0, Math.Max(0, _scroll.Height - _cameraPanel.Height - 16));
+    }
+
+    private void AttachCameraDrag(View handle)
+    {
         double startX = 0, startY = 0;
+#if ANDROID
+        // MAUI's Android pan totals use coordinates relative to the moving view, causing feedback/jumps.
+        // Screen coordinates stay stable while the panel moves; convert physical pixels to MAUI units.
+        Android.Views.View native = null;
+        double downX = 0, downY = 0;
+        bool dragging = false;
+        void Touch(object sender, Android.Views.View.TouchEventArgs e)
+        {
+            var motion = e.Event;
+            switch (motion.ActionMasked)
+            {
+                case Android.Views.MotionEventActions.Down:
+                    startX = _cameraPanel.TranslationX;
+                    startY = _cameraPanel.TranslationY;
+                    downX = motion.RawX;
+                    downY = motion.RawY;
+                    dragging = true;
+                    native.Parent?.RequestDisallowInterceptTouchEvent(true);
+                    break;
+                case Android.Views.MotionEventActions.Move when dragging:
+                    double density = native.Resources.DisplayMetrics.Density;
+                    MoveCameraPanel(startX + (motion.RawX - downX) / density, startY + (motion.RawY - downY) / density);
+                    break;
+                case Android.Views.MotionEventActions.Up:
+                case Android.Views.MotionEventActions.Cancel:
+                case Android.Views.MotionEventActions.PointerDown:
+                    dragging = false;
+                    native.Parent?.RequestDisallowInterceptTouchEvent(false);
+                    break;
+            }
+            e.Handled = true;
+        }
+        handle.HandlerChanging += (_, _) =>
+        {
+            if (native == null) return;
+            dragging = false;
+            native.Parent?.RequestDisallowInterceptTouchEvent(false);
+            native.Touch -= Touch;
+            native = null;
+        };
+        handle.HandlerChanged += (_, _) =>
+        {
+            native = handle.Handler?.PlatformView as Android.Views.View;
+            if (native != null) native.Touch += Touch;
+        };
+#else
         var pan = new PanGestureRecognizer();
         pan.PanUpdated += (_, e) =>
         {
@@ -61,18 +126,11 @@ public partial class LiteRtLmChatPage
             }
             else if (e.StatusType == GestureStatus.Running)
             {
-                _cameraPanel.TranslationX = Math.Clamp(startX + e.TotalX, -Math.Max(0, _mainColumn.Width - _cameraPanel.Width - 16), 0);
-                _cameraPanel.TranslationY = Math.Clamp(startY + e.TotalY, 0, Math.Max(0, _scroll.Height - _cameraPanel.Height - 16));
+                MoveCameraPanel(startX + e.TotalX, startY + e.TotalY);
             }
         };
-        _cameraPreview.GestureRecognizers.Add(pan);
-        _scroll.SizeChanged += (_, _) =>
-        {
-            _cameraPanel.WidthRequest = Math.Min(270, Math.Max(180, _mainColumn.Width - 16));
-            _cameraPreview.HeightRequest = Math.Min(170, Math.Max(70, _scroll.Height - 100));
-            _cameraPanel.TranslationX = Math.Clamp(_cameraPanel.TranslationX, -Math.Max(0, _mainColumn.Width - _cameraPanel.Width - 16), 0);
-            _cameraPanel.TranslationY = Math.Clamp(_cameraPanel.TranslationY, 0, Math.Max(0, _scroll.Height - _cameraPanel.Height - 16));
-        };
+        handle.GestureRecognizers.Add(pan);
+#endif
     }
 
     private Task<string> OpenCameraAsync(CancellationToken token) => MainThread.InvokeOnMainThreadAsync(async () =>

@@ -290,7 +290,7 @@ again.
 - With Gemma 4 on Android, Mac Catalyst or Windows, ask **"Open the camera"** for an in-app live preview, then
   **"What do you see in the camera?"** (or "Read the label through the camera") to capture a fresh frame for the
   model. A snapshot thumbnail appears in the chat; subsequent camera questions capture new frames. Web search is
-  not required. Drag the preview image to move it out of the way. The preview uses the default camera and remains
+  not required. Drag the preview image, title or instruction strip to move it out of the way. The preview uses the default camera and remains
   visible while chatting; **Close**, leaving the chat,
   starting another chat or backgrounding the app releases it. There is no continuous analysis or video recording.
   Requested snapshots are saved with ordinary chats and stay in memory in Private chat. Allow camera permission
