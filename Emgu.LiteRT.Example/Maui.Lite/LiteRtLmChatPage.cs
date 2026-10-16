@@ -826,6 +826,7 @@ namespace Maui.Demo.Lite
             _mainColumn.Add(new Grid { Children = { _scroll, _loadCard } }, 0, 1);
             _mainColumn.Add(_statusLabel, 0, 2);
             _mainColumn.Add(composerCard, 0, 3);
+            BuildCameraPanel();
 
             // ---- Side panel (wide screens): the model list and the settings ----
             _sideChatList = new VerticalStackLayout { Spacing = 2 };
@@ -1148,6 +1149,7 @@ namespace Maui.Demo.Lite
         {
             base.OnDisappearing();
             _pageVisible = false;
+            _ = CloseCameraAsync();
         }
 
         private static bool IsDownloaded(ModelOption option)
@@ -1638,6 +1640,7 @@ namespace Maui.Demo.Lite
         // the reply into the transcript.
         private async Task SendAsync(string prompt, List<PendingAttachment> attachments)
         {
+            ClearCameraTurn();
             _sendSteps.Clear();
             lock (_sendImages)
                 _sendImages.Clear();
@@ -1721,6 +1724,7 @@ namespace Maui.Demo.Lite
                         UiStallWatchdog.Mark("Context full: " + ex.Message);
                         streamed.Clear();
                         _sendSteps.Clear();
+                        ClearCameraTurn(true);
                         await CompactAsync(false, 0, dividerIndex);
                         PrimeModel();
                         SetStatus("Generating...");
@@ -1730,6 +1734,12 @@ namespace Maui.Demo.Lite
                 UpdateStreamingBubble(bubble, reply, true);
                 MarkDocumentContextGiven(document);
                 UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
+                foreach (byte[] jpeg in _cameraTurnFrames)
+                {
+                    userItem.Attachments.Add(("image", "image/jpeg", jpeg));
+                    userItem.Tokens += ImageTokens;
+                }
+                ClearCameraTurn();
                 await SaveExchangeAsync(userItem, reply);
                 SetStatus(null);
                 if (_readAloudSwitch.IsToggled)
@@ -1741,6 +1751,7 @@ namespace Maui.Demo.Lite
             }
             finally
             {
+                ClearCameraTurn();
                 SetBusy(false);
                 UpdateMemoryLabel();
                 // The agent may have saved or deleted a memory.
@@ -1776,9 +1787,15 @@ namespace Maui.Demo.Lite
                 // Local search and generation tools remain available with their settings off, so the model can explain how to
                 // turn them on.
                 Instructions = JoinInstructions(await MemoryInstructionsAsync(), WebSearchInstructions(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions,
-                    ImageGenerationSupported ? ImageInstructions : null),
+                    ImageGenerationSupported ? ImageInstructions : null,
+                    LiveCamera.Supported && SelectedOption.AcceptsImages ? CameraInstructions : null),
                 ToolMode = ChatToolMode.Auto
             };
+            if (LiveCamera.Supported && SelectedOption.AcceptsImages)
+            {
+                options.Tools.Add(AgentTools.OpenCamera(OpenCameraAsync));
+                options.Tools.Add(AgentTools.CaptureCameraFrame(CaptureCameraFrameAsync));
+            }
 
             StringBuilder thinking = new StringBuilder();
             StringBuilder answer = new StringBuilder();
@@ -2383,6 +2400,8 @@ namespace Maui.Demo.Lite
         // Clear the transcript and the model's conversation; the next message starts a new saved chat.
         private void StartNewChat()
         {
+            _ = CloseCameraAsync();
+            ClearCameraTurn();
             _sessionVersion++;
             if (IsPrivateChat) { ClearPrivateSessionContent(); ResetAgent(); }
             _chat?.ClearHistory();
@@ -3206,7 +3225,12 @@ namespace Maui.Demo.Lite
             if (!Navigation.NavigationStack.Contains(this) && !Navigation.ModalStack.Contains(this))
             {
                 _sessionVersion++;
-                if (_resumeWindow != null) { _resumeWindow.Resumed -= OnAppResumed; _resumeWindow = null; }
+                if (_resumeWindow != null)
+                {
+                    _resumeWindow.Resumed -= OnAppResumed;
+                    _resumeWindow.Stopped -= CameraWindowStopped;
+                    _resumeWindow = null;
+                }
                 StopSpeaking();
                 _loadCancel?.Cancel();
                 if (!IsPrivateChat) _ = CancelRecordingAsync();

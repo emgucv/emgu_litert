@@ -21,6 +21,7 @@
     <Compile Include="..\UnitTestBackgroundDownloads.cs" Link="UnitTestBackgroundDownloads.cs" />
     <Compile Include="..\UnitTestWorkloadPolicy.cs" Link="UnitTestWorkloadPolicy.cs" />
     <Compile Include="..\UnitTestAgentRegression.cs" Link="UnitTestAgentRegression.cs" />
+    <Compile Include="..\UnitTestCameraTools.cs" Link="UnitTestCameraTools.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\WorkloadPolicy.cs" Link="WorkloadPolicy.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\DownloadActivity.cs" Link="DownloadActivity.cs" />
     <Compile Include="..\UnitTestChatSearch.cs" Link="UnitTestChatSearch.cs" />

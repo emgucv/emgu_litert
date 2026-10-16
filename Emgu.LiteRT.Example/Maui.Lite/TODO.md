@@ -552,3 +552,21 @@ static `tfliteextern` has its own TFLite), so image generation is hidden there.
       `Emgu.LiteRT` use, without duplicating TFLite symbols in the app - or a second, self-contained framework if the
       symbols can be kept apart.
 - [ ] Memory: Z-Image-Turbo's graphs on an iPhone (the text encoder alone maps 3.5 GB).
+
+## 32. Live camera tools — first version implemented
+
+- [x] `open_camera` opens a visible in-app preview; `capture_camera_frame` opens it if needed and returns a fresh image
+      for Gemma to describe. Available to image-capable agent models without Web search or a Tavily key.
+- [x] Emgu CV captures and encodes frames on a worker; bounded preview updates, Android color conversion and sensor/display
+      orientation, draggable preview and Close control. Closing, changing chats, leaving the page or backgrounding stops capture.
+- [x] Show captured snapshots in the transcript and save them with regular chats; private snapshots remain in session memory.
+- [x] The LiteRT-LM adapter handles image tool results as real media and batches appended turns to preserve the conversation
+      cache. Regression tests cover bytes, cancellation, failed results and history; native Gemma tests describe a fixed image
+      twice and verify cache reuse. Existing text-tool and private-chat tests pass too (10 tests total).
+- [x] Pixel Fold: live color preview, actual Gemma 4 E2B GPU camera descriptions, repeated fresh capture, close/reopen and
+      background release verified. Normal Debug build deployed after removing the temporary private-session probe.
+- [x] Android arm64 and Mac Catalyst builds pass. CPU camera opening works, but the full CPU description run was stopped
+      to switch to GPU validation; responses can take tens of seconds even on the phone's GPU.
+- [ ] Real webcam checks on Mac Catalyst and Windows; this Mac has no camera. iOS live capture is not enabled yet.
+- [ ] Follow-ups: camera selection, YOLO detection/tracking and optional continuous analysis. The first version captures
+      only when asked and does not record video.

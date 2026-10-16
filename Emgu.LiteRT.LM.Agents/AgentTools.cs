@@ -368,6 +368,22 @@ namespace Emgu.LiteRT.LM.Agents
                 "Finds the user's own photos on this device - by what is in them, where and when they were taken, or their kind (selfie, screenshot...) - and shows them to the user. Use it whenever the user asks to find, show or look for their photos or pictures.");
         }
 
+        /// <summary>Open a visible live camera preview using the app's camera service.</summary>
+        public static AIFunction OpenCamera(Func<CancellationToken, Task<string>> open)
+        {
+            if (open == null) throw new ArgumentNullException(nameof(open));
+            return AIFunctionFactory.Create((CancellationToken cancellationToken) => open(cancellationToken),
+                "open_camera", "Opens a live camera preview in this app. Use when the user asks to open or turn on the camera. This does not capture or describe an image; use capture_camera_frame for that.");
+        }
+
+        /// <summary>Capture a fresh camera image. The result contains image bytes, not a file path.</summary>
+        public static AIFunction CaptureCameraFrame(Func<CancellationToken, Task<IEnumerable<AIContent>>> capture)
+        {
+            if (capture == null) throw new ArgumentNullException(nameof(capture));
+            return AIFunctionFactory.Create((CancellationToken cancellationToken) => capture(cancellationToken),
+                "capture_camera_frame", "Captures a NEW frame from the live camera, opening its visible preview if needed. Returns the actual image for you to examine. Use when the user asks what you see in the camera, to look through the camera, read a label, or inspect what they are pointing at now. Describe the returned image and answer their question; do not guess from an earlier frame. Only capture when the user requests a camera observation.");
+        }
+
         /// <summary>Search saved conversations using the app's local search.</summary>
         /// <param name="search">Returns excerpts with their conversation titles and dates.</param>
         public static AIFunction SearchChats(Func<string, CancellationToken, Task<string>> search)
@@ -716,6 +732,8 @@ namespace Emgu.LiteRT.LM.Agents
             {
                 case "get_current_date_time": return "Checking the date and time";
                 case "get_current_location": return "Getting your location";
+                case "open_camera": return "Opening the live camera";
+                case "capture_camera_frame": return "Capturing a fresh camera frame";
                 case "find_photos": return "Looking for \u201C" + Argument("request") + "\u201D";
                 case "search_chats": return "Searching past chats for \u201C" + Argument("request") + "\u201D";
                 case "generate_image": return "Drawing \u201C" + Argument("prompt") + "\u201D";

@@ -148,14 +148,21 @@ namespace Maui.Demo.Lite
             if (Window == _resumeWindow)
                 return;
             if (_resumeWindow != null)
+            {
                 _resumeWindow.Resumed -= OnAppResumed;
+                _resumeWindow.Stopped -= CameraWindowStopped;
+            }
             _resumeWindow = Window;
             if (_resumeWindow != null)
+            {
                 _resumeWindow.Resumed += OnAppResumed;
+                _resumeWindow.Stopped += CameraWindowStopped;
+            }
         }
 
         private void OnAppResumed(object sender, EventArgs e)
         {
+            _cameraSuspended = false;
             if (_pageVisible)
                 StartChatIndexing();
             if (_pageVisible)

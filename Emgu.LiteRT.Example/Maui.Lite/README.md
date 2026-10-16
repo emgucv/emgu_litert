@@ -287,6 +287,15 @@ again.
 - The "+" button attaches images (from the photo library, the camera - "Take Photo", on devices with one - or the
   samples) or audio, and the microphone button records a voice message, for models that accept them; the first photo
   or recording asks for camera / microphone access.
+- With Gemma 4 on Android, Mac Catalyst or Windows, ask **"Open the camera"** for an in-app live preview, then
+  **"What do you see in the camera?"** (or "Read the label through the camera") to capture a fresh frame for the
+  model. A snapshot thumbnail appears in the chat; subsequent camera questions capture new frames. Web search is
+  not required. Drag the preview image to move it out of the way. The preview uses the default camera and remains
+  visible while chatting; **Close**, leaving the chat,
+  starting another chat or backgrounding the app releases it. There is no continuous analysis or video recording.
+  Requested snapshots are saved with ordinary chats and stay in memory in Private chat. Allow camera permission
+  when asked; a device without an available camera reports that it cannot be opened. iOS live capture is not yet
+  enabled. Android camera behavior is verified on Pixel Fold; Mac Catalyst/Windows camera hardware needs a device check.
 - Settings → Context window (Gemma 4) sets how much of a chat the model keeps in mind: Automatic (8k tokens on a
   Mac or PC, 4k on a phone), 4k, 8k, 16k or 32k. A larger window summarizes the chat less often, but reading it again
   (opening a saved chat, after summarizing) takes longer and needs more memory. Changing it reloads the model; the chat

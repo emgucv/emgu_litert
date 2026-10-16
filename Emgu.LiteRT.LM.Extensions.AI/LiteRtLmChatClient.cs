@@ -29,13 +29,14 @@ namespace Emgu.LiteRT.LM.Extensions.AI
     /// IChatClient is stateless (each request carries the whole conversation) while a LiteRT-LM Conversation keeps its
     /// history. For models that support multi-turn conversations (LanguageModel.SupportsMultiTurnConversation), the
     /// client keeps one Conversation open and, when a request only adds a message to the messages already in it,
-    /// sends just that message, so earlier turns aren't processed again. Otherwise it creates a new Conversation
+    /// sends just the new message(s), so earlier turns aren't processed again. Otherwise it creates a new Conversation
     /// seeded with the earlier messages. Changing the system message, the tools or the other options also starts a new
     /// Conversation.
     /// </para>
     /// <para>
     /// Supported content: text, images and audio (DataContent, for models that accept them), tool calls and tool
     /// results (FunctionCallContent / FunctionResultContent, for models with LanguageModel.SupportsToolCalling).
+    /// Tool results containing AIContent or IEnumerable&lt;AIContent&gt; can return image/audio DataContent for the model.
     /// Thinking is reported as TextReasoningContent; ChatOptions.Reasoning turns it on (any effort) or off
     /// (ReasoningEffort.None) for models that can think. ChatOptions.MaxOutputTokens is supported; the other sampling
     /// options are ignored. One request runs at a time; dispose the client before the model, or let the model's
@@ -117,7 +118,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             if (_disposed)
                 throw new ObjectDisposedException(GetType().Name);
 
-            List<AIChatMessage> all = messages.ToList();
+            List<AIChatMessage> all = ExpandToolMedia(messages);
             String systemMessage = GetSystemMessage(all, options);
             List<AIChatMessage> turns = all.Where(m => m.Role != ChatRole.System).ToList();
             if (turns.Count == 0)
@@ -132,12 +133,13 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             await _requestLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                // Reuse the open conversation if this request only adds the last message to it; otherwise start a new
-                // one seeded with all but the last message.
+                // Reuse an unchanged prefix. v0.18 also accepts a batch of appended messages: a media tool result
+                // needs both its acknowledgement and an image turn, without re-reading the whole conversation.
                 OpenConversation conversation = _open;
                 if (conversation != null
                     && (conversation.SettingsKey != settingsKey
-                        || keys.Count != conversation.MessageKeys.Count + 1
+                        || keys.Count <= conversation.MessageKeys.Count
+                        || (!LiteRtLmInvoke.IsV018OrLater && keys.Count != conversation.MessageKeys.Count + 1)
                         || !conversation.MessageKeys.SequenceEqual(keys.Take(conversation.MessageKeys.Count))))
                 {
                     CloseConversation();
@@ -154,7 +156,8 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                     conversation.MessageKeys.AddRange(keys.Take(keys.Count - 1));
                 }
 
-                String messageJson = ToLiteRtLmJson(turns[turns.Count - 1]);
+                var pendingMessages = turns.Skip(conversation.MessageKeys.Count).Select(ToLiteRtLmJson).ToList();
+                String messageJson = pendingMessages.Count == 1 ? pendingMessages[0] : "[" + String.Join(",", pendingMessages) + "]";
                 String responseId = Guid.NewGuid().ToString("N");
                 String messageId = Guid.NewGuid().ToString("N");
                 DateTimeOffset createdAt = DateTimeOffset.UtcNow;
@@ -200,7 +203,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                     // The conversation now also holds this message and the reply.
                     if (_model.SupportsMultiTurnConversation)
                     {
-                        conversation.MessageKeys.Add(keys[keys.Count - 1]);
+                        conversation.MessageKeys.AddRange(keys.Skip(conversation.MessageKeys.Count));
                         conversation.MessageKeys.Add(GetAssistantKey(replyText.ToString(), calls));
                         _open = conversation;
                     }
@@ -410,6 +413,40 @@ namespace Emgu.LiteRT.LM.Extensions.AI
         }
 
         // ---------- Messages to LiteRT-LM ----------
+
+        // Gemma's tool-response template renders response text, not images. Keep the tool acknowledgement and
+        // follow it with a user media turn, so the native preprocessor actually receives the bytes.
+        // Expand the complete history deterministically on every request, including restored agent sessions.
+        internal static List<AIChatMessage> ExpandToolMedia(IEnumerable<AIChatMessage> messages)
+        {
+            var expanded = new List<AIChatMessage>();
+            foreach (AIChatMessage message in messages)
+            {
+                var contents = new List<AIContent>();
+                var media = new List<AIContent>();
+                foreach (AIContent content in message.Contents)
+                {
+                    if (content is FunctionResultContent result && result.Exception == null &&
+                        (result.Result is AIContent || result.Result is IEnumerable<AIContent>))
+                    {
+                        var items = result.Result is AIContent single ? new[] { single } : ((IEnumerable<AIContent>)result.Result).ToArray();
+                        string text = String.Join("\n", items.OfType<TextContent>().Select(t => t.Text));
+                        var data = items.OfType<DataContent>().ToList();
+                        contents.Add(new FunctionResultContent(result.CallId,
+                            text + (data.Count > 0 ? "\nThe captured media follows in the next message. Answer the user's question using it." : "")));
+                        if (data.Count > 0)
+                        {
+                            media.Add(new TextContent(text));
+                            media.AddRange(data);
+                        }
+                    }
+                    else contents.Add(content);
+                }
+                expanded.Add(new AIChatMessage(message.Role, contents));
+                if (media.Count > 0) expanded.Add(new AIChatMessage(ChatRole.User, media));
+            }
+            return expanded;
+        }
 
         // A message in LiteRT-LM's format, e.g. {"role": "user", "content": [{"type": "text", "text": "Hello"}]}.
         private String ToLiteRtLmJson(AIChatMessage message)
