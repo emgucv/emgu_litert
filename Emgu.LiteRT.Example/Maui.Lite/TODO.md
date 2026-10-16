@@ -60,21 +60,25 @@ device and fixed or noted:
 - [ ] Photo search on a real phone's library (only the emulator's test photos so far), on a phone whose owner agrees
       to have their photos indexed for the test.
 
-## 4. Collapsible "Model" section in settings
+## 4. Collapsible "Model" section in settings — implemented; foldable UI check pending
 
 In wide windows (desktop, a foldable's inner screen) the side panel shows Chats, Model and Settings
 (`_sidePanel` in `LiteRtLmChatPage.cs`); the model list takes a lot of room.
 
 - [x] Make CPU Models and GPU Models separately collapsible (implemented in both sheet and sidebar).
-- [ ] Make the outer "Model" title a tappable header with a chevron that shows or hides `_sideModelList`.
-- [ ] When collapsed, show the selected model on the header line (e.g. "Model · Gemma 4 E2B"), so it is still visible.
-- [ ] Remember the state in Preferences.
+- [x] Make the outer "Model" title a tappable header with a chevron that shows or hides `_sideModelList`.
+- [x] When collapsed, show the selected model and CPU/GPU backend on the header line.
+- [x] Remember the outer section and explicit CPU/GPU group states independently in Preferences.
 - [x] Preserve access from the model chip on phones; the sheet also has collapsible CPU/GPU groups.
 
-The group expansion state is currently retained only while the page is open; the outer Model header, selected-model
-summary when collapsed, Preferences persistence, and device checks remain unfinished.
+The selected backend's group opens by default until the user explicitly expands or collapses it. Saved choices
+survive page recreation and app restarts, including a collapsed selected group. The outer header remains usable
+while the model is busy and includes screen-reader descriptions of its state and selection.
 
-- [ ] Check on Mac Catalyst and a foldable's inner screen.
+- [x] Mac Catalyst: build, expand/collapse, selected-model summary and outer/CPU/GPU state restoration after relaunch;
+      compact model chip opens the sheet with the same saved group states.
+- [x] Android arm64 build and install on Galaxy Z Fold3, preserving app data.
+- [ ] Foldable inner-screen UI check (Z Fold3 installed; initially locked, then wireless debugging disconnected).
 
 ## 5. A new app icon — implemented; Windows visual check remains
 

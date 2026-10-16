@@ -148,6 +148,11 @@ namespace Maui.Demo.Lite
         private readonly Grid _mainColumn;
         private readonly Border _sidePanel;
         private readonly VerticalStackLayout _sideModelList;
+        private readonly Button _sideModelHeader;
+        private bool _modelsExpanded = true;
+        private const string ModelsExpandedPreference = "litert_lm_chat_models_expanded";
+        private const string CpuModelsExpandedPreference = "litert_lm_chat_cpu_models_expanded";
+        private const string GpuModelsExpandedPreference = "litert_lm_chat_gpu_models_expanded";
         private readonly VerticalStackLayout _sideSettingsHost;
         private readonly VerticalStackLayout _settingsView;
         private readonly Border _modelChip;
@@ -825,6 +830,29 @@ namespace Maui.Demo.Lite
             // ---- Side panel (wide screens): the model list and the settings ----
             _sideChatList = new VerticalStackLayout { Spacing = 2 };
             _sideModelList = new VerticalStackLayout { Spacing = 4 };
+            try
+            {
+                _modelsExpanded = Preferences.Default.Get(ModelsExpandedPreference, true);
+                _cpuModelsExpanded = ReadModelGroupPreference(CpuModelsExpandedPreference);
+                _gpuModelsExpanded = ReadModelGroupPreference(GpuModelsExpandedPreference);
+            }
+            catch (Exception) { }
+            _sideModelHeader = new Button
+            {
+                FontFamily = Theme.TitleFont,
+                FontSize = 15,
+                TextColor = Theme.PrimaryText,
+                BackgroundColor = Colors.Transparent,
+                HorizontalOptions = LayoutOptions.Fill,
+                MinimumHeightRequest = 44,
+                Padding = new Thickness(0, 8)
+            };
+            _sideModelHeader.Clicked += (_, _) =>
+            {
+                _modelsExpanded = !_modelsExpanded;
+                try { Preferences.Default.Set(ModelsExpandedPreference, _modelsExpanded); } catch (Exception) { }
+                UpdateModelSectionHeader();
+            };
             _sideSettingsHost = new VerticalStackLayout();
             _sidePanel = new Border
             {
@@ -843,7 +871,7 @@ namespace Maui.Demo.Lite
                             Theme.SectionTitle("Chats"),
                             _sideChatList,
                             Theme.Divider(),
-                            Theme.SectionTitle("Model"),
+                            _sideModelHeader,
                             _sideModelList,
                             Theme.Divider(),
                             Theme.SectionTitle("Settings"),
@@ -903,6 +931,19 @@ namespace Maui.Demo.Lite
         private bool? _cpuModelsExpanded;
         private bool? _gpuModelsExpanded;
 
+        private static bool? ReadModelGroupPreference(string key) =>
+            Preferences.Default.ContainsKey(key) ? Preferences.Default.Get(key, false) : null;
+
+        private void UpdateModelSectionHeader()
+        {
+            string selected = SelectedOption.Name + (_selectedGpu ? " · GPU" : " · CPU");
+            _sideModelList.IsVisible = _modelsExpanded;
+            _sideModelHeader.Text = _modelsExpanded ? "▼ Model" : "▶ Model · " + selected;
+            SemanticProperties.SetDescription(_sideModelHeader,
+                "Model, " + (_modelsExpanded ? "expanded" : "collapsed") + ", selected " + selected);
+            SemanticProperties.SetHint(_sideModelHeader, _modelsExpanded ? "Collapse model section" : "Expand model section");
+        }
+
         // The model list: collapsible backend groups, with a check mark on the current model.
         private View BuildModelList(bool inSheet)
         {
@@ -938,6 +979,7 @@ namespace Maui.Demo.Lite
                     models.IsVisible = !models.IsVisible;
                     if (gpu) _gpuModelsExpanded = models.IsVisible;
                     else _cpuModelsExpanded = models.IsVisible;
+                    try { Preferences.Default.Set(gpu ? GpuModelsExpandedPreference : CpuModelsExpandedPreference, models.IsVisible); } catch (Exception) { }
                     UpdateHeader();
                     if (inSheet) RefreshModelList();
                 };
@@ -1003,6 +1045,7 @@ namespace Maui.Demo.Lite
 
         private void RefreshModelList()
         {
+            UpdateModelSectionHeader();
             if (_wide != true)
                 return;
             _sideModelList.Children.Clear();
@@ -1045,8 +1088,6 @@ namespace Maui.Demo.Lite
             _selectedModel = index;
             ModelOption option = SelectedOption;
             _selectedGpu = (gpu ?? _selectedGpu) && HasGpu(option);
-            if (_selectedGpu) _gpuModelsExpanded = true;
-            else _cpuModelsExpanded = true;
             _gpuUnavailable = false;
             _modelChipLabel.Text = option.Name + (_selectedGpu ? " · GPU" : " · CPU");
             RefreshModelList();

@@ -128,7 +128,10 @@ For GPU chat on Windows, first build the matching runtime bundle with
 `platforms/windows/bazel_build_windows_gpu.ps1`. The demo includes that bundle
 automatically. The chat model picker has **CPU models** and **GPU models** sections;
 select a GPU entry to use GPU inference. Tap either section heading to expand or collapse its models; the selected
-model's section opens by default, and expansion choices are kept while the page is open. Switching backend reloads
+model's section opens by default, and explicit expansion choices are remembered across app restarts. In wide windows,
+tap **Model** to hide or show the whole list; when hidden, the header shows the selected model and CPU/GPU backend.
+The outer section and CPU/GPU groups remember their states independently; the compact model chip still opens the
+picker on phones and narrow windows. Switching backend reloads
 the model while retaining the conversation.
 Qwen3.5 loading can take several minutes. See [Windows GPU build instructions](../../platforms/windows/README.windows-gpu.md)
 for output locations, alternate bundle directories, and CPU-only builds.
