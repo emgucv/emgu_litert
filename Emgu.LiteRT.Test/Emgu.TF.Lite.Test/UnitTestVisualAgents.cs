@@ -13,7 +13,7 @@ using NUnit.Framework;
 namespace Emgu.TF.Lite.Test;
 
 [TestFixture]
-public class UnitTestVisualAgents
+public partial class UnitTestVisualAgents
 {
     private static VisualFrame Frame(double seconds, Action release = null, string source = "camera") =>
         new(new byte[3], 1, 1, 3, source, (long)(seconds * 1000), DateTimeOffset.UnixEpoch.AddSeconds(seconds), TimeSpan.FromSeconds(seconds), release);
@@ -358,7 +358,7 @@ public class UnitTestVisualAgents
                 { MaximumIterationsPerRequest = 4 };
             var response = await client.GetResponseAsync("When you see a person, play a sound.", new ChatOptions
             {
-                Instructions = VisualAgentTools.Instructions, Tools = tools,
+                Instructions = VisualAgentTools.LegacyInstructions, Tools = tools,
                 Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }
             }, cancel.Token);
             TestContext.Progress.WriteLine(response.Text);

@@ -2165,11 +2165,16 @@ namespace Maui.Demo.Lite
             try
             {
                 // With a voice for the reply's language, and without its Markdown.
-                await ReplySpeech.SpeakAsync(text, speech.Token);
+                await _alertAudio.SpeakReplyAsync(text, speech.Token);
             }
             catch (Exception)
             {
                 // Cancelled, or no speech engine
+            }
+            finally
+            {
+                if (ReferenceEquals(_speech, speech)) _speech = null;
+                speech.Dispose();
             }
         }
 

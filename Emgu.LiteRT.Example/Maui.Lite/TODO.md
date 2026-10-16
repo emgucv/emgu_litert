@@ -576,7 +576,7 @@ static `tfliteextern` has its own TFLite), so image generation is hidden there.
 - [ ] Follow-ups: camera selection and YOLO detection/tracking. Continuous detector monitoring is covered by item 33;
       model image descriptions still capture only when asked. Neither feature records video.
 
-## 33. Visual agents and event monitors — first version implemented
+## 33. Visual agents and event monitors — versions 1 and 2 implemented
 
 - [x] Pure managed visual-agent descriptors/registry, owned timestamped BGR8 frames and typed observations. Still-image
       analysis and live analysis share adapters, with serialized model access and no model-specific event predicates.
@@ -602,6 +602,20 @@ static `tfliteextern` has its own TFLite), so image generation is hidden there.
       bounded frame ownership, serialized model access, faults, duplicate rules and tool contracts.
 - [x] Framework builds for netstandard2.0; Android arm64 and Mac Catalyst builds pass. Normal Android Debug app
       deployed to Pixel Fold after removing temporary diagnostic code and device markers.
+- [x] V2 action descriptors/factories and `list_visual_actions`; explicit action-array schema generated from the
+      available registry. Whole-set validation before rule/camera side effects, one of each type, immutable normalized
+      parameters and order-independent equivalent-rule suppression. Legacy single-action APIs remain available.
+- [x] Bundled chime and fixed-text system speech (up to 200 characters), selected independently or together. Event
+      groups stay FIFO while siblings run concurrently and report independent outcomes. Hide/pause cancels the group.
+- [x] Alert audio interrupts chat read-aloud and awaits cleanup; interrupted replies are not restarted. New reply
+      speech waits for alerts, retaining only the latest pending reply. Explicit alerts ignore the read-aloud toggle.
+- [x] Pixel Fold: production JSON tool binding created a combined rule, controlled empty/person frames through the
+      live camera queue triggered overlapping chime/speech with both succeeding, and Close cancelled both during
+      the next episode. Native Android TTS/MediaPlayer initialized successfully. Mac camera/audio and Windows
+      hardware remain untested.
+- [x] V2: 37 focused tests pass, including real Gemma sound-only/speech-only/combined action selection, existing
+      camera image regression, concurrent sibling execution, independent failures, FIFO groups, validation and
+      audio interruption/cleanup/latest-pending-reply behavior. Pixel Fold confirmed chat speech interruption.
 - [ ] Additional adapters: YOLO, face detection, OCR and plate detection/reading; tracking individuals, recurring
       alerts, saved rules, richer conditions, and background monitoring remain future work.
 - [ ] Real camera/audio hardware validation on Mac Catalyst and Windows, plus long-running thermal/battery tests.

@@ -17,8 +17,12 @@ namespace Emgu.LiteRT.LM.Agents.Events
         public string AgentId { get; internal set; }
         /// <summary>Predicate or human-readable condition associated with this monitor.</summary>
         public string Condition { get; internal set; }
-        /// <summary>Registered action to dispatch on the selected event phase.</summary>
+        /// <summary>Legacy summary: first registered action ID. Use Actions for the full configuration.</summary>
         public string ActionId { get; internal set; }
+        /// <summary>All validated actions, executed concurrently for each selected event.</summary>
+        public IReadOnlyList<VisualActionInfo> Actions { get; internal set; }
+        /// <summary>Per-action results for the latest scheduled event group.</summary>
+        public IReadOnlyList<VisualActionResult> LastActionResults { get; internal set; }
         /// <summary>Current preparation, visibility, or execution state.</summary>
         public VisualMonitorState State { get; internal set; }
         /// <summary>Whether the user has enabled this rule; hiding the camera does not change this preference.</summary>
@@ -41,7 +45,10 @@ namespace Emgu.LiteRT.LM.Agents.Events
         {
             public VisualPresenceMonitor Monitor;
             public IVisualAgent Agent;
-            public IVisualAction Action;
+            public VisualActionBinding[] Actions;
+            public VisualActionInfo[] ActionInfos;
+            public string ActionKey;
+            public VisualActionResult[] LastResults = Array.Empty<VisualActionResult>();
             public VisualEventPhase Phase;
             public bool Enabled = true;
             public long Revision;
@@ -55,10 +62,12 @@ namespace Emgu.LiteRT.LM.Agents.Events
             public Entry Entry;
             public long Revision, Generation;
             public VisualEvent Event;
+            public VisualActionResult[] Results;
         }
         private readonly object _gate = new object();
         private readonly VisualAgentRegistry _registry;
-        private readonly Dictionary<string, IVisualAction> _actions;
+        private readonly VisualActionRegistry _actions;
+        private readonly IVisualActionGroupCoordinator _actionCoordinator;
         private readonly string _sourceId;
         private readonly List<Entry> _entries = new List<Entry>();
         private readonly Queue<Dispatch> _dispatches = new Queue<Dispatch>();
@@ -77,7 +86,11 @@ namespace Emgu.LiteRT.LM.Agents.Events
         public event Action<VisualEvent> EventOccurred;
         /// <summary>Creates a session runtime using pre-registered agents and host actions.</summary>
         public VisualMonitorRuntime(VisualAgentRegistry registry, IEnumerable<IVisualAction> actions, string sourceId = "camera")
-        { _registry = registry; _actions = actions.ToDictionary(a => a.Id); _sourceId = sourceId; }
+            : this(registry, VisualActionRegistry.FromActions(actions), sourceId) { }
+        /// <summary>Creates a runtime with discoverable action factories and an optional host resource coordinator.</summary>
+        public VisualMonitorRuntime(VisualAgentRegistry registry, VisualActionRegistry actions, string sourceId = "camera",
+            IVisualActionGroupCoordinator actionCoordinator = null)
+        { _registry = registry; _actions = actions; _sourceId = sourceId; _actionCoordinator = actionCoordinator; }
 
         /// <summary>Returns a thread-safe snapshot of session rules; no camera pixels are retained.</summary>
         public IReadOnlyList<VisualMonitorInfo> Snapshot()
@@ -87,7 +100,8 @@ namespace Emgu.LiteRT.LM.Agents.Events
         private static VisualMonitorInfo Info(Entry e) => new VisualMonitorInfo
         {
             Id = e.Monitor.Id, AgentId = e.Agent.Descriptor.Id, Condition = e.Monitor.Condition.Description,
-            ActionId = e.Action.Id, Enabled = e.Enabled, State = e.State, Status = e.Status,
+            ActionId = e.Actions[0].Action.Id, Actions = Array.AsReadOnly(e.ActionInfos),
+            LastActionResults = Array.AsReadOnly(e.LastResults.ToArray()), Enabled = e.Enabled, State = e.State, Status = e.Status,
             LastEvent = e.LastEvent, LastAction = e.LastAction
         };
         /// <summary>Creates or returns an equivalent object-count rule. Rules start when the feed is visible; at most eight rules are retained.</summary>
@@ -101,20 +115,34 @@ namespace Emgu.LiteRT.LM.Agents.Events
         /// <summary>Binds a registered detector, custom observation predicate, event phase and registered action.</summary>
         public VisualMonitorInfo CreateMonitor(string agentId, IVisualCondition condition, string actionId,
             VisualEventPhase phase = VisualEventPhase.Started)
+            => CreateMonitor(agentId, condition, new[] { new VisualActionRequest(actionId, VisualActionParameters.Empty) }, phase);
+
+        /// <summary>Creates an object rule with an explicit validated action set, or returns an equivalent rule.</summary>
+        public VisualMonitorInfo CreateObjectMonitor(string label, IEnumerable<VisualActionRequest> actions,
+            int minimumCount = 1, double confidence = 0.5, VisualEventPhase phase = VisualEventPhase.Started)
+        {
+            var condition = new ObjectCountCondition(label, minimumCount, confidence);
+            return CreateMonitor(_registry.SelectObjects(condition.Label).Descriptor.Id, condition, actions, phase);
+        }
+        /// <summary>Validates and binds every action before a rule is created. Each action type is allowed once.</summary>
+        public VisualMonitorInfo CreateMonitor(string agentId, IVisualCondition condition, IEnumerable<VisualActionRequest> actions,
+            VisualEventPhase phase = VisualEventPhase.Started)
         {
             if (condition == null) throw new ArgumentNullException(nameof(condition));
             var agent = _registry.Get(agentId);
-            if (!_actions.TryGetValue(actionId, out var action)) throw new ArgumentException("Unavailable action: " + actionId);
             if (!Enum.IsDefined(typeof(VisualEventPhase), phase)) throw new ArgumentException("Invalid event phase.");
+            var bindings = _actions.Bind(actions);
+            string key = VisualActionRegistry.Key(bindings);
             VisualMonitorInfo result;
             lock (_gate)
             {
                 ThrowIfDisposed();
                 var existing = _entries.FirstOrDefault(e => e.Monitor.Condition.Key == condition.Key &&
-                    e.Agent == agent && e.Action.Id == actionId && e.Phase == phase);
+                    e.Agent == agent && e.ActionKey == key && e.Phase == phase);
                 if (existing != null) return Info(existing);
                 if (_entries.Count >= 8) throw new InvalidOperationException("Remove a monitor before adding more (maximum 8).");
-                var entry = new Entry { Monitor = new VisualPresenceMonitor(condition), Agent = agent, Action = action,
+                var entry = new Entry { Monitor = new VisualPresenceMonitor(condition), Agent = agent, Actions = bindings, ActionKey = key,
+                    ActionInfos = bindings.Select(b => new VisualActionInfo(b.Action.Id, _actions.Name(b.Action.Id), b.Parameters)).ToArray(),
                     Phase = phase, AfterSequence = _sequence, State = _visible ? VisualMonitorState.Preparing : VisualMonitorState.Paused,
                     Status = _visible ? "Preparing detector" : "Waiting for visible live camera" };
                 _entries.Add(entry); result = Info(entry);
@@ -131,6 +159,7 @@ namespace Emgu.LiteRT.LM.Agents.Events
                 var entry = Find(id);
                 old = entry.Stop; entry.Stop = new CancellationTokenSource();
                 entry.Enabled = enabled; entry.Revision++; entry.Monitor.Reset();
+                CancelResults(entry, "Rule changed");
                 entry.AfterSequence = _sequence;
                 entry.State = enabled && _visible ? VisualMonitorState.Preparing : VisualMonitorState.Paused;
                 entry.Status = enabled ? (_visible ? "Preparing detector" : "Waiting for visible live camera") : "Paused by user";
@@ -167,6 +196,7 @@ namespace Emgu.LiteRT.LM.Agents.Events
                 _pending?.Dispose(); _pending = null; _dispatches.Clear();
                 foreach (var entry in _entries)
                 {
+                    CancelResults(entry, "Camera feed changed");
                     entry.Monitor.Reset();
                     if (entry.State == VisualMonitorState.Faulted) continue;
                     entry.State = visible && entry.Enabled ? VisualMonitorState.Preparing : VisualMonitorState.Paused;
@@ -227,10 +257,14 @@ namespace Emgu.LiteRT.LM.Agents.Events
                                 entry.LastEvent = $"{occurrence.Phase}: {occurrence.Count} at {analysis.CapturedAt.ToLocalTime():HH:mm:ss}";
                                 events.Add(occurrence);
                                 if (occurrence.Phase != entry.Phase) continue;
-                                if (_dispatches.Count >= 16) { entry.LastAction = "Action skipped: dispatcher busy"; continue; }
+                                var results = entry.Actions.Select(b => new VisualActionResult(b.Action.Id, occurrence.EpisodeId,
+                                    _dispatches.Count >= 16 ? VisualActionState.Skipped : VisualActionState.Queued,
+                                    _dispatches.Count >= 16 ? "Dispatcher busy" : "Waiting to execute")).ToArray();
+                                entry.LastResults = results; UpdateActionSummary(entry);
+                                if (_dispatches.Count >= 16) continue;
                                 // One transition per episode; no retries or replay queue across visibility changes.
                                 _dispatches.Enqueue(new Dispatch { Entry = entry, Revision = entry.Revision,
-                                    Generation = generation, Event = occurrence });
+                                    Generation = generation, Event = occurrence, Results = results });
                                 if (_actionWorker == null) _actionWorker = Task.Run(DispatchAsync);
                             }
                         }
@@ -302,21 +336,65 @@ namespace Emgu.LiteRT.LM.Agents.Events
                     if (!Current(item)) continue;
                     linked = CancellationTokenSource.CreateLinkedTokenSource(_feedStop.Token, item.Entry.Stop.Token);
                 }
-                string result;
                 using (linked)
                 {
                     try
                     {
                         linked.Token.ThrowIfCancellationRequested();
-                        await item.Entry.Action.ExecuteAsync(item.Event, linked.Token).ConfigureAwait(false);
-                        result = "Completed " + item.Entry.Action.Id + " at " + DateTimeOffset.Now.ToString("HH:mm:ss");
+                        using (var lease = _actionCoordinator == null ? null :
+                            await _actionCoordinator.EnterAsync(item.Event, linked.Token).ConfigureAwait(false))
+                        {
+                            linked.Token.ThrowIfCancellationRequested();
+                            // Groups remain FIFO; sibling actions launch together and report failures independently.
+                            await Task.WhenAll(item.Entry.Actions.Select((binding, index) =>
+                                Task.Run(() => ExecuteActionAsync(item, binding, index, linked.Token)))).ConfigureAwait(false);
+                        }
                     }
                     catch (OperationCanceledException) when (linked.IsCancellationRequested) { continue; }
-                    catch (Exception ex) { result = "Action failed: " + ex.Message; }
+                    catch (Exception ex)
+                    {
+                        for (int i = 0; i < item.Entry.Actions.Length; i++)
+                            ReportAction(item, i, VisualActionState.Failed, "Could not reserve action resources: " + ex.Message);
+                    }
                 }
-                lock (_gate) { if (Current(item)) item.Entry.LastAction = result; }
-                Notify();
             }
+        }
+        private async Task ExecuteActionAsync(Dispatch item, VisualActionBinding binding, int index, CancellationToken token)
+        {
+            try
+            {
+                token.ThrowIfCancellationRequested();
+                ReportAction(item, index, VisualActionState.Running, "Running");
+                token.ThrowIfCancellationRequested();
+                await binding.Action.ExecuteAsync(item.Event, token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
+                ReportAction(item, index, VisualActionState.Succeeded, "Completed at " + DateTimeOffset.Now.ToString("HH:mm:ss"));
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            { ReportAction(item, index, VisualActionState.Cancelled, "Cancelled"); }
+            catch (Exception ex) { ReportAction(item, index, VisualActionState.Failed, ex.Message); }
+        }
+        private void ReportAction(Dispatch item, int index, VisualActionState state, string message)
+        {
+            lock (_gate)
+            {
+                if (!Current(item) || !ReferenceEquals(item.Entry.LastResults, item.Results)) return;
+                item.Results[index] = new VisualActionResult(item.Entry.Actions[index].Action.Id, item.Event.EpisodeId, state, message);
+                UpdateActionSummary(item.Entry);
+            }
+            Notify();
+        }
+        private static void UpdateActionSummary(Entry entry) => entry.LastAction = string.Join("; ",
+            entry.LastResults.Select(r => r.ActionId + ": " + r.State + " — " + r.Message));
+        private static void CancelResults(Entry entry, string reason)
+        {
+            for (int i = 0; i < entry.LastResults.Length; i++)
+            {
+                var r = entry.LastResults[i];
+                if (r.State == VisualActionState.Queued || r.State == VisualActionState.Running)
+                    entry.LastResults[i] = new VisualActionResult(r.ActionId, r.EpisodeId, VisualActionState.Cancelled, reason);
+            }
+            if (entry.LastResults.Length > 0) UpdateActionSummary(entry);
         }
         private bool Current(Dispatch item) => !_disposed && _visible && item.Generation == _generation &&
             _entries.Contains(item.Entry) && item.Entry.Enabled && item.Entry.Revision == item.Revision;

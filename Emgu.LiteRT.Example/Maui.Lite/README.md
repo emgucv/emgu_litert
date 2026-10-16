@@ -302,18 +302,23 @@ again.
   improved preview delivery from about 9 to 28 FPS and removed the old image-source reloads' observed blank frames;
   frame rate during model inference still depends on device load.
 - **Visual agents and camera alerts:** with a tool-capable chat model, ask **"When you see a person, play a sound."**
+  You can also ask **"When you see a person, say Person detected"**, or request both sound and speech.
+  The chat discovers registered actions and selects an explicit set; combined actions run concurrently, with
+  independent results on the monitor card. One of each type is allowed, and speech is fixed text up to 200 characters.
+  Alerts interrupt chat read-aloud without restarting it. New reply speech waits for alerts; only the latest pending
+  reply is retained. Explicit alert speech works with chat read-aloud off, using the system voice.
   The chat selects the COCO SSD MobileNet visual agent and creates a session monitor. Other supported COCO classes
   and minimum counts can be requested too. There is no Tavily requirement and Gemma is not called on every frame.
   The monitor card shows preparation/download progress, Watching/Paused/Faulted, and the last event and action result.
   Use its Pause, Resume and Remove buttons, or ask the chat to control a monitor. A failed detector requires Resume
   to retry. Unsupported detectors/actions are reported rather than substituted.
   Detection uses a separate worker at up to 5 FPS, with one in-flight frame and one replaceable pending frame.
-  The default confidence is 0.5; two positives within one second start a presence episode and play one bundled chime.
+  The default confidence is 0.5; two positives within one second start a presence episode and run the selected actions once.
   At least two negative observations spanning 1.5 seconds end it; brief misses do not rearm it. Additional people
   during the same episode do not produce another chime. A gap over two seconds resets confirmation rather than
   claiming somebody left. Detector accuracy and device load affect responsiveness; normal media volume controls the sound.
   Monitoring runs **only while the live camera feed is visible**. Close, leaving the page and backgrounding pause
-  rules and cancel pending sounds. Reopening resumes enabled rules with fresh state; explicitly paused rules stay
+  rules and cancel the whole action group. Reopening resumes enabled rules with fresh state; explicitly paused rules stay
   paused. A person still present after reopening can start a new episode. New chats discard the rules, and no rules,
   frames or event history are persisted, including in ordinary chats. The chat request and reply follow normal chat storage.
   Attach an image and ask to detect/count its objects to use the same visual agent once, without monitoring or sounds.

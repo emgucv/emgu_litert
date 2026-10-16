@@ -65,6 +65,36 @@ runtime.SetFeedVisible(false);
 await runtime.DisposeAsync();
 ```
 
+For explicit action discovery, register `IVisualActionFactory` implementations in `VisualActionRegistry` and pass
+that registry to the runtime. A factory advertises `VisualActionDescriptor` (ID, availability, description and JSON
+parameter schema) and validates/binds parameters without executing side effects:
+
+```csharp
+var actions = new VisualActionRegistry();
+actions.Register(yourSoundFactory);
+actions.Register(yourSpeechFactory);
+var runtime = new VisualMonitorRuntime(registry, actions, actionCoordinator: yourOptionalCoordinator);
+var rule = runtime.CreateObjectMonitor("person", new[] {
+    new VisualActionRequest("play_sound", VisualActionParameters.Empty),
+    new VisualActionRequest("speak_text", VisualActionParameters.Text("Person detected"))
+});
+```
+
+The six-tool `VisualAgentTools.Create` overload adds `list_visual_actions` and derives the monitor action-array
+schema from registered available descriptors. Pair it with `VisualAgentTools.Instructions`. The legacy five-tool,
+sound-only overload remains available with `LegacyInstructions`. Hosts may pass source-generated serializer
+options for action argument deserialization. The old single-action runtime overloads are retained.
+
+Action sets reject unknown/unavailable IDs and repeated types; each factory must reject unknown parameters and
+invalid values. Complete validation precedes rule creation. Normalized parameters are cloned; equivalent sets
+are order independent. `Snapshot().Actions` exposes configuration and `LastActionResults` reports each action's
+Queued/Running/Succeeded/Failed/Cancelled/Skipped status for the latest event group.
+
+Groups execute FIFO (sixteen waiting groups maximum); sibling actions launch concurrently and fail independently.
+An optional `IVisualActionGroupCoordinator` supplies a disposable resource lease around the entire group,
+including all sibling cleanup. Hide/pause/remove cancels every sibling. Hosts must honor cancellation and release
+native resources before returning. Stale group results cannot overwrite a newer event's results.
+
 Register adapters before runtime use. `IVisualAgent` returns `VisualAnalysis` containing typed observations (kind,
 canonical label, confidence, optional normalized box/text/tracking ID) and source/capture metadata. The runtime
 serializes preparation and inference; adapters must honor cancellation, and must not retain borrowed frame pixels.
@@ -91,7 +121,8 @@ feed reopen; detector faults require explicit resume. `Clear()` ends a chat's ru
 before releasing model adapters. No pixels, rule definitions or event history are written to disk by this framework.
 Text recognized in images is untrusted scene data and must never be executed as instructions.
 
-The MAUI demo supplies COCO SSD MobileNet and a local chime. Add YOLO, face detection, OCR or plate-recognition
+The MAUI demo supplies COCO SSD MobileNet, a local chime and fixed-text system speech. Its audio coordinator
+interrupts chat read-aloud before alert groups and retains only the latest pending reply until alerts finish. Add YOLO, face detection, OCR or plate-recognition
 adapters by implementing the same contracts and advertising only supported capabilities/classes; custom predicates
 can consume their observations. No native detector or audio library is a dependency of this package.
 

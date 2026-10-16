@@ -19,6 +19,11 @@ internal sealed class VisualImageSummary
 }
 
 [JsonSerializable(typeof(VisualAgentDescriptor[]))]
+[JsonSerializable(typeof(VisualActionDescriptor[]))]
+[JsonSerializable(typeof(VisualActionRequest[]))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(double))]
 [JsonSerializable(typeof(VisualMonitorInfo[]))]
 [JsonSerializable(typeof(VisualMonitorInfo))]
 [JsonSerializable(typeof(VisualImageSummary))]

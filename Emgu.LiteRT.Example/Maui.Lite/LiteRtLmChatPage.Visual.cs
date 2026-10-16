@@ -17,6 +17,8 @@ public partial class LiteRtLmChatPage
     private VisualAgentRegistry _visualAgents;
     private VisualMonitorRuntime _visualRuntime;
     private CameraChimeAction _visualChime;
+    private VisualActionRegistry _visualActions;
+    private AlertAudioCoordinator _alertAudio;
     private Border _visualMonitorPanel;
     private VerticalStackLayout _visualMonitorRows;
     private int _visualUiQueued;
@@ -28,7 +30,11 @@ public partial class LiteRtLmChatPage
         _visualAgents = new VisualAgentRegistry();
         _visualAgents.Register(new CocoVisualAgent());
         _visualChime = new CameraChimeAction();
-        _visualRuntime = new VisualMonitorRuntime(_visualAgents, new[] { _visualChime });
+        _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(text, token)));
+        _visualActions = new VisualActionRegistry();
+        _visualActions.Register(new CameraChimeFactory(_visualChime));
+        _visualActions.Register(new CameraSpeechFactory(_alertAudio));
+        _visualRuntime = new VisualMonitorRuntime(_visualAgents, _visualActions, actionCoordinator: _alertAudio);
         _visualRuntime.Changed += QueueVisualMonitorUi;
         _visualMonitorRows = new VerticalStackLayout { Spacing = 6 };
         _visualMonitorPanel = Theme.Card(new ScrollView { Content = _visualMonitorRows }, 8);
@@ -91,11 +97,18 @@ public partial class LiteRtLmChatPage
         foreach (var monitor in monitors)
         {
             string detectorName = _visualAgents.Describe().FirstOrDefault(d => d.Id == monitor.AgentId)?.Name ?? monitor.AgentId;
-            _visualMonitorRows.Children.Add(new Label { Text = monitor.Condition + " → sound", FontSize = 12, TextColor = Theme.PrimaryText });
+            _visualMonitorRows.Children.Add(new Label { Text = monitor.Condition, FontSize = 12, TextColor = Theme.PrimaryText });
             _visualMonitorRows.Children.Add(new Label { Text = detectorName + " · " + monitor.State + " · " + monitor.Status,
                 FontSize = 11, TextColor = Theme.SecondaryText });
-            if (monitor.LastEvent != null || monitor.LastAction != null)
-                _visualMonitorRows.Children.Add(new Label { Text = string.Join("\n", new[] { monitor.LastEvent, monitor.LastAction }.Where(s => s != null)),
+            foreach (var action in monitor.Actions)
+            {
+                string detail = action.ActionId == "speak_text" ? "“" + action.Parameters.GetProperty("text").GetString() + "”" : null;
+                var result = monitor.LastActionResults.FirstOrDefault(r => r.ActionId == action.ActionId);
+                _visualMonitorRows.Children.Add(new Label { Text = action.Name + (detail == null ? "" : ": " + detail) +
+                    (result == null ? "" : " · " + result.State + " · " + result.Message), FontSize = 11, TextColor = Theme.SecondaryText });
+            }
+            if (monitor.LastEvent != null)
+                _visualMonitorRows.Children.Add(new Label { Text = monitor.LastEvent,
                     FontSize = 11, TextColor = Theme.SecondaryText });
             var buttons = new HorizontalStackLayout { Spacing = 6 };
             bool pause = monitor.Enabled && monitor.State != VisualMonitorState.Faulted;
@@ -115,16 +128,18 @@ public partial class LiteRtLmChatPage
     private static Button MonitorButton(string text) => new() { Text = text, FontSize = 12, MinimumHeightRequest = 40, Padding = new Thickness(8, 0) };
 
     private IList<AITool> VisualTools(List<PendingAttachment> attachments) => VisualAgentTools.Create(
-        () => JsonSerializer.Serialize(_visualAgents.Describe().ToArray(), VisualJson.Default.VisualAgentDescriptorArray), CreateVisualMonitorAsync,
+        () => JsonSerializer.Serialize(_visualAgents.Describe().ToArray(), VisualJson.Default.VisualAgentDescriptorArray),
+        () => JsonSerializer.Serialize(_visualActions.Describe().ToArray(), VisualJson.Default.VisualActionDescriptorArray),
+        _visualActions.Describe(), CreateVisualMonitorAsync,
         () => JsonSerializer.Serialize(_visualRuntime.Snapshot().ToArray(), VisualJson.Default.VisualMonitorInfoArray), ControlVisualMonitorAsync,
-        (agentId, imageId, token) => AnalyzeVisualImageAsync(agentId, imageId, attachments, token));
+        (agentId, imageId, token) => AnalyzeVisualImageAsync(agentId, imageId, attachments, token), VisualJson.Default.Options);
 
-    private async Task<string> CreateVisualMonitorAsync(string label, int minimumCount, double confidence, CancellationToken token)
+    private async Task<string> CreateVisualMonitorAsync(string label, int minimumCount, double confidence, VisualActionRequest[] actions, CancellationToken token)
     {
         try
         {
             token.ThrowIfCancellationRequested();
-            var monitor = _visualRuntime.CreateObjectMonitor(label, minimumCount, confidence);
+            var monitor = _visualRuntime.CreateObjectMonitor(label, actions, minimumCount, confidence);
             // Repeated requests return the existing rule, including its user-paused status.
             if (monitor.Enabled && monitor.State != VisualMonitorState.Faulted)
             {

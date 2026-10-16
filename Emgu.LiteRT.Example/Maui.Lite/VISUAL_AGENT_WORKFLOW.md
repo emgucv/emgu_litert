@@ -2,105 +2,91 @@
 
 This guide describes the current MAUI demo implementation using the request:
 
-> When you see a person, play a sound.
+> When you see a person, play a sound and say “Person detected”.
 
 The chat model interprets the request and calls a tool to configure a monitor. The detector, event monitor,
 and action dispatcher then run locally without calling Gemma for every frame.
 
-**In this first version, sound is the monitor tool's preconfigured action. Chat does not yet discover and choose
-among multiple actions.** The underlying runtime supports registered actions and explicit action identifiers.
+Version 2 exposes action discovery and explicit validated action sets. A rule can play a chime, speak fixed words,
+or do both concurrently. A speech-only request does not implicitly add a chime.
 
 ## Workflow
 
 ```mermaid
 flowchart TD
-    Request[Chat: When you see a person, play a sound] --> Model[Gemma interprets the request]
-    Model --> Discover[list_visual_agents]
-    Discover --> Tool[create_visual_monitor: person, count 1, confidence 0.5]
-    Tool --> Bind[Select detector and bind Started to play_sound]
-    Bind --> Camera[Open visible live camera]
-    Camera --> Detector[COCO SSD analyzes sampled frames]
-    Detector --> Observations[Typed object observations]
-    Observations --> Monitor[Presence state machine]
-    Monitor --> Started[Started event after confirmed presence]
-    Started --> Dispatcher[Action dispatcher]
-    Dispatcher --> Chime[CameraChimeAction.ExecuteAsync]
-    Chime --> Playback[Play bundled chime]
+    Request[Chat request] --> Model[Gemma interprets intent]
+    Model --> Discover[list_visual_agents and list_visual_actions]
+    Discover --> Tool[create_visual_monitor with explicit actions]
+    Tool --> Bind[Validate and bind the complete action set]
+    Bind --> Camera[Open visible camera]
+    Camera --> Detector[COCO SSD on sampled raw frames]
+    Detector --> Monitor[Presence state machine]
+    Monitor --> Started[Confirmed Started event]
+    Started --> Audio[Reserve audio and interrupt chat read-aloud]
+    Audio --> Group[Concurrent action group]
+    Group --> Chime[Play chime]
+    Group --> Speech[Speak fixed text]
+    Chime --> Results[Independent action results]
+    Speech --> Results
 ```
 
-### 1. The app registers detectors and actions
+### 1. The app registers detectors and action factories
 
-`BuildVisualMonitoring()` creates the registry and runtime:
+`BuildVisualMonitoring()` registers `CocoVisualAgent`, `CameraChimeFactory` and `CameraSpeechFactory`.
+Each action factory supplies a `VisualActionDescriptor` containing its stable ID, name, availability,
+description and JSON parameter schema. Its side-effect-free `Bind` method validates parameters and creates
+an immutable `VisualActionBinding`. Registration and binding do not play audio.
 
-```csharp
-_visualAgents = new VisualAgentRegistry();
-_visualAgents.Register(new CocoVisualAgent());
-_visualChime = new CameraChimeAction();
-_visualRuntime = new VisualMonitorRuntime(_visualAgents, new[] { _visualChime });
-```
+| ID | Parameters | Host implementation |
+|---|---|---|
+| `play_sound` | `{}` | `CameraChimeAction`, bundled `visual_chime.wav`, five-second timeout |
+| `speak_text` | `{ "text": "Person detected" }` | `CameraSpeechAction`, system speech, thirty-second timeout |
 
-The detector advertises `object_detection` and its supported COCO classes, including `person`.
-The sound action implements `IVisualAction` and declares:
+Speech must contain nonblank, pronounceable text of at most 200 characters. The host uses the existing speech
+language selection and system voice. Explicit alert speech works even when chat read-aloud is off.
 
-```csharp
-public string Id => "play_sound";
-```
+### 2. Gemma discovers capabilities and supplies explicit actions
 
-The runtime builds an action dictionary keyed by these registered identifiers.
-
-### 2. Gemma interprets the request and calls tools
-
-`VisualAgentTools.Instructions` tells the model how to configure an object-presence alert. The tool descriptions
-explain available operations and the sound behavior of `create_visual_monitor`.
-
-Gemma first calls `list_visual_agents` to inspect available capabilities and supported classes. It then calls
-`create_visual_monitor` with arguments such as:
+`VisualAgentTools.Instructions` directs Gemma to call `list_visual_agents` and `list_visual_actions` first.
+The monitor tool's `actions` array schema is generated from available registered action descriptors, including
+an ID enum and the exact parameter schema for each alternative. The combined request becomes:
 
 ```json
 {
   "label": "person",
   "minimumCount": 1,
-  "confidence": 0.5
+  "confidence": 0.5,
+  "actions": [
+    { "actionId": "play_sound", "parameters": {} },
+    { "actionId": "speak_text", "parameters": { "text": "Person detected" } }
+  ]
 }
 ```
 
-There is no `actionId` argument in this chat tool yet. The model chooses this tool because its description matches
-the requested object-detection-and-sound workflow. It does not independently call a `play_sound` chat tool.
+Gemma chooses registered identifiers and literal speech text. There is no arbitrary code execution or
+per-frame language-model decision. Only appearance (`Started`) is exposed through chat in this version.
+Requests for disappearance, recurring alerts or dynamic spoken descriptions are unsupported.
 
-### 3. The host creates the rule and resolves its action
+### 3. The host validates and binds the entire rule
 
-The tool invokes the page's `CreateVisualMonitorAsync`, which calls:
-
-```csharp
-_visualRuntime.CreateObjectMonitor(label, minimumCount, confidence);
-```
-
-That runtime method has these defaults:
+`CreateVisualMonitorAsync` calls:
 
 ```csharp
-string actionId = "play_sound";
-VisualEventPhase phase = VisualEventPhase.Started;
+_visualRuntime.CreateObjectMonitor(label, actions, minimumCount, confidence);
 ```
 
-It creates an `ObjectCountCondition` and selects the first available registered object detector supporting the
-canonical label. Currently that is COCO SSD MobileNet V3. Detector selection is deterministic registry lookup;
-Gemma supplies the requested class rather than a detector implementation identifier.
+The registry selects an available object detector supporting the canonical class. The action registry rejects
+missing/empty action lists, unknown or unavailable IDs, repeated action types, invalid parameter objects and
+unknown parameters. All actions must bind successfully before a rule is stored or the camera is opened.
+Each rule can contain at most one action of each registered type. Speech parameters are normalized and copied
+into a per-rule action, so another rule cannot change the words spoken by an existing rule.
 
-`CreateMonitor(...)` then looks up `actionId` in the registered action dictionary and stores the resulting
-`IVisualAction` instance with the rule. An unknown action identifier is rejected. The resulting configuration is:
+Equivalent rules return the existing monitor. Identity includes detector, condition, trigger phase and the
+normalized action set; reversing the order of the same actions does not create another rule. Different speech
+text creates a different rule. Rules remain limited to eight per session.
 
-| Part | Bound value |
-|---|---|
-| Source | Live camera |
-| Detector | COCO SSD MobileNet V3 |
-| Condition | At least one `person` with confidence at least `0.5` |
-| Trigger phase | `Started` |
-| Action identifier | `play_sound` |
-| Action implementation | `CameraChimeAction` |
-
-The host opens the live camera and returns the rule's actual status to chat. Model preparation may require a
-download on first use. A returned `Preparing` or `Paused` status must not be described as already watching.
-Equivalent create requests return the existing rule rather than adding duplicate alerts.
+The host opens the camera and returns actual status. First use may download the detector. `Preparing` and
+`Paused` must not be described as already watching. The monitor card shows configured actions and each result.
 
 ### 4. Frames become observations
 
@@ -131,25 +117,27 @@ missing frames are not treated as proof that somebody left. Temporal decisions u
 These event phases are separate from the rule's lifecycle states: `Preparing`, `Watching`, `Paused`, `Stopped`,
 and `Faulted`.
 
-### 6. The dispatcher executes the bound action
+### 6. The dispatcher executes a concurrent action group
 
-When the monitor emits an event, the runtime compares its phase with the rule's trigger phase. This rule is
-bound to `Started`, so `Updated` and `Ended` do not queue a sound.
+Only `Started` queues the rule's action group. The separate dispatcher keeps at most sixteen waiting event
+groups. Groups execute FIFO; a full queue reports `Skipped` for every action in the dropped group.
+Before starting, the dispatcher checks rule revision and visible-feed generation, then obtains an optional
+`IVisualActionGroupCoordinator` lease. Each sibling action runs concurrently through `Task.WhenAll` with its
+own exception handling. A failed chime does not stop speech, and a speech failure does not stop the chime.
+The lease is released after all siblings and their cleanup complete. Actions are not automatically retried.
 
-A separate, bounded action dispatcher validates that the rule and visible-feed generation are still current,
-then calls:
+The MAUI `AlertAudioCoordinator` reserves audio for the group, cancels any chat read-aloud, and awaits its
+native cleanup before allowing alert audio. Interrupted replies are not restarted. Chat speech arriving during
+an alert waits until the whole group finishes; only the latest pending reply is retained. A chime and an alert
+utterance can overlap, but two text-to-speech calls cannot. Alerts use normal media volume and the system voice.
 
-```csharp
-await action.ExecuteAsync(occurrence, cancellationToken);
-```
+Snapshots expose `Actions` and `LastActionResults` (`Queued`, `Running`, `Succeeded`, `Failed`, `Cancelled`,
+`Skipped`) for the latest scheduled group, with episode IDs and messages. Lifecycle changes cancel the whole
+group. Late results from an older group or revision cannot overwrite the newest result. The old `ActionId` and
+`LastAction` properties remain available as summaries for existing consumers.
 
-For `play_sound`, that instance is `CameraChimeAction`. It plays `Resources/Raw/visual_chime.wav` using the
-platform's native audio player. Playback follows normal media-volume settings. The monitor card displays the
-last event and action result, including playback failures. Actions are not automatically retried.
-
-Gemma is not called again to approve or execute each sound. One confirmed episode produces one `Started` alert;
-another person entering while somebody remains visible does not produce another chime. Confirmed absence rearms
-the rule for the next episode. This is session-local dispatch, not a durable exactly-once delivery system.
+Gemma is not called again for playback. One confirmed presence episode produces one group; additional people
+during that episode do not retrigger it. Confirmed absence rearms the rule. This is session-local delivery.
 
 ## Visibility, controls and single images
 
@@ -168,21 +156,18 @@ the rule for the next episode. This is session-local dispatch, not a durable exa
   Continuous detector monitoring does not send every frame to Gemma. Recognized scene text is untrusted data,
   never an instruction to execute.
 
-## Extending action selection
+## Extending the framework
 
-The runtime already supports an explicit binding:
+Implement `IVisualActionFactory` with a discoverable descriptor and strict, side-effect-free `Bind` validation;
+return an `IVisualAction` plus normalized immutable parameters. Register factories before runtime/tool creation.
+A host may supply `IVisualActionGroupCoordinator` to reserve shared resources around the entire group. The pure
+managed core has no MAUI, camera, audio or detector-model dependencies.
 
-```csharp
-runtime.CreateMonitor(agentId, condition, actionId, phase);
-```
-
-A future version can register more `IVisualAction` implementations, expose action descriptors through a discovery
-tool, and add `actionId` plus validated action parameters to the monitor-creation tool. Gemma could then choose
-among supported actions such as a chime, notification or snapshot. The host would validate the identifier and
-parameters before binding the rule. Any action-specific authorization requirements would belong to that host action.
-
-That discovery and parameter-selection layer is not implemented yet. Likewise, YOLO, face, OCR and plate-recognition
-adapters remain future additions to the existing visual-agent contracts.
+Existing single-action constructors, `CreateMonitor(..., actionId, phase)` and sound-only tool overload remain
+available. Use `LegacyInstructions` with the old five-tool overload; use `Instructions` with the six-tool overload
+that adds action discovery. Hosts using source-generated JSON can pass serializer options to the new overload.
+YOLO, face, OCR and plate recognition, notifications, snapshots as actions, persistent rules and background
+monitoring remain future additions.
 
 ## Source map
 
@@ -195,5 +180,8 @@ adapters remain future additions to the existing visual-agent contracts.
 | Conditions and presence state machine | [VisualEvents.cs](../../Emgu.LiteRT.LM.Agents/VisualEvents.cs) |
 | Rule binding, frame scheduling and action dispatch | [VisualMonitorRuntime.cs](../../Emgu.LiteRT.LM.Agents/VisualMonitorRuntime.cs) |
 | COCO model adapter | [CocoVisualAgent.cs](CocoVisualAgent.cs) |
+| Action contracts, factories and validation | [VisualActions.cs](../../Emgu.LiteRT.LM.Agents/VisualActions.cs) |
+| MAUI factories and fixed speech | [CameraActionFactories.cs](CameraActionFactories.cs) |
+| Audio arbitration | [AlertAudioCoordinator.cs](AlertAudioCoordinator.cs) |
 | Native chime playback | [CameraChimeAction.cs](CameraChimeAction.cs) |
 | Regression tests | [UnitTestVisualAgents.cs](../../Emgu.LiteRT.Test/Emgu.TF.Lite.Test/UnitTestVisualAgents.cs) |
