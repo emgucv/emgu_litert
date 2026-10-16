@@ -2,10 +2,12 @@
 #if ANDROID || MACCATALYST || WINDOWS || IOS
 using Emgu.CV;
 using Emgu.CV.CvEnum;
+using System.Diagnostics;
 
 namespace Maui.Demo.Lite;
 
-// One worker owns the native capture and Mats. Frames are encoded at a bounded rate; the UI keeps only the newest.
+// One worker owns the native capture and Mats. Preview consumers must copy a frame before returning.
+// Only requested snapshots are JPEG-encoded; the live preview receives raw pixels.
 internal sealed class LiveCamera
 {
     public static bool Supported => DeviceInfo.Platform == DevicePlatform.Android ||
@@ -16,7 +18,7 @@ internal sealed class LiveCamera
     private TaskCompletionSource<byte[]> _snapshot;
     private Task _worker;
     public bool IsRunning => !_stop.IsCancellationRequested;
-    public Action<byte[]> FrameReady;
+    public Action<Mat> FrameReady;
     public Action<string> Failed;
     public Func<int> RotationDegrees;
 
@@ -69,6 +71,7 @@ internal sealed class LiveCamera
             using var rotated = new Mat();
             while (!_stop.IsCancellationRequested)
             {
+                long started = Stopwatch.GetTimestamp();
                 // A request registered after this point must wait for the next frame, not receive an older preview.
                 TaskCompletionSource<byte[]> request;
                 lock (_gate) request = _snapshot;
@@ -81,12 +84,17 @@ internal sealed class LiveCamera
                         rotation == 180 ? RotateFlags.Rotate180 : RotateFlags.Rotate90CounterClockwise);
                     image = rotated;
                 }
-                byte[] jpeg = CvInvoke.Imencode(".jpg", image,
-                    new KeyValuePair<ImwriteFlags, int>(ImwriteFlags.JpegQuality, 85));
-                FrameReady?.Invoke(jpeg);
+                FrameReady?.Invoke(image);
                 _ready.TrySetResult(true);
-                request?.TrySetResult(jpeg);
-                await Task.Delay(100, _stop.Token);
+                if (request != null)
+                {
+                    byte[] jpeg = CvInvoke.Imencode(".jpg", image,
+                        new KeyValuePair<ImwriteFlags, int>(ImwriteFlags.JpegQuality, 85));
+                    request.TrySetResult(jpeg);
+                }
+                // Pace to at most 30 FPS, including the camera read/render time rather than adding a fixed gap.
+                TimeSpan delay = TimeSpan.FromSeconds(1.0 / 30) - Stopwatch.GetElapsedTime(started);
+                if (delay > TimeSpan.Zero) await Task.Delay(delay, _stop.Token);
             }
         }
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }

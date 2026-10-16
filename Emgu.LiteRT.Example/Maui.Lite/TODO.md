@@ -565,6 +565,11 @@ static `tfliteextern` has its own TFLite), so image generation is hidden there.
       twice and verify cache reuse. Existing text-tool and private-chat tests pass too (10 tests total).
 - [x] Pixel Fold: live color preview, actual Gemma 4 E2B GPU camera descriptions, repeated fresh capture, close/reopen and
       background release verified. Normal Debug build deployed after removing the temporary private-session probe.
+- [x] Replace per-frame JPEG/MAUI ImageSource reloads with native raw-pixel rendering, following Emgu CV's CvImageView
+      bitmap buffers on Android. Reuse pending/displayed Mats with one queued UI update; encode JPEG only on capture.
+      Idle 10-second Pixel Fold comparison: 88 vs 281 captured preview frames, 196/585 vs 0/597 blank display samples;
+      process managed allocations ~24.1 vs ~4.2 MB. Requested JPEG capture and close passed both runs. This is a short
+      preview-only comparison, not a sustained-inference benchmark. Mac Catalyst build checked; no webcam on this Mac.
 - [x] Android arm64 and Mac Catalyst builds pass. CPU camera opening works, but the full CPU description run was stopped
       to switch to GPU validation; responses can take tens of seconds even on the phone's GPU.
 - [ ] Real webcam checks on Mac Catalyst and Windows; this Mac has no camera. iOS live capture is not enabled yet.

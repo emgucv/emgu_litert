@@ -296,6 +296,10 @@ again.
   Requested snapshots are saved with ordinary chats and stay in memory in Private chat. Allow camera permission
   when asked; a device without an available camera reports that it cannot be opened. iOS live capture is not yet
   enabled. Android camera behavior is verified on Pixel Fold; Mac Catalyst/Windows camera hardware needs a device check.
+  Live preview frames use native rendering (Emgu CV's reusable Android bitmap buffers), with a fixed view size and
+  at most one pending UI update. JPEG encoding runs only for requested snapshots. A 10-second Pixel Fold comparison
+  improved preview delivery from about 9 to 28 FPS and removed the old image-source reloads' observed blank frames;
+  frame rate during model inference still depends on device load.
 - Settings → Context window (Gemma 4) sets how much of a chat the model keeps in mind: Automatic (8k tokens on a
   Mac or PC, 4k on a phone), 4k, 8k, 16k or 32k. A larger window summarizes the chat less often, but reading it again
   (opening a saved chat, after summarizing) takes longer and needs more memory. Changing it reloads the model; the chat

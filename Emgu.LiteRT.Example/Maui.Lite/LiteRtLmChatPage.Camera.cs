@@ -1,6 +1,7 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 #if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.IO;
+using Emgu.CV;
 using Microsoft.Extensions.AI;
 
 namespace Maui.Demo.Lite;
@@ -9,14 +10,15 @@ public partial class LiteRtLmChatPage
 {
     private LiveCamera _camera;
     private Border _cameraPanel;
-    private Image _cameraPreview;
+    private LiveCameraPreview _cameraPreview;
     private Label _cameraLabel;
     private bool _cameraSuspended;
     private readonly SemaphoreSlim _cameraGate = new(1, 1);
     private readonly List<byte[]> _cameraTurnFrames = new();
     private readonly List<View> _cameraTurnViews = new();
     private readonly object _previewGate = new();
-    private byte[] _previewFrame;
+    private Mat _previewFrame;
+    private Mat _previewDisplayedFrame;
     private bool _previewQueued;
     private int _previewVersion;
     private int _cameraRotation = 0;
@@ -30,7 +32,7 @@ public partial class LiteRtLmChatPage
 
     private void BuildCameraPanel()
     {
-        _cameraPreview = new Image { Aspect = Aspect.AspectFit, HeightRequest = 170, BackgroundColor = Colors.Black };
+        _cameraPreview = new LiveCameraPreview { Aspect = Aspect.AspectFit, HeightRequest = 170, BackgroundColor = Colors.Black };
         _cameraLabel = new Label { Text = "Live camera", FontFamily = Theme.TitleFont, FontSize = 13,
             TextColor = Theme.PrimaryText, VerticalOptions = LayoutOptions.Center };
         var close = new Button { Text = "Close", FontSize = 12, Padding = new Thickness(8, 0), MinimumHeightRequest = 40 };
@@ -91,7 +93,7 @@ public partial class LiteRtLmChatPage
             _cameraPanel.IsVisible = true;
             _cameraLabel.Text = "Opening camera…";
             var camera = _camera = new LiveCamera { RotationDegrees = () => Volatile.Read(ref _cameraRotation) };
-            camera.FrameReady = jpeg => QueueCameraPreview(camera, jpeg);
+            camera.FrameReady = frame => QueueCameraPreview(camera, frame);
             camera.Failed = _ => MainThread.BeginInvokeOnMainThread(() =>
             {
                 if (_camera == camera) _cameraLabel.Text = "Camera stopped · ask to reopen";
@@ -146,27 +148,31 @@ public partial class LiteRtLmChatPage
         _cameraTurnViews.Clear();
     }
 
-    private void QueueCameraPreview(LiveCamera camera, byte[] jpeg)
+    private void QueueCameraPreview(LiveCamera camera, Mat frame)
     {
         int version;
         lock (_previewGate)
         {
             if (_camera != camera) return;
-            _previewFrame = jpeg;
+            _previewFrame ??= new Mat();
+            frame.CopyTo(_previewFrame);
             if (_previewQueued) return;
             _previewQueued = true;
             version = _previewVersion;
         }
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            byte[] newest;
+            Mat newest;
             lock (_previewGate)
             {
                 if (version != _previewVersion) return;
-                newest = _previewFrame; _previewFrame = null; _previewQueued = false;
+                newest = _previewFrame;
+                _previewFrame = _previewDisplayedFrame;
+                _previewDisplayedFrame = newest;
+                _previewQueued = false;
             }
             if (_camera == camera && _cameraPanel.IsVisible && newest != null)
-                _cameraPreview.Source = ImageSource.FromStream(() => new MemoryStream(newest));
+                _cameraPreview.Present(newest);
         });
     }
 
@@ -210,8 +216,14 @@ public partial class LiteRtLmChatPage
         var camera = _camera;
         _camera = null;
         if (_cameraPanel != null) _cameraPanel.IsVisible = false;
-        if (_cameraPreview != null) _cameraPreview.Source = null;
-        lock (_previewGate) { _previewVersion++; _previewFrame = null; _previewQueued = false; }
+        _cameraPreview?.ClearFrame();
+        lock (_previewGate)
+        {
+            _previewVersion++;
+            _previewQueued = false;
+            _previewFrame?.Dispose(); _previewFrame = null;
+            _previewDisplayedFrame?.Dispose(); _previewDisplayedFrame = null;
+        }
         if (camera != null) { camera.FrameReady = null; camera.Failed = null; await camera.StopAsync(); }
     }
 }
