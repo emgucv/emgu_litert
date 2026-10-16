@@ -60,6 +60,7 @@ public partial class LiteRtLmChatPage
             _cameraPreview.HeightRequest = Math.Min(170, Math.Max(70, _scroll.Height - 100));
             MoveCameraPanel(_cameraPanel.TranslationX, _cameraPanel.TranslationY);
         };
+        BuildVisualMonitoring();
     }
 
     private void MoveCameraPanel(double x, double y)
@@ -140,7 +141,11 @@ public partial class LiteRtLmChatPage
         {
             if (!LiveCamera.Supported) return "Live camera is not supported on this platform yet.";
             if (!_pageVisible || _cameraSuspended) return "The chat must be visible in the foreground to open the camera.";
-            if (_camera?.IsRunning == true && _cameraPanel.IsVisible) return "The live camera preview is open. You have not captured an image. Tell the user they can ask what you see in the camera.";
+            if (_camera?.IsRunning == true && _cameraPanel.IsVisible)
+            {
+                _visualRuntime.SetFeedVisible(true);
+                return "The live camera preview is open. You have not captured an image. Tell the user they can ask what you see in the camera.";
+            }
             if (_camera != null) await CloseCameraCoreAsync();
             var permission = await Permissions.RequestAsync<Permissions.Camera>();
             if (permission != PermissionStatus.Granted) return "Camera permission was not granted. Allow Camera for this app in system settings to use the live preview.";
@@ -151,11 +156,15 @@ public partial class LiteRtLmChatPage
             _cameraPanel.IsVisible = true;
             _cameraLabel.Text = "Opening camera…";
             var camera = _camera = new LiveCamera { RotationDegrees = () => Volatile.Read(ref _cameraRotation) };
-            camera.FrameReady = frame => QueueCameraPreview(camera, frame);
-            camera.Failed = _ => MainThread.BeginInvokeOnMainThread(() =>
+            camera.FrameReady = frame => { QueueCameraPreview(camera, frame); QueueVisualFrame(camera, frame); };
+            camera.Failed = _ =>
             {
-                if (_camera == camera) _cameraLabel.Text = "Camera stopped · ask to reopen";
-            });
+                PauseVisualFeed();
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    if (_camera == camera) { _cameraLabel.Text = "Camera stopped · ask to reopen"; QueueVisualMonitorUi(); }
+                });
+            };
             await camera.StartAsync(token);
             if (!_pageVisible || _cameraSuspended)
             {
@@ -163,6 +172,8 @@ public partial class LiteRtLmChatPage
                 return "The camera was closed because the chat left the foreground.";
             }
             _cameraLabel.Text = "Live camera · not recording";
+            _visualRuntime.SetFeedVisible(true);
+            QueueVisualMonitorUi();
             return "The live camera preview is now open. No image has been captured for you yet. Tell the user they can ask what you see in the camera.";
         }
         catch (OperationCanceledException) { await CloseCameraCoreAsync(); throw; }
@@ -261,19 +272,25 @@ public partial class LiteRtLmChatPage
         _cameraSuspended = true;
         await CloseCameraAsync();
     }
-    private Task CloseCameraAsync() => MainThread.InvokeOnMainThreadAsync(async () =>
+    private Task CloseCameraAsync()
     {
-        await _cameraGate.WaitAsync();
-        try { await CloseCameraCoreAsync(); }
-        finally { _cameraGate.Release(); }
-    });
+        PauseVisualFeed();
+        return MainThread.InvokeOnMainThreadAsync(async () =>
+        {
+            await _cameraGate.WaitAsync();
+            try { await CloseCameraCoreAsync(); }
+            finally { _cameraGate.Release(); }
+        });
+    }
 
     private async Task CloseCameraCoreAsync()
     {
+        PauseVisualFeed();
         DeviceDisplay.Current.MainDisplayInfoChanged -= CameraDisplayChanged;
         var camera = _camera;
         _camera = null;
         if (_cameraPanel != null) _cameraPanel.IsVisible = false;
+        QueueVisualMonitorUi();
         _cameraPreview?.ClearFrame();
         lock (_previewGate)
         {

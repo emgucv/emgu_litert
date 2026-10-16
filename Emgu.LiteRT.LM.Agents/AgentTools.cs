@@ -734,6 +734,11 @@ namespace Emgu.LiteRT.LM.Agents
                 case "get_current_location": return "Getting your location";
                 case "open_camera": return "Opening the live camera";
                 case "capture_camera_frame": return "Capturing a fresh camera frame";
+                case "list_visual_agents": return "Checking available visual detectors";
+                case "create_visual_monitor": return "Setting up a camera alert for " + Argument("label");
+                case "list_visual_monitors": return "Checking camera monitors";
+                case "control_visual_monitor": return "Updating a camera monitor";
+                case "analyze_visual_image": return "Detecting objects in the attached image";
                 case "find_photos": return "Looking for \u201C" + Argument("request") + "\u201D";
                 case "search_chats": return "Searching past chats for \u201C" + Argument("request") + "\u201D";
                 case "generate_image": return "Drawing \u201C" + Argument("prompt") + "\u201D";

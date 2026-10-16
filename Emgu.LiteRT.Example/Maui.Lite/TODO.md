@@ -573,5 +573,35 @@ static `tfliteextern` has its own TFLite), so image generation is hidden there.
 - [x] Android arm64 and Mac Catalyst builds pass. CPU camera opening works, but the full CPU description run was stopped
       to switch to GPU validation; responses can take tens of seconds even on the phone's GPU.
 - [ ] Real webcam checks on Mac Catalyst and Windows; this Mac has no camera. iOS live capture is not enabled yet.
-- [ ] Follow-ups: camera selection, YOLO detection/tracking and optional continuous analysis. The first version captures
-      only when asked and does not record video.
+- [ ] Follow-ups: camera selection and YOLO detection/tracking. Continuous detector monitoring is covered by item 33;
+      model image descriptions still capture only when asked. Neither feature records video.
+
+## 33. Visual agents and event monitors — first version implemented
+
+- [x] Pure managed visual-agent descriptors/registry, owned timestamped BGR8 frames and typed observations. Still-image
+      analysis and live analysis share adapters, with serialized model access and no model-specific event predicates.
+- [x] Reusable event conditions, presence debounce/grace periods, Started/Updated/Ended episode notifications and
+      independent monitor lifecycle. Generic condition/action registration supports additional detector adapters.
+- [x] Session-only monitors (maximum eight), equivalent-rule suppression, one in-flight/latest pending frame at up to
+      5 FPS, separate bounded action dispatcher, cancellation and stale-result rejection. No per-frame LLM calls.
+- [x] COCO SSD MobileNet host adapter, local chime, capability discovery/create/list/control/image-analysis chat tools,
+      status card, preparation/download progress and pause/resume/remove. Monitoring requires a visible live feed;
+      hiding pauses/cancels, reopening resets confirmation, and new chats discard rules. No automatic rule persistence.
+- [x] Pixel Fold: actual Gemma 4 E2B GPU request “When you see a person, play a sound” selected capability discovery
+      and monitor creation; the first cold conversation took about 105 s after model load. Detector events and sound
+      playback continued while Gemma generated its final response. Existing preview and fresh JPEG capture still work.
+- [x] Controlled empty/surfers/empty/surfers images through the camera's detector queue produced two distinct episodes
+      with one completed chime each. First Started appeared ~0.43 s after switching to people; Ended ~1.66 s after
+      switching to empty. Separate single-image analysis found two people and three surfboards without creating events.
+      Warm image analysis (12 calls, including decode/serialization) median 23.1 ms, max 28.1 ms. With monitoring,
+      425 live capture callbacks in 16.517 s (~25.7 FPS); this is a short run, not a sustained thermal benchmark.
+- [x] Device UI: Close/Open feed, explicit pause retained across reopen, resume, preview dragging, background camera
+      release, and New chat clearing rules verified. Frames/observations/event history remain in memory.
+- [x] 26 focused tests pass, including real Gemma capability selection/monitor creation and repeated camera-image
+      description/cache reuse. Synthetic-clock tests cover presence timing, unknown gaps, stale work, cancellation,
+      bounded frame ownership, serialized model access, faults, duplicate rules and tool contracts.
+- [x] Framework builds for netstandard2.0; Android arm64 and Mac Catalyst builds pass. Normal Android Debug app
+      deployed to Pixel Fold after removing temporary diagnostic code and device markers.
+- [ ] Additional adapters: YOLO, face detection, OCR and plate detection/reading; tracking individuals, recurring
+      alerts, saved rules, richer conditions, and background monitoring remain future work.
+- [ ] Real camera/audio hardware validation on Mac Catalyst and Windows, plus long-running thermal/battery tests.

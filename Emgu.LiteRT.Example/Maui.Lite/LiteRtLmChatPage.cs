@@ -1788,14 +1788,20 @@ namespace Maui.Demo.Lite
                 // turn them on.
                 Instructions = JoinInstructions(await MemoryInstructionsAsync(), WebSearchInstructions(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions,
                     ImageGenerationSupported ? ImageInstructions : null,
-                    LiveCamera.Supported && SelectedOption.AcceptsImages ? CameraInstructions : null),
+                    LiveCamera.Supported && SelectedOption.AcceptsImages ? CameraInstructions : null,
+                    LiveCamera.Supported ? VisualInstructions : null),
                 ToolMode = ChatToolMode.Auto
             };
-            if (LiveCamera.Supported && SelectedOption.AcceptsImages)
+            if (LiveCamera.Supported)
             {
                 options.Tools.Add(AgentTools.OpenCamera(OpenCameraAsync));
-                options.Tools.Add(AgentTools.CaptureCameraFrame(CaptureCameraFrameAsync));
+                if (SelectedOption.AcceptsImages) options.Tools.Add(AgentTools.CaptureCameraFrame(CaptureCameraFrameAsync));
+                foreach (var tool in VisualTools(attachments)) options.Tools.Add(tool);
             }
+            int attachedImages = attachments.Count(a => a.Image != null);
+            if (attachedImages > 0 && LiveCamera.Supported)
+                contents.Add(new TextContent("Attached image references for analyze_visual_image: " +
+                    string.Join(", ", Enumerable.Range(1, attachedImages).Select(i => "image-" + i))));
 
             StringBuilder thinking = new StringBuilder();
             StringBuilder answer = new StringBuilder();
@@ -2401,6 +2407,7 @@ namespace Maui.Demo.Lite
         private void StartNewChat()
         {
             _ = CloseCameraAsync();
+            _visualRuntime?.Clear();
             ClearCameraTurn();
             _sessionVersion++;
             if (IsPrivateChat) { ClearPrivateSessionContent(); ResetAgent(); }
@@ -2425,7 +2432,9 @@ namespace Maui.Demo.Lite
 
         // What the conversation may take before a message is sent: the window, less room for the reply and what the
         // chat template - or the agent's instructions and tools - take.
-        private int ContextBudget => ContextWindow - ReplyReserveTokens - (UseAgent ? AgentOverheadTokens : ChatOverheadTokens);
+        private int ContextBudget => ContextWindow - ReplyReserveTokens - (UseAgent
+            ? AgentOverheadTokens + (LiveCamera.Supported ? 800 : 0) // Visual tools and monitoring instructions.
+            : ChatOverheadTokens);
 
         // The estimated size of a message in the model's context. Runs the tokenizer: call it off the UI thread.
         private static int EstimateTokens(LanguageModel model, HistoryItem item)
@@ -3224,6 +3233,7 @@ namespace Maui.Demo.Lite
             base.OnNavigatedFrom(args);
             if (!Navigation.NavigationStack.Contains(this) && !Navigation.ModalStack.Contains(this))
             {
+                _ = DisposeVisualMonitoringAsync();
                 _sessionVersion++;
                 if (_resumeWindow != null)
                 {

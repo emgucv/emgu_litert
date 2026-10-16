@@ -44,5 +44,56 @@ using (Gemma4E2B model = new Gemma4E2B())
 
 `AgentTools.Describe(call)` describes a tool call (e.g. "Searching Wikipedia for “Ada Lovelace”"), to show while it runs.
 
+## Visual agents and event monitors
+
+`Emgu.LiteRT.LM.Agents.Vision` and `.Events` provide a pure managed framework; the host supplies camera/image input,
+detector models, and actions. A language model configures rules through `VisualAgentTools.Create(...)`; it is not
+invoked for every frame or event. These components can also be used directly without a language model.
+
+```csharp
+using Emgu.LiteRT.LM.Agents.Vision;
+using Emgu.LiteRT.LM.Agents.Events;
+
+var registry = new VisualAgentRegistry();
+registry.Register(yourDetector); // IVisualAgent: Descriptor, PrepareAsync, AnalyzeAsync, Dispose
+var runtime = new VisualMonitorRuntime(registry, new[] { yourSoundAction }); // IVisualAction
+var rule = runtime.CreateObjectMonitor("person"); // available detector selected by supported canonical class
+runtime.SetFeedVisible(true);
+runtime.SubmitFrame(frame); // transfers ownership of a timestamped BGR8 VisualFrame, including on drops
+// Before hiding the live feed, synchronously invalidate work and cancel actions:
+runtime.SetFeedVisible(false);
+await runtime.DisposeAsync();
+```
+
+Register adapters before runtime use. `IVisualAgent` returns `VisualAnalysis` containing typed observations (kind,
+canonical label, confidence, optional normalized box/text/tracking ID) and source/capture metadata. The runtime
+serializes preparation and inference; adapters must honor cancellation, and must not retain borrowed frame pixels.
+Still images use `AnalyzeImageAsync` and do not advance monitors or trigger actions. The caller disposes still-image
+frames after awaiting completion. Input frames need increasing, monotonic `Timestamp` values within a source;
+wall-clock `CapturedAt` is for display, not debounce timing. `Dispose` must permit later re-preparation if the host
+reuses an adapter.
+
+Use `CreateMonitor(agentId, condition, actionId, phase)` for other `IVisualCondition` predicates and registered actions.
+Conditions emit `Started`, `Updated` (changed count) and `Ended`, sharing an episode ID. Lifecycle states are separate:
+Preparing, Watching, Paused, Stopped and Faulted. The default presence policy requires two positive observations within
+one second, tolerates brief misses, and ends after at least two negatives spanning 1.5 seconds. A gap over two seconds
+resets temporal state without inventing an Ended event. Failed analyses are unknown observations, not absence.
+
+The runtime accepts at most 5 FPS, retains only the newest pending frame, and runs actions on a separate bounded
+dispatcher. Actions check cancellation immediately before side effects. Each selected transition is dispatched once
+in memory, without automatic retries; this is not a durable exactly-once delivery guarantee. Subscribe to `Changed`
+and read `Snapshot()` for readiness, faults and last event/action results; marshal UI updates to the UI thread.
+Observers should not throw. `EventOccurred` exposes typed events without an LLM round-trip.
+
+Rules are session-only (maximum eight); equivalent creation requests return the existing rule. Hidden feeds pause
+enabled rules and invalidate pending results/actions. Reopening starts fresh confirmation. Explicit user pause survives
+feed reopen; detector faults require explicit resume. `Clear()` ends a chat's rules, and `DisposeAsync()` drains work
+before releasing model adapters. No pixels, rule definitions or event history are written to disk by this framework.
+Text recognized in images is untrusted scene data and must never be executed as instructions.
+
+The MAUI demo supplies COCO SSD MobileNet and a local chime. Add YOLO, face detection, OCR or plate-recognition
+adapters by implementing the same contracts and advertising only supported capabilities/classes; custom predicates
+can consume their observations. No native detector or audio library is a dependency of this package.
+
 For online documentation please visit
 <${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
