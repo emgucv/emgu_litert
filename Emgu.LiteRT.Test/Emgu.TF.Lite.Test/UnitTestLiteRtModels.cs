@@ -95,7 +95,7 @@ namespace Emgu.TF.Lite.Test
         [TestAttribute]
         public Task TestCocoSsdMobilenetV3()
         {
-            return CompareCocoSsd(new LiteRtModels.CocoSsdMobilenetV3(), new TfLiteModels.CocoSsdMobilenetV3());
+            return CompareCocoSsd(new LiteRtModels.CocoSsdMobilenetV3 { NumThreads = 2 }, new TfLiteModels.CocoSsdMobilenetV3());
         }
 
         private static async Task CompareCocoSsd(LiteRtModels.CocoSsdMobilenet compiled, TfLiteModels.CocoSsdMobilenet interpreted)

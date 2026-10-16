@@ -99,9 +99,31 @@ The existing camera supplies raw frames to both the preview and the analysis pat
 a second camera. Monitoring accepts at most five frames per second, with one in-flight frame and at most one
 replaceable pending frame. Older pending frames are disposed instead of building a backlog.
 
-`CocoVisualAgent` prepares the model, converts/resizes pixels for inference, and returns `VisualAnalysis` with
+`CocoVisualAgent` uses the shared `CocoDetector` adapter on `Emgu.LiteRT.Models.CocoSsdMobilenetV3`
+and LiteRT's **CompiledModel** API. It resizes BGR pixels before converting to RGB, writes a locked
+input `TensorBuffer`, runs the compiled model, and returns `VisualAnalysis` with
 typed `VisualObservation` results. Object observations contain a canonical label, confidence and normalized box.
 Frame/source identifiers and capture timestamps travel with the analysis.
+
+Android/OpenCL and Mac Catalyst/Metal try GPU compilation with `Gpu | Cpu`: the model's custom
+`TFLite_Detection_PostProcess` operation needs CPU execution. Before accepting GPU execution, the adapter
+compares detections on the bundled `surfers.jpg` with compiled CPU results (class, score and box, allowing
+0.05 score/coordinate differences and reordered results). Compilation/execution errors or a failed check
+release the GPU model and fall back to compiled CPU. After accuracy passes, the adapter also compares
+speed on the same bundled image resized to 640×480: three warmup runs per backend, then twelve timed
+runs per backend with alternating CPU/GPU order. It uses median end-to-end detection latency, including
+resize/color conversion, input/output transfers, inference and result extraction; compilation and image
+decoding are excluded. GPU is accepted only when its median is strictly lower than CPU's. Ties or invalid
+timings keep CPU. A slower GPU is released and CPU is prepared instead. Cancellation is checked between
+runs and propagates without starting fallback. This adds a short benchmark to GPU preparation; results
+reflect device load at preparation time and are not a sustained performance guarantee.
+This is a startup sanity check, not comprehensive GPU accuracy certification. The monitor's detector name
+shows the backend and whether GPU preparation failed; the photo demo shares the same adapter and has a
+CPU/GPU-with-fallback picker. GPU selection is independent of Gemma's backend.
+
+The live detector uses at most two CPU threads; the photo demo follows the app's CPU thread setting.
+Pixel Fold testing found matching compiled CPU results, but inaccurate GPU results with this uint8 model,
+including FP32 trials. The device therefore uses compiled CPU. See TODO #35 for measurements and follow-up.
 
 The detector reports observations. It does not decide when to play a sound.
 

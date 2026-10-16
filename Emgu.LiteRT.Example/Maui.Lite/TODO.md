@@ -729,3 +729,52 @@ near its context limit. Record enabled tool/settings differences, history size a
 - [ ] Follow up with extended, near-capacity Pixel Fold conversations, user setting/tool combinations, thermal/battery
       runs and Mac/Windows hardware checks. Essential requests/catalogs can still exceed 4k; report that limitation
       rather than silently disabling Thinking, truncating current evidence or repeating actions.
+
+
+### 35. COCO CompiledModel GPU accuracy and device performance
+
+**Status:** CompiledModel migration implemented; Pixel Fold GPU rejected by startup accuracy check (2026-10-16).
+
+- Both the photo demo and `CocoVisualAgent` now share `CocoDetector`, using
+  `Emgu.LiteRT.Models.CocoSsdMobilenetV3`, locked `TensorBuffer`s and `CompiledModel.Run`.
+  Resize precedes BGR-to-RGB conversion; the photo path now also supplies the model's expected RGB pixels.
+- CPU thread settings are passed through `CompiledImageModel.NumThreads` / `Options.AddCpuOptions`.
+  Live analysis uses at most two threads; the photo demo uses the app setting.
+- Android/OpenCL and Mac Catalyst/Metal try `Gpu | Cpu`. GPU-only compilation fails because the custom
+  `TFLite_Detection_PostProcess` operation requires CPU fallback. Pixel Fold logs assigned **164/165 operations
+  to GPU**, with the final post-processing operation on CPU.
+- GPU execution compiles, but `surfers.jpg` scores are incorrect: leading scores about **0.247/0.161** versus
+  CPU **0.627/0.597**, and no detections reach the 0.5 threshold. FP32 gives about **0.242/0.159**; changing
+  `AllowSrcQuantizedFcConvOps` does not correct it. The underlying GPU/runtime cause remains unconfirmed.
+- The host qualifies GPU execution against compiled CPU on bundled `surfers.jpg`: equal detection counts,
+  matched classes, score and box differences at most 0.05, permitting reordered detections. A failed check,
+  compilation or execution failure releases that GPU candidate and falls back to compiled CPU. This is a
+  startup sanity check, not exhaustive numerical validation. Cancellation does not initiate fallback.
+- GPU qualification also requires a speed win after accuracy passes: three warmups per backend, twelve
+  timed runs each, alternating CPU/GPU order, using median full detection time on a 640×480 version of
+  the bundled image. Includes preprocessing, transfers, inference and results; excludes compilation/decode.
+  Ties, slower GPU timing and invalid timing values keep CPU. Cancellation is checked between native calls.
+  This is a startup/load-dependent comparison, not a sustained benchmark; inaccurate GPUs skip speed testing.
+  Eight deterministic timing-policy regressions cover faster/slower GPU, ties, invalid medians, warmups,
+  alternating order, outlier resistance and cancellation; these and five native model parity checks passed.
+- The standalone photo demo offers CPU or GPU with CPU fallback. Monitor/photo results show the selected
+  backend and GPU failure/fallback; detector selection is independent of Gemma's backend.
+- Early warmed inference-only samples on Pixel Fold (same uint8 model and RGB input, two CPU threads,
+  five warmups, thirty timed iterations): Interpreter/NNAPI median **10.6–10.7 ms**, compiled CPU median
+  **7.4–9.9 ms**, matching detections. GPU mixed execution medians **16.8–24.3 ms**, inaccurate results.
+  These are short samples, not a sustained foreground/thermal benchmark. Later device sleeping/background
+  scheduling inflated both CPU measurements to roughly 100–130 ms; those runs do not establish a speedup.
+- Production checks confirmed CPU fallback after the GPU accuracy failure, two people recognized by the
+  visual adapter with padded input stride, and correct photo-page labels/rendering. The optimized 640×480
+  path returned about **9–14 ms** in awake-device samples, including preprocessing and result extraction.
+  Final short 640×480 comparison: old preprocessing + Interpreter median **13.37 ms**, compiled CPU
+  path **12.87 ms** (explicit CPU) / **13.84 ms** (after rejecting GPU). Inference-only medians were
+  **10.68 ms** versus **7.41 ms**. Total latency therefore does not show a reliable material improvement.
+- Compiled-model parity and visual-monitor/production-contract regressions passed: **38 tests**, one
+  opt-in Gemma test skipped. Mac Catalyst and Android builds passed; phone camera hardware is not needed
+  for these controlled image/frame tests.
+- [ ] Isolate the uint8 OpenCL GPU numerical failure (input quantization/buffer layout, accelerator/runtime
+      version and GPU kernels); repeat known-image score/box parity on more images before accepting GPU.
+- [ ] Repeat controlled foreground, alternating CPU/Interpreter/GPU timings, including initialization,
+      preprocessing, transfers, result extraction, sustained camera FPS, battery and thermals; check Metal
+      on Mac Catalyst and other Android devices. Do not infer a general speedup from the short samples.

@@ -26,6 +26,11 @@ namespace Emgu.LiteRT.Models
         private String[] _labels;
 
         /// <summary>
+        /// CPU worker threads, including CPU portions of a GPU model. Set before Init; null keeps LiteRT's default.
+        /// </summary>
+        public int? NumThreads { get; set; }
+
+        /// <summary>
         /// Create the model. Call Init to download and compile it.
         /// </summary>
         protected CompiledImageModel()
@@ -80,7 +85,16 @@ namespace Emgu.LiteRT.Models
                 throw new FileNotFoundException(String.Format("File {0} doesn't exist", modelFileName));
             _environment = new Environment();
             _model = new Model(_environment, modelFileName);
-            _compiledModel = new CompiledModel(_environment, _model, accelerators);
+            using (Options options = new Options(accelerators))
+            {
+                if (NumThreads.HasValue)
+                {
+                    if (NumThreads.Value < 1)
+                        throw new ArgumentOutOfRangeException(nameof(NumThreads));
+                    options.AddCpuOptions(new CpuOptions { NumThreads = NumThreads });
+                }
+                _compiledModel = new CompiledModel(_environment, _model, options);
+            }
             _inputBuffers = _compiledModel.CreateInputBuffers();
             _outputBuffers = _compiledModel.CreateOutputBuffers();
         }
@@ -90,7 +104,7 @@ namespace Emgu.LiteRT.Models
         /// </summary>
         public bool Imported
         {
-            get { return _compiledModel != null; }
+            get { return _compiledModel != null && _inputBuffers != null && _outputBuffers != null; }
         }
 
         /// <summary>

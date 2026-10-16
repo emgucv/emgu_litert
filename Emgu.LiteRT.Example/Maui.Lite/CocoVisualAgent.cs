@@ -4,64 +4,36 @@ using System.Runtime.InteropServices;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.LiteRT.LM.Agents.Vision;
-using Emgu.LiteRT.Util;
-using Emgu.TF.Lite.Models;
 
 namespace Maui.Demo.Lite;
 
 // All native/model work is serialized off the UI thread by VisualMonitorRuntime.
 internal sealed class CocoVisualAgent : IVisualAgent
 {
-    private CocoSsdMobilenetV3 _model;
-    private readonly DownloadableFile _weights = new(
-        "https://github.com/emgucv/models/raw/master/coco_ssd_mobilenet_v3_small_2020_01_14/model.tflite",
-        "CocoSsdMobilenetV3", "0F52F7A4884DD6426D38F4AFC06DA75105EFE77F7C83E470254C267FE34CC43C");
-    private readonly DownloadableFile _labels = new(
-        "https://github.com/emgucv/models/raw/master/coco_ssd_mobilenet_v3_small_2020_01_14/labelmap.txt",
-        "CocoSsdMobilenetV3", "C7E79C855F73CBBA9F33D649D60E1676EB0A974021A41696D1AC0D4B7F7E0211");
+    private readonly CocoDetector _detector = new();
     internal static readonly string[] Classes = VisualHostCatalog.Classes;
-    public VisualAgentDescriptor Descriptor => VisualHostCatalog.Detector(_model?.Imported != true);
+    public VisualAgentDescriptor Descriptor => VisualHostCatalog.Detector(!_detector.Imported,
+        _detector.Imported ? _detector.Backend + (_detector.GpuFailure == null ? "" : " (GPU validation failed or unavailable)") : null);
 
     public async Task PrepareAsync(Action<string> progress, CancellationToken cancellationToken)
     {
-        if (_model?.Imported == true) return;
-        progress?.Invoke("Preparing COCO detector (first use may download the model)");
-        // Download explicitly to support cancellation; Init then reuses the verified files.
-        var downloads = new FileDownloadManager();
-        downloads.AddFile(_weights); downloads.AddFile(_labels);
-        downloads.OnDownloadProgressChanged += (_, _, percent) => progress?.Invoke(percent.HasValue
-            ? $"Downloading COCO detector: {percent:0}%" : "Downloading COCO detector…");
-        await downloads.Download(1, cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!downloads.AllFilesDownloaded) throw new IOException("COCO detector download failed. Check the connection and resume this monitor to retry.");
-        _model?.Dispose();
-        _model = new CocoSsdMobilenetV3 { NumThreads = Math.Min(2, CpuThreadSettings.Count) };
-        await _model.Init(_weights, _labels).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!_model.Imported) throw new InvalidOperationException("COCO detector could not be loaded.");
+        await _detector.PrepareAsync(CocoDetector.CanTryGpu, Math.Min(2, CpuThreadSettings.Count), progress, cancellationToken).ConfigureAwait(false);
     }
+
     public Task<VisualAnalysis> AnalyzeAsync(VisualFrame frame, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_model?.Imported != true) throw new InvalidOperationException("Prepare the detector first.");
+        if (!_detector.Imported) throw new InvalidOperationException("Prepare the detector first.");
         using var input = new Mat(frame.Height, frame.Width, DepthType.Cv8U, 3);
         // Honor arbitrary frame strides; no native pointers escape the adapter.
         if (!MemoryMarshal.TryGetArray(frame.Pixels, out ArraySegment<byte> pixels)) pixels = new ArraySegment<byte>(frame.Pixels.ToArray());
         for (int y = 0; y < frame.Height; y++)
             Marshal.Copy(pixels.Array, pixels.Offset + y * frame.Stride, IntPtr.Add(input.DataPointer, y * input.Step), frame.Width * 3);
-        var tensor = _model.InputTensor;
-        var size = new System.Drawing.Size(tensor.Dims[2], tensor.Dims[1]);
-        using (var target = new Mat(size, DepthType.Cv8U, 3, tensor.DataPointer, size.Width * 3))
-        using (var rgb = new Mat())
-        {
-            CvInvoke.CvtColor(input, rgb, ColorConversion.Bgr2Rgb);
-            CvInvoke.Resize(rgb, target, size);
-        }
-        _model.Interpreter.Invoke();
+        var results = _detector.Detect(input);
         cancellationToken.ThrowIfCancellationRequested();
-        var observations = _model.GetResults(0).Select(r =>
+        var observations = results.Select(r =>
         {
-            // Wrapper results are x0,y0,x1,y1, despite its historical Rectangle field comment.
+            // CompiledModel results are x0,y0,x1,y1.
             var b = r.Rectangle;
             double x = Math.Clamp(b[0], 0, 1), y = Math.Clamp(b[1], 0, 1);
             return new VisualObservation("object", CanonicalLabel(r.Label), r.Score,
@@ -74,6 +46,6 @@ internal sealed class CocoVisualAgent : IVisualAgent
         "motorbike" => "motorcycle", "aeroplane" => "airplane", "sofa" => "couch",
         "pottedplant" => "potted plant", "diningtable" => "dining table", "tvmonitor" => "tv", var value => value
     };
-    public void Dispose() { _model?.Dispose(); _model = null; }
+    public void Dispose() => _detector.Dispose();
 }
 #endif

@@ -15,7 +15,9 @@ internal static class VisualHostCatalog
         "carrot,hot dog,pizza,donut,cake,chair,couch,potted plant,bed,dining table,toilet,tv,laptop,mouse,remote," +
         "keyboard,cell phone,microwave,oven,toaster,sink,refrigerator,book,clock,vase,scissors,teddy bear,hair drier,toothbrush").Split(',');
 
-    internal static VisualAgentDescriptor Detector(bool requiresPreparation = true) => new("coco-ssd-mobilenet-v3", "COCO SSD MobileNet V3", new[] { "object_detection" }, Classes, requiresPreparation: requiresPreparation);
+    internal static VisualAgentDescriptor Detector(bool requiresPreparation = true, string backend = null) => new(
+        "coco-ssd-mobilenet-v3", "COCO SSD MobileNet V3" + (backend == null ? "" : " · LiteRT " + backend),
+        new[] { "object_detection" }, Classes, requiresPreparation: requiresPreparation);
 
     internal static readonly VisualActionDescriptor Chime = new("play_sound", "Chime", "Play the bundled alert chime once.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));

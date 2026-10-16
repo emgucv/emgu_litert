@@ -317,6 +317,12 @@ again.
   reply is retained. Explicit alert speech works with chat read-aloud off, using the system voice.
   The chat selects the COCO SSD MobileNet visual agent and creates a session monitor. Other supported COCO classes
   and minimum counts can be requested too. There is no Tavily requirement and Gemma is not called on every frame.
+  The detector and COCO photo demo use LiteRT **CompiledModel**. Android and Mac Catalyst try GPU with CPU
+  post-processing, then compare a bundled image against CPU detections before accepting it. After accuracy
+  passes, a warmed, alternating timing comparison must also show a faster median detection time than CPU.
+  Failure, slower GPU timing or a tie keeps compiled CPU, with the backend shown in the monitor/photo results. Pixel Fold currently fails the GPU
+  accuracy check for this model and uses compiled CPU. The photo demo also offers an explicit CPU choice;
+  detector GPU selection is independent of Gemma's GPU setting. See TODO #35 for performance measurements.
   The monitor card shows preparation/download progress, Watching/Paused/Faulted, and the last event and action result.
   Use its Pause, Resume and Remove buttons, or ask the chat to control a monitor. A failed detector requires Resume
   to retry. Unsupported detectors/actions are reported rather than substituted.
