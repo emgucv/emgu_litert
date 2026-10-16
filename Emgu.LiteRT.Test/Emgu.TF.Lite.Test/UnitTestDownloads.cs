@@ -72,6 +72,17 @@ public class UnitTestDownloads
     }
 
     [Test, CancelAfter(20000)]
+    public async Task TestFirstDownloadCreatesMissingModelDirectory()
+    {
+        using var server = new Server((r, n) => Response.Full(Data));
+        var file = FileFor(server);
+        file.LocalFile = Path.Combine(_directory, "new-model", "nested", "model.tflite");
+        Check(!Directory.Exists(file.LocalFolder), "Test must start without the model directory");
+        await Manager(file).Download(0, TestContext.CurrentContext.CancellationToken);
+        Complete(file);
+    }
+
+    [Test, CancelAfter(20000)]
     public async Task TestDownloadPublishesOnlyAfterVerification()
     {
         using var server = new Server((r, n) => Response.Full(Data));

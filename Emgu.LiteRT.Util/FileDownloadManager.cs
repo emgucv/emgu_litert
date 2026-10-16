@@ -403,6 +403,9 @@ namespace Emgu.LiteRT.Util
             try
             {
                 if (downloadableFile.IsLocalFileValid) return;
+                // File.Delete also throws when a parent directory is missing. First-use model folders must
+                // exist before removing legacy files, not only later when the HTTP transfer starts.
+                Directory.CreateDirectory(downloadableFile.LocalFolder);
                 // A legacy partial/corrupt final file must not look downloaded in the UI.
                 File.Delete(downloadableFile.LocalFile);
                 File.Delete(downloadableFile.LocalFile + ".sha256ok");
