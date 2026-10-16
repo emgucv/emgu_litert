@@ -30,9 +30,11 @@ namespace Emgu.LiteRT.LM.Agents.Vision
         public const string Instructions = "For camera appearance alerts, first call list_visual_agents and list_visual_actions, then create_visual_monitor. " +
             "Use an exact supported object class, minimumCount=1 and confidence=0.5 unless specified. " +
             "Pass an explicit actions array using ONLY requested registered actions: play_sound has parameters {}, " +
-            "speak_text has parameters {text: the requested words}. Use both when asked for both; they run concurrently. " +
+            "speak_text has parameters {text: the requested words}, take_snapshot has parameters {}. " +
+            "For take a photo/picture/snapshot when an object appears, select take_snapshot. It shows a fresh camera image in the current chat session; no automatic saving or model analysis. " +
+            "Use all requested actions together; they run concurrently. " +
             "Do not add a chime to a speech-only request. Use each action type once, combining speech into one literal message of at most 200 characters. " +
-            "No dynamic speech, per-person tracking, disappearance or recurring alerts. Unsupported requests need an explanation, not a substitute. " +
+            "Do not add sound or speech to a snapshot-only request. No dynamic speech, per-person tracking, disappearance or recurring alerts. Unsupported requests need an explanation, not a substitute. " +
             "Monitoring runs locally only while the live camera feed is visible. Preparing/Paused is not Watching. " +
             "After creation write one short sentence acknowledging the configured alert and its returned status, for example: Camera monitor created; waiting for the visible feed. Do not repeat calls for the same request. " +
             "Use list_visual_monitors and control_visual_monitor for pause/resume/remove. " +

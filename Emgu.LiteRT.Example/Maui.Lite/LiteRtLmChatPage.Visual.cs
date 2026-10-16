@@ -30,10 +30,13 @@ public partial class LiteRtLmChatPage
         _visualAgents = new VisualAgentRegistry();
         _visualAgents.Register(new CocoVisualAgent());
         _visualChime = new CameraChimeAction();
-        _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(text, token)));
+        _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(text, token)),
+            occurrence => _visualRuntime.Snapshot().Any(m => m.Id == occurrence.MonitorId &&
+                m.Actions.Any(a => a.ActionId is "play_sound" or "speak_text")));
         _visualActions = new VisualActionRegistry();
         _visualActions.Register(new CameraChimeFactory(_visualChime));
         _visualActions.Register(new CameraSpeechFactory(_alertAudio));
+        _visualActions.Register(new CameraSnapshotFactory(TakeVisualSnapshotAsync));
         _visualRuntime = new VisualMonitorRuntime(_visualAgents, _visualActions, actionCoordinator: _alertAudio);
         _visualRuntime.Changed += QueueVisualMonitorUi;
         _visualMonitorRows = new VerticalStackLayout { Spacing = 6 };
@@ -144,13 +147,16 @@ public partial class LiteRtLmChatPage
             if (monitor.Enabled && monitor.State != VisualMonitorState.Faulted)
             {
                 string opened = await OpenCameraAsync(token);
-                if (_camera?.IsRunning != true) return JsonSerializer.Serialize(_visualRuntime.Snapshot().First(m => m.Id == monitor.Id), VisualJson.Default.VisualMonitorInfo) + "\n" + opened;
+                if (_camera?.IsRunning != true) return MonitorToolResult(_visualRuntime.Snapshot().First(m => m.Id == monitor.Id)) + "\n" + opened;
             }
-            return JsonSerializer.Serialize(_visualRuntime.Snapshot().First(m => m.Id == monitor.Id), VisualJson.Default.VisualMonitorInfo);
+            return MonitorToolResult(_visualRuntime.Snapshot().First(m => m.Id == monitor.Id));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { return "Could not create visual monitor: " + ex.Message; }
     }
+    // A creation acknowledgement needs facts, not the full UI snapshot repeated in the context.
+    private static string MonitorToolResult(VisualMonitorInfo monitor) => VisualHostCatalog.MonitorResult(monitor);
+
     private async Task<string> ControlVisualMonitorAsync(string monitorId, string operation, CancellationToken token)
     {
         try

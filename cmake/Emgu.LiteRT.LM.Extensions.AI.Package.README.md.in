@@ -26,6 +26,39 @@ using (Gemma4E2B model = new Gemma4E2B())
 
 `LiteRtLmChatClient` keeps one LiteRT-LM conversation open while each request only adds to it, so earlier turns aren't processed again. With tools, generation is constrained to well-formed calls of the given tools (`LiteRtLmChatClient.EnableConstrainedDecoding`, on by default; it needs a LiteRT-LM v0.18.0 or later native library and is skipped with an older one). Tool calling uses `UseFunctionInvocation()` from the `Microsoft.Extensions.AI` package.
 
+## Context budgeting for tool loops
+
+The MAUI demo enables boundary context management; package callers opt in explicitly:
+
+```csharp
+var native = new LiteRtLmChatClient(model) {
+    EnableContextManagement = true,
+    MaxThinkingTokens = 256
+};
+native.ContextChanged += info => Console.WriteLine(info); // counts only; no prompt or reasoning text
+using var client = new ChatClientBuilder(native).UseFunctionInvocation().Build();
+```
+
+The client reads the loaded engine's configured capacity (including `configureSettings` overrides), the native
+KV-cache count (using a conservative 4096 capacity when native settings leave it unspecified), the rendered prompt preface (instructions, schemas and history) and estimates pending payload/media
+costs. JSON transport escaping is not counted as model text. It reserves 64 tokens of safety headroom and sets
+per-message output/thinking budgets. Thinking remains enabled when requested, with at most `MaxThinkingTokens`
+(default 256), further reduced to fit that round. Explicit `ChatOptions.MaxOutputTokens` remains an upper bound.
+
+At a model/tool boundary with insufficient headroom, the client rebuilds the native conversation without completed
+reasoning. It retains the latest original user request and every associated tool call/result, including media tool
+results. Complete older exchanges can be dropped if needed. This process never executes tools; already completed
+side effects are not replayed. Rebuilding requires prefilling retained text again, so it can increase latency.
+The host can still summarize older exchanges before a send, as the MAUI demo does.
+
+If essential current content cannot fit, `LiteRtLmContextException` gives actionable capacity guidance. Empty
+completions are not silently treated as successful answers when management is enabled. `ChatFinishReason.Length`
+is reported when native cache or available benchmark decode counts show a limit was reached. Native APIs do not
+always expose a distinct stop reason; diagnostics distinguish empty output when no limit can be established.
+Set `EngineSettings.EnableBenchmark()` at model initialization to include native per-round decode counts.
+Estimates and media costs can differ from actual native token use; capacity errors remain possible and are surfaced
+without automatically restarting the whole agent request. Do not add a host retry that replays tool side effects.
+
 For online documentation please visit
 <${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
 

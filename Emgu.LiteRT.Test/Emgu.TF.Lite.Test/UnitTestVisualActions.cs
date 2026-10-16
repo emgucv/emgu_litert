@@ -189,16 +189,74 @@ public partial class UnitTestVisualAgents
         Assert.That(active, Is.EqualTo(2)); Assert.That(calls, Is.EqualTo(2)); Assert.That(secondGroupStarted.Task.IsCompleted, Is.False);
         release.SetResult(true); await Drain(runtime); Assert.That(completed, Is.EqualTo(4)); await runtime.DisposeAsync();
     }
+    private static VisualActionRequest SnapshotAction() => new("take_snapshot", VisualActionParameters.Empty);
+    [Test]
+    public async Task SnapshotFactoryValidatesBeforeCaptureAndCapturesOncePerEpisode()
+    {
+        var events = new List<VisualEvent>();
+        var factory = new CameraSnapshotFactory((occurrence, token) => { token.ThrowIfCancellationRequested(); events.Add(occurrence); return Task.CompletedTask; });
+        var runtime = ActionRuntime(ActionRegistry(factory));
+        Assert.Throws<ArgumentException>(() => runtime.CreateObjectMonitor("person", new[] { new VisualActionRequest("take_snapshot", VisualActionParameters.Text("invalid")) }));
+        Assert.That(runtime.Snapshot(), Is.Empty); Assert.That(events, Is.Empty);
+        var rule = runtime.CreateObjectMonitor("person", new[] { SnapshotAction() });
+        Assert.That(runtime.CreateObjectMonitor("person", new[] { SnapshotAction() }).Id, Is.EqualTo(rule.Id));
+        Assert.That(events, Is.Empty, "Binding must not capture.");
+        runtime.SetFeedVisible(true);
+        foreach (double seconds in new[] { 0, .2, .4, .6 }) { runtime.SubmitFrame(Frame(seconds)); await Drain(runtime); }
+        Assert.That(events.Count, Is.EqualTo(1)); Assert.That(events[0].MonitorId, Is.EqualTo(rule.Id));
+        Assert.That(events[0].Evidence.SourceId, Is.EqualTo("camera"));
+        Assert.That(runtime.Snapshot().Single().LastActionResults.Single().State, Is.EqualTo(VisualActionState.Succeeded));
+        await runtime.DisposeAsync();
+    }
+    [Test]
+    public async Task SnapshotFailureDoesNotCancelAudioSiblings()
+    {
+        var actions = ActionRegistry(new TestFactory("play_sound"), new TestFactory("speak_text"),
+            new CameraSnapshotFactory((_, _) => throw new InvalidOperationException("Camera capture unavailable")));
+        var runtime = ActionRuntime(actions); runtime.CreateObjectMonitor("person", new[] { Sound(), Speech(), SnapshotAction() }); runtime.SetFeedVisible(true);
+        runtime.SubmitFrame(Frame(0)); await Drain(runtime); runtime.SubmitFrame(Frame(.2)); await Drain(runtime);
+        var results = runtime.Snapshot().Single().LastActionResults;
+        Assert.That(results.Single(r => r.ActionId == "take_snapshot").State, Is.EqualTo(VisualActionState.Failed));
+        Assert.That(results.Where(r => r.ActionId != "take_snapshot").Select(r => r.State), Is.All.EqualTo(VisualActionState.Succeeded));
+        await runtime.DisposeAsync();
+    }
+    [Test]
+    public async Task SnapshotCancellationPreventsLatePresentation()
+    {
+        var started = Signal(); bool presented = false;
+        var factory = new CameraSnapshotFactory(async (_, token) => {
+            started.SetResult(true); await Task.Delay(Timeout.Infinite, token); token.ThrowIfCancellationRequested(); presented = true;
+        });
+        var runtime = ActionRuntime(ActionRegistry(factory)); runtime.CreateObjectMonitor("person", new[] { SnapshotAction() }); runtime.SetFeedVisible(true);
+        runtime.SubmitFrame(Frame(0)); await Drain(runtime); runtime.SubmitFrame(Frame(.2)); await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        runtime.SetFeedVisible(false); await Drain(runtime);
+        Assert.That(presented, Is.False); Assert.That(runtime.Snapshot().Single().LastActionResults.Single().State, Is.EqualTo(VisualActionState.Cancelled));
+        await runtime.DisposeAsync();
+    }
+    [Test]
+    public async Task SnapshotOnlyGroupLeavesReadAloudPlaying()
+    {
+        var speaking = Signal(); var stopReply = Signal(); bool captured = false;
+        var audio = new AlertAudioCoordinator(async (_, token) => { speaking.SetResult(true); await stopReply.Task.WaitAsync(token); }, _ => false);
+        var reply = audio.SpeakReplyAsync("reply", CancellationToken.None); await speaking.Task;
+        var runtime = ActionRuntime(ActionRegistry(new CameraSnapshotFactory((_, _) => { captured = true; return Task.CompletedTask; })), audio);
+        runtime.CreateObjectMonitor("person", new[] { SnapshotAction() }); runtime.SetFeedVisible(true);
+        runtime.SubmitFrame(Frame(0)); await Drain(runtime); runtime.SubmitFrame(Frame(.2)); await Drain(runtime);
+        Assert.That(captured, Is.True); Assert.That(reply.IsCompleted, Is.False);
+        stopReply.SetResult(true); await reply; await runtime.DisposeAsync();
+    }
 #if TEST_MODELS
-    [TestCase("When you see a person, play a sound.", true, false)]
-    [TestCase("When you see a person, say 'Person detected'.", false, true)]
-    [TestCase("When you see a person, play a sound and say 'Person detected'.", true, true)]
-    public async Task GemmaSelectsExplicitVisualActions(string request, bool sound, bool speech)
+    [TestCase("When you see a person, play a sound.", true, false, false)]
+    [TestCase("When you see a person, say 'Person detected'.", false, true, false)]
+    [TestCase("When you see a person, play a sound and say 'Person detected'.", true, true, false)]
+    [TestCase("When you see a person, take a snapshot.", false, false, true)]
+    [TestCase("When you see a person, take a snapshot, play a sound and say 'Person detected'.", true, true, true)]
+    public async Task GemmaSelectsExplicitVisualActions(string request, bool sound, bool speech, bool snapshot)
     {
         using var model = new Emgu.LiteRT.LM.Models.Gemma4E2B { VisionBackend = null, AudioBackend = null };
         using var stop = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         await model.Init(configureSettings: settings => { settings.NumThreads = 4; settings.MaxNumTokens = 4096; }, cancellationToken: stop.Token);
-        var actions = ActionRegistry(new TestFactory("play_sound"), new TestFactory("speak_text"));
+        var actions = ActionRegistry(new TestFactory("play_sound"), new TestFactory("speak_text"), new CameraSnapshotFactory((_, _) => Task.CompletedTask));
         var runtime = ActionRuntime(actions); int agentListings = 0, actionListings = 0, creations = 0;
         var tools = VisualAgentTools.Create(() => { agentListings++; return "Agent test supports object_detection with person, cat; live camera and images."; },
             () => { actionListings++; return JsonSerializer.Serialize(actions.Describe()); }, actions.Describe(),
@@ -213,7 +271,7 @@ public partial class UnitTestVisualAgents
             TestContext.Progress.WriteLine(request + " => " + response.Text);
             foreach (var message in response.Messages) TestContext.Progress.WriteLine(message.Role + ": " + string.Join(" | ", message.Contents.Select(c => c.ToString())));
             Assert.That(creations, Is.EqualTo(1)); var selected = runtime.Snapshot().Single().Actions;
-            Assert.That(selected.Select(a => a.ActionId), Is.EquivalentTo((sound ? new[] { "play_sound" } : Array.Empty<string>()).Concat(speech ? new[] { "speak_text" } : Array.Empty<string>())));
+            Assert.That(selected.Select(a => a.ActionId), Is.EquivalentTo((sound ? new[] { "play_sound" } : Array.Empty<string>()).Concat(speech ? new[] { "speak_text" } : Array.Empty<string>()).Concat(snapshot ? new[] { "take_snapshot" } : Array.Empty<string>())));
             if (speech) Assert.That(selected.Single(a => a.ActionId == "speak_text").Parameters.GetProperty("text").GetString(), Is.EqualTo("Person detected"));
             Assert.That(response.Text, Is.Not.Empty);
         } finally { await runtime.DisposeAsync(); }

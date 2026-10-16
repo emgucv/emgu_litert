@@ -252,7 +252,12 @@ again.
   keeps the last setting: the model reasons before answering, which gives better answers but takes longer and uses
   more of its context (so long chats are compacted sooner). While the model thinks, the reply shows "Thinking..."
   and the last few lines of it; once the answer starts, the thinking collapses to "Thought for N s" - tap it to read
-  it all, formatted like the answer (code blocks, maths). General web search (including news) requires a Tavily API
+  it all, formatted like the answer (code blocks, maths). Tool rounds now budget thinking and output against the
+  loaded context capacity. When needed, completed thinking is removed by rebuilding the context between tool calls;
+  the current request and its tool results stay intact. Thinking remains on, bounded to at most 256 tokens per round
+  and reduced further when space is tight. This can add prompt-processing time on small windows. Requests that
+  cannot fit report guidance instead of a silent empty reply; completed actions are not automatically replayed.
+  General web search (including news) requires a Tavily API
   key in Settings > Web search. Without a key, Wikipedia, reading supplied links, weather and currency conversion
   remain available. A notice above the message box explains the missing key when Web search is enabled; the agent
   also receives this limitation so it can explain how to enable general search. Your searches leave the device.
@@ -302,10 +307,13 @@ again.
   improved preview delivery from about 9 to 28 FPS and removed the old image-source reloads' observed blank frames;
   frame rate during model inference still depends on device load.
 - **Visual agents and camera alerts:** with a tool-capable chat model, ask **"When you see a person, play a sound."**
-  You can also ask **"When you see a person, say Person detected"**, or request both sound and speech.
+  You can also ask **"When you see a person, say Person detected"** or **"When you see a person, take a snapshot"**,
+  or combine snapshot, sound and speech. Snapshot alerts show a fresh JPEG in the current session; tap it to open
+  and choose **Save snapshot…**. The newest twenty remain in memory; they are not saved to chat history or sent
+  to the model. New chat clears them. Snapshot-only alerts leave chat read-aloud playing.
   The chat discovers registered actions and selects an explicit set; combined actions run concurrently, with
   independent results on the monitor card. One of each type is allowed, and speech is fixed text up to 200 characters.
-  Alerts interrupt chat read-aloud without restarting it. New reply speech waits for alerts; only the latest pending
+  Audio alerts interrupt chat read-aloud without restarting it. New reply speech waits for alerts; only the latest pending
   reply is retained. Explicit alert speech works with chat read-aloud off, using the system voice.
   The chat selects the COCO SSD MobileNet visual agent and creates a session monitor. Other supported COCO classes
   and minimum counts can be requested too. There is no Tavily requirement and Gemma is not called on every frame.
@@ -320,7 +328,7 @@ again.
   Monitoring runs **only while the live camera feed is visible**. Close, leaving the page and backgrounding pause
   rules and cancel the whole action group. Reopening resumes enabled rules with fresh state; explicitly paused rules stay
   paused. A person still present after reopening can start a new episode. New chats discard the rules, and no rules,
-  frames or event history are persisted, including in ordinary chats. The chat request and reply follow normal chat storage.
+  frames or event history are automatically persisted, including in ordinary chats. The chat request and reply follow normal chat storage.
   Attach an image and ask to detect/count its objects to use the same visual agent once, without monitoring or sounds.
   YOLO, faces, OCR, plate recognition, individual tracking, saved rules and background monitoring are not included yet.
   The reusable `Emgu.LiteRT.LM.Agents.Vision` and `.Events` contracts have no MAUI/Emgu CV dependencies;

@@ -185,12 +185,7 @@ namespace Maui.Demo.Lite
 
         // Web search: an agent (Microsoft Agent Framework) over the model's IChatClient, with the tools of ChatAgentTools.
         private const string TavilyKeyStorageName = "tavily_api_key";
-        private const string AgentInstructions =
-            "You are a helpful assistant running on the user's device. You can look things up with your tools: use them " +
-            "for facts you are not sure about, recent events and anything that depends on today's date or, when you have the " +
-            "location tool, on where the user is. Use the calculate tool for any arithmetic, and the convert tools for units and money. When the user gives a link, read it with read_web_page. When the user tells you " +
-            "something lasting about themselves, save it with the remember tool. Base your answer on what the tools " +
-            "return, mention where it came from, and keep it short.";
+        private const string AgentInstructions = ChatPlannerInstructions.Agent;
         private readonly ToggleChip _webSearchSwitch;
         private readonly Label _webSearchNotice;
         private readonly Entry _tavilyKeyEntry;
@@ -1196,6 +1191,7 @@ namespace Maui.Demo.Lite
         private static void ConfigureCpuThreads(Emgu.LiteRT.LM.EngineSettings settings)
         {
             int count = CpuThreadSettings.Count;
+            settings.EnableBenchmark();
             settings.NumThreads = count;
             settings.AudioNumThreads = count;
         }
@@ -1717,7 +1713,7 @@ namespace Maui.Demo.Lite
                         reply = await generation;
                         break;
                     }
-                    catch (Exception ex) when (attempt == 0 && IsContextFull(ex))
+                    catch (Exception ex) when (attempt == 0 && !UseAgent && IsContextFull(ex))
                     {
                         // The estimate was short, so don't rely on it: drop the earlier messages (a summary made before
                         // stays) and try once more.
@@ -1880,7 +1876,12 @@ namespace Maui.Demo.Lite
         private async Task EnsureAgentAsync()
         {
             if (_chatClient == null)
-                _chatClient = _model.AsIChatClient();
+            {
+                var localClient = new LiteRtLmChatClient(_model);
+                localClient.EnableContextManagement = true;
+                localClient.ContextChanged += info => UiStallWatchdog.Mark("Context: " + info);
+                _chatClient = localClient;
+            }
             // The tools are passed with each message (RunAgentAsync), so the settings and the Web search chip can change
             // them during a conversation.
             if (_agent == null)
@@ -2435,8 +2436,8 @@ namespace Maui.Demo.Lite
 
         private int ContextWindow => _model != null && _model.MaxNumTokens > 0 ? _model.MaxNumTokens : 4096;
 
-        // What the conversation may take before a message is sent: the window, less room for the reply and what the
-        // chat template - or the agent's instructions and tools - take.
+        // Early estimate for history summarization before a send. The native chat client additionally budgets
+        // rendered instructions/tools, actual cache occupancy and each pending tool round at execution time.
         private int ContextBudget => ContextWindow - ReplyReserveTokens - (UseAgent
             ? AgentOverheadTokens + (LiveCamera.Supported ? 800 : 0) // Visual tools and monitoring instructions.
             : ChatOverheadTokens);
@@ -3263,6 +3264,7 @@ namespace Maui.Demo.Lite
 
         private void ClearTranscript()
         {
+            ClearVisualSnapshots();
             _transcript.Children.Clear();
             _transcript.Children.Add(_emptyLabel);
         }

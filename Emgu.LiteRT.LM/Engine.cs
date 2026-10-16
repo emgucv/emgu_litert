@@ -14,6 +14,9 @@ namespace Emgu.LiteRT.LM
     /// <remarks>Dispose the sessions and conversations created from an engine before disposing the engine.</remarks>
     public class Engine : Emgu.LiteRT.Util.UnmanagedObject
     {
+        /// <summary>Explicit context capacity copied from the settings at creation; zero means the native default.</summary>
+        public int ConfiguredContextTokens { get; private set; }
+
         /// <summary>
         /// Create an engine, loading the model described by the settings. This can take a while for large models.
         /// The settings are copied, so they can be disposed afterwards.
@@ -28,6 +31,7 @@ namespace Emgu.LiteRT.LM
                 || String.Equals(settings.AudioBackend, "gpu", StringComparison.OrdinalIgnoreCase))
                 Emgu.LiteRT.Util.AcceleratorPlugins.Load();
             _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_engine_create(settings), "litert_lm_engine_create");
+            ConfiguredContextTokens = settings.MaxNumTokens;
         }
 
         /// <summary>

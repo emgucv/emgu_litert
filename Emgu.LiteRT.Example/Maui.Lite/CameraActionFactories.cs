@@ -7,8 +7,7 @@ namespace Maui.Demo.Lite;
 
 internal sealed class CameraChimeFactory(CameraChimeAction chime) : IVisualActionFactory
 {
-    public VisualActionDescriptor Descriptor { get; } = new("play_sound", "Chime", "Play the bundled alert chime once.",
-        VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
+    public VisualActionDescriptor Descriptor => VisualHostCatalog.Chime;
     public VisualActionBinding Bind(JsonElement parameters)
     {
         VisualActionParameters.AllowOnly(parameters);
@@ -19,9 +18,7 @@ internal sealed class CameraChimeFactory(CameraChimeAction chime) : IVisualActio
 
 internal sealed class CameraSpeechFactory(AlertAudioCoordinator audio) : IVisualActionFactory
 {
-    public VisualActionDescriptor Descriptor { get; } = new("speak_text", "Spoken message",
-        "Speak fixed requested words once. Uses the system voice and existing language selection, independently of chat read-aloud.",
-        VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":200}},\"required\":[\"text\"],\"additionalProperties\":false}"));
+    public VisualActionDescriptor Descriptor => VisualHostCatalog.Speech;
     public VisualActionBinding Bind(JsonElement parameters)
     {
         VisualActionParameters.AllowOnly(parameters, "text");

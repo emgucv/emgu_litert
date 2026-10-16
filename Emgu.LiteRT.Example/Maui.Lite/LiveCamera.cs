@@ -14,6 +14,7 @@ internal sealed class LiveCamera
         DeviceInfo.Platform == DevicePlatform.MacCatalyst || DeviceInfo.Platform == DevicePlatform.WinUI;
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
+    private readonly SemaphoreSlim _captureGate = new(1, 1);
     private readonly TaskCompletionSource<bool> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private TaskCompletionSource<byte[]> _snapshot;
     private Task _worker;
@@ -30,15 +31,20 @@ internal sealed class LiveCamera
 
     public async Task<byte[]> CaptureAsync(CancellationToken token)
     {
-        TaskCompletionSource<byte[]> request;
-        lock (_gate)
+        // Chat snapshots and alert snapshots share this camera; each waits for its own fresh frame.
+        await _captureGate.WaitAsync(token);
+        try
         {
-            if (_stop.IsCancellationRequested) throw new InvalidOperationException("The camera is closed.");
-            if (_snapshot != null) throw new InvalidOperationException("A camera capture is already in progress.");
-            request = _snapshot = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<byte[]> request;
+            lock (_gate)
+            {
+                if (_stop.IsCancellationRequested) throw new InvalidOperationException("The camera is closed.");
+                request = _snapshot = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+            try { return await request.Task.WaitAsync(TimeSpan.FromSeconds(10), token); }
+            finally { lock (_gate) { if (_snapshot == request) _snapshot = null; } }
         }
-        try { return await request.Task.WaitAsync(TimeSpan.FromSeconds(10), token); }
-        finally { lock (_gate) { if (_snapshot == request) _snapshot = null; } }
+        finally { _captureGate.Release(); }
     }
 
     public async Task StopAsync()

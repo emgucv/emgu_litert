@@ -11,6 +11,7 @@ namespace Maui.Demo.Lite;
 internal sealed class AlertAudioCoordinator : IVisualActionGroupCoordinator
 {
     private readonly Func<string, CancellationToken, Task> _speak;
+    private readonly Func<VisualEvent, bool> _requiresAudio;
     private readonly object _gate = new();
     private readonly SemaphoreSlim _groups = new(1, 1);
     private TaskCompletionSource<bool> _changed = Signal();
@@ -18,7 +19,8 @@ internal sealed class AlertAudioCoordinator : IVisualActionGroupCoordinator
     private CancellationTokenSource _replyStop, _pendingStop;
     private bool _reserved;
 
-    public AlertAudioCoordinator(Func<string, CancellationToken, Task> speak) => _speak = speak;
+    public AlertAudioCoordinator(Func<string, CancellationToken, Task> speak, Func<VisualEvent, bool> requiresAudio = null)
+    { _speak = speak; _requiresAudio = requiresAudio; }
     private static TaskCompletionSource<bool> Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     private void Pulse()
     {
@@ -67,6 +69,8 @@ internal sealed class AlertAudioCoordinator : IVisualActionGroupCoordinator
     }
     public async Task<IDisposable> EnterAsync(VisualEvent occurrence, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
+        if (_requiresAudio?.Invoke(occurrence) == false) return NoReservation.Instance;
         await _groups.WaitAsync(token).ConfigureAwait(false);
         try
         {
@@ -93,6 +97,11 @@ internal sealed class AlertAudioCoordinator : IVisualActionGroupCoordinator
     {
         lock (_gate) { _reserved = false; Pulse(); }
         _groups.Release();
+    }
+    private sealed class NoReservation : IDisposable
+    {
+        internal static readonly NoReservation Instance = new();
+        public void Dispose() { }
     }
     private sealed class Reservation(AlertAudioCoordinator owner) : IDisposable
     {

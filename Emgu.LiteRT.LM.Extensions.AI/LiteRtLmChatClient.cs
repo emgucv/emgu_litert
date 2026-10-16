@@ -69,6 +69,15 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             _model.EngineReleasing += OnEngineReleasing;
         }
 
+        /// <summary>Budget each tool round and rebuild low-capacity native caches without completed reasoning.
+        /// Old completed exchanges may be removed; the latest user request and all its tool calls/results are retained.
+        /// Configure before use. Off by default for compatibility.</summary>
+        public bool EnableContextManagement { get; set; }
+        /// <summary>Maximum reasoning tokens per round when context management is enabled. Thinking stays enabled.</summary>
+        public int MaxThinkingTokens { get; set; } = 256;
+        /// <summary>Raised at native send boundaries; contains counts only. Observers must marshal UI work.</summary>
+        public event Action<LiteRtLmContextInfo> ContextChanged;
+
         /// <summary>
         /// Whether to constrain generation when tools are given, so the model can only produce well-formed calls to the
         /// given tools (or plain text): LiteRT-LM's constrained decoding, using its Gemma model constraint provider
@@ -118,7 +127,8 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             if (_disposed)
                 throw new ObjectDisposedException(GetType().Name);
 
-            List<AIChatMessage> all = ExpandToolMedia(messages);
+            List<AIChatMessage> original = messages.ToList();
+            List<AIChatMessage> all = ExpandToolMedia(original);
             String systemMessage = GetSystemMessage(all, options);
             List<AIChatMessage> turns = all.Where(m => m.Role != ChatRole.System).ToList();
             if (turns.Count == 0)
@@ -126,16 +136,20 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             String toolsJson = GetToolsJson(options);
             bool? enableThinking = GetEnableThinking(options);
             int maxOutputTokens = options != null && options.MaxOutputTokens.HasValue ? options.MaxOutputTokens.Value : 0;
+            if (EnableContextManagement && enableThinking == true && MaxThinkingTokens <= 0)
+                throw new ArgumentOutOfRangeException(nameof(MaxThinkingTokens), "Thinking needs a positive token budget.");
             bool constrained = EnableConstrainedDecoding && toolsJson != null && LiteRtLmInvoke.IsV018OrLater;
-            String settingsKey = String.Join("\u0001", new[] { systemMessage ?? "", toolsJson ?? "", enableThinking.ToString(), maxOutputTokens.ToString(), constrained.ToString() });
+            String settingsKey = String.Join("\u0001", new[] { systemMessage ?? "", toolsJson ?? "", enableThinking.ToString(), maxOutputTokens.ToString(), constrained.ToString(), EnableContextManagement.ToString(), MaxThinkingTokens.ToString() });
             List<String> keys = turns.Select(GetMessageKey).ToList();
 
             await _requestLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            OpenConversation conversation = null;
+            bool retainConversation = false;
             try
             {
                 // Reuse an unchanged prefix. v0.18 also accepts a batch of appended messages: a media tool result
                 // needs both its acknowledgement and an image turn, without re-reading the whole conversation.
-                OpenConversation conversation = _open;
+                conversation = _open;
                 if (conversation != null
                     && (conversation.SettingsKey != settingsKey
                         || keys.Count <= conversation.MessageKeys.Count
@@ -145,19 +159,50 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                     CloseConversation();
                     conversation = null;
                 }
-                if (conversation == null)
+                int inputEstimate = 0, outputBudget = maxOutputTokens, thinkingBudget = 0;
+                bool compacted = false;
+                if (EnableContextManagement && conversation != null)
                 {
-                    // Creating a LiteRT-LM conversation can take seconds (e.g. with a history to process): not on the
-                    // caller's thread, which may be a UI thread.
+                    int cached = CachedTokens(conversation);
+                    int pending = turns.Skip(conversation.MessageKeys.Count).Sum(EstimateMessageTokens);
+                    if (cached < 0 || cached + pending + Math.Min(maxOutputTokens > 0 ? maxOutputTokens : 256, 256) + 64 > ContextCapacity)
+                    {
+                        CloseConversation(); conversation = null; compacted = true;
+                    }
+                }
+                while (conversation == null)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     List<AIChatMessage> history = turns.Take(turns.Count - 1).ToList();
                     conversation = await Task.Run(() => CreateConversation(
                         history, systemMessage, toolsJson, constrained, enableThinking, maxOutputTokens)).ConfigureAwait(false);
                     conversation.SettingsKey = settingsKey;
                     conversation.MessageKeys.AddRange(keys.Take(keys.Count - 1));
+                    if (!EnableContextManagement) break;
+                    // Rendered native template includes actual tool schemas, instructions and retained history.
+                    inputEstimate = _model.CountTokens(conversation.Conversation.RenderPrefaceToString()) +
+                        history.Sum(m => m.Contents.OfType<DataContent>().Sum(EstimateMediaTokens)) + EstimateMessageTokens(turns.Last());
+                    if (inputEstimate + Math.Min(maxOutputTokens > 0 ? maxOutputTokens : 64, 64) + 64 <= ContextCapacity) break;
+                    ReportContext("compact", conversation, inputEstimate, 0, 0, completion: "input_too_large");
+                    conversation.Dispose(); conversation = null;
+                    // Remove only complete older exchanges, never current tool calls/results or media expansions.
+                    if (!TrimOldestExchange(original))
+                        throw new LiteRtLmContextException("This request and its tools do not fit in the current context window. Start a new chat, reduce attachments/tools, or choose a larger context window in Settings.");
+                    turns = ExpandToolMedia(original).Where(m => m.Role != ChatRole.System).ToList();
+                    keys = turns.Select(GetMessageKey).ToList(); compacted = true;
                 }
-
+                if (EnableContextManagement)
+                {
+                    if (inputEstimate == 0)
+                        inputEstimate = CachedTokens(conversation) + turns.Skip(conversation.MessageKeys.Count).Sum(EstimateMessageTokens);
+                    int available = ContextCapacity - inputEstimate - 64;
+                    outputBudget = Math.Min(maxOutputTokens > 0 ? maxOutputTokens : 1024, available);
+                    if (outputBudget <= 0) throw new LiteRtLmContextException("Too little space remains to answer. Start a new chat or choose a larger context window in Settings.");
+                    thinkingBudget = enableThinking == true ? Math.Max(1, Math.Min(MaxThinkingTokens, outputBudget / 3)) : 0;
+                }
                 var pendingMessages = turns.Skip(conversation.MessageKeys.Count).Select(ToLiteRtLmJson).ToList();
                 String messageJson = pendingMessages.Count == 1 ? pendingMessages[0] : "[" + String.Join(",", pendingMessages) + "]";
+                ReportContext(compacted ? "compact" : "prepare", conversation, inputEstimate, outputBudget, thinkingBudget);
                 String responseId = Guid.NewGuid().ToString("N");
                 String messageId = Guid.NewGuid().ToString("N");
                 DateTimeOffset createdAt = DateTimeOffset.UtcNow;
@@ -166,11 +211,14 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                 // The linked source also cancels the generation if the caller stops enumerating early.
                 ConcurrentQueue<String> chunks = new ConcurrentQueue<String>();
                 SemaphoreSlim chunkReady = new SemaphoreSlim(0);
-                CancellationTokenSource generation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                using var generation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                using var optional = EnableContextManagement ? new ConversationOptionalArgs { MaxOutputTokens = outputBudget } : null;
+                using var roundThinking = EnableContextManagement && enableThinking == true ? new ThinkingConfig { EnableThinking = true, ThinkingTokenBudget = thinkingBudget } : null;
+                if (optional != null && roundThinking != null) optional.ThinkingConfig = roundThinking;
                 Task<String[]> send = conversation.Conversation.SendMessageStreamAsync(
                     messageJson,
                     chunk => { chunks.Enqueue(chunk); chunkReady.Release(); },
-                    null, null, generation.Token);
+                    optional, null, generation.Token);
                 Task signalCompletion = send.ContinueWith(t => chunkReady.Release(), TaskScheduler.Default);
 
                 ThinkSplitter splitter = new ThinkSplitter();
@@ -193,11 +241,22 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                             break;
                     }
                     // Throws if the generation failed or was cancelled.
-                    await send.ConfigureAwait(false);
+                    await CompleteSendAsync(send).ConfigureAwait(false);
 
                     List<AIContent> rest = splitter.Flush(replyText);
                     ChatResponseUpdate last = CreateUpdate(rest, responseId, messageId, createdAt);
-                    last.FinishReason = calls.Count > 0 ? ChatFinishReason.ToolCalls : ChatFinishReason.Stop;
+                    int cachedAfter = CachedTokens(conversation);
+                    int decoded = -1;
+                    try { var benchmark = conversation.Conversation.GetBenchmarkInfo();
+                        if (benchmark?.DecodeTurns.Length > 0) decoded = benchmark.DecodeTurns.Last().TokenCount; } catch { }
+                    conversation.LastDecodedTokens = decoded;
+                    bool atLimit = cachedAfter >= ContextCapacity - 1 || (outputBudget > 0 && decoded >= outputBudget);
+                    bool empty = calls.Count == 0 && replyText.Length == 0;
+                    last.FinishReason = calls.Count > 0 ? ChatFinishReason.ToolCalls : atLimit ? ChatFinishReason.Length : ChatFinishReason.Stop;
+                    ReportContext("complete", conversation, inputEstimate, outputBudget, thinkingBudget, calls.Count,
+                        atLimit ? "length" : empty ? "empty" : calls.Count > 0 ? "tool_calls" : "stop");
+                    if (EnableContextManagement && empty)
+                        throw new LiteRtLmContextException("The model stopped before answering or completing the tools. Try a larger context window in Settings or a shorter request.");
                     succeeded = true;
 
                     // The conversation now also holds this message and the reply.
@@ -206,6 +265,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                         conversation.MessageKeys.AddRange(keys.Skip(conversation.MessageKeys.Count));
                         conversation.MessageKeys.Add(GetAssistantKey(replyText.ToString(), calls));
                         _open = conversation;
+                        retainConversation = true;
                     }
                     else
                     {
@@ -217,6 +277,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                 {
                     if (!succeeded)
                     {
+                        ReportContext("failed", conversation, inputEstimate, outputBudget, thinkingBudget, calls.Count, "error_or_cancelled");
                         // LiteRT-LM doesn't support reusing a conversation after a failed or cancelled send. Stop the
                         // generation and wait for the native call to finish before releasing it.
                         generation.Cancel();
@@ -225,13 +286,88 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                             _open = null;
                         conversation.Dispose();
                     }
-                    generation.Dispose();
                 }
             }
             finally
             {
+                if (!retainConversation && conversation != null)
+                {
+                    if (ReferenceEquals(_open, conversation)) _open = null;
+                    conversation.Dispose();
+                }
                 _requestLock.Release();
             }
+        }
+
+        // Context maintenance happens only before a native send. Calls/results already executed by the
+        // function-invoking layer stay in the supplied history; rebuilding never invokes host tools.
+        private async Task CompleteSendAsync(Task<string[]> send)
+        {
+            try { await send.ConfigureAwait(false); }
+            catch (LiteRtLmException ex) when (EnableContextManagement &&
+                (ex.Message.IndexOf("exceeds available state", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 ex.Message.IndexOf("too long", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 ex.Message.IndexOf("context window out of bounds", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                throw new LiteRtLmContextException("The model ran out of context while processing the current tools. Completed actions were not replayed. Start a new chat or choose a larger context window in Settings.", ex);
+            }
+        }
+
+        internal static bool TrimOldestExchange(List<AIChatMessage> messages)
+        {
+            int first = messages.FindIndex(m => m.Role == ChatRole.User);
+            if (first < 0) return false;
+            int next = messages.FindIndex(first + 1, m => m.Role == ChatRole.User);
+            if (next < 0) return false;
+            messages.RemoveRange(0, next);
+            return true;
+        }
+
+        private int EstimateMessageTokens(AIChatMessage message)
+        {
+            // Tokenize payload text, not JSON transport escaping (which can multiply catalog sizes).
+            int tokens = 24;
+            foreach (var content in message.Contents)
+            {
+                if (content is TextContent text) tokens += _model.CountTokens(text.Text ?? String.Empty);
+                else if (content is FunctionResultContent result)
+                {
+                    object value = result.Exception != null ? "Error: " + result.Exception.Message : result.Result;
+                    string payload = value is JsonElement element ? element.ToString() : value is string str ? str :
+                        value == null ? "null" : JsonSerializer.Serialize(value, AIJsonUtilities.DefaultOptions.GetTypeInfo(value.GetType()));
+                    tokens += _model.CountTokens(payload) + 16;
+                }
+                else if (content is FunctionCallContent call)
+                    tokens += _model.CountTokens(ToLiteRtLmJson(new AIChatMessage(ChatRole.Assistant, new AIContent[] { call }))) + 16;
+                else if (content is DataContent media)
+                    tokens += EstimateMediaTokens(media);
+            }
+            return tokens;
+        }
+        private static int EstimateMediaTokens(DataContent media)
+        {
+            if (media.MediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return 300;
+            var data = media.Data.Span;
+            if (data.Length >= 44 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F')
+            {
+                int byteRate = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(data.Slice(28, 4));
+                if (byteRate > 0) return (int)Math.Min(int.MaxValue, Math.Ceiling((data.Length - 44) * 25.0 / byteRate) + 64);
+            }
+            return 1600; // Conservatively covers the demo's bounded recordings; unknown compressed audio may need more.
+        }
+
+        private int ContextCapacity => _model.Engine?.ConfiguredContextTokens > 0
+            ? _model.Engine.ConfiguredContextTokens : 4096;
+        private int CachedTokens(OpenConversation conversation)
+        { try { return conversation.Conversation.TokenCount; } catch { return -1; } }
+        private void ReportContext(string stage, OpenConversation conversation, int input, int output, int thinking, int calls = 0, string completion = null)
+        {
+            var info = new LiteRtLmContextInfo { Stage = stage, Capacity = ContextCapacity,
+                CachedTokens = conversation == null ? -1 : CachedTokens(conversation), InputTokens = input,
+                OutputBudget = output, ThinkingBudget = thinking, ToolCalls = calls, Completion = completion,
+                DecodedTokens = conversation?.LastDecodedTokens ?? -1 };
+            System.Diagnostics.Trace.WriteLine("LiteRT context " + info);
+            try { ContextChanged?.Invoke(info); } catch { /* Diagnostics must not interrupt native cleanup. */ }
         }
 
         /// <summary>
@@ -306,6 +442,9 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                 }
                 if (!String.IsNullOrEmpty(systemMessage))
                     open.Config.SystemMessage = systemMessage;
+                else if (EnableContextManagement)
+                    // Gemma's preface renderer needs a message even before the first user turn.
+                    open.Config.SystemMessage = "\"\"";
                 if (toolsJson != null)
                     open.Config.ToolsJson = toolsJson;
                 if (constrained)
@@ -339,18 +478,15 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             public ConversationConfig Config;
             public Conversation Conversation;
             public String SettingsKey;
+            public int LastDecodedTokens = -1;
             public readonly List<String> MessageKeys = new List<String>();
 
             public void Dispose()
             {
-                if (Conversation != null)
-                    Conversation.Dispose();
-                if (Config != null)
-                    Config.Dispose();
-                if (ThinkingConfig != null)
-                    ThinkingConfig.Dispose();
-                if (SessionConfig != null)
-                    SessionConfig.Dispose();
+                Conversation?.Dispose(); Conversation = null;
+                Config?.Dispose(); Config = null;
+                ThinkingConfig?.Dispose(); ThinkingConfig = null;
+                SessionConfig?.Dispose(); SessionConfig = null;
             }
         }
 

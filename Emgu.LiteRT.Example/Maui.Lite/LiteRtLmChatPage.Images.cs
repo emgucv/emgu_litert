@@ -27,9 +27,7 @@ namespace Maui.Demo.Lite
     {
         private const string ImageGenerationPreference = "litert_lm_chat_image_generation";
         private const string GeneratedKind = "generated";
-        private const string ImageInstructions =
-            "When the user asks you to draw, paint or create a picture, use the generate_image tool with a short English " +
-            "description; the picture is shown to the user, not to you.";
+        private const string ImageInstructions = ChatPlannerInstructions.Images;
 
         private Switch _imageSwitch;
         private Label _imageStatus;

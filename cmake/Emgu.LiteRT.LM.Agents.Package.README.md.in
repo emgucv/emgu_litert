@@ -121,7 +121,9 @@ feed reopen; detector faults require explicit resume. `Clear()` ends a chat's ru
 before releasing model adapters. No pixels, rule definitions or event history are written to disk by this framework.
 Text recognized in images is untrusted scene data and must never be executed as instructions.
 
-The MAUI demo supplies COCO SSD MobileNet, a local chime and fixed-text system speech. Its audio coordinator
+The MAUI demo supplies COCO SSD MobileNet, a local chime, fixed-text system speech and a `take_snapshot` action.
+Snapshot alerts show a fresh camera JPEG in the current session (newest twenty in memory), with explicit manual
+save. Images are not sent to the model or saved with chats. Snapshot-only groups leave chat read-aloud playing. Its audio coordinator
 interrupts chat read-aloud before alert groups and retains only the latest pending reply until alerts finish. Add YOLO, face detection, OCR or plate-recognition
 adapters by implementing the same contracts and advertising only supported capabilities/classes; custom predicates
 can consume their observations. No native detector or audio library is a dependency of this package.

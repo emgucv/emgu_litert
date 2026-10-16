@@ -77,8 +77,8 @@ public class UnitTestCameraTools
 #if !TEST_MODELS
     [Ignore("Opt in with -p:TestModels=true; requires cached Gemma 4 E2B.")]
 #endif
-    [Test, Category("AgentRegression")]
-    public async Task GemmaDescribesImageReturnedByCameraTool()
+    [TestCase(false), TestCase(true), Category("AgentRegression")]
+    public async Task GemmaDescribesImageReturnedByCameraTool(bool manageContext)
     {
         using var cancel = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         using var model = new Gemma4E2B { AudioBackend = null };
@@ -91,7 +91,7 @@ public class UnitTestCameraTools
             return Task.FromResult<IEnumerable<AIContent>>(new AIContent[] {
                 new TextContent("Fresh camera image. Describe what you actually see in it."), new DataContent(image, "image/jpeg") });
         });
-        var native = model.AsIChatClient();
+        var native = new LiteRtLmChatClient(model) { EnableContextManagement = manageContext };
         using var client = new ChatClientBuilder(native).UseFunctionInvocation().Build();
         var options = new ChatOptions { Tools = new List<AITool> { tool }, MaxOutputTokens = 160,
                 Instructions = "Call capture_camera_frame for camera questions. Then examine its image and give a brief answer. Do not capture again for the same question.",

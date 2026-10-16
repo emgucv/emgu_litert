@@ -576,7 +576,7 @@ static `tfliteextern` has its own TFLite), so image generation is hidden there.
 - [ ] Follow-ups: camera selection and YOLO detection/tracking. Continuous detector monitoring is covered by item 33;
       model image descriptions still capture only when asked. Neither feature records video.
 
-## 33. Visual agents and event monitors — versions 1 and 2 implemented
+## 33. Visual agents and event monitors — actions and snapshots implemented
 
 - [x] Pure managed visual-agent descriptors/registry, owned timestamped BGR8 frames and typed observations. Still-image
       analysis and live analysis share adapters, with serialized model access and no model-specific event predicates.
@@ -616,6 +616,116 @@ static `tfliteextern` has its own TFLite), so image generation is hidden there.
 - [x] V2: 37 focused tests pass, including real Gemma sound-only/speech-only/combined action selection, existing
       camera image regression, concurrent sibling execution, independent failures, FIFO groups, validation and
       audio interruption/cleanup/latest-pending-reply behavior. Pixel Fold confirmed chat speech interruption.
+- [x] `take_snapshot` alert action: one fresh live-camera JPEG after confirmed appearance, independently or alongside
+      sound/speech. Session-only transcript thumbnails (latest twenty), enlarged viewer and explicit JPEG Save.
+      Images are not automatically saved/exported or sent to the model; New chat clears them, including private chats.
+      Chat and alert capture requests serialize on the existing camera. Snapshot-only groups do not interrupt audio.
+- [x] 43 focused tests pass, including real Gemma snapshot-only/all-three selection, snapshot factory validation,
+      single-episode dispatch, cancellation, independent failures and audio independence. Pixel Fold verified a valid
+      480x640 JPEG, viewer opening, three concurrent capture requests, twenty-image limit and New chat cleanup;
+      the model's per-turn camera input stayed empty. Temporary probes were removed after validation.
+- [x] Pixel Fold full chat workflow: Gemma 4 E2B GPU, explicit 8192-token context and Thinking off, fresh normal
+      chat with the current tool/settings set. Exact request “when you see a person, play a sound and take a picture”
+      finished in 39.66 s after GPU load (65.57 s), selected only `play_sound` + `take_snapshot`, and acknowledged
+      without a context-capacity error. Controlled person detection completed both actions and showed one snapshot.
+      Temporary test chat, probe code and markers removed; saved context/thinking preferences were unchanged.
+      This verifies the workaround; automatic token budgeting/within-tool-loop recovery still needs improvement.
+- [x] Pixel Fold comparison: same exact request, fresh normal chats, Gemma 4 E2B GPU with 4096 tokens and Thinking
+      on, tested twice. Requests ended after 85.72 s / 88.56 s with detector/action discovery only, an empty answer
+      and no monitor; neither run exposed the user's exact remaining-capacity error. This configuration failed the
+      workflow in both runs, compared with successful 8k/Thinking-off. The empty-result cause is not yet established.
+      Both test chats and temporary probes/markers removed; saved preferences unchanged.
 - [ ] Additional adapters: YOLO, face detection, OCR and plate detection/reading; tracking individuals, recurring
       alerts, saved rules, richer conditions, and background monitoring remain future work.
 - [ ] Real camera/audio hardware validation on Mac Catalyst and Windows, plus long-running thermal/battery tests.
+
+## 34. Visual-alert context exhaustion and empty replies — fixed; long-session follow-ups remain
+
+- [x] Fix the full chat/tool workflow on Pixel Fold with **Gemma 4 E2B GPU**, **4k (4096-token) context** and
+      **Thinking on**. Track both the reported prefill-capacity exception and the reproduced empty-reply failure;
+      they may have different causes. Do not assume that increasing context alone fixes the underlying behavior.
+
+**Primary reproducer (reported by the user and tested on-device):**
+
+> when you see a person, play a sound and take a picture
+
+Start a New chat, select Gemma 4 E2B GPU, set the context window to 4k and turn Thinking on. Send the prompt
+through the normal chat UI with the production instructions/tool catalog. Also repeat in an existing conversation
+near its context limit. Record enabled tool/settings differences, history size and effective loaded context size.
+
+**Observed failures (2026-10-16):**
+
+- User report: lengthy thinking, followed by `FAILED_PRECONDITION: Prefill input length exceeds available state
+  entries (remaining capacity: 224)`.
+- Two fresh-chat device runs at 4k/Thinking-on: ended after **85.72 s** and **88.56 s** after calling
+  `list_visual_agents` and `list_visual_actions`, with **an empty reply and no monitor**. No capacity exception
+  surfaced in these runs; the cause was subsequently confirmed by token diagnostics below.
+- Control: the identical prompt at 8k (8192 tokens)/Thinking-off completed in **39.66 s**, selected exactly
+  `play_sound` and `take_snapshot`, and acknowledged. Controlled person detection completed both actions and
+  displayed one snapshot. Timing excludes model load. This control changes two variables; isolate context size
+  and Thinking independently before attributing the difference to either one.
+
+**Related prompts to include in regression coverage** (not yet confirmed to trigger the 4k/Thinking-on failure):
+
+> When you see a person, play a sound.
+>
+> When you see a person, take a snapshot.
+>
+> When you see a person, take a snapshot, play a sound and say 'Person detected'.
+
+- [x] Instrument token use and native completion/stop reasons across each model/tool round: production system
+      instructions, schemas, history, thinking, tool calls/results and remaining cache capacity. Investigate why
+      discovery can end in an apparently successful empty response without monitor creation.
+- [x] Replace fixed tool-overhead estimates with budgeting based on the actual request and reserve room for
+      intermediate tool results, thinking and the final answer. The host still uses an early history-summary estimate; the native adapter enforces per-round rendered-input,
+      cache-occupancy and output/thinking budgets.
+- [x] Handle capacity exhaustion within the tool loop, including first-turn requests with no history to compact.
+      Keep retries bounded and preserve/deduplicate already completed tool side effects; never create duplicate
+      monitors or replay alerts. Report a clear, actionable message if the requested workflow cannot fit.
+- [x] Preserve the requested Thinking/context settings; do not silently disable Thinking. Detect incomplete/empty
+      agent results and avoid presenting them as a completed request. Check native stop/length reporting in
+      `LiteRtLmChatClient`: available native cache/benchmark evidence now distinguishes token-limit completion.
+      Unknown empty completion is surfaced as actionable failure rather than silently succeeding.
+- [x] Test the full production tool catalog/instructions, not only the smaller visual-tool fixture. Cover
+      4k/Thinking-on, 4k/Thinking-off, 8k/Thinking-on and 8k/Thinking-off, fresh and near-full chats, and repeated
+      requests. New production-catalog tests cover the primary prompt and the three-action variant; older-history
+      compaction, current tool/media retention and one-time side effects have dedicated tests.
+- [x] Acceptance: the primary prompt creates one monitor containing exactly `play_sound` + `take_snapshot`,
+      returns a nonempty acknowledgement with actual status, and both actions execute on confirmed presence.
+      No raw prefill exception, silent empty answer, duplicate rule or replayed side effect. Verify on Pixel Fold
+      GPU with the failing configuration; retain a regression test and record any explicit capacity limitation.
+
+**Implementation and validation (2026-10-16):**
+
+- Baseline diagnostics confirmed the empty-answer run ended at exactly **4096 cached tokens**, after discovery,
+  with no text/tool call. LiteRT-LM can finish a max-token run normally; the old adapter reported Stop.
+- `LiteRtLmChatClient.EnableContextManagement` is enabled in the demo. It reads the loaded engine capacity,
+  native cache count and rendered template; estimates payload/media costs without JSON-escaping inflation;
+  reserves 64 safety tokens; and applies adaptive output and positive Thinking budgets (at most 256 per round).
+- Compaction runs between model/tool rounds, removes completed reasoning and, when necessary, whole older
+  exchanges. It retains the current request and all its tool/media results. The adapter does not execute tools;
+  the host's whole-agent context-error retry is disabled so completed side effects are not replayed.
+- Monitor creation returns concise configuration/status facts; full snapshots remain available in the UI/list tool.
+  Core adapter capacity/empty errors provide guidance. Native benchmark counts help distinguish length limits.
+- Full chat UI on Pixel Fold, Gemma 4 E2B GPU, fresh normal chats, exact primary prompt:
+
+  | Context | Thinking | Response time | Result |
+  |---|---|---:|---|
+  | 4096 | On | 88.12 s | One sound + snapshot monitor, nonempty acknowledgement |
+  | 4096 | Off | 37.29 s | One sound + snapshot monitor, nonempty acknowledgement |
+  | 8192 | On | 87.82 s | One sound + snapshot monitor, nonempty acknowledgement |
+  | 8192 | Off | 36.06 s | One sound + snapshot monitor, nonempty acknowledgement |
+
+  Times exclude model loading and are single runs, not a sustained thermal benchmark. All monitors reached
+  Watching. The 4k/Thinking-on case confirmed both actions succeeding on a controlled person-detection episode.
+  Two snapshots were present after an initial detection and a controlled absence/reappearance (distinct episodes).
+  Saved context/Thinking preferences were unchanged; test chats and temporary probe files were removed.
+- Planner text and visual catalog metadata are shared with the permanent test fixture, avoiding shortened mock
+  instructions/schemas. Tests cover loaded-settings overrides, output-length reporting and oversized-current-input
+  rejection without tool execution. Other camera/media and visual-action regressions are retained.
+- 55 focused tests passed, including real Gemma, full default planner metadata, native length reporting and camera
+  image/cache reuse. After final ownership cleanup, all 11 targeted context/camera checks passed again.
+  netstandard2.0 and Mac Catalyst builds passed. Temporary device probes and markers were removed.
+- [ ] Follow up with extended, near-capacity Pixel Fold conversations, user setting/tool combinations, thermal/battery
+      runs and Mac/Windows hardware checks. Essential requests/catalogs can still exceed 4k; report that limitation
+      rather than silently disabling Thinking, truncating current evidence or repeating actions.

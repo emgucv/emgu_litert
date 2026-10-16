@@ -19,14 +19,8 @@ internal sealed class CocoVisualAgent : IVisualAgent
     private readonly DownloadableFile _labels = new(
         "https://github.com/emgucv/models/raw/master/coco_ssd_mobilenet_v3_small_2020_01_14/labelmap.txt",
         "CocoSsdMobilenetV3", "C7E79C855F73CBBA9F33D649D60E1676EB0A974021A41696D1AC0D4B7F7E0211");
-    internal static readonly string[] Classes = ("person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light," +
-        "fire hydrant,stop sign,parking meter,bench,bird,cat,dog,horse,sheep,cow,elephant,bear,zebra,giraffe,backpack," +
-        "umbrella,handbag,tie,suitcase,frisbee,skis,snowboard,sports ball,kite,baseball bat,baseball glove,skateboard," +
-        "surfboard,tennis racket,bottle,wine glass,cup,fork,knife,spoon,bowl,banana,apple,sandwich,orange,broccoli," +
-        "carrot,hot dog,pizza,donut,cake,chair,couch,potted plant,bed,dining table,toilet,tv,laptop,mouse,remote," +
-        "keyboard,cell phone,microwave,oven,toaster,sink,refrigerator,book,clock,vase,scissors,teddy bear,hair drier,toothbrush").Split(',');
-    public VisualAgentDescriptor Descriptor => new("coco-ssd-mobilenet-v3", "COCO SSD MobileNet V3",
-        new[] { "object_detection" }, Classes, requiresPreparation: _model?.Imported != true);
+    internal static readonly string[] Classes = VisualHostCatalog.Classes;
+    public VisualAgentDescriptor Descriptor => VisualHostCatalog.Detector(_model?.Imported != true);
 
     public async Task PrepareAsync(Action<string> progress, CancellationToken cancellationToken)
     {

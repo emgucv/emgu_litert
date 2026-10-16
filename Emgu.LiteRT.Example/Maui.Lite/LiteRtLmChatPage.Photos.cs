@@ -25,9 +25,7 @@ namespace Maui.Demo.Lite
         // How many of the most recent photos are indexed: each takes about 1 s on a Mac's CPU and several seconds on a
         // phone's, in the background.
         private static int MaxIndexedPhotos => DeviceInfo.Idiom == DeviceIdiom.Desktop ? 1000 : 200;
-        private const string PhotoInstructions =
-            "When the user asks you to find or show their photos or pictures, use the find_photos tool with the request in their " +
-            "words; the photos it finds are shown to the user, not to you.";
+        private const string PhotoInstructions = ChatPlannerInstructions.Photos;
 
         private PhotoIndex _photoIndex;
         private Switch _photoSwitch;

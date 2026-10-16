@@ -22,6 +22,10 @@
     <Compile Include="..\UnitTestWorkloadPolicy.cs" Link="UnitTestWorkloadPolicy.cs" />
     <Compile Include="..\UnitTestAgentRegression.cs" Link="UnitTestAgentRegression.cs" />
     <Compile Include="..\UnitTestCameraTools.cs" Link="UnitTestCameraTools.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\CameraSnapshotAction.cs" Link="CameraSnapshotAction.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatPlannerInstructions.cs" Link="ChatPlannerInstructions.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\VisualHostCatalog.cs" Link="VisualHostCatalog.cs" />
+    <Compile Include="..\UnitTestContextManagement.cs" Link="UnitTestContextManagement.cs" />
     <Compile Include="..\UnitTestVisualActions.cs" Link="UnitTestVisualActions.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\AlertAudioCoordinator.cs" Link="AlertAudioCoordinator.cs" />
     <Compile Include="..\UnitTestVisualAgents.cs" Link="UnitTestVisualAgents.cs" />

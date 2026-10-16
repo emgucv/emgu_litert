@@ -8,7 +8,7 @@ The chat model interprets the request and calls a tool to configure a monitor. T
 and action dispatcher then run locally without calling Gemma for every frame.
 
 Version 2 exposes action discovery and explicit validated action sets. A rule can play a chime, speak fixed words,
-or do both concurrently. A speech-only request does not implicitly add a chime.
+or capture a snapshot, with any requested combination running concurrently. No unrequested action is added.
 
 ## Workflow
 
@@ -24,15 +24,19 @@ flowchart TD
     Monitor --> Started[Confirmed Started event]
     Started --> Audio[Reserve audio and interrupt chat read-aloud]
     Audio --> Group[Concurrent action group]
+    Started --> Silent[Snapshot-only: leave audio alone]
+    Silent --> Group
     Group --> Chime[Play chime]
     Group --> Speech[Speak fixed text]
+    Group --> Snapshot[Fresh camera JPEG shown in chat]
     Chime --> Results[Independent action results]
     Speech --> Results
+    Snapshot --> Results
 ```
 
 ### 1. The app registers detectors and action factories
 
-`BuildVisualMonitoring()` registers `CocoVisualAgent`, `CameraChimeFactory` and `CameraSpeechFactory`.
+`BuildVisualMonitoring()` registers `CocoVisualAgent`, `CameraChimeFactory`, `CameraSpeechFactory` and `CameraSnapshotFactory`.
 Each action factory supplies a `VisualActionDescriptor` containing its stable ID, name, availability,
 description and JSON parameter schema. Its side-effect-free `Bind` method validates parameters and creates
 an immutable `VisualActionBinding`. Registration and binding do not play audio.
@@ -40,6 +44,7 @@ an immutable `VisualActionBinding`. Registration and binding do not play audio.
 | ID | Parameters | Host implementation |
 |---|---|---|
 | `play_sound` | `{}` | `CameraChimeAction`, bundled `visual_chime.wav`, five-second timeout |
+| `take_snapshot` | `{}` | `CameraSnapshotAction`, fresh camera JPEG, fifteen-second timeout |
 | `speak_text` | `{ "text": "Person detected" }` | `CameraSpeechAction`, system speech, thirty-second timeout |
 
 Speech must contain nonblank, pronounceable text of at most 200 characters. The host uses the existing speech
@@ -49,7 +54,7 @@ language selection and system voice. Explicit alert speech works even when chat 
 
 `VisualAgentTools.Instructions` directs Gemma to call `list_visual_agents` and `list_visual_actions` first.
 The monitor tool's `actions` array schema is generated from available registered action descriptors, including
-an ID enum and the exact parameter schema for each alternative. The combined request becomes:
+an ID enum and the exact parameter schema for each alternative. For example, a combined sound-and-speech request becomes:
 
 ```json
 {
@@ -126,18 +131,47 @@ Before starting, the dispatcher checks rule revision and visible-feed generation
 own exception handling. A failed chime does not stop speech, and a speech failure does not stop the chime.
 The lease is released after all siblings and their cleanup complete. Actions are not automatically retried.
 
-The MAUI `AlertAudioCoordinator` reserves audio for the group, cancels any chat read-aloud, and awaits its
+For groups containing `play_sound` or `speak_text`, the MAUI `AlertAudioCoordinator` reserves audio, cancels any chat read-aloud, and awaits its
 native cleanup before allowing alert audio. Interrupted replies are not restarted. Chat speech arriving during
 an alert waits until the whole group finishes; only the latest pending reply is retained. A chime and an alert
 utterance can overlap, but two text-to-speech calls cannot. Alerts use normal media volume and the system voice.
 
-Snapshots expose `Actions` and `LastActionResults` (`Queued`, `Running`, `Succeeded`, `Failed`, `Cancelled`,
+Runtime snapshots expose `Actions` and `LastActionResults` (`Queued`, `Running`, `Succeeded`, `Failed`, `Cancelled`,
 `Skipped`) for the latest scheduled group, with episode IDs and messages. Lifecycle changes cancel the whole
 group. Late results from an older group or revision cannot overwrite the newest result. The old `ActionId` and
 `LastAction` properties remain available as summaries for existing consumers.
 
 Gemma is not called again for playback. One confirmed presence episode produces one group; additional people
 during that episode do not retrigger it. Confirmed absence rearms the rule. This is session-local delivery.
+
+### Snapshot alerts
+
+Ask **“When you see a person, take a snapshot”**, or combine that with sound and/or fixed speech. The tool
+selects `{ "actionId": "take_snapshot", "parameters": {} }`. Snapshot-only alerts do not reserve audio or
+interrupt chat read-aloud. The action uses the existing live camera, waits for a fresh frame after the event,
+and presents a JPEG thumbnail and time in the transcript. This is not the exact detector evidence frame; a
+queued event can capture a later scene. Capture is serialized with chat camera requests so neither competes
+for the camera snapshot slot. The action does not reopen a hidden camera.
+
+Images remain in memory for the current chat session, including private chats. The newest twenty thumbnails
+are retained; New chat or opening a saved chat clears them. They are not added to model context, chat
+attachments, chat export or automatic photo storage. Tap an image to open it and choose **Save snapshot…**
+to write a JPEG using the platform file picker. Saving is an explicit user action, including in private chat.
+Closing/hiding the feed or pausing/removing the rule cancels pending capture/presentation. A capture failure
+is reported independently and does not cancel audio siblings.
+
+## Thinking and context capacity
+
+The chat client budgets each model/tool round using the loaded context size, native cache occupancy and estimated
+rendered input costs. With Thinking on, reasoning has a per-round budget (at most 256 tokens, smaller near the
+limit). It can rebuild the cache between tool calls to omit completed thinking while retaining the current request
+and all tool calls/results. Older completed exchanges can be removed when needed. This does not rerun actions.
+Creation results return concise facts rather than repeating the full UI snapshot, leaving room for acknowledgement.
+
+A rebuild can make a small-window request slower because retained text must be processed again. If essential
+content cannot fit, the app gives context-window guidance. Empty native output is detected rather than presented
+as a successful blank answer. This addresses the observed 4k/Thinking-on failure path; see TODO item 34 for
+hardware validation and limits. Keep large tool results and catalogs concise to reduce pressure.
 
 ## Visibility, controls and single images
 
@@ -166,13 +200,15 @@ managed core has no MAUI, camera, audio or detector-model dependencies.
 Existing single-action constructors, `CreateMonitor(..., actionId, phase)` and sound-only tool overload remain
 available. Use `LegacyInstructions` with the old five-tool overload; use `Instructions` with the six-tool overload
 that adds action discovery. Hosts using source-generated JSON can pass serializer options to the new overload.
-YOLO, face, OCR and plate recognition, notifications, snapshots as actions, persistent rules and background
+YOLO, face, OCR and plate recognition, notifications, persistent rules and background
 monitoring remain future additions.
 
 ## Source map
 
 | Component | Source |
 |---|---|
+| Context budgets and diagnostics | [LiteRtLmChatClient.cs](../../Emgu.LiteRT.LM.Extensions.AI/LiteRtLmChatClient.cs), [ContextManagement.cs](../../Emgu.LiteRT.LM.Extensions.AI/ContextManagement.cs) |
+| Shared planner/catalog metadata | [ChatPlannerInstructions.cs](ChatPlannerInstructions.cs), [VisualHostCatalog.cs](VisualHostCatalog.cs) |
 | Chat tool schemas and planner instructions | [VisualAgentTools.cs](../../Emgu.LiteRT.LM.Agents/VisualAgentTools.cs) |
 | MAUI registration, tool handlers and controls | [LiteRtLmChatPage.Visual.cs](LiteRtLmChatPage.Visual.cs) |
 | Camera capture and visibility lifecycle | [LiteRtLmChatPage.Camera.cs](LiteRtLmChatPage.Camera.cs), [LiveCamera.cs](LiveCamera.cs) |
@@ -182,6 +218,7 @@ monitoring remain future additions.
 | COCO model adapter | [CocoVisualAgent.cs](CocoVisualAgent.cs) |
 | Action contracts, factories and validation | [VisualActions.cs](../../Emgu.LiteRT.LM.Agents/VisualActions.cs) |
 | MAUI factories and fixed speech | [CameraActionFactories.cs](CameraActionFactories.cs) |
+| Snapshot action | [CameraSnapshotAction.cs](CameraSnapshotAction.cs), [LiteRtLmChatPage.VisualSnapshots.cs](LiteRtLmChatPage.VisualSnapshots.cs) |
 | Audio arbitration | [AlertAudioCoordinator.cs](AlertAudioCoordinator.cs) |
 | Native chime playback | [CameraChimeAction.cs](CameraChimeAction.cs) |
 | Regression tests | [UnitTestVisualAgents.cs](../../Emgu.LiteRT.Test/Emgu.TF.Lite.Test/UnitTestVisualAgents.cs) |
