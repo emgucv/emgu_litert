@@ -302,14 +302,20 @@ A document only helps the chat it is attached to, and its excerpts go with every
 Its index is saved in the chat database (`Document` / `DocumentItem` tables), so every document ever attached can be
 searched.
 
-- [ ] Tool in `Emgu.LiteRT.LM.Agents` (`AgentTools.SearchDocuments(search)`, the app provides the search, like
+- [x] Tool in `Emgu.LiteRT.LM.Agents` (`AgentTools.SearchDocuments(search)`, the app provides the search, like
       `FindPhotos`): a query in the user's words, optionally a document name.
-- [ ] Demo: search the saved indexes with the embedding model already used for documents and photos
+- [x] Demo: search the saved indexes with the embedding model already used for documents and photos
       (`EmbeddingGemma2TextVision`, `_embedderGate`); return the best passages with the document name and page,
-      within the excerpt budget the attached-document path uses.
-- [ ] Keep attaching a document to a chat as it is; the tool adds "in any of my documents" and lets the model decide
+      within the excerpt budget the attached-document path uses (1,600 / 3,200 characters).
+- [x] Keep attaching a document to a chat as it is; the tool adds "in any of my documents" and lets the model decide
       when to look.
 - [x] Saved documents with their size and delete: in the Storage page (item 8).
+
+Implemented as `DocumentLibrarySearch` (cosine ranking of the saved passages, the chat search's cutoffs: score at least
+0.5 and within 0.12 of the best; optional case-insensitive document-name filter). Indexes built with another embedding
+model are skipped rather than rebuilt. The tool is omitted in private chats and reports a deleted search model. Model-free
+tests cover the tool, ranking, filtering, budget and model mismatch; the Windows build passes. Still to check: Gemma
+actually choosing the tool on a device, and a regression scenario in the agent test (item 7).
 
 ## 16. Agent tool: search past chats (`search_chats`)
 

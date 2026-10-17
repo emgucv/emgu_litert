@@ -85,6 +85,50 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
+        public async Task DocumentSearchToolForwardsArguments()
+        {
+            var tool = AgentTools.SearchDocuments((request, document, token) => Task.FromResult(request + "|" + document));
+            Assert.That(tool.Name, Is.EqualTo("search_documents"));
+            var result = await tool.InvokeAsync(new AIFunctionArguments { ["request"] = "notice period", ["document"] = "lease" });
+            Assert.That(result?.ToString(), Is.EqualTo("notice period|lease"));
+            Assert.That(AgentTools.Describe(new FunctionCallContent("1", "search_documents",
+                new Dictionary<string, object> { ["request"] = "notice period" })), Does.Contain("notice period"));
+            Assert.Throws<ArgumentNullException>(() => AgentTools.SearchDocuments(null));
+        }
+
+        [Test]
+        public async Task DocumentLibrarySearchRanksFiltersAndSkipsOtherModels()
+        {
+            var store = CreateStore();
+            byte[] Vector(params float[] v) { var b = new byte[v.Length * 4]; Buffer.BlockCopy(v, 0, b, 0, b.Length); return b; }
+            async Task Save(string id, string name, string model, params (string Text, string Page, float[] V)[] items)
+            {
+                await store.SaveDocumentAsync(
+                    new DocumentRecord { Id = id, Name = name, PageCount = 2, Settings = "v1|" + model + "|x", Created = DateTime.UtcNow },
+                    items.Select((p, i) => new DocumentItemRecord { DocumentId = id, Position = i, Text = p.Text, Location = p.Page, Embedding = Vector(p.V) }));
+            }
+            await Save("a", "lease.pdf", "m1", ("Notice period is three months.", "page 2", new[] { 1f, 0f }),
+                ("The garden is shared.", "page 1", new[] { 0f, 1f }));
+            await Save("b", "recipes.docx", "m1", ("Notice the pepper.", "page 1", new[] { 0.9f, 0.1f }));
+            await Save("c", "old.pdf", "m2", ("Stale vector.", "page 1", new[] { 1f, 0f }));
+            Task<float[]> Embed(string text, CancellationToken token) => Task.FromResult(new[] { 1f, 0f });
+            var search = new DocumentLibrarySearch(store);
+
+            var all = await search.SearchAsync("m1", "notice", null, Embed, 3200, CancellationToken.None);
+            Assert.That(all.Select(m => m.DocumentName), Is.EqualTo(new[] { "lease.pdf", "recipes.docx" }));
+            Assert.That(all[0].Location, Is.EqualTo("page 2"));
+
+            var named = await search.SearchAsync("m1", "notice", "RECIPES", Embed, 3200, CancellationToken.None);
+            Assert.That(named.Select(m => m.DocumentName), Is.EqualTo(new[] { "recipes.docx" }));
+
+            var small = await search.SearchAsync("m1", "notice", null, Embed, 10, CancellationToken.None);
+            Assert.That(small, Has.Count.EqualTo(1));
+
+            Assert.That(await search.SearchAsync("m3", "notice", null, Embed, 3200, CancellationToken.None), Is.Empty);
+            Assert.That(DocumentLibrarySearch.Format(all), Does.Contain("[lease.pdf, page 2").And.Contain("three months"));
+        }
+
+        [Test]
         public async Task IndexPersistsReplacesPrunesAndClearsWithoutDeletingChats()
         {
             var store = CreateStore();

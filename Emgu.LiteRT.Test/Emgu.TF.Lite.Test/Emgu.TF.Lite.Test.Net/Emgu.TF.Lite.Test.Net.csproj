@@ -44,6 +44,7 @@
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\StorageFiles.cs" Link="StorageFiles.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\StorageCatalog.cs" Link="StorageCatalog.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatSearchIndex.cs" Link="ChatSearchIndex.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\DocumentLibrarySearch.cs" Link="DocumentLibrarySearch.cs" />
   </ItemGroup>
 
   <ItemGroup>

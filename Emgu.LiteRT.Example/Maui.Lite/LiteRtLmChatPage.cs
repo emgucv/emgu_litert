@@ -1780,10 +1780,11 @@ namespace Maui.Demo.Lite
                 Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
                     !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, FindPhotosAsync, ImageGenerationSupported ? GenerateImageAsync : null,
-                    IsPrivateChat ? null : SearchChatsAsync, privateChat: IsPrivateChat),
+                    IsPrivateChat ? null : SearchChatsAsync, privateChat: IsPrivateChat,
+                    searchDocuments: SearchDocumentsAsync),
                 // Local search and generation tools remain available with their settings off, so the model can explain how to
                 // turn them on.
-                Instructions = JoinInstructions(await MemoryInstructionsAsync(), WebSearchInstructions(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions,
+                Instructions = JoinInstructions(await MemoryInstructionsAsync(), WebSearchInstructions(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions + " " + ChatPlannerInstructions.Documents,
                     ImageGenerationSupported ? ImageInstructions : null,
                     LiveCamera.Supported && SelectedOption.AcceptsImages ? CameraInstructions : null,
                     LiveCamera.Supported ? VisualInstructions : null),

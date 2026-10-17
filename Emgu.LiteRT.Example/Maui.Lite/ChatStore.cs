@@ -403,6 +403,27 @@ namespace Maui.Demo.Lite
             return await (await Db).Table<DocumentItemRecord>().Where(i => i.DocumentId == id).OrderBy(i => i.Position).ToListAsync();
         }
 
+        /// <summary>
+        /// Every saved passage (not image) with its document, for searching all saved documents. Documents indexed with
+        /// another embedding model (the second part of DocumentRecord.Settings) are left out: their vectors can't be compared.
+        /// </summary>
+        public async Task<List<(DocumentRecord Document, DocumentItemRecord Item)>> GetDocumentPassagesAsync(string embeddingFile)
+        {
+            var result = new List<(DocumentRecord, DocumentItemRecord)>();
+            if (IsPrivateSession) return result;
+            SQLiteAsyncConnection db = await Db;
+            foreach (DocumentRecord document in await db.Table<DocumentRecord>().ToListAsync())
+            {
+                if (document.Settings?.Split('|').ElementAtOrDefault(1) != embeddingFile)
+                    continue;
+                foreach (DocumentItemRecord item in await db.Table<DocumentItemRecord>()
+                    .Where(i => i.DocumentId == document.Id && !i.IsImage).OrderBy(i => i.Position).ToListAsync())
+                    if (item.Embedding != null && item.Embedding.Length > 0 && !string.IsNullOrEmpty(item.Text))
+                        result.Add((document, item));
+            }
+            return result;
+        }
+
         /// <summary>Save a document's index, replacing an older one of the same file.</summary>
         public async Task SaveDocumentAsync(DocumentRecord document, IEnumerable<DocumentItemRecord> items)
         {

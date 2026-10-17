@@ -24,9 +24,10 @@ namespace Maui.Demo.Lite
         public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location, ChatStore memories,
             Func<string, CancellationToken, Task<string>> findPhotos = null,
             Func<string, CancellationToken, Task<string>> generateImage = null,
-            Func<string, CancellationToken, Task<string>> searchChats = null, bool privateChat = false)
+            Func<string, CancellationToken, Task<string>> searchChats = null, bool privateChat = false,
+            Func<string, string, CancellationToken, Task<string>> searchDocuments = null)
         {
-            var tools = new List<AITool>(SessionTools(privateChat, memories, findPhotos, generateImage, searchChats));
+            var tools = new List<AITool>(SessionTools(privateChat, memories, findPhotos, generateImage, searchChats, searchDocuments));
             if (location)
                 tools.Add(AgentTools.Location(GetCurrentLocationAsync));
             if (!webSearch)

@@ -518,6 +518,30 @@ namespace Maui.Demo.Lite
 
         // ---------- Asking ----------
 
+        // search_documents: the best passages from every saved document index, with their document and page. Documents
+        // attached to a chat stay as they are (their excerpts go with each message); this lets the model look in the others.
+        private async Task<string> SearchDocumentsAsync(string request, string documentName, CancellationToken cancel)
+        {
+            if (IsPrivateChat) return "Document search is unavailable in private chats.";
+            if (string.IsNullOrWhiteSpace(request))
+                return "Provide what to find in the documents.";
+            if (SearchDownloadRequired)
+                return "The search model was deleted, so saved documents can't be searched. The user can download it again in Settings > Storage.";
+            var found = await new DocumentLibrarySearch(_store).SearchAsync(SelectedEmbeddingFile, request, documentName,
+                async (text, token) =>
+                {
+                    var embedder = await EnsureEmbedderAsync(null, token);
+                    await _embedderGate.WaitAsync(token);
+                    try { return await Task.Run(() => embedder.EmbedQuery(text), token); }
+                    finally { _embedderGate.Release(); }
+                }, ContextWindow >= 8192 ? 3200 : 1600, cancel);
+            if (found.Count == 0)
+                return "No relevant passages were found in the user's saved documents" +
+                    (string.IsNullOrWhiteSpace(documentName) ? "" : " named \"" + documentName + "\"") +
+                    ". Do not invent document content.";
+            return DocumentLibrarySearch.Format(found);
+        }
+
         // The excerpts (and picture) to send with a message, or null without a document. Waits for the document to be
         // indexed.
         private async Task<DocumentContext> GetDocumentContextAsync(string prompt)
