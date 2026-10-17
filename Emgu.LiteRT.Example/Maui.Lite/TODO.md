@@ -223,7 +223,9 @@ matching core/WebGPU/Dawn DLLs. See the [Windows GPU guide](../../platforms/wind
       bundle named by `EMGU_LITERT_WEBGPU_DIR` next to the test and is skipped without the plugin. RTX 3070 / Direct3D 12:
       same top class, max abs diff 0.0082 (tolerance 0.01). Run it alone with `--filter`, since `libLiteRt.dll` can't be
       replaced once loaded.
-- [ ] Long-chat CPU/GPU accuracy and performance comparisons in `Performance.md` beyond the current smoke tests.
+- [x] Long-chat CPU/GPU accuracy and performance comparisons in `Performance.md` (Windows section, RTX 3070): `UnitTestLongChatBenchmark`
+      at 4k and 8k for CPU, GPU fp32 and GPU fp16. fp32 and CPU answer correctly; fp16 garbles the digits, as on the
+      other platforms. 16k/32k, E4B and other GPUs aren't measured.
 
 ## 11. GPU for the embedding models — Windows completed; Apple/Android pending
 

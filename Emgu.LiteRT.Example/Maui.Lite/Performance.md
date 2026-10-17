@@ -161,6 +161,34 @@ The Mac's GPU shows the same fp16 problem as the Pixel Fold's, and on the M1 fp3
 `Gemma4` classes themselves now use fp32 on the GPU (`Gemma4.CreateEngineSettings`), for every app, not just the demo.
 Google's own numbers for Gemma 4 12B on a GPU are 15 tokens/s (M4 MacBook Air 16 GB) and 29 tokens/s (M4 Pro).
 
+## GPU (Windows, RTX 3070)
+
+Measured on 2026-10-17 with LiteRT-LM v0.18.0 and the source-built WebGPU bundle (`platforms/windows/README.windows-gpu.md`;
+Direct3D 12), on a Windows 11 workstation with an Intel Xeon Silver 4210 (4 CPU threads used), 191 GB RAM and an NVIDIA
+GeForce RTX 3070 (8 GB, driver 610.88). Gemma 4 E2B, thinking off, one fresh process per row
+(`UnitTestLongChatBenchmark`, `EMGU_LONGCHAT=<cpu|gpu32|gpu16>:<window>`): the history (a fact, then filler) fills the
+window less ~1,200 tokens, then the model is asked for the secret code, for the code plus one, and for a ~120-word story.
+
+| Gemma 4 E2B | CPU 4k | CPU 8k | GPU fp32 4k | GPU fp32 8k | GPU fp16 4k | GPU fp16 8k |
+|---|---|---|---|---|---|---|
+| History read and recalled | 15.4 s | 46.6 s | 5.9 s | 4.1 s | 5.7 s | 3.2 s |
+| "What is the secret code?" | 7341 ✓ | 7341 ✓ | 7341 ✓ | 7341 ✓ | 7341 ✓ | **734141** ✗ |
+| "What is the code plus one?" | 7342 ✓ | 7342 ✓ | 7342 ✓ | 7342 ✓ | **73412** ✗ | **7341** ✗ |
+| Short follow-up | 1.4 s | 1.6 s | 0.2 s | 0.2 s | 0.2 s | 0.2 s |
+| Writing a long answer | 7.8 tokens/s | 7.1 tokens/s | 50 tokens/s | 48 tokens/s | 47 tokens/s | 44 tokens/s |
+| Process memory at the peak (GPU memory not counted) | 2.8 GB | 5.6 GB | 1.1 GB | 1.2 GB | 1.1 GB | 1.4 GB |
+| Load (GPU: cache already built for another size) | 0.5-0.7 s | 0.7 s | 11.4 s | 3.7 s | 10.7 s | 12.5 s |
+
+- **fp16 has the same problem as on the Pixel Fold and the M1:** the GPU with 16-bit activations repeated or garbled the
+  digits in both window sizes, while the CPU and the GPU with fp32 answered every question correctly. Windows therefore
+  keeps `Gemma4`'s fp32 default (set by `Gemma4.CreateEngineSettings`).
+- fp32 costs nothing measurable here: reading the history took 4-6 s against 3-6 s, and decode speed was 48-50 tokens/s
+  against 44-47. The GPU reads a full 8k conversation 11 times faster than the CPU and writes 6-7 times faster.
+- These are single runs on one machine, with the model and its caches already on disk; the loads include building the
+  GPU cache the first time a window size is used. The CPU numbers use 4 threads, like the rest of this file.
+- Not measured: Gemma 4 E4B and 12B (the 12B is CPU-only on Windows, see `platforms/windows/GPU-MODEL-COMPATIBILITY.md`),
+  16k and 32k windows, images and audio, or other GPUs.
+
 ## Token costs
 
 Method: a single message sent with the window set to 128 tokens, so that LiteRT-LM's error reports the message's exact
