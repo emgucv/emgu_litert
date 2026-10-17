@@ -178,7 +178,12 @@ persists a block on automatic reloads, turns photo/chat search off, and removes 
 Storage offers an explicit Download action to restore the search model. Deleting documents detaches all saved-chat
 references, while keeping messages and their saved excerpts. Database deletions compact SQLite to reclaim space.
 Tests use temporary files/databases to verify accounting, cache boundaries, deletion and space recovery. Windows
-build checked; interactive confirmations and native-model unload/delete behavior still need device verification.
+build checked. Windows interactive check (2026-10-17): confirmation dialogs with a working Cancel, deleting a loaded
+model released it cleanly and one Delete removed the model and its GPU cache, and deleting the search model turned the
+search switches off and offered Download. Fixed on the way: rows for things not on the device said "0 B on disk" next to a
+greyed Delete (now "Not on this device", no button), and the photo and past-chat search switches were just disabled after
+the search model was deleted - each now shows a note with its own Download button. (The packaged app sees the real
+LocalApplicationData folder through the package's copy, so test models copied into both places need deleting twice.)
 
 ## 9. Update to the next LiteRT-LM release
 
@@ -338,7 +343,7 @@ Implemented with an opt-in, persisted **Search past chats** setting, incremental
 model-specific rebuilding, and links above the reply. Indexing pauses between passages while the chat is busy and
 is cancelled before embedding-model reloads. The current conversation, tool steps, reasoning and attachments are
 excluded from search. Automated tests cover tool invocation, date parsing, chunking, incremental/cancelled indexing,
-model changes, filtering, and deletion. Interactive link/setting behavior still needs platform verification.
+model changes, filtering, and deletion. Windows (2026-10-17): the setting indexes in the background, Gemma calls the tool and the links open the chat, turning it off and on re-indexes.
 Windows CPU verification with EmbeddingGemma 2 Text Vision 440M and Gemma 4 E2B passed: semantic queries retrieved
 the correct saved chats, and Gemma called `search_chats` and answered from the returned travel decision.
 
@@ -347,8 +352,8 @@ the correct saved chats, and Gemma called `search_chats` and answered from the r
 - [ ] "Draw it again" with a new seed (a button on the picture, or the model calls the tool again with the same
       description).
 - [x] Save the original PNG to a user-selected file from the enlarged image view, including images reopened from saved
-      chats (`CommunityToolkit.Maui.Core` FileSaver). Windows build/startup checked; save-dialog interaction still needs
-      platform verification.
+      chats (`CommunityToolkit.Maui.Core` FileSaver). Windows save dialog verified, and a cancelled dialog no longer shows a
+      "Couldn't save" alert (the Windows picker reports a cancel as a plain exception).
 - [ ] Save the picture to Photos / the gallery.
 - [ ] Share the picture (MAUI `Share`).
 - [ ] Show the description and seed under the picture (tap), so a picture can be made again.
@@ -381,8 +386,9 @@ document tasks before releasing their embedding model. App-cache picker copies a
 temporary files are cleaned up; user originals are retained. Debug breadcrumbs redact activity details while the
 private session is active. Web tools retain their separate toggle, and explicitly saved images remain saved.
 Private mode is not persisted across app restarts. Regression tests verify storage isolation, memory/tool/search
-boundaries, regular saving after leaving private mode, and cache-copy cleanup. Windows build checked; interactive
-mode transitions and Apple/Android media cleanup still need device verification.
+boundaries, regular saving after leaving private mode, and cache-copy cleanup. Windows build checked; the interactive
+mode transitions were verified on Windows (badge, not listed in history, New chat, the End private chat dialog skipped
+for an empty chat and shown, with Cancel, otherwise). Apple/Android media cleanup still needs device verification.
 
 ## 20. Export or share a chat
 
@@ -396,7 +402,7 @@ saved document excerpts are included. The currently attached document's stored t
 the original PDF is not retained and cannot be recreated. Missing files are noted in the transcript. Sharing uses
 MAUI's native share sheet; ZIPs remain in a dedicated cache folder so recipients can read them after the sheet
 closes, with old exports removed on a later export. Automated archive tests and a Windows build verify the export;
-interactive share-sheet behavior still needs platform verification. Import remains optional follow-up work.
+the Windows share sheet opens and the shared ZIP holds chat.md. Import remains optional follow-up work.
 
 ## 21. Accessibility
 

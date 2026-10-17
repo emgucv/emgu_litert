@@ -367,6 +367,14 @@ namespace Maui.Demo.Lite
             return tile;
         }
 
+        // The Windows file picker reports cancelling as a plain exception, "Operation cancelled or Path doesn't exist.",
+        // not an OperationCanceledException (Apple and Android do use that).
+        private static bool SaveWasCancelled(Exception exception)
+        {
+            return exception is OperationCanceledException
+                || (exception != null && exception.Message.StartsWith("Operation cancelled", StringComparison.OrdinalIgnoreCase));
+        }
+
         private void ShowGeneratedImage(ImageTile tile, byte[] png, string caption)
         {
             tile.Frame.Content = new Image { Source = ImageUtil.ToImageSource(png), Aspect = Aspect.AspectFill };
@@ -408,7 +416,7 @@ namespace Maui.Demo.Lite
                         status.Text = "Saved to " + result.FilePath;
                         status.IsVisible = true;
                     }
-                    else if (result.Exception is not OperationCanceledException)
+                    else if (!SaveWasCancelled(result.Exception))
                         throw result.Exception ?? new System.IO.IOException("The image could not be saved.");
                 }
                 catch (OperationCanceledException) { }

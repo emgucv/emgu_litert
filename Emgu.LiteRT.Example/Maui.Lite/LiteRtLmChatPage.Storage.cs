@@ -15,6 +15,23 @@ namespace Maui.Demo.Lite
     {
         private const string SearchDeletedPreference = "litert_lm_chat_search_deleted_";
         private Button _restoreSearchButton;
+        // Notices with their own download button under the photo and past-chat search switches, shown while the search
+        // model is deleted - otherwise the switches are just disabled, with the way back only in the Storage section.
+        private readonly List<View> _searchNotices = new List<View>();
+        private readonly List<Button> _searchNoticeButtons = new List<Button>();
+
+        private View CreateSearchModelNotice()
+        {
+            var button = new Button { Text = "Download search model", HorizontalOptions = LayoutOptions.Start };
+            SemanticProperties.SetDescription(button, "Download the search model again");
+            button.Clicked += async (_, _) => await RestoreSearchModelDownloadAsync();
+            var notice = new VerticalStackLayout { Spacing = 4, IsVisible = SearchDownloadRequired, Children = {
+                new Label { Text = "The search model was deleted, so this is off. Download it again to turn it on.",
+                    FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.Danger }, button } };
+            _searchNotices.Add(notice);
+            _searchNoticeButtons.Add(button);
+            return notice;
+        }
         private CancellationTokenSource _searchRestoreCancel;
         private bool SearchDownloadRequired
         {
@@ -39,6 +56,7 @@ namespace Maui.Demo.Lite
         {
             bool blocked = SearchDownloadRequired;
             if (_restoreSearchButton != null) _restoreSearchButton.IsVisible = blocked;
+            foreach (View notice in _searchNotices) notice.IsVisible = blocked;
             if (blocked && _photoSwitch?.IsToggled == true) { SetPhotoSearchOff(); _photoIndexing?.Cancel(); }
             if (blocked && _chatSearchSwitch?.IsToggled == true) { SetChatSearchOff(); _chatIndexing?.Cancel(); }
             if (_photoSwitch != null) _photoSwitch.IsEnabled = !blocked && EmbeddingSupportsImages;
@@ -204,6 +222,7 @@ namespace Maui.Demo.Lite
         private async Task DownloadSearchModelCoreAsync(DownloadableFile file, string name, CancellationToken cancel)
         {
             _restoreSearchButton.IsEnabled = false;
+            foreach (Button b in _searchNoticeButtons) b.IsEnabled = false;
             try
             {
                 await BackgroundDownloads.DownloadFileAsync(file, name,
@@ -214,7 +233,13 @@ namespace Maui.Demo.Lite
             }
             catch (OperationCanceledException) { SetStatus("Search-model download paused."); throw; }
             catch (Exception ex) { SetStatus("Search-model download failed: " + ex.Message); throw; }
-            finally { _reloadingCpuThreads = false; _restoreSearchButton.IsEnabled = true; UpdateSearchStorageState(); }
+            finally
+            {
+                _reloadingCpuThreads = false;
+                _restoreSearchButton.IsEnabled = true;
+                foreach (Button b in _searchNoticeButtons) b.IsEnabled = true;
+                UpdateSearchStorageState();
+            }
         }
     }
 }

@@ -58,16 +58,18 @@ namespace Maui.Demo.Lite
             _list.Children.Clear();
             foreach (StorageEntry entry in snapshot.Entries)
             {
+                // Nothing to delete for an item that isn't on the device (e.g. a model never downloaded).
+                bool hasData = entry.Bytes > 0 || entry.Kind == StorageKind.Document;
                 var remove = new Button { Text = "Delete", TextColor = Theme.Danger, BackgroundColor = Colors.Transparent,
-                    IsEnabled = entry.CanDelete && (entry.Bytes > 0 || entry.Kind == StorageKind.Document), MinimumHeightRequest = 44 };
+                    IsEnabled = entry.CanDelete && hasData, MinimumHeightRequest = 44 };
                 SemanticProperties.SetDescription(remove, "Delete " + entry.Name);
                 remove.Clicked += async (_, _) => await DeleteAsync(entry);
                 var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
                 row.Add(new VerticalStackLayout { Spacing = 3, Children = {
                     new Label { Text = entry.Name, FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText },
-                    new Label { Text = Amount(entry.Bytes) + (entry.InDatabase ? " stored data" : " on disk"), FontSize = 13, TextColor = Theme.Accent },
+                    new Label { Text = hasData ? Amount(entry.Bytes) + (entry.InDatabase ? " stored data" : " on disk") : "Not on this device", FontSize = 13, TextColor = Theme.Accent },
                     new Label { Text = entry.Detail, FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText } } }, 0, 0);
-                if (entry.CanDelete) row.Add(remove, 1, 0);
+                if (entry.CanDelete && hasData) row.Add(remove, 1, 0);
                 if (entry.CanDownload)
                 {
                     var download = new Button { Text = "Download", BackgroundColor = Colors.Transparent, TextColor = Theme.Accent };

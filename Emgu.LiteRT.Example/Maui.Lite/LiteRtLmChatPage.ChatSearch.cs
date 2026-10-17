@@ -37,7 +37,7 @@ namespace Maui.Demo.Lite
             _chatSearchStatus = new Label { FontSize = 12, TextColor = Theme.SecondaryText, IsVisible = enabled };
             return new VerticalStackLayout { Spacing = 6, Children = { row,
                 new Label { Text = "Lets Gemma 4 search saved messages and show links to matching chats. Uses the selected embedding model on this device, indexing in the background between replies. The model downloads on first use. Turning this off deletes the search index; saved chats remain.",
-                    FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText }, _chatSearchStatus } };
+                    FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText }, CreateSearchModelNotice(), _chatSearchStatus } };
         }
 
         private async void OnChatSearchToggled(object sender, ToggledEventArgs e)
