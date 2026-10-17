@@ -52,7 +52,7 @@ namespace Emgu.TF.Lite.Test
         [TestAttribute]
         public async Task TestLiteRtMobilenetGpu()
         {
-            if (!System.IO.File.Exists(System.IO.Path.Combine(AppContext.BaseDirectory, "libLiteRtMetalAccelerator.dylib")))
+            if (!StageGpuPlugin())
             {
 #if VS_TEST
                 Assert.Inconclusive("No LiteRT GPU accelerator plugin next to libLiteRt");
@@ -61,6 +61,34 @@ namespace Emgu.TF.Lite.Test
 #endif
             }
             await RunLiteRtMobilenet(LiteRt.HwAccelerators.Gpu, 1e-2);
+        }
+
+        // True if a LiteRT GPU accelerator plugin is next to libLiteRt. On Windows the plugin is not in the normal
+        // runtime package: it needs the matching source-built bundle (platforms/windows/bazel_build_windows_gpu.ps1,
+        // by default .tmp/wgpu/artifacts), whose folder EMGU_LITERT_WEBGPU_DIR names; its DLLs are copied next to the
+        // test (replacing libLiteRt.dll fails once it is loaded, so run this test on its own with --filter).
+        private static bool StageGpuPlugin()
+        {
+            string baseDir = AppContext.BaseDirectory;
+            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+            {
+                string bundle = System.Environment.GetEnvironmentVariable("EMGU_LITERT_WEBGPU_DIR");
+                if (!String.IsNullOrEmpty(bundle) && System.IO.Directory.Exists(bundle))
+                {
+                    foreach (string name in new[] { "libLiteRt.dll", "libLiteRtWebGpuAccelerator.dll", "webgpu_dawn.dll",
+                        "dxcompiler.dll", "dxil.dll", "d3dcompiler_47.dll" })
+                    {
+                        string target = System.IO.Path.Combine(baseDir, name);
+                        if (System.IO.File.Exists(target) && System.IO.File.Exists(System.IO.Path.Combine(bundle, name))
+                            && System.IO.File.ReadAllBytes(target).AsSpan().SequenceEqual(System.IO.File.ReadAllBytes(System.IO.Path.Combine(bundle, name))))
+                            continue;
+                        System.IO.File.Copy(System.IO.Path.Combine(bundle, name), target, true);
+                        new System.IO.FileInfo(target).IsReadOnly = false;
+                    }
+                }
+                return System.IO.File.Exists(System.IO.Path.Combine(baseDir, "libLiteRtWebGpuAccelerator.dll"));
+            }
+            return System.IO.File.Exists(System.IO.Path.Combine(baseDir, "libLiteRtMetalAccelerator.dylib"));
         }
 
         private static async Task RunLiteRtMobilenet(LiteRt.HwAccelerators accelerators, double tolerance)

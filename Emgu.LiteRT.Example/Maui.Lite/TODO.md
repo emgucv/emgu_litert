@@ -212,7 +212,10 @@ matching core/WebGPU/Dawn DLLs. See the [Windows GPU guide](../../platforms/wind
 - [x] Verify Windows multimodal embedding GPU support (item 11) and investigate Z-Image-Turbo: the complete Windows GPU
       image-generation pipeline failed compilation; CPU remains available.
 - [x] Build/run the Windows MAUI demo on a Direct3D 12 GPU machine.
-- [ ] Compare MobileNet CPU/GPU outputs in an automated Windows `TestLiteRtMobilenetGpu`.
+- [x] Compare MobileNet CPU/GPU outputs in an automated Windows `TestLiteRtMobilenetGpu`: it copies the source-built
+      bundle named by `EMGU_LITERT_WEBGPU_DIR` next to the test and is skipped without the plugin. RTX 3070 / Direct3D 12:
+      same top class, max abs diff 0.0082 (tolerance 0.01). Run it alone with `--filter`, since `libLiteRt.dll` can't be
+      replaced once loaded.
 - [ ] Long-chat CPU/GPU accuracy and performance comparisons in `Performance.md` beyond the current smoke tests.
 
 ## 11. GPU for the embedding models — Windows completed; Apple/Android pending
@@ -230,7 +233,9 @@ the Windows source-built bundle.
       in `platforms/windows/GPU-MODEL-COMPATIBILITY.md`.
 - [ ] Update LiteRT-LM/LiteRT together for matching prebuilt Metal/OpenCL accelerators (item 9); rebuild Apple/Android.
 - [ ] Verify CPU/GPU text/image/audio embeddings and search on Mac and a real Android phone before enabling them.
-- [ ] Add a persistent automated GPU embedding test skipped without the matching accelerator plugin.
+- [x] Add a persistent automated GPU embedding test skipped without the matching accelerator plugin:
+      `TestEmbeddingGemma2TextVisionGpuMatchesCpu` (`TEST_MODELS`, Windows) - on the RTX 3070, GPU/CPU cosine 0.998-0.999
+      for three texts and an image.
 - [ ] Verify simultaneous chat/search GPU memory use and indexing performance on phones.
 
 ## 12. Pixel Fold freeze — rendering stalls fixed; original ANR unconfirmed

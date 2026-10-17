@@ -375,6 +375,56 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // Windows only: EmbeddingGemma 2 Text Vision 440M on the Direct3D 12 GPU (the source-built WebGPU bundle next to
+        // libLiteRt, see TestLiteRtMobilenetGpu) must give the CPU's embeddings for text and an image.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestEmbeddingGemma2TextVisionGpuMatchesCpu()
+        {
+            RequireLiteRtLm();
+            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                Skip("The embedding models' GPU is only enabled on Windows");
+            if (!System.IO.File.Exists(System.IO.Path.Combine(AppContext.BaseDirectory, "libLiteRtWebGpuAccelerator.dll")))
+                Skip("No LiteRT WebGPU accelerator next to libLiteRt (run TestLiteRtMobilenetGpu with EMGU_LITERT_WEBGPU_DIR first)");
+
+            String[] texts = { "How do I change my password?", "The Eiffel Tower is 330 metres tall.", "a red apple" };
+            float[][] cpuText;
+            float[] cpuImage;
+            using (EmbeddingGemma2TextVision cpu = new EmbeddingGemma2TextVision())
+            {
+                await cpu.Init();
+                cpuText = cpu.Embed(texts);
+                cpuImage = cpu.EmbedImageFile("apple.jpg");
+            }
+            using (EmbeddingGemma2TextVision gpu = new EmbeddingGemma2TextVision { EnableWindowsWebGpu = true, VisionBackend = "gpu" })
+            {
+                await gpu.Init(backend: "gpu");
+                float[][] gpuText = gpu.Embed(texts);
+                float[] gpuImage = gpu.EmbedImageFile("apple.jpg");
+                for (int i = 0; i < texts.Length; i++)
+                {
+                    float cosine = EmbeddingModel.CosineSimilarity(cpuText[i], gpuText[i]);
+                    Console.WriteLine("Text {0}: GPU/CPU cosine {1:F5}", i, cosine);
+                    if (cosine < 0.99f)
+                        throw new Exception("GPU text embedding differs from the CPU's: " + texts[i]);
+                }
+                float imageCosine = EmbeddingModel.CosineSimilarity(cpuImage, gpuImage);
+                Console.WriteLine("Image: GPU/CPU cosine {0:F5}", imageCosine);
+                if (imageCosine < 0.99f)
+                    throw new Exception("GPU image embedding differs from the CPU's");
+                // The apple picture should match its description best, on the GPU too.
+                float apple = EmbeddingModel.CosineSimilarity(gpuImage, gpuText[2]);
+                if (apple <= EmbeddingModel.CosineSimilarity(gpuImage, gpuText[0]) || apple <= EmbeddingModel.CosineSimilarity(gpuImage, gpuText[1]))
+                    throw new Exception("The GPU image embedding doesn't match its description best");
+            }
+        }
+
         // EmbeddingGemma 2 Text 270M through the EmbeddingEngine: sizes, normalization, batch vs single, and semantic
         // search - each question's best match should be the document that answers it (165 MB download).
 #if !TEST_MODELS
