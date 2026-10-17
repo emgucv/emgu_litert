@@ -28,6 +28,51 @@ namespace Emgu.TF.Lite.Test
     [TestFixture]
     public class UnitTestZImageTurbo
     {
+        [TestAttribute]
+        public void TestZImagePartialDownloadAccounting()
+        {
+            string folder = Path.Combine(Path.GetTempPath(), "emgu-zimage-progress-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path.Combine(folder, "host"));
+            try
+            {
+                using (var model = new ZImageTurbo(folder))
+                {
+                    string graph = Path.Combine(folder, "zc_final.tflite");
+                    File.WriteAllBytes(graph + ".part", new byte[65536]);
+                    File.WriteAllBytes(Path.Combine(folder, "host", "vocab.json.part"), new byte[128]);
+                    if (model.DownloadedBytes != 65536 + 128 || model.IsDownloaded)
+                        throw new Exception("Paused graph and host downloads must count retained bytes without becoming ready.");
+                    File.WriteAllBytes(graph, new byte[32]);
+                    if (model.DownloadedBytes != 65536 + 128)
+                        throw new Exception("An invalid final file must not replace or add to the resumable partial's progress.");
+                    File.Delete(graph + ".part");
+                    if (model.DownloadedBytes != 128)
+                        throw new Exception("Incomplete final files cannot be resumed and must not count as downloaded bytes.");
+                }
+            }
+            finally { Directory.Delete(folder, true); }
+        }
+
+        [TestAttribute]
+        public void TestZImageCompletedFileDoesNotDoubleCountStalePartial()
+        {
+            string folder = Path.Combine(Path.GetTempPath(), "emgu-zimage-complete-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                using (var model = new ZImageTurbo(folder))
+                {
+                    const int graphSize = 1295936; // Pinned zc_final graph.
+                    string graph = Path.Combine(folder, "zc_final.tflite");
+                    File.WriteAllBytes(graph, new byte[graphSize]);
+                    File.WriteAllBytes(graph + ".part", new byte[65536]);
+                    if (model.DownloadedBytes != graphSize)
+                        throw new Exception("Completed files must count once even if a stale partial remains.");
+                }
+            }
+            finally { Directory.Delete(folder, true); }
+        }
+
         private const String GoldenUrl =
             "https://raw.githubusercontent.com/alexeyw/android-image-generator/bcdc30e08d3ade936f003079fee383e423306afd/";
 

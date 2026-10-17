@@ -189,14 +189,14 @@ namespace Emgu.LiteRT.Models
         }
 
         /// <summary>
-        /// The bytes of the model files already in the folder
+        /// The bytes of completed model files and resumable partial downloads already in the folder
         /// </summary>
         public long DownloadedBytes
         {
             get
             {
-                return Graphs.Sum(g => Math.Min(g.Value, FileLength(GraphFile(g.Key))))
-                    + HostFiles.Sum(f => Math.Min(f.Value, FileLength(HostFile(f.Key))));
+                return Graphs.Sum(g => DownloadedFileBytes(GraphFile(g.Key), g.Value))
+                    + HostFiles.Sum(f => DownloadedFileBytes(HostFile(f.Key), f.Value));
             }
         }
 
@@ -238,6 +238,12 @@ namespace Emgu.LiteRT.Models
             return Path.Combine(_folder, "host", name);
         }
 
+        // Only a complete final file is usable. RangeDownloader resumes from .part, never an incomplete final.
+        private static long DownloadedFileBytes(String path, long expected)
+        {
+            return FileLength(path) == expected ? expected : Math.Min(expected, FileLength(path + ".part"));
+        }
+
         private static long FileLength(String path)
         {
             FileInfo info = new FileInfo(path);
@@ -274,7 +280,7 @@ namespace Emgu.LiteRT.Models
                     String file = HostFile(name);
                     if (FileLength(file) == size)
                         continue;
-                    long had = Math.Min(size, FileLength(file));
+                    long had = DownloadedFileBytes(file, size);
                     await downloader.Download(UpstreamUrl + "tokenizer/" + name, 0, size, file, d => report(name, d, had), cancellationToken).ConfigureAwait(false);
                     done += size - had;
                 }
@@ -293,7 +299,7 @@ namespace Emgu.LiteRT.Models
                         String file = HostFile(tensor.Value);
                         if (FileLength(file) == size)
                             continue;
-                        long had = Math.Min(size, FileLength(file));
+                        long had = DownloadedFileBytes(file, size);
                         await downloader.Download(url, info.Start, info.End, file, d => report(tensor.Value, d, had), cancellationToken).ConfigureAwait(false);
                         done += size - had;
                     }
@@ -308,7 +314,7 @@ namespace Emgu.LiteRT.Models
                     SafetensorsHeader.Tensor info = header.Get("model.embed_tokens.weight", "BF16");
                     if (info.End - info.Start != embedSize)
                         throw new IOException(String.Format("embed_tokens is {0} bytes, expected {1}", info.End - info.Start, embedSize));
-                    long had = Math.Min(embedSize, FileLength(HostFile(EmbedFile)));
+                    long had = DownloadedFileBytes(HostFile(EmbedFile), embedSize);
                     await downloader.Download(url, info.Start, info.End, HostFile(EmbedFile), d => report(EmbedFile, d, had), cancellationToken).ConfigureAwait(false);
                     done += embedSize - had;
                 }
@@ -318,7 +324,7 @@ namespace Emgu.LiteRT.Models
                     String file = GraphFile(graph.Key);
                     if (FileLength(file) == graph.Value)
                         continue;
-                    long had = Math.Min(graph.Value, FileLength(file));
+                    long had = DownloadedFileBytes(file, graph.Value);
                     String name = graph.Key + ".tflite";
                     await downloader.Download(LiteRtUrl + name, 0, graph.Value, file, d => report(name, d, had), cancellationToken).ConfigureAwait(false);
                     done += graph.Value - had;

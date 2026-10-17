@@ -107,10 +107,14 @@ namespace Maui.Demo.Lite
             try { Preferences.Default.Set(ImageGenerationPreference, e.Value); } catch (Exception) { }
             if (e.Value && !_zimage.IsDownloaded)
             {
+                long remaining = Math.Max(0, ZImageTurbo.DownloadSize - _zimage.DownloadedBytes);
+                string remainingSize = remaining >= 1e9
+                    ? string.Format(CultureInfo.InvariantCulture, "{0:F1} GB", remaining / 1e9)
+                    : string.Format(CultureInfo.InvariantCulture, "{0:F0} MB", Math.Ceiling(remaining / 1e6));
                 bool download = await DisplayAlertAsync("Image generation",
                     string.Format(CultureInfo.InvariantCulture,
-                        "Download the image model ({0:F1} GB)? It needs about {1:F0} GB of free space in all.",
-                        (ZImageTurbo.DownloadSize - _zimage.DownloadedBytes) / 1e9, (ZImageTurbo.DownloadSize + 9e9) / 1e9),
+                        "Download the image model ({0} remaining)? Model files and prepared caches use about {1:F0} GB in total.",
+                        remainingSize, (ZImageTurbo.DownloadSize + 9e9) / 1e9),
                     "Download", "Cancel");
                 if (!download)
                 {

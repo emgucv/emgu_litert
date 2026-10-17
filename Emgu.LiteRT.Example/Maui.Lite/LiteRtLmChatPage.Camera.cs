@@ -263,6 +263,7 @@ public partial class LiteRtLmChatPage
 
     private async void CameraWindowStopped(object sender, EventArgs e)
     {
+        await CancelRecordingAsync();
         _cameraSuspended = true;
         await CloseCameraAsync();
     }

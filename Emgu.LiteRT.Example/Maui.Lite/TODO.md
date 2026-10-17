@@ -44,21 +44,48 @@ confirmed deletion for chat, image and search models, including caches and parti
 - [x] Centralized model deletion with caches and confirmation in Settings > Storage, replacing optional per-row deletion.
 - [x] Equivalent size and delete controls for image and search models in Storage; the image settings link opens it.
 
-## 3. Test the paths that were never run
+## 3. Test the paths that were never run — partially verified
 
 Features that were built and compiled but never run on some platforms (see CLAUDE.md), each checked once on a
 device and fixed or noted:
 
-- [ ] Image generation on Android (a Pixel Fold / Galaxy Z Fold3: ~21 GB free needed, time per picture, memory next to
-      Gemma 4 on the GPU) and Windows; the settings switch's download prompt, progress, resume and "Delete the image
-      model" on any platform.
+- [x] Pixel Fold Android image generation, memory alongside Gemma 4 GPU, and native image-settings download,
+      pause/resume and storage-delete dialogs (details below).
+- [ ] Windows image generation; first-run cache preparation with Gemma resident and interactive image saving
+      remain additional device checks.
 - [ ] Recording a voice message live (`VoiceRecorder.cs`: AVAudioRecorder, Android AudioRecord, Windows MediaCapture) -
-      only `say`-generated WAV files were tried.
+      Android capture/model input passed; Mac Catalyst and Windows live capture remain pending.
 - [ ] Windows: the PDF page renderer (`PdfPageRenderer`, `Windows.Data.Pdf`) and the photo library (`StorageFile`
       details).
-- [ ] Tavily web search and page reading (needs a Tavily key).
+- [x] Tavily web search and page reading: real Mac Catalyst production-tool calls succeeded with the saved key
+      (2026-10-16). Search returned 1,978 characters; extraction returned 1,503. No API key or response body logged.
+      A full model-driven recent-news reply with citations remains a separate end-to-end check.
 - [ ] Photo search on a real phone's library (only the emulator's test photos so far), on a phone whose owner agrees
       to have their photos indexed for the test.
+
+**2026-10-16–17 checks:** [Device check guide and evidence](DEVICE_PATH_CHECKS.md).
+
+- [x] Mac Catalyst image-model download progress, cancellation/resume and storage deletion, using an isolated
+      fixture and a real 50 MB Hugging Face graph download. Retained 8,407,809 bytes, resumed with matching SHA-256,
+      and deleted the test weights/cache through the production storage catalog; the existing model stayed intact.
+- [x] Fixed image-download accounting: `ZImageTurbo.DownloadedBytes` and per-file resumed progress now include
+      `.part` bytes, exclude unusable incomplete final files, and avoid double counting completed files.
+      Two new image-progress and six existing storage regressions passed.
+- [x] Pixel Fold native image Download/Cancel, pause/resume to Ready and storage Delete/Cancel dialogs passed
+      using an isolated settings fixture. Fixed small remaining downloads displaying as “0.0 GB”; use MB below 1 GB.
+- [x] Pixel Fold standalone CPU image generation: verified all 21 model files after the interrupted/resumed download,
+      generated and inspected the eight-step watercolor fox; 883.11 s including first-run cache preparation,
+      peak process RSS 3.67 GiB.
+- [x] Pixel Fold real private-chat image request with Gemma 4 E2B GPU, 4K context, thinking off and prepared image
+      caches: one tool call, one inspected PNG, nonempty reply and image-viewer action; 1,040.71 s total, peak process
+      RSS 4.92 GiB (not complete GPU memory). Image generation works but is slow on this phone; investigate performance
+      separately. Temporary test models/caches were removed and the clean normal app redeployed.
+- [ ] Mac live recording reached the OS microphone permission request; no completed capture is claimed.
+- [x] Pixel Fold live microphone capture and Gemma 4 E2B GPU audio input: two actual microphone recordings of
+      synthesized speech passed format/signal checks; the model returned a nonempty transcription.
+- [x] Fixed recording continuing after navigation: cancel capture on page disappearance and window stop.
+      Native Pixel Fold navigation and Home/background checks passed.
+- [ ] Real-library photo indexing awaits owner agreement; Windows runtime checks await a Windows device/VM.
 
 ## 4. Collapsible "Model" section in settings — implemented; foldable UI check pending
 

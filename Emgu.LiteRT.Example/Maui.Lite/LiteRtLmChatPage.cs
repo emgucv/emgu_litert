@@ -1144,6 +1144,7 @@ namespace Maui.Demo.Lite
         {
             base.OnDisappearing();
             _pageVisible = false;
+            _ = CancelRecordingAsync();
             _ = CloseCameraAsync();
         }
 
