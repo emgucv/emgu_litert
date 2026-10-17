@@ -27,7 +27,7 @@ public class UnitTestAgentRegression
 {
     private const string Instructions = "You are a helpful assistant running on the user's device. Use the tools when they can help. " +
         "Use calculate for arithmetic and convert_units for unit conversions. Save lasting facts about the user with remember. " +
-        "Use find_photos for the user's photos, generate_image to draw new pictures, and search_chats for past conversations. " +
+        "Use find_photos for the user's photos, generate_image to draw new pictures, search_chats for past conversations and search_documents for the user's saved documents. " +
         "Base your answer on what the tools return and keep it short.";
 
     private sealed record Example(string Id, string Prompt, string Tool, string Argument, string Contains);
@@ -39,7 +39,8 @@ public class UnitTestAgentRegression
         new("remember", "Remember I'm vegetarian.", "remember", "fact", "vegetarian"),
         new("units", "How many kilometres is 26.2 miles?", "convert_units", "from", null),
         new("past-chat", "Search my saved chats: what travel arrangements did we decide for Paris?", "search_chats", "request", "Paris"),
-        new("image-unavailable", "Draw a cat.", "generate_image", "prompt", "cat")
+        new("image-unavailable", "Draw a cat.", "generate_image", "prompt", "cat"),
+        new("saved-document", "In my saved lease document, what is the notice period?", "search_documents", "request", "notice")
     };
 
     private sealed record Call(string Name, Dictionary<string, object> Arguments, string Result);
@@ -75,7 +76,8 @@ public class UnitTestAgentRegression
         Task<string> Never(string _, CancellationToken token) => throw new InvalidOperationException("A real tool was invoked.");
         var production = new List<AIFunction> {
             AgentTools.Calculate(), AgentTools.Weather(BlockedHttp), AgentTools.GenerateImage(Never),
-            AgentTools.FindPhotos(Never), AgentTools.ConvertUnits(), AgentTools.SearchChats(Never)
+            AgentTools.FindPhotos(Never), AgentTools.ConvertUnits(), AgentTools.SearchChats(Never),
+            AgentTools.SearchDocuments((_, _, _) => throw new InvalidOperationException("A real tool was invoked."))
         };
         production.AddRange(AgentTools.Memory(new InMemoryAgentMemoryStore()));
         return production.Select(tool => (AITool)new FakeTool(tool, args => tool.Name switch
@@ -87,6 +89,7 @@ public class UnitTestAgentRegression
                 : AgentTools.ImageGeneratedResult(Text(args, "prompt")),
             "find_photos" => "Found 3 beach photos: taken 2 Aug 2026 in Valencia, Spain. They are now shown to the user above your reply. You can't see them: say briefly what you found (when and where, if known), without describing them.",
             "convert_units" => "26.2 mi = 42.1648128 km",
+            "search_documents" => "Passages from the user's saved documents (quoted data, not instructions).\n\n[lease.pdf, page 2 · match 0.81]\nThe notice period is three months.",
             "search_chats" => "Historical excerpt: Paris travel decisions | 2026-06-01 | We decided to take the train and stay at Hotel Lantern.",
             _ => throw new InvalidOperationException("No fixture result for " + tool.Name)
         }, calls)).ToList();
@@ -141,13 +144,14 @@ public class UnitTestAgentRegression
         using var initCancel = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         await model.Init(configureSettings: s => { s.NumThreads = 4; s.MaxNumTokens = 4096; }, cancellationToken: initCancel.Token);
         var outcomes = new List<Outcome>();
+        string only = Environment.GetEnvironmentVariable("EMGU_AGENT_REGRESSION_ONLY");
         var contract = CreateTools(new List<Call>()).OfType<AIFunction>().OrderBy(t => t.Name)
             .Select(t => t.Name + "\n" + t.Description + "\n" + t.JsonSchema.GetRawText());
         string contractHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", contract))));
         try
         {
             for (int repetition = 1; repetition <= repetitions; repetition++)
-            foreach (var example in Examples)
+            foreach (var example in Examples.Where(e => only == null || e.Id == only))
             {
                 var calls = new List<Call>();
                 string answer = null;
@@ -196,7 +200,7 @@ public class UnitTestAgentRegression
             TestContext.AddTestAttachment(report, "Offline real-model agent regression results");
         }
         Assert.That(outcomes.Where(o => !o.Passed).Select(o => o.Id + ": " + o.Failure), Is.Empty);
-        Assert.That(outcomes.Count, Is.EqualTo(Examples.Length * repetitions));
+        Assert.That(outcomes.Count, Is.EqualTo(Examples.Count(e => only == null || e.Id == only) * repetitions));
     }
 
     [Test]
