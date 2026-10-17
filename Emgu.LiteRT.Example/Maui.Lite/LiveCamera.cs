@@ -58,6 +58,13 @@ internal sealed class LiveCamera
     {
         try
         {
+#if WINDOWS
+            // The default Media Foundation backend took 11-12 s to open a Logitech StreamCam (DirectShow 1.3 s) - longer
+            // than the start timeout; fall back to it for cameras DirectShow can't open.
+            VideoCapture capture = new VideoCapture(0, VideoCapture.API.DShow);
+            if (!capture.IsOpened) { capture.Dispose(); capture = new VideoCapture(0, VideoCapture.API.Any); }
+            using var captureOwner = capture;
+#else
             using var capture = new VideoCapture(0,
 #if ANDROID
                 VideoCapture.API.Android
@@ -65,6 +72,7 @@ internal sealed class LiveCamera
                 VideoCapture.API.Any
 #endif
             );
+#endif
             if (!capture.IsOpened) throw new InvalidOperationException("No camera could be opened. Check that a camera is connected and available to this app.");
             capture.Set(CapProp.FrameWidth, 640);
             capture.Set(CapProp.FrameHeight, 480);

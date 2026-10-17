@@ -610,7 +610,13 @@ static `tfliteextern` has its own TFLite), so image generation is hidden there.
       preview-only comparison, not a sustained-inference benchmark. Mac Catalyst build checked; no webcam on this Mac.
 - [x] Android arm64 and Mac Catalyst builds pass. CPU camera opening works, but the full CPU description run was stopped
       to switch to GPU validation; responses can take tens of seconds even on the phone's GPU.
-- [ ] Real webcam checks on Mac Catalyst and Windows; this Mac has no camera. iOS live capture is not enabled yet.
+- [x] Windows webcam (Logitech StreamCam): `UnitTestCameraHardware` (`EMGU_CAMERA_TEST=1`) reads 30 FPS at 640x480 with
+      correct colours and runs the COCO detector on a captured frame. In the packaged demo (a temporary self-test, removed):
+      the Windows camera consent prompt appears on first use and blocks until answered; live preview rendered, 240 frames
+      in 8 s, snapshot JPEG, detector ready on the CPU, chime and system speech played. Found and fixed: the default
+      Media Foundation backend took 11-12 s to open this camera, near `StartAsync`'s 15 s timeout, so `LiveCamera` now
+      opens DirectShow first on Windows (1.3 s) and falls back to the default.
+- [ ] Real webcam check on Mac Catalyst (this Mac has no camera); iOS live capture is not enabled yet.
 - [ ] Follow-ups: camera selection and YOLO detection/tracking. Continuous detector monitoring is covered by item 33;
       model image descriptions still capture only when asked. Neither feature records video.
 
@@ -675,7 +681,10 @@ static `tfliteextern` has its own TFLite), so image generation is hidden there.
       Both test chats and temporary probes/markers removed; saved preferences unchanged.
 - [ ] Additional adapters: YOLO, face detection, OCR and plate detection/reading; tracking individuals, recurring
       alerts, saved rules, richer conditions, and background monitoring remain future work.
-- [ ] Real camera/audio hardware validation on Mac Catalyst and Windows, plus long-running thermal/battery tests.
+- [x] Windows hardware: camera preview, snapshot, detector on a live frame, chime and spoken alert all ran in the packaged
+      demo (see item 32). The chat-driven flow with Gemma (person alert created from a request) passed as tests on
+      Windows (`GemmaSelectsVisualMonitorForPersonAlert`, camera-image description) but wasn't driven through the UI.
+- [ ] Mac Catalyst camera/audio hardware, the full Windows chat UI flow, and long-running thermal/battery tests.
 
 ## 34. Visual-alert context exhaustion and empty replies — fixed; long-session follow-ups remain
 
