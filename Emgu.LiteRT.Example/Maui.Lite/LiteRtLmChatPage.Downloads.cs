@@ -12,6 +12,7 @@ public partial class LiteRtLmChatPage
     {
         public ModelOption Option;
         public Label Status;
+        public Microsoft.Maui.Controls.Shapes.Path StatusIcon;
         public Label Detail;
         public Button Continue;
         public bool InSheet;
@@ -34,6 +35,13 @@ public partial class LiteRtLmChatPage
     private static string PausedDownload(ModelOption option) => "Download paused · "
         + DownloadAmount(option.File.PartialDownloadBytes, option.File.PartialDownloadTotalBytes);
 
+    private static void SetStatusIcon(ModelDownloadRow row, string data, Color color)
+    {
+        if (row.StatusIcon == null) return;
+        row.StatusIcon.Data = (Microsoft.Maui.Controls.Shapes.Geometry)new Microsoft.Maui.Controls.Shapes.PathGeometryConverter().ConvertFromInvariantString(data);
+        row.StatusIcon.Fill = new SolidColorBrush(color);
+    }
+
     private void UpdateModelDownloadRows()
     {
         foreach (ModelDownloadRow row in _modelDownloadRows)
@@ -46,6 +54,9 @@ public partial class LiteRtLmChatPage
         bool downloading = _downloadingChoice == option.Choice;
         bool downloaded = IsDownloaded(option);
         bool paused = !downloading && !downloaded && option.File.PartialDownloadBytes > 0;
+        // On this device / a download is waiting, in progress or paused, next to the text.
+        SetStatusIcon(row, downloaded ? Theme.PathDevice : paused ? Theme.PathPause : Theme.PathCloudDownload,
+            downloaded ? Theme.Success : downloading ? Theme.Accent : Theme.SecondaryText);
         if (downloading)
             row.Status.Text = "Downloading · " + DownloadAmount(_downloadReceived, _downloadTotal);
         else if (downloaded)

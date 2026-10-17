@@ -990,7 +990,8 @@ namespace Maui.Demo.Lite
                     var detail = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText };
                     var status = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.Accent };
                     var resume = new Button { Text = "Continue", FontFamily = Theme.TitleFont, FontSize = 12, HorizontalOptions = LayoutOptions.Start };
-                    var downloadRow = new ModelDownloadRow { Option = option, Detail = detail, Status = status, Continue = resume, InSheet = inSheet };
+                    var statusIcon = Theme.MakePathIcon(Theme.PathCloudDownload, Theme.SecondaryText, 14);
+                    var downloadRow = new ModelDownloadRow { Option = option, Detail = detail, Status = status, StatusIcon = statusIcon, Continue = resume, InSheet = inSheet };
                     _modelDownloadRows.Add(downloadRow);
                     UpdateModelDownloadRow(downloadRow);
                     SemanticProperties.SetDescription(resume, "Continue downloading " + option.Name);
@@ -1012,7 +1013,7 @@ namespace Maui.Demo.Lite
                         Children =
                         {
                             new Label { Text = option.Name + (gpu ? " · GPU" : " · CPU"), FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText },
-                            status,
+                            new HorizontalStackLayout { Spacing = 6, Children = { statusIcon, status } },
                             detail,
                             resume
                         }

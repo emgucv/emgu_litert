@@ -35,7 +35,9 @@ Chat model rows show downloaded/downloading/paused state and size. Storage (item
 confirmed deletion for chat, image and search models, including caches and partial downloads.
 - [x] Mark each row with "Downloaded · size on disk" versus "Download · 2.6 GB", using
       `IsDownloaded(option)`, which only looks at the file and never hashes it.
-- [ ] Optional device/cloud icons alongside the text download states.
+- [x] Device/cloud icons alongside the text download states: a green phone for on this device, a cloud-download for not
+      downloaded or downloading, a pause mark for paused (vector paths, since the icon font subset lacks them; the text
+      still carries the state). Checked on Windows; other platforms use the same MAUI shapes but weren't built.
 - [x] Drop "~2.6 GB download." from the description of downloaded models; show the size on disk instead.
 - [x] A row for a model that is downloading shows its progress, and a partly downloaded one "Download paused"
       with its progress (item 1).

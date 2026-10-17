@@ -48,6 +48,28 @@ namespace Maui.Demo.Lite
         public const string GlyphWand = "";         // auto_fix_high
         public const string GlyphGrid = "";         // grid_on
 
+        // Material icon outlines (Apache 2.0, 24x24 viewbox) for states the bundled icon font subset has no glyph for.
+        public const string PathDevice = "M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z";
+        public const string PathCloudDownload = "M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z";
+        public const string PathPause = "M6 19h4V5H6v14zm8-14v14h4V5h-4z";
+
+        public static Microsoft.Maui.Controls.Shapes.Path MakePathIcon(string pathData, Color color, double size)
+        {
+            var path = new Microsoft.Maui.Controls.Shapes.Path
+            {
+                Data = (Microsoft.Maui.Controls.Shapes.Geometry)new Microsoft.Maui.Controls.Shapes.PathGeometryConverter().ConvertFromInvariantString(pathData),
+                Fill = new SolidColorBrush(color),
+                Aspect = Stretch.Uniform,
+                WidthRequest = size,
+                HeightRequest = size,
+                VerticalOptions = LayoutOptions.Center
+            };
+            // The state is also in the row's text.
+            SemanticProperties.SetDescription(path, null);
+            AutomationProperties.SetIsInAccessibleTree(path, false);
+            return path;
+        }
+
         public static Image MakeIcon(string glyph, Color color, double size) => new Image
         {
             Source = new FontImageSource { FontFamily = IconFont, Glyph = glyph, Color = color, Size = size },
