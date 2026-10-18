@@ -422,7 +422,7 @@ the Windows share sheet opens and the shared ZIP holds chat.md. Import remains o
 - [ ] Large text: check the chat, settings and sheets with the largest font sizes on Android and iOS.
 - [ ] Contrast of the secondary text in light and dark mode.
 
-## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst with a recorded voice
+## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst
 
 Voice messages and "Read replies aloud" exist, but each turn needs a tap. A conversation mode: speak, hear the reply,
 speak again.
@@ -451,8 +451,9 @@ speak again.
       sentence splitting).
 - [x] Verified with a real microphone and loudspeaker on a Pixel Fold (Gemma 4 E2B on the GPU), without headphones:
       the end of speech is found in a room 25-35 dB quieter than the voice, and the reply is read and listening
-      resumes.
-- [ ] The Mac (and an iPhone) with a real microphone, and any device with headphones (speaking over the reply).
+      resumes; and on Mac Catalyst (a Mac mini with a USB microphone - the app records from the system's input
+      device - and its built-in speakers).
+- [ ] An iPhone with a real microphone, and any device with headphones (speaking over the reply).
 - [ ] Headphone detection (`VoiceRecorder.HeadphonesConnected`: the audio route on iOS/Mac Catalyst, output devices
       on Android) is untested; so is recording while text-to-speech plays on iOS.
 
