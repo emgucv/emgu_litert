@@ -48,6 +48,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>The demo takes photos to classify, detect objects in, or ask the on-device language model about.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>The LiteRT-LM chat turns your voice into text for models that don't understand speech, such as a model on your own server.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>The LiteRT-LM chat records your voice to send it to the on-device language model.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

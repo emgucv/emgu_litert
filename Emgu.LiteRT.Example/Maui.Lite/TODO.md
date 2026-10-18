@@ -453,6 +453,21 @@ speak again.
       the end of speech is found in a room 25-35 dB quieter than the voice, and the reply is read and listening
       resumes; and on Mac Catalyst (a Mac mini with a USB microphone - the app records from the system's input
       device - and its built-in speakers).
+- [x] Models that don't take audio (your own server's, the Qwen models) get voice messages and the voice chat too:
+      `SpeechToText.cs` writes the recording down with the platform's recognizer and the words are sent as the
+      message ("Writing down what you said..."). Android 13+: `SpeechRecognizer` (on the device when it can - Google's
+      offline recognizer) reading the recording from a pipe (`EXTRA_AUDIO_SOURCE`, segmented session, partial
+      results). It needs the audio at recording speed (given all at once it dropped words), doesn't take the end of
+      the pipe as the end of speech (its final result came minutes later) and passed a reused recognizer's late
+      results to the next recording - so the samples are fed 20 ms at a time, followed by 0.6 s of silence and
+      `StopListening`, the last partial results are used if no final one comes within 2.5 s, and each recording gets
+      its own recognizer. Verified on a Pixel Fold: LiteRT-LM's `audio_sample.wav` and a `say` question, twice each,
+      word for word, ~1 s after the recording's length; a voice message to LM Studio (Gemma 4 26B) answered "The
+      capital of France is Paris." iOS/Mac Catalyst: the Speech framework (`SFSpeechUrlRecognitionRequest`, on the
+      device when supported, `NSSpeechRecognitionUsageDescription`) - built, not yet run (the first use asks for
+      permission).
+- [ ] Speech-to-text on Mac Catalyst and an iPhone; Windows has none (its recorder has no level for the voice chat
+      either, but voice messages could use `Windows.Media.SpeechRecognition`).
 - [ ] An iPhone with a real microphone, and any device with headphones (speaking over the reply).
 - [ ] Headphone detection (`VoiceRecorder.HeadphonesConnected`: the audio route on iOS/Mac Catalyst, output devices
       on Android) is untested; so is recording while text-to-speech plays on iOS.

@@ -40,7 +40,8 @@ public partial class LiteRtLmChatPage
     private ChatReply _latestPartial;
 
     // Gemma 4 takes speech; measuring the microphone's level needs a recorder that reports it (not Windows').
-    private bool VoiceModeSupported => VoiceRecorder.SupportsLevel && SelectedOption.AcceptsAudio;
+    // With a model that doesn't take audio, what was said is sent as text (SpeechToText).
+    private bool VoiceModeSupported => VoiceRecorder.SupportsLevel && TakesVoice(SelectedOption);
 
     private ToggleChip CreateVoiceChip()
     {

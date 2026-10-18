@@ -1092,7 +1092,7 @@ namespace Maui.Demo.Lite
             _gpuUnavailable = false;
             _modelChipLabel.Text = option.Choice == ModelChoice.Server ? ServerModelLabel : option.Name + (_selectedGpu ? " · GPU" : " · CPU");
             RefreshModelList();
-            _talkButton.IsVisible = option.AcceptsAudio;
+            _talkButton.IsVisible = TakesVoice(option);
             _thinkingSwitch.IsVisible = option.CanThink;
             _webSearchSwitch.IsVisible = option.CanUseTools;
             _voiceChip.IsVisible = VoiceModeSupported;
@@ -1669,6 +1669,14 @@ namespace Maui.Demo.Lite
             {
                 if (!await EnsureModelReadyAsync())
                     return;
+                // A model that doesn't take audio is given the words of a voice message instead.
+                if (!SelectedOption.AcceptsAudio && attachments.Any(IsVoiceRecording))
+                {
+                    string heard = await TranscribeVoiceAsync(attachments, replyCancel.Token);
+                    if (heard == null)
+                        return;
+                    prompt = string.IsNullOrWhiteSpace(prompt) ? heard : prompt + " " + heard;
+                }
 
                 _promptEditor.Text = string.Empty;
                 ClearPendingAttachments();
@@ -1802,6 +1810,47 @@ namespace Maui.Demo.Lite
                 _ = RefreshMemoryCountAsync();
                 _ = RefreshServerContextAsync();
             }
+        }
+
+        // ---------- Voice for models without audio ----------
+
+        // A voice message can be sent to the model: as audio, or as text the platform's speech recognizer wrote.
+        private static bool TakesVoice(ModelOption option) => option.AcceptsAudio || SpeechToText.IsSupported;
+
+        private static bool IsVoiceRecording(PendingAttachment attachment) =>
+            attachment.Image == null && attachment.MediaType != null && attachment.MediaType.StartsWith("audio/", StringComparison.Ordinal);
+
+        // Replace the voice recordings among the attachments with their words; null (with the status saying why) if there
+        // were none or recognition failed.
+        private async Task<string> TranscribeVoiceAsync(List<PendingAttachment> attachments, CancellationToken token)
+        {
+            SetStatus("Writing down what you said...");
+            UiStallWatchdog.Mark("Speech recognition");
+            var words = new List<string>();
+            try
+            {
+                foreach (PendingAttachment recording in attachments.Where(IsVoiceRecording).ToList())
+                {
+                    string text = (await SpeechToText.TranscribeAsync(recording.Data, token))?.Trim();
+                    if (!string.IsNullOrEmpty(text))
+                        words.Add(text);
+                    attachments.Remove(recording);
+                }
+            }
+            catch (Exception ex) when (!token.IsCancellationRequested)
+            {
+                UiStallWatchdog.Mark("Speech recognition failed: " + ex.Message);
+                SetStatus(ex.Message);
+                return null;
+            }
+            UiStallWatchdog.Mark("Speech recognized: " + words.Sum(w => w.Length) + " chars");
+            if (words.Count == 0)
+            {
+                SetStatus("I didn't catch any words - please try again.");
+                return null;
+            }
+            SetStatus(null);
+            return string.Join(" ", words);
         }
 
         // ---------- Web search (agent) ----------
