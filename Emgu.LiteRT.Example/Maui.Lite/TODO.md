@@ -9,7 +9,7 @@ Storage page, the next LiteRT-LM release, and GPU follow-ups on platforms not ye
 the Pixel Fold freeze, being gentle with phones, background downloads. Then chat features and new agent tools,
 smallest and most useful first - with a hands-free voice mode and a task mode before the tools that act outside the
 app - and last the largest: other system models, MCP, serving the Mac's models to phones, background tasks (which work
-best through that server), and image generation on iOS.
+best through that server), image generation on iOS, and the privacy manifests an App Store release needs.
 
 ## 1. Resume partial downloads — completed (.NET / MAUI)
 
@@ -866,3 +866,25 @@ near its context limit. Record enabled tool/settings differences, history size a
 - [ ] Repeat controlled foreground, alternating CPU/Interpreter/GPU timings, including initialization,
       preprocessing, transfers, result extraction, sustained camera FPS, battery and thermals; check Metal
       on Mac Catalyst and other Android devices. Do not infer a general speedup from the short samples.
+
+## 35. Privacy manifests for an App Store release (iOS, Mac Catalyst)
+
+Apple asks App Store apps, and SDKs that use "required-reason" APIs, to declare those APIs and the reasons for using
+them in a `PrivacyInfo.xcprivacy`. The demo has none yet, and neither do the iOS frameworks it embeds
+(`CLiteRTLM`, `GemmaModelConstraintProvider`, and `LiteRt`/`tfliteextern` after the split in item 31).
+
+- [ ] Check which required-reason APIs the app and its frameworks use: `nm -u` on each framework and the app binary
+      for file timestamps (`stat`/`fstat`/`getattrlist`, `NSFileModificationDate`), disk space (`statfs`,
+      `NSFileSystemFreeSize`), system boot time (`systemUptime`), user defaults (`NSUserDefaults`) and active
+      keyboards. The demo itself uses `Preferences` (user defaults) and file modification times (`DownloadableFile`'s
+      `.sha256ok` markers); Microsoft's guidance for .NET MAUI apps also lists the .NET runtime's file timestamp,
+      boot time and disk space uses.
+- [ ] Add a `PrivacyInfo.xcprivacy` to the demo (`Platforms/iOS`, and Mac Catalyst's, as a bundle resource) declaring
+      those APIs with their reason codes. Decide whether the frameworks get their own manifests (needed if they are
+      shipped to other apps through the NuGet packages): the runtime packages could carry one per framework.
+- [ ] Data collection (`NSPrivacyCollectedDataTypes`) and the App Store privacy labels: the models run on the device
+      and chats stay local, but the web tools send queries (and, with location shared, the place) to Open-Meteo,
+      Wikipedia, Frankfurter and Tavily; none track the user (`NSPrivacyTracking` false).
+- [ ] Confirm by uploading a Release build to App Store Connect (or `xcrun altool --validate-app`) and fixing what
+      validation reports - also the embedded frameworks' `Info.plist` and `MinimumOSVersion` (the Gemma library needs
+      iOS 26.4).
