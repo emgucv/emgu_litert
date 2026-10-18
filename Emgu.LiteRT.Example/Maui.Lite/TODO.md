@@ -9,7 +9,8 @@ Storage page, the next LiteRT-LM release, and GPU follow-ups on platforms not ye
 the Pixel Fold freeze, being gentle with phones, background downloads. Then chat features and new agent tools,
 smallest and most useful first - with a hands-free voice mode and a task mode before the tools that act outside the
 app - and last the largest: other system models, MCP, serving the Mac's models to phones, background tasks (which work
-best through that server), image generation on iOS, and the privacy manifests an App Store release needs.
+best through that server), image generation on iOS, the privacy manifests an App Store release needs, and
+splitting the iOS natives into frameworks.
 
 ## 1. Resume partial downloads — completed (.NET / MAUI)
 
@@ -593,44 +594,18 @@ agent runs on a schedule, with a notification when there is something to say.
 
 ## 31. Image generation on iOS — implemented; untested on an iPhone
 
-- [x] No new framework needed: LiteRT-LM's `CLiteRTLM` framework links LiteRT statically and exports its whole C API,
-      including every function `Emgu.LiteRT` calls, so on iOS `Emgu.LiteRT` loads `@rpath/CLiteRTLM.framework/CLiteRTLM`
-      - one LiteRT shared by the chat and image generation. (`Emgu.LiteRT` on iOS therefore needs the LiteRT-LM add-on
-      and iOS 26.4.)
+- [x] On iOS `Emgu.LiteRT` loads `LiteRt.framework`, which `tfliteextern` and LiteRT-LM are linked to (item 36). (At
+      first it used the LiteRT inside LiteRT-LM's `CLiteRTLM`, so it needed the LiteRT-LM add-on and iOS 26.4.)
 - [x] The demo offers "Image generation" on iOS; the model folder (Documents/Z-Image-Turbo) is excluded from iCloud
       backups.
 - [x] Verified in an iPhone 18 Pro simulator (iOS 27): pictures drawn directly and by Gemma 4 E2B through the chat.
 - [x] Mono's interpreter (iOS Debug builds) crashed at the second picture; the demo now compiles iOS Debug builds
       ahead of time (`UseInterpreter=false`), which needed the `System.Drawing.Common` exclusion on iOS too.
 - [ ] Speed: ~205-225 s per picture in the simulator, about 10x the Mac's CPU with the caches in use; measure on an
-      iPhone (if it is as slow, check which XNNPACK kernels CLiteRTLM's build uses).
+      iPhone (if it is as slow, check which XNNPACK kernels the iOS build uses).
 - [ ] Memory and storage on an iPhone: the text encoder maps 3.5 GB; ~21 GB with the caches. Consider the
       `com.apple.developer.kernel.increased-memory-limit` entitlement if the app is killed.
-- [ ] Split the iOS natives into frameworks that depend on each other, like the Android/macOS libraries: a base
-      `LiteRt.framework`, with `tfliteextern` and LiteRT-LM linked to it instead of carrying their own LiteRT.
-      - Why: `Emgu.LiteRT` (CompiledModel, `Emgu.LiteRT.Models`, `ZImageTurbo`) and TF Lite would work on iOS without
-        the LiteRT-LM add-on and iOS 26.4 (the base framework can target iOS 15); TF Lite and LiteRT would share one
-        runtime; `Emgu.LiteRT`'s iOS `DllImport` would no longer name CLiteRTLM's path; and the packages would match
-        Android's (base runtime with LiteRT, LM add-on with only LiteRT-LM + the Gemma library).
-      - Not for size: LiteRT-LM's embedding code uses TFLite's C++ API, so its TFLite kernels and XNNPACK stay inside
-        it even in dynamic mode (macOS: `libLiteRt` 6.7 MB + `liblitert-lm` 27.5 MB; Android arm64: 5.7 + 23.3 MB;
-        iOS now: CLiteRTLM 28.2 MB with everything). An app with LiteRT-LM would grow by ~6 MB.
-      - [ ] Build `libLiteRt` for iOS device + simulator as a `cc_shared_library` (as on macOS: LiteRT's
-            `litert_tflite_runtime_c_api_so_shim`, `LiteRt*`/`TfLite*` exported) with install name
-            `@rpath/LiteRt.framework/LiteRt`, wrapped into `LiteRt.framework` / `lib/ios/LiteRt.xcframework`
-            (`Info.plist`, ad hoc signing) the way `bazel_build_litert_lm_ios` wraps `GemmaModelConstraintProvider`.
-      - [ ] Build `tfliteextern` for iOS as a dynamic framework linked to it (the macOS `tfliteextern_dylib` target),
-            replacing the static `libtfliteextern_ios.xcframework`; `DllImport("tfliteextern")` then names the
-            framework instead of `__Internal`. Mac Catalyst stays static (Bazel has no Catalyst platform).
-      - [ ] `Emgu.LiteRT`'s iOS `LiteRtLibrary` -> `@rpath/LiteRt.framework/LiteRt`; the base
-            `Emgu.LiteRT.runtime.maui.ios` embeds both frameworks.
-      - [ ] Try LiteRT-LM with `--define=litert_runtime_link_mode=dynamic` on iOS (proven only on macOS/Android):
-            build `//c:litert-lm` as a dylib (LiteRT-LM's own `//swift:CLiteRTLM` links everything statically), wrap
-            it as a framework that loads `@rpath/LiteRt.framework/LiteRt`, and make the LM add-on depend on the base
-            package. If it doesn't work, keep CLiteRTLM static - two LiteRT copies in one app are fine as long as
-            `Emgu.LiteRT` points at `LiteRt.framework`.
-      - [ ] Verify in the simulator that the chat, the TF Lite demos and Z-Image run in one process with one LiteRT
-            loaded (`image list` / `DYLD_PRINT_LIBRARIES`), and that an app without the LM add-on runs `Emgu.LiteRT`.
+- [x] A standalone LiteRT framework, so `Emgu.LiteRT` works without the LiteRT-LM add-on - item 36.
 
 ## 32. Live camera tools — first version implemented
 
@@ -871,7 +846,7 @@ near its context limit. Record enabled tool/settings differences, history size a
 
 Apple asks App Store apps, and SDKs that use "required-reason" APIs, to declare those APIs and the reasons for using
 them in a `PrivacyInfo.xcprivacy`. The demo has none yet, and neither do the iOS frameworks it embeds
-(`CLiteRTLM`, `GemmaModelConstraintProvider`, and `LiteRt`/`tfliteextern` after the split in item 31).
+(`LiteRt`, `tfliteextern`, `LiteRtLm` and `GemmaModelConstraintProvider`, item 36).
 
 - [ ] Check which required-reason APIs the app and its frameworks use: `nm -u` on each framework and the app binary
       for file timestamps (`stat`/`fstat`/`getattrlist`, `NSFileModificationDate`), disk space (`statfs`,
@@ -888,3 +863,32 @@ them in a `PrivacyInfo.xcprivacy`. The demo has none yet, and neither do the iOS
 - [ ] Confirm by uploading a Release build to App Store Connect (or `xcrun altool --validate-app`) and fixing what
       validation reports - also the embedded frameworks' `Info.plist` and `MinimumOSVersion` (the Gemma library needs
       iOS 26.4).
+
+## 36. Split the iOS natives into frameworks — implemented; verified in the simulator
+
+The iOS natives are now frameworks that depend on each other, like the Android/macOS libraries: a base
+`LiteRt.framework`, with `tfliteextern.framework` and LiteRT-LM's `LiteRtLm.framework` linked to it instead of
+carrying their own LiteRT. Before, `tfliteextern` was a static library with its own TFLite, and `Emgu.LiteRT` used the
+LiteRT inside LiteRT-LM's `CLiteRTLM` (item 31).
+
+- Why: `Emgu.LiteRT` (CompiledModel, `Emgu.LiteRT.Models`, `ZImageTurbo`) and TF Lite work on iOS without the
+  LiteRT-LM add-on and iOS 26.4 (the base frameworks target iOS 15); TF Lite and LiteRT share one runtime; and the
+  packages match Android's (base runtime with LiteRT, LM add-on with only LiteRT-LM + the Gemma library).
+- Not for size: TFLite's kernels, XNNPACK and much of LiteRT's runtime stay inside LiteRT-LM (its C++ code calls them;
+  only 34 `LiteRt*` functions come from `LiteRt.framework`). Per device slice: `LiteRt` 6.5 MB + `tfliteextern`
+  0.1 MB + `LiteRtLm` 27.0 MB, vs `CLiteRTLM` 28.3 MB with everything.
+- [x] `platforms/ios/bazel_build_tflite_ios_frameworks` (also run by `bazel_build_xcframework`) builds the macOS
+      targets `//tfliteextern:litert_runtime` / `:tfliteextern_dylib` for `ios_arm64` and `ios_sim_arm64` and wraps
+      them into `lib/ios/LiteRt.xcframework` and `lib/ios/tfliteextern.xcframework` (`platforms/ios/ios_frameworks.sh`).
+- [x] `platforms/ios/bazel_build_litert_lm_ios` builds `//c:litert-lm` in LiteRT-LM's dynamic mode, linked to
+      `LiteRt.framework` (`--linkopt`: LiteRT's own iOS `libLiteRt.dylib` is a macOS binary, so it was skipped and the
+      `LiteRt*` imports left to `-undefined dynamic_lookup`), into `lib/ios/LiteRtLm.xcframework`.
+- [x] A check that every imported symbol is bound to a library (LiteRT-LM's `.bazelrc` allows undefined symbols on a
+      macOS host); it found TFLite's iOS signpost profiler missing from `libLiteRt`, now linked in.
+- [x] DllImports: `@rpath/LiteRt.framework/LiteRt`, `@rpath/tfliteextern.framework/tfliteextern`,
+      `@rpath/LiteRtLm.framework/LiteRtLm` on iOS (Mac Catalyst and Unity iOS keep `__Internal`). The base
+      `Emgu.LiteRT.runtime.maui.ios` embeds `LiteRt` + `tfliteextern`, the LM add-on `LiteRtLm` + the Gemma library.
+- [x] Verified in an iPhone 18 Pro simulator (iOS 27), one process: TF Lite Interpreter and LiteRT CompiledModel
+      MobileNet (space shuttle, 1.0), Gemma 4 E2B ("Paris"), Z-Image (the fox, 225 s), one `LiteRt.framework` loaded.
+- [ ] An app that references only the base runtime (no LM add-on) running `Emgu.LiteRT` and TF Lite.
+- [ ] A real iPhone, and App Store validation of the frameworks (item 35).

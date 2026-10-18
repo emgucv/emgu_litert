@@ -9,7 +9,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\lib))</TfLiteBinaryDir>
-    <EmguLiteRtLmIOSFramework>$(TfLiteBinaryDir)\ios\CLiteRTLM.xcframework</EmguLiteRtLmIOSFramework>
+    <EmguLiteRtLmIOSFramework>$(TfLiteBinaryDir)\ios\LiteRtLm.xcframework</EmguLiteRtLmIOSFramework>
     <EmguLiteRtLmGemmaIOSFramework>$(TfLiteBinaryDir)\ios\GemmaModelConstraintProvider.xcframework</EmguLiteRtLmGemmaIOSFramework>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -28,11 +28,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- LiteRT-LM's C API (Emgu.LiteRT.LM), built by platforms/ios/bazel_build_litert_lm_ios: a dynamic framework,
-         since it carries its own statically linked LiteRT/TFLite, which would clash with the static tfliteextern
-         of Emgu.LiteRT.runtime.maui.ios in one binary. It depends on LiteRT-LM's prebuilt Gemma model constraint
-         provider, which that script wraps into a framework of its own. Emgu.LiteRT.LM's DllImport("__Internal")
-         resolves against the linked framework. -->
+    <!-- LiteRT-LM's C API (Emgu.LiteRT.LM), built by platforms/ios/bazel_build_litert_lm_ios: a dynamic framework
+         linked to LiteRt.framework, LiteRT's runtime, which the base Emgu.LiteRT.runtime.maui.ios embeds. It depends on
+         LiteRT-LM's prebuilt Gemma model constraint provider, which that script wraps into a framework of its own.
+         Emgu.LiteRT.LM's DllImport names it by path (@rpath/LiteRtLm.framework/LiteRtLm). -->
     <NativeReference Condition="Exists('$(EmguLiteRtLmIOSFramework)')" Include="$(EmguLiteRtLmIOSFramework)">
       <Kind>Framework</Kind>
       <SmartLink>False</SmartLink>

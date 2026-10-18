@@ -5,7 +5,7 @@
   <PropertyGroup>
 
     <!-- MAUI platforms with a LiteRT-LM native library: Android (liblitert-lm.so, via
-         Emgu.LiteRT.LM.runtime.maui.android), iOS (CLiteRTLM.xcframework, via
+         Emgu.LiteRT.LM.runtime.maui.android), iOS (LiteRtLm.xcframework, via
          Emgu.LiteRT.LM.runtime.maui.ios - its TargetFramework is only added when that framework was
          built, see EMGU_LITERT_LM_MAUI_IOS_TFM in the top-level CMakeLists.txt) and Windows
          (Emgu.LiteRT.LM.runtime.windows), and Mac Catalyst (the macOS liblitert-lm.dylib, via

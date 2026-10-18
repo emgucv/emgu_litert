@@ -21,7 +21,7 @@ found - use your version's number otherwise).
 | Platform | Commands | Output |
 |---|---|---|
 | Mac Catalyst | `platforms/ios/cmake_build_tflite_catalyst arm64` (and `x86_64` for Intel / universal builds), plus `platforms/macos/bazel_build_tflite_macos_fat` for LiteRT-LM | `lib/ios/libtfliteextern_darwin_<arch>.a`, `lib/runtimes/osx/native/*.dylib` |
-| iOS | `cd platforms/ios && ./bazel_build_xcframework && ./bazel_build_litert_lm_ios` | `lib/ios/libtfliteextern_ios.xcframework`, `CLiteRTLM.xcframework`, `GemmaModelConstraintProvider.xcframework` |
+| iOS | `cd platforms/ios && ./bazel_build_xcframework && ./bazel_build_litert_lm_ios` | `lib/ios/LiteRt.xcframework`, `tfliteextern.xcframework`, `LiteRtLm.xcframework`, `GemmaModelConstraintProvider.xcframework` |
 | Android | `platforms/android/bazel_build_tflite_android arm64` (also `x86_64`, `arm`, `x86` as needed); on macOS set `ANDROID_HOME` first, e.g. `export ANDROID_HOME=~/Library/Android/sdk` | `lib/android/<abi>/*.so` |
 | Windows | `platforms\windows\bazel_build_litert.ps1 64` | `lib/runtimes/win-x64/native/` |
 

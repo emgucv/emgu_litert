@@ -1,11 +1,7 @@
 #!/bin/bash -v
 
-./bazel_build_tflite_ios ios_x86_64
-./bazel_build_tflite_ios ios_arm64
-./bazel_build_tflite_ios ios_sim_arm64
+# Builds the iOS natives as dynamic frameworks: lib/ios/LiteRt.xcframework and lib/ios/tfliteextern.xcframework (see
+# bazel_build_tflite_ios_frameworks). They replace the static libtfliteextern_ios.xcframework this script used to build
+# from bazel_build_tflite_ios, which carried its own copy of TFLite. LiteRT-LM: bazel_build_litert_lm_ios.
 
-lipo -create -output ../../lib/ios/libtfliteextern_ios_simulator.a ../../lib/ios/libtfliteextern_ios_x86_64.a ../../lib/ios/libtfliteextern_ios_sim_arm64.a
-lipo -create -output ../../lib/ios/libtfliteextern.a ../../lib/ios/libtfliteextern_ios_x86_64.a ../../lib/ios/libtfliteextern_ios_arm64.a
-
-rm -rf ../../lib/ios/libtfliteextern_ios.xcframework
-xcodebuild -create-xcframework -library ../../lib/ios/libtfliteextern_ios_simulator.a -library ../../lib/ios/libtfliteextern_ios_arm64.a -output ../../lib/ios/libtfliteextern_ios.xcframework
+"$(dirname "$0")/bazel_build_tflite_ios_frameworks" "$@"

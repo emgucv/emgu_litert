@@ -1,0 +1,59 @@
+#!/bin/bash -v
+
+# Builds the base iOS natives as dynamic frameworks (device arm64 + simulator arm64), the same split as the macOS and
+# Android builds:
+#   lib/ios/LiteRt.xcframework        - LiteRT's runtime (libLiteRt, exporting the LiteRt* and TfLite* C APIs),
+#                                       P/Invoked by Emgu.LiteRT
+#   lib/ios/tfliteextern.xcframework  - the Emgu TF Lite C wrapper (Emgu.TF.Lite), linked to LiteRt.framework
+# Both come from the macOS targets //tfliteextern:litert_runtime and //tfliteextern:tfliteextern_dylib
+# (litertextern/tfliteextern/bazel/BUILD), built in the LiteRT-LM workspace against the LiteRT it pins, and are embedded
+# by Emgu.LiteRT.Runtime/Maui/iOS (Emgu.LiteRT.runtime.maui.ios). platforms/ios/bazel_build_litert_lm_ios then builds
+# LiteRT-LM linked to this LiteRt.framework.
+#
+# Usage: bazel_build_tflite_ios_frameworks [extra bazel build arguments]
+
+cd "$(dirname "$0")/../.."
+source platforms/ios/ios_frameworks.sh
+
+# LiteRT-LM is a pristine third-party submodule (we don't own/patch it upstream), so the tfliteextern Bazel package
+# can't live there in git: stage our tracked source into it here instead, each run. Our BUILD file is written for the
+# litert workspace, where LiteRT's packages are local (//tflite/..., //litert/...); rewrite those labels to @litert//...
+mkdir -p $WORKSPACE_DIR/tfliteextern
+sed -e 's#"//tflite#"@litert//tflite#g' -e 's#"//litert#"@litert//litert#g' \
+    litertextern/tfliteextern/bazel/BUILD > $WORKSPACE_DIR/tfliteextern/BUILD || exit 1
+cp -f litertextern/tfliteextern/bazel/tfliteextern.def litertextern/tfliteextern/bazel/litert_exported_symbols_darwin.lds \
+    litertextern/tfliteextern/tfliteextern.cc litertextern/tfliteextern/tfliteextern.h \
+    litertextern/imgproc/imgproc.cc litertextern/imgproc/imgproc.h $WORKSPACE_DIR/tfliteextern/ || exit 1
+
+STAGING=$(mktemp -d)
+LITERT_ARGS=""
+TFLITEEXTERN_ARGS=""
+for ENTRY in $IOS_SLICES; do
+    IFS=: read CONFIG XCF_SLICE PLATFORM <<< "$ENTRY"
+    run_bazel build --verbose_failures -c opt --config=$CONFIG --ios_minimum_os=$IOS_MINIMUM_OS "$@" \
+        //tfliteextern:litert_runtime //tfliteextern:tfliteextern_dylib || exit 1
+    # bazel-bin follows the most recent build, so each slice is wrapped right after it is built.
+    check_bound $WORKSPACE_DIR/bazel-bin/tfliteextern/libLiteRt.dylib
+    check_bound $WORKSPACE_DIR/bazel-bin/tfliteextern/libtfliteextern.dylib
+    wrap_framework $WORKSPACE_DIR/bazel-bin/tfliteextern/libLiteRt.dylib $STAGING/$XCF_SLICE/LiteRt.framework $PLATFORM $IOS_MINIMUM_OS
+    wrap_framework $WORKSPACE_DIR/bazel-bin/tfliteextern/libtfliteextern.dylib $STAGING/$XCF_SLICE/tfliteextern.framework $PLATFORM $IOS_MINIMUM_OS
+    LITERT_ARGS="$LITERT_ARGS -framework $STAGING/$XCF_SLICE/LiteRt.framework"
+    TFLITEEXTERN_ARGS="$TFLITEEXTERN_ARGS -framework $STAGING/$XCF_SLICE/tfliteextern.framework"
+done
+
+# Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
+# libraries. The top level CMakeLists.txt reads it to version the Emgu.TF.Lite packages.
+TF_VERSION_BZL="$(run_bazel info output_base)/external/org_tensorflow/tensorflow/tf_version.bzl"
+TFLITE_VERSION=$(sed -n 's/^TF_VERSION = "\([0-9][0-9.]*\)".*/\1/p' "$TF_VERSION_BZL")
+if [ -n "$TFLITE_VERSION" ]; then
+    echo $TFLITE_VERSION > $OUT_DIR/tflite_version.txt
+else
+    echo "Warning: could not read TF_VERSION from $TF_VERSION_BZL; $OUT_DIR/tflite_version.txt not written"
+fi
+
+rm -rf $OUT_DIR/LiteRt.xcframework $OUT_DIR/tfliteextern.xcframework
+xcodebuild -create-xcframework $LITERT_ARGS -output $OUT_DIR/LiteRt.xcframework || exit 1
+xcodebuild -create-xcframework $TFLITEEXTERN_ARGS -output $OUT_DIR/tfliteextern.xcframework || exit 1
+rm -rf $STAGING
+
+echo Output written to $OUT_DIR/LiteRt.xcframework and $OUT_DIR/tfliteextern.xcframework

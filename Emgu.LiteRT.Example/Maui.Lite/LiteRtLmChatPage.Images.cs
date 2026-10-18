@@ -20,9 +20,8 @@ namespace Maui.Demo.Lite
     // (Emgu.LiteRT.LM.Agents' AgentTools.GenerateImage), which draws a 256 x 256 picture with Z-Image-Turbo
     // (Emgu.LiteRT.Models' ZImageTurbo) on this device's CPU and shows it above the reply - the model doesn't see it. The
     // model is 10.6 GB, downloaded when the setting is turned on, and its first image writes ~9 GB of weight caches. The
-    // pictures are saved with the reply (attachments of kind "generated", never given back to the model). On iOS, LiteRT
-    // comes from LiteRT-LM's CLiteRTLM framework (Emgu.LiteRT.LM.runtime.maui.ios), and the model folder is kept out of
-    // iCloud backups. With the setting off the tool is offered anyway and tells the model where to turn it on.
+    // pictures are saved with the reply (attachments of kind "generated", never given back to the model). On iOS the model
+    // folder is kept out of iCloud backups. With the setting off the tool is offered anyway and tells the model where to turn it on.
     public partial class LiteRtLmChatPage
     {
         private const string ImageGenerationPreference = "litert_lm_chat_image_generation";
@@ -40,7 +39,7 @@ namespace Maui.Demo.Lite
         // The pictures drawn for the reply being written, saved with it.
         private readonly List<byte[]> _sendImages = new List<byte[]>();
 
-        // Everywhere the chat runs: on iOS Emgu.LiteRT uses the LiteRT inside CLiteRTLM, which the chat needs anyway.
+        // Everywhere the chat runs.
         private static bool ImageGenerationSupported => true;
 
         // iOS backs up the app's Library/Application Support (where ZImageTurbo keeps its ~21 GB) to iCloud unless told

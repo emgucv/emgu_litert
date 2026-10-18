@@ -1,48 +1,37 @@
 #!/bin/bash -v
 
-# Builds LiteRT-LM's C API for iOS (Emgu.LiteRT.LM's native library) from the LiteRT-LM submodule:
-#   lib/ios/CLiteRTLM.xcframework                      - LiteRT-LM's own //swift:CLiteRTLM target
+# Builds LiteRT-LM's C API for iOS (Emgu.LiteRT.LM's native library) from the LiteRT-LM submodule, linked to the base
+# LiteRt.framework instead of carrying its own LiteRT runtime - the same split as macOS and Android:
+#   lib/ios/LiteRtLm.xcframework                       - LiteRT-LM's //c:litert-lm, built with
+#                                                        --define=litert_runtime_link_mode=dynamic
 #   lib/ios/GemmaModelConstraintProvider.xcframework   - LiteRT-LM's prebuilt Gemma model constraint provider,
-#                                                        which CLiteRTLM links, wrapped into a framework
+#                                                        which it links, wrapped into a framework
 # Both are dynamic frameworks with a device (arm64) and a simulator (arm64) slice. The LiteRT-LM add-on
-# Emgu.LiteRT.Runtime/Maui/LM/iOS (Emgu.LiteRT.LM.runtime.maui.ios) embeds them in the app when present.
+# Emgu.LiteRT.Runtime/Maui/LM/iOS (Emgu.LiteRT.LM.runtime.maui.ios) embeds them; LiteRt.framework comes from the base
+# Emgu.LiteRT.runtime.maui.ios. Run platforms/ios/bazel_build_tflite_ios_frameworks first: this script links against
+# its lib/ios/LiteRt.xcframework.
 #
-# CLiteRTLM must stay a dynamic framework: it carries its own statically linked LiteRT/TFLite, while the iOS
-# tfliteextern (bazel_build_tflite_ios) is a static library with its own TFLite, so linking both statically into
-# one app binary would duplicate those symbols. As a dynamic framework it only exports the litert_lm_* C API.
+# In dynamic mode LiteRT's C API libraries are headers only, and LiteRT links LiteRT-LM against its own libLiteRt.dylib
+# - which LiteRT builds for macOS only (a macos_dylib, even in an iOS build), so the linker skips it, and LiteRT-LM's
+# .bazelrc (-undefined dynamic_lookup, from its build:macos config, which applies on a macOS host) hides the missing
+# library. So the matching slice of our LiteRt.framework is passed to the link (--linkopt), which then binds every
+# LiteRt* function to @rpath/LiteRt.framework/LiteRt. As on macOS, TFLite's kernels and XNNPACK, and much of LiteRT's
+# runtime, stay inside LiteRT-LM: it calls them through C++ APIs libLiteRt doesn't export.
 #
 # On iOS LiteRT-LM links prebuilt/ios_{arm64,sim_arm64}/libGemmaModelConstraintProvider.dylib (Git LFS - run
-# "git -C LiteRT-LM lfs pull" first), a loose dylib, which an iOS app bundle can't contain. This script wraps each
-# slice into GemmaModelConstraintProvider.framework and points CLiteRTLM's load command at it. Google builds that
-# prebuilt for iOS 26.4 and later, so LiteRT-LM needs iOS 26.4+ at run time even though CLiteRTLM targets iOS 15.
+# "git -C LiteRT-LM lfs pull" first), a loose dylib, which an iOS app bundle can't contain, so it is wrapped into
+# GemmaModelConstraintProvider.framework. Google builds that prebuilt for iOS 26.4 and later, so LiteRT-LM needs
+# iOS 26.4+ at run time even though LiteRtLm.framework targets iOS 15.
 #
 # Usage: bazel_build_litert_lm_ios [extra bazel build arguments]
 
-if command -v python3.12 >/dev/null 2>&1; then
-    export HERMETIC_PYTHON_VERSION=3.12
+cd "$(dirname "$0")/../.."
+source platforms/ios/ios_frameworks.sh
+
+if [ ! -d $OUT_DIR/LiteRt.xcframework ]; then
+    echo "$OUT_DIR/LiteRt.xcframework is missing - run platforms/ios/bazel_build_tflite_ios_frameworks first"
+    exit 1
 fi
-
-cd "$(dirname "$0")"
-cd ../../
-REPO_ROOT=$(pwd)
-# Keep Bazel's output tree in a subfolder of this repo, like the other Bazel build scripts.
-BAZEL_OUTPUT_USER_ROOT="$REPO_ROOT/bazel_output"
-WORKSPACE_DIR=LiteRT-LM
-OUT_DIR=lib/ios
-mkdir -p $OUT_DIR
-
-# If Xcode is installed outside /Applications (e.g. on a separate volume), Bazel's sandbox won't use it by
-# default. (Unlike bazel_build_tflite_ios, no per-SDK APPLE_SDK_PLATFORM override: one build covers the device
-# and simulator SDKs.)
-XCODE_DEVELOPER_DIR="$(xcode-select -p 2>/dev/null)"
-case "$XCODE_DEVELOPER_DIR" in
-    /Volumes/*)
-        echo "Xcode is on a non-root volume - setting BAZEL_ALLOW_NON_APPLICATIONS_XCODE=1 and DEVELOPER_DIR"
-        export BAZEL_ALLOW_NON_APPLICATIONS_XCODE=1
-        export DEVELOPER_DIR="$XCODE_DEVELOPER_DIR"
-        ;;
-esac
-
 for SLICE in ios_arm64 ios_sim_arm64; do
     GEMMA=$WORKSPACE_DIR/prebuilt/$SLICE/libGemmaModelConstraintProvider.dylib
     if ! file "$GEMMA" | grep -q Mach-O; then
@@ -51,66 +40,33 @@ for SLICE in ios_arm64 ios_sim_arm64; do
     fi
 done
 
-cd $WORKSPACE_DIR
-bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build --verbose_failures -c opt "$@" //swift:CLiteRTLM || exit 1
-cd ..
-
-rm -rf $OUT_DIR/CLiteRTLM.xcframework $OUT_DIR/GemmaModelConstraintProvider.xcframework
-unzip -q -o $WORKSPACE_DIR/bazel-bin/swift/CLiteRTLM.xcframework.zip -d $OUT_DIR || exit 1
-chmod -R u+w $OUT_DIR/CLiteRTLM.xcframework
-
-GEMMA_NAME=GemmaModelConstraintProvider
-GEMMA_INSTALL_NAME=@rpath/$GEMMA_NAME.framework/$GEMMA_NAME
-GEMMA_MIN_OS=26.4
 STAGING=$(mktemp -d)
-XCFRAMEWORK_ARGS=""
-# xcframework slice folder : LiteRT-LM prebuilt folder : CFBundleSupportedPlatforms
-for ENTRY in ios-arm64:ios_arm64:iPhoneOS ios-arm64-simulator:ios_sim_arm64:iPhoneSimulator; do
-    IFS=: read XCF_SLICE PREBUILT_SLICE PLATFORM <<< "$ENTRY"
-
-    # Wrap the prebuilt dylib into GemmaModelConstraintProvider.framework.
-    FRAMEWORK=$STAGING/$XCF_SLICE/$GEMMA_NAME.framework
-    mkdir -p $FRAMEWORK
-    cp $WORKSPACE_DIR/prebuilt/$PREBUILT_SLICE/libGemmaModelConstraintProvider.dylib $FRAMEWORK/$GEMMA_NAME
-    chmod u+w $FRAMEWORK/$GEMMA_NAME
-    install_name_tool -id $GEMMA_INSTALL_NAME $FRAMEWORK/$GEMMA_NAME || exit 1
-    cat > $FRAMEWORK/Info.plist <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleExecutable</key>
-  <string>$GEMMA_NAME</string>
-  <key>CFBundleIdentifier</key>
-  <string>com.emgu.litert.$GEMMA_NAME</string>
-  <key>CFBundleName</key>
-  <string>$GEMMA_NAME</string>
-  <key>CFBundlePackageType</key>
-  <string>FMWK</string>
-  <key>CFBundleShortVersionString</key>
-  <string>1.0</string>
-  <key>CFBundleVersion</key>
-  <string>1</string>
-  <key>CFBundleSupportedPlatforms</key>
-  <array>
-    <string>$PLATFORM</string>
-  </array>
-  <key>MinimumOSVersion</key>
-  <string>$GEMMA_MIN_OS</string>
-</dict>
-</plist>
-EOF
-    # install_name_tool invalidates the signature - re-sign ad hoc (the app build signs it properly).
-    codesign -f -s - $FRAMEWORK/$GEMMA_NAME || exit 1
-    XCFRAMEWORK_ARGS="$XCFRAMEWORK_ARGS -framework $FRAMEWORK"
-
-    # Point CLiteRTLM at the framework instead of the loose dylib.
-    CLITERTLM=$OUT_DIR/CLiteRTLM.xcframework/$XCF_SLICE/CLiteRTLM.framework/CLiteRTLM
-    install_name_tool -change @rpath/libGemmaModelConstraintProvider.dylib $GEMMA_INSTALL_NAME $CLITERTLM || exit 1
-    codesign -f -s - $CLITERTLM || exit 1
+LM_ARGS=""
+GEMMA_ARGS=""
+for ENTRY in $IOS_SLICES; do
+    IFS=: read CONFIG XCF_SLICE PLATFORM <<< "$ENTRY"
+    # A copy in a new folder each run: Bazel doesn't track files named only in --linkopt, so a changed path makes it
+    # relink against the current LiteRt.framework.
+    mkdir -p $STAGING/link/$XCF_SLICE
+    cp $OUT_DIR/LiteRt.xcframework/$XCF_SLICE/LiteRt.framework/LiteRt $STAGING/link/$XCF_SLICE/LiteRt || exit 1
+    # --platform_suffix keeps this build's outputs apart from the base frameworks' build: the define isn't part of
+    # Bazel's output folder name, and in dynamic mode LiteRT's C API libraries would be built empty.
+    run_bazel build --verbose_failures -c opt --config=$CONFIG --ios_minimum_os=$IOS_MINIMUM_OS \
+        --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic \
+        --linkopt=$STAGING/link/$XCF_SLICE/LiteRt "$@" //c:litert-lm || exit 1
+    LM_DYLIB=$WORKSPACE_DIR/bazel-bin/c/liblitert-lm.dylib
+    check_bound $LM_DYLIB
+    wrap_framework $LM_DYLIB $STAGING/$XCF_SLICE/LiteRtLm.framework $PLATFORM $IOS_MINIMUM_OS
+    wrap_framework $WORKSPACE_DIR/prebuilt/$CONFIG/libGemmaModelConstraintProvider.dylib \
+        $STAGING/$XCF_SLICE/GemmaModelConstraintProvider.framework $PLATFORM 26.4
+    LM_ARGS="$LM_ARGS -framework $STAGING/$XCF_SLICE/LiteRtLm.framework"
+    GEMMA_ARGS="$GEMMA_ARGS -framework $STAGING/$XCF_SLICE/GemmaModelConstraintProvider.framework"
 done
 
-xcodebuild -create-xcframework $XCFRAMEWORK_ARGS -output $OUT_DIR/$GEMMA_NAME.xcframework || exit 1
+# CLiteRTLM.xcframework is what this script built before: LiteRT-LM's own //swift:CLiteRTLM, with its own LiteRT.
+rm -rf $OUT_DIR/LiteRtLm.xcframework $OUT_DIR/GemmaModelConstraintProvider.xcframework $OUT_DIR/CLiteRTLM.xcframework
+xcodebuild -create-xcframework $LM_ARGS -output $OUT_DIR/LiteRtLm.xcframework || exit 1
+xcodebuild -create-xcframework $GEMMA_ARGS -output $OUT_DIR/GemmaModelConstraintProvider.xcframework || exit 1
 rm -rf $STAGING
 
-echo Output written to $OUT_DIR/CLiteRTLM.xcframework and $OUT_DIR/$GEMMA_NAME.xcframework
+echo Output written to $OUT_DIR/LiteRtLm.xcframework and $OUT_DIR/GemmaModelConstraintProvider.xcframework

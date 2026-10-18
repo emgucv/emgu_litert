@@ -131,21 +131,43 @@ cc_library(
 #
 # bazel build --config=macos --config=macos_arm64 //tfliteextern:litert_runtime //tfliteextern:tfliteextern_dylib
 # ---------------------------------------------------------------------------------------------------------
+# The archive of TFLite's iOS signpost profiler, linked into libLiteRt.dylib on iOS (see ":litert_runtime").
+filegroup(
+    name = "signpost_profiler_archive",
+    srcs = ["//tflite/profiling:signpost_profiler"],
+)
+
 cc_shared_library(
     name = "litert_runtime",
-    additional_linker_inputs = ["litert_exported_symbols_darwin.lds"],
+    # On iOS TFLite's platform profiler calls tflite::profiling::MaybeCreateSignpostProfiler(), from the objc_library
+    # //tflite/profiling:signpost_profiler, which cc_shared_library leaves out (its graph aspect doesn't cover
+    # objc_library), so the library would leave it undefined - LiteRT-LM's -undefined dynamic_lookup hides that. Its
+    # archive is passed to the link directly instead.
+    additional_linker_inputs = ["litert_exported_symbols_darwin.lds"] + select({
+        "@platforms//os:ios": [":signpost_profiler_archive"],
+        "//conditions:default": [],
+    }),
     exports_filter = [
         "//tflite:__subpackages__",
         "@flatbuffers//:__subpackages__",
         "@XNNPACK//:__subpackages__",
     ],
     shared_lib_name = "libLiteRt.dylib",
-    target_compatible_with = ["@platforms//os:macos"],
+    # Also built for iOS, where platforms/ios/bazel_build_tflite_ios_frameworks wraps it into LiteRt.framework (and
+    # changes its install name to @rpath/LiteRt.framework/LiteRt).
+    target_compatible_with = select({
+        "@platforms//os:macos": [],
+        "@platforms//os:ios": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     user_link_flags = [
         "-Wl,-exported_symbols_list,$(location litert_exported_symbols_darwin.lds)",
         "-Wl,-install_name,@rpath/libLiteRt.dylib",
         "-Wl,-framework,Metal",
-    ],
+    ] + select({
+        "@platforms//os:ios": ["$(location :signpost_profiler_archive)"],
+        "//conditions:default": [],
+    }),
     deps = ["//litert/c:litert_tflite_runtime_c_api_so_shim"],
 )
 
@@ -244,6 +266,7 @@ cc_library(
     }),
     target_compatible_with = select({
         "@platforms//os:macos": [],
+        "@platforms//os:ios": [],
         "@platforms//os:android": [],
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -258,7 +281,12 @@ cc_shared_library(
     name = "tfliteextern_dylib",
     dynamic_deps = [":litert_runtime"],
     shared_lib_name = "libtfliteextern.dylib",
-    target_compatible_with = ["@platforms//os:macos"],
+    # Also built for iOS (wrapped into tfliteextern.framework, like libLiteRt.dylib above).
+    target_compatible_with = select({
+        "@platforms//os:macos": [],
+        "@platforms//os:ios": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     user_link_flags = [
         "-Wl,-install_name,@rpath/libtfliteextern.dylib",
         # libLiteRt.dylib is deployed next to libtfliteextern.dylib.

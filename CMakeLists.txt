@@ -229,7 +229,21 @@ MACRO(CHECK_BINARY_EXIST folder patterns property_name second_check)
 ENDMACRO()
 
 
-CHECK_BINARY_EXIST("lib/ios" "libtfliteextern.a" HAVE_IOS_LITE OFF)
+# iOS: the dynamic frameworks built by platforms/ios/bazel_build_tflite_ios_frameworks (LiteRT's runtime, and
+# tfliteextern linked to it).
+IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/tfliteextern.xcframework" AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/LiteRt.xcframework")
+  SET(HAVE_IOS_LITE ON)
+  MESSAGE(STATUS "HAVE_IOS_LITE: ${HAVE_IOS_LITE}")
+  INSTALL(
+    DIRECTORY
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/LiteRt.xcframework"
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/tfliteextern.xcframework"
+    DESTINATION lib/ios
+    COMPONENT emgulitert_binary
+    )
+ELSE()
+  SET(HAVE_IOS_LITE OFF)
+ENDIF()
 
 CHECK_BINARY_EXIST("lib/ios" "libtfliteextern_darwin_arm64.a" HAVE_MAC_CATALYST_LITE_ARM64 OFF)
 CHECK_BINARY_EXIST("lib/ios" "libtfliteextern_darwin_x86_64.a" HAVE_MAC_CATALYST_LITE_X86_64 OFF)
@@ -767,12 +781,12 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # lib/runtimes/win-x64/native/liblitert-lm.dll exists (see HAVE_WINDOWS_LITERT_LM further below,
   # computed after this point in the file - re-checked here with the same EXISTS test rather than
   # reordering that block).
-  # Emgu.LiteRT.LM.runtime.maui.ios (CLiteRTLM.xcframework, built on macOS by
+  # Emgu.LiteRT.LM.runtime.maui.ios (LiteRtLm.xcframework, built on macOS by
   # platforms/ios/bazel_build_litert_lm_ios) is likewise only added - together with the ios
   # TargetFramework it needs - when that framework exists, so hosts without it (e.g. Windows) don't
   # try to restore an iOS add-on package that was never built.
   SET(EMGU_LITERT_LM_MAUI_IOS_TFM "")
-  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/CLiteRTLM.xcframework")
+  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/LiteRtLm.xcframework")
     SET(EMGU_LITERT_LM_MAUI_IOS_TFM ";net${DOTNET_VERSION_MAJOR}.0-ios")
     SET(EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY "${EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY}
   	<ItemGroup>

@@ -19,7 +19,7 @@
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
 	<summary>iOS runtime package of Emgu LiteRT LM for MAUI</summary>
-    <Description>This package contains the native iOS runtime of Emgu LiteRT LM for MAUI: LiteRT-LM's C API as CLiteRTLM.xcframework (a dynamic framework with its own LiteRT/TFLite), and the prebuilt Gemma model constraint provider it depends on, wrapped as GemmaModelConstraintProvider.xcframework. Requires iOS 26.4 or later at run time. Depends on Emgu.LiteRT.runtime.maui.ios.</Description>
+    <Description>This package contains the native iOS runtime of Emgu LiteRT LM for MAUI: LiteRT-LM's C API as LiteRtLm.xcframework (a dynamic framework linked to LiteRt.framework, LiteRT's runtime, from Emgu.LiteRT.runtime.maui.ios), and the prebuilt Gemma model constraint provider it depends on, wrapped as GemmaModelConstraintProvider.xcframework. Requires iOS 26.4 or later at run time. Depends on Emgu.LiteRT.runtime.maui.ios.</Description>
     <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION} release of Emgu LiteRT LM for MAUI iOS, built on LiteRT-LM ${LITERT_LM_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
 ${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html
 </PackageReleaseNotes>

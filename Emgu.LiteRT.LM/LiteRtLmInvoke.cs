@@ -18,12 +18,14 @@ namespace Emgu.LiteRT.LM
         /// <summary>
         /// The file name of the LiteRT-LM C API library. .NET appends the platform suffix, resolving to
         /// liblitert-lm.dylib (macOS), liblitert-lm.so (Linux / Android) or liblitert-lm.dll (Windows).
-        /// On iOS it is linked into the app (CLiteRTLM.framework), so the symbols are looked up there. Mac
-        /// Catalyst (which also defines __IOS__) loads the macOS liblitert-lm.dylib from the app bundle by name
-        /// instead: there is no Mac Catalyst build of LiteRT-LM, and a Catalyst app can load, but not link
+        /// On iOS it is LiteRtLm.framework (Emgu.LiteRT.LM.runtime.maui.ios, linked to LiteRt.framework), named by
+        /// its path. Mac Catalyst (which also defines __IOS__) loads the macOS liblitert-lm.dylib from the app bundle
+        /// by name instead: there is no Mac Catalyst build of LiteRT-LM, and a Catalyst app can load, but not link
         /// against, a macOS dylib.
         /// </summary>
-#if ((__IOS__ && !__MACCATALYST__) || UNITY_IPHONE) && (!UNITY_EDITOR)
+#if (__IOS__ && !__MACCATALYST__) && (!UNITY_EDITOR)
+        public const string LiteRtLmLibrary = "@rpath/LiteRtLm.framework/LiteRtLm";
+#elif UNITY_IPHONE && (!UNITY_EDITOR)
         public const string LiteRtLmLibrary = "__Internal";
 #else
         public const string LiteRtLmLibrary = "liblitert-lm";

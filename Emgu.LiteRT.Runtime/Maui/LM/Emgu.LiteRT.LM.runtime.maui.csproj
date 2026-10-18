@@ -26,7 +26,7 @@
 	       multi-TFM closure together and errors on this project's other TFMs being asked to resolve
 	       a platform-only referenced project; PackageReference has no such problem, since package
 	       compatibility is checked per-TFM independently. The ios and maccatalyst TFMs and their
-	       PackageReferences are only generated when lib/ios/CLiteRTLM.xcframework /
+	       PackageReferences are only generated when lib/ios/LiteRtLm.xcframework /
 	       lib/runtimes/osx/native/liblitert-lm.dylib exist. -->
 	</ItemGroup>
 </Project>
