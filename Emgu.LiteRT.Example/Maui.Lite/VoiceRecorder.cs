@@ -16,11 +16,89 @@ namespace Maui.Demo.Lite
     /// recorder of its own, so each platform uses its native API: AVAudioRecorder on iOS / Mac Catalyst,
     /// AudioRecord on Android and MediaCapture on Windows.
     /// </summary>
-    internal sealed class VoiceRecorder
+    internal sealed class VoiceRecorder : IVoiceInput
     {
         public const int SampleRate = 16000;
 
         public bool IsRecording { get; private set; }
+
+        /// <summary>
+        /// Whether <see cref="ReadLevelDb"/> measures the microphone (not on Windows, whose recorder writes straight to a
+        /// stream), which voice conversations need to hear when speech starts and ends.
+        /// </summary>
+        public static bool SupportsLevel =>
+#if WINDOWS
+            false;
+#else
+            true;
+#endif
+
+        /// <summary>
+        /// The microphone's level (dBFS) since the last call, while recording; very negative when quiet.
+        /// </summary>
+        public double ReadLevelDb()
+        {
+            if (!IsRecording)
+                return -160;
+#if IOS || MACCATALYST
+            AVFoundation.AVAudioRecorder recorder = _recorder;
+            if (recorder == null)
+                return -160;
+            recorder.UpdateMeters();
+            return recorder.AveragePower(0);
+#elif ANDROID
+            lock (_levelLock)
+            {
+                double level = VoiceActivityDetector.LevelDb(_sumOfSquares, _sampleCount);
+                _sumOfSquares = 0;
+                _sampleCount = 0;
+                return level;
+            }
+#else
+            return -160;
+#endif
+        }
+
+        /// <summary>
+        /// Whether replies are heard through headphones (wired, USB or Bluetooth), so the microphone doesn't pick them up
+        /// and the user can interrupt a reply by speaking. False where it can't be told.
+        /// </summary>
+        public static bool HeadphonesConnected()
+        {
+            try
+            {
+#if IOS || MACCATALYST
+                foreach (AVFoundation.AVAudioSessionPortDescription port in AVFoundation.AVAudioSession.SharedInstance().CurrentRoute.Outputs)
+                {
+                    string type = port.PortType?.ToString();
+                    if (type == AVFoundation.AVAudioSession.PortHeadphones.ToString()
+                        || type == AVFoundation.AVAudioSession.PortBluetoothA2DP.ToString()
+                        || type == AVFoundation.AVAudioSession.PortBluetoothHfp.ToString()
+                        || type == AVFoundation.AVAudioSession.PortBluetoothLE.ToString())
+                        return true;
+                }
+#elif ANDROID
+                var audio = (Android.Media.AudioManager)Android.App.Application.Context.GetSystemService(Android.Content.Context.AudioService);
+                foreach (Android.Media.AudioDeviceInfo device in audio.GetDevices(Android.Media.GetDevicesTargets.Outputs))
+                {
+                    switch (device.Type)
+                    {
+                        case Android.Media.AudioDeviceType.WiredHeadphones:
+                        case Android.Media.AudioDeviceType.WiredHeadset:
+                        case Android.Media.AudioDeviceType.UsbHeadset:
+                        case Android.Media.AudioDeviceType.BluetoothA2dp:
+                        case Android.Media.AudioDeviceType.BluetoothSco:
+                        case Android.Media.AudioDeviceType.BleHeadset:
+                            return true;
+                    }
+                }
+#endif
+            }
+            catch (Exception)
+            {
+            }
+            return false;
+        }
 
         /// <summary>
         /// Ask for the microphone permission (the first time) and start recording.
@@ -92,6 +170,7 @@ namespace Maui.Demo.Lite
             _recorder = AVFoundation.AVAudioRecorder.Create(Foundation.NSUrl.FromFilename(_path), settings, out error);
             if (_recorder == null || error != null)
                 throw new InvalidOperationException(error?.LocalizedDescription ?? "Could not create the audio recorder.");
+            _recorder.MeteringEnabled = true;
             if (!_recorder.Record())
             {
                 _recorder.Dispose();
@@ -114,6 +193,9 @@ namespace Maui.Demo.Lite
         private MemoryStream _pcm;
         private Task _readLoop;
         private volatile bool _reading;
+        private readonly object _levelLock = new object();
+        private double _sumOfSquares;
+        private int _sampleCount;
 
         private Task StartPlatformAsync()
         {
@@ -139,7 +221,20 @@ namespace Maui.Demo.Lite
                 {
                     int read = record.Read(buffer, 0, buffer.Length);
                     if (read > 0)
+                    {
                         pcm.Write(buffer, 0, read);
+                        double sum = 0;
+                        for (int i = 0; i + 1 < read; i += 2)
+                        {
+                            short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
+                            sum += (double)sample * sample;
+                        }
+                        lock (_levelLock)
+                        {
+                            _sumOfSquares += sum;
+                            _sampleCount += read / 2;
+                        }
+                    }
                     else if (read < 0)
                         break;
                 }

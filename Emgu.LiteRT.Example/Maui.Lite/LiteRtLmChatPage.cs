@@ -181,7 +181,6 @@ namespace Maui.Demo.Lite
         private readonly VoiceRecorder _recorder = new VoiceRecorder();
         private DateTime _recordingStarted;
         private CancellationTokenSource _recordingTimer;
-        private CancellationTokenSource _speech;
 
         // Web search: an agent (Microsoft Agent Framework) over the model's IChatClient, with the tools of ChatAgentTools.
         private const string TavilyKeyStorageName = "tavily_api_key";
@@ -423,7 +422,7 @@ namespace Maui.Demo.Lite
             try { webSearch = Preferences.Default.Get(WebSearchPreference, false); } catch (Exception) { }
             _webSearchSwitch.IsToggled = webSearch;
             _webSearchSwitch.Toggled += OnWebSearchToggled;
-            _toggleRow = new HorizontalStackLayout { Spacing = 8, Children = { _thinkingSwitch, _webSearchSwitch } };
+            _toggleRow = new HorizontalStackLayout { Spacing = 8, Children = { _thinkingSwitch, _webSearchSwitch, CreateVoiceChip() } };
             _webSearchNotice = new Label
             {
                 Text = "Web search requires a Tavily API key. Add one in Settings > Web search. Without a key, Wikipedia, links you provide, weather and currency tools are still available.",
@@ -885,7 +884,7 @@ namespace Maui.Demo.Lite
             _pageGrid.Add(_mainColumn, 1, 0);
 
             _sheet = new BottomSheet();
-            Content = new Grid { Children = { _pageGrid, _sheet } };
+            Content = new Grid { Children = { _pageGrid, BuildVoiceView(), _sheet } };
 
             SizeChanged += (s, e) => UpdateLayout();
             SelectModel(0);
@@ -1091,7 +1090,8 @@ namespace Maui.Demo.Lite
             _talkButton.IsVisible = option.AcceptsAudio;
             _thinkingSwitch.IsVisible = option.CanThink;
             _webSearchSwitch.IsVisible = option.CanUseTools;
-            _toggleRow.IsVisible = option.CanThink || option.CanUseTools;
+            _voiceChip.IsVisible = VoiceModeSupported;
+            _toggleRow.IsVisible = option.CanThink || option.CanUseTools || _voiceChip.IsVisible;
             UpdateWebSearchNotice();
             UpdateContextSection();
             // Drop attachments the new model can't take.
@@ -1145,6 +1145,7 @@ namespace Maui.Demo.Lite
         {
             base.OnDisappearing();
             _pageVisible = false;
+            EndVoiceMode();
             _ = CancelRecordingAsync();
             _ = CloseCameraAsync();
         }
@@ -1644,7 +1645,13 @@ namespace Maui.Demo.Lite
                 _sendImages.Clear();
             UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, agent {3}, think {4}, web {5}",
                 prompt.Length, attachments.Count, SelectedOption.Name, UseAgent, _thinkingSwitch.IsToggled, _webSearchSwitch.IsToggled));
-            StopSpeaking();
+            // With read-aloud on (or in a voice chat) the reply is read while it is written.
+            ReplyReader reader = StartReplyReader();
+            // Cancelled when the user interrupts the reply (voice chat).
+            CancellationTokenSource replyCancel = new CancellationTokenSource();
+            _replyCancel = replyCancel;
+            _latestPartial = null;
+            bool interrupted = false;
             SetBusy(true);
             try
             {
@@ -1698,6 +1705,8 @@ namespace Maui.Demo.Lite
                             SetStatus(null);
                         }
                         UpdateStreamingBubble(bubble, partial);
+                        _latestPartial = partial;
+                        reader?.Update(partial.Text);
                     });
                 };
 
@@ -1707,12 +1716,21 @@ namespace Maui.Demo.Lite
                     // Kept so teardown (OnNavigatedFrom / switching models) can wait for it instead of
                     // freeing the chat/engine while LiteRT-LM is still generating into it.
                     Task<ChatReply> generation = UseAgent
-                        ? RunAgentAsync(modelPrompt, attachments, bubble)
-                        : _chat.SendAsync(modelPrompt, attachments.Select(a => a.Attachment), onChunk);
+                        ? RunAgentAsync(modelPrompt, attachments, bubble, replyCancel.Token)
+                        : _chat.SendAsync(modelPrompt, attachments.Select(a => a.Attachment), onChunk, replyCancel.Token);
                     _generation = generation;
                     try
                     {
                         reply = await generation;
+                        break;
+                    }
+                    catch (Exception) when (replyCancel.IsCancellationRequested)
+                    {
+                        // Interrupted: the chat keeps what was written so far, and the model is given the conversation
+                        // again with the next message (LiteRT-LM can't continue a cancelled one).
+                        UiStallWatchdog.Mark("Reply interrupted");
+                        interrupted = true;
+                        reply = InterruptedReply();
                         break;
                     }
                     catch (Exception ex) when (attempt == 0 && !UseAgent && IsContextFull(ex))
@@ -1740,15 +1758,23 @@ namespace Maui.Demo.Lite
                 ClearCameraTurn();
                 await SaveExchangeAsync(userItem, reply);
                 SetStatus(null);
-                if (_readAloudSwitch.IsToggled)
-                    Speak(reply.Text);
+                if (interrupted)
+                    _needsPrime = true;
+                else
+                    reader?.Finish(reply.Text);
             }
             catch (Exception ex)
             {
+                reader?.Stop();
                 SetStatus("Error: " + ex.Message);
             }
             finally
             {
+                // Not read aloud if the model wasn't ready (the reader has nothing to read).
+                reader?.Finish(string.Empty);
+                if (ReferenceEquals(_replyCancel, replyCancel))
+                    _replyCancel = null;
+                replyCancel.Dispose();
                 ClearCameraTurn();
                 SetBusy(false);
                 UpdateMemoryLabel();
@@ -1765,7 +1791,8 @@ namespace Maui.Demo.Lite
 
         // Send a message through the agent, streaming its reply into the bubble and showing each tool call as a step
         // line above it. Runs on the UI thread (the await foreach resumes on it).
-        private async Task<ChatReply> RunAgentAsync(string prompt, List<PendingAttachment> attachments, StreamingBubble bubble)
+        private async Task<ChatReply> RunAgentAsync(string prompt, List<PendingAttachment> attachments, StreamingBubble bubble,
+            CancellationToken cancellationToken)
         {
             _agentBubble = bubble;
             await EnsureAgentAsync();
@@ -1778,7 +1805,8 @@ namespace Maui.Demo.Lite
             // tools with the Web search chip on.
             ChatOptions options = new ChatOptions
             {
-                Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink ? ReasoningEffort.Medium : ReasoningEffort.None },
+                // A voice chat answers without thinking first: a spoken reply should start quickly.
+                Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink && !_voiceMode ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
                     !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, FindPhotosAsync, ImageGenerationSupported ? GenerateImageAsync : null,
                     IsPrivateChat ? null : SearchChatsAsync, privateChat: IsPrivateChat,
@@ -1814,7 +1842,7 @@ namespace Maui.Demo.Lite
             }
             messages.Add(new AIChatMessage(ChatRole.User, contents));
             await foreach (AgentResponseUpdate update in _agent.RunStreamingAsync(
-                messages, _session, new ChatClientAgentRunOptions(options)))
+                messages, _session, new ChatClientAgentRunOptions(options), cancellationToken))
             {
                 foreach (AIContent content in update.Contents)
                 {
@@ -1857,7 +1885,10 @@ namespace Maui.Demo.Lite
                 {
                     if (!steps.Values.Any(l => l.Text.EndsWith("...")))
                         SetStatus(null);
-                    UpdateStreamingBubble(bubble, ToReply(thinking, answer));
+                    ChatReply partial = ToReply(thinking, answer);
+                    UpdateStreamingBubble(bubble, partial);
+                    _latestPartial = partial;
+                    _replyReader?.Update(partial.Text);
                 }
             }
             return ToReply(thinking, answer);
@@ -2156,36 +2187,6 @@ namespace Maui.Demo.Lite
             try { await _recorder.StopAsync(); }
             catch { }
             SetRecording(false);
-        }
-
-        private async void Speak(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-                return;
-            StopSpeaking();
-            UiStallWatchdog.Mark(string.Format("Speak: {0} chars", text.Length));
-            CancellationTokenSource speech = new CancellationTokenSource();
-            _speech = speech;
-            try
-            {
-                // With a voice for the reply's language, and without its Markdown.
-                await _alertAudio.SpeakReplyAsync(text, speech.Token);
-            }
-            catch (Exception)
-            {
-                // Cancelled, or no speech engine
-            }
-            finally
-            {
-                if (ReferenceEquals(_speech, speech)) _speech = null;
-                speech.Dispose();
-            }
-        }
-
-        private void StopSpeaking()
-        {
-            _speech?.Cancel();
-            _speech = null;
         }
 
         // ---------- Attachments ----------
@@ -3250,6 +3251,7 @@ namespace Maui.Demo.Lite
                     _resumeWindow.Stopped -= CameraWindowStopped;
                     _resumeWindow = null;
                 }
+                EndVoiceMode();
                 StopSpeaking();
                 _loadCancel?.Cancel();
                 if (!IsPrivateChat) _ = CancelRecordingAsync();
