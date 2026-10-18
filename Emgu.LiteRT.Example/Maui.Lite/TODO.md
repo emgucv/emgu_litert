@@ -591,15 +591,22 @@ agent runs on a schedule, with a notification when there is something to say.
 - [ ] Limits: at most a few runs a day per task; web tasks only with Web search allowed; nothing that changes things
       outside the app without approval.
 
-## 31. Image generation on iOS
+## 31. Image generation on iOS — implemented; untested on an iPhone
 
-The iOS app has no `libLiteRt` (LiteRT-LM comes as the `CLiteRTLM` framework, which only exports its C API, and the
-static `tfliteextern` has its own TFLite), so image generation is hidden there.
-
-- [ ] Build LiteRT's runtime as an iOS framework (`LiteRt.framework`, LiteRT and TFLite C APIs) that both CLiteRTLM and
-      `Emgu.LiteRT` use, without duplicating TFLite symbols in the app - or a second, self-contained framework if the
-      symbols can be kept apart.
-- [ ] Memory: Z-Image-Turbo's graphs on an iPhone (the text encoder alone maps 3.5 GB).
+- [x] No new framework needed: LiteRT-LM's `CLiteRTLM` framework links LiteRT statically and exports its whole C API,
+      including every function `Emgu.LiteRT` calls, so on iOS `Emgu.LiteRT` loads `@rpath/CLiteRTLM.framework/CLiteRTLM`
+      - one LiteRT shared by the chat and image generation. (`Emgu.LiteRT` on iOS therefore needs the LiteRT-LM add-on
+      and iOS 26.4.)
+- [x] The demo offers "Image generation" on iOS; the model folder (Documents/Z-Image-Turbo) is excluded from iCloud
+      backups.
+- [x] Verified in an iPhone 18 Pro simulator (iOS 27): pictures drawn directly and by Gemma 4 E2B through the chat.
+- [x] Mono's interpreter (iOS Debug builds) crashed at the second picture; the demo now compiles iOS Debug builds
+      ahead of time (`UseInterpreter=false`), which needed the `System.Drawing.Common` exclusion on iOS too.
+- [ ] Speed: ~205-225 s per picture in the simulator, about 10x the Mac's CPU with the caches in use; measure on an
+      iPhone (if it is as slow, check which XNNPACK kernels CLiteRTLM's build uses).
+- [ ] Memory and storage on an iPhone: the text encoder maps 3.5 GB; ~21 GB with the caches. Consider the
+      `com.apple.developer.kernel.increased-memory-limit` entitlement if the app is killed.
+- [ ] Optional: a standalone LiteRT framework for apps that use `Emgu.LiteRT` without LiteRT-LM.
 
 ## 32. Live camera tools — first version implemented
 

@@ -16,9 +16,17 @@ namespace Emgu.LiteRT
     {
         /// <summary>
         /// The file name of the LiteRT runtime library. .NET appends the platform suffix, resolving to
-        /// libLiteRt.dylib (macOS), libLiteRt.so (Linux / Android) or libLiteRt.dll (Windows).
+        /// libLiteRt.dylib (macOS), libLiteRt.so (Linux / Android) or libLiteRt.dll (Windows). On iOS there is no
+        /// libLiteRt: LiteRT's C API comes from LiteRT-LM's CLiteRTLM framework (the Emgu.LiteRT.LM.runtime.maui.ios
+        /// add-on), which links LiteRT statically and exports its whole C API - every function this library calls - so
+        /// Emgu.LiteRT and Emgu.LiteRT.LM share one LiteRT. It is named by its path rather than "__Internal", since
+        /// the app binary's static tfliteextern and CLiteRTLM both define TfLite* symbols.
         /// </summary>
+#if (__IOS__ && !__MACCATALYST__) && !UNITY_EDITOR
+        public const string LiteRtLibrary = "@rpath/CLiteRTLM.framework/CLiteRTLM";
+#else
         public const string LiteRtLibrary = "libLiteRt";
+#endif
 
         /// <summary>
         /// The LiteRT native api calling convention

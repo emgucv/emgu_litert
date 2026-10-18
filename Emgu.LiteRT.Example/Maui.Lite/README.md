@@ -359,7 +359,7 @@ again.
   CPU fallback. The demo's search tools currently use only text and images.
 - Settings → Image-generation model lists Z-Image-Turbo · CPU, currently the only image model. Image generation
   remains unavailable on iOS; GPU execution is not offered because the complete Windows GPU pipeline failed testing.
-- Settings → Image generation (Gemma 4; off by default; not on iOS) lets Gemma 4 draw pictures - "draw a red fox in
+- Settings → Image generation (Gemma 4; off by default) lets Gemma 4 draw pictures - "draw a red fox in
   the snow, watercolor" - with [Z-Image-Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo) on the device: 256 x 256,
   shown above the reply and saved with the chat. Tap a generated picture to enlarge it, then **Save image…** to
   export the original PNG through the platform's save dialog. This also works for pictures reopened from saved chats.
