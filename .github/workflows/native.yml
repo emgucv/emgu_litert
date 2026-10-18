@@ -140,3 +140,136 @@ jobs:
           lib/runtimes/osx/native/libGemmaModelConstraintProvider.dylib
           lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib
         if-no-files-found: error
+
+  ios:
+    # Builds the iOS frameworks (device arm64 + simulator arm64), then the MAUI demo for the iOS simulator with them, and
+    # checks that the app bundle embeds all four. A simulator build needs no signing; the device slices are built and
+    # uploaded but not linked into an app here.
+    name: iOS frameworks and MAUI demo
+    runs-on: macos-latest
+    timeout-minutes: 360
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        submodules: true
+    - name: Fetch LiteRT-LM's prebuilt Gemma libraries
+      # LiteRtLm.framework links prebuilt/ios_{arm64,sim_arm64}/libGemmaModelConstraintProvider.dylib, which LiteRT-LM
+      # stores with Git LFS; the submodule checkout only has their pointer files.
+      run: >
+        git -C LiteRT-LM lfs pull
+        --include=prebuilt/ios_arm64/libGemmaModelConstraintProvider.dylib,prebuilt/ios_sim_arm64/libGemmaModelConstraintProvider.dylib
+    - name: Build LiteRt.xcframework and tfliteextern.xcframework
+      run: platforms/ios/bazel_build_tflite_ios_frameworks
+    - name: Build LiteRtLm.xcframework and GemmaModelConstraintProvider.xcframework
+      run: platforms/ios/bazel_build_litert_lm_ios
+    - uses: actions/upload-artifact@v7
+      with:
+        name: native-ios
+        path: |
+          lib/ios/LiteRt.xcframework
+          lib/ios/tfliteextern.xcframework
+          lib/ios/LiteRtLm.xcframework
+          lib/ios/GemmaModelConstraintProvider.xcframework
+          lib/ios/tflite_version.txt
+        if-no-files-found: error
+    - uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+    - name: Install the .NET MAUI iOS workload
+      run: dotnet workload install maui-ios
+    - name: Generate the projects' Directory.Build.props
+      # The projects take their target framework and package settings from files CMake generates.
+      run: cmake -S . -B build
+    - name: Build the MAUI demo for the iOS simulator
+      # ValidateXcodeVersion=false: the runner's Xcode needn't be the exact version the .NET iOS SDK pack names.
+      run: >
+        dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug
+        -p:RuntimeIdentifier=iossimulator-arm64 -p:ValidateXcodeVersion=false
+    - name: Check the app bundle's frameworks
+      # Each framework must be embedded, be a simulator binary, and find the frameworks it links in the app's
+      # Frameworks folder.
+      run: |
+        APP=$(ls -d Emgu.LiteRT.Example/Maui.Lite/bin/Debug/net10.0-ios/iossimulator-arm64/*.app)
+        echo "$APP"
+        ls "$APP/Frameworks"
+        for NAME in LiteRt tfliteextern LiteRtLm GemmaModelConstraintProvider; do
+          BIN="$APP/Frameworks/$NAME.framework/$NAME"
+          [ -f "$BIN" ] || { echo "::error::$NAME.framework is missing from the app"; exit 1; }
+          vtool -show-build "$BIN" | grep -q "platform IOSSIMULATOR" || { echo "::error::$NAME is not an iOS simulator binary"; exit 1; }
+          for DEP in $(otool -L "$BIN" | awk '/@rpath\/.*\.framework/ {print $1}'); do
+            DEP_NAME=$(basename "$DEP")
+            [ "$DEP_NAME" = "$NAME" ] && continue
+            [ -f "$APP/Frameworks/$DEP_NAME.framework/$DEP_NAME" ] || { echo "::error::$NAME links $DEP, which the app doesn't embed"; exit 1; }
+          done
+        done
+
+  windows:
+    # Builds tfliteextern.dll, libLiteRt.dll and liblitert-lm.dll with platforms/windows/bazel_build_litert.ps1, then runs
+    # the whole test suite against them, including the "Native" tests the model-free Tests workflow skips (the model
+    # tests stay ignored without -p:TestModels=true).
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 360
+    env:
+      # The script uses Python 3.12 for Bazel's hermetic Python only when it finds one in C:\Python312; the runner's
+      # comes from setup-python instead.
+      HERMETIC_PYTHON_VERSION: "3.12"
+      # Bazel runs genrules and shell actions with this bash.
+      BAZEL_SH: C:\msys64\usr\bin\bash.exe
+    steps:
+    - name: Show free disk space
+      run: Get-PSDrive -PSProvider FileSystem
+    - uses: actions/checkout@v7
+      with:
+        submodules: true
+    - uses: actions/setup-python@v7
+      with:
+        python-version: "3.12"
+    - uses: bazel-contrib/setup-bazel@0.19.1
+      # Bazelisk, which runs the Bazel version LiteRT-LM's .bazelversion pins; no caching across runs.
+      with:
+        bazelisk-cache: false
+        disk-cache: false
+        repository-cache: false
+    - name: Fetch LiteRT-LM's prebuilt Gemma library
+      # liblitert-lm.dll depends on prebuilt/windows_x86_64/libGemmaModelConstraintProvider.dll, which LiteRT-LM stores
+      # with Git LFS; without it the script skips liblitert-lm.dll.
+      run: git -C LiteRT-LM lfs pull --include=prebuilt/windows_x86_64/libGemmaModelConstraintProvider.dll
+    - name: Build tfliteextern.dll, libLiteRt.dll and liblitert-lm.dll
+      # Run from a drive letter mapped to the workspace: the LiteRT-LM build's Rust objects come within a few characters
+      # of link.exe's 260-character path limit even under the repo root's short "o"/"u" output folders (see the script).
+      run: |
+        subst X: "$env:GITHUB_WORKSPACE"
+        X:
+        powershell -NoProfile -ExecutionPolicy Bypass -File X:\platforms\windows\bazel_build_litert.ps1 64
+    - name: Check the built libraries
+      # The script doesn't stop at a failed Bazel build, so check that every library was written.
+      run: |
+        $missing = @("tfliteextern.dll", "libLiteRt.dll", "liblitert-lm.dll", "libGemmaModelConstraintProvider.dll", "tflite_version.txt") |
+          Where-Object { -not (Test-Path "lib\runtimes\win-x64\native\$_") }
+        Get-ChildItem lib\runtimes\win-x64\native
+        if ($missing) { Write-Error "Missing: $($missing -join ', ')"; exit 1 }
+    - uses: actions/upload-artifact@v7
+      with:
+        name: native-windows-x64
+        path: |
+          lib/runtimes/win-x64/native/tfliteextern.dll
+          lib/runtimes/win-x64/native/libLiteRt.dll
+          lib/runtimes/win-x64/native/liblitert-lm.dll
+          lib/runtimes/win-x64/native/libGemmaModelConstraintProvider.dll
+          lib/runtimes/win-x64/native/tflite_version.txt
+        if-no-files-found: error
+    - uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+    - name: Generate the projects' Directory.Build.props
+      run: cmake -S . -B build
+    - name: Run the tests
+      run: >
+        dotnet test Emgu.LiteRT.Test/Emgu.TF.Lite.Test/Emgu.TF.Lite.Test.Net/Emgu.TF.Lite.Test.Net.csproj
+        --logger "trx;LogFileName=tests.trx" --results-directory test-results
+    - uses: actions/upload-artifact@v7
+      if: failure()
+      with:
+        name: test-results-windows
+        path: test-results/

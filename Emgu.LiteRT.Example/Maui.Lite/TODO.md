@@ -132,7 +132,7 @@ Launchers cache icons: reinstall the updated app without clearing its data; on M
 Services and relaunch if needed. Do not uninstall just to refresh an icon, since that removes downloaded models and
 saved chats. Older demos with the separate `com.emgu.tf.lite.maui.demo` identifier keep their own original icons.
 
-## 6. Run the model-free tests in CI — implemented; first GitHub run pending
+## 6. Run the model-free tests in CI — completed
 
 The native workflow only builds. `.github/workflows/tests.yml` now runs the tests that need neither a model nor this
 repo's native libraries on every push and pull request (Ubuntu 26.04, .NET 10): CMake generates the projects'
@@ -145,7 +145,7 @@ repo's native libraries on every push and pull request (Ubuntu 26.04, .NET 10): 
       runs: 111 tests, 49 skipped, ~4 s.
 - [x] Rehearsed in a .NET 10 Linux container (arm64) from the tracked files only, without `lib/`: 111 passed. On the
       Mac with the natives present, `TestCategory=Native` runs the other 9.
-- [ ] Watch the first run on GitHub after the next push.
+- [x] First GitHub run (commit 028c7ac0): 111 passed, 49 skipped, 0 failed; the job takes ~1 minute.
 
 ## 7. An agent regression test — implemented
 

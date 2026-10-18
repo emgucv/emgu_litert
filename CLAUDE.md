@@ -61,10 +61,10 @@ cd platforms/windows
 Or via Bazel (also produces `lib/runtimes/win-x64/native/tfliteextern.dll`):
 ```powershell
 cd platforms/windows
-.\bazel_build_litert.ps1 64 xnn
+.\bazel_build_litert.ps1 64
 ```
 
-Verified with LiteRT-LM v0.18.0 (`litert_windows_exports.def` unchanged: 652 live exports vs 652 listed; `TestGetVersion` passes). The scripts aren't signed, so from a shell with a restrictive execution policy run them as `powershell -NoProfile -ExecutionPolicy Bypass -File .\bazel_build_litert.ps1 64 xnn`.
+Verified with LiteRT-LM v0.18.0 (`litert_windows_exports.def` unchanged: 652 live exports vs 652 listed; `TestGetVersion` passes). The scripts aren't signed, so from a shell with a restrictive execution policy run them as `powershell -NoProfile -ExecutionPolicy Bypass -File .\bazel_build_litert.ps1 64` (XNNPACK is on by default; `-DisableXnn` turns it off).
 
 ### Build the .NET solution (Windows)
 ```powershell
@@ -138,6 +138,8 @@ dotnet test Emgu.LiteRT.Test/Emgu.TF.Lite.Test/Emgu.TF.Lite.Test.Net/Emgu.TF.Lit
 
 ### Model-free tests in CI
 `.github/workflows/tests.yml` runs the suite on Ubuntu without models or this repo's native libraries: `cmake -S . -B build` (generates the `Directory.Build.props`), then `dotnet test ... --filter "TestCategory!=Native"` (111 tests, ~4 s). Test classes that load `tfliteextern`/`libLiteRt` are in the `Native` category (`[Category("Native")]`, `[TestCategory]` under `VS_TEST`) - put new native-dependent test classes there too, or CI fails with `DllNotFoundException`.
+
+`.github/workflows/native.yml`'s `ios` job builds the four iOS xcframeworks (`bazel_build_tflite_ios_frameworks`, `bazel_build_litert_lm_ios`), then the MAUI demo for the iOS simulator (`-f net10.0-ios -p:RuntimeIdentifier=iossimulator-arm64 -p:ValidateXcodeVersion=false`, no signing needed), and checks that the `.app`'s `Frameworks` folder holds all four as simulator binaries, with every `@rpath/*.framework` each one links also embedded. Its `windows` job runs `bazel_build_litert.ps1 64` on `windows-latest` (Bazelisk, Python 3.12, `BAZEL_SH` = MSYS2's bash, from a `subst` drive letter to keep the LiteRT-LM build's paths under 260 characters), checks that all four DLLs were written - the script carries on past a failed Bazel build - and runs the whole test suite, `Native` tests included.
 
 ### Run a single test
 ```bash
