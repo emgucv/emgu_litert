@@ -39,7 +39,9 @@ namespace Maui.Demo.Lite
             Qwen35_4B,
             Gemma4E2B,
             Gemma4E4B,
-            Gemma4_12B
+            Gemma4_12B,
+            // A model on the user's own server (LiteRtLmChatPage.Server.cs).
+            Server
         }
 
         private sealed class ModelOption
@@ -591,6 +593,8 @@ namespace Maui.Demo.Lite
                         TextColor = Theme.SecondaryText
                     },
                     Theme.Divider(),
+                    BuildServerSection(),
+                    Theme.Divider(),
                     BuildEmbeddingModelSection(),
                     Theme.Divider(),
                     BuildPhotoSection(),
@@ -1036,6 +1040,7 @@ namespace Maui.Demo.Lite
                     models.Children.Add(cell);
                 }
             }
+            list.Children.Add(BuildServerModelRow(inSheet));
             return list;
         }
 
@@ -1072,12 +1077,12 @@ namespace Maui.Demo.Lite
 
         // ---------- Model selection ----------
 
-        private ModelOption SelectedOption => Models[_selectedModel];
+        private ModelOption SelectedOption => OptionAt(_selectedModel);
 
         // Select a model (loaded on the next message) and show the controls it supports.
         private void SelectModel(int index, bool? gpu = null)
         {
-            UiStallWatchdog.Mark("Select model " + Models[index].Name);
+            UiStallWatchdog.Mark("Select model " + OptionAt(index).Name);
             // A chat belongs to a model: another model starts a new chat.
             if (_pageStarted && index != _selectedModel)
                 StartNewChat();
@@ -1085,7 +1090,7 @@ namespace Maui.Demo.Lite
             ModelOption option = SelectedOption;
             _selectedGpu = (gpu ?? _selectedGpu) && HasGpu(option);
             _gpuUnavailable = false;
-            _modelChipLabel.Text = option.Name + (_selectedGpu ? " · GPU" : " · CPU");
+            _modelChipLabel.Text = option.Choice == ModelChoice.Server ? ServerModelLabel : option.Name + (_selectedGpu ? " · GPU" : " · CPU");
             RefreshModelList();
             _talkButton.IsVisible = option.AcceptsAudio;
             _thinkingSwitch.IsVisible = option.CanThink;
@@ -1101,7 +1106,9 @@ namespace Maui.Demo.Lite
             if (_pageStarted)
             {
                 // Constructor UI setup must not overwrite the saved backend before OnAppearing restores it.
-                try { Preferences.Default.Set(BackendPreference, _selectedGpu); } catch (Exception) { }
+                // (The server has no backend: the local models keep theirs.)
+                if (option.Choice != ModelChoice.Server)
+                    try { Preferences.Default.Set(BackendPreference, _selectedGpu); } catch (Exception) { }
                 try { Preferences.Default.Set(LastModelPreference, option.Choice.ToString()); } catch (Exception) { }
                 _ = PrepareModelAsync(false);
             }
@@ -1125,7 +1132,7 @@ namespace Maui.Demo.Lite
             try
             {
                 string last = Preferences.Default.Get(LastModelPreference, null as string);
-                int found = Array.FindIndex(Models, m => m.Choice.ToString() == last);
+                int found = ModelIndexOf(last);
                 if (found >= 0)
                     index = found;
             }
@@ -1153,6 +1160,8 @@ namespace Maui.Demo.Lite
         private static bool IsDownloaded(ModelOption option)
         {
             // A file that exists but isn't verified yet (e.g. downloaded by an older version) is checked when loading.
+            if (option.File == null)
+                return true; // The server: nothing to download.
             try
             {
                 string path = option.File.LocalFile;
@@ -1211,10 +1220,12 @@ namespace Maui.Demo.Lite
             }
             // (PrepareModelAsync only gets here when the loaded model isn't the one wanted: another model, or the same one
             // on another backend.)
-            if (_model != null)
+            if (_model != null || _serverConnected != null || _chatClient != null)
                 await CleanupModelAsync();
             if (token.IsCancellationRequested)
                 return false;
+            if (option.Choice == ModelChoice.Server)
+                return await ConnectServerAsync(option, token);
 
             bool onGpu = WantsGpu(option);
             int contextTokens = ContextTokensFor(option);
@@ -1325,7 +1336,8 @@ namespace Maui.Demo.Lite
         }
 
         // The selected model is loaded, on the backend it should run on.
-        private bool ModelReady => _model != null && _loaded == SelectedChoice && _loadedOnGpu == WantsGpu(SelectedOption)
+        private bool ModelReady => (SelectedChoice == ModelChoice.Server ? _serverConnected == ServerConnectionKey : _model != null)
+            && _loaded == SelectedChoice && _loadedOnGpu == WantsGpu(SelectedOption)
             && _loadedContextTokens == ContextTokensFor(SelectedOption);
 
         // Whether the model should run on the GPU: the setting, unless the GPU failed to load this session.
@@ -1519,7 +1531,7 @@ namespace Maui.Demo.Lite
         {
             if (_downloadingChoice == option.Choice) _downloadingChoice = null;
             UpdateModelDownloadRows();
-            bool paused = option.File.PartialDownloadBytes > 0;
+            bool paused = option.File != null && option.File.PartialDownloadBytes > 0;
             ShowLoadCard(option, (paused ? PausedDownload(option) + "\n" : "") + "Could not load the model: " + message, null);
             _loadSpinner.IsVisible = _loadSpinner.IsRunning = false;
             SetLoadButtons(paused ? "Continue" : "Retry", () => _ = PrepareModelAsync(true), null);
@@ -1780,6 +1792,7 @@ namespace Maui.Demo.Lite
                 UpdateMemoryLabel();
                 // The agent may have saved or deleted a memory.
                 _ = RefreshMemoryCountAsync();
+                _ = RefreshServerContextAsync();
             }
         }
 
@@ -1806,7 +1819,9 @@ namespace Maui.Demo.Lite
             ChatOptions options = new ChatOptions
             {
                 // A voice chat answers without thinking first: a spoken reply should start quickly.
-                Reasoning = new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink && !_voiceMode ? ReasoningEffort.Medium : ReasoningEffort.None },
+                // (A server's model is left to think as it is set up to: OpenAI-compatible servers differ in what they accept.)
+                Reasoning = SelectedChoice == ModelChoice.Server ? null
+                    : new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink && !_voiceMode ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
                     !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, FindPhotosAsync, ImageGenerationSupported ? GenerateImageAsync : null,
                     IsPrivateChat ? null : SearchChatsAsync, privateChat: IsPrivateChat,
@@ -1909,6 +1924,8 @@ namespace Maui.Demo.Lite
         // new tools, and so a new agent.
         private async Task EnsureAgentAsync()
         {
+            if (_chatClient == null && SelectedChoice == ModelChoice.Server)
+                _chatClient = CreateServerChatClient();
             if (_chatClient == null)
             {
                 var localClient = new LiteRtLmChatClient(_model);
@@ -2438,7 +2455,21 @@ namespace Maui.Demo.Lite
 
         // ---------- Context window ----------
 
-        private int ContextWindow => _model != null && _model.MaxNumTokens > 0 ? _model.MaxNumTokens : 4096;
+        private int ContextWindow => SelectedChoice == ModelChoice.Server ? _serverContextTokens
+            : _model != null && _model.MaxNumTokens > 0 ? _model.MaxNumTokens : 4096;
+
+        // Counts tokens with the loaded model's tokenizer, or estimates them for a server's model. Call it off the UI
+        // thread.
+        private Func<string, int> TokenCounter
+        {
+            get
+            {
+                LanguageModel model = _model;
+                if (SelectedChoice == ModelChoice.Server || model == null)
+                    return ApproximateTokens;
+                return model.CountTokens;
+            }
+        }
 
         // Early estimate for history summarization before a send. The native chat client additionally budgets
         // rendered instructions/tools, actual cache occupancy and each pending tool round at execution time.
@@ -2447,9 +2478,9 @@ namespace Maui.Demo.Lite
             : ChatOverheadTokens);
 
         // The estimated size of a message in the model's context. Runs the tokenizer: call it off the UI thread.
-        private static int EstimateTokens(LanguageModel model, HistoryItem item)
+        private static int EstimateTokens(Func<string, int> countTokens, HistoryItem item)
         {
-            int tokens = model.CountTokens(item.ModelText ?? string.Empty) + MessageOverheadTokens;
+            int tokens = countTokens(item.ModelText ?? string.Empty) + MessageOverheadTokens;
             foreach (var attachment in item.Attachments)
                 tokens += attachment.Kind == "image" ? ImageTokens : AudioTokens(attachment.Data);
             return tokens;
@@ -2484,7 +2515,7 @@ namespace Maui.Demo.Lite
         // and the next message.
         private async Task CountTokensAsync(HistoryItem next)
         {
-            LanguageModel model = _model;
+            Func<string, int> countTokens = TokenCounter;
             List<HistoryItem> items = _historyItems.Skip(_contextStart).Where(i => i.Tokens < 0).ToList();
             if (next != null && next.Tokens < 0)
                 items.Add(next);
@@ -2494,9 +2525,9 @@ namespace Maui.Demo.Lite
             int summaryTokens = await Task.Run(() =>
             {
                 foreach (HistoryItem item in items)
-                    item.Tokens = EstimateTokens(model, item);
+                    item.Tokens = EstimateTokens(countTokens, item);
                 return summary == null ? 0
-                    : model.CountTokens(SummaryIntro + summary + SummaryAcknowledgement) + 2 * MessageOverheadTokens;
+                    : countTokens(SummaryIntro + summary + SummaryAcknowledgement) + 2 * MessageOverheadTokens;
             });
             if (summary != null && summary == _summary)
                 _summaryTokens = summaryTokens;
@@ -2640,6 +2671,7 @@ namespace Maui.Demo.Lite
                 "with who is meant (\"The user ...\" or \"The assistant ...\"), at most 150 words, and write only the " +
                 "summary.";
             LanguageModel model = _model;
+            Func<string, int> countTokens = TokenCounter;
             // Release the chat's and the agent's conversations first; they are given the conversation again afterwards.
             ResetAgent();
             _chat?.LoadHistory(Array.Empty<Emgu.LiteRT.LM.Models.ChatMessage>());
@@ -2651,10 +2683,12 @@ namespace Maui.Demo.Lite
                     + "\n\nConversation:\n";
                 List<string> lines = messages.Select(DescribeForSummary).ToList();
                 // If it's still too long for the model, the oldest messages go.
-                while (lines.Count > 1 && model.CountTokens(head + string.Join("\n", lines)) > inputBudget)
+                while (lines.Count > 1 && countTokens(head + string.Join("\n", lines)) > inputBudget)
                     lines.RemoveAt(0);
                 return head + string.Join("\n", lines);
             });
+            if (SelectedChoice == ModelChoice.Server)
+                return await SummarizeOnServerAsync(prompt);
             Chat summarizer = model.CreateChat();
             try
             {
@@ -2689,7 +2723,7 @@ namespace Maui.Demo.Lite
                 SetStatus("Hang on - still answering.");
                 return;
             }
-            if (_model == null || _loaded != SelectedChoice)
+            if (!ModelReady)
             {
                 SetStatus("Load the model first.");
                 return;
@@ -2724,7 +2758,7 @@ namespace Maui.Demo.Lite
                 "The model takes in about {0:N0} tokens. Longer chats are summarized - or, for the small models, their " +
                 "earliest messages are dropped - so it keeps up; the conversation here stays complete.", ContextWindow);
             int visible = _historyItems.Count - _contextStart;
-            if (_model != null && visible > 0 && _historyItems.Skip(_contextStart).All(i => i.Tokens >= 0))
+            if (ModelReady && visible > 0 && _historyItems.Skip(_contextStart).All(i => i.Tokens >= 0))
             {
                 // With what the chat template, or the agent's instructions and tools, take.
                 int used = ContextTokens() + ContextWindow - ReplyReserveTokens - ContextBudget;
@@ -2847,15 +2881,15 @@ namespace Maui.Demo.Lite
             _historyItems.Add(replyItem);
             try
             {
-                LanguageModel model = _model;
+                Func<string, int> countTokens = TokenCounter;
                 // The document step line isn't a tool call: its excerpts are counted with the message.
                 int steps = _sendSteps.Count(IsToolStep);
                 await Task.Run(() =>
                 {
-                    replyItem.Tokens = EstimateTokens(model, replyItem);
+                    replyItem.Tokens = EstimateTokens(countTokens, replyItem);
                     // Until the conversation is rebuilt, the model's own conversation also holds the thinking and the
                     // tool calls.
-                    replyItem.ExtraTokens = (string.IsNullOrEmpty(reply.Thinking) ? 0 : model.CountTokens(reply.Thinking))
+                    replyItem.ExtraTokens = (string.IsNullOrEmpty(reply.Thinking) ? 0 : countTokens(reply.Thinking))
                         + steps * ToolStepTokens;
                 });
             }
@@ -3097,7 +3131,7 @@ namespace Maui.Demo.Lite
                 if (chat == null)
                     return;
                 UiStallWatchdog.Mark("Open saved chat " + id);
-                int index = Array.FindIndex(Models, m => m.Choice.ToString() == chat.Model);
+                int index = ModelIndexOf(chat.Model);
                 if (index >= 0 && index != _selectedModel)
                     SelectModel(index);
                 StartNewChat();
@@ -3230,6 +3264,7 @@ namespace Maui.Demo.Lite
             _chat = null;
             _model = null;
             _loaded = null;
+            _serverConnected = null;
             // Freeing an engine can take a moment: not on the UI thread.
             await Task.Run(() =>
             {
