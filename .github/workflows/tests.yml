@@ -1,0 +1,48 @@
+# Runs the unit tests that need neither a model nor this repo's native libraries (libLiteRt, tfliteextern,
+# liblitert-lm), so every push gets them in seconds instead of waiting for the hours-long native builds:
+# calculator, unit converter, HTML text, agent memory, photo requests and places, document splitting, Z-Image math,
+# chat storage, export and search, visual agents, downloads, workload policy and the like.
+#
+# The model tests are ignored unless built with -p:TestModels=true, and the tests that load the natives are in the
+# "Native" category, which this workflow skips. Some tests fetch small files from GitHub (e.g. Z-Image's golden
+# fixtures).
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  managed:
+    name: Model-free tests (Ubuntu)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        # litert for the version CMake reads (litert/litert/version.bzl), LiteRT-LM for test inputs the test project
+        # links. Non-recursive, and without Git LFS: no prebuilt libraries are needed.
+        submodules: true
+    - uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+    - name: Generate the projects' Directory.Build.props
+      # The projects take their target framework and package settings from files CMake generates.
+      run: cmake -S . -B build
+    - name: Run the tests
+      run: >
+        dotnet test Emgu.LiteRT.Test/Emgu.TF.Lite.Test/Emgu.TF.Lite.Test.Net/Emgu.TF.Lite.Test.Net.csproj
+        --filter "TestCategory!=Native"
+        --logger "trx;LogFileName=tests.trx" --results-directory test-results
+    - uses: actions/upload-artifact@v7
+      if: failure()
+      with:
+        name: test-results
+        path: test-results/

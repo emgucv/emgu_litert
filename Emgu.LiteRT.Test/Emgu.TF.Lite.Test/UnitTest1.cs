@@ -17,7 +17,14 @@ using LiteRt = Emgu.LiteRT;
 
 namespace Emgu.TF.Lite.Test
 {
+    // Needs the native libraries (tfliteextern, libLiteRt): the CI test workflow, which runs without them, skips the
+    // "Native" category.
     [TestFixture]
+#if VS_TEST
+    [TestCategory("Native")]
+#else
+    [Category("Native")]
+#endif
     public class UnitTest1
     {
         [TestAttribute]

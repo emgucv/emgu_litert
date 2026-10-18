@@ -132,14 +132,20 @@ Launchers cache icons: reinstall the updated app without clearing its data; on M
 Services and relaunch if needed. Do not uninstall just to refresh an icon, since that removes downloaded models and
 saved chats. Older demos with the separate `com.emgu.tf.lite.maui.demo` identifier keep their own original icons.
 
-## 6. Run the model-free tests in CI
+## 6. Run the model-free tests in CI — implemented; first GitHub run pending
 
-The GitHub Actions workflows only build. Many tests need no model or device and take seconds.
+The native workflow only builds. `.github/workflows/tests.yml` now runs the tests that need neither a model nor this
+repo's native libraries on every push and pull request (Ubuntu 26.04, .NET 10): CMake generates the projects'
+`Directory.Build.props`, then `dotnet test --filter "TestCategory!=Native"`.
 
-- [ ] Run them on every push: `TestZImageMath`, `TestDocumentSplitText`, `TestPlaceLookup`, `TestPhotoRequest`,
-      `TestCalculator`, `TestUnitConverter`, `TestHtmlText`, `TestAgentMemoryTools` (some fetch small files from the
-      network; mark or skip those if the runner can't).
-- [ ] Needs the natives the tests load (or a filter for the managed-only ones on runners without them).
+- [x] The two test classes that load `tfliteextern`/`libLiteRt` (`UnitTest1`, `UnitTestLiteRtModels`: version, GPU,
+      MobileNet, Inception, COCO SSD) are in the `Native` category; the model tests stay ignored without
+      `-p:TestModels=true`. Everything else - calculator, unit converter, HTML text, memory tools, photo requests and
+      places, document splitting, Z-Image math, chat storage/export/search, visual agents, downloads, workload policy -
+      runs: 111 tests, 49 skipped, ~4 s.
+- [x] Rehearsed in a .NET 10 Linux container (arm64) from the tracked files only, without `lib/`: 111 passed. On the
+      Mac with the natives present, `TestCategory=Native` runs the other 9.
+- [ ] Watch the first run on GitHub after the next push.
 
 ## 7. An agent regression test — implemented
 
@@ -890,5 +896,7 @@ LiteRT inside LiteRT-LM's `CLiteRTLM` (item 31).
       `Emgu.LiteRT.runtime.maui.ios` embeds `LiteRt` + `tfliteextern`, the LM add-on `LiteRtLm` + the Gemma library.
 - [x] Verified in an iPhone 18 Pro simulator (iOS 27), one process: TF Lite Interpreter and LiteRT CompiledModel
       MobileNet (space shuttle, 1.0), Gemma 4 E2B ("Paris"), Z-Image (the fox, 225 s), one `LiteRt.framework` loaded.
-- [ ] An app that references only the base runtime (no LM add-on) running `Emgu.LiteRT` and TF Lite.
+- [x] An app that references only the base runtime (no LM add-on): a plain .NET iOS app in the simulator ran TF Lite
+      and CompiledModel MobileNet (space shuttle, 1.0) with only `LiteRt` and `tfliteextern` in its bundle. (The
+      simulator runs iOS 27, so the iOS 15 minimum itself is untested.)
 - [ ] A real iPhone, and App Store validation of the frameworks (item 35).

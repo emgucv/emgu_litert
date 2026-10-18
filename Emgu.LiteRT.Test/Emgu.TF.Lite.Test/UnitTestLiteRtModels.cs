@@ -21,7 +21,13 @@ namespace Emgu.TF.Lite.Test
 {
     // Emgu.LiteRT.Models (LiteRT's CompiledModel API) against Emgu.TF.Lite.Models (the TFLite Interpreter API): the same
     // models and images should give the same results.
+    // Needs the native libraries (tfliteextern, libLiteRt), like UnitTest1: category "Native".
     [TestFixture]
+#if VS_TEST
+    [TestCategory("Native")]
+#else
+    [Category("Native")]
+#endif
     public class UnitTestLiteRtModels
     {
         private static void Skip(String message)

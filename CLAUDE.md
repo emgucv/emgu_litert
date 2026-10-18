@@ -136,6 +136,9 @@ Tests use either NUnit or MSTest (selected at compile-time via the `VS_TEST` pre
 dotnet test Emgu.LiteRT.Test/Emgu.TF.Lite.Test/Emgu.TF.Lite.Test.Net/Emgu.TF.Lite.Test.Net.csproj
 ```
 
+### Model-free tests in CI
+`.github/workflows/tests.yml` runs the suite on Ubuntu without models or this repo's native libraries: `cmake -S . -B build` (generates the `Directory.Build.props`), then `dotnet test ... --filter "TestCategory!=Native"` (111 tests, ~4 s). Test classes that load `tfliteextern`/`libLiteRt` are in the `Native` category (`[Category("Native")]`, `[TestCategory]` under `VS_TEST`) - put new native-dependent test classes there too, or CI fails with `DllNotFoundException`.
+
 ### Run a single test
 ```bash
 dotnet test <project.csproj> --filter "FullyQualifiedName~TestGetVersion"
