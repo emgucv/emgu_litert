@@ -31,7 +31,9 @@ public partial class LiteRtLmChatPage
     {
         Name = "Your server",
         Choice = ModelChoice.Server,
-        CanThink = false,
+        // Thinking comes back as reasoning_content (LM Studio, Ollama, ...), which Microsoft.Extensions.AI.OpenAI turns
+        // into TextReasoningContent; the Think chip is sent as reasoning_effort ("none" turns it off in LM Studio).
+        CanThink = true,
         CanUseTools = true,
         CanSummarize = true,
         AcceptsImages = true,
@@ -56,6 +58,9 @@ public partial class LiteRtLmChatPage
     private string _serverKey = string.Empty;
     // The server, model and key the connection was checked for (ModelReady), or null.
     private string _serverConnected;
+    // The server refused reasoning_effort (some OpenAI-compatible servers reject what they don't know): not sent to it again.
+    private bool _serverRejectsReasoning;
+    private string _serverRejectsReasoningUrl;
     private int _serverContextTokens = DefaultServerContextTokens;
     private bool _serverContextKnown;
 
@@ -356,6 +361,8 @@ public partial class LiteRtLmChatPage
         if (token.IsCancellationRequested)
             return false;
         _serverConnected = ServerConnectionKey;
+        if (_serverRejectsReasoningUrl != url)
+            _serverRejectsReasoning = false;
         _loaded = option.Choice;
         _loadedOnGpu = false;
         _loadedContextTokens = 0;
@@ -390,6 +397,17 @@ public partial class LiteRtLmChatPage
                 if (attachment.Image != null && !ServerOption.AcceptsImages)
                     RemovePending(attachment);
         }
+    }
+
+    // A server's 400 that names the reasoning option: remember it for this server, and let the message be sent again.
+    private bool ServerRejectedReasoning(System.ClientModel.ClientResultException ex)
+    {
+        if (!ServerSelected || _serverRejectsReasoning || ex.Status != 400
+            || ex.Message.IndexOf("reasoning", StringComparison.OrdinalIgnoreCase) < 0)
+            return false;
+        _serverRejectsReasoning = true;
+        _serverRejectsReasoningUrl = _serverUrl;
+        return true;
     }
 
     // LM Studio loads a model on its first request, with the context length it is set to: learn it then.
@@ -427,13 +445,24 @@ public partial class LiteRtLmChatPage
         return (int)Math.Ceiling(ascii / 3.5 + (text.Length - ascii) * 1.0);
     }
 
-    // Summarize with the server's model. The limit leaves room for thinking: LM Studio runs Gemma 4 with it on, and its
-    // thinking used up SummaryMaxTokens before any summary came out (an empty reply). The instructions keep the summary
-    // itself short.
+    // Summarize with the server's model, without thinking. The limit still leaves room for it, for a server that thinks
+    // anyway: LM Studio runs Gemma 4 with thinking on unless told otherwise, and it used up SummaryMaxTokens before any
+    // summary came out (an empty reply). The instructions keep the summary itself short.
     private async Task<string> SummarizeOnServerAsync(string prompt)
     {
         using IChatClient client = CreateServerChatClient();
-        ChatResponse response = await client.GetResponseAsync(prompt, new ChatOptions { MaxOutputTokens = SummaryMaxTokens + 1600 });
+        var options = new ChatOptions
+        {
+            MaxOutputTokens = SummaryMaxTokens + 1600,
+            Reasoning = _serverRejectsReasoning ? null : new ReasoningOptions { Effort = ReasoningEffort.None }
+        };
+        ChatResponse response;
+        try { response = await client.GetResponseAsync(prompt, options); }
+        catch (ClientResultException ex) when (ServerRejectedReasoning(ex))
+        {
+            options.Reasoning = null;
+            response = await client.GetResponseAsync(prompt, options);
+        }
         string text = new Emgu.LiteRT.LM.Models.ChatReply(response.Text ?? string.Empty).Text.Trim();
         if (text.Length == 0)
             throw new Exception("The summary is empty");

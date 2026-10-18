@@ -1745,6 +1745,14 @@ namespace Maui.Demo.Lite
                         reply = InterruptedReply();
                         break;
                     }
+                    catch (System.ClientModel.ClientResultException ex) when (attempt == 0 && ServerRejectedReasoning(ex))
+                    {
+                        // The server doesn't take reasoning_effort: send it again without (the agent's session only keeps
+                        // a message once its reply is complete).
+                        UiStallWatchdog.Mark("Server rejected reasoning_effort: " + ex.Message);
+                        streamed.Clear();
+                        _sendSteps.Clear();
+                    }
                     catch (Exception ex) when (attempt == 0 && !UseAgent && IsContextFull(ex))
                     {
                         // The estimate was short, so don't rely on it: drop the earlier messages (a summary made before
@@ -1818,9 +1826,9 @@ namespace Maui.Demo.Lite
             // tools with the Web search chip on.
             ChatOptions options = new ChatOptions
             {
-                // A voice chat answers without thinking first: a spoken reply should start quickly.
-                // (A server's model is left to think as it is set up to: OpenAI-compatible servers differ in what they accept.)
-                Reasoning = SelectedChoice == ModelChoice.Server ? null
+                // A voice chat answers without thinking first: a spoken reply should start quickly. (Sent to a server as
+                // reasoning_effort, unless it rejected that - then its model thinks as the server is set up to.)
+                Reasoning = SelectedChoice == ModelChoice.Server && _serverRejectsReasoning ? null
                     : new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink && !_voiceMode ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
                     !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, FindPhotosAsync, ImageGenerationSupported ? GenerateImageAsync : null,
