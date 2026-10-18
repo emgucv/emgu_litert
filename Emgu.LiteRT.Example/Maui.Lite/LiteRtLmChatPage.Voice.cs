@@ -311,6 +311,7 @@ public partial class LiteRtLmChatPage
     {
         Stopwatch clock = Stopwatch.StartNew();
         TimeSpan last = TimeSpan.Zero, quietSince = TimeSpan.Zero;
+        double scale = _voiceCircle.Scale;
         _voiceTapped = false;
         while (true)
         {
@@ -321,9 +322,13 @@ public partial class LiteRtLmChatPage
             last = now;
             if (until == VoiceActivity.SpeechEnded)
             {
-                // The circle grows with the voice.
+                // The circle grows with the voice - up to a quarter at a normal speaking level, 25-35 dB above the
+                // background on a Pixel Fold - eased so it follows the voice's loudness rather than every syllable: up
+                // over about 0.15 s, down over about 0.3 s. Background noise doesn't move it.
                 double above = double.IsNaN(detector.NoiseFloorDb) ? 0 : level - detector.NoiseFloorDb;
-                _voiceCircle.Scale = 1 + Math.Clamp(above / 40, 0, 0.35);
+                double target = 1 + Math.Clamp((above - 6) / 100, 0, 0.25);
+                scale += (target - scale) * (target > scale ? 0.35 : 0.15);
+                _voiceCircle.Scale = scale;
                 if (activity == VoiceActivity.SpeechStarted)
                     _voiceHint.Text = "Pause when you're done, or tap the circle to send now";
                 if (_voiceTapped)
@@ -376,13 +381,13 @@ public partial class LiteRtLmChatPage
                 _voiceCircle.BackgroundColor = Theme.SecondaryText;
                 _voiceStatus.Text = "Thinking...";
                 _voiceHint.Text = "Tap the circle to stop and speak again.";
-                Pulse(0.05, 1400);
+                Pulse(0.03, 2000);
                 break;
             case VoiceState.Speaking:
                 _voiceCircle.BackgroundColor = Theme.Success;
                 _voiceStatus.Text = "Speaking...";
                 _voiceHint.Text = _voiceHeadphones ? "Speak or tap the circle to interrupt." : "Tap the circle to interrupt.";
-                Pulse(0.1, 800);
+                Pulse(0.05, 1600);
                 break;
         }
     }

@@ -97,6 +97,33 @@ public class UnitTestVoiceConversation
     }
 
     [Test]
+    public void EndsSpeechInANoisyRoomAfterDigitalSilence()
+    {
+        // As recorded on a Pixel Fold: the recording starts with digital silence, the room is -57 to -47 dBFS with an
+        // occasional louder blip, and speech is -30 to -19 dBFS. The background must not stay at the digital silence,
+        // where only the -50 dBFS minimum would tell speech from the room's peaks.
+        Random random = new Random(3);
+        var levels = new List<double> { -160, -80 };
+        void Room(int frames)
+        {
+            for (int i = 0; i < frames; i++)
+                levels.Add(i % 25 == 24 ? -44 : -57 + 10 * random.NextDouble());
+        }
+        Room(20);
+        int speechStart = levels.Count;
+        for (int i = 0; i < 67; i++)
+            levels.Add(i % 9 == 4 ? -41 : -30 + 11 * random.NextDouble());
+        int speechEnd = levels.Count;
+        Room(100);
+
+        var events = Run(new VoiceActivityDetector(), levels);
+        TestContext.Out.WriteLine(string.Join(", ", events.Select(e => e.Activity + " " + e.Seconds.ToString("0.00"))));
+        Assert.That(events.Select(e => e.Activity), Is.EqualTo(new[] { VoiceActivity.SpeechStarted, VoiceActivity.SpeechEnded }));
+        Assert.That(events[0].Seconds, Is.InRange(speechStart * Frame.TotalSeconds, (speechStart + 10) * Frame.TotalSeconds));
+        Assert.That(events[1].Seconds - speechEnd * Frame.TotalSeconds, Is.InRange(0.85, 1.2), "ended by the pause");
+    }
+
+    [Test]
     public void ShortPausesDoNotEndAnUtteranceButTheLengthLimitDoes()
     {
         var detector = new VoiceActivityDetector { MaxUtterance = TimeSpan.FromSeconds(5) };

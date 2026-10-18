@@ -422,32 +422,37 @@ the Windows share sheet opens and the shared ZIP holds chat.md. Import remains o
 - [ ] Large text: check the chat, settings and sheets with the largest font sizes on Android and iOS.
 - [ ] Contrast of the secondary text in light and dark mode.
 
-## 22. Hands-free voice conversation — implemented; verified on Mac Catalyst with a recorded voice
+## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst with a recorded voice
 
 Voice messages and "Read replies aloud" exist, but each turn needs a tap. A conversation mode: speak, hear the reply,
 speak again.
 
 - [x] A "Voice chat" chip (Gemma 4; not on Windows, whose recorder can't measure the microphone level) opens a
       full-screen view that listens, finds the end of speech (`VoiceActivityDetector`: the level against a tracked
-      background - 12 dB above it for 0.2 s starts speech, 0.9 s below +7 dB ends it, 30 s at most - from
-      AVAudioRecorder's metering or the RMS of Android's 16 kHz samples), sends the audio to Gemma 4 (without
-      thinking, for a quick answer) and reads the reply aloud, then listens again.
+      background - 12 dB above it for 0.2 s starts speech, 0.9 s below +9 dB ends it (a single loud 50 ms frame
+      doesn't), 30 s at most - from AVAudioRecorder's metering or the RMS of Android's 16 kHz samples, read 20 ms at a
+      time; on a Pixel Fold the 200 ms reads left most 50 ms frames empty, which counted as digital silence, pulled
+      the background down to it and kept a noisy room's peaks above the -50 dBFS minimum, so speech never ended),
+      sends the audio to Gemma 4 (without thinking, for a quick answer) and reads the reply aloud, then listens again.
 - [x] Read aloud while the reply streams, sentence by sentence (`SpeechSegmenter`, `ReplyReader`): sentences and line
       ends, code blocks and table rows skipped, thinking never read; also for "Read replies aloud" outside the voice chat.
 - [x] Interrupt: a tap on the circle stops the reply (generation cancelled, the text so far kept with "…", the model
       given the conversation again with the next message) and listens; while listening, a tap sends at once. With
       headphones, speaking interrupts too and becomes the next message.
 - [x] The voice view: a circle that grows with the voice (blue, listening), breathes while the model thinks (grey) and
-      pulses while it speaks (green), with the sentence being read and a hint; the transcript stays in the chat.
+      pulses while it speaks (green), with the sentence being read and a hint; the transcript stays in the chat. The
+      growth is eased (up over ~0.15 s, down over ~0.3 s) and at most a quarter: following the level directly, by up
+      to 35%, it jumped with every syllable.
 - [x] Verified on Mac Catalyst with Gemma 4 E2B on the GPU (temporary self-test: `say` recordings played in place of
       the microphone, speech output replaced by a log): two questions in a row ("Paris", then "Berlin" for "And what
       about Germany?"), a long explanation interrupted by a tap and then "What were you explaining?" ("how a bicycle
       works"), and with headphones a question spoken over the reply ("2 + 2 equals 4"). Unit tests: `UnitTestVoiceConversation`
       (end of speech in LiteRT-LM's `audio_sample.wav`, clicks, a growing noise, pauses, the length limit; streamed
       sentence splitting).
-- [ ] Try it with a real microphone and speakers: a phone and the Mac, with and without headphones (the loudspeaker's
-      echo must not count as speech - without headphones the microphone is off while the reply is read). The level
-      thresholds were only checked against recordings.
+- [x] Verified with a real microphone and loudspeaker on a Pixel Fold (Gemma 4 E2B on the GPU), without headphones:
+      the end of speech is found in a room 25-35 dB quieter than the voice, and the reply is read and listening
+      resumes.
+- [ ] The Mac (and an iPhone) with a real microphone, and any device with headphones (speaking over the reply).
 - [ ] Headphone detection (`VoiceRecorder.HeadphonesConnected`: the audio route on iOS/Mac Catalyst, output devices
       on Android) is untested; so is recording while text-to-speech plays on iOS.
 

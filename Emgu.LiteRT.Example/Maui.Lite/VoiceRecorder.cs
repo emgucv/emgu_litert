@@ -49,10 +49,12 @@ namespace Maui.Demo.Lite
 #elif ANDROID
             lock (_levelLock)
             {
-                double level = VoiceActivityDetector.LevelDb(_sumOfSquares, _sampleCount);
+                // No samples since the last call: the level hasn't changed (it isn't silence).
+                if (_sampleCount > 0)
+                    _lastLevel = VoiceActivityDetector.LevelDb(_sumOfSquares, _sampleCount);
                 _sumOfSquares = 0;
                 _sampleCount = 0;
-                return level;
+                return _lastLevel;
             }
 #else
             return -160;
@@ -196,11 +198,15 @@ namespace Maui.Demo.Lite
         private readonly object _levelLock = new object();
         private double _sumOfSquares;
         private int _sampleCount;
+        private double _lastLevel = -160;
 
         private Task StartPlatformAsync()
         {
             int minBuffer = Android.Media.AudioRecord.GetMinBufferSize(SampleRate, Android.Media.ChannelIn.Mono, Android.Media.Encoding.Pcm16bit);
             int bufferSize = Math.Max(minBuffer, SampleRate / 5 * 2); // at least 200 ms
+            // Read 20 ms at a time, so ReadLevelDb (every 50 ms in a voice chat) always has new samples: reading the
+            // whole buffer at once left it three calls in four with none.
+            int chunkSize = SampleRate / 50 * 2;
             _record = new Android.Media.AudioRecord(Android.Media.AudioSource.Mic, SampleRate, Android.Media.ChannelIn.Mono,
                 Android.Media.Encoding.Pcm16bit, bufferSize * 2);
             if (_record.State != Android.Media.State.Initialized)
@@ -216,7 +222,7 @@ namespace Maui.Demo.Lite
             MemoryStream pcm = _pcm;
             _readLoop = Task.Run(() =>
             {
-                byte[] buffer = new byte[bufferSize];
+                byte[] buffer = new byte[chunkSize];
                 while (_reading)
                 {
                     int read = record.Read(buffer, 0, buffer.Length);

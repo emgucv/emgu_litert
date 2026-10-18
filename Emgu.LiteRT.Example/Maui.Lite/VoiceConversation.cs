@@ -32,7 +32,7 @@ namespace Maui.Demo.Lite
         public double StartMarginDb { get; set; } = 12;
 
         /// <summary>How far above the background a level must stay for speech to continue.</summary>
-        public double ContinueMarginDb { get; set; } = 7;
+        public double ContinueMarginDb { get; set; } = 9;
 
         /// <summary>Quieter than this is never speech, however quiet the room.</summary>
         public double MinSpeechLevelDb { get; set; } = -50;
@@ -45,6 +45,13 @@ namespace Maui.Demo.Lite
 
         /// <summary>The longest utterance; speech is ended there.</summary>
         public TimeSpan MaxUtterance { get; set; } = TimeSpan.FromSeconds(30);
+
+        /// <summary>
+        /// Quieter than this is not a real microphone's background but digital silence - e.g. the first moments of a
+        /// recording - so it doesn't change the background (lowering it would leave only <see cref="MinSpeechLevelDb"/>
+        /// to tell speech from quiet).
+        /// </summary>
+        public double MinNoiseFloorDb { get; set; } = -90;
 
         /// <summary>The background level (dBFS); NaN until the first level.</summary>
         public double NoiseFloorDb { get; private set; } = double.NaN;
@@ -60,6 +67,7 @@ namespace Maui.Demo.Lite
         private TimeSpan _candidate;   // loud input not yet long enough to be speech
         private TimeSpan _candidateGap; // a dip inside it
         private TimeSpan _silence;      // quiet since the last speech, within an utterance
+        private bool _lastLoud;         // the previous frame was loud, within an utterance
 
         /// <summary>
         /// Start again, e.g. after the reply was read out (the background is kept).
@@ -69,6 +77,7 @@ namespace Maui.Demo.Lite
             InSpeech = false;
             UtteranceLength = TimeSpan.Zero;
             _candidate = _candidateGap = _silence = TimeSpan.Zero;
+            _lastLoud = false;
         }
 
         /// <summary>
@@ -82,15 +91,22 @@ namespace Maui.Demo.Lite
                 levelDb = -160;
             levelDb = Math.Max(-160, levelDb);
             if (double.IsNaN(NoiseFloorDb))
+            {
+                if (levelDb < MinNoiseFloorDb)
+                    return VoiceActivity.None;
                 NoiseFloorDb = levelDb;
+            }
 
             if (InSpeech)
             {
                 UtteranceLength += duration;
-                if (levelDb >= Math.Max(NoiseFloorDb + ContinueMarginDb, MinSpeechLevelDb))
-                    _silence = TimeSpan.Zero;
-                else
+                // A pause ends with sound lasting two frames: one loud frame (a breath, a click) leaves it running.
+                bool loud = levelDb >= Math.Max(NoiseFloorDb + ContinueMarginDb, MinSpeechLevelDb);
+                if (!loud)
                     _silence += duration;
+                else if (_lastLoud)
+                    _silence = TimeSpan.Zero;
+                _lastLoud = loud;
                 if (_silence >= EndSilence || UtteranceLength >= MaxUtterance)
                 {
                     Reset();
@@ -109,6 +125,7 @@ namespace Maui.Demo.Lite
                     UtteranceLength = _candidate;
                     _candidate = TimeSpan.Zero;
                     _silence = TimeSpan.Zero;
+                    _lastLoud = true;
                     return VoiceActivity.SpeechStarted;
                 }
                 return VoiceActivity.None;
@@ -122,11 +139,20 @@ namespace Maui.Demo.Lite
                     _candidate = _candidateGap = TimeSpan.Zero;
             }
             // Follow the background: down at once, up slowly (about 3 dB a second), so a steady noise such as a fan
-            // becomes the background within seconds.
+            // becomes the background within seconds, but speech doesn't. Below MinSpeechLevelDb nothing is speech, so
+            // there it rises quickly (20 dB a second), and a level more than StartMarginDb above the background - which
+            // only gets here by being below MinSpeechLevelDb - pulls it up at once to StartMarginDb below: a background
+            // left too low would leave only MinSpeechLevelDb to tell speech from a noisy room, whose peaks then keep an
+            // utterance from ending. Digital silence (below MinNoiseFloorDb) leaves it as it is.
+            if (levelDb < MinNoiseFloorDb)
+                return VoiceActivity.None;
             if (levelDb < NoiseFloorDb)
                 NoiseFloorDb = levelDb;
             else
-                NoiseFloorDb = Math.Min(levelDb, NoiseFloorDb + 3 * duration.TotalSeconds);
+            {
+                double rate = levelDb < MinSpeechLevelDb ? 20 : 3;
+                NoiseFloorDb = Math.Min(levelDb, Math.Max(NoiseFloorDb + rate * duration.TotalSeconds, levelDb - StartMarginDb));
+            }
             return VoiceActivity.None;
         }
 
