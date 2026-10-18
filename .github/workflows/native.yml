@@ -226,7 +226,7 @@ jobs:
       with:
         python-version: "3.12"
     - uses: bazel-contrib/setup-bazel@0.19.1
-      # Bazelisk, which runs the Bazel version LiteRT-LM's .bazelversion pins; no caching across runs.
+      # Bazelisk (the build step tells it LiteRT-LM's Bazel version); no caching across runs.
       with:
         bazelisk-cache: false
         disk-cache: false
@@ -238,7 +238,10 @@ jobs:
     - name: Build tfliteextern.dll, libLiteRt.dll and liblitert-lm.dll
       # Run from a drive letter mapped to the workspace: the LiteRT-LM build's Rust objects come within a few characters
       # of link.exe's 260-character path limit even under the repo root's short "o"/"u" output folders (see the script).
+      # USE_BAZEL_VERSION: Bazelisk otherwise runs the latest Bazel (9.x, which no longer reads WORKSPACE files), since
+      # the repository root has no .bazelversion.
       run: |
+        $env:USE_BAZEL_VERSION = (Get-Content LiteRT-LM\.bazelversion).Trim()
         subst X: "$env:GITHUB_WORKSPACE"
         X:
         powershell -NoProfile -ExecutionPolicy Bypass -File X:\platforms\windows\bazel_build_litert.ps1 64
