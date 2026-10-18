@@ -175,8 +175,10 @@ jobs:
     - uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
-    - name: Install the .NET MAUI iOS workload
-      run: dotnet workload install maui-ios
+    - name: Install the .NET MAUI workloads
+      # All of them, not just maui-ios: restoring the demo restores every target framework it has on macOS (Android,
+      # iOS, Mac Catalyst), even when building one.
+      run: dotnet workload install maui
     - name: Generate the projects' Directory.Build.props
       # The projects take their target framework and package settings from files CMake generates.
       run: cmake -S . -B build
