@@ -606,7 +606,31 @@ agent runs on a schedule, with a notification when there is something to say.
       iPhone (if it is as slow, check which XNNPACK kernels CLiteRTLM's build uses).
 - [ ] Memory and storage on an iPhone: the text encoder maps 3.5 GB; ~21 GB with the caches. Consider the
       `com.apple.developer.kernel.increased-memory-limit` entitlement if the app is killed.
-- [ ] Optional: a standalone LiteRT framework for apps that use `Emgu.LiteRT` without LiteRT-LM.
+- [ ] Split the iOS natives into frameworks that depend on each other, like the Android/macOS libraries: a base
+      `LiteRt.framework`, with `tfliteextern` and LiteRT-LM linked to it instead of carrying their own LiteRT.
+      - Why: `Emgu.LiteRT` (CompiledModel, `Emgu.LiteRT.Models`, `ZImageTurbo`) and TF Lite would work on iOS without
+        the LiteRT-LM add-on and iOS 26.4 (the base framework can target iOS 15); TF Lite and LiteRT would share one
+        runtime; `Emgu.LiteRT`'s iOS `DllImport` would no longer name CLiteRTLM's path; and the packages would match
+        Android's (base runtime with LiteRT, LM add-on with only LiteRT-LM + the Gemma library).
+      - Not for size: LiteRT-LM's embedding code uses TFLite's C++ API, so its TFLite kernels and XNNPACK stay inside
+        it even in dynamic mode (macOS: `libLiteRt` 6.7 MB + `liblitert-lm` 27.5 MB; Android arm64: 5.7 + 23.3 MB;
+        iOS now: CLiteRTLM 28.2 MB with everything). An app with LiteRT-LM would grow by ~6 MB.
+      - [ ] Build `libLiteRt` for iOS device + simulator as a `cc_shared_library` (as on macOS: LiteRT's
+            `litert_tflite_runtime_c_api_so_shim`, `LiteRt*`/`TfLite*` exported) with install name
+            `@rpath/LiteRt.framework/LiteRt`, wrapped into `LiteRt.framework` / `lib/ios/LiteRt.xcframework`
+            (`Info.plist`, ad hoc signing) the way `bazel_build_litert_lm_ios` wraps `GemmaModelConstraintProvider`.
+      - [ ] Build `tfliteextern` for iOS as a dynamic framework linked to it (the macOS `tfliteextern_dylib` target),
+            replacing the static `libtfliteextern_ios.xcframework`; `DllImport("tfliteextern")` then names the
+            framework instead of `__Internal`. Mac Catalyst stays static (Bazel has no Catalyst platform).
+      - [ ] `Emgu.LiteRT`'s iOS `LiteRtLibrary` -> `@rpath/LiteRt.framework/LiteRt`; the base
+            `Emgu.LiteRT.runtime.maui.ios` embeds both frameworks.
+      - [ ] Try LiteRT-LM with `--define=litert_runtime_link_mode=dynamic` on iOS (proven only on macOS/Android):
+            build `//c:litert-lm` as a dylib (LiteRT-LM's own `//swift:CLiteRTLM` links everything statically), wrap
+            it as a framework that loads `@rpath/LiteRt.framework/LiteRt`, and make the LM add-on depend on the base
+            package. If it doesn't work, keep CLiteRTLM static - two LiteRT copies in one app are fine as long as
+            `Emgu.LiteRT` points at `LiteRt.framework`.
+      - [ ] Verify in the simulator that the chat, the TF Lite demos and Z-Image run in one process with one LiteRT
+            loaded (`image list` / `DYLD_PRINT_LIBRARIES`), and that an app without the LM add-on runs `Emgu.LiteRT`.
 
 ## 32. Live camera tools — first version implemented
 
