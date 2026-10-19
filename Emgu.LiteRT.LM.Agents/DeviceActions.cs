@@ -385,9 +385,14 @@ namespace Emgu.LiteRT.LM.Agents
             return text;
         }
 
-        /// <summary>The result of a device action the user cancelled.</summary>
+        /// <summary>
+        /// The result of a device action the user cancelled. Blunt on purpose: given "The user cancelled it: nothing was
+        /// done. Say so...", Gemma 4 E2B answered "I have set an alarm for 7:00 am tomorrow" (and the same for a timer and
+        /// a calendar event); with this text it said they were cancelled.
+        /// </summary>
         public const string DeviceActionCancelled =
-            "The user cancelled it: nothing was done. Say so in one short sentence, and don't try again unless the user asks.";
+            "CANCELLED - NOT done. The user tapped Cancel, so nothing was set or added. Tell the user, in one short sentence, " +
+            "that it was cancelled. Don't say it was done, and don't try again unless the user asks.";
 
         /// <summary>
         /// The result of a device action that couldn't be done.

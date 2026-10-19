@@ -142,7 +142,7 @@ public class UnitTestDeviceActions
         Assert.That(requests.Count, Is.EqualTo(asked));
 
         confirm = false;
-        Assert.That(await Call("set_alarm", ("time", "7am")), Does.StartWith("The user cancelled"));
+        Assert.That(await Call("set_alarm", ("time", "7am")), Does.StartWith("CANCELLED"));
         Assert.That(((AlarmRequest)requests[^1]).Time, Is.EqualTo(new DateTime(2026, 10, 13, 7, 0, 0)));
     }
 }

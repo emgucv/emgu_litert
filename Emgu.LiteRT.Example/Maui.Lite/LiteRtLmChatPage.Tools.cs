@@ -37,7 +37,8 @@ public partial class LiteRtLmChatPage
                 () => JoinInstructions(SelectedOption.AcceptsImages ? CameraInstructions : null, VisualInstructions)),
             new ToolGroup(ChatToolGroups.DeviceActions, ChatToolGroups.DeviceActionsSummary, ChatToolGroups.DeviceActionsKeywords,
                 DeviceActionToolsForMessage,
-                DeviceActionInstructionsForMessage),
+                DeviceActionInstructionsForMessage,
+                rerunAfterStub: true),
             new ToolGroup(ChatToolGroups.Goals, ChatToolGroups.GoalsSummary, ChatToolGroups.GoalsKeywords,
                 GoalToolsForMessage,
                 () => _routeGoalInstructions,
@@ -56,7 +57,9 @@ public partial class LiteRtLmChatPage
             groups.Add(new ToolGroup(ChatToolGroups.ImageGeneration, ChatToolGroups.ImageGenerationSummary, ChatToolGroups.ImageGenerationKeywords,
                 () => new AITool[] { AgentTools.GenerateImage(GenerateImageAsync) },
                 () => ImageInstructions));
-        var router = new ToolRouter(groups, () => FunctionInvokingChatClient.CurrentContext?.Options);
+        // The clock/calendar/maps stub ends the request and RunAgentAsync sends the message again (rerunAfterStub).
+        var router = new ToolRouter(groups, () => FunctionInvokingChatClient.CurrentContext?.Options,
+            () => FunctionInvokingChatClient.CurrentContext.Terminate = true);
         router.GroupRequested += name => UiStallWatchdog.Mark("Tool group requested by the model: " + name);
         return router;
     }

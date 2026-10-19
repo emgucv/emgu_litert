@@ -28,8 +28,10 @@ namespace Emgu.LiteRT.LM.Agents
         /// <param name="instructions">Gives the instructions for the agent while the group is in use, or null</param>
         /// <param name="alsoMatches">Another test of whether a message needs the group, e.g. the user's own goals'
         /// words, or null</param>
+        /// <param name="rerunAfterStub">Whether its stub ends the request so the message is sent again with the group
+        /// (ToolRouter's endRequest) rather than continuing it</param>
         public ToolGroup(string name, string summary, IEnumerable<string> keywords, Func<IEnumerable<AITool>> createTools,
-            Func<string> instructions = null, Func<string, bool> alsoMatches = null)
+            Func<string> instructions = null, Func<string, bool> alsoMatches = null, bool rerunAfterStub = false)
         {
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentException("A name is needed", nameof(name));
@@ -39,7 +41,11 @@ namespace Emgu.LiteRT.LM.Agents
             CreateTools = createTools ?? throw new ArgumentNullException(nameof(createTools));
             Instructions = instructions;
             AlsoMatches = alsoMatches;
+            RerunAfterStub = rerunAfterStub;
         }
+
+        /// <summary>Whether its stub ends the request so the message is sent again with the group</summary>
+        public bool RerunAfterStub { get; }
 
         /// <summary>The group's name, e.g. "camera"</summary>
         public string Name { get; }
@@ -78,6 +84,8 @@ namespace Emgu.LiteRT.LM.Agents
         private readonly List<ToolGroup> _groups;
         private readonly HashSet<string> _active = new HashSet<string>(StringComparer.Ordinal);
         private readonly Func<ChatOptions> _currentOptions;
+        private readonly Action _endRequest;
+        private bool _rerun;
 
         /// <summary>
         /// Create a router.
@@ -86,10 +94,28 @@ namespace Emgu.LiteRT.LM.Agents
         /// <param name="currentOptions">The options of the request a tool is being called in, e.g.
         /// () => FunctionInvokingChatClient.CurrentContext?.Options; a stub adds its group's tools there. Without it (or
         /// if it returns null) the group is used from the next message on.</param>
-        public ToolRouter(IEnumerable<ToolGroup> groups, Func<ChatOptions> currentOptions)
+        /// <param name="endRequest">Ends the request (e.g. () => FunctionInvokingChatClient.CurrentContext.Terminate =
+        /// true): the stubs of groups with RerunAfterStub call it instead of adding their tools, and TakeRerun tells the
+        /// app to send the message again - without the stub's turn, with the group's tools from the start. Which is better
+        /// depends on the group: continuing after the stub, Gemma 4 E2B asked for details it had been given ("Add the
+        /// dentist on Friday at 3 pm to my calendar": the date, the title), and sent again it added the event; but sent
+        /// again with the camera tools, it asked which object class "a bird" was, where continuing it set the monitor
+        /// up.</param>
+        public ToolRouter(IEnumerable<ToolGroup> groups, Func<ChatOptions> currentOptions, Action endRequest = null)
         {
             _groups = (groups ?? throw new ArgumentNullException(nameof(groups))).ToList();
             _currentOptions = currentOptions;
+            _endRequest = endRequest;
+        }
+
+        /// <summary>
+        /// Whether a stub ended the last request (with endRequest), so the app should send the message again; resets it.
+        /// </summary>
+        public bool TakeRerun()
+        {
+            bool rerun = _rerun;
+            _rerun = false;
+            return rerun;
         }
 
         /// <summary>The groups</summary>
@@ -106,7 +132,11 @@ namespace Emgu.LiteRT.LM.Agents
         public bool IsActive(string name) => _active.Contains(name);
 
         /// <summary>Start a new conversation: no group is in use.</summary>
-        public void Reset() => _active.Clear();
+        public void Reset()
+        {
+            _active.Clear();
+            _rerun = false;
+        }
 
         /// <summary>
         /// Use a group from now on, e.g. the camera group while the live camera is open.
@@ -209,6 +239,12 @@ namespace Emgu.LiteRT.LM.Agents
         {
             _active.Add(group.Name);
             GroupRequested?.Invoke(group.Name);
+            if (_endRequest != null && group.RerunAfterStub)
+            {
+                _rerun = true;
+                _endRequest();
+                return "The tools are ready.";
+            }
             ChatOptions options = _currentOptions?.Invoke();
             List<AITool> tools = group.CreateTools().ToList();
             if (options == null)

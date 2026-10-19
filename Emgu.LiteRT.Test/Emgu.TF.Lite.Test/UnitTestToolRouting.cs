@@ -87,7 +87,8 @@ public class UnitTestToolRouting
             new ToolGroup(ChatToolGroups.DeviceActions, ChatToolGroups.DeviceActionsSummary, ChatToolGroups.DeviceActionsKeywords,
                 () => AgentTools.DeviceActions(DeviceActionKinds.Timer | DeviceActionKinds.Alarm | DeviceActionKinds.CalendarEvent | DeviceActionKinds.Directions,
                     (request, token) => { done?.Invoke(request.ToolName); return Task.FromResult(AgentTools.DeviceActionDone(request.Summary)); }),
-                () => AgentTools.DeviceActionInstructions(DeviceActionKinds.Timer | DeviceActionKinds.Alarm | DeviceActionKinds.CalendarEvent | DeviceActionKinds.Directions)),
+                () => AgentTools.DeviceActionInstructions(DeviceActionKinds.Timer | DeviceActionKinds.Alarm | DeviceActionKinds.CalendarEvent | DeviceActionKinds.Directions),
+                rerunAfterStub: true),
             new ToolGroup(ChatToolGroups.Goals, ChatToolGroups.GoalsSummary, ChatToolGroups.GoalsKeywords, () => AgentTools.Goals(store)),
             new ToolGroup(ChatToolGroups.Photos, ChatToolGroups.PhotosSummary, ChatToolGroups.PhotosKeywords,
                 () => new AITool[] { AgentTools.FindPhotos(Unused) }, () => ChatPlannerInstructions.Photos),
@@ -189,8 +190,9 @@ public class UnitTestToolRouting
     [TestCase("Beep when a bird lands on the feeder", false, "camera", "monitor:bird:play_sound")]
     [TestCase("Set a timer for 10 minutes", false, "clock_calendar_maps", "set_timer")]
     [TestCase("Say welcome out loud whenever a person comes into view", false, "camera", "monitor:person:speak_text")]
-    // Not through the stub: Gemma 4 E2B called use_clock_calendar_maps for it and then asked for details it had been given
-    // (the date, the title), however the stub's result was worded. The keywords catch it.
+    // Through the stub, continuing the request, Gemma 4 E2B asked for details it had been given (the date, the title),
+    // however the stub's result was worded: the stub ends the request and the message is sent again.
+    [TestCase("Add the dentist on Friday at 3 pm to my calendar", false, "clock_calendar_maps", "add_calendar_event")]
     [TestCase("Add the dentist on Friday at 3 pm to my calendar", true, "clock_calendar_maps", "add_calendar_event")]
     public async Task Gemma4E2BUsesGroupsAndStubsAt4k(string prompt, bool route, string group, string expected)
     {
@@ -198,27 +200,80 @@ public class UnitTestToolRouting
         using var model = new Emgu.LiteRT.LM.Models.Gemma4E2B { VisionBackend = null, AudioBackend = null };
         await model.Init(configureSettings: s => { s.NumThreads = 4; s.MaxNumTokens = 4096; }, cancellationToken: stop.Token);
         List<string> done = new List<string>();
-        ToolRouter router = new ToolRouter(DemoGroups(null, done.Add), () => FunctionInvokingChatClient.CurrentContext?.Options);
+        // As the demo does: a stub ends the request, and the message is sent again with the group.
+        ToolRouter router = new ToolRouter(DemoGroups(null, done.Add), () => FunctionInvokingChatClient.CurrentContext?.Options,
+            () => FunctionInvokingChatClient.CurrentContext.Terminate = true);
         List<string> requested = new List<string>();
         router.GroupRequested += requested.Add;
         // Without routing, only the stub can get the group.
         if (route)
             Assert.That(router.Route(prompt), Does.Contain(group));
-        IList<AITool> tools = ChatAgentTools.SessionTools(false, null, null, null, null);
-        foreach (AITool tool in router.Tools())
-            tools.Add(tool);
         using var native = new Emgu.LiteRT.LM.Extensions.AI.LiteRtLmChatClient(model) { EnableContextManagement = true };
         using var client = new FunctionInvokingChatClient(native) { MaximumIterationsPerRequest = 6 };
-        ChatResponse response = await client.GetResponseAsync(prompt, new ChatOptions
+        ChatResponse response = null;
+        for (int run = 0; run < 2; run++)
         {
-            Tools = tools,
-            Instructions = string.Join("\n\n", new[] { ChatPlannerInstructions.Agent, router.Instructions() }.Where(t => t != null)),
-            Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }
-        }, stop.Token);
+            IList<AITool> tools = ChatAgentTools.SessionTools(false, null, null, null, null);
+            foreach (AITool tool in router.Tools())
+                tools.Add(tool);
+            response = await client.GetResponseAsync(prompt, new ChatOptions
+            {
+                Tools = tools,
+                Instructions = string.Join("\n\n", new[] { ChatPlannerInstructions.Agent, router.Instructions() }.Where(t => t != null)),
+                Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }
+            }, stop.Token);
+            if (!router.TakeRerun())
+                break;
+        }
         TestContext.Progress.WriteLine(prompt + " -> requested [" + string.Join(", ", requested) + "], done [" + string.Join(", ", done) + "]: " + response.Text);
         if (!route)
             Assert.That(requested, Does.Contain(group));
         Assert.That(done, Does.Contain(expected));
+    }
+
+#if !TEST_MODELS
+    [Ignore("Opt in with -p:TestModels=true; downloads Gemma 4 E2B (2.6 GB).")]
+#endif
+    [TestCase("Ring me at 7 tomorrow morning.")]
+    [TestCase("Set a timer for 10 minutes.")]
+    [TestCase("Put lunch with Sam in my calendar for Friday at 12:30.")]
+    public async Task Gemma4E2BSaysSoWhenTheUserCancels(string prompt)
+    {
+        using var stop = new CancellationTokenSource(TimeSpan.FromMinutes(4));
+        using var model = new Emgu.LiteRT.LM.Models.Gemma4E2B { VisionBackend = null, AudioBackend = null };
+        await model.Init(configureSettings: s => { s.NumThreads = 4; s.MaxNumTokens = 4096; }, cancellationToken: stop.Token);
+        int asked = 0;
+        var kinds = DeviceActionKinds.Timer | DeviceActionKinds.Alarm | DeviceActionKinds.CalendarEvent | DeviceActionKinds.Directions;
+        IList<AITool> tools = ChatAgentTools.SessionTools(false, null, null, null, null);
+        foreach (AITool tool in AgentTools.DeviceActions(kinds, (request, token) => { asked++; return Task.FromResult(AgentTools.DeviceActionCancelled); }))
+            tools.Add(tool);
+        using var native = new Emgu.LiteRT.LM.Extensions.AI.LiteRtLmChatClient(model) { EnableContextManagement = true };
+        using var client = new FunctionInvokingChatClient(native) { MaximumIterationsPerRequest = 4 };
+        ChatResponse response = await client.GetResponseAsync(prompt, new ChatOptions
+        {
+            Tools = tools,
+            Instructions = ChatPlannerInstructions.Agent + "\n\n" + AgentTools.DeviceActionInstructions(kinds),
+            Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }
+        }, stop.Token);
+        TestContext.Progress.WriteLine(prompt + " -> " + response.Text);
+        Assert.That(asked, Is.EqualTo(1));
+        Assert.That(response.Text, Does.Match("(?i)cancel|not set|didn't|did not|wasn't|was not|nothing"));
+    }
+
+    [Test]
+    public async Task StubCanEndTheRequestForARerun()
+    {
+        ScriptedChatClient model = new ScriptedChatClient();
+        model.Calls.Enqueue("use_clock_calendar_maps");
+        ToolRouter router = new ToolRouter(DemoGroups(), () => FunctionInvokingChatClient.CurrentContext?.Options,
+            () => FunctionInvokingChatClient.CurrentContext.Terminate = true);
+        using var client = new FunctionInvokingChatClient(model);
+        await client.GetResponseAsync("Put the dentist on Friday at 3 in my diary", new ChatOptions { Tools = router.Tools() });
+        // The request ended after the stub: no second round, and the message is to be sent again with the group.
+        Assert.That(model.OfferedTools.Count, Is.EqualTo(1));
+        Assert.That(router.TakeRerun(), Is.True);
+        Assert.That(router.TakeRerun(), Is.False);
+        Assert.That(router.Tools().Select(t => t.Name), Does.Contain("add_calendar_event").And.Not.Contain("use_clock_calendar_maps"));
     }
 
     private static int Size(IEnumerable<AITool> tools) =>

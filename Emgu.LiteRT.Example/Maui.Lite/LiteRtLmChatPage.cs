@@ -1971,6 +1971,18 @@ namespace Maui.Demo.Lite
                     _replyReader?.Update(partial.Text);
                 }
             }
+            if (ToolRouter.TakeRerun() && !cancellationToken.IsCancellationRequested)
+            {
+                // A stub ended the request (ToolRouter, rerunAfterStub): send the message again with its group, in a new
+                // session given the conversation so far - without the stub's turn, which the model handled worse.
+                UiStallWatchdog.Mark("Sending the message again with the tool group: " + string.Join(", ", ToolRouter.Active));
+                int stubStep = _sendSteps.LastIndexOf("Getting more tools");
+                if (stubStep >= 0)
+                    _sendSteps.RemoveAt(stubStep);
+                _session = await _agent.CreateSessionAsync();
+                _agentPrimeHistory = ToAgentMessages(ContextItems());
+                return await RunAgentAsync(prompt, attachments, bubble, cancellationToken);
+            }
             return ToReply(thinking, answer);
         }
 

@@ -40,7 +40,7 @@ public partial class LiteRtLmChatPage
     {
         if (result.StartsWith("Done:", StringComparison.Ordinal))
             return " - done";
-        if (result.StartsWith("The user cancelled", StringComparison.Ordinal))
+        if (result.StartsWith("CANCELLED", StringComparison.Ordinal))
             return " - cancelled";
         if (result.StartsWith("It couldn't be done", StringComparison.Ordinal))
             return " - failed";

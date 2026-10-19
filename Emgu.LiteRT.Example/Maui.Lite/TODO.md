@@ -1004,11 +1004,21 @@ on a phone's 4k window failed every message (phones now get 8k for Gemma 4, item
       bird/play_sound and person/speak_text monitors and the 10-minute timer, twice each. A stub alone wasn't enough at
       first ("Beep when a bird lands on the feeder": E2B said it couldn't set alarms) - the instruction line listing the
       stubs fixed it.
-- [ ] Through its stub, E2B called `use_clock_calendar_maps` for "Add the dentist on Friday at 3 pm to my calendar" and
+- [x] Through its stub, E2B called `use_clock_calendar_maps` for "Add the dentist on Friday at 3 pm to my calendar" and
       then asked for details it had been given (the date, the title), however the stub's result was worded; routed by
-      its words it added the event. The keywords catch calendar requests; a re-run of the message with the group (no
-      stub turn) would fix the rest.
+      its words it added the event. So a group can be `rerunAfterStub` (the demo's clock/calendar/maps): its stub ends
+      the request (`endRequest`: `FunctionInvokingChatClient.CurrentContext.Terminate`) and `RunAgentAsync` sends the
+      message again in a new session given the conversation so far - then E2B added it. Not for the camera: sent again
+      with the camera tools, E2B asked which object class "a bird" was, while continuing after the stub set the monitor
+      up. Verified on the S10 (GPU): "Ring me at 7 tomorrow morning" (no keyword) - stub, re-run, the alarm card.
+- [x] Cancelled device actions: given `DeviceActionCancelled` ("The user cancelled it: nothing was done. Say so..."),
+      E2B replied "I have set an alarm for 7:00 am tomorrow" - also a timer and a calendar event, on the Mac and the S10.
+      Now it starts "CANCELLED - NOT done. The user tapped Cancel...", and E2B says it was cancelled
+      (`Gemma4E2BSaysSoWhenTheUserCancels`, 3/3; on the S10 "I have cancelled the alarm").
 - [ ] Trimming the camera group's definitions (the action schema of `create_visual_monitor`, 1,600 characters): only
       with `FullDemoPlannerCatalogCreatesAlertAt4k` before and after, since they were tuned for E2B.
 - [ ] Routing by meaning (EmbeddingGemma similarity to each group) in place of, or with, the keywords.
-- [ ] Phones could go back to 4k for Gemma 4 now that a typical message carries ~1k tokens of tools.
+- [ ] Phones could go back to 4k for Gemma 4: on the S10's GPU, E2B at 4k answered "12 times 7", set and logged a goal
+      and went through the alarm stub just as at 8k, in the same time (21-26 s vs 21-27 s). 8k only costs when a long
+      chat is read again (a saved chat opened, after compacting) - slower on a phone's CPU (Pixel Fold 342 s vs 123 s),
+      seconds on its GPU. Kept at 8k for now.
