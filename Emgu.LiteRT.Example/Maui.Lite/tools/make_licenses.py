@@ -157,6 +157,10 @@ def curated():
         fetch("https://emgu-public.s3.amazonaws.com/yolox/yolox_license.txt"),
         copyright="Megvii, Inc. and its affiliates", url="https://github.com/Megvii-BaseDetection/YOLOX",
         used_for="Optional object detector; converted by Emgu to LiteRT")
+    add(model, "D-FINE-N", "Apache-2.0", fetch("https://emgu-public.s3.amazonaws.com/dfine/dfine_notice.txt") + "\n\n" +
+        fetch("https://emgu-public.s3.amazonaws.com/dfine/dfine_license.txt"),
+        copyright="The D-FINE Authors", url="https://github.com/Peterande/D-FINE",
+        used_for="Optional object detector (Mac Catalyst); converted by Emgu to LiteRT; trained on COCO (CC BY 4.0 annotations)")
     add(model, "MobileNet, Inception and COCO SSD MobileNet", "Apache-2.0", APACHE, copyright="The TensorFlow Authors",
         url="https://github.com/tensorflow/models", used_for="Image classification and object detection demos")
 

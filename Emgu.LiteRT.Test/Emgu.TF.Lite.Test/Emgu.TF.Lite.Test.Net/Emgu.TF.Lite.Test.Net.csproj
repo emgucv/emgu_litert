@@ -17,6 +17,8 @@
     <Compile Include="..\UnitTestLiteRtLm.cs" Link="UnitTestLiteRtLm.cs" />
     <Compile Include="..\UnitTestLiteRtModels.cs" Link="UnitTestLiteRtModels.cs" />
     <Compile Include="..\UnitTestYoloX.cs" Link="UnitTestYoloX.cs" />
+    <Compile Include="..\UnitTestDFine.cs" Link="UnitTestDFine.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\DFineImageInput.cs" Link="DFineImageInput.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\YoloXImageInput.cs" Link="YoloXImageInput.cs" />
     <Compile Include="..\UnitTestCocoBackendBenchmark.cs" Link="UnitTestCocoBackendBenchmark.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\CocoBackendBenchmark.cs" Link="CocoBackendBenchmark.cs" />
@@ -60,6 +62,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\TestData\dfine_reference.json" Link="dfine_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\yolox_reference.json" Link="yolox_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\Resources\Raw\dog416.png" Link="dog416.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\Resources\Raw\space_shuttle.jpg" Link="space_shuttle.jpg" CopyToOutputDirectory="PreserveNewest" />

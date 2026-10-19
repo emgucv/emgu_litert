@@ -1,10 +1,12 @@
-# D-FINE-N evaluation (not integrated in the demo)
+# D-FINE-N evaluation (a Mac Catalyst photo detector in the demo)
 
 Evaluated 2026-10-19 on Mac Catalyst's host (Apple M1), a Galaxy S10 and a Pixel Fold, as an alternative to SSD MobileNet V3
-and [YOLOX-Nano](YOLOX_EVALUATION.md). **Decision: not added to the app.** It converts to LiteRT and matches the original, but
+and [YOLOX-Nano](YOLOX_EVALUATION.md). **Decision: not a phone or visual-agent detector; offered on Mac Catalyst only, for single photos.** It converts to LiteRT and matches the original, but
 it is 1.4-2.7x slower than YOLOX-Nano on CPUs and has no phone-GPU path, where YOLOX runs in 16-18 ms. This note keeps the
-recipe, the results and a sketch of what integrating it would take, should a Mac-only "accurate detector" for single photos
-be wanted. No app code was written; nothing here is bundled or downloaded by the demo.
+recipe and the results. The model is not bundled: `DFineDetector` downloads the 640 file from Emgu's S3
+(`emgu-public/dfine/`, hash checked) for the "D-FINE Nano" photo page, which exists on Mac Catalyst only, runs on the CPU, and has no
+visual-agent entry. The classes are `Emgu.LiteRT.Models/DFine.cs`, `DFineDetector.cs` and `DFineImageInput.cs` in the demo;
+tests are `UnitTestDFine` (decoding) and `UnitTestDFineNative` (parity with `dfine_reference.json`, made from the ONNX model).
 
 ## Why D-FINE-N
 
@@ -120,14 +122,14 @@ decoding: see YOLOX_EVALUATION.md).
   The phones were awake and unlocked, unplugged or on USB, one run each: short samples, not sustained or thermal tests.
 - On the same CPU the LiteRT model is about as fast as ONNX Runtime (68.3 vs 64.6 ms at 640, 2 threads).
 
-## If it were integrated
+## What integrating it took (and what is left)
 
-Roughly the YOLOX pattern, Mac-only unless the GPU graph gets fixed:
+The YOLOX pattern, Mac-only until the GPU graph gets fixed. Done:
 
 - `Emgu.LiteRT.Models/DFine.cs` (an `IDisposable` over `CompiledModel`, like `YoloX.cs`) with the decode above and tests
-  against the ONNX output (a reference fixture like `yolox_reference.json`);
-- `DFineDetector : ICocoDetector` downloading the model from Emgu's S3 with its hash, a photo page and, if wanted, a third
-  visual agent;
+  against the ONNX output (`dfine_reference.json`, like `yolox_reference.json`);
+- `DFineDetector : ICocoDetector` downloading the model from Emgu's S3 with its hash, and the Mac Catalyst photo page (no visual
+  agent: it's too slow for monitoring);
 - the licences page entry (Apache-2.0 plus the COCO attribution) in `tools/make_licenses.py`;
 - the input is resized to S x S without letterboxing, so box coordinates scale by the original width and height.
 

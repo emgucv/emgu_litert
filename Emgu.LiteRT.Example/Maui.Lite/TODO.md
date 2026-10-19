@@ -962,7 +962,7 @@ near its context limit. Record enabled tool/settings differences, history size a
       live camera plus Gemma selecting YOLOX in chat remains an end-to-end check.
       [Usage, provenance, reproduction and results](YOLOX_EVALUATION.md).
 
-### D-FINE-N evaluation — converts and matches; not added to the app
+### D-FINE-N — converts and matches; a Mac Catalyst photo detector only
 
 - [x] Official D-FINE-N (COCO, Apache-2.0) converted to float32 LiteRT with static shapes (`tools/prepare_dfine_n.py`, TF converter with
       Erf replaced; reproduced bit for bit at 640 and 416) and checked against its ONNX export on the four bundled images
@@ -970,9 +970,13 @@ near its context limit. Record enabled tool/settings differences, history size a
       [DFINE_EVALUATION.md](DFINE_EVALUATION.md).
 - [x] Measured on the M1, a Galaxy S10 and the Pixel Fold: 1.4-2.7x YOLOX-Nano's CPU time at 416 px, 2x at 640 px, and no GPU path
       (the GPU compile fails on Metal and OpenCL; GPU+CPU is slower than CPU). Less accurate at 416 than at 640. Decision: keep
-      YOLOX-Nano as the optional detector; D-FINE only as a possible Mac-only photo detector at 640.
-- [ ] Host `dfine_n_coco_{640,416}_float32.tflite` with `dfine_license.txt` and `dfine_notice.txt` on S3 if D-FINE is ever
-      integrated; find what blocks its GPU compile (GridSample/attention?) first.
+      YOLOX-Nano as the optional detector; D-FINE only as a Mac-only photo detector at 640.
+- [x] Models, licence and notice hosted at `emgu-public/dfine/` (hashes verified).
+- [x] `Emgu.LiteRT.Models/DFine.cs` (CPU, `Decode`), the demo's `DFineDetector`/`DFineImageInput` and a "D-FINE Nano" photo page
+      on Mac Catalyst only (`CocoSsdMobilenetPage(useDFine: true)`); `UnitTestDFine` (decoding) and `UnitTestDFineNative`
+      (parity with the ONNX reference `dfine_reference.json` on the four images). No visual agent. Licences page entry added.
+- [ ] Try the page in the Catalyst app (the sandbox build failed at code signing, so only the tests ran); find what blocks the
+      GPU compile (GridSample/attention?) before offering it on phones.
 
 ### MobileNet V5 evaluation — encoder verified; detector checkpoint needed
 
