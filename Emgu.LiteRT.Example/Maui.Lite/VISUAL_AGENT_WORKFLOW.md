@@ -107,7 +107,7 @@ Frame/source identifiers and capture timestamps travel with the analysis.
 
 An optional second registration, `coco-yolox-nano`, uses `CocoVisualAgent(useYoloX: true)` and `YoloXDetector`.
 Ask explicitly, for example: "Use YOLOX to watch for a person and play a sound." This path downloads the official
-YOLOX-Nano weights from Emgu public S3 on first use, verifies SHA-256 and caches them, then runs them on LiteRT CPU. It uses BGR float pixels, top-left padding, grid decoding and NMS before returning
+YOLOX-Nano weights from Emgu public S3 on first use, verifies SHA-256 and caches them, then runs them on the LiteRT GPU when that passes an accuracy and speed check against the CPU (else on CPU). It uses BGR float pixels, top-left padding, grid decoding and NMS before returning
 the same observations to the monitor; the event/action pipeline is shared. It is experimental and was slower than V3
 on the tested Mac and Pixel Fold. See [the evaluation](YOLOX_EVALUATION.md) for provenance and measured results.
 

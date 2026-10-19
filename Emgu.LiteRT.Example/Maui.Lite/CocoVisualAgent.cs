@@ -19,9 +19,10 @@ internal sealed class CocoVisualAgent : IVisualAgent
     }
     internal static readonly string[] Classes = VisualHostCatalog.Classes;
     public VisualAgentDescriptor Descriptor => _useYoloX
-        ? VisualHostCatalog.YoloXDetector(!_detector.Imported, _detector.Backend)
-        : VisualHostCatalog.Detector(!_detector.Imported,
-            _detector.Imported ? _detector.Backend + (_detector.GpuFailure == null ? "" : " (GPU validation failed or unavailable)") : null);
+        ? VisualHostCatalog.YoloXDetector(!_detector.Imported, Backend)
+        : VisualHostCatalog.Detector(!_detector.Imported, Backend);
+    private string Backend => _detector.Imported
+        ? _detector.Backend + (_detector.GpuFailure == null ? "" : " (GPU validation failed or unavailable)") : null;
 
     public async Task PrepareAsync(Action<string> progress, CancellationToken cancellationToken)
     {

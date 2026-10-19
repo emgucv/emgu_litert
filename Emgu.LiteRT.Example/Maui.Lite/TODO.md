@@ -954,8 +954,11 @@ near its context limit. Record enabled tool/settings differences, history size a
 - [x] Same-device two-thread CPU comparison: M1 roughly 23 ms vs V3 4.6–4.8 ms; Pixel Fold 44–50 ms vs 12–17 ms.
       Keep YOLOX optional; these short samples do not establish sustained performance or overall accuracy.
 - [x] YOLOX GPU benchmark: accelerator/precision options, strict upstream parity and full-frame CPU/GPU timing
-      on M1 Metal and Pixel Fold OpenCL; explicit FP32 required (see evaluation report). Production adapter stays CPU.
-- [ ] Automatic YOLOX GPU qualification/fallback, quantization, COCO validation and sustained camera/memory/thermal comparison;
+      on M1 Metal and Pixel Fold OpenCL; explicit FP32 required (see evaluation report).
+- [x] `YoloXDetector` qualifies the GPU itself (FP32, GPU+CPU; same detections as the CPU on `surfers.jpg`, and faster) and
+      falls back to the CPU otherwise, for the photo page and the visual agent. Verified on the M1 (9.6 vs 23.6 ms), a
+      Galaxy S10 (31.4 vs 62.6 ms) and the Pixel Fold (36.2 vs 42.6 ms), full pipeline.
+- [ ] YOLOX quantization, COCO validation and sustained camera/memory/thermal comparison (GPU alongside a loaded Gemma too);
       live camera plus Gemma selecting YOLOX in chat remains an end-to-end check.
       [Usage, provenance, reproduction and results](YOLOX_EVALUATION.md).
 

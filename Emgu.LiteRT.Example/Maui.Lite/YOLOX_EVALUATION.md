@@ -1,6 +1,7 @@
 # Official YOLOX-Nano in the MAUI demo
 
-Verified 2026-10-19 on Mac Catalyst (Apple M1) and Pixel Fold. YOLOX-Nano is an optional CPU detector;
+Verified 2026-10-19 on Mac Catalyst (Apple M1) and Pixel Fold. YOLOX-Nano is an optional detector (GPU where it
+qualifies, else CPU);
 the existing SSD MobileNet V3 demo and visual agent remain available. No Ultralytics models, packages or export
 tools were used. This experiment does not establish a better default detector.
 
@@ -13,8 +14,15 @@ tools were used. This experiment does not establish a better default detector.
 
 The chat instructions prefer V3 for ordinary object monitors and select YOLOX when explicitly requested.
 
-YOLOX currently uses LiteRT **CPU**, including when Gemma uses GPU. An opt-in GPU benchmark is recorded below; automatic GPU accuracy/speed qualification has not been
-implemented for the production YOLOX adapter. V3's existing GPU qualification and CPU fallback are unchanged. This run checked the actual
+`YoloXDetector` tries the **GPU** first (Metal on Mac Catalyst, OpenCL on Android; explicit FP32, GPU+CPU) and keeps it
+only if its detections on the bundled `surfers.jpg` match the CPU model's (same count and classes, score within 0.01,
+normalized box within 0.005) and it is faster over a short alternating benchmark; otherwise - or if compiling fails -
+it falls back to the CPU and `GpuFailure` says why, as `CocoDetector` does for V3. The photo page's backend picker and the
+visual agent (`CocoVisualAgent`) both use it. Verified with a temporary check (`YoloXDetector.PrepareAsync(preferGpu:
+true)` on `surfers.jpg`, full pipeline including preprocessing and decoding, median of 15 after 3 warmups, 2 CPU
+threads): M1 Metal 9.6 ms vs CPU 23.6 ms; Galaxy S10 (OpenCL) 31.4 vs 62.6 ms; Pixel Fold (OpenCL) 36.2 vs 42.6 ms
+- all three accepted the GPU, reported "GPU" (fully accelerated) and returned the same six detections as the CPU. A
+GPU that fails either check is not used. The earlier V3 qualification is unchanged. This run checked the actual
 visual adapter on a padded-stride test frame; live camera monitoring and model-driven YOLOX selection in chat were
 not exercised end to end.
 
@@ -190,6 +198,5 @@ Remove both temporary source/asset files, delete the private command/log and any
 asset in the Mac app bundle. Clean the demo's Android build intermediates before rebuilding:
 incremental packaging can retain removed assets. Verify the resulting APK excludes the deleted assets.
 Rebuild and reinstall the normal app
-after testing. The standard adapter stays on CPU until GPU parity, speed qualification and fallback are wired
-into normal preparation. These short measurements do not establish sustained performance, battery use or
-latency alongside Gemma.
+after testing. (The standard adapter now qualifies the GPU itself - see above.) These short measurements do not
+establish sustained performance, battery use or latency alongside Gemma.

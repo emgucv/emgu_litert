@@ -22,7 +22,7 @@ namespace Maui.Demo.Lite
                 "Find and label objects in a photo.",
                 Theme.GlyphDetect,
                 useYoloX
-                    ? "Detects COCO objects with the official YOLOX-Nano model on this device. This experimental detector uses CPU; compare its boxes and timing with SSD MobileNet in the other demo."
+                    ? "Detects COCO objects with the official YOLOX-Nano model on this device. This experimental detector tries the GPU where available (FP32, checked against the CPU for accuracy and speed), with CPU fallback; compare its boxes and timing with SSD MobileNet in the other demo."
                     : "Detects the 80 object classes of the COCO dataset with SSD MobileNet v3 using LiteRT CompiledModel, drawing a box and a confidence score around each object found. GPU is tried where available, with CPU fallback.",
                 new[]
                 {
@@ -39,8 +39,8 @@ namespace Maui.Demo.Lite
             _backend = new Picker { Title = "Detector backend", FontFamily = Theme.BodyFont, FontSize = 16,
                 TextColor = Theme.PrimaryText, TitleColor = Theme.SecondaryText };
             _backend.Items.Add("CPU");
-            if (!useYoloX && CocoDetector.CanTryGpu) _backend.Items.Add("GPU (CPU fallback)");
-            _backend.SelectedIndex = !useYoloX && CocoDetector.CanTryGpu ? 1 : 0;
+            if (CocoDetector.CanTryGpu) _backend.Items.Add("GPU (CPU fallback)");
+            _backend.SelectedIndex = CocoDetector.CanTryGpu ? 1 : 0;
             _backend.SelectedIndexChanged += (_, _) => ReleaseModel();
             AddOptionsCard(Theme.Card(_backend, 14));
         }

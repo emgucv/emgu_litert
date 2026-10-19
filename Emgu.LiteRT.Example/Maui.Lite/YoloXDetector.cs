@@ -1,11 +1,14 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using Emgu.LiteRT.Util;
 using Emgu.CV;
+using Emgu.LiteRT;
 using Emgu.LiteRT.Models;
 
 namespace Maui.Demo.Lite;
 
-// Initial experiment qualifies CPU only. V3's GPU qualification/fallback remains independent.
+// Tries the GPU first (Metal on Mac Catalyst, OpenCL on Android) with explicit FP32 - the default precision failed the
+// upstream parity check on both - and keeps it only if it matches the CPU's detections on a bundled image and is
+// faster; otherwise the CPU detector is used (GpuFailure says why). See YOLOX_EVALUATION.md.
 internal sealed class YoloXDetector : ICocoDetector
 {
     internal const string ModelUrl = "https://emgu-public.s3.amazonaws.com/yolox/yolox_nano_float32.tflite";
@@ -13,8 +16,8 @@ internal sealed class YoloXDetector : ICocoDetector
     internal const string AssetSha256 = "4BE8F0E9E203E8150738DB6B3E8486D49B3C3D16C46EBA6ED3CCB70BB215FE00";
     private YoloX _model;
     public bool Imported => _model != null;
-    public string Backend => Imported ? "CPU" : null;
-    public string GpuFailure => null;
+    public string Backend { get; private set; }
+    public string GpuFailure { get; private set; }
 
     public async Task PrepareAsync(bool preferGpu, int numThreads, Action<string> progress, CancellationToken token)
     {
@@ -30,19 +33,90 @@ internal sealed class YoloXDetector : ICocoDetector
         token.ThrowIfCancellationRequested();
         if (!downloads.AllFilesDownloaded)
             throw new IOException("YOLOX-Nano download failed or did not match its SHA-256 checksum. Check the connection and retry.");
-        progress?.Invoke("Preparing YOLOX-Nano on CPU…");
-        var candidate = await Task.Run(() => new YoloX(file, numThreads), token).ConfigureAwait(false);
-        if (token.IsCancellationRequested) { candidate.Dispose(); token.ThrowIfCancellationRequested(); }
-        _model = candidate;
-        progress?.Invoke("YOLOX-Nano ready · LiteRT CPU");
+
+        GpuFailure = null;
+        if (preferGpu && CocoDetector.CanTryGpu)
+        {
+            try
+            {
+                await CompileAsync(file, HwAccelerators.Gpu | HwAccelerators.Cpu, numThreads, progress, token).ConfigureAwait(false);
+                return;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Dispose();
+                GpuFailure = ex.Message;
+                progress?.Invoke("YOLOX GPU unavailable or failed validation; preparing CPU detector…");
+            }
+        }
+        await CompileAsync(file, HwAccelerators.Cpu, numThreads, progress, token).ConfigureAwait(false);
+    }
+
+    private async Task CompileAsync(string file, HwAccelerators accelerator, int numThreads, Action<string> progress, CancellationToken token)
+    {
+        bool gpu = (accelerator & HwAccelerators.Gpu) != 0;
+        progress?.Invoke($"Preparing YOLOX-Nano on {(gpu ? "GPU" : "CPU")}…");
+        var candidate = await Task.Run(() => new YoloX(file, numThreads, accelerator, gpu ? GpuPrecision.Fp32 : null), token).ConfigureAwait(false);
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            if (gpu)
+                await ValidateGpuAsync(candidate, file, numThreads, progress, token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            Backend = gpu ? (candidate.IsFullyAccelerated ? "GPU" : "GPU + CPU") : "CPU";
+            _model = candidate;
+            candidate = null;
+            progress?.Invoke($"YOLOX-Nano ready · LiteRT {Backend}");
+        }
+        finally { candidate?.Dispose(); }
+    }
+
+    // Compile can succeed and the results still differ (default precision did): compare a bundled known image with the
+    // CPU's, then check that the GPU is actually faster before using it for real alerts.
+    private static async Task ValidateGpuAsync(YoloX gpu, string file, int numThreads, Action<string> progress, CancellationToken token)
+    {
+        using var cpu = await Task.Run(() => new YoloX(file, numThreads), token).ConfigureAwait(false);
+        using var image = ImageUtil.Decode(await ImageUtil.ReadAppFileAsync("surfers.jpg").ConfigureAwait(false));
+        await Task.Run(() =>
+        {
+            var expected = Detect(cpu, image);
+            var unmatched = Detect(gpu, image).ToList();
+            // As in the upstream parity test: count, class, score within 0.01 and box within 0.005 (normalized).
+            bool matches = expected.Length > 0 && expected.Length == unmatched.Count;
+            foreach (var detection in expected)
+            {
+                int index = matches ? unmatched.FindIndex(r => r.Class == detection.Class
+                    && Math.Abs(r.Score - detection.Score) <= 0.01
+                    && Enumerable.Range(0, 4).All(k => Math.Abs(r.Rectangle[k] - detection.Rectangle[k]) <= 0.005)) : -1;
+                if (index < 0) { matches = false; break; }
+                unmatched.RemoveAt(index);
+            }
+            if (!matches) throw new InvalidOperationException("GPU accuracy check failed for YOLOX-Nano.");
+
+            progress?.Invoke("Checking YOLOX GPU speed against CPU…");
+            using var benchmarkImage = new Mat();
+            CvInvoke.Resize(image, benchmarkImage, new System.Drawing.Size(640, 480));
+            var timing = CocoBackendBenchmark.Compare(() => Detect(cpu, benchmarkImage), () => Detect(gpu, benchmarkImage), token);
+            if (!timing.UseGpu)
+                throw new InvalidOperationException(FormattableString.Invariant(
+                    $"GPU speed check failed for YOLOX-Nano: CPU {timing.CpuMilliseconds:F2} ms, GPU {timing.GpuMilliseconds:F2} ms. Keeping CPU."));
+        }, token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
     }
 
     public CocoSsdMobilenet.RecognitionResult[] Detect(Mat bgr)
     {
         if (!Imported) throw new InvalidOperationException("Prepare YOLOX-Nano first.");
-        YoloXImageInput.Write(_model, bgr);
-        return _model.Run(bgr.Width, bgr.Height).Select(r => new CocoSsdMobilenet.RecognitionResult
+        return Detect(_model, bgr).Select(r => new CocoSsdMobilenet.RecognitionResult
             { Class = r.Class, Label = r.Label, Score = r.Score, Rectangle = r.Rectangle }).ToArray();
     }
-    public void Dispose() { _model?.Dispose(); _model = null; }
+
+    private static YoloX.Detection[] Detect(YoloX model, Mat bgr)
+    {
+        YoloXImageInput.Write(model, bgr);
+        return model.Run(bgr.Width, bgr.Height);
+    }
+
+    public void Dispose() { _model?.Dispose(); _model = null; Backend = null; }
 }
