@@ -15,7 +15,7 @@ internal static class ChatToolGroups
         "snapshot", "take a picture", "take a photo", "take picture", "take photo", "monitor", "detect", "alert me",
         "let me know when", "let me know if", "tell me when", "tell me if", "notify me", "when someone",
         "when a person", "when a dog", "when a cat", "when a car", "if someone", "if a person",
-        "appears", "shows up", "walks in", "comes in", "intruder", "visitor", "front door", "the door"
+        "appears", "shows up", "walks in", "comes in", "intruder", "visitor", "front door", "the door", "yolox", "mobilenet", "detector"
     };
 
     internal const string DeviceActions = "clock_calendar_maps";

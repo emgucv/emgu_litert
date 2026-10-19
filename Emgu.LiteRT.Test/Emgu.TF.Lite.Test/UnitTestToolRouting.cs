@@ -117,6 +117,7 @@ public class UnitTestToolRouting
             ("Let me know when someone walks in", new[] { ChatToolGroups.Camera }),
             ("Tell me if a dog shows up at the front door", new[] { ChatToolGroups.Camera }),
             ("What am I holding?", new[] { ChatToolGroups.Camera }),
+            ("Switch the monitor to YOLOX", new[] { ChatToolGroups.Camera }),
             ("Can you read the label on this bottle through the camera?", new[] { ChatToolGroups.Camera }),
             ("Set a 10 minute timer for the pasta", new[] { ChatToolGroups.DeviceActions }),
             ("Wake me up tomorrow at 6:45 am.", new[] { ChatToolGroups.DeviceActions }),
