@@ -135,6 +135,7 @@ namespace Maui.Demo.Lite
             ClearPendingAttachments();
             _promptEditor.Text = string.Empty;
             lock (_sendImages) _sendImages.Clear();
+            ClearWrittenDocuments();
             _sendSteps.Clear();
             _agentBubble = null;
             _statusLabel.Text = string.Empty;

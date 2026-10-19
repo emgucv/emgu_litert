@@ -59,7 +59,7 @@ public class UnitTestToolRouting
 
     // The demo's groups with the library's real tools (the camera's from VisualAgentTools with the demo's catalog).
     // done: called with what was done - "open_camera", "monitor:{label}:{actions}" or a device action's tool name.
-    private static List<ToolGroup> DemoGroups(Action snapshot = null, Action<string> done = null)
+    private static List<ToolGroup> DemoGroups(Action snapshot = null, Action<string> done = null, Func<string> request = null)
     {
         var actions = new[] { VisualHostCatalog.Chime, VisualHostCatalog.Speech, VisualHostCatalog.Snapshot };
         IEnumerable<AITool> Camera()
@@ -96,6 +96,13 @@ public class UnitTestToolRouting
                 () => new AITool[] { AgentTools.SearchDocuments((request, document, token) => Task.FromResult("none")) }, () => ChatPlannerInstructions.Documents),
             new ToolGroup(ChatToolGroups.PastChats, ChatToolGroups.PastChatsSummary, ChatToolGroups.PastChatsKeywords,
                 () => new AITool[] { AgentTools.SearchChats(Unused) }, () => ChatPlannerInstructions.ChatSearch),
+            new ToolGroup(ChatToolGroups.WriteDocument, ChatToolGroups.WriteDocumentSummary, ChatToolGroups.WriteDocumentKeywords,
+                () => new AITool[] { AgentTools.CreateDocument((document, token) =>
+                {
+                    done?.Invoke("document:" + document.Format + ":" + (document.Data.Length > 200 ? "content" : "short"));
+                    return Task.FromResult(AgentTools.DocumentCreatedResult(document));
+                }, request) },
+                () => "When the user asks for a document or a file (Word, PDF, Markdown), write the whole content into create_document's content in Markdown - not into your reply - then say in one short sentence that it is ready."),
             new ToolGroup(ChatToolGroups.ImageGeneration, ChatToolGroups.ImageGenerationSummary, ChatToolGroups.ImageGenerationKeywords,
                 () => new AITool[] { AgentTools.GenerateImage(Unused) }, () => ChatPlannerInstructions.Images),
         };
@@ -125,6 +132,9 @@ public class UnitTestToolRouting
             ("What was the restaurant you told me about?", new[] { ChatToolGroups.PastChats }),
             ("Draw a red fox in the snow", new[] { ChatToolGroups.ImageGeneration }),
             ("Can you paint a lighthouse at sunset?", new[] { ChatToolGroups.ImageGeneration }),
+            ("Make me a packing list as a Word document", new[] { ChatToolGroups.WriteDocument }),
+            ("Write that up as a PDF", new[] { ChatToolGroups.WriteDocument }),
+            ("Can you export this as Markdown?", new[] { ChatToolGroups.WriteDocument }),
             // Everyday messages need no group.
             ("What's the weather in Paris?", new string[0]),
             ("Look up the capital of France", new string[0]),
@@ -134,6 +144,7 @@ public class UnitTestToolRouting
             ("Tell me a joke", new string[0]),
             ("Explain how a bicycle works", new string[0]),
             ("When are museums open on Sunday?", new string[0]),
+            ("Plan a weekend in Paris", new string[0]),
         };
         ToolRouter router = new ToolRouter(DemoGroups(), null);
         List<string> wrong = new List<string>();
@@ -189,6 +200,8 @@ public class UnitTestToolRouting
     [TestCase("When you see a person, take a picture", true, "camera", "monitor:person:take_snapshot")]
     [TestCase("Beep when a bird lands on the feeder", false, "camera", "monitor:bird:play_sound")]
     [TestCase("Set a timer for 10 minutes", false, "clock_calendar_maps", "set_timer")]
+    [TestCase("Make me a packing list for a weekend of camping as a Word document.", true, "write_document", "document:Word:content")]
+    [TestCase("Put together a moving-house checklist I can print and stick on the fridge.", false, "write_document", "document:PDF:content")]
     [TestCase("Say welcome out loud whenever a person comes into view", false, "camera", "monitor:person:speak_text")]
     // Through the stub, continuing the request, Gemma 4 E2B asked for details it had been given (the date, the title),
     // however the stub's result was worded: the stub ends the request and the message is sent again.
@@ -201,7 +214,7 @@ public class UnitTestToolRouting
         await model.Init(configureSettings: s => { s.NumThreads = 4; s.MaxNumTokens = 4096; }, cancellationToken: stop.Token);
         List<string> done = new List<string>();
         // As the demo does: a stub ends the request, and the message is sent again with the group.
-        ToolRouter router = new ToolRouter(DemoGroups(null, done.Add), () => FunctionInvokingChatClient.CurrentContext?.Options,
+        ToolRouter router = new ToolRouter(DemoGroups(null, done.Add, () => prompt), () => FunctionInvokingChatClient.CurrentContext?.Options,
             () => FunctionInvokingChatClient.CurrentContext.Terminate = true);
         List<string> requested = new List<string>();
         router.GroupRequested += requested.Add;
@@ -294,7 +307,8 @@ public class UnitTestToolRouting
         TestContext.Out.WriteLine($"core tools and instructions {coreSize} characters, stubs {stubs}, all groups {all}");
         foreach (ToolGroup group in router.Groups)
             TestContext.Out.WriteLine($"  {group.Name}: {Size(group.CreateTools()) + (group.Instructions?.Invoke()?.Length ?? 0)}");
-        // ~4 characters a token: what every message carries stays well under a quarter of a 4k window.
-        Assert.That(coreSize + stubs, Is.LessThan(4000));
+        // ~4 characters a token: what every message carries stays at about a quarter of a 4k window (each group's stub
+        // adds ~200 characters).
+        Assert.That(coreSize + stubs, Is.LessThan(4500));
     }
 }

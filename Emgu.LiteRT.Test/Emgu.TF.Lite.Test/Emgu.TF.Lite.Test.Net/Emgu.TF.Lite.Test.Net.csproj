@@ -26,6 +26,7 @@
     <Compile Include="..\UnitTestDeviceActions.cs" Link="UnitTestDeviceActions.cs" />
     <Compile Include="..\UnitTestAgentGoals.cs" Link="UnitTestAgentGoals.cs" />
     <Compile Include="..\UnitTestToolRouting.cs" Link="UnitTestToolRouting.cs" />
+    <Compile Include="..\UnitTestDocumentWriter.cs" Link="UnitTestDocumentWriter.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\VoiceConversation.cs" Link="VoiceConversation.cs" />
     <Compile Include="..\UnitTestAgentRegression.cs" Link="UnitTestAgentRegression.cs" />
     <Compile Include="..\UnitTestCameraTools.cs" Link="UnitTestCameraTools.cs" />

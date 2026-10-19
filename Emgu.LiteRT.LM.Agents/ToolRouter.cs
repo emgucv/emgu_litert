@@ -23,7 +23,8 @@ namespace Emgu.LiteRT.LM.Agents
         /// <param name="summary">What the tools do, for the stub's description, e.g. "look at, watch for or photograph
         /// something with the device's camera"</param>
         /// <param name="keywords">Words and phrases of a message that need the group (lower case; a keyword also
-        /// matches longer words it starts, e.g. "remind" matches "reminder")</param>
+        /// matches longer words it starts, e.g. "remind" matches "reminder", unless it ends with "$": "a week$" doesn't
+        /// match "a weekend")</param>
         /// <param name="createTools">Creates the group's tools (none: the group is left out, e.g. when a setting is off)</param>
         /// <param name="instructions">Gives the instructions for the agent while the group is in use, or null</param>
         /// <param name="alsoMatches">Another test of whether a message needs the group, e.g. the user's own goals'
@@ -183,8 +184,11 @@ namespace Emgu.LiteRT.LM.Agents
             string normalized = " " + Normalize(text) + " ";
             foreach (string keyword in group.Keywords)
             {
-                // At the start of a word; the end may run on ("remind" - "reminder", "photo" - "photos").
-                if (normalized.IndexOf(" " + Normalize(keyword), StringComparison.Ordinal) >= 0)
+                // At the start of a word; the end may run on ("remind" - "reminder", "photo" - "photos") unless the keyword
+                // ends with "$".
+                bool whole = keyword.EndsWith("$", StringComparison.Ordinal);
+                string word = " " + Normalize(whole ? keyword.Substring(0, keyword.Length - 1) : keyword) + (whole ? " " : "");
+                if (normalized.IndexOf(word, StringComparison.Ordinal) >= 0)
                     return true;
             }
             return false;

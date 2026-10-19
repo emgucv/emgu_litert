@@ -369,18 +369,34 @@ the correct saved chats, and Gemma called `search_chats` and answered from the r
 - [ ] Share the picture (MAUI `Share`).
 - [ ] Show the description and seed under the picture (tap), so a picture can be made again.
 
-## 18. Agent tool: create documents (`create_document`)
+## 18. Agent tool: create documents (`create_document`) — implemented; verified on Mac Catalyst with Gemma 4 E2B
 
 "Make me a packing list as a document", "write that up as a Word file".
 
-- [ ] Tool in `Emgu.LiteRT.LM.Agents` (`AgentTools.CreateDocument(save)`, the app saves and shows the file): a title, the
-      content in Markdown, and a format - Word (.docx), PDF or Markdown.
-- [ ] Writing: Markdown as is; .docx with the Open XML basics (headings, paragraphs, lists, bold/italic, tables) -
-      the document reader already parses `word/document.xml`; PDF with a small writer, or left out at first.
-- [ ] Demo: the file appears as a card in the reply (name, size, format) with Open and Share (MAUI `Launcher` / `Share`),
-      saved with the chat like the generated pictures (a new attachment kind, never given back to the model).
-- [ ] Long content: the model writes it in its reply budget (`MaxOutputTokens`); for longer documents, ask it to write
-      section by section.
+- [x] `Emgu.LiteRT.LM.Agents`: `AgentTools.CreateDocument(save, userRequest)` - `create_document(title, content, format)`,
+      the content in Markdown - and `DocumentWriter` (`DocumentWriter.cs`), which makes the file: Word (.docx, Office Open
+      XML written directly with `System.IO.Compression`: title, headings, paragraphs, bullet and numbered lists to three
+      levels, bold/italic/inline code, links as "text (url)", tables with a shaded header row, code blocks, quotes),
+      PDF (a small writer: A4, Helvetica/Courier with WinAnsi encoding and Helvetica's widths for wrapping, pages,
+      lists, tables, code; text those fonts can't show - e.g. Chinese - becomes a Word document, and the model is told)
+      or Markdown. The format the user's words name wins (`ChooseFormat`: Word/docx, PDF, "print" - PDF, Markdown/md);
+      otherwise the model's, but Markdown only when asked for - E2B chose Markdown for "a checklist I can print", even
+      told "pdf for something to print". The files open in macOS's readers (`textutil`, Quick Look, Preview); each
+      numbered list has a numbering definition of its own, since Quick Look kept counting across lists that shared one.
+- [x] Demo (`LiteRtLmChatPage.WrittenDocuments.cs`): its own tool group (`write_document`: document, word file, docx,
+      pdf, markdown, write up, as a file, export, print out, report, letter, itinerary...); the file appears as a card
+      above the reply (name, format, size) with Open (`Launcher` + `OpenFileRequest`) and Share (`Share` +
+      `ShareFileRequest`) from a copy in the cache, and is saved with the reply as an attachment of kind `document`
+      (its name in the media type, `...; name=Packing list.docx`), shown again when the chat is reopened, never given
+      back to the model.
+- [x] Tests: `UnitTestDocumentWriter` (the .docx parts and XML, the PDF's cross-reference table, pages and WinAnsi text,
+      the fallback to Word, file names, the format choice, the tool); `Gemma4E2BUsesGroupsAndStubsAt4k` - "a packing list
+      for a weekend of camping as a Word document" (routed) and, through the stub, "a moving-house checklist I can print
+      and stick on the fridge" (PDF). On Mac Catalyst (E2B, Metal): a Word packing list in 20 s, then "the same list as a
+      PDF" in 11 s, both cards, and both again after reopening the chat.
+- [ ] Open and Share not yet tapped on a device (Mac Catalyst opens Pages/Preview, Android the user's apps).
+- [ ] Long content: the model writes it in its reply budget (1,024 tokens by default in `LiteRtLmChatClient`); for
+      longer documents, ask it to write section by section.
 
 ## 19. A private chat
 

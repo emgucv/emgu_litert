@@ -25,6 +25,7 @@ public partial class LiteRtLmChatPage
     private List<PendingAttachment> _routeAttachments = new List<PendingAttachment>();
     private IList<AgentGoal> _routeGoals = new List<AgentGoal>();
     private string _routeGoalInstructions;
+    private string _routePrompt;
 
     private ToolRouter ToolRouter => _toolRouter ??= CreateToolRouter();
 
@@ -53,6 +54,9 @@ public partial class LiteRtLmChatPage
                 () => IsPrivateChat ? Array.Empty<AITool>() : new AITool[] { AgentTools.SearchChats(SearchChatsAsync) },
                 () => ChatSearchInstructions),
         };
+        groups.Add(new ToolGroup(ChatToolGroups.WriteDocument, ChatToolGroups.WriteDocumentSummary, ChatToolGroups.WriteDocumentKeywords,
+            () => new AITool[] { AgentTools.CreateDocument(SaveWrittenDocumentAsync, () => _routePrompt) },
+            () => DocumentWritingInstructions));
         if (ImageGenerationSupported)
             groups.Add(new ToolGroup(ChatToolGroups.ImageGeneration, ChatToolGroups.ImageGenerationSummary, ChatToolGroups.ImageGenerationKeywords,
                 () => new AITool[] { AgentTools.GenerateImage(GenerateImageAsync) },
@@ -84,6 +88,7 @@ public partial class LiteRtLmChatPage
     private async Task RouteToolsAsync(string prompt, List<PendingAttachment> attachments)
     {
         _routeAttachments = attachments;
+        _routePrompt = prompt;
         try { _routeGoals = GoalsOn ? await _store.GetGoalsAsync() : new List<AgentGoal>(); }
         catch (Exception) { _routeGoals = new List<AgentGoal>(); }
         _routeGoalInstructions = await GoalInstructionsAsync();

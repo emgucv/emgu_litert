@@ -1658,6 +1658,7 @@ namespace Maui.Demo.Lite
             _sendSteps.Clear();
             lock (_sendImages)
                 _sendImages.Clear();
+            ClearWrittenDocuments();
             UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, agent {3}, think {4}, web {5}",
                 prompt.Length, attachments.Count, SelectedOption.Name, UseAgent, _thinkingSwitch.IsToggled, _webSearchSwitch.IsToggled));
             // With read-aloud on (or in a voice chat) the reply is read while it is written.
@@ -2996,6 +2997,8 @@ namespace Maui.Demo.Lite
                 List<(string Kind, string MediaType, byte[] Data)> drawn;
                 lock (_sendImages)
                     drawn = _sendImages.Select(png => (GeneratedKind, "image/png", png)).ToList();
+                // And the documents it wrote.
+                drawn.AddRange(TakeWrittenDocuments());
                 replyItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking, drawn);
                 // The document the chat uses now (or none), restored when it is opened again.
                 await _store.SetConversationDocumentAsync(id, _document?.Index != null ? _document.Id : null);
@@ -3256,6 +3259,12 @@ namespace Maui.Demo.Lite
                     foreach (SavedAttachment attachment in _store.GetAttachments(message))
                     {
                         byte[] data = await System.IO.File.ReadAllBytesAsync(attachment.Path);
+                        if (attachment.Kind == DocumentKind)
+                        {
+                            // A document the reply wrote: a card above it, not part of what the model is given.
+                            AddSavedDocumentCard(attachment.MediaType, data);
+                            continue;
+                        }
                         if (attachment.Kind == GeneratedKind)
                         {
                             // A picture the reply drew: shown above it, not part of what the model is given.

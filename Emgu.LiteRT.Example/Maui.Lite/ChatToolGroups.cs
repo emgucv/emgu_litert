@@ -27,12 +27,21 @@ internal static class ChatToolGroups
         "walk to", "drive to", "take me to", "navigate", "route", "map", "minutes for", "countdown"
     };
 
+    internal const string WriteDocument = "write_document";
+    internal const string WriteDocumentSummary = "write a document file (Word, PDF or Markdown) for the user to open or share";
+    internal static readonly string[] WriteDocumentKeywords =
+    {
+        "document", "word file", "word doc", "a doc", "docx", "pdf", "markdown", "write up", "write it up", "write that up",
+        "write this up", "as a file", "into a file", "in a file", "save it as", "save that as", "save this as", "export",
+        "printable", "print out", "handout", "report", "letter", "essay", "cv", "resume", "itinerary"
+    };
+
     internal const string Goals = "goals";
     internal const string GoalsSummary = "save the user's goals (habits, targets) and log or check their progress";
     internal static readonly string[] GoalsKeywords =
     {
-        "goal", "habit", "target", "streak", "progress", "i want to", "i'd like to", "every day", "a day", "a week",
-        "per week", "per day", "each week", "times a week", "how am i doing", "on track", "keep track", "track my"
+        "goal", "habit", "target", "streak", "progress", "i want to", "i'd like to", "every day", "a day$", "a week$",
+        "per week$", "per day$", "each week$", "times a week", "how am i doing", "on track", "keep track", "track my"
     };
 
     internal const string Photos = "photo_search";

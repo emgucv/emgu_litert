@@ -576,8 +576,14 @@ namespace Maui.Demo.Lite
 
         private static string Extension(string mediaType)
         {
+            int parameter = mediaType?.IndexOf(';') ?? -1;
+            if (parameter >= 0)
+                mediaType = mediaType.Substring(0, parameter).Trim();
             switch (mediaType)
             {
+                case "application/vnd.openxmlformats-officedocument.wordprocessingml.document": return ".docx";
+                case "application/pdf": return ".pdf";
+                case "text/markdown": return ".md";
                 case "image/jpeg": return ".jpg";
                 case "image/png": return ".png";
                 case "audio/mpeg": return ".mp3";
