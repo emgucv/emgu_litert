@@ -1875,8 +1875,10 @@ namespace Maui.Demo.Lite
             foreach (PendingAttachment attachment in attachments)
                 contents.Add(new DataContent(attachment.Data, attachment.MediaType));
             contents.Add(new TextContent(prompt));
-            // The tools for this message: the date and time always, the location if the user shares it, and the search
-            // tools with the Web search chip on.
+            // The tools for this message: the core ones (date and time, calculator, units, memories, the location if the
+            // user shares it, the web tools with the Web search chip on), then the groups the conversation needs
+            // (LiteRtLmChatPage.Tools.cs) - with a stub for each other group.
+            await RouteToolsAsync(prompt, attachments);
             ChatOptions options = new ChatOptions
             {
                 // A voice chat answers without thinking first: a spoken reply should start quickly. (Sent to a server as
@@ -1884,27 +1886,13 @@ namespace Maui.Demo.Lite
                 Reasoning = SelectedChoice == ModelChoice.Server && _serverRejectsReasoning ? null
                     : new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink && !_voiceMode ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
-                    !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, FindPhotosAsync, ImageGenerationSupported ? GenerateImageAsync : null,
-                    IsPrivateChat ? null : SearchChatsAsync, privateChat: IsPrivateChat,
-                    searchDocuments: SearchDocumentsAsync),
-                // Local search and generation tools remain available with their settings off, so the model can explain how to
-                // turn them on.
-                Instructions = JoinInstructions(await MemoryInstructionsAsync(), await GoalInstructionsAsync(), WebSearchInstructions(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions + " " + ChatPlannerInstructions.Documents,
-                    ImageGenerationSupported ? ImageInstructions : null, DeviceActionInstructionsForMessage(),
-                    LiveCamera.Supported && SelectedOption.AcceptsImages ? CameraInstructions : null,
-                    LiveCamera.Supported ? VisualInstructions : null),
+                    !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, privateChat: IsPrivateChat),
+                Instructions = JoinInstructions(await MemoryInstructionsAsync(), WebSearchInstructions(),
+                    IsPrivateChat ? PrivateInstructions : null, ToolRouter.Instructions()),
                 ToolMode = ChatToolMode.Auto
             };
-            foreach (AIFunction tool in DeviceActionToolsForMessage())
+            foreach (AITool tool in ToolRouter.Tools())
                 options.Tools.Add(tool);
-            foreach (AIFunction tool in GoalToolsForMessage())
-                options.Tools.Add(tool);
-            if (LiveCamera.Supported)
-            {
-                options.Tools.Add(AgentTools.OpenCamera(OpenCameraAsync));
-                if (SelectedOption.AcceptsImages) options.Tools.Add(AgentTools.CaptureCameraFrame(CaptureCameraFrameAsync));
-                foreach (var tool in VisualTools(attachments)) options.Tools.Add(tool);
-            }
             int attachedImages = attachments.Count(a => a.Image != null);
             if (attachedImages > 0 && LiveCamera.Supported)
                 contents.Add(new TextContent("Attached image references for analyze_visual_image: " +
@@ -2018,7 +2006,11 @@ namespace Maui.Demo.Lite
                 _session = null;
             }
             if (_session == null)
+            {
                 _session = await _agent.CreateSessionAsync();
+                // A new conversation for the model: the tool groups start again from what its messages need.
+                _toolRouter?.Reset();
+            }
         }
 
         private void ResetAgent()
@@ -2551,7 +2543,8 @@ namespace Maui.Demo.Lite
         // Early estimate for history summarization before a send. The native chat client additionally budgets
         // rendered instructions/tools, actual cache occupancy and each pending tool round at execution time.
         private int ContextBudget => ContextWindow - ReplyReserveTokens - (UseAgent
-            ? AgentOverheadTokens + (LiveCamera.Supported ? 800 : 0) // Visual tools and monitoring instructions.
+            ? AgentOverheadTokens + ToolGroupTokens
+
             : ChatOverheadTokens);
 
         // The estimated size of a message in the model's context. Runs the tokenizer: call it off the UI thread.

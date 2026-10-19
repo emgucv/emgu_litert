@@ -980,3 +980,35 @@ LiteRT inside LiteRT-LM's `CLiteRTLM` (item 31).
       and CompiledModel MobileNet (space shuttle, 1.0) with only `LiteRt` and `tfliteextern` in its bundle. (The
       simulator runs iOS 27, so the iOS 15 minimum itself is untested.)
 - [ ] A real iPhone, and App Store validation of the frameworks (item 35).
+
+## 37. Tool groups on demand — implemented; verified with Gemma 4 E2B on a Mac and a Galaxy S10
+
+Every message carried all ~25 tool definitions and their instructions, ~3,850 tokens: with the goal tools Gemma 4 E2B
+on a phone's 4k window failed every message (phones now get 8k for Gemma 4, item 25).
+
+- [x] `Emgu.LiteRT.LM.Agents`' `ToolRouter` / `ToolGroup`: the app's core tools come with every message; each group
+      (the demo's `ChatToolGroups`: camera, clock/calendar/maps, goals, photo search, documents, past chats, image
+      generation) comes when a message's words need it (keywords, matched at word starts; goals also by the user's own
+      goals' words, `AgentTools.MentionsGoal`) or the app's state does (the camera open, a monitor set), and stays for
+      the rest of the conversation - LiteRT-LM re-reads the whole conversation when the tools change. Every other group
+      is a stub tool (`use_camera`...) plus one line of instructions listing them: calling it adds the group's tools and
+      instructions to the same request (`FunctionInvokingChatClient.CurrentContext.Options`, re-read each round), so a
+      request the keywords miss still works in one message.
+- [x] What every message carries: 3,770 characters (core tools and instructions 2,376, 7 stubs 1,394) instead of
+      ~15,400 with every group (the camera group alone 5,839). On the S10's GPU: "What is 12 times 7?" 22 s instead of
+      48 s, goal messages 26-27 s instead of 44-46 s.
+- [x] Tests: `UnitTestToolRouting` - 27 phrasings routed (indirect ones such as "Let me know when someone walks in";
+      everyday ones such as "How many people live in Tokyo?" get no group), a stub adding its group mid-request (a
+      scripted model through `ChatClientAgent`), the size budget; `Gemma4E2BUsesGroupsAndStubsAt4k` (`TEST_MODELS`):
+      at a 4k window E2B created the person/take_snapshot monitor when routed, and through the stubs alone the
+      bird/play_sound and person/speak_text monitors and the 10-minute timer, twice each. A stub alone wasn't enough at
+      first ("Beep when a bird lands on the feeder": E2B said it couldn't set alarms) - the instruction line listing the
+      stubs fixed it.
+- [ ] Through its stub, E2B called `use_clock_calendar_maps` for "Add the dentist on Friday at 3 pm to my calendar" and
+      then asked for details it had been given (the date, the title), however the stub's result was worded; routed by
+      its words it added the event. The keywords catch calendar requests; a re-run of the message with the group (no
+      stub turn) would fix the rest.
+- [ ] Trimming the camera group's definitions (the action schema of `create_visual_monitor`, 1,600 characters): only
+      with `FullDemoPlannerCatalogCreatesAlertAt4k` before and after, since they were tuned for E2B.
+- [ ] Routing by meaning (EmbeddingGemma similarity to each group) in place of, or with, the keywords.
+- [ ] Phones could go back to 4k for Gemma 4 now that a typical message carries ~1k tokens of tools.

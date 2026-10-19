@@ -607,6 +607,19 @@ namespace Emgu.LiteRT.LM.Agents
             return best;
         }
 
+        /// <summary>
+        /// Whether a text mentions one of the goals by its words ("I finished my book" - "Read 12 books"), e.g. to give
+        /// the agent the goal tools for it (ToolRouter).
+        /// </summary>
+        /// <param name="goals">The user's goals</param>
+        /// <param name="text">The text</param>
+        /// <returns>True if a goal's word is in the text</returns>
+        public static bool MentionsGoal(IEnumerable<AgentGoal> goals, string text)
+        {
+            HashSet<string> words = GoalWords(text);
+            return words.Count > 0 && goals != null && goals.Any(g => GoalWords(g.Text).Any(w => words.Any(t => SameWord(t, w))));
+        }
+
         private static HashSet<string> GoalWords(string text)
         {
             HashSet<string> words = ContentWords(text);

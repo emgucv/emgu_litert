@@ -1,0 +1,68 @@
+// Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+namespace Maui.Demo.Lite;
+
+// The chat agent's tool groups (LiteRtLmChatPage.Tools.cs): name, what they do (for the stub tool) and the words of a
+// message that need them. A keyword also matches longer words it starts ("remind" - "reminder"). Leaning towards
+// including: a group a message didn't need costs some tokens, a missing one a stub call. Shared with UnitTestToolRouting.
+internal static class ChatToolGroups
+{
+    internal const string Camera = "camera";
+    internal const string CameraSummary = "use the device's live camera: look at or read something, or watch for something (a person, an animal, a car...) and beep, speak or take a picture when it appears";
+    internal static readonly string[] CameraKeywords =
+    {
+        "camera", "you see", "can you see", "do you see", "look at", "looking at", "watch for", "keep an eye",
+        "show me what", "what is this", "what's this", "what am i holding", "read this", "read the label",
+        "snapshot", "take a picture", "take a photo", "take picture", "take photo", "monitor", "detect", "alert me",
+        "let me know when", "let me know if", "tell me when", "tell me if", "notify me", "when someone",
+        "when a person", "when a dog", "when a cat", "when a car", "if someone", "if a person",
+        "appears", "shows up", "walks in", "comes in", "intruder", "visitor", "front door", "the door"
+    };
+
+    internal const string DeviceActions = "clock_calendar_maps";
+    internal const string DeviceActionsSummary = "set a timer or an alarm, add a calendar event or a reminder, or get directions";
+    internal static readonly string[] DeviceActionsKeywords =
+    {
+        "timer", "alarm", "wake me", "wake up", "remind", "calendar", "schedule", "appointment", "meeting", "event",
+        "book a", "put it in", "put lunch", "put dinner", "direction", "how do i get", "how to get", "get to",
+        "walk to", "drive to", "take me to", "navigate", "route", "map", "minutes for", "countdown"
+    };
+
+    internal const string Goals = "goals";
+    internal const string GoalsSummary = "save the user's goals (habits, targets) and log or check their progress";
+    internal static readonly string[] GoalsKeywords =
+    {
+        "goal", "habit", "target", "streak", "progress", "i want to", "i'd like to", "every day", "a day", "a week",
+        "per week", "per day", "each week", "times a week", "how am i doing", "on track", "keep track", "track my"
+    };
+
+    internal const string Photos = "photo_search";
+    internal const string PhotosSummary = "find and show the user's own photos and pictures on this device";
+    internal static readonly string[] PhotosKeywords =
+    {
+        "photo", "picture", "pic", "selfie", "screenshot", "gallery", "album", "camera roll", "images of",
+        "image of my", "my images"
+    };
+
+    internal const string Documents = "documents";
+    internal const string DocumentsSummary = "search the documents (PDF, Word, text files) the user attached to earlier chats";
+    internal static readonly string[] DocumentsKeywords =
+    {
+        "document", "file", "pdf", "report", "contract", "paper", "manual", "my notes", "attached", "the doc"
+    };
+
+    internal const string PastChats = "past_chats";
+    internal const string PastChatsSummary = "search the user's earlier conversations on this device";
+    internal static readonly string[] PastChatsKeywords =
+    {
+        "earlier", "previous", "last time", "we talked", "we discussed", "you said", "you told", "i said",
+        "i told you", "i asked", "remember when", "conversation", "chat", "mentioned", "recall"
+    };
+
+    internal const string ImageGeneration = "image_generation";
+    internal const string ImageGenerationSummary = "draw, paint or create a new picture from a description";
+    internal static readonly string[] ImageGenerationKeywords =
+    {
+        "draw", "paint", "sketch", "illustrat", "generate an image", "generate a picture", "create an image",
+        "create a picture", "make an image", "make a picture", "imagine", "picture of a", "image of a", "artwork"
+    };
+}
