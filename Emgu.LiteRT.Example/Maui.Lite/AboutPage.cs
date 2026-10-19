@@ -3,6 +3,7 @@
 //----------------------------------------------------------------------------
 
 using System;
+using System.Threading.Tasks;
 
 namespace Maui.Demo.Lite
 {
@@ -42,7 +43,7 @@ namespace Maui.Demo.Lite
                 Spacing = 0,
                 Children =
                 {
-                    LinkRow(Theme.GlyphInfo, "TensorFlow Lite license", "https://github.com/tensorflow/tensorflow/blob/master/LICENSE"),
+                    NavRow(Theme.GlyphInfo, "Open-source licences", () => Navigation.PushAsync(new LicensesPage())),
                     Theme.Divider(54),
                     LinkRow(Theme.GlyphGrid, "Visit our website", "https://www.emgu.com/wiki/index.php/Emgu_TF"),
                     Theme.Divider(54),
@@ -73,6 +74,26 @@ namespace Maui.Demo.Lite
             };
             g.Add(new Label { Text = name, FontFamily = Theme.BodyFont, FontSize = 16, TextColor = Theme.SecondaryText }, 0, 0);
             g.Add(new Label { Text = value, FontFamily = Theme.TitleFont, FontSize = 16, TextColor = Theme.PrimaryText }, 1, 0);
+            return g;
+        }
+
+        private static View NavRow(string glyph, string text, Func<Task> open)
+        {
+            var g = new Grid
+            {
+                Padding = new Thickness(0, 10),
+                ColumnSpacing = 12,
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto)
+                }
+            };
+            g.Add(Theme.IconTile(glyph, 42, 22, 11), 0, 0);
+            g.Add(new Label { Text = text, FontFamily = Theme.TitleFont, FontSize = 16, TextColor = Theme.PrimaryText, VerticalOptions = LayoutOptions.Center }, 1, 0);
+            g.Add(Theme.MakeIcon(Theme.GlyphChevronRight, Theme.Chevron, 22), 2, 0);
+            g.OnTap(async () => await open());
             return g;
         }
 
