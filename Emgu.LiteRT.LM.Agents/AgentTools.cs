@@ -771,6 +771,10 @@ namespace Emgu.LiteRT.LM.Agents
                 case "open_directions": return "Getting directions to " + Argument("destination");
                 case "remember": return "Remembering: " + Argument("fact");
                 case "forget": return "Forgetting “" + Argument("text") + "”";
+                case "add_goal": return "Saving your goal: " + Argument("goal");
+                case "log_progress": return "Logging progress: " + Argument("goal");
+                case "get_goals": return "Checking your goals";
+                case "remove_goal": return "Removing the goal: " + Argument("goal");
                 case "search_wikipedia": return "Searching Wikipedia for “" + Argument("query") + "”";
                 case "search_web": return "Searching the web for “" + Argument("query") + "”";
                 case "read_web_page": return "Reading " + Argument("url");

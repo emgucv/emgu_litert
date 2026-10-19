@@ -521,16 +521,31 @@ anything happens (the model can get a date or time wrong).
 - [ ] iOS / Mac Catalyst: EventKit events and reminders, Apple Maps (built, not run; the first use asks for access).
 - [ ] Alarms more than 24 hours ahead (a calendar event is suggested instead); timers/alarms on iOS (no public API).
 
-## 25. Goals and check-ins
+## 25. Goals and check-ins — goals implemented and verified on Android; check-ins pending
 
 "I want to run three times a week", "read 20 pages a day".
 
-- [ ] A goals list kept like memories (`ChatStore`, local only): the goal, its target and period, and progress entries;
-      tools `add_goal`, `log_progress`, `get_goals` (`Emgu.LiteRT.LM.Agents`, with an app-provided store like
-      `IAgentMemoryStore`).
-- [ ] The goals go into the agent's instructions with the memories, so "I ran today" is logged without asking.
-- [ ] Settings: the goals with their progress, edit and delete.
-- [ ] Check-ins: a reminder (device actions, item 24) or a scheduled task (item 30) asks how it went.
+- [x] `Emgu.LiteRT.LM.Agents` (`AgentGoals.cs`): `AgentTools.Goals(store)` - `add_goal`, `log_progress`, `get_goals`,
+      `remove_goal` - over an app-provided `IAgentGoalStore` (`InMemoryAgentGoalStore` for tests). The model passes the
+      goal in the user's words: `GoalParser` reads its target, unit and period ("three times a week", "20 pages a day",
+      "10,000 steps every day", "twice daily", "4x per week", "12 books" - no period; "Learn Spanish" - nothing to count)
+      and the day progress was made ("yesterday", "last night", "Monday" - the last one, "3 days ago", a date - moved
+      back a year if ahead); `log_progress` finds the goal by its words ("ran" - "run", "reading" - "read"; numbers and
+      period words don't count, or "this week" would match every weekly goal). Weeks start on Monday; progress counts
+      by period, also days before the goal was set. Unit tests: `UnitTestAgentGoals`.
+- [x] The demo keeps them in `ChatStore` (`Goal`, `GoalProgress` tables; `ChatStore.Goals.cs`), on with "Remember things
+      about me", never in a private chat; `GoalInstructionsAsync` puts each goal with this period's progress into the
+      message's instructions, so "I ran today" is logged without asking.
+- [x] Settings > Your goals: each goal with its progress, Edit (re-read from the new text), Undo last, Delete.
+- [x] Verified on a Galaxy S10 with LM Studio's Gemma 4 26B-A4B (thinking on), each message in a new chat: "I want to
+      run three times a week" saved 3 times a week; "I went for a run this morning, 5 km" logged 1 time (not 5);
+      "I also ran on Monday" (it was Monday) 2 of 3; "read 20 pages a day" saved; "Read 35 pages before bed last night"
+      logged 35 yesterday (0 of 20 today); "How am I doing with my goals?" called `get_goals` and answered with both;
+      the Settings sheet listed them. 20-53 s per message.
+- [ ] Not yet tried with Gemma 4 E2B/E4B on the device.
+- [ ] Check-ins: a reminder (device actions, item 24 - only iOS/Mac Catalyst have reminders) or a scheduled task
+      (item 30) asks how it went; e.g. a local notification on the evening of a day a goal is behind.
+- [ ] Streaks and history (per week/day) in Settings.
 
 ## 26. Agent tool: clipboard (`read_clipboard`)
 

@@ -617,6 +617,7 @@ namespace Maui.Demo.Lite
                         TextColor = Theme.SecondaryText
                     },
                     _memoryCountLabel,
+                    BuildGoalsSection(),
                     Theme.Divider(),
                     new Label { Text = "Conversation memory", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     _memoryLabel,
@@ -1806,8 +1807,9 @@ namespace Maui.Demo.Lite
                 ClearCameraTurn();
                 SetBusy(false);
                 UpdateMemoryLabel();
-                // The agent may have saved or deleted a memory.
+                // The agent may have saved or deleted a memory or a goal.
                 _ = RefreshMemoryCountAsync();
+                _ = RefreshGoalCountAsync();
                 _ = RefreshServerContextAsync();
             }
         }
@@ -1885,13 +1887,15 @@ namespace Maui.Demo.Lite
                     searchDocuments: SearchDocumentsAsync),
                 // Local search and generation tools remain available with their settings off, so the model can explain how to
                 // turn them on.
-                Instructions = JoinInstructions(await MemoryInstructionsAsync(), WebSearchInstructions(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions + " " + ChatPlannerInstructions.Documents,
+                Instructions = JoinInstructions(await MemoryInstructionsAsync(), await GoalInstructionsAsync(), WebSearchInstructions(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions + " " + ChatPlannerInstructions.Documents,
                     ImageGenerationSupported ? ImageInstructions : null, DeviceActionInstructionsForMessage(),
                     LiveCamera.Supported && SelectedOption.AcceptsImages ? CameraInstructions : null,
                     LiveCamera.Supported ? VisualInstructions : null),
                 ToolMode = ChatToolMode.Auto
             };
             foreach (AIFunction tool in DeviceActionToolsForMessage())
+                options.Tools.Add(tool);
+            foreach (AIFunction tool in GoalToolsForMessage())
                 options.Tools.Add(tool);
             if (LiveCamera.Supported)
             {

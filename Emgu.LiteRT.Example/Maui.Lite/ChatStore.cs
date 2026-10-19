@@ -253,6 +253,8 @@ namespace Maui.Demo.Lite
                 await connection.CreateTableAsync<MessageRecord>();
                 await connection.CreateTableAsync<ChatEmbeddingRecord>();
                 await connection.CreateTableAsync<MemoryRecord>();
+                await connection.CreateTableAsync<GoalRecord>();
+                await connection.CreateTableAsync<GoalProgressRecord>();
                 await connection.CreateTableAsync<PhotoEmbeddingRecord>();
                 await connection.CreateTableAsync<DocumentRecord>();
                 await connection.CreateTableAsync<DocumentItemRecord>();
