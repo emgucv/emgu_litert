@@ -962,6 +962,18 @@ near its context limit. Record enabled tool/settings differences, history size a
       live camera plus Gemma selecting YOLOX in chat remains an end-to-end check.
       [Usage, provenance, reproduction and results](YOLOX_EVALUATION.md).
 
+### D-FINE-N evaluation — converts and matches; not added to the app
+
+- [x] Official D-FINE-N (COCO, Apache-2.0) converted to float32 LiteRT with static shapes (`tools/prepare_dfine_n.py`, TF converter with
+      Erf replaced; reproduced bit for bit at 640 and 416) and checked against its ONNX export on the four bundled images
+      (`tools/check_dfine_conversion.py`: identical detections). Recipe, pitfalls, licence notes and results in
+      [DFINE_EVALUATION.md](DFINE_EVALUATION.md).
+- [x] Measured on the M1, a Galaxy S10 and the Pixel Fold: 1.4-2.7x YOLOX-Nano's CPU time at 416 px, 2x at 640 px, and no GPU path
+      (the GPU compile fails on Metal and OpenCL; GPU+CPU is slower than CPU). Less accurate at 416 than at 640. Decision: keep
+      YOLOX-Nano as the optional detector; D-FINE only as a possible Mac-only photo detector at 640.
+- [ ] Host `dfine_n_coco_{640,416}_float32.tflite` with `dfine_license.txt` and `dfine_notice.txt` on S3 if D-FINE is ever
+      integrated; find what blocks its GPU compile (GridSample/attention?) first.
+
 ### MobileNet V5 evaluation — encoder verified; detector checkpoint needed
 
 - [x] Ran the published V5-300M pretrained encoder on bundled `surfers.jpg` on the M1 CPU. Hash-verified weights,
