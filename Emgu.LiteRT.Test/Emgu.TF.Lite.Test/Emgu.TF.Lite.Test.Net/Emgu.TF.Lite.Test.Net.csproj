@@ -47,6 +47,7 @@
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatStore.cs" Link="ChatStore.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatAgentTools.Session.cs" Link="ChatAgentTools.Session.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatStore.Storage.cs" Link="ChatStore.Storage.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatStore.Goals.cs" Link="ChatStore.Goals.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\StorageFiles.cs" Link="StorageFiles.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\StorageCatalog.cs" Link="StorageCatalog.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\ChatSearchIndex.cs" Link="ChatSearchIndex.cs" />

@@ -542,7 +542,14 @@ anything happens (the model can get a date or time wrong).
       "I also ran on Monday" (it was Monday) 2 of 3; "read 20 pages a day" saved; "Read 35 pages before bed last night"
       logged 35 yesterday (0 of 20 today); "How am I doing with my goals?" called `get_goals` and answered with both;
       the Settings sheet listed them. 20-53 s per message.
-- [ ] Not yet tried with Gemma 4 E2B/E4B on the device.
+- [x] Gemma 4 E2B on the S10's GPU (OpenCL, Think off, 8k window): first every message failed - the agent's
+      instructions and ~25 tool definitions no longer fit the phones' 4k window - so Automatic now picks 8k on phones
+      for models with tools. Then: the goal saved; "a run this morning, 5 km" first logged 5 of 3 runs (E2B passed the
+      distance as the amount), fixed by `log_progress`'s `unit` (another unit than times counts as one time) - then
+      1 of 3; "I also ran on Saturday" logged on the 17th (last week, so this week stayed 1 of 3); "read 20 pages a
+      day" saved, "35 pages last night" logged yesterday; "How am I doing" called `get_goals` and answered. 44-52 s per
+      message on the GPU (the CPU took 356 s for one, reading ~4k tokens of tools).
+- [ ] Gemma 4 E4B.
 - [ ] Check-ins: a reminder (device actions, item 24 - only iOS/Mac Catalyst have reminders) or a scheduled task
       (item 30) asks how it went; e.g. a local notification on the evening of a day a goal is behind.
 - [ ] Streaks and history (per week/day) in Settings.

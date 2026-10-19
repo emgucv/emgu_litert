@@ -430,9 +430,10 @@ namespace Emgu.LiteRT.LM.Agents
                     "Saves a new goal the user sets themselves, such as a habit or a target (\"I want to run three times a week\"), so their progress can be tracked across chats."),
                 AIFunctionFactory.Create(
                     ([Description("Words from the goal it counts toward, e.g. \"run\", \"read\"")] string goal,
-                        [Description("How much, in the goal's unit (e.g. 1 for one run, 30 for 30 pages); 1 if not said")] double amount = 1,
+                        [Description("How much, in the goal's unit: for a goal counted in times, how many times (one run is 1, however far); for pages, the pages. 1 if not said")] double amount = 1,
+                        [Description("The unit the amount is in, e.g. \"times\", \"pages\", \"km\"; empty for the goal's own")] string unit = "",
                         [Description("When it was done, in the user's words, e.g. \"yesterday\", \"Monday\"; empty for today")] string when = "",
-                        CancellationToken cancellationToken = default) => LogProgressAsync(store, goal, amount, when, clock()),
+                        CancellationToken cancellationToken = default) => LogProgressAsync(store, goal, amount, unit, when, clock()),
                     "log_progress",
                     "Logs something the user did toward one of their goals (\"I ran today\", \"read 30 pages last night\"). Use it whenever the user says they did something one of their goals counts, without asking first."),
                 AIFunctionFactory.Create(
@@ -533,7 +534,7 @@ namespace Emgu.LiteRT.LM.Agents
                 + GoalReplyInstruction;
         }
 
-        private static async Task<string> LogProgressAsync(IAgentGoalStore store, string text, double amount, string when, DateTime now)
+        private static async Task<string> LogProgressAsync(IAgentGoalStore store, string text, double amount, string unit, string when, DateTime now)
         {
             AgentGoal goal = await FindGoalAsync(store, text).ConfigureAwait(false);
             if (goal == null)
@@ -544,6 +545,11 @@ namespace Emgu.LiteRT.LM.Agents
                     : "No goal matches \"" + text + "\". The user's goals: " + string.Join("; ", goals.Select(g => g.Text)) + ".";
             }
             if (amount <= 0 || double.IsNaN(amount) || double.IsInfinity(amount))
+                amount = 1;
+            // A goal counted in times takes one per activity: Gemma 4 E2B passed the 5 of "a run this morning, 5 km",
+            // which logged 5 of 3 runs.
+            string given = (unit ?? string.Empty).Trim().ToLowerInvariant();
+            if (goal.Unit == "times" && given.Length > 0 && given != "time" && given != "times")
                 amount = 1;
             if (!GoalParser.TryParsePastDay(when, now, out DateTime day))
                 return "Couldn't read \"" + when + "\" as a day: pass e.g. \"today\", \"yesterday\" or \"Monday\".";

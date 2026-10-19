@@ -95,6 +95,9 @@ public class UnitTestAgentGoals
         Assert.That(result, Does.Contain("Logged 1 time for \"Run three times a week\" (Monday)"));
         Assert.That(result, Does.Contain("1 of 3 times this week"));
         await Call("log_progress", ("goal", "running"), ("when", "last Wednesday"));
+        // A distance for a goal counted in times is one time.
+        Assert.That(await Call("log_progress", ("goal", "run"), ("amount", 5.0), ("unit", "km"), ("when", "last Wednesday")),
+            Does.Contain("Logged 1 time"));
         result = await Call("log_progress", ("goal", "run"));
         Assert.That(result, Does.Contain("2 of 3 times this week, last: today"));
         result = await Call("log_progress", ("goal", "reading"), ("amount", 25.0), ("when", "yesterday"));

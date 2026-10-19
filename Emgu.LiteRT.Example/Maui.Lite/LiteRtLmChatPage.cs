@@ -59,10 +59,12 @@ namespace Maui.Demo.Lite
             // Whether the model writes useful summaries: when a chat outgrows its context window, earlier messages
             // are summarized; otherwise (the small models) they are dropped.
             public bool CanSummarize;
-            // The context window on desktops (Mac Catalyst, Windows), or 0 for LanguageModel's default (4096) - used on
-            // phones too. Gemma 4's files allow up to ~32k, but the model re-reads the whole conversation when a saved
-            // chat is opened or after compacting, which grows with the window: a full 4k chat took 2 minutes on a Pixel
-            // Fold (8k: almost 6, with 1.5 GB of its RAM left), 8k 27 s (E2B) / 61 s (E4B) on an Apple Silicon Mac.
+            // The context window Automatic picks, or 0 for LanguageModel's default (4096). Gemma 4's files allow up to
+            // ~32k, but the model re-reads the whole conversation when a saved chat is opened or after compacting, which
+            // grows with the window: a full 4k chat took 2 minutes on a Pixel Fold's CPU (8k: almost 6, with 1.5 GB of
+            // its RAM left; on its GPU 8 s at 4k), 8k 27 s (E2B) / 61 s (E4B) on an Apple Silicon Mac. Phones use it too
+            // for models with tools: the agent's instructions and tool definitions alone grew to ~4k tokens (goals
+            // pushed them past a 4k window, so every message failed).
             public int DesktopContextTokens;
             // The largest context window the model's file allows, which Settings > Context window can choose up to; 0 for
             // a model with a fixed window (the Qwen files: 4096).
@@ -219,7 +221,7 @@ namespace Maui.Demo.Lite
         private static string BackendPreference => UseGpuPreference + "_" + DeviceInfo.Platform;
         private bool _loadedOnGpu;
         private bool _loadingOnGpu;
-        // Context window (Settings, Gemma 4): Automatic (0: 8k on desktops, 4k on phones) or a size; the loaded model's
+        // Context window (Settings, Gemma 4): Automatic (0: the model's DesktopContextTokens, 8k) or a size; the loaded model's
         // and the loading one's, to reload the model when it changes.
         private const string ContextWindowPreference = "litert_lm_chat_context_tokens";
         private static readonly int[] ContextWindowChoices = { 0, 4096, 8192, 16384, 32000 };
@@ -1366,8 +1368,8 @@ namespace Maui.Demo.Lite
         // ---------- Context window ----------
 
         // The context window to load a model with, or 0 for LanguageModel's default (4096): the setting, or Automatic -
-        // the model's desktop size on Mac Catalyst and Windows, the default on phones (re-reading a full 8k chat took a
-        // Pixel Fold almost 6 minutes and left it 1.5 GB of memory) - capped at what the model's file allows.
+        // the model's DesktopContextTokens; on phones only for models with tools, whose instructions and tool
+        // definitions need more than 4k - capped at what the model's file allows.
         private int ContextTokensFor(ModelOption option)
         {
             if (option.MaxContextTokens <= 0)
@@ -1381,7 +1383,7 @@ namespace Maui.Demo.Lite
 #if MACCATALYST || WINDOWS
             return option.DesktopContextTokens;
 #else
-            return 0;
+            return option.CanUseTools ? option.DesktopContextTokens : 0;
 #endif
         }
 
