@@ -227,12 +227,16 @@ jobs:
     - uses: actions/setup-python@v7
       with:
         python-version: "3.12"
-    - uses: bazel-contrib/setup-bazel@0.19.1
-      # Bazelisk (the build step tells it LiteRT-LM's Bazel version); no caching across runs.
-      with:
-        bazelisk-cache: false
-        disk-cache: false
-        repository-cache: false
+    - name: Download Bazelisk
+      # The bazel.exe on the runner's PATH ran Bazel 9.x (which no longer reads WORKSPACE files) whatever
+      # USE_BAZEL_VERSION or LiteRT-LM's .bazelversion said, so the script is given its own Bazelisk, which runs the
+      # version in LiteRT-LM's .bazelversion (the script builds from that folder).
+      run: |
+        New-Item -ItemType Directory -Force D:\bazelisk | Out-Null
+        Invoke-WebRequest "https://github.com/bazelbuild/bazelisk/releases/download/v1.29.0/bazelisk-windows-amd64.exe" -OutFile D:\bazelisk\bazel.exe
+        "BAZEL_COMMAND=D:\bazelisk\bazel.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        cd LiteRT-LM
+        & D:\bazelisk\bazel.exe --version
     - name: Fetch LiteRT-LM's prebuilt Gemma library
       # liblitert-lm.dll depends on prebuilt/windows_x86_64/libGemmaModelConstraintProvider.dll, which LiteRT-LM stores
       # with Git LFS; without it the script skips liblitert-lm.dll.
@@ -240,10 +244,7 @@ jobs:
     - name: Build tfliteextern.dll, libLiteRt.dll and liblitert-lm.dll
       # Run from a drive letter mapped to the workspace: the LiteRT-LM build's Rust objects come within a few characters
       # of link.exe's 260-character path limit even under the repo root's short "o"/"u" output folders (see the script).
-      # USE_BAZEL_VERSION: Bazelisk otherwise runs the latest Bazel (9.x, which no longer reads WORKSPACE files), since
-      # the repository root has no .bazelversion.
       run: |
-        $env:USE_BAZEL_VERSION = (Get-Content LiteRT-LM\.bazelversion).Trim()
         subst X: "$env:GITHUB_WORKSPACE"
         X:
         powershell -NoProfile -ExecutionPolicy Bypass -File X:\platforms\windows\bazel_build_litert.ps1 64

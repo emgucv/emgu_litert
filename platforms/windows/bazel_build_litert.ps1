@@ -275,6 +275,8 @@ $BazelCommand = "bazel.exe"
 $MsysPath = "C:\msys64"
 $MsysBin = Join-Path $MsysPath "usr\bin"
 if (Test-Path (Join-Path $MsysBin "bazel.exe")) { $BazelCommand = Join-Path $MsysBin "bazel.exe" }
+# A particular Bazel (CI downloads LiteRT-LM's version).
+if ($env:BAZEL_COMMAND) { $BazelCommand = $env:BAZEL_COMMAND }
 
 $CommonBazelArgs = @(
     "--output_base=$OutputBaseDir",
