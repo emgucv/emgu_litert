@@ -1,0 +1,93 @@
+// Opt-in development probe. See YOLOX_EVALUATION.md; copy to the app root only for a diagnostic build.
+#if ANDROID || MACCATALYST
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using Emgu.LiteRT;
+using Emgu.LiteRT.Models;
+
+namespace Maui.Demo.Lite;
+internal static class YoloXGpuProbe
+{
+    [ModuleInitializer]
+    internal static void Start() => Task.Run(async () =>
+    {
+#if ANDROID
+        string folder = Android.App.Application.Context.FilesDir.AbsolutePath;
+        string command = Path.Combine(folder, "yolox_gpu_probe_command");
+        if (!File.Exists(command)) return;
+        File.Delete(command);
+#else
+        if (System.Environment.GetEnvironmentVariable("EMGU_YOLOX_GPU_TEST") != "1") return;
+        string folder = "/private/tmp";
+#endif
+        await Task.Delay(8000);
+        string logFile = Path.Combine(folder, "yolox_gpu_probe.log");
+        void Log(string text) => File.AppendAllText(logFile, DateTimeOffset.UtcNow.ToString("O") + " " + text + "\n");
+        try
+        {
+            Log("START " + DeviceInfo.Model);
+            // Download/reuse and hash-check the model using the normal adapter, then release it.
+            using (var adapter = new YoloXDetector())
+                await adapter.PrepareAsync(false, 2, Log, CancellationToken.None);
+            string path = Path.Combine(FileSystem.CacheDirectory, YoloXDetector.Asset);
+            var compile = Stopwatch.StartNew();
+            using var cpu = new YoloX(path, 2);
+            Log($"CPU compile={compile.Elapsed.TotalMilliseconds:F2}ms");
+            foreach (GpuPrecision? precision in new GpuPrecision?[] { null, GpuPrecision.Fp32 })
+            foreach (var backend in new[] { HwAccelerators.Gpu, HwAccelerators.Gpu | HwAccelerators.Cpu })
+            {
+                try
+                {
+                    compile.Restart();
+                    using var gpu = new YoloX(path, 2, backend, precision);
+                    Log($"BACKEND {backend} precision={precision?.ToString() ?? "default"} compile={compile.Elapsed.TotalMilliseconds:F2}ms fullyAccelerated={gpu.IsFullyAccelerated}");
+                    using var referenceStream = await FileSystem.OpenAppPackageFileAsync("yolox_gpu_reference.json");
+                    using var reference = await JsonDocument.ParseAsync(referenceStream);
+                    foreach (var sample in reference.RootElement.GetProperty("samples").EnumerateArray())
+                    {
+                        string name = sample.GetProperty("image").GetString();
+                        using var image = ImageUtil.Decode(await ImageUtil.ReadAppFileAsync(name));
+                        YoloX.Detection[] Detect(YoloX model)
+                        {
+                            YoloXImageInput.Write(model, image);
+                            return model.Run(image.Width, image.Height);
+                        }
+                        var expected = sample.GetProperty("detections_xyxy_score_class").EnumerateArray().Select(r => r.EnumerateArray().Select(x => x.GetDouble()).ToArray()).ToArray();
+                        var actual = Detect(gpu).ToList();
+                        if (actual.Count != expected.Length) throw new Exception($"PARITY FAIL {name}: expected={expected.Length} actual={actual.Count}");
+                        double maxScoreError = 0, maxBoxError = 0;
+                        foreach (var e in expected)
+                        {
+                            var found = actual.FirstOrDefault(d => d.Class == (int)e[5] && Math.Abs(d.Score - e[4]) < .01 &&
+                                Enumerable.Range(0, 4).All(k => Math.Abs(d.Rectangle[k] - Math.Clamp(e[k] / (k % 2 == 0 ? image.Width : image.Height), 0, 1)) < .005));
+                            if (found == null) throw new Exception("PARITY FAIL class/score/box " + name);
+                            maxScoreError = Math.Max(maxScoreError, Math.Abs(found.Score - e[4]));
+                            maxBoxError = Math.Max(maxBoxError, Enumerable.Range(0, 4).Max(k => Math.Abs(found.Rectangle[k] - Math.Clamp(e[k] / (k % 2 == 0 ? image.Width : image.Height), 0, 1))));
+                            actual.Remove(found);
+                        }
+                        Log(FormattableString.Invariant($"PARITY PASS {backend} precision={precision?.ToString() ?? "default"} {name} count={expected.Length} maxScoreError={maxScoreError:F6} maxBoxError={maxBoxError:F6}"));
+                        for (int n = 0; n < 5; n++) { Detect(cpu); Detect(gpu); }
+                        var cm = new List<double>(); var gm = new List<double>();
+                        void Measure(YoloX model, List<double> results)
+                        {
+                            var timer = Stopwatch.StartNew(); Detect(model); results.Add(timer.Elapsed.TotalMilliseconds);
+                        }
+                        for (int n = 0; n < 30; n++)
+                        {
+                            if (n % 2 == 0) { Measure(cpu, cm); Measure(gpu, gm); }
+                            else { Measure(gpu, gm); Measure(cpu, cm); }
+                        }
+                        cm.Sort(); gm.Sort();
+                        Log(FormattableString.Invariant($"TIMING {backend} precision={precision?.ToString() ?? "default"} {name} CPU={(cm[14]+cm[15])/2:F2}ms GPU={(gm[14]+gm[15])/2:F2}ms CPU_p90={cm[26]:F2}ms GPU_p90={gm[26]:F2}ms full-frame threads=2 warmup=5 samples=30"));
+                    }
+                    Log("BACKEND PASS " + backend + " precision=" + precision);
+                }
+                catch (Exception e) { Log("BACKEND FAILED " + backend + " precision=" + precision + " " + e); }
+            }
+            Log("DONE");
+        }
+        catch (Exception e) { Log("FAILED " + e); }
+    });
+}
+#endif

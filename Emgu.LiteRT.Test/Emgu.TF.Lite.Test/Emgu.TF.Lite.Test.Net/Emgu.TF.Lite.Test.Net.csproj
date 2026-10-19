@@ -16,6 +16,8 @@
     <Compile Include="..\UnitTest1.cs" Link="UnitTest1.cs" />
     <Compile Include="..\UnitTestLiteRtLm.cs" Link="UnitTestLiteRtLm.cs" />
     <Compile Include="..\UnitTestLiteRtModels.cs" Link="UnitTestLiteRtModels.cs" />
+    <Compile Include="..\UnitTestYoloX.cs" Link="UnitTestYoloX.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\YoloXImageInput.cs" Link="YoloXImageInput.cs" />
     <Compile Include="..\UnitTestCocoBackendBenchmark.cs" Link="UnitTestCocoBackendBenchmark.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\CocoBackendBenchmark.cs" Link="CocoBackendBenchmark.cs" />
     <Compile Include="..\UnitTestZImageTurbo.cs" Link="UnitTestZImageTurbo.cs" />
@@ -58,6 +60,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\TestData\yolox_reference.json" Link="yolox_reference.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\Resources\Raw\dog416.png" Link="dog416.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\Resources\Raw\space_shuttle.jpg" Link="space_shuttle.jpg" CopyToOutputDirectory="PreserveNewest" />
     <!-- Image and audio test inputs for the Gemma 4 E2B tests, from the LiteRT-LM submodule (apple.png is a JPEG). -->
     <Content Include="..\..\..\LiteRT-LM\support\preprocessor\testdata\apple.png" Link="apple.jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

@@ -19,6 +19,10 @@ internal static class VisualHostCatalog
         "coco-ssd-mobilenet-v3", "COCO SSD MobileNet V3" + (backend == null ? "" : " · LiteRT " + backend),
         new[] { "object_detection" }, Classes, requiresPreparation: requiresPreparation);
 
+    internal static VisualAgentDescriptor YoloXDetector(bool requiresPreparation = true, string backend = null) => new(
+        "coco-yolox-nano", "YOLOX Nano (experimental)" + (backend == null ? "" : " · LiteRT " + backend),
+        new[] { "object_detection" }, Classes, requiresPreparation: requiresPreparation);
+
     internal static readonly VisualActionDescriptor Chime = new("play_sound", "Chime", "Play the bundled alert chime once.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
 

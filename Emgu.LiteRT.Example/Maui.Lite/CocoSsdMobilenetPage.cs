@@ -12,15 +12,18 @@ namespace Maui.Demo.Lite
 {
     public class CocoSsdMobilenetPage : DemoPage
     {
-        private CocoDetector _detector;
+        private ICocoDetector _detector;
+        private readonly bool _useYoloX;
         private readonly Picker _backend;
 
-        public CocoSsdMobilenetPage()
+        public CocoSsdMobilenetPage(bool useYoloX = false)
             : base(
-                "Coco SSD Mobilenet",
+                useYoloX ? "YOLOX Nano" : "Coco SSD Mobilenet",
                 "Find and label objects in a photo.",
                 Theme.GlyphDetect,
-                "Detects the 80 object classes of the COCO dataset with SSD MobileNet v3 using LiteRT CompiledModel, drawing a box and a confidence score around each object found. GPU is tried where available, with CPU fallback.",
+                useYoloX
+                    ? "Detects COCO objects with the official YOLOX-Nano model on this device. This experimental detector uses CPU; compare its boxes and timing with SSD MobileNet in the other demo."
+                    : "Detects the 80 object classes of the COCO dataset with SSD MobileNet v3 using LiteRT CompiledModel, drawing a box and a confidence score around each object found. GPU is tried where available, with CPU fallback.",
                 new[]
                 {
                     new Sample("dog416.png", "Dog & bike", Theme.GlyphPets),
@@ -32,11 +35,12 @@ namespace Maui.Demo.Lite
                 "Detect Objects",
                 "Detections")
         {
+            _useYoloX = useYoloX;
             _backend = new Picker { Title = "Detector backend", FontFamily = Theme.BodyFont, FontSize = 16,
                 TextColor = Theme.PrimaryText, TitleColor = Theme.SecondaryText };
             _backend.Items.Add("CPU");
-            if (CocoDetector.CanTryGpu) _backend.Items.Add("GPU (CPU fallback)");
-            _backend.SelectedIndex = CocoDetector.CanTryGpu ? 1 : 0;
+            if (!useYoloX && CocoDetector.CanTryGpu) _backend.Items.Add("GPU (CPU fallback)");
+            _backend.SelectedIndex = !useYoloX && CocoDetector.CanTryGpu ? 1 : 0;
             _backend.SelectedIndexChanged += (_, _) => ReleaseModel();
             AddOptionsCard(Theme.Card(_backend, 14));
         }
@@ -52,7 +56,7 @@ namespace Maui.Demo.Lite
             _backend.IsEnabled = false;
             try
             {
-                _detector ??= new CocoDetector();
+                _detector ??= _useYoloX ? new YoloXDetector() : new CocoDetector();
                 await _detector.PrepareAsync(_backend.SelectedIndex == 1, CpuThreadSettings.Count,
                     ShowProgress, CancellationToken.None);
                 ShowProgress("Detecting objects...");
@@ -76,7 +80,7 @@ namespace Maui.Demo.Lite
                             rects[0], rects[1], rects[2] - rects[0], rects[3] - rects[1]);
                         CvInvoke.Rectangle(render, System.Drawing.Rectangle.Round(rect), color, 2);
                         CvInvoke.PutText(render, $"{r.Label} {r.Score * 100:0}%", System.Drawing.Point.Round(rect.Location),
-                            FontFace.HersheyDuplex, 0.8, color, 2);
+                            FontFace.HersheyDuplex, _useYoloX ? 0.45 : 0.8, color, _useYoloX ? 1 : 2);
                     }
                     return demo;
                 });

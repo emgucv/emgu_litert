@@ -944,6 +944,30 @@ near its context limit. Record enabled tool/settings differences, history size a
       preprocessing, transfers, result extraction, sustained camera FPS, battery and thermals; check Metal
       on Mac Catalyst and other Android devices. Do not infer a general speedup from the short samples.
 
+### YOLOX-Nano experiment — optional detector verified
+
+- [x] Official Megvii YOLOX-Nano ONNX weights converted to float32 LiteRT; downloaded on demand from Emgu public S3 with SHA-256;
+      source license/notice hosted alongside the weights in S3;
+      no Ultralytics models/packages. Separate photo demo and `coco-yolox-nano` visual agent; V3 remains available.
+- [x] Upstream-output parity on four images, native Mac Catalyst/Pixel Fold photo path and padded-stride visual
+      adapter passed. Decoder/native parity and related regressions: 47 passed, one opt-in Gemma test skipped.
+- [x] Same-device two-thread CPU comparison: M1 roughly 23 ms vs V3 4.6–4.8 ms; Pixel Fold 44–50 ms vs 12–17 ms.
+      Keep YOLOX optional; these short samples do not establish sustained performance or overall accuracy.
+- [x] YOLOX GPU benchmark: accelerator/precision options, strict upstream parity and full-frame CPU/GPU timing
+      on M1 Metal and Pixel Fold OpenCL; explicit FP32 required (see evaluation report). Production adapter stays CPU.
+- [ ] Automatic YOLOX GPU qualification/fallback, quantization, COCO validation and sustained camera/memory/thermal comparison;
+      live camera plus Gemma selecting YOLOX in chat remains an end-to-end check.
+      [Usage, provenance, reproduction and results](YOLOX_EVALUATION.md).
+
+### MobileNet V5 evaluation — encoder verified; detector checkpoint needed
+
+- [x] Ran the published V5-300M pretrained encoder on bundled `surfers.jpg` on the M1 CPU. Hash-verified weights,
+      finite `[1, 2048, 16, 16]` spatial features and `[1, 2048]` pooled output; four threads, 256×256,
+      median 766.10 ms over three warmed forwards. This is PyTorch encoder timing, not a LiteRT detector benchmark.
+- [x] Checked the replacement contract: the available weights have no COCO class/score/box head. Keep V3 as the
+      working detector. [Evidence, reproducible probe and required next steps](MOBILENET_V5_EVALUATION.md).
+- [ ] Obtain/train a V5 detection head before attempting LiteRT export and a same-device V3/V5 detection comparison.
+
 ## 35. Privacy manifests for an App Store release (iOS, Mac Catalyst)
 
 Apple asks App Store apps, and SDKs that use "required-reason" APIs, to declare those APIs and the reasons for using

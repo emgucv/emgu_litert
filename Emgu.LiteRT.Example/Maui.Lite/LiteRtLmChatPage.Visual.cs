@@ -23,12 +23,14 @@ public partial class LiteRtLmChatPage
     private VerticalStackLayout _visualMonitorRows;
     private int _visualUiQueued;
     private long _visualFrameId, _lastVisualFrame;
-    private const string VisualInstructions = VisualAgentTools.Instructions;
+    private const string VisualInstructions = VisualAgentTools.Instructions +
+        " Prefer coco-ssd-mobilenet-v3 for ordinary object monitors. Use the experimental coco-yolox-nano when the user asks for YOLOX.";
 
     private void BuildVisualMonitoring()
     {
         _visualAgents = new VisualAgentRegistry();
         _visualAgents.Register(new CocoVisualAgent());
+        _visualAgents.Register(new CocoVisualAgent(useYoloX: true));
         _visualChime = new CameraChimeAction();
         _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(text, token)),
             occurrence => _visualRuntime.Snapshot().Any(m => m.Id == occurrence.MonitorId &&

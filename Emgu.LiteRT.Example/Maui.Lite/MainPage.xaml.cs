@@ -28,6 +28,7 @@ public partial class MainPage : ContentPage
         tabs.Add(("TF Lite", Theme.GlyphImage, "TF Lite Demos", new List<(string, string, string, Func<Page>)>
         {
             (Theme.GlyphDetect, "Coco SSD Mobilenet", "Detect and label objects in a photo", () => new CocoSsdMobilenetPage()),
+            (Theme.GlyphDetect, "YOLOX Nano", "Try the YOLOX COCO detector on a photo", () => new CocoSsdMobilenetPage(useYoloX: true)),
             (Theme.GlyphImage, "Mobilenet", "Recognize what is in an image", () => new MobilenetPage()),
             (Theme.GlyphSparkle, "Inception", "Recognize flower species", () => new InceptionPage()),
             (Theme.GlyphSettings, "Model Checker", "Inspect any .tflite model file", () => new ModelCheckerPage()),

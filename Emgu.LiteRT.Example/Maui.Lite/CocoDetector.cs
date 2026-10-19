@@ -8,7 +8,7 @@ using Emgu.LiteRT.Util;
 namespace Maui.Demo.Lite;
 
 // Shared by the photo demo and live visual agent. Callers serialize prepare/detect/dispose off the UI thread.
-internal sealed class CocoDetector : IDisposable
+internal sealed class CocoDetector : ICocoDetector
 {
     private CocoSsdMobilenetV3 _model;
     private readonly DownloadableFile _weights = new(

@@ -10,10 +10,18 @@ namespace Maui.Demo.Lite;
 // All native/model work is serialized off the UI thread by VisualMonitorRuntime.
 internal sealed class CocoVisualAgent : IVisualAgent
 {
-    private readonly CocoDetector _detector = new();
+    private readonly ICocoDetector _detector;
+    private readonly bool _useYoloX;
+    internal CocoVisualAgent(bool useYoloX = false)
+    {
+        _useYoloX = useYoloX;
+        _detector = useYoloX ? new YoloXDetector() : new CocoDetector();
+    }
     internal static readonly string[] Classes = VisualHostCatalog.Classes;
-    public VisualAgentDescriptor Descriptor => VisualHostCatalog.Detector(!_detector.Imported,
-        _detector.Imported ? _detector.Backend + (_detector.GpuFailure == null ? "" : " (GPU validation failed or unavailable)") : null);
+    public VisualAgentDescriptor Descriptor => _useYoloX
+        ? VisualHostCatalog.YoloXDetector(!_detector.Imported, _detector.Backend)
+        : VisualHostCatalog.Detector(!_detector.Imported,
+            _detector.Imported ? _detector.Backend + (_detector.GpuFailure == null ? "" : " (GPU validation failed or unavailable)") : null);
 
     public async Task PrepareAsync(Action<string> progress, CancellationToken cancellationToken)
     {
