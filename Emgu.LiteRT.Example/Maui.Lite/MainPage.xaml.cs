@@ -29,6 +29,7 @@ public partial class MainPage : ContentPage
         {
             (Theme.GlyphDetect, "Coco SSD Mobilenet", "Detect and label objects in a photo", () => new CocoSsdMobilenetPage()),
             (Theme.GlyphDetect, "YOLOX Nano", "Try the YOLOX COCO detector on a photo", () => new CocoSsdMobilenetPage(useYoloX: true)),
+            (Theme.GlyphDetect, "PicoDet S", "A more accurate small COCO detector, on the GPU where it works", () => new CocoSsdMobilenetPage(usePicoDet: true)),
 #if MACCATALYST
             (Theme.GlyphDetect, "D-FINE Nano", "A slower, more accurate COCO detector (CPU) for single photos", () => new CocoSsdMobilenetPage(useDFine: true)),
 #endif

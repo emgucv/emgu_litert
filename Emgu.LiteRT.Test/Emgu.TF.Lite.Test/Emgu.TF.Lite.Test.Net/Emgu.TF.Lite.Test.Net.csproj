@@ -18,6 +18,8 @@
     <Compile Include="..\UnitTestLiteRtModels.cs" Link="UnitTestLiteRtModels.cs" />
     <Compile Include="..\UnitTestYoloX.cs" Link="UnitTestYoloX.cs" />
     <Compile Include="..\UnitTestDFine.cs" Link="UnitTestDFine.cs" />
+    <Compile Include="..\UnitTestPicoDet.cs" Link="UnitTestPicoDet.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\PicoDetImageInput.cs" Link="PicoDetImageInput.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\DFineImageInput.cs" Link="DFineImageInput.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\YoloXImageInput.cs" Link="YoloXImageInput.cs" />
     <Compile Include="..\UnitTestCocoBackendBenchmark.cs" Link="UnitTestCocoBackendBenchmark.cs" />
@@ -62,6 +64,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\TestData\picodet_reference.json" Link="picodet_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\dfine_reference.json" Link="dfine_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\yolox_reference.json" Link="yolox_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\Resources\Raw\dog416.png" Link="dog416.png" CopyToOutputDirectory="PreserveNewest" />

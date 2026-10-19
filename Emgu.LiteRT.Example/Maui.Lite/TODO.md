@@ -978,6 +978,24 @@ near its context limit. Record enabled tool/settings differences, history size a
 - [ ] Try the page in the Catalyst app (the sandbox build failed at code signing, so only the tests ran); find what blocks the
       GPU compile (GridSample/attention?) before offering it on phones.
 
+### PicoDet-S — converts, matches, runs on the GPU; a "PicoDet S" photo page
+
+- [x] Official PP-PicoDet-S 416 (COCO AP 32.5, Apache-2.0) from Baidu's ONNX export, converted to float32 LiteRT with
+      `tools/prepare_picodet_s.py` (reproduced bit for bit) and checked against ONNX Runtime on the four bundled images
+      (`tools/check_picodet_conversion.py`: identical detections). Results, recipe and licence notes in
+      [PICODET_EVALUATION.md](PICODET_EVALUATION.md).
+- [x] GPU: the first conversion failed to compile on Metal and OpenCL because of `RELU_0_TO_1` (from the two HardSigmoid nodes);
+      rewriting them as Mul/Add/Relu/Sub makes it fully accelerated: 3.9 ms (M1), 17.8 ms (S10), 16.7 ms (Fold). On the phones'
+      CPUs it is 25-45% faster than YOLOX-Nano with about 6 AP more.
+- [x] `Emgu.LiteRT.Models/PicoDet.cs`, the demo's `PicoDetDetector` (GPU validated against the CPU, as YOLOX's) and `PicoDetImageInput`,
+      a "PicoDet S" page on all platforms, `UnitTestPicoDet`/`UnitTestPicoDetNative`, licences entry. Verified on the M1 (CPU and
+      Metal GPU tests) and the S10 (the detector chose the GPU and found the same objects).
+- [x] `picodet_s_416_coco_float32.tflite`, `picodet_license.txt` and `picodet_notice.txt` hosted at `emgu-public/picodet/` (hashes
+      verified; the page and the native test download the model from there).
+- [ ] Try the page in the Catalyst app and on the phones' UI (only the detector and tests were run); a visual agent entry; GPU
+      speed on the Fold looks no better than YOLOX's, so a visual agent is optional.
+- [ ] Fold CPU timing was measured only after the first (locked-screen) run was discarded; re-measure if the numbers matter.
+
 ### MobileNet V5 evaluation — encoder verified; detector checkpoint needed
 
 - [x] Ran the published V5-300M pretrained encoder on bundled `surfers.jpg` on the M1 CPU. Hash-verified weights,
@@ -1081,3 +1099,31 @@ on a phone's 4k window failed every message (phones now get 8k for Gemma 4, item
       and went through the alarm stub just as at 8k, in the same time (21-26 s vs 21-27 s). 8k only costs when a long
       chat is read again (a saved chat opened, after compacting) - slower on a phone's CPU (Pixel Fold 342 s vs 123 s),
       seconds on its GPU. Kept at 8k for now.
+
+## 38. Agent tools: Gmail (read first, then drafts and sending)
+
+"Do I have mail from the bank this week?", "Summarize the last email from Sam", "Reply that I'll be there at 6".
+Uses the Gmail API with OAuth 2.0 (the IMAP/app-password route and a compose-only `mailto:` action were considered and left
+out). Not started.
+
+- [ ] Google Cloud project with the Gmail API enabled and OAuth clients for Android and Mac Catalyst (iOS later); the app stays
+      in testing mode (up to 100 listed test users, no Google review). Publishing it needs Google's verification and, for the
+      restricted read scope, a paid security assessment - decide only if this ships publicly. Check Google's current scope
+      list before choosing scopes.
+- [ ] Sign-in in the demo: `WebAuthenticator` with authorization code + PKCE, a custom redirect scheme per platform (Android
+      intent filter, `Info.plist` URL scheme), refresh token in `SecureStorage`; Settings > "Connect Gmail" and "Disconnect"
+      (revokes the token); off by default, with a note that the Gmail API call goes to Google although the model runs on the
+      device.
+- [ ] `Emgu.LiteRT.LM.Agents`: a small Gmail client (`HttpClient`, no Google SDK) and `AgentTools.Email(...)` with
+      `search_email` (the user's words - sender, subject, dates, unread, label - turned into Gmail's `q=` syntax, like
+      `PhotoRequest.Parse`; a short list of sender, subject, date) and `read_email` (HTML stripped with `HtmlText.Extract`, cut to
+      about 1,500 characters so it fits the 8k window; threads: latest messages only).
+- [ ] Routing: an "email" `ToolGroup` (keywords mail, email, inbox, gmail, message from...) so the tools cost nothing otherwise
+      (`ToolRouter`); step lines "Searching your mail" / "Reading an email from ..."; the instructions say the model must not
+      send or act on anything it didn't get from the user.
+- [ ] Second phase: `draft_email` / `send_email` through the device-action Confirm / Cancel card (`CANCELLED - NOT done`
+      when declined); the model never sends on its own; the send scope is added only then.
+- [ ] Email bodies are untrusted text (prompt injection): label tool results as email content, no automatic forwarding or
+      replying, and a test where a message tells the model to send mail.
+- [ ] Tests: the query builder and message parsing model-free (a canned API response); a Gemma 4 E2B check on a test
+      account (search, read, summary); the confirmation card on Android and Mac Catalyst.

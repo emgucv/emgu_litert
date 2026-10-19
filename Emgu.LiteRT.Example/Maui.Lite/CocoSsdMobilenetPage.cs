@@ -13,15 +13,17 @@ namespace Maui.Demo.Lite
     public class CocoSsdMobilenetPage : DemoPage
     {
         private ICocoDetector _detector;
-        private readonly bool _useYoloX, _useDFine;
+        private readonly bool _useYoloX, _useDFine, _usePicoDet;
         private readonly Picker _backend;
 
-        public CocoSsdMobilenetPage(bool useYoloX = false, bool useDFine = false)
+        public CocoSsdMobilenetPage(bool useYoloX = false, bool useDFine = false, bool usePicoDet = false)
             : base(
-                useDFine ? "D-FINE Nano" : useYoloX ? "YOLOX Nano" : "Coco SSD Mobilenet",
+                usePicoDet ? "PicoDet S" : useDFine ? "D-FINE Nano" : useYoloX ? "YOLOX Nano" : "Coco SSD Mobilenet",
                 "Find and label objects in a photo.",
                 Theme.GlyphDetect,
-                useDFine
+                usePicoDet
+                    ? "Detects COCO objects with PP-PicoDet-S (Baidu, 416 px, COCO AP 32.5 against YOLOX-Nano's 25.8). It tries the GPU where available (FP32, checked against the CPU for accuracy and speed), with CPU fallback, and on a phone's CPU it is faster than YOLOX-Nano."
+                    : useDFine
                     ? "Detects COCO objects with D-FINE-N (640 px, COCO AP 42.8 against YOLOX-Nano's 25.8), a transformer detector that needs no NMS step. It runs on the CPU only - its graph doesn't compile for the GPU - and takes a few times longer than SSD MobileNet or YOLOX, so it's best for single photos where accuracy matters."
                     : useYoloX
                     ? "Detects COCO objects with the official YOLOX-Nano model on this device. This experimental detector tries the GPU where available (FP32, checked against the CPU for accuracy and speed), with CPU fallback; compare its boxes and timing with SSD MobileNet in the other demo."
@@ -39,6 +41,7 @@ namespace Maui.Demo.Lite
         {
             _useYoloX = useYoloX;
             _useDFine = useDFine;
+            _usePicoDet = usePicoDet;
             _backend = new Picker { Title = "Detector backend", FontFamily = Theme.BodyFont, FontSize = 16,
                 TextColor = Theme.PrimaryText, TitleColor = Theme.SecondaryText };
             _backend.Items.Add("CPU");
@@ -60,7 +63,7 @@ namespace Maui.Demo.Lite
             _backend.IsEnabled = false;
             try
             {
-                _detector ??= _useDFine ? new DFineDetector() : _useYoloX ? new YoloXDetector() : new CocoDetector();
+                _detector ??= _usePicoDet ? new PicoDetDetector() : _useDFine ? new DFineDetector() : _useYoloX ? new YoloXDetector() : new CocoDetector();
                 await _detector.PrepareAsync(_backend.SelectedIndex == 1, CpuThreadSettings.Count,
                     ShowProgress, CancellationToken.None);
                 ShowProgress("Detecting objects...");
@@ -84,7 +87,7 @@ namespace Maui.Demo.Lite
                             rects[0], rects[1], rects[2] - rects[0], rects[3] - rects[1]);
                         CvInvoke.Rectangle(render, System.Drawing.Rectangle.Round(rect), color, 2);
                         CvInvoke.PutText(render, $"{r.Label} {r.Score * 100:0}%", System.Drawing.Point.Round(rect.Location),
-                            FontFace.HersheyDuplex, _useYoloX || _useDFine ? 0.45 : 0.8, color, _useYoloX || _useDFine ? 1 : 2);
+                            FontFace.HersheyDuplex, _useYoloX || _useDFine || _usePicoDet ? 0.45 : 0.8, color, _useYoloX || _useDFine || _usePicoDet ? 1 : 2);
                     }
                     return demo;
                 });
