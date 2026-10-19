@@ -1886,11 +1886,13 @@ namespace Maui.Demo.Lite
                 // Local search and generation tools remain available with their settings off, so the model can explain how to
                 // turn them on.
                 Instructions = JoinInstructions(await MemoryInstructionsAsync(), WebSearchInstructions(), PhotoInstructions, IsPrivateChat ? PrivateInstructions : ChatSearchInstructions + " " + ChatPlannerInstructions.Documents,
-                    ImageGenerationSupported ? ImageInstructions : null,
+                    ImageGenerationSupported ? ImageInstructions : null, DeviceActionInstructionsForMessage(),
                     LiveCamera.Supported && SelectedOption.AcceptsImages ? CameraInstructions : null,
                     LiveCamera.Supported ? VisualInstructions : null),
                 ToolMode = ChatToolMode.Auto
             };
+            foreach (AIFunction tool in DeviceActionToolsForMessage())
+                options.Tools.Add(tool);
             if (LiveCamera.Supported)
             {
                 options.Tools.Add(AgentTools.OpenCamera(OpenCameraAsync));
@@ -1905,6 +1907,7 @@ namespace Maui.Demo.Lite
             StringBuilder thinking = new StringBuilder();
             StringBuilder answer = new StringBuilder();
             Dictionary<string, Label> steps = new Dictionary<string, Label>();
+            Dictionary<string, (string Name, string Step)> stepTools = new Dictionary<string, (string, string)>();
             // A restored chat: the first message of the session carries the earlier conversation.
             List<AIChatMessage> messages = new List<AIChatMessage>();
             if (_agentPrimeHistory != null)
@@ -1930,6 +1933,7 @@ namespace Maui.Demo.Lite
                             string step = AgentTools.Describe(call);
                             UiStallWatchdog.Mark("Tool call: " + step);
                             steps[call.CallId] = AddStepLine(bubble, step + "...");
+                            stepTools[call.CallId] = (call.Name, step);
                             _sendSteps.Add(step);
                             SetStatus(step + "...");
                             break;
@@ -1945,6 +1949,16 @@ namespace Maui.Demo.Lite
                                     int index = _sendSteps.FindIndex(t => t.StartsWith("Remembering", StringComparison.Ordinal));
                                     if (index >= 0)
                                         _sendSteps[index] = "Already remembered";
+                                }
+                                else if (result.Exception == null && stepTools.TryGetValue(result.CallId, out var tool)
+                                    && DeviceActionTools.Contains(tool.Name))
+                                {
+                                    // A device action: what the user chose, also in the saved chat.
+                                    string outcome = DeviceActionStepOutcome(resultText);
+                                    line.Text = "\U0001F50E " + tool.Step + outcome;
+                                    int index = _sendSteps.LastIndexOf(tool.Step);
+                                    if (index >= 0)
+                                        _sendSteps[index] = tool.Step + outcome;
                                 }
                                 else
                                     line.Text = line.Text.TrimEnd('.') + (result.Exception != null ? " - failed: " + result.Exception.Message : "");
@@ -3341,6 +3355,8 @@ namespace Maui.Demo.Lite
                 {
                     _resumeWindow.Resumed -= OnAppResumed;
                     _resumeWindow.Stopped -= CameraWindowStopped;
+                    _resumeWindow.Resumed -= ServerAppResumed;
+                    _resumeWindow.Stopped -= ServerAppStopped;
                     _resumeWindow = null;
                 }
                 EndVoiceMode();

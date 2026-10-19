@@ -24,7 +24,7 @@ namespace Emgu.LiteRT.LM.Agents
     /// Wikipedia - none of these need a key - and, with a Tavily API key, a web search and Tavily's page reader. The web tools send what they look up to those services. Results are kept short, since an
     /// on-device model has a small context.
     /// </summary>
-    public static class AgentTools
+    public static partial class AgentTools
     {
         private const int MaxResultLength = 1500;
         private const int TopArticleLength = 1100;
@@ -764,6 +764,11 @@ namespace Emgu.LiteRT.LM.Agents
                 case "get_weather":
                     string place = Argument("place");
                     return "Checking the weather" + (place.Length > 0 ? " in " + place : "");
+                case "set_timer": return "Setting a timer for " + Argument("duration");
+                case "set_alarm": return "Setting an alarm for " + Argument("time");
+                case "add_calendar_event": return "Adding \u201C" + Argument("title") + "\u201D to your calendar";
+                case "add_reminder": return "Adding a reminder: " + Argument("title");
+                case "open_directions": return "Getting directions to " + Argument("destination");
                 case "remember": return "Remembering: " + Argument("fact");
                 case "forget": return "Forgetting “" + Argument("text") + "”";
                 case "search_wikipedia": return "Searching Wikipedia for “" + Argument("query") + "”";

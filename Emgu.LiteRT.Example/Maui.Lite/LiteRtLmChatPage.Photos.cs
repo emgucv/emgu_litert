@@ -150,12 +150,16 @@ namespace Maui.Demo.Lite
             {
                 _resumeWindow.Resumed -= OnAppResumed;
                 _resumeWindow.Stopped -= CameraWindowStopped;
+                _resumeWindow.Resumed -= ServerAppResumed;
+                _resumeWindow.Stopped -= ServerAppStopped;
             }
             _resumeWindow = Window;
             if (_resumeWindow != null)
             {
                 _resumeWindow.Resumed += OnAppResumed;
                 _resumeWindow.Stopped += CameraWindowStopped;
+                _resumeWindow.Resumed += ServerAppResumed;
+                _resumeWindow.Stopped += ServerAppStopped;
             }
         }
 

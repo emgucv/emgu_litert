@@ -48,6 +48,14 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>The demo takes photos to classify, detect objects in, or ask the on-device language model about.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>The LiteRT-LM chat adds events you ask for to your calendar, after you confirm them.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>The LiteRT-LM chat adds events you ask for to your calendar, after you confirm them.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>The LiteRT-LM chat adds reminders you ask for to Reminders, after you confirm them.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>The LiteRT-LM chat adds reminders you ask for to Reminders, after you confirm them.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>The LiteRT-LM chat turns your voice into text for models that don't understand speech, such as a model on your own server.</string>
 	<key>NSMicrophoneUsageDescription</key>

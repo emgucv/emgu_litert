@@ -1,6 +1,7 @@
 #if WINDOWS || IOS || ANDROID || MACCATALYST
 using System;
 using System.ClientModel;
+using System.ClientModel.Primitives;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -431,8 +432,80 @@ public partial class LiteRtLmChatPage
     private IChatClient CreateServerChatClient()
     {
         var client = new OpenAIClient(new ApiKeyCredential(string.IsNullOrEmpty(_serverKey) ? "none" : _serverKey),
-            new OpenAIClientOptions { Endpoint = new Uri(_serverUrl), NetworkTimeout = TimeSpan.FromMinutes(10) });
+            new OpenAIClientOptions
+            {
+                Endpoint = new Uri(_serverUrl),
+                NetworkTimeout = TimeSpan.FromMinutes(10),
+                Transport = new HttpClientPipelineTransport(new HttpClient(new ServerRetryHandler(WaitForForegroundAsync)
+                {
+                    InnerHandler = new HttpClientHandler()
+                }))
+            });
         return client.GetChatClient(_serverModel).AsIChatClient();
+    }
+
+    // Whether the app is in front: a server request that failed while it wasn't is sent again once it is.
+    private TaskCompletionSource<bool> _foreground = CompletedForeground();
+
+    private static TaskCompletionSource<bool> CompletedForeground()
+    {
+        var source = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        source.SetResult(true);
+        return source;
+    }
+
+    private void ServerAppStopped(object sender, EventArgs e)
+    {
+        if (_foreground.Task.IsCompleted)
+            _foreground = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private void ServerAppResumed(object sender, EventArgs e) => _foreground.TrySetResult(true);
+
+    private Task WaitForForegroundAsync(CancellationToken token) => _foreground.Task.WaitAsync(token);
+
+    // Sends a request that failed without a response once more, after the app is back in front. On a Galaxy S10
+    // (Android 12) the connection to the server ended ("unexpected end of stream") the moment another app came to the
+    // front - Google Maps, opened by open_directions while the reply to its result was being requested - so the reply
+    // was lost. A chat request changes nothing on the server, so sending it again is safe.
+    private sealed class ServerRetryHandler : DelegatingHandler
+    {
+        private readonly Func<CancellationToken, Task> _waitForForeground;
+
+        public ServerRetryHandler(Func<CancellationToken, Task> waitForForeground)
+        {
+            _waitForForeground = waitForForeground;
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            byte[] body = request.Content == null ? null : await request.Content.ReadAsByteArrayAsync(cancellationToken);
+            try
+            {
+                return await base.SendAsync(request, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                System.Diagnostics.Debug.WriteLine("Server request failed, sending it again: " + ex.Message);
+                await _waitForForeground(cancellationToken);
+                return await base.SendAsync(Copy(request, body), cancellationToken);
+            }
+        }
+
+        // A request can only be sent once.
+        private static HttpRequestMessage Copy(HttpRequestMessage request, byte[] body)
+        {
+            HttpRequestMessage copy = new HttpRequestMessage(request.Method, request.RequestUri) { Version = request.Version };
+            foreach (var header in request.Headers)
+                copy.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            if (body != null)
+            {
+                copy.Content = new ByteArrayContent(body);
+                foreach (var header in request.Content.Headers)
+                    copy.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+            return copy;
+        }
     }
 
     // Without the model's tokenizer: about 3.5 characters a token for English, fewer for other scripts - rounded up,

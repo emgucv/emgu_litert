@@ -485,18 +485,41 @@ three museums open on Sunday, and a packing list as a document"), a task mode th
 - [ ] The context window: each step gets the plan and the earlier steps' short results, not their full tool output.
 - [ ] Turned on per message (a chip like "Think" / "Web search") or proposed by the model for long requests.
 
-## 24. Agent tools: device actions, confirmed by the user
+## 24. Agent tools: device actions, confirmed by the user — implemented; Android verified, iOS/Mac Catalyst untested
 
 Tools that change something outside the app, so each shows a card with what it will do and Confirm / Cancel before
 anything happens (the model can get a date or time wrong).
 
-- [ ] `set_timer` / `set_alarm`: Android's `AlarmClock` intents; iOS / Mac Catalyst have no public timer API - a
-      local notification instead, or leave them out there.
-- [ ] `add_calendar_event` / `add_reminder`: Android's calendar insert intent (opens the calendar app filled in);
-      EventKit on iOS and Mac Catalyst (calendar and reminders permissions); Windows: an .ics file or leave out.
-- [ ] `open_directions`: open the maps app with directions to a place (pairs with location and weather).
-- [ ] The confirmation card in the transcript; the tool returns what the user chose, so the model can say so.
-- [ ] Permissions and manifest entries per platform; step lines and saved chats show what was done.
+- [x] `Emgu.LiteRT.LM.Agents`: `AgentTools.DeviceActions(kinds, perform)` builds `set_timer`, `set_alarm`,
+      `add_calendar_event`, `add_reminder` and `open_directions`; the model passes times in the user's words, which
+      `WhenParser` reads (durations - "half an hour", "1:30", "2 hours and a half" - and dates/times - "tomorrow at
+      6:45 am", "next Friday at noon", "3rd of March", "in 2 weeks"; an hour without am/pm is the next one to come), since
+      small models get exact dates wrong; an unreadable or past time goes back to the model. The app's `perform` gets a
+      typed request (`TimerRequest`, `AlarmRequest`, ...) with a title, details and confirm text, and returns
+      `DeviceActionDone`/`DeviceActionCancelled`/`DeviceActionFailed` for the model. `DeviceActionInstructions(kinds)`
+      goes into the agent's instructions: without it, Gemma 4 26B-A4B (LM Studio, thinking off) answered "I've set your
+      alarm" without calling `set_alarm` about half the time. Unit tests: `UnitTestDeviceActions`.
+- [x] Android (`DeviceActions.cs`): timers and alarms through `AlarmClock` intents (`EXTRA_SKIP_UI`, so the app stays in
+      front; alarms only within 24 hours - the intent takes an hour and minute), events through the calendar's insert
+      intent (opens the calendar app filled in; the user saves there, and the model is told it isn't saved yet - it
+      said "added" otherwise), directions through a Google Maps URL with the travel mode. iOS / Mac Catalyst: events
+      and reminders saved with EventKit (write-only calendar access, full reminders access), directions in Apple Maps;
+      no public timer/alarm API, so those tools aren't offered. Windows: directions (Bing Maps) only.
+- [x] The confirmation card above the reply (icon, title, details, Confirm / Cancel, then the outcome: "✓ Timer started",
+      "Cancelled"...); stopping the reply cancels it. The step line ends with "- done" / "- cancelled" / "- failed" and is
+      saved with the chat. Not offered in the voice chat, whose full-screen view would hide the card.
+- [x] Manifest entries: Android `SET_ALARM` and intent queries for `SET_TIMER`, `SET_ALARM` and the calendar insert;
+      iOS / Mac Catalyst calendar and reminders usage descriptions.
+- [x] Verified on a Galaxy S10 (Android 12): with Gemma 4 E2B on the device, a 1-minute timer ("tea") set in Samsung
+      Clock from the card; with LM Studio's Gemma 4 26B-A4B (thinking on), an alarm cancelled from its card, a calendar
+      event (title, Friday's date, 12:30-1:30, location; the phone's three calendar apps brought up Android's chooser)
+      and directions on foot, by car and by transit opened in Google Maps, each answered. With thinking off the server's
+      model still skipped the tool in 20-40% of replayed requests, with thinking on in none of 16.
+- [x] Your own server: the first directions reply was lost ("unexpected end of stream") when Maps came to the front -
+      the connection dropped as Android stopped the app - so a failed server request is now sent again once, after
+      the app is back in front (`ServerRetryHandler`); the drop didn't recur in 4 later runs, so the retry is untested.
+- [ ] iOS / Mac Catalyst: EventKit events and reminders, Apple Maps (built, not run; the first use asks for access).
+- [ ] Alarms more than 24 hours ahead (a calendar event is suggested instead); timers/alarms on iOS (no public API).
 
 ## 25. Goals and check-ins
 

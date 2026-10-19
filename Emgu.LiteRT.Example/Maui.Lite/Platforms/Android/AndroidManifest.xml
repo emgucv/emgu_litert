@@ -31,6 +31,8 @@
 	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 	<!-- Photo search: where photos were taken (Android 10+ removes their GPS position for apps without it). Optional. -->
 	<uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+	<!-- LiteRT-LM chat: device actions - timers and alarms in the clock app (AlarmClock intents), once the user confirms -->
+	<uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 	<!-- LiteRT-LM chat: reading replies aloud (TextToSpeech, Android 11+ package visibility) -->
 	<queries>
 		<intent>
@@ -39,6 +41,17 @@
 		<!-- Taking photos with the device's camera app (MediaPicker.CapturePhotoAsync, Android 11+ package visibility) -->
 		<intent>
 			<action android:name="android.media.action.IMAGE_CAPTURE" />
+		</intent>
+		<!-- Device actions: the clock app (timers, alarms) and the calendar app (a new event, filled in) -->
+		<intent>
+			<action android:name="android.intent.action.SET_TIMER" />
+		</intent>
+		<intent>
+			<action android:name="android.intent.action.SET_ALARM" />
+		</intent>
+		<intent>
+			<action android:name="android.intent.action.INSERT" />
+			<data android:mimeType="vnd.android.cursor.dir/event" />
 		</intent>
 	</queries>
 </manifest>
