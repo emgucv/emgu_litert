@@ -29,6 +29,9 @@ public partial class LiteRtLmChatPage
         "open hand or high five = open palm, fist = closed fist, pointing finger = pointing up, rock sign = i love you. The label is just the class, never prefixed by the agent id, and never person. " +
         "It sees upright hands, a gesture held for about a second." +
 #if ANDROID
+        " The app switches between the back camera and the selfie (front) camera by itself when the user's request says so: don't refuse such a request, use the camera tools as usual and say which camera is used." +
+#endif
+#if ANDROID
         " For record a video or clip when an object appears, select record_clip with parameters {seconds: the requested length, default 10, from 3 to 30}. " +
         "It records from the live camera with sound and shows the clip in this chat session; no automatic saving or model analysis. A request for both a picture and a clip uses take_snapshot and record_clip. " +
         "For a full resolution, high resolution or high quality photo when an object appears, select take_photo (parameters {}), not take_snapshot; it is slower and shows the full-size photo in this chat session.";
@@ -114,7 +117,7 @@ public partial class LiteRtLmChatPage
             var open = MonitorButton("Open live feed");
             open.Clicked += async (_, _) =>
             {
-                string result = await OpenCameraAsync(CancellationToken.None);
+                string result = await OpenCameraCoreAsync(CancellationToken.None, false);
                 if (_camera?.IsRunning != true) SetStatus(result);
                 UpdateVisualMonitorUi();
             };
@@ -183,7 +186,13 @@ public partial class LiteRtLmChatPage
         catch (Exception ex) { return "Could not create visual monitor: " + ex.Message; }
     }
     // A creation acknowledgement needs facts, not the full UI snapshot repeated in the context.
-    private static string MonitorToolResult(VisualMonitorInfo monitor) => VisualHostCatalog.MonitorResult(monitor);
+    // Which camera is in use is a fact the model should report (it said it couldn't switch, though the app had).
+    private string MonitorToolResult(VisualMonitorInfo monitor) => VisualHostCatalog.MonitorResult(monitor) +
+#if ANDROID
+        " Camera: " + (_cameraFront ? "the selfie (front) camera" : "the back camera") + ".";
+#else
+        "";
+#endif
 
     private async Task<string> ControlVisualMonitorAsync(string monitorId, string operation, CancellationToken token)
     {

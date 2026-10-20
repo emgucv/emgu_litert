@@ -1442,3 +1442,22 @@ The hand tracker (item 40) was only the "Hand gestures" photo page: the camera m
 - [ ] MediaPipe's video mode (the next frame's hand rect from the previous landmarks) to roughly halve the work; more gestures (OK, wave, rock) from the landmarks; two hands making one gesture
       together; the model files' licence (item 40).
 
+## 48. The selfie camera on Android — ask for it in words, or tap Flip
+
+- [x] `LiveCamera.Front` (Camera2 picks the first camera facing the user, `LiveCamera.FindCameraId`; the OpenCV fallback has no selfie camera and says so). A request that names a camera
+      switches to it before the camera tools run (`VisualHostCatalog.CameraFacingRequest`: selfie, front camera, front-facing, "camera facing me" -> front; back, rear, rear-facing, main camera ->
+      back; the one named last wins; "the front door camera" is neither); the monitors going on across the switch. A **Flip** button on the preview switches by hand (shown when the phone has a
+      selfie camera); the label says "· selfie"; the preview of a selfie is mirrored, the frames the detectors, photos and clips get are not; the rotation follows Android's compensation for a front
+      camera ((sensor + display) % 360, so 270 on both phones held upright, where the back camera is 90), which also gives the photo's EXIF orientation and the clip's rotation; New chat goes back
+      to the back camera. The tools tell the model which camera is open ("(selfie camera)") and the visual instructions say the app switches by itself, so it shouldn't refuse.
+- [x] Checked on a Galaxy S10 (Gemma 4 E2B, GPU): "Use the selfie camera and take a picture when you see a thumb up." opened the selfie camera (id 1) and made the thumb-up monitor; 29 fps;
+      a photo 3648x2736 with EXIF orientation 8 and a clip 1280x720 with rotation 270 from it; Flip to the back camera (rotation 90, 30 fps) and back with the monitor kept; "Use the back camera
+      and beep when you see a victory sign." switched back with both monitors kept, the next request naming no camera kept the back camera; New chat closed the camera, cleared the monitors and
+      reset to the back camera. On the Pixel Fold the same: selfie photo 3280x2464 (orientation 8), clip rotation 270, Flip both ways, the switch back by words (in its first run; a second run was
+      cut short when the phone's screen timed out and the app, in the background, closed the camera as it always does; two more runs with the screen kept on passed - the first of them had
+      Gemma say it "cannot explicitly switch to the back camera" although the app had, so `create_visual_monitor`'s result now ends "Camera: the back camera." and the replies then named the right camera). `UnitTestHandVisualAgent` checks the words (14 cases).
+- [ ] Not run: a real face or hand in the selfie camera (only metadata was read - no frames were looked at), that the mirrored preview and the upright frames look right (no screenshot: the camera
+      would be in it), phones with several front cameras or none, the camera switch while a clip or photo is being taken, and Mac Catalyst and Windows (one camera, no choice).
+- [ ] An option to keep the last camera between chats; mirrored selfie photos and clips (Android's camera app mirrors selfies by default, ours are saved as the sensor sees them); asking for a
+      specific lens (ultra-wide, telephoto).
+

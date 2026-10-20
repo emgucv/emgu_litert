@@ -71,6 +71,20 @@ internal sealed partial class LiveCamera
         public override void OnConfigureFailed(CameraCaptureSession session) => Configured.TrySetException(new InvalidOperationException("The camera session couldn't be configured."));
     }
 
+    /// <summary>The id of the first camera facing the user (<paramref name="front"/>) or, for the back, the first facing away (else the first listed); null if there is none.</summary>
+    internal static string FindCameraId(bool front)
+    {
+        var manager = (CameraManager)Android.App.Application.Context.GetSystemService(Context.CameraService);
+        string[] ids = manager.GetCameraIdList();
+        foreach (string id in ids)
+        {
+            using var characteristics = manager.GetCameraCharacteristics(id);
+            var facing = characteristics.Get(CameraCharacteristics.LensFacing) as Java.Lang.Integer;
+            if (facing != null && (facing.IntValue() == (int)LensFacing.Front) == front) return id;
+        }
+        return front ? null : ids.FirstOrDefault();
+    }
+
     private static Android.Util.Size Nearest(Android.Util.Size[] sizes, int width, int height) =>
         sizes.OrderBy(s => Math.Abs(s.Width * s.Height - width * height)).First();
 
@@ -81,7 +95,7 @@ internal sealed partial class LiveCamera
         try
         {
             var manager = (CameraManager)Android.App.Application.Context.GetSystemService(Context.CameraService);
-            string id = manager.GetCameraIdList().FirstOrDefault() ?? throw new InvalidOperationException("No camera.");
+            string id = FindCameraId(Front) ?? throw new InvalidOperationException(Front ? "This phone has no selfie camera." : "No camera.");
             Android.Util.Size analysisSize;
             using (var characteristics = manager.GetCameraCharacteristics(id))
             {

@@ -2579,6 +2579,7 @@ namespace Maui.Demo.Lite
         private void StartNewChat()
         {
             _ = CloseCameraAsync();
+            _cameraFront = false;
             _visualRuntime?.Clear();
             ClearSoundMonitors();
             ForgetMonitorRequests();

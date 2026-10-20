@@ -22,6 +22,8 @@ internal sealed partial class LiveCamera
     public Action<Mat> FrameReady;
     public Action<string> Failed;
     public Func<int> RotationDegrees;
+    /// <summary>The selfie camera instead of the back one (Android, Camera2 only); set before <see cref="StartAsync"/>.</summary>
+    public bool Front { get; init; }
 
     public async Task StartAsync(CancellationToken token)
     {
@@ -62,6 +64,7 @@ internal sealed partial class LiveCamera
             // Camera2 first: it can record a video clip while the preview and the detector keep running (LiveCamera.Camera2.cs);
             // OpenCV's camera backend below takes over on a device where Camera2 can't be set up.
             if (await RunCamera2Async()) return;
+            if (Front) throw new InvalidOperationException("The selfie camera needs Camera2, which couldn't be set up on this phone.");
 #endif
 #if WINDOWS
             // The default Media Foundation backend took 11-12 s to open a Logitech StreamCam (DirectShow 1.3 s) - longer

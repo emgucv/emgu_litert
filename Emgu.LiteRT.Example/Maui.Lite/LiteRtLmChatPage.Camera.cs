@@ -22,6 +22,7 @@ public partial class LiteRtLmChatPage
     private bool _previewQueued;
     private int _previewVersion;
     private int _cameraRotation = 0;
+    private bool _cameraFront;     // the selfie camera (Android); New chat goes back to the back camera
     private const string CameraInstructions = ChatPlannerInstructions.Camera;
 
     private void BuildCameraPanel()
@@ -34,6 +35,17 @@ public partial class LiteRtLmChatPage
         SemanticProperties.SetDescription(close, "Close live camera and stop capture");
         var header = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
         header.Add(_cameraLabel, 0); header.Add(close, 1);
+#if ANDROID
+        if (LiveCamera.FindCameraId(true) != null)
+        {
+            var flip = new Button { Text = "Flip", FontSize = 12, Padding = new Thickness(8, 0), MinimumHeightRequest = 40 };
+            flip.Clicked += async (_, _) => await SwitchCameraAsync(!_cameraFront);
+            SemanticProperties.SetDescription(flip, "Switch between the back camera and the selfie camera");
+            header.ColumnDefinitions.Insert(1, new ColumnDefinition(GridLength.Auto));
+            header.SetColumn(close, 2);
+            header.Add(flip, 1);
+        }
+#endif
         var hint = new Label { Text = "Drag to move · Ask what you see", FontSize = 11, TextColor = Theme.SecondaryText };
         _cameraPanel = Theme.Card(new VerticalStackLayout { Spacing = 4, Children = { header, _cameraPreview, hint } }, 8);
         _cameraPanel.WidthRequest = 270;
@@ -129,17 +141,29 @@ public partial class LiteRtLmChatPage
 #endif
     }
 
-    private Task<string> OpenCameraAsync(CancellationToken token) => MainThread.InvokeOnMainThreadAsync(async () =>
+    // The camera tools: a request that names a camera ("use the selfie camera") switches to it.
+    private Task<string> OpenCameraAsync(CancellationToken token) => OpenCameraCoreAsync(token, true);
+
+    private Task<string> OpenCameraCoreAsync(CancellationToken token, bool followRequest) => MainThread.InvokeOnMainThreadAsync(async () =>
     {
         await _cameraGate.WaitAsync(token);
         try
         {
             if (!LiveCamera.Supported) return "Live camera is not supported on this platform yet.";
             if (!_pageVisible || _cameraSuspended) return "The chat must be visible in the foreground to open the camera.";
+#if ANDROID
+            string facing = followRequest ? VisualHostCatalog.CameraFacingRequest(_routePrompt) : null;
+            if (facing != null && (facing == "front") != _cameraFront)
+            {
+                if (facing == "front" && LiveCamera.FindCameraId(true) == null) return "This phone has no selfie camera. Tell the user.";
+                _cameraFront = facing == "front";
+                if (_camera != null) await CloseCameraCoreAsync();
+            }
+#endif
             if (_camera?.IsRunning == true && _cameraPanel.IsVisible)
             {
                 _visualRuntime.SetFeedVisible(true);
-                return "The live camera preview is open. You have not captured an image. Tell the user they can ask what you see in the camera.";
+                return "The live camera preview" + CameraNote + " is open. You have not captured an image. Tell the user they can ask what you see in the camera.";
             }
             if (_camera != null) await CloseCameraCoreAsync();
             var permission = await Permissions.RequestAsync<Permissions.Camera>();
@@ -150,7 +174,7 @@ public partial class LiteRtLmChatPage
             DeviceDisplay.Current.MainDisplayInfoChanged += CameraDisplayChanged;
             _cameraPanel.IsVisible = true;
             _cameraLabel.Text = "Opening camera…";
-            var camera = _camera = new LiveCamera { RotationDegrees = () => Volatile.Read(ref _cameraRotation) };
+            var camera = _camera = new LiveCamera { RotationDegrees = () => Volatile.Read(ref _cameraRotation), Front = _cameraFront };
             camera.FrameReady = frame => { QueueCameraPreview(camera, frame); QueueVisualFrame(camera, frame); };
             camera.Failed = _ =>
             {
@@ -169,12 +193,33 @@ public partial class LiteRtLmChatPage
             UpdateCameraLabel();
             _visualRuntime.SetFeedVisible(true);
             QueueVisualMonitorUi();
-            return "The live camera preview is now open. No image has been captured for you yet. Tell the user they can ask what you see in the camera.";
+            return "The live camera preview" + CameraNote + " is now open. No image has been captured for you yet. Tell the user they can ask what you see in the camera.";
         }
         catch (OperationCanceledException) { await CloseCameraCoreAsync(); throw; }
         catch (Exception ex) { await CloseCameraCoreAsync(); return "Could not open the camera: " + ex.Message; }
         finally { _cameraGate.Release(); }
     });
+
+    // Which camera, for what the tools tell the model (Android is the only platform with a choice).
+    private string CameraNote =>
+#if ANDROID
+        _cameraFront ? " (selfie camera)" : " (back camera)";
+#else
+        "";
+#endif
+
+#if ANDROID
+    // The Flip button: the other camera, with the monitors going on.
+    private async Task SwitchCameraAsync(bool front)
+    {
+        if (front == _cameraFront) return;
+        if (front && LiveCamera.FindCameraId(true) == null) { SetStatus("This phone has no selfie camera."); return; }
+        _cameraFront = front;
+        await CloseCameraAsync();
+        string result = await OpenCameraCoreAsync(CancellationToken.None, false);
+        if (_camera?.IsRunning != true) SetStatus(result);
+    }
+#endif
 
     private async Task<IEnumerable<AIContent>> CaptureCameraFrameAsync(CancellationToken token)
     {
@@ -220,6 +265,8 @@ public partial class LiteRtLmChatPage
             if (_camera != camera) return;
             _previewFrame ??= new Mat();
             frame.CopyTo(_previewFrame);
+            // A selfie preview is a mirror; the frames the detectors, photos and clips get are not mirrored.
+            if (_cameraFront) CvInvoke.Flip(_previewFrame, _previewFrame, Emgu.CV.CvEnum.FlipType.Horizontal);
             if (_previewQueued) return;
             _previewQueued = true;
             version = _previewVersion;
@@ -245,7 +292,7 @@ public partial class LiteRtLmChatPage
     {
 #if ANDROID
         var manager = (Android.Hardware.Camera2.CameraManager)Android.App.Application.Context.GetSystemService(Android.Content.Context.CameraService);
-        string id = manager.GetCameraIdList().FirstOrDefault();
+        string id = LiveCamera.FindCameraId(_cameraFront) ?? manager.GetCameraIdList().FirstOrDefault();
         if (id != null)
         {
             using var characteristics = manager.GetCameraCharacteristics(id);
@@ -257,7 +304,8 @@ public partial class LiteRtLmChatPage
                 DisplayRotation.Rotation270 => 270,
                 _ => 0
             };
-            _cameraRotation = (sensor - display + 360) % 360;
+            // Android's rotation compensation: a front camera turns the other way.
+            _cameraRotation = _cameraFront ? (sensor + display) % 360 : (sensor - display + 360) % 360;
         }
 #endif
     }

@@ -65,6 +65,25 @@ public class UnitTestHandVisualAgent
         Assert.That(VisualHostCatalog.Gestures.Length, Is.EqualTo(7));
     }
 
+    [TestCase("Use the selfie camera and take a picture when you see a thumb up", "front")]
+    [TestCase("take a picture with the front camera", "front")]
+    [TestCase("use the front-facing camera", "front")]
+    [TestCase("Open the camera facing me", "front")]
+    [TestCase("switch to the rear camera", "back")]
+    [TestCase("use the back camera", "back")]
+    [TestCase("Use the main camera.", "back")]
+    [TestCase("stop using the selfie camera, use the back camera", "back")]
+    [TestCase("use the back camera... no, the selfie camera", "front")]
+    [TestCase("when you see a person, take a picture", null)]
+    [TestCase("take a selfie of me", "front")]
+    [TestCase("the front door camera", null)]
+    [TestCase("", null)]
+    [TestCase(null, null)]
+    public void TheWordsForACameraChooseIt(string said, string expected)
+    {
+        Assert.That(VisualHostCatalog.CameraFacingRequest(said), Is.EqualTo(expected));
+    }
+
     private sealed class FakeAgent(VisualAgentDescriptor descriptor) : IVisualAgent
     {
         public VisualAgentDescriptor Descriptor => descriptor;

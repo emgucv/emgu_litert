@@ -88,6 +88,7 @@ public partial class LiteRtLmChatPage
         }
         int watching = _visualRuntime.Snapshot().Count(m => m.Enabled);
         _cameraLabel.Text = watching > 0 ? "Watching · " + watching + (watching == 1 ? " monitor" : " monitors") : "Live camera";
+        if (_cameraFront) _cameraLabel.Text += " · selfie";
     }
 }
 #endif

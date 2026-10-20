@@ -111,6 +111,26 @@ internal static class VisualHostCatalog
         return line.Length <= MaximumRequestLength ? line : line.Substring(0, MaximumRequestLength - 1).TrimEnd() + "…";
     }
 
+    // Which camera the user's words ask for: "front" (selfie, front-facing...), "back" (rear, back-facing, main camera...) or null. The one mentioned last wins.
+    internal static string CameraFacingRequest(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        string said = " " + string.Join(" ", new string(text.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
+            .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)) + " ";
+        string result = null; int at = -1;
+        void Look(string facing, params string[] phrases)
+        {
+            foreach (string phrase in phrases)
+            {
+                int index = said.LastIndexOf(" " + phrase + " ", StringComparison.Ordinal);
+                if (index > at) { at = index; result = facing; }
+            }
+        }
+        Look("front", "selfie", "selfie camera", "front camera", "front cam", "front facing", "front facing camera", "user facing", "forward camera", "camera facing me", "facing me");
+        Look("back", "back camera", "back cam", "rear camera", "rear cam", "rear facing", "back facing", "main camera", "outward camera");
+        return result;
+    }
+
     internal const int DefaultClipSeconds = 10, MinimumClipSeconds = 3, MaximumClipSeconds = 30;
 
     internal static readonly VisualActionDescriptor Clip = new("record_clip", "Video clip",
