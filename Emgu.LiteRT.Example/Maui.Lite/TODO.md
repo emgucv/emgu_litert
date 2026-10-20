@@ -617,7 +617,15 @@ anything happens (the model can get a date or time wrong).
 - [ ] Gemma 4 E4B.
 - [ ] Check-ins: a reminder (device actions, item 24 - only iOS/Mac Catalyst have reminders) or a scheduled task
       (item 30) asks how it went; e.g. a local notification on the evening of a day a goal is behind.
-- [ ] Streaks and history (per week/day) in Settings.
+- [x] Streaks and history (`GoalHistory.cs` in `Emgu.LiteRT.LM.Agents`): the periods since the goal was set (or its first progress, also before it was
+      set) with what was logged in each and whether the target was reached, and the streak - periods in a row that reached it; the period still going
+      on never breaks a streak and adds to it once reached; the best streak is kept. Settings > Your goals shows, per goal with a target and a
+      period, "🔥 3-week streak (best: 5)" (only from two periods in a row), a strip of blocks for the latest 12 periods (filled: reached, grey: missed,
+      outlined: the current one) and, tapping the strip, a line for each ("Week of 5 Oct: 3 of 3 times - reached"). `get_goals` and the goals in each
+      message's instructions mention a streak ("..., 2-week-streak, last: today"), so "how long is my streak?" can be answered. Verified on Mac Catalyst
+      with temporary goals (6 weeks of runs: reached, reached, reached, missed, reached, 1 so far -> "1-week streak (best: 3)" and the matching strip;
+      a daily goal over 10 days likewise), deleted afterwards. `UnitTestGoalHistory` (weeks Monday to Sunday, days, months, the current period, breaks
+      and the best, progress before the goal was set, no history without a target or period).
 
 ## 26. Agent tool: clipboard (`read_clipboard`) — implemented
 

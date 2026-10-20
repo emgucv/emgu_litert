@@ -503,6 +503,10 @@ namespace Emgu.LiteRT.LM.Agents
             {
                 text += " - logged " + all.Count.ToString(CultureInfo.InvariantCulture) + (all.Count == 1 ? " time" : " times");
             }
+            // A streak worth mentioning (two periods or more in a row) - so "how long is my streak" can be answered.
+            string streak = GoalHistory.Compute(goal, all, now).StreakText;
+            if (streak != null)
+                text += ", " + streak.Replace(" streak", "-streak").Replace("(best: ", "(best ");
             if (all.Count > 0)
                 text += goal.Target != null ? ", last: " + DayText(all.Last().When, now) : " (last: " + DayText(all.Last().When, now) + ")";
             else

@@ -108,7 +108,7 @@ public class UnitTestAgentGoals
 
         string instructions = await AgentTools.GoalInstructionsAsync(store, now);
         Assert.That(instructions, Does.Contain("- Run three times a week - 2 of 3 times this week, last: today"));
-        Assert.That(instructions, Does.Contain("- Read 20 pages a day - 30 of 20 pages today (reached), last: today"));
+        Assert.That(instructions, Does.Contain("- Read 20 pages a day - 30 of 20 pages today (reached), 2-day-streak, last: today"));
 
         // A new week starts on Monday.
         now = new DateTime(2026, 10, 19, 8, 0, 0);

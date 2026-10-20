@@ -14,7 +14,8 @@ namespace Maui.Demo.Lite;
 // Goals (TODO item 25): the agent's add_goal / log_progress / get_goals / remove_goal tools (Emgu.LiteRT.LM.Agents'
 // AgentTools.Goals) keep the user's goals in ChatStore, with the memories - on with "Remember things about me", never
 // in a private chat. Each message's instructions list the goals with this period's progress, so "I ran today" is
-// logged without asking. Settings lists them with their progress, to edit, undo the last entry or delete.
+// logged without asking. Settings lists them with their progress, streak and history by period (GoalHistory), to edit, undo
+// the last entry or delete.
 public partial class LiteRtLmChatPage
 {
     private const int MaxGoalLength = 800;
@@ -100,9 +101,33 @@ public partial class LiteRtLmChatPage
     private async Task<View> BuildGoalRowAsync(AgentGoal goal, VerticalStackLayout list)
     {
         var status = new Label { FontFamily = Theme.BodyFont, FontSize = 14, TextColor = Theme.PrimaryText };
+        // The streak, a strip with a block for each of the latest periods (filled: reached, empty: missed, outlined: the one
+        // going on) and, tapping the strip, a line for each.
+        var streak = new Label { FontFamily = Theme.TitleFont, FontSize = 13, TextColor = Theme.Accent, IsVisible = false };
+        var strip = new HorizontalStackLayout { Spacing = 3, IsVisible = false, Padding = new Thickness(0, 2) };
+        var historyLines = new VerticalStackLayout { Spacing = 1, IsVisible = false };
+        strip.OnTap(() => historyLines.IsVisible = !historyLines.IsVisible);
         async Task Refresh()
         {
-            try { status.Text = await AgentTools.GoalStatusAsync(_store, goal, DateTime.Now); }
+            try
+            {
+                status.Text = await AgentTools.GoalStatusAsync(_store, goal, DateTime.Now);
+                GoalHistory history = GoalHistory.Compute(goal, await _store.GetProgressAsync(goal.Id, DateTime.MinValue), DateTime.Now, 12);
+                streak.Text = history.StreakText == null ? string.Empty : "\U0001F525 " + history.StreakText;
+                streak.IsVisible = history.StreakText != null;
+                strip.Children.Clear();
+                historyLines.Children.Clear();
+                strip.IsVisible = history.Periods.Count > 1;
+                foreach (GoalPeriodResult period in history.Periods)
+                {
+                    strip.Children.Add(period.IsCurrent && !period.Met
+                        ? new Border { WidthRequest = 14, HeightRequest = 14, Stroke = Theme.Accent, StrokeThickness = 1, BackgroundColor = Colors.Transparent, StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(3) } }
+                        : new Border { WidthRequest = 14, HeightRequest = 14, Stroke = Colors.Transparent, BackgroundColor = period.Met ? Theme.Accent : Theme.Chevron, StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(3) } });
+                    historyLines.Children.Insert(0, new Label { Text = history.Describe(period, goal), FontFamily = Theme.BodyFont, FontSize = 12, TextColor = period.Met ? Theme.PrimaryText : Theme.SecondaryText });
+                }
+                SemanticProperties.SetDescription(strip, string.Format("The last {0} {1}s: {2} reached the target. Tap to show them.",
+                    history.Periods.Count, history.PeriodName, history.Periods.Count(p => p.Met)));
+            }
             catch (Exception ex) { status.Text = goal.Text + " (" + ex.Message + ")"; }
         }
         await Refresh();
@@ -119,7 +144,7 @@ public partial class LiteRtLmChatPage
         {
             Padding = new Thickness(10, 7),
             Spacing = 2,
-            Children = { status, new HorizontalStackLayout { Children = { edit, undo, delete } } }
+            Children = { status, streak, strip, historyLines, new HorizontalStackLayout { Children = { edit, undo, delete } } }
         };
         edit.OnTap(async () =>
         {
