@@ -62,6 +62,7 @@
     <Compile Include="..\UnitTestContextManagement.cs" Link="UnitTestContextManagement.cs" />
     <Compile Include="..\UnitTestVisualActions.cs" Link="UnitTestVisualActions.cs" />
     <Compile Include="..\UnitTestClipAction.cs" Link="UnitTestClipAction.cs" />
+    <Compile Include="..\UnitTestHandVisualAgent.cs" Link="UnitTestHandVisualAgent.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\AlertAudioCoordinator.cs" Link="AlertAudioCoordinator.cs" />
     <Compile Include="..\UnitTestVisualAgents.cs" Link="UnitTestVisualAgents.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\WorkloadPolicy.cs" Link="WorkloadPolicy.cs" />

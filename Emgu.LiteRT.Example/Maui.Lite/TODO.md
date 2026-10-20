@@ -1281,7 +1281,7 @@ Real-time hand-gesture recognition for the camera agents ("take a picture when I
       sample photos are MediaPipe's test images (`Resources/Raw/hand_*.jpg`); the licences page lists MediaPipe. Run on Mac Catalyst (a thumb up: 69%,
       23 ms).
 - [ ] The model files' own licence terms (the model cards) before they are bundled or hosted; now they are downloaded from Google.
-- [ ] A live-camera `hand-gesture` visual agent: the gestures as its classes, monitors with a hold time, MediaPipe's video-mode tracking (the next
+- [x] A live-camera `hand-gesture` visual agent: built, see item 47. Still open from this item: MediaPipe's video-mode tracking (the next
       frame's hand rect from the previous landmarks, the palm detector only when the hand is lost) to halve the work; selfie cameras are mirrored,
       which swaps left and right.
 - [ ] More gestures (OK, wave, rock) from the landmarks with rules, or a custom classifier on the gesture embedder.
@@ -1417,4 +1417,28 @@ platforms are unchanged): a 640x480 YUV image reader gives the preview and the d
       and can draw over or behind other views while it scrolls), the camera panel overlapping a playing card, seeking by touch, and playing with sound from the clip while the
       phone's volume is low or in a call.
 - [ ] A texture-based player (Media3/ExoPlayer, CommunityToolkit.Maui's MediaElement) if the surface misbehaves; seeking; the same for photos' full-screen view.
+
+## 47. The hand-gesture visual agent — "take a picture when you see a thumb up" goes to MediaPipe's gestures
+
+The hand tracker (item 40) was only the "Hand gestures" photo page: the camera monitors knew COCO's 80 classes, so a thumbs-up request had nothing to match.
+
+- [x] `HandVisualAgent` (`hand-gesture`, registered beside the two COCO agents; CPU; the 8 MB models download on first use): each analysed frame goes through the hand tracker and every
+      hand with a recognised gesture is an observation of that gesture's class - `thumb up`, `thumb down`, `victory`, `open palm`, `closed fist`, `pointing up`, `i love you`, with the hand's
+      box from its landmarks (`VisualHostCatalog.GestureObservations`). It is an ordinary object monitor from there: the hold time, the episodes, "at least 2 thumb up", and every
+      action (chime, speech, snapshot, photo, clip) work. The classes don't overlap COCO's, and "none" and a sideways hand are not reported.
+- [x] The words people use map to the classes before the monitor is created (`VisualHostCatalog.CanonicalGesture`: thumbs up, 👍, peace sign, V sign, high five, fist, ILoveYou,
+      MediaPipe's own labels, and "hand-gesture.thumb up" as a model once wrote it; "stop sign" stays a COCO class), the visual instructions tell the planner which label fits
+      which words and never to use `person`, and the camera tool group's keywords gained thumb, gesture, peace sign, open palm and fist.
+- [x] Checked on a Galaxy S10 with Gemma 4 E2B (GPU): "Tell me when you see a thumbs up" -> `hand-gesture` thumb up (speech); "take a picture when you see a thumb up" -> thumb up + `take_snapshot`;
+      "When I make a peace sign, record a 5 second clip" -> victory + `record_clip` 5 s; "Beep when I show an open palm" -> open palm + `play_sound`; "Take a full resolution photo when you see a
+      fist" -> closed fist + `take_photo`; "Say hello when you see a thumbs down" -> thumb down + speech; "Alert me when a person appears" still -> the COCO detector. The first version of the
+      instructions failed once ("peace sign" came out as `hand-gesture.thumb up`), which led to the clearer wording and the prefix handling.
+- [x] The whole path with MediaPipe's photos as the camera's frames (the live frames switched off): the empty image gave nothing, the thumb-up photo started the episode in ~1 s and the snapshot
+      action succeeded (a card appeared), the empty image ended it, a fist didn't trigger it, the thumb-up photo started a second episode and a second snapshot.
+      `UnitTestHandVisualAgent` (the words, the classes, selection by class, the condition counting; and, with the models, MediaPipe's images -> their gesture as an observation inside the image,
+      none for the sideways hand and the image without one).
+- [ ] Not run: a real hand in front of a real camera (the frames were MediaPipe's photos), the detection rate in a room (distance, light, a hand held sideways or tilted), the cost of
+      the hand models beside the COCO detector and Gemma on a phone, a monitor for a gesture on the Fold, Mac Catalyst and Windows (the code is shared and builds).
+- [ ] MediaPipe's video mode (the next frame's hand rect from the previous landmarks) to roughly halve the work; more gestures (OK, wave, rock) from the landmarks; two hands making one gesture
+      together; the model files' licence (item 40).
 

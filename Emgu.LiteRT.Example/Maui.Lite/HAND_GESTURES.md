@@ -88,7 +88,6 @@ is alone - 50 ms against 14 ms on the Fold - so it isn't used here.)
 
 - The live camera path: `HandTracker.DetectPalms` on every frame is 8 ms on a CPU; MediaPipe's video mode tracks the hand from the previous frame's
   landmarks (the next rect comes from them) and runs the palm detector only when the hand is lost - about half the work. Not done.
-- A `hand-gesture` visual agent next to `coco-ssd-mobilenet-v3`, `coco-yolox-nano` and the others (`VisualAgents.cs`, `CocoVisualAgent.cs`): its classes
-  are the gestures, so the planner can create monitors such as "when I show a thumbs up, take a picture", with a hold time so a flicker isn't an event.
+- The `hand-gesture` visual agent is built (`HandVisualAgent.cs`, TODO item 47): the seven gestures are object classes of the camera monitors, so "when I show a thumbs up, take a picture" is an ordinary monitor with a hold time and every action. What it hasn't had is a real hand in front of a real camera - only MediaPipe's photos fed in as frames.
 - More gestures (OK, wave, rock): from the 21 landmarks with rules, or MediaPipe's custom classifier training (`gesture_embedder` + a new classifier).
 - The model licence question above, before the models are bundled or hosted.

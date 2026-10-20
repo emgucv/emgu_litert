@@ -25,6 +25,9 @@ public partial class LiteRtLmChatPage
     private long _visualFrameId, _lastVisualFrame;
     private static readonly string VisualInstructions = VisualAgentTools.Instructions +
         " Prefer coco-ssd-mobilenet-v3 for ordinary object monitors. Use the experimental coco-yolox-nano when the user asks for YOLOX." +
+        " For a hand gesture use the hand-gesture agent and pick the label that matches the user's words: thumbs up = thumb up, thumbs down = thumb down, peace sign or V sign = victory, " +
+        "open hand or high five = open palm, fist = closed fist, pointing finger = pointing up, rock sign = i love you. The label is just the class, never prefixed by the agent id, and never person. " +
+        "It sees upright hands, a gesture held for about a second." +
 #if ANDROID
         " For record a video or clip when an object appears, select record_clip with parameters {seconds: the requested length, default 10, from 3 to 30}. " +
         "It records from the live camera with sound and shows the clip in this chat session; no automatic saving or model analysis. A request for both a picture and a clip uses take_snapshot and record_clip. " +
@@ -38,6 +41,7 @@ public partial class LiteRtLmChatPage
         _visualAgents = new VisualAgentRegistry();
         _visualAgents.Register(new CocoVisualAgent());
         _visualAgents.Register(new CocoVisualAgent(useYoloX: true));
+        _visualAgents.Register(new HandVisualAgent());
         _visualChime = new CameraChimeAction();
         _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(text, token)),
             occurrence => _visualRuntime.Snapshot().Any(m => m.Id == occurrence.MonitorId &&
@@ -163,6 +167,8 @@ public partial class LiteRtLmChatPage
         try
         {
             token.ThrowIfCancellationRequested();
+            // "thumbs up" and the like are the hand-gesture agent's classes ("thumb up"); anything else goes as it came.
+            label = VisualHostCatalog.CanonicalGesture(label) ?? label;
             var monitor = _visualRuntime.CreateObjectMonitor(label, actions, minimumCount, confidence);
             RememberMonitorRequest(monitor.Id);
             // Repeated requests return the existing rule, including its user-paused status.
