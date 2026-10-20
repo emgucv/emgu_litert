@@ -89,7 +89,7 @@ scores the audio with YAMNet (the model runs once per window for all monitors), 
 
 ## What is left
 
-- Sound monitors in the live-camera agent's own panel and combined conditions ("a dog barks and a person is in view"), and a camera snapshot as an alert.
+- Sound monitors in the live-camera agent's own panel and combined conditions ("a dog barks and a person is in view"). (A sound can already take a photo or record a clip on Android, TODO item 49.)
 - The Windows microphone source, and listening with the app in the background (an Android foreground service; iOS background audio).
 - A threshold per sound: the defaults are untuned - 0.5 for speech was fine, a smoke alarm or a baby's cry needs real recordings to tune.
 - Run together with the camera loop and Gemma on a phone for a while (heat, battery): the models are small but nothing was timed together.

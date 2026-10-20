@@ -12,7 +12,10 @@ public partial class LiteRtLmChatPage
     private readonly Queue<(View Row, string Path)> _visualPhotos = new();
     private const int MaximumVisualPhotos = 5;
 
-    private async Task TakeVisualPhotoAsync(VisualEvent occurrence, CancellationToken token)
+    private Task TakeVisualPhotoAsync(VisualEvent occurrence, CancellationToken token) =>
+        TakePhotoAsync(() => _visualRuntime.Snapshot().FirstOrDefault(m => m.Id == occurrence.MonitorId)?.Condition, token);
+
+    private async Task TakePhotoAsync(Func<string> cause, CancellationToken token)
     {
         LiveCamera camera = await MainThread.InvokeOnMainThreadAsync(() =>
         {
@@ -36,7 +39,7 @@ public partial class LiteRtLmChatPage
                 token.ThrowIfCancellationRequested();
                 return;
             }
-            string condition = _visualRuntime.Snapshot().FirstOrDefault(m => m.Id == occurrence.MonitorId)?.Condition;
+            string condition = cause();
             var image = new Image { HeightRequest = 150, WidthRequest = 210, Aspect = Aspect.AspectFit, BackgroundColor = Theme.ImageBackground };
             if (thumbnail != null) image.Source = ImageUtil.ToImageSource(thumbnail);
             image.OnTap(() => _ = OpenVisualPhotoAsync(photo.Path));

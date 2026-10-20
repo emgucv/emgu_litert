@@ -224,4 +224,33 @@ public class UnitTestSoundMonitors
         Assert.That(create.Description, Does.Contain("doorbell").And.Contain("baby_cry"));
         Assert.That(SoundMonitorTools.Describe(new SoundMonitorRuntime(Labels()).Create("dog")), Does.Contain("listening"));
     }
+
+    [Test]
+    public async Task ACameraAlertIsPartOfTheMonitor()
+    {
+        Assert.Throws<ArgumentException>(() => new SoundAlert(false, null, 2));
+        Assert.Throws<ArgumentException>(() => new SoundAlert(false, null, 31));
+        Assert.That(new SoundAlert(false, null, 10).IsEmpty, Is.False);
+        Assert.That(new SoundAlert(false, null, 0, true).IsEmpty, Is.False);
+        var runtime = new SoundMonitorRuntime(Labels());
+        var clip = runtime.Create("dog", 0.5, 0, new SoundAlert(false, null, 10, true));
+        Assert.That(clip.ClipSeconds, Is.EqualTo(10));
+        Assert.That(clip.TakePhoto, Is.True);
+        Assert.That(clip.Description, Does.Contain("take a photo").And.Contain("record a 10 s video clip"));
+        Assert.That(runtime.Create("dog", 0.5, 0, new SoundAlert(false, null, 10, true)).Id, Is.EqualTo(clip.Id));
+        Assert.That(runtime.Create("dog", 0.5, 0, new SoundAlert(false, null, 20, true)).Id, Is.Not.EqualTo(clip.Id));
+
+        string seen = null;
+        var tools = SoundMonitorTools.Create(
+            (sound, minimum, play, speak, threshold, seconds, photo, token) => { seen = $"{sound}|{seconds}|{photo}"; return Task.FromResult("ok"); },
+            () => "list", (id, operation, token) => Task.FromResult("ok"), true);
+        var create = (AIFunction)tools[0];
+        await create.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object> { ["sound"] = "baby_cry", ["clipSeconds"] = 12 }));
+        Assert.That(seen, Is.EqualTo("baby_cry|12|False"));
+        Assert.That(create.Description, Does.Contain("video clip"));
+        // Without a camera the tool has no clip or photo parameters.
+        var plain = (AIFunction)SoundMonitorTools.Create((a, b, c, d, e, t) => Task.FromResult("ok"), () => "none", (a, b, t) => Task.FromResult("ok"))[0];
+        Assert.That(plain.JsonSchema.ToString(), Does.Not.Contain("clipSeconds"));
+        Assert.That(create.JsonSchema.ToString(), Does.Contain("clipSeconds").And.Contain("takePhoto"));
+    }
 }

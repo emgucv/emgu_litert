@@ -126,6 +126,7 @@ public class UnitTestToolRouting
             ("Let me know when you hear the doorbell", new[] { ChatToolGroups.Sound }),
             ("Beep if my dog starts to bark", new[] { ChatToolGroups.Sound }),
             ("Alert me when a baby cries", new[] { ChatToolGroups.Sound }),
+            ("When you hear the baby cry, take a video", new[] { ChatToolGroups.Sound }),
             ("Listen for the smoke alarm while I'm out", new[] { ChatToolGroups.Sound }),
             ("Set a 10 minute timer for the pasta", new[] { ChatToolGroups.DeviceActions }),
             ("Wake me up tomorrow at 6:45 am.", new[] { ChatToolGroups.DeviceActions }),

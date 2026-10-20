@@ -19,7 +19,8 @@ public partial class LiteRtLmChatPage
     private const bool SoundSupported = false;     // no Windows microphone stream yet
 #endif
     private const string SoundInstructions = SoundMonitorTools.Instructions +
-        " Use the camera tools instead when the user wants to see something rather than hear it.";
+        " Use the camera tools instead when the user wants to see something rather than hear it. When the user wants a video or photo taken because of a sound, " +
+        "that is still a sound monitor: use create_sound_monitor with clipSeconds or takePhoto, not a camera monitor.";
 
     private SoundMonitorRuntime _soundRuntime;
     private readonly YamNetDetector _soundDetector = new YamNetDetector();
@@ -78,22 +79,41 @@ public partial class LiteRtLmChatPage
     }
 
     private IEnumerable<AITool> SoundTools() => !SoundSupported ? Array.Empty<AITool>()
-        : SoundMonitorTools.Create(CreateSoundMonitorAsync, ListSoundMonitors, ControlSoundMonitorAsync);
+        : SoundMonitorTools.Create(CreateSoundMonitorAsync, ListSoundMonitors, ControlSoundMonitorAsync, CameraAlertsSupported);
+
+    // A sound can also set off the live camera's clip and photo, where the camera records (Android; TODO item 49).
+#if ANDROID
+    private const bool CameraAlertsSupported = true;
+#else
+    private const bool CameraAlertsSupported = false;
+#endif
+    private readonly Dictionary<Guid, long> _soundCameraUntil = new();   // per monitor: no new clip or photo before this timestamp
+    private const int SoundCameraCooldownSeconds = 30;
 
     // ---------- tools ----------
 
-    private async Task<string> CreateSoundMonitorAsync(string sound, double minimumSeconds, bool playSound, string speakText, double threshold, CancellationToken token)
+    private async Task<string> CreateSoundMonitorAsync(string sound, double minimumSeconds, bool playSound, string speakText, double threshold,
+        int clipSeconds, bool takePhoto, CancellationToken token)
     {
         try
         {
             token.ThrowIfCancellationRequested();
             if (!SoundSupported) return "Sound monitoring isn't supported on this device yet.";
             await EnsureSoundRuntimeAsync(token);
-            var monitor = _soundRuntime.Create(sound, threshold, minimumSeconds, new SoundAlert(playSound, speakText));
+            if (!CameraAlertsSupported && (clipSeconds != 0 || takePhoto)) return "Recording a clip or taking a photo isn't supported on this device yet.";
+            if (clipSeconds < 0 || (clipSeconds > 0 && clipSeconds < SoundAlert.MinimumClipSeconds)) clipSeconds = SoundAlert.DefaultClipSeconds;
+            var monitor = _soundRuntime.Create(sound, threshold, minimumSeconds, new SoundAlert(playSound, speakText, clipSeconds, takePhoto));
             RememberMonitorRequest(monitor.Id);
             string status = await UpdateSoundListeningAsync();
             var current = _soundRuntime.Snapshot().First(m => m.Id == monitor.Id);
-            return SoundMonitorTools.Describe(current) + " " + status;
+            string camera = "";
+            if (clipSeconds > 0 || takePhoto)
+            {
+                // The camera is what records: open it now, so the user sees it works (and can allow the permission) before the sound comes.
+                string opened = await OpenCameraAsync(token);
+                camera = _camera?.IsRunning == true ? " The live camera is open and will be used when the sound is heard." : " " + opened;
+            }
+            return SoundMonitorTools.Describe(current) + " " + status + camera;
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { return "Could not create the sound monitor: " + ex.Message; }
@@ -216,11 +236,34 @@ public partial class LiteRtLmChatPage
         try
         {
             var actions = new List<Task>();
+            if (monitor.ClipSeconds > 0 || monitor.TakePhoto) actions.Add(SoundCameraAlertAsync(occurrence, monitor, token));
             if (monitor.Chime) actions.Add(_soundChime.ExecuteAsync(null, token));
             if (monitor.SpeakText != null) actions.Add(MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(monitor.SpeakText, token)));
             await Task.WhenAll(actions);
         }
         finally { EndSoundMute(); }
+    }
+
+    // The photo first, then the clip; a continuing sound makes one capture each SoundCameraCooldownSeconds, not one per episode of it.
+    // The clip's audio is the room's, so listening is off for the clip (the page's alert audio mute): it must not start itself again.
+    private async Task SoundCameraAlertAsync(SoundEvent occurrence, SoundMonitorInfo monitor, CancellationToken token)
+    {
+        lock (_soundCameraUntil)
+        {
+            long now = Stopwatch.GetTimestamp();
+            if (_soundCameraUntil.TryGetValue(monitor.Id, out long until) && now < until) return;
+            _soundCameraUntil[monitor.Id] = now + (long)(SoundCameraCooldownSeconds + monitor.ClipSeconds) * Stopwatch.Frequency;
+        }
+#if ANDROID
+        if (_camera?.IsRunning != true) await OpenCameraCoreAsync(token, false);
+        string cause() => "Heard " + (occurrence.Label ?? monitor.Sound).ToLowerInvariant() + " at " + occurrence.At.ToString("HH:mm:ss") +
+            " (" + Math.Round(occurrence.Score * 100) + "%) · " + monitor.Description;
+        // A failure reaches the monitor's card through the runtime ("The alert failed: ...").
+        if (monitor.TakePhoto) await TakePhotoAsync(cause, token);
+        if (monitor.ClipSeconds > 0) await RecordClipAsync(cause, monitor.ClipSeconds, token);
+#else
+        await Task.CompletedTask;
+#endif
     }
 
     // Listening is off while something plays, and for 2 s after. Holds can overlap (an alert while a clip plays).

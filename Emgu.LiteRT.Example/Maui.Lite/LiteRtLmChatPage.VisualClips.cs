@@ -13,7 +13,11 @@ public partial class LiteRtLmChatPage
     private Action _stopPlayingClip;   // the one clip that plays in the chat now
     private const int MaximumVisualClips = 5;
 
-    private async Task RecordVisualClipAsync(VisualEvent occurrence, int seconds, CancellationToken token)
+    private Task RecordVisualClipAsync(VisualEvent occurrence, int seconds, CancellationToken token) =>
+        RecordClipAsync(() => _visualRuntime.Snapshot().FirstOrDefault(m => m.Id == occurrence.MonitorId)?.Condition, seconds, token);
+
+    // What a clip's card says set it off: a camera monitor's condition, or the sound that was heard (read when the card is made).
+    private async Task RecordClipAsync(Func<string> cause, int seconds, CancellationToken token)
     {
         LiveCamera camera = await MainThread.InvokeOnMainThreadAsync(() =>
         {
@@ -39,7 +43,7 @@ public partial class LiteRtLmChatPage
                 token.ThrowIfCancellationRequested();
                 return;
             }
-            string condition = _visualRuntime.Snapshot().FirstOrDefault(m => m.Id == occurrence.MonitorId)?.Condition;
+            string condition = cause();
             var image = new Image { Aspect = Aspect.AspectFit };
             if (thumbnail != null) image.Source = ImageUtil.ToImageSource(thumbnail);
             SemanticProperties.SetDescription(image, "Camera clip. Tap to play.");

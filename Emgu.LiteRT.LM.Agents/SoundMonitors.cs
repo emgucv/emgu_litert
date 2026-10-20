@@ -131,17 +131,27 @@ namespace Emgu.LiteRT.LM.Agents.Audio
         public bool Chime { get; }
         /// <summary>Words to speak (at most 200 characters), or null.</summary>
         public string SpeakText { get; }
+        /// <summary>Seconds of video to record with the host's camera (3 to 30), or 0 for none.</summary>
+        public int ClipSeconds { get; }
+        /// <summary>Take a full-resolution photo with the host's camera.</summary>
+        public bool TakePhoto { get; }
 
-        /// <summary>Creates an alert, trimming the text.</summary>
-        public SoundAlert(bool chime = false, string speakText = null)
+        /// <summary>The shortest and longest clip.</summary>
+        public const int MinimumClipSeconds = 3, MaximumClipSeconds = 30, DefaultClipSeconds = 10;
+
+        /// <summary>Creates an alert, trimming the text. <paramref name="clipSeconds"/> is 0 for no clip, else 3 to 30.</summary>
+        public SoundAlert(bool chime = false, string speakText = null, int clipSeconds = 0, bool takePhoto = false)
         {
+            if (clipSeconds != 0 && (clipSeconds < MinimumClipSeconds || clipSeconds > MaximumClipSeconds))
+                throw new ArgumentException("The clip must be " + MinimumClipSeconds + " to " + MaximumClipSeconds + " seconds long.");
+            ClipSeconds = clipSeconds; TakePhoto = takePhoto;
             string text = string.IsNullOrWhiteSpace(speakText) ? null : speakText.Trim();
             if (text != null && text.Length > 200) throw new ArgumentException("The spoken message can have at most 200 characters.");
             Chime = chime; SpeakText = text;
         }
         /// <summary>Whether it does anything.</summary>
-        public bool IsEmpty => !Chime && SpeakText == null;
-        internal string Key => (Chime ? "chime" : "") + "|" + (SpeakText ?? "");
+        public bool IsEmpty => !Chime && SpeakText == null && ClipSeconds == 0 && !TakePhoto;
+        internal string Key => (Chime ? "chime" : "") + "|" + (SpeakText ?? "") + "|" + ClipSeconds + (TakePhoto ? "|photo" : "");
     }
 
     /// <summary>Pure temporal state machine: advance it with each window's score and its monotonic time.</summary>
@@ -224,6 +234,10 @@ namespace Emgu.LiteRT.LM.Agents.Audio
         public bool Chime { get; internal set; }
         /// <summary>Spoken words, or null.</summary>
         public string SpeakText { get; internal set; }
+        /// <summary>Seconds of video it records, or 0.</summary>
+        public int ClipSeconds { get; internal set; }
+        /// <summary>Whether it takes a photo.</summary>
+        public bool TakePhoto { get; internal set; }
         /// <summary>Whether it is listening (not paused by the user).</summary>
         public bool Enabled { get; internal set; }
         /// <summary>How many times its sound has been heard.</summary>
@@ -331,10 +345,12 @@ namespace Emgu.LiteRT.LM.Agents.Audio
             var parts = new List<string>();
             if (e.Alert.Chime) parts.Add("play a chime");
             if (e.Alert.SpeakText != null) parts.Add("say \"" + e.Alert.SpeakText + "\"");
+            if (e.Alert.TakePhoto) parts.Add("take a photo");
+            if (e.Alert.ClipSeconds > 0) parts.Add("record a " + e.Alert.ClipSeconds + " s video clip");
             return new SoundMonitorInfo
             {
                 Id = e.Monitor.Id, Sound = e.Group.Id, Threshold = e.Monitor.Threshold, MinimumSeconds = e.Monitor.MinimumDuration.TotalSeconds,
-                Chime = e.Alert.Chime, SpeakText = e.Alert.SpeakText, Enabled = e.Enabled, Heard = e.Heard, LastHeard = e.LastHeard, LastEvent = e.LastEvent,
+                Chime = e.Alert.Chime, SpeakText = e.Alert.SpeakText, ClipSeconds = e.Alert.ClipSeconds, TakePhoto = e.Alert.TakePhoto, Enabled = e.Enabled, Heard = e.Heard, LastHeard = e.LastHeard, LastEvent = e.LastEvent,
                 Description = "Listen for " + e.Group.Name.ToLowerInvariant() +
                     (e.Monitor.MinimumDuration > TimeSpan.Zero ? " lasting at least " + e.Monitor.MinimumDuration.TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture) + " s" : "") +
                     (parts.Count > 0 ? ", then " + string.Join(" and ", parts) : ", and show it here")
@@ -443,6 +459,7 @@ namespace Emgu.LiteRT.LM.Agents.Audio
         public const string Instructions = "To be alerted when a sound happens (the doorbell, a dog barking, a baby crying, a smoke alarm, a knock...), " +
             "use create_sound_monitor with the sound in the user's words. It listens through the microphone while the app is open; the audio isn't recorded or sent anywhere, " +
             "and each time the sound is heard the app shows it. Set playSound only if the user wants a beep or chime, and speakText only to the exact words the user asked to hear, unchanged. " +
+            "When the tool has clipSeconds and takePhoto, set them only if the user asked for a video, clip or photo when the sound is heard (\"when you hear the baby cry, take a video\"); the live camera is used. " +
             "Use list_sound_monitors and control_sound_monitor to pause, resume or remove monitors. After creating one, say in one short sentence what it listens for, and don't repeat the call.";
 
         /// <summary>The tools; each callback returns the text the model sees.</summary>
@@ -451,8 +468,16 @@ namespace Emgu.LiteRT.LM.Agents.Audio
         /// <param name="control">monitorId, operation (pause, resume, remove)</param>
         public static IList<AITool> Create(Func<string, double, bool, string, double, CancellationToken, Task<string>> create,
             Func<string> list, Func<string, string, CancellationToken, Task<string>> control)
+            => Create((sound, minimumSeconds, playSound, speakText, threshold, clipSeconds, takePhoto, token) => create(sound, minimumSeconds, playSound, speakText, threshold, token),
+                list, control, false);
+
+        /// <summary>The same tools, and with <paramref name="cameraActions"/> the monitor can also record a video clip or take a photo (the host's camera).</summary>
+        /// <param name="create">sound, minimumSeconds, playSound, speakText, threshold, clipSeconds (0 for none), takePhoto</param>
+        /// <param name="cameraActions">Whether the host can record clips and take photos</param>
+        public static IList<AITool> Create(Func<string, double, bool, string, double, int, bool, CancellationToken, Task<string>> create,
+            Func<string> list, Func<string, string, CancellationToken, Task<string>> control, bool cameraActions)
         {
-            return new List<AITool>
+            var tools = new List<AITool>
             {
                 AIFunctionFactory.Create(
                     ([Description("The sound to listen for, in the user's words, e.g. doorbell, dog, baby_cry, smoke_alarm.")] string sound,
@@ -460,7 +485,7 @@ namespace Emgu.LiteRT.LM.Agents.Audio
                      [Description("Set true only if the user asked for a beep, chime or sound when it is heard. Leave out otherwise.")] bool playSound = false,
                      [Description("Leave out unless the user said to say something aloud. Then the words they said to say, verbatim: for \"say hello when...\" it is hello.")] string speakText = null,
                      [Description("Sensitivity from 0.1 to 0.95. Leave out unless the user asked for more or less.")] double threshold = 0.5,
-                     CancellationToken cancellationToken = default) => create(sound, minimumSeconds, playSound, speakText, threshold <= 0 ? 0.5 : threshold, cancellationToken),
+                     CancellationToken cancellationToken = default) => create(sound, minimumSeconds, playSound, speakText, threshold <= 0 ? 0.5 : threshold, 0, false, cancellationToken),
                     "create_sound_monitor",
                     "Listens through the microphone for a kind of sound and alerts when it is heard (shown in the app, plus a chime or spoken words if asked). " +
                     "Sounds: " + SoundGroups.Ids + ". Session only; runs while the app is open. Not for recording or understanding speech."),
@@ -471,6 +496,20 @@ namespace Emgu.LiteRT.LM.Agents.Audio
                      CancellationToken cancellationToken) => control(monitorId, operation, cancellationToken),
                     "control_sound_monitor", "Pauses, resumes or removes a sound monitor.")
             };
+            if (cameraActions)
+                tools[0] = AIFunctionFactory.Create(
+                    ([Description("The sound to listen for, in the user's words, e.g. doorbell, dog, baby_cry, smoke_alarm.")] string sound,
+                     [Description("Seconds the sound must last before it counts. Leave out unless the user gave a duration.")] double minimumSeconds = 0,
+                     [Description("Set true only if the user asked for a beep, chime or sound when it is heard. Leave out otherwise.")] bool playSound = false,
+                     [Description("Leave out unless the user said to say something aloud. Then the words they said to say, verbatim: for \"say hello when...\" it is hello.")] string speakText = null,
+                     [Description("Sensitivity from 0.1 to 0.95. Leave out unless the user asked for more or less.")] double threshold = 0.5,
+                     [Description("Set only if the user asked for a video or clip when the sound is heard: its length in seconds, 3 to 30 (10 if they gave none). Leave out otherwise.")] int clipSeconds = 0,
+                     [Description("Set true only if the user asked for a photo or picture when the sound is heard. Leave out otherwise.")] bool takePhoto = false,
+                     CancellationToken cancellationToken = default) => create(sound, minimumSeconds, playSound, speakText, threshold <= 0 ? 0.5 : threshold, clipSeconds, takePhoto, cancellationToken),
+                    "create_sound_monitor",
+                    "Listens through the microphone for a kind of sound and alerts when it is heard (shown in the app, plus a chime, spoken words, a video clip or a photo from the live camera if asked). " +
+                    "Sounds: " + SoundGroups.Ids + ". Session only; runs while the app is open. Not for recording or understanding speech.");
+            return tools;
         }
 
         /// <summary>One monitor as a line of text for a tool result.</summary>

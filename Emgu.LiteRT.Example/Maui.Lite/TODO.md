@@ -1483,3 +1483,13 @@ The hand tracker (item 40) was only the "Hand gestures" photo page: the camera m
 - [ ] An option to keep the last camera between chats; mirrored selfie photos and clips (Android's camera app mirrors selfies by default, ours are saved as the sensor sees them); asking for a
       specific lens (ultra-wide, telephoto).
 
+## 49. A sound can take the photo or the clip — "when you hear the baby cry, take a video"
+
+Sound monitors (item 42) could only chime, speak and show a card; the camera's clip and photo (items 43, 44) belonged to the camera monitors. A sound monitor now has the same two actions.
+
+- [x] `SoundAlert` has `ClipSeconds` (0, or 3 to 30) and `TakePhoto`; they are part of a monitor's identity (same sound with another action is another monitor) and its description ("Listen for baby crying, then take a photo and record a 10 s video clip"). `SoundMonitorTools.Create(..., cameraActions: true)` adds `clipSeconds` and `takePhoto` to `create_sound_monitor`; without it the tool is unchanged (Mac Catalyst, where the camera can't record).
+- [x] The chat page (Android): creating such a monitor opens the live camera at once - the user sees it work and can allow the permission before the sound comes - and says so in the tool result. When the sound is heard the photo is taken first, then the clip, through the same code as the camera monitors (`TakePhotoAsync`/`RecordClipAsync`, refactored out of the visual ones: the card says "Heard baby crying at 14:02:11 (87%)" instead of a camera condition). The sound monitors don't listen while it records (the alert mute), so the clip doesn't start itself, and a sound that goes on makes one capture per 30 s plus the clip's length, not one per episode. A failure shows on the monitor's card.
+- [x] The sound group's instructions say a video or photo wanted because of a sound is a sound monitor, not a camera monitor ("take a picture" is also a camera keyword, so both groups can be active).
+- [x] Verified on a Galaxy S10 with a spoken WAV in place of the microphone (a temporary harness, removed): the photo (2.4 MB JPEG) came 2 s after the sound, the 5 s clip (3.8 MB MP4) 8 s after it; a second sound 25 s later fell in the cooldown and made no capture. Unit tests: `ACameraAlertIsPartOfTheMonitor`, a routing case. Not run: Gemma 4 choosing `clipSeconds` from the real sentence, a real baby's cry (or a recording of one), the Fold, the app in the background, and Mac Catalyst (no clip/photo there).
+- [ ] A pre-roll (the seconds before the cry) needs a rolling buffer of encoded frames; the clip starts after the sound is confirmed.
+
