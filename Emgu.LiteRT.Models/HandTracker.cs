@@ -75,6 +75,8 @@ namespace Emgu.LiteRT.Models
         public string Gesture { get; internal set; }
         /// <summary>The gesture's score, 0..1</summary>
         public float GestureScore { get; internal set; }
+        /// <summary>The angle in degrees (clockwise in the image) the hand's landmarks were turned by for the gesture that was kept: 0 unless the hand was tilted (see <see cref="HandTracker.TiltAngles"/>).</summary>
+        public int GestureRotation { get; internal set; }
     }
 
     /// <summary>
@@ -418,7 +420,7 @@ namespace Emgu.LiteRT.Models
         /// The gesture embedder's features of a hand: the landmarks with the image's aspect ratio taken out, moved so the wrist
         /// is the origin and scaled by the larger extent in x or y. (MediaPipe's gesture recognizer doesn't rotate them.)
         /// </summary>
-        public static float[] GestureFeatures(float[][] landmarks, int imageWidth, int imageHeight, bool world = false)
+        public static float[] GestureFeatures(float[][] landmarks, int imageWidth, int imageHeight, bool world = false, double rotation = 0)
         {
             if (landmarks == null || landmarks.Length != LandmarkCount) throw new ArgumentException("Expected 21 landmarks.");
             double max = Math.Max(imageWidth, imageHeight);
@@ -428,10 +430,18 @@ namespace Emgu.LiteRT.Models
                     ? new double[] { landmarks[i][0], landmarks[i][1], landmarks[i][2] }
                     : new[] { (landmarks[i][0] - 0.5) * (imageWidth / max) + 0.5, (landmarks[i][1] - 0.5) * (imageHeight / max) + 0.5, landmarks[i][2] };
             double[] origin = (double[])points[0].Clone();   // a copy: points[0] itself is moved with the others
+            double cos = Math.Cos(rotation), sin = Math.Sin(rotation);
             double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
             foreach (double[] p in points)
             {
                 for (int k = 0; k < 3; k++) p[k] -= origin[k];
+                if (rotation != 0)
+                {
+                    // Turned about the wrist, clockwise in the image (y points down), with the aspect ratio already taken out.
+                    double x = p[0], y = p[1];
+                    p[0] = cos * x - sin * y;
+                    p[1] = sin * x + cos * y;
+                }
                 minX = Math.Min(minX, p[0]); maxX = Math.Max(maxX, p[0]);
                 minY = Math.Min(minY, p[1]); maxY = Math.Max(maxY, p[1]);
             }
@@ -443,11 +453,28 @@ namespace Emgu.LiteRT.Models
             return result;
         }
 
-        private void Classify(Hand hand, int imageWidth, int imageHeight)
+        /// <summary>
+        /// Angles in degrees the gesture classifier is also tried at when the upright reading is weak. MediaPipe's classifier takes the hand as it is
+        /// in the image, so a hand tilted 45 degrees comes out as "none"; turning the landmarks about the wrist and asking again finds the
+        /// gesture it would have been upright. (Not the hand's own direction: for a thumbs-up that points sideways.) Empty turns it off.
+        /// </summary>
+        public double[] TiltAngles { get; set; } = { -30, 30, -60, 60 };
+
+        /// <summary>A turned reading is only kept if its score is at least this...</summary>
+        public float TiltMinimumScore { get; set; } = 0.7f;
+
+        /// <summary>...and beats the upright reading's score by at least this much.</summary>
+        public float TiltMargin { get; set; } = 0.15f;
+
+        /// <summary>If turned readings name different gestures, the best must lead the next gesture's best by this much, else none is kept.</summary>
+        public float TiltDisagreement { get; set; } = 0.15f;
+
+        // The classifier's best class and score for the landmarks turned by the angle (radians, 0 = as they are).
+        private (string Gesture, float Score) ClassifyAt(Hand hand, int imageWidth, int imageHeight, double rotation)
         {
-            _embedderIn[_embedderOrder[0]].Write(GestureFeatures(hand.Landmarks, imageWidth, imageHeight));
+            _embedderIn[_embedderOrder[0]].Write(GestureFeatures(hand.Landmarks, imageWidth, imageHeight, false, rotation));
             _embedderIn[_embedderOrder[1]].Write(new[] { hand.RightHandScore });
-            _embedderIn[_embedderOrder[2]].Write(GestureFeatures(hand.WorldLandmarks, imageWidth, imageHeight, true));
+            _embedderIn[_embedderOrder[2]].Write(GestureFeatures(hand.WorldLandmarks, imageWidth, imageHeight, true, rotation));
             _embedder.Run(_embedderIn, _embedderOut);
             _classifierIn[0].Write(_embedderOut[0].Read<float>());
             _classifier.Run(_classifierIn, _classifierOut);
@@ -455,8 +482,35 @@ namespace Emgu.LiteRT.Models
             int best = 0;
             for (int i = 1; i < scores.Length; i++)
                 if (scores[i] > scores[best]) best = i;
-            hand.Gesture = best < GestureLabels.Count ? GestureLabels[best] : "None";
-            hand.GestureScore = scores[best];
+            return (best < GestureLabels.Count ? GestureLabels[best] : "None", scores[best]);
+        }
+
+        private void Classify(Hand hand, int imageWidth, int imageHeight)
+        {
+            var (gesture, score) = ClassifyAt(hand, imageWidth, imageHeight, 0);
+            int rotation = 0;
+            // A weak or missing upright reading: try the hand turned, and keep a clearly better gesture - unless the turned readings disagree
+            // (a thumb pointing sideways is neither up nor down).
+            if (TiltAngles != null && TiltAngles.Length > 0 && (gesture == "None" || score < TiltMinimumScore))
+            {
+                float bar = Math.Max(TiltMinimumScore, gesture == "None" ? 0 : score + TiltMargin);
+                var found = new Dictionary<string, (float Score, int Degrees)>();
+                foreach (double degrees in TiltAngles)
+                {
+                    var turned = ClassifyAt(hand, imageWidth, imageHeight, degrees * Math.PI / 180);
+                    if (turned.Gesture == "None" || turned.Score < bar) continue;
+                    if (!found.TryGetValue(turned.Gesture, out var known) || turned.Score > known.Score)
+                        found[turned.Gesture] = (turned.Score, (int)degrees);
+                }
+                var ranked = found.OrderByDescending(f => f.Value.Score).ToList();
+                if (ranked.Count > 0 && (ranked.Count == 1 || ranked[0].Value.Score - ranked[1].Value.Score >= TiltDisagreement))
+                {
+                    gesture = ranked[0].Key; score = ranked[0].Value.Score; rotation = ranked[0].Value.Degrees;
+                }
+            }
+            hand.Gesture = gesture;
+            hand.GestureScore = score;
+            hand.GestureRotation = rotation;
         }
 
         private void CheckActive()

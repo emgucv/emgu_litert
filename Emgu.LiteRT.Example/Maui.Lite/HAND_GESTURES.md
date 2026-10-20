@@ -91,3 +91,12 @@ is alone - 50 ms against 14 ms on the Fold - so it isn't used here.)
 - The `hand-gesture` visual agent is built (`HandVisualAgent.cs`, TODO item 47): the seven gestures are object classes of the camera monitors, so "when I show a thumbs up, take a picture" is an ordinary monitor with a hold time and every action. What it hasn't had is a real hand in front of a real camera - only MediaPipe's photos fed in as frames.
 - More gestures (OK, wave, rock): from the 21 landmarks with rules, or MediaPipe's custom classifier training (`gesture_embedder` + a new classifier).
 - The model licence question above, before the models are bundled or hosted.
+
+## From a real hand (TODO item 47)
+
+Tested on a Pixel Fold's selfie camera with a person holding each gesture for 8 s, MediaPipe's photos having been the only test until then. The first run: most gestures 94-100% of frames, but
+the closed fist 5% (the palm detector found no hand) and a thumb up tilted 45 degrees 5% ("none": the classifier takes the hand as it is in the image). Changes: the palm threshold 0.35;
+the classifier is asked again on the landmarks turned by -30, +30, -60 and +60 degrees when the upright reading is "none" or under 0.7, keeping a turned reading only when it scores 0.7 and
+beats the upright one by 0.15 and the turned readings don't disagree (`HandTracker.TiltAngles`); gesture monitors default to 0.4. The second run: the tilted thumb up 92%, the others 94-100%, the
+fist 17% and "I love you" 0% (a pose-sensitive "none"). The tilt extension is not MediaPipe's behaviour: the parity tests turn it off.
+

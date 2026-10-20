@@ -225,6 +225,34 @@ public class UnitTestHandTracker
     }
 }
 
+[TestFixture]
+public class UnitTestHandGestureRotation
+{
+    [Test]
+    public void FeaturesOfATurnedHandAreTheUprightFeaturesWhenTurnedBack()
+    {
+        // 21 made-up landmarks on a square image (so the aspect ratio plays no part), the wrist first.
+        var random = new Random(7);
+        var upright = Enumerable.Range(0, 21).Select(i => new[] { 0.5f + (float)(random.NextDouble() - 0.5) * 0.3f, 0.5f + (float)(random.NextDouble() - 0.5) * 0.3f, (float)(random.NextDouble() - 0.5) * 0.05f }).ToArray();
+        float[] expected = HandTracker.GestureFeatures(upright, 100, 100);
+        foreach (double degrees in new double[] { 30, -30, 60, 90, 180 })
+        {
+            double c = Math.Cos(degrees * Math.PI / 180), s = Math.Sin(degrees * Math.PI / 180);
+            // The hand turned clockwise about its wrist (y points down in an image).
+            var turned = upright.Select(p => new[]
+            {
+                (float)(upright[0][0] + c * (p[0] - upright[0][0]) - s * (p[1] - upright[0][1])),
+                (float)(upright[0][1] + s * (p[0] - upright[0][0]) + c * (p[1] - upright[0][1])), p[2]
+            }).ToArray();
+            float[] unturned = HandTracker.GestureFeatures(turned, 100, 100, false, -degrees * Math.PI / 180);
+            Assert.That(unturned, Is.EqualTo(expected).Within(1e-4), degrees + " degrees");
+            Assert.That(HandTracker.GestureFeatures(turned, 100, 100), Is.Not.EqualTo(expected).Within(1e-3), "the features of a turned hand differ");
+        }
+        // No rotation is the old behaviour.
+        Assert.That(HandTracker.GestureFeatures(upright, 100, 100, false, 0), Is.EqualTo(expected));
+    }
+}
+
 [TestFixture, Category("Native")]
 public class UnitTestHandTrackerNative
 {
@@ -248,6 +276,8 @@ public class UnitTestHandTrackerNative
         string[] models = await ModelsAsync();
         using var reference = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "hand_reference.json")));
         using var tracker = new HandTracker(models[0], models[1], models[2], models[3], 2, accelerators, Emgu.LiteRT.GpuPrecision.Fp32);
+        // The parity is with MediaPipe, which doesn't try a tilted hand again: switch that extension off here (UnitTestHandTrackerTiltNative tests it).
+        tracker.TiltAngles = Array.Empty<double>();
         if (accelerators == Emgu.LiteRT.HwAccelerators.Gpu)
             Assert.That(tracker.IsFullyAccelerated, Is.True, "The two vision models must compile fully for the GPU.");
         foreach (var image in reference.RootElement.GetProperty("images").EnumerateObject())
@@ -275,5 +305,66 @@ public class UnitTestHandTrackerNative
         Assert.That(Maui.Demo.Lite.HandImageInput.Track(tracker, shuttle), Is.Empty);
         tracker.Dispose();
         Assert.Throws<ObjectDisposedException>(() => tracker.DetectPalms(100, 100));
+    }
+}
+
+// The reference images turned by an angle, with and without trying the classifier on turned landmarks (HandTracker.TiltAngles).
+[TestFixture, Category("Native")]
+public class UnitTestHandTrackerTiltNative
+{
+    private static Emgu.CV.Mat Turn(Emgu.CV.Mat image, double degrees)
+    {
+        var center = new System.Drawing.PointF(image.Width / 2f, image.Height / 2f);
+        using var matrix = new Emgu.CV.Mat();
+        Emgu.CV.CvInvoke.GetRotationMatrix2D(center, -degrees, 1.0, matrix);   // positive = clockwise
+        int size = (int)Math.Ceiling(Math.Sqrt(image.Width * image.Width + image.Height * image.Height));
+        // A canvas big enough that nothing is cut off, the original centred in it.
+        using var shifted = new Emgu.CV.Mat();
+        var m = new Emgu.CV.Matrix<double>(2, 3);
+        matrix.CopyTo(m);
+        m[0, 2] += (size - image.Width) / 2.0; m[1, 2] += (size - image.Height) / 2.0;
+        var result = new Emgu.CV.Mat();
+        Emgu.CV.CvInvoke.WarpAffine(image, result, m, new System.Drawing.Size(size, size), Emgu.CV.CvEnum.Inter.Linear, Emgu.CV.CvEnum.Warp.Default, Emgu.CV.CvEnum.BorderType.Constant, new Emgu.CV.Structure.MCvScalar(127, 127, 127));
+        return result;
+    }
+
+    [Test]
+    public async Task TiltedPhotosAreRecognisedMoreOftenWhenTheLandmarksAreTurned()
+    {
+        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Emgu.LiteRT.Tests", "Hands");
+        var bundle = new DownloadableFile(HandModelFiles.BundleUrl, Path.Combine("Emgu.LiteRT.Tests", "Hands"), HandModelFiles.BundleSha256);
+        var downloads = new FileDownloadManager();
+        downloads.AddFile(bundle);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await downloads.Download(1, timeout.Token);
+        string[] models = HandModelFiles.Extract(bundle.LocalFile, folder);
+        using var tracker = new HandTracker(models[0], models[1], models[2], models[3]);
+        var images = new[] { ("hand_thumb_up.jpg", "Thumb_Up"), ("hand_victory.jpg", "Victory"), ("hand_fist.jpg", "Closed_Fist"), ("hand_pointing_up.jpg", "Pointing_Up") };
+        var report = new System.Text.StringBuilder();
+        int withTurn = 0, without = 0, total = 0, wrongClaims = 0, plainWrong = 0;
+        foreach (var (name, expected) in images)
+        {
+            using var original = Emgu.CV.CvInvoke.Imread(Path.Combine(AppContext.BaseDirectory, name), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
+            foreach (double angle in new double[] { 0, 30, 45, 60, -30, -45, -60, 75, -75, 90, -90, 120, -120, 150, 180 })
+            {
+                using var turned = angle == 0 ? original.Clone() : Turn(original, angle);
+                tracker.TiltAngles = Array.Empty<double>();
+                var a = Maui.Demo.Lite.HandImageInput.Track(tracker, turned);
+                tracker.TiltAngles = new double[] { -30, 30, -60, 60 };
+                var b = Maui.Demo.Lite.HandImageInput.Track(tracker, turned);
+                string ga = a.Count == 0 ? "-" : a[0].Gesture + $" {a[0].GestureScore:0.00}", gb = b.Count == 0 ? "-" : b[0].Gesture + $" {b[0].GestureScore:0.00}@{b[0].GestureRotation}";
+                report.AppendLine($"{name} {angle,4}: plain {ga,-18} turned {gb,-22} hands {a.Count}/{b.Count}");
+                if (Math.Abs(angle) > 60) { string claimed = b.Count == 1 ? b[0].Gesture : "-"; if (claimed != "None" && claimed != "-" && claimed != expected) { wrongClaims++; report.AppendLine($"   ^ wrong claim at {angle}: {claimed}"); } if (a.Count == 1 && a[0].Gesture != "None" && a[0].Gesture != expected) plainWrong++; }
+                if (Math.Abs(angle) <= 60) { total++; if (a.Count == 1 && a[0].Gesture == expected) without++; if (b.Count == 1 && b[0].Gesture == expected) withTurn++; }
+            }
+        }
+        TestContext.Out.WriteLine(report.ToString());
+        TestContext.Out.WriteLine($"tilts of up to 60 degrees: right gesture without {without}/{total}, with the turned reading {withTurn}/{total}");
+        Console.WriteLine($"RESULT without {without}/{total} with {withTurn}/{total}; beyond 60 degrees wrong claims: plain {plainWrong}, turned {wrongClaims}");
+        // Turning the landmarks finds the gesture of a tilted hand that the upright reading calls "none" (13 of 28 -> 27 of 28 here), and doesn't make
+        // more wrong claims about hands tilted past what it tries (those are thumbs that point down, or sideways, and are read as such or as none).
+        Assert.That(withTurn, Is.GreaterThanOrEqualTo(24), "right gestures up to 60 degrees of tilt with the turned reading");
+        Assert.That(withTurn, Is.GreaterThan(without + 8), "against " + without + " without it");
+        Assert.That(wrongClaims, Is.LessThanOrEqualTo(plainWrong), "wrong claims past 60 degrees");
     }
 }

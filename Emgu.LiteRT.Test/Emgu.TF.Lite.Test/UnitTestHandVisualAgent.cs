@@ -84,6 +84,15 @@ public class UnitTestHandVisualAgent
         Assert.That(VisualHostCatalog.CameraFacingRequest(said), Is.EqualTo(expected));
     }
 
+    [Test]
+    public void AGestureMonitorGetsALowerDefaultConfidenceAndKeepsAChosenOne()
+    {
+        Assert.That(VisualHostCatalog.GestureConfidence(0.5), Is.EqualTo(0.4));
+        Assert.That(VisualHostCatalog.GestureConfidence(0.7), Is.EqualTo(0.7));
+        Assert.That(VisualHostCatalog.GestureConfidence(0.3), Is.EqualTo(0.3));
+        Assert.That(VisualHostCatalog.GestureConfidence(0.9), Is.EqualTo(0.9));
+    }
+
     private sealed class FakeAgent(VisualAgentDescriptor descriptor) : IVisualAgent
     {
         public VisualAgentDescriptor Descriptor => descriptor;
@@ -157,9 +166,12 @@ public class UnitTestHandVisualAgentNative
             Assert.That(new ObjectCountCondition(expected).Count(new VisualAnalysis("hand-gesture",
                 new VisualFrame(new byte[12], 2, 2, 6, "camera", 1, DateTimeOffset.Now, TimeSpan.Zero), observations)), Is.EqualTo(1), image);
         }
-        // The sideways hand and the image without a hand give nothing (MediaPipe's gesture is "none" for the former).
+        // The sideways hand: MediaPipe's own reading is "none"; with the turned readings it is pointing up.
         using var sideways = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "hand_pointing_up_rotated.jpg"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
+        Assert.That(VisualHostCatalog.GestureObservations(HandImageInput.Track(tracker, sideways)).Select(o => o.Label), Is.EqualTo(new[] { "pointing up" }));
+        tracker.TiltAngles = Array.Empty<double>();
         Assert.That(VisualHostCatalog.GestureObservations(HandImageInput.Track(tracker, sideways)), Is.Empty);
+        tracker.TiltAngles = new double[] { -30, 30, -60, 60 };
         using var shuttle = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "space_shuttle.jpg"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
         Assert.That(VisualHostCatalog.GestureObservations(HandImageInput.Track(tracker, shuttle)), Is.Empty);
     }

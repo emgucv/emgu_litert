@@ -1437,8 +1437,30 @@ The hand tracker (item 40) was only the "Hand gestures" photo page: the camera m
       action succeeded (a card appeared), the empty image ended it, a fist didn't trigger it, the thumb-up photo started a second episode and a second snapshot.
       `UnitTestHandVisualAgent` (the words, the classes, selection by class, the condition counting; and, with the models, MediaPipe's images -> their gesture as an observation inside the image,
       none for the sideways hand and the image without one).
-- [ ] Not run: a real hand in front of a real camera (the frames were MediaPipe's photos), the detection rate in a room (distance, light, a hand held sideways or tilted), the cost of
-      the hand models beside the COCO detector and Gemma on a phone, a monitor for a gesture on the Fold, Mac Catalyst and Windows (the code is shared and builds).
+- [x] A real hand (2026-10-20, Pixel Fold, selfie camera, the user holding the phone about an arm's length away, spoken cues, 8 s per gesture, the live frames at ~4.3 a second, only the labels
+      logged): over each gesture's 8 s window the share of frames with the right gesture at a score of at least 0.5 was thumb down 100% (median score 0.87), victory 100% (0.93), pointing up
+      100% (0.89), i love you 100% (0.91), open palm 100% (0.66), thumb up 94% (0.57) and a thumb up with the arm stretched out 94% (0.53), the first hit within 0.2 s; each of those gestures was
+      one episode of a monitor (Started when shown, Ended on release), and with no hand in view for 7 s there was nothing. Two gestures failed: **closed fist 5%** (the palm detector found no hand
+      in 34 of 37 frames - the fist was shown but never "seen") and **a thumb up tilted about 45 degrees 5%** (the hand was found in every frame but the classifier said "none", as MediaPipe's
+      unrotated features predict; a spurious 1.8 s episode came out of it). The thumb up's scores sit just above the 0.5 default threshold, so a monitor is close to its limit for that gesture.
+      Detection took a mean of 57.6 ms a frame (max 173 ms) on the CPU while the camera streamed - well inside the 200 ms between frames.
+- [ ] Not run: the hand models beside the COCO detector and Gemma on a phone, a monitor for a gesture on the S10, Mac Catalyst and Windows (the code is shared and builds), other hands, rooms
+      and lighting (one person, one room), the back camera with a real hand, two hands.
+- [x] Three changes from the real-hand test (2026-10-20, then a second real-hand run): (1) the palm detector's threshold 0.5 -> 0.35 (`HandImageInput.PalmThreshold`; the landmark model's presence score
+      still rejects non-hands; MediaPipe's five images and the no-hand image give the same hands); (2) tilt tolerance: when the upright reading of a hand is "none" or weak (< 0.7) the gesture
+      classifier is asked again on the landmarks turned about the wrist by -30, +30, -60 and +60 degrees (`HandTracker.TiltAngles`, `GestureFeatures(..., rotation)`), and a turned reading is kept
+      only if it scores at least 0.7 and beats the upright one by 0.15, and not if the turned readings name different gestures (`TiltDisagreement`: a thumb pointing sideways is neither up nor
+      down) - on MediaPipe's photos turned by up to 60 degrees the right gesture went from 13 of 28 to 27 of 28, with no more wrong claims than before on hands turned further
+      (`UnitTestHandTrackerTiltNative`), and `Hand.GestureRotation` says which was used; the parity tests with MediaPipe switch it off; (3) gesture monitors default to confidence 0.4 when the
+      planner passes the usual 0.5 (`VisualHostCatalog.GestureConfidence`; a chosen value is kept).
+- [x] The second real-hand run (same phone, same person, same room): thumb up 97% of frames (median score 0.67), thumb down 94% (0.91), victory 100% (0.93), open palm 100% (0.65), pointing up 95% (0.76),
+      thumb up far away 100% (0.63), **thumb up tilted about 45 degrees 92% (0.73, the turned reading used in 34 frames; it was 5%)**; nothing with no hand in view; one episode per gesture;
+      mean analysis 55 ms. Still weak: **closed fist 17%** (the hand is now found - "no hand" fell from 34 frames to 11 - but the classifier says "none" for 19 of the 36, a fist shown as this person
+      holds it) and **"I love you" 0%** this time (36 frames of a found hand called "none", after 100% in the first run - the pose differed: the cue's first frames flickered L/N - so it is pose-sensitive
+      rather than a regression; the upright reading is unchanged by the tilt code).
+- [ ] The fist and "I love you": log the classifier's raw scores for the frames it calls "none" (is the gesture second, at 0.3-0.5?) before deciding whether to take the second-best gesture when "none"
+      isn't clearly ahead; MediaPipe's video mode (follow the hand from its last landmarks) so a hand that closes into a fist stays found.
+
 - [ ] MediaPipe's video mode (the next frame's hand rect from the previous landmarks) to roughly halve the work; more gestures (OK, wave, rock) from the landmarks; two hands making one gesture
       together; the model files' licence (item 40).
 

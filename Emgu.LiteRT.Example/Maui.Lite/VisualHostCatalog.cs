@@ -51,6 +51,12 @@ internal static class VisualHostCatalog
         return words;
     }
 
+    // The confidence a gesture monitor gets when the planner passes the usual default (0.5): the classifier's scores for a real thumbs up sat just above it
+    // (a median of 0.57 in front of a real camera, TODO item 47), so 0.5 sat on the edge. Any other value is the user's choice and is kept.
+    internal const double GestureDefaultConfidence = 0.4;
+
+    internal static double GestureConfidence(double requested) => Math.Abs(requested - 0.5) < 1e-9 ? GestureDefaultConfidence : requested;
+
     /// <summary>The gesture class for a MediaPipe label or the words a person used (case, underscores and punctuation ignored), or null if it isn't one.</summary>
     internal static string CanonicalGesture(string text)
     {

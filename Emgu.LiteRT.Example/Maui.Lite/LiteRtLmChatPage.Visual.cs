@@ -171,7 +171,8 @@ public partial class LiteRtLmChatPage
         {
             token.ThrowIfCancellationRequested();
             // "thumbs up" and the like are the hand-gesture agent's classes ("thumb up"); anything else goes as it came.
-            label = VisualHostCatalog.CanonicalGesture(label) ?? label;
+            string gesture = VisualHostCatalog.CanonicalGesture(label);
+            if (gesture != null) { label = gesture; confidence = VisualHostCatalog.GestureConfidence(confidence); }
             var monitor = _visualRuntime.CreateObjectMonitor(label, actions, minimumCount, confidence);
             RememberMonitorRequest(monitor.Id);
             // Repeated requests return the existing rule, including its user-paused status.

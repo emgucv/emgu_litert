@@ -53,7 +53,11 @@ internal static class HandImageInput
     }
 
     /// <summary>Find the hands in a BGR image, best palm first, each with its landmarks and gesture.</summary>
-    internal static List<Hand> Track(HandTracker tracker, Mat bgr, int maxHands = 2, float threshold = 0.5f)
+    // The palm detector's score a candidate needs. MediaPipe's 0.5 never found a closed fist in front of a real camera (TODO item 47); the landmark
+    // model's presence score (0.5) still rejects candidates that aren't hands.
+    internal const float PalmThreshold = 0.35f;
+
+    internal static List<Hand> Track(HandTracker tracker, Mat bgr, int maxHands = 2, float threshold = PalmThreshold)
     {
         if (bgr.IsEmpty || bgr.Depth != DepthType.Cv8U || bgr.NumberOfChannels != 3)
             throw new ArgumentException("Expected a nonempty 8-bit BGR frame.", nameof(bgr));
