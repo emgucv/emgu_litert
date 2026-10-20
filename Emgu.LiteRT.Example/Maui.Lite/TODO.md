@@ -623,10 +623,17 @@ Let the chat's agent use tools from Model Context Protocol (MCP) servers, next t
       answer); "What is 12 times 7?" in a new chat carried no MCP group and called `calculate` (23 s).
 - [ ] stdio on Mac Catalyst and Windows is untested (a program such as `npx -y <server>`); OAuth for servers that need it (the SDK has
       a client for it) - only a static header now; resources and prompts of servers aren't used, only tools.
-- [ ] Try the settings UI on a phone and in the Catalyst app (only a self-test drove it, on the S10). On this Mac the Catalyst build
-      now fails to sign: the identity the SDK picks ("Apple Development: Canming Huang (XCQJ34Q8R4)") is gone from the keychain;
-      `-p:CodesignKey=-` builds, but the keychain entitlement stops it launching, and with an empty entitlements file it died at
-      launch ("Code Signature Invalid" loading a dylib). The Catalyst build compiles; the app wasn't run.
+- [x] On Mac Catalyst (built and launched with `tools/run_catalyst`, see below): the settings section shows DeepWiki "Connected · 3 tools ·
+      trusted" and a disabled server, with the add form; Gemma 4 E2B on the Metal GPU answered "What is the modelcontextprotocol/csharp-sdk
+      repository about? Ask DeepWiki." through the tool (20 s) and "What is 12 times 7?" through `calculate` (5 s), from a temporary self-test.
+      Not tried by hand on a phone's settings sheet.
+- [x] The default Catalyst build failed on this Mac ("MacCatalyst code signing key 'Apple Development: Canming Huang (XCQJ34Q8R4)' not found in
+      keychain": that certificate, and the one in the "Mac Catalyst Team Provisioning Profile: com.emgu.*", expired; a new profile needs Xcode's
+      account UI). `tools/run_catalyst` builds without the profile (ad hoc, no keychain entitlement, so the API keys last for the session)
+      and starts the app. An ad hoc app was killed at launch on macOS 27 ("Code Signature Invalid", in dyld mapping a dependent library): the
+      universal `libLiteRt.dylib` / `liblitert-lm.dylib` in MonoBundle have an x86_64 slice the SDK's `install_name_tool` step leaves invalid, so the
+      script keeps only the arm64 slice of each universal dylib and signs everything ad hoc again, in a copy on the internal disk. A proper fix
+      would be the build shipping arm64-only dylibs in the Catalyst app (they are `lipo`'d universal from the Bazel build).
 - [ ] A reusable package (`Emgu.LiteRT.LM.Agents.Mcp`?) if an app other than the demo wants it.
 
 ## 29. Serve the Mac's models to phones ("Server" option)
