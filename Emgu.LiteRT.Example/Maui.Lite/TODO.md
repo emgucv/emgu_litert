@@ -1493,3 +1493,8 @@ Sound monitors (item 42) could only chime, speak and show a card; the camera's c
 - [x] Verified on a Galaxy S10 with a spoken WAV in place of the microphone (a temporary harness, removed): the photo (2.4 MB JPEG) came 2 s after the sound, the 5 s clip (3.8 MB MP4) 8 s after it; a second sound 25 s later fell in the cooldown and made no capture. Unit tests: `ACameraAlertIsPartOfTheMonitor`, a routing case. Not run: Gemma 4 choosing `clipSeconds` from the real sentence, a real baby's cry (or a recording of one), the Fold, the app in the background, and Mac Catalyst (no clip/photo there).
 - [ ] A pre-roll (the seconds before the cry) needs a rolling buffer of encoded frames; the clip starts after the sound is confirmed.
 
+## 50. A shutter click for photos taken by an alert
+
+- [x] `take_photo` (camera monitors and sound monitors alike, Android) plays a short click - `Resources/Raw/camera_click.wav`, synthesized for this (two filtered-noise bursts, 0.1 s, no licence) - through `CameraChimeAction("camera_click.wav")` while the photo is taken, so a photo taken with nobody touching the phone has a sign. Settings > "Camera sounds" (on by default, Preferences `litert_lm_chat_camera_sound`) turns it off, for a baby's room. Clips and `take_snapshot` stay silent. The click runs inside the sound mute, so a sound monitor can't hear it as a sound, and a failing click never loses the photo.
+- [x] Verified on a Galaxy S10 with a temporary harness (removed): the click took 215-290 ms to play with the setting on and nothing with it off, the mute count returned to 0, and the photo was taken. Not heard by a person (no one was there), and not run on the Fold.
+

@@ -7,19 +7,22 @@ namespace Maui.Demo.Lite;
 internal sealed class CameraChimeAction : IVisualAction
 {
     public string Id => "play_sound";
+    private readonly string _asset;
     private Action _stop;
+    // The alert chime, or another short sound from the app package (the camera's shutter click).
+    public CameraChimeAction(string asset = "visual_chime.wav") { _asset = asset; }
     // Called synchronously on the UI thread when hiding the feed.
     public void Stop() => _stop?.Invoke();
 
     public async Task ExecuteAsync(VisualEvent occurrence, CancellationToken cancellationToken)
     {
-        string path = Path.Combine(FileSystem.CacheDirectory, "visual_chime.wav");
+        string path = Path.Combine(FileSystem.CacheDirectory, _asset);
         if (!File.Exists(path))
         {
             string temporary = path + "." + Guid.NewGuid().ToString("N");
             try
             {
-                using (var source = await FileSystem.OpenAppPackageFileAsync("visual_chime.wav"))
+                using (var source = await FileSystem.OpenAppPackageFileAsync(_asset))
                 using (var destination = File.Create(temporary))
                     await source.CopyToAsync(destination, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();

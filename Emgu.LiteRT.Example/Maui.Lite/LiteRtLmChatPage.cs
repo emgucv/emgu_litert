@@ -642,6 +642,9 @@ namespace Maui.Demo.Lite
                         TextColor = Theme.SecondaryText
                     },
                     Theme.Divider(),
+#if ANDROID
+                    BuildCameraSoundSection(),
+#endif
                     BuildServerSection(),
                     Theme.Divider(),
                     BuildMcpSection(),

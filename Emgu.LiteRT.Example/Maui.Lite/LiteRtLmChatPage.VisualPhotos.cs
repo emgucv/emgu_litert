@@ -27,8 +27,9 @@ public partial class LiteRtLmChatPage
         string path = System.IO.Path.Combine(FileSystem.CacheDirectory, "photos", "photo-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".jpg");
         object activity = await MainThread.InvokeOnMainThreadAsync(() => BeginCameraActivity("Taking photo"));
         LiveCamera.PhotoResult photo;
+        Task click = PlayCameraClickAsync(token);
         try { photo = await camera.TakePhotoAsync(path, token); }
-        finally { await MainThread.InvokeOnMainThreadAsync(() => EndCameraActivity(activity)); }
+        finally { await MainThread.InvokeOnMainThreadAsync(() => EndCameraActivity(activity)); await click; }
         byte[] thumbnail = PhotoThumbnail(photo.Path);
         DateTimeOffset at = DateTimeOffset.Now;
         await MainThread.InvokeOnMainThreadAsync(() =>
