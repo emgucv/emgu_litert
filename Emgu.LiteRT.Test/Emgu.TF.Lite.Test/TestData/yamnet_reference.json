@@ -1,0 +1,130 @@
+{
+ "labels_checked": 521,
+ "signals": {
+  "silence": [
+   {
+    "index": 494,
+    "label": "Silence",
+    "score": 0.80078
+   },
+   {
+    "index": 498,
+    "label": "Sound effect",
+    "score": 0.00781
+   },
+   {
+    "index": 0,
+    "label": "Speech",
+    "score": 0.00391
+   },
+   {
+    "index": 488,
+    "label": "Plop",
+    "score": 0.00391
+   },
+   {
+    "index": 132,
+    "label": "Music",
+    "score": 0.00391
+   }
+  ],
+  "sine440": [
+   {
+    "index": 495,
+    "label": "Sine wave",
+    "score": 0.99609
+   },
+   {
+    "index": 133,
+    "label": "Musical instrument",
+    "score": 0.01172
+   },
+   {
+    "index": 0,
+    "label": "Speech",
+    "score": 0.0
+   },
+   {
+    "index": 355,
+    "label": "Squeak",
+    "score": 0.0
+   },
+   {
+    "index": 354,
+    "label": "Tap",
+    "score": 0.0
+   }
+  ],
+  "noise": [
+   {
+    "index": 509,
+    "label": "Static",
+    "score": 0.66797
+   },
+   {
+    "index": 507,
+    "label": "Noise",
+    "score": 0.41406
+   },
+   {
+    "index": 514,
+    "label": "White noise",
+    "score": 0.41406
+   },
+   {
+    "index": 132,
+    "label": "Music",
+    "score": 0.04297
+   },
+   {
+    "index": 447,
+    "label": "Spray",
+    "score": 0.04297
+   }
+  ],
+  "speech_first": [
+   {
+    "index": 0,
+    "label": "Speech",
+    "score": 0.95703
+   },
+   {
+    "index": 2,
+    "label": "Conversation",
+    "score": 0.01172
+   },
+   {
+    "index": 500,
+    "label": "Inside, small room",
+    "score": 0.01172
+   },
+   {
+    "index": 5,
+    "label": "Speech synthesizer",
+    "score": 0.00781
+   },
+   {
+    "index": 1,
+    "label": "Child speech, kid speaking",
+    "score": 0.00391
+   }
+  ]
+ },
+ "speech_windows": [
+  {
+   "start": 0,
+   "label": "Speech",
+   "score": 0.95703
+  },
+  {
+   "start": 7800,
+   "label": "Speech",
+   "score": 0.91797
+  },
+  {
+   "start": 15600,
+   "label": "Speech",
+   "score": 0.96875
+  }
+ ]
+}

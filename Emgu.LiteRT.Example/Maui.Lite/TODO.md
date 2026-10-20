@@ -1285,3 +1285,21 @@ Real-time hand-gesture recognition for the camera agents ("take a picture when I
       frame's hand rect from the previous landmarks, the palm detector only when the hand is lost) to halve the work; selfie cameras are mirrored,
       which swaps left and right.
 - [ ] More gestures (OK, wave, rock) from the landmarks with rules, or a custom classifier on the gesture embedder.
+
+## 41. Sound events for the visual agents — prototype: YAMNet on LiteRT; a "Sound events" page only
+
+Audio event detection (speech, laughter, a dog barking, a doorbell, a siren...: 521 AudioSet classes) for monitors like "tell me when the doorbell
+rings", next to the camera agents'. Details and numbers in [YAMNET.md](YAMNET.md).
+
+- [x] `Emgu.LiteRT.Models/YamNet.cs`: MediaPipe's float32 YAMNet (15,600 samples at 16 kHz in, 521 scores out; static shapes, the labels are a zip
+      appended to the file) through `CompiledModel`, WAV reading and resampling; the file is downloaded from Google (4.1 MB, SHA-256 pinned; its metadata
+      says Apache-2.0).
+- [x] Python reference (the TFLite interpreter, four signals and the windows of a speech clip): same top classes, scores within 0.02-0.03
+      (`UnitTestYamNet`, `yamnet_reference.json`).
+- [x] The "Sound events" page (`SoundEventsPage.cs`, `SoundSource.cs`, `YamNetDetector.cs`): the microphone (`AudioRecord` on Android, an `AVAudioEngine` tap
+      on Apple, not Windows) or two sample clips, the best five sounds twice a second (Mac 3-5 ms and S10 7-17 ms a window on the CPU), a log of what was heard.
+      Checked on Mac Catalyst with the samples and on a Galaxy S10 with its microphone; the Apple microphone path isn't run yet.
+- [ ] The model's licence beyond its metadata (Google has no licence file beside it), before bundling or hosting it.
+- [ ] Sound monitors in the live-camera visual agent: class groups with a threshold and a minimum duration, alerts through the existing actions.
+- [ ] Share the microphone with the voice message button and the voice chat (one recorder at a time), and run with the camera loop (heat, Gemma).
+- [ ] Android foreground service for listening in the background; Windows microphone source.

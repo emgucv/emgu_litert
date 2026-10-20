@@ -34,6 +34,7 @@ public partial class MainPage : ContentPage
             (Theme.GlyphDetect, "D-FINE Nano", "A slower, more accurate COCO detector (CPU) for single photos", () => new CocoSsdMobilenetPage(useDFine: true)),
 #endif
             (Theme.GlyphDetect, "Hand gestures", "Find hands and name the gesture, with MediaPipe's models", () => new HandGesturePage()),
+            (Theme.GlyphSparkle, "Sound events", "Name the sounds the microphone hears, with YAMNet", () => new SoundEventsPage()),
             (Theme.GlyphImage, "Mobilenet", "Recognize what is in an image", () => new MobilenetPage()),
             (Theme.GlyphSparkle, "Inception", "Recognize flower species", () => new InceptionPage()),
             (Theme.GlyphSettings, "Model Checker", "Inspect any .tflite model file", () => new ModelCheckerPage()),

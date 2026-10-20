@@ -28,6 +28,7 @@
     <Compile Include="..\UnitTestTaskPlan.cs" Link="UnitTestTaskPlan.cs" />
     <Compile Include="..\UnitTestGoalHistory.cs" Link="UnitTestGoalHistory.cs" />
     <Compile Include="..\UnitTestHandTracker.cs" Link="UnitTestHandTracker.cs" />
+    <Compile Include="..\UnitTestYamNet.cs" Link="UnitTestYamNet.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\HandImageInput.cs" Link="HandImageInput.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\TaskPlan.cs" Link="TaskPlan.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\VoiceLanguages.cs" Link="VoiceLanguages.cs" />
@@ -85,6 +86,7 @@
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\Resources\Raw\hand_pointing_up.jpg" Link="hand_pointing_up.jpg" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\Resources\Raw\hand_pointing_up_rotated.jpg" Link="hand_pointing_up_rotated.jpg" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\hand_reference.json" Link="hand_reference.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\TestData\yamnet_reference.json" Link="yamnet_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\picodet_reference.json" Link="picodet_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\dfine_reference.json" Link="dfine_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\yolox_reference.json" Link="yolox_reference.json" CopyToOutputDirectory="PreserveNewest" />

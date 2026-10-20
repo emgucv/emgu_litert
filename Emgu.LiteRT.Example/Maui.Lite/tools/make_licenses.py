@@ -161,6 +161,10 @@ def curated():
         copyright="Google LLC / The MediaPipe Authors", url="https://github.com/google-ai-edge/mediapipe",
         used_for="Hand gesture demo: the palm detector, hand landmark model, gesture embedder and classifier of MediaPipe's "
         "gesture_recognizer.task, downloaded from Google on first use (not part of the app); the sample hand photos are MediaPipe's test images")
+    add(model, "YAMNet", "Apache-2.0", APACHE,
+        copyright="Google LLC / The TensorFlow Authors", url="https://github.com/tensorflow/models/tree/master/research/audioset/yamnet",
+        used_for="Sound event demo: the audio classifier as MediaPipe ships it (its metadata says Apache-2.0), downloaded from Google on first "
+        "use (not part of the app); trained on AudioSet, whose class names come from its ontology (CC BY-SA 4.0)")
     add(model, "PicoDet-S", "Apache-2.0", fetch("https://emgu-public.s3.amazonaws.com/picodet/picodet_notice.txt") + "\n\n" +
         fetch("https://emgu-public.s3.amazonaws.com/picodet/picodet_license.txt"),
         copyright="PaddlePaddle Authors", url="https://github.com/PaddlePaddle/PaddleDetection",
