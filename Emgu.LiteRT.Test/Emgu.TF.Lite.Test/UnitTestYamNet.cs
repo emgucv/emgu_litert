@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.Models;
 using Emgu.LiteRT.Util;
 using NUnit.Framework;
@@ -131,5 +132,32 @@ public class UnitTestYamNetNative
         Assert.Throws<ArgumentOutOfRangeException>(() => model.Classify(speech, speech.Length - 100));
         model.Dispose();
         Assert.Throws<ObjectDisposedException>(() => model.Classify(speech));
+    }
+
+    [Test]
+    public async Task EverySoundGroupUsesClassesTheModelHas()
+    {
+        var labels = YamNet.ReadLabels(await ModelAsync());
+        foreach (var group in SoundGroups.All)
+            foreach (string name in group.Classes)
+                Assert.That(labels, Does.Contain(name), group.Id);
+    }
+
+    [Test]
+    public async Task ASoundMonitorHearsTheSpeechSampleAndNotTheSilence()
+    {
+        using var model = new YamNet(await ModelAsync());
+        using var runtime = new SoundMonitorRuntime(model.Labels);
+        runtime.Create("speech", 0.5, 0);
+        runtime.Create("sine wave", 0.8, 0);
+        var silence = new float[YamNet.WindowSamples];
+        runtime.Advance(TimeSpan.FromSeconds(0), model.Classify(silence));
+        Assert.That(runtime.Snapshot().Select(m => m.Heard), Is.EqualTo(new[] { 0, 0 }));
+        float[] speech = Speech();
+        for (int i = 0; i < 3; i++)
+            runtime.Advance(TimeSpan.FromSeconds(1 + i * 0.4875), model.Classify(speech, i * YamNet.HopSamples));
+        Assert.That(runtime.Snapshot().Select(m => m.Heard), Is.EqualTo(new[] { 1, 0 }));     // one episode of speech, no tone
+        runtime.Advance(TimeSpan.FromSeconds(5), model.Classify(Signal("sine440")));
+        Assert.That(runtime.Snapshot()[1].Heard, Is.EqualTo(1));
     }
 }

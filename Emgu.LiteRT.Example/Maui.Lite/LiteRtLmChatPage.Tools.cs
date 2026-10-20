@@ -36,6 +36,9 @@ public partial class LiteRtLmChatPage
             new ToolGroup(ChatToolGroups.Camera, ChatToolGroups.CameraSummary, ChatToolGroups.CameraKeywords,
                 CameraTools,
                 () => JoinInstructions(SelectedOption.AcceptsImages ? CameraInstructions : null, VisualInstructions)),
+            new ToolGroup(ChatToolGroups.Sound, ChatToolGroups.SoundSummary, ChatToolGroups.SoundKeywords,
+                SoundTools,
+                () => SoundInstructions),
             new ToolGroup(ChatToolGroups.DeviceActions, ChatToolGroups.DeviceActionsSummary, ChatToolGroups.DeviceActionsKeywords,
                 DeviceActionToolsForMessage,
                 DeviceActionInstructionsForMessage,
@@ -84,7 +87,7 @@ public partial class LiteRtLmChatPage
     // group's tools and instructions are ~1,100 tokens, the others ~150-500.
     private int ToolGroupTokens => _toolRouter == null ? 0
         : _toolRouter.Active.Sum(name => name == ChatToolGroups.Camera ? 1100 : name == ChatToolGroups.DeviceActions || name == ChatToolGroups.Goals ? 500
-            : name.StartsWith("mcp_", StringComparison.Ordinal) ? 400 : 200);
+            : name.StartsWith("mcp_", StringComparison.Ordinal) ? 400 : name == ChatToolGroups.Sound ? 600 : 200);
 
     // Choose the groups for a message (before its tools are put together): its words, and the app's state.
     private async Task RouteToolsAsync(string prompt, List<PendingAttachment> attachments)
@@ -97,6 +100,8 @@ public partial class LiteRtLmChatPage
         ToolRouter router = ToolRouter;
         if (_camera?.IsRunning == true || _visualRuntime.Snapshot().Any())
             router.Activate(ChatToolGroups.Camera);
+        if (_soundRuntime?.Snapshot().Count > 0)
+            router.Activate(ChatToolGroups.Sound);
         IList<string> added = router.Route(prompt);
         if (added.Count > 0)
             UiStallWatchdog.Mark("Tool groups: " + string.Join(", ", router.Active));

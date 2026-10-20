@@ -55,6 +55,7 @@ public partial class LiteRtLmChatPage
             MoveCameraPanel(_cameraPanel.TranslationX, _cameraPanel.TranslationY);
         };
         BuildVisualMonitoring();
+        BuildSoundMonitoring();
     }
 
     private void MoveCameraPanel(double x, double y)

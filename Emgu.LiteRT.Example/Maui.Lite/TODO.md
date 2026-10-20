@@ -1300,6 +1300,24 @@ rings", next to the camera agents'. Details and numbers in [YAMNET.md](YAMNET.md
       on Apple, not Windows) or two sample clips, the best five sounds twice a second (Mac 3-5 ms and S10 7-17 ms a window on the CPU), a log of what was heard.
       Checked on Mac Catalyst with the samples and on a Galaxy S10 with its microphone; the Apple microphone path isn't run yet.
 - [ ] The model's licence beyond its metadata (Google has no licence file beside it), before bundling or hosting it.
-- [ ] Sound monitors in the live-camera visual agent: class groups with a threshold and a minimum duration, alerts through the existing actions.
-- [ ] Share the microphone with the voice message button and the voice chat (one recorder at a time), and run with the camera loop (heat, Gemma).
+- [x] Sound monitors in the chat: see item 42.
+- [x] Share the microphone with the voice message button and the voice chat (one recorder at a time): `MicrophoneGate`, item 42. Running with the camera loop and Gemma for a while (heat) isn't measured.
 - [ ] Android foreground service for listening in the background; Windows microphone source.
+
+## 42. Sound monitors in the chat — "tell me when the doorbell rings"; YAMNet scores the microphone, no model per sound
+
+Details in [YAMNET.md](YAMNET.md#sound-monitors-in-the-chat-todo-item-42).
+
+- [x] `Emgu.LiteRT.LM.Agents` (`Audio/SoundMonitors.cs`): 30 sound groups of YAMNet classes with the users' words, the presence state machine
+      (threshold, minimum duration, gaps, 3 s release), `SoundMonitorRuntime` (8 monitors, alerts on their own worker) and the chat tools
+      `create_sound_monitor` / `list_sound_monitors` / `control_sound_monitor`. 18 model-free tests, plus native checks against the real model's labels.
+- [x] The chat page (`LiteRtLmChatPage.Sound.cs`): a "sound_monitor" tool group, the microphone on while a monitor is enabled, a monitor card with
+      Pause / Resume / Remove, chime and spoken-words alerts (the page doesn't hear its own alert), `MicrophoneGate` so the voice recorder gets the
+      microphone, monitors cleared by New chat. Android, iOS, Mac Catalyst.
+- [x] Gemma 4 E2B on Mac Catalyst chose the right sound and alert for six kinds of request (the optional-parameter descriptions fixed invented spoken
+      words and unasked chimes); a Galaxy S10's microphone heard the Mac's speech three times and ran the monitor's chime.
+- [ ] Tune thresholds per sound with real recordings (smoke alarm, baby, doorbell); try other phones' microphones and noisy rooms.
+- [ ] Combined camera + sound conditions, a camera snapshot as a sound alert, and sound monitors listed beside the camera monitors.
+- [ ] Windows microphone stream; listening in the background (Android foreground service, iOS background audio).
+- [ ] Run with the camera loop and Gemma together on a phone (heat, battery) - nothing was timed together.
+- [ ] Try on iOS (the `AVAudioEngine` tap and the microphone gate are built, not run).

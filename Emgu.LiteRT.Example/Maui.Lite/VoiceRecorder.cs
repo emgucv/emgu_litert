@@ -116,9 +116,12 @@ namespace Maui.Demo.Lite
             if (status != PermissionStatus.Granted)
                 return false;
 
+            // A sound monitor lets go of the microphone first (SoundSource.cs).
+            await MicrophoneGate.EnterAsync();
             try { await StartPlatformAsync(); }
             catch
             {
+                MicrophoneGate.Exit();
 #if IOS || MACCATALYST
                 _recorder?.Dispose();
                 _recorder = null;
@@ -139,7 +142,8 @@ namespace Maui.Demo.Lite
             if (!IsRecording)
                 return null;
             IsRecording = false;
-            return await StopPlatformAsync();
+            try { return await StopPlatformAsync(); }
+            finally { MicrophoneGate.Exit(); }
         }
 
 #if IOS || MACCATALYST

@@ -18,6 +18,14 @@ internal static class ChatToolGroups
         "appears", "shows up", "walks in", "comes in", "intruder", "visitor", "front door", "the door", "yolox", "mobilenet", "detector"
     };
 
+    internal const string Sound = "sound_monitor";
+    internal const string SoundSummary = "listen through the microphone and alert the user when a sound happens (a doorbell, a dog barking, a baby crying, a smoke alarm, a knock...)";
+    internal static readonly string[] SoundKeywords =
+    {
+        "sound", "hear", "listen", "microphone", "noise", "doorbell", "door bell", "knock", "ringing", "rings", "bark", "meow", "siren",
+        "smoke alarm", "smoke detector", "baby cry", "baby crying", "cries", "crying", "cough", "snor", "glass break", "breaking glass", "honk"
+    };
+
     internal const string DeviceActions = "clock_calendar_maps";
     internal const string DeviceActionsSummary = "set a timer or an alarm, add a calendar event or a reminder, or get directions";
     internal static readonly string[] DeviceActionsKeywords =

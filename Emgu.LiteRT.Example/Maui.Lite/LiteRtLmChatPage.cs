@@ -2580,6 +2580,7 @@ namespace Maui.Demo.Lite
         {
             _ = CloseCameraAsync();
             _visualRuntime?.Clear();
+            ClearSoundMonitors();
             ClearCameraTurn();
             _sessionVersion++;
             if (IsPrivateChat) { ClearPrivateSessionContent(); ResetAgent(); }
@@ -3450,6 +3451,7 @@ namespace Maui.Demo.Lite
             if (!Navigation.NavigationStack.Contains(this) && !Navigation.ModalStack.Contains(this))
             {
                 _ = DisposeVisualMonitoringAsync();
+                _ = DisposeSoundMonitoringAsync();
                 _sessionVersion++;
                 if (_resumeWindow != null)
                 {

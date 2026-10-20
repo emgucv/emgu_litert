@@ -30,6 +30,16 @@ internal sealed class YamNetDetector : IDisposable
         progress?.Invoke("YAMNet ready · LiteRT CPU");
     }
 
+    /// <summary>The 521 class names, once prepared.</summary>
+    public IReadOnlyList<string> Labels => _model?.Labels;
+
+    /// <summary>All 521 scores for a window of 15,600 samples.</summary>
+    public float[] Scores(float[] window)
+    {
+        if (!Imported) throw new InvalidOperationException("Prepare YAMNet first.");
+        return _model.Classify(window);
+    }
+
     /// <summary>The sounds in 15,600 samples (16 kHz mono) starting at <paramref name="offset"/>, best first.</summary>
     public IReadOnlyList<SoundScore> Classify(float[] samples, int offset, int count = 5)
     {

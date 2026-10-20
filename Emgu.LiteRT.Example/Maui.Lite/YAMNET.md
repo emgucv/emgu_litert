@@ -55,11 +55,42 @@ Checked: on Mac Catalyst the tone sample gave Silence -> Sine wave 100% -> Stati
 96-100%; on a Galaxy S10, the microphone heard `say` and a quiet room from the Mac next to it (Speech 85-89% while it spoke, Silence otherwise). The Apple
 microphone path was not run (no permission prompt without the user); it is built.
 
-## What is left for a visual agent
+## Sound monitors in the chat (TODO item 42)
 
-- Sound monitors in the live-camera agent: a class group (Dog + Bark + Growling; Doorbell + Ding-dong + Knock) with a threshold and a minimum duration, as
-  the scores overlap.
-- One microphone user at a time: a monitor and the voice message button / voice chat can't both record, so they must share the stream or pause it.
-- Run together with the camera: the models are small, but phones heat up, and Gemma generating at the same time slows everything.
-- Foreground service on Android for listening with the app in the background.
+"Tell me when the doorbell rings", "beep if the dog barks", "say 'someone is at the door' when you hear a knock", "alert me if a baby cries for
+more than 10 seconds". The agent's `create_sound_monitor` tool adds a monitor; while any is enabled the chat page listens through the microphone and
+scores the audio with YAMNet (the model runs once per window for all monitors), and no language model runs per sound.
+
+- **Library** (`Emgu.LiteRT.LM.Agents`, namespace `Audio`, `SoundMonitors.cs`, pure managed): `SoundGroups` (30 sounds, each a group of YAMNet
+  classes with the words people use for it - doorbell, knock, phone, smoke_alarm, alarm_clock, alarm, siren, dog, cat, baby_cry, speech, laughter,
+  shouting, cough, sneeze, snoring, clapping, glass_breaking, running_water, microwave, car_horn, music, singing, footsteps, typing, thunder, rain,
+  bird, vacuum, whistle - or any exact YAMNet class name; the longest matching phrase wins, so "smoke detector" is not just "alarm"),
+  `SoundPresenceMonitor` (the temporal state machine), `SoundMonitorRuntime` (up to 8 session-only monitors, duplicates suppressed, alerts on a worker
+  of their own, one at a time) and `SoundMonitorTools` (`create_sound_monitor`, `list_sound_monitors`, `control_sound_monitor`).
+- **Semantics**: a window scores a group by its best class. The sound starts when the score is at or above the threshold (0.5 by default) for
+  `minimumSeconds` (0 = the first window; a run goes on across gaps of up to 2 s, since a dog doesn't bark in every window), and ends - arming the monitor
+  again - after 3 s without it, so a doorbell rung three times in a row is one alert. A listening gap over 5 s drops the episode without claiming anything.
+- **Alerts**: the monitor's card shows when it heard the sound (always), plus optionally a chime (`playSound`) and fixed spoken words (`speakText`, at
+  most 200 characters), the same chime and speech as the camera monitors. The page doesn't listen while its own alert audio plays and for 2 s after, or
+  it would hear itself.
+- **Host** (`LiteRtLmChatPage.Sound.cs`): a "sound_monitor" tool group (keywords: sound, hear, listen, doorbell, knock, bark, siren, smoke alarm, baby cry...),
+  a "Sound monitors · session only" card with Pause / Resume / Remove, the microphone started and stopped to match the enabled monitors, and one
+  microphone user at a time: `VoiceRecorder` goes through `MicrophoneGate`, so listening is released before a voice message or the voice chat records
+  and taken back afterwards. New chat removes the monitors. Android, iOS and Mac Catalyst; not Windows (no microphone stream yet).
+- **Model behaviour** (Gemma 4 E2B on Mac Catalyst, real model, the microphone replaced by a clip): every request made one `create_sound_monitor` call
+  with the right sound - talking, a baby crying for 10 s, the doorbell with a chime, a dog with no alert, a knock with "someone is at the door", the smoke
+  alarm with a chime - and "remove all the sound monitors" listed and removed them. Before the parameters were optional with "leave out unless..." texts,
+  it made up spoken words nobody asked for and added chimes to "tell me"; with them it didn't. It sometimes still leaves out words the user did ask it to
+  say ("say the words I hear voices"): a small model's limit.
+- **Checked on devices**: Mac Catalyst - the clip's speech was heard at 98% and the alert ran, repeatedly across prompts; Galaxy S10 - a speech monitor
+  with the real microphone heard three separate episodes of the Mac's `say` (50-67%), each running its chime. Tests: `UnitTestSoundMonitors` (groups,
+  state machine, runtime, tools: 18 cases), `UnitTestYamNetNative` (every group's classes exist in the model; a monitor hears the speech sample and not
+  silence), routing cases in `UnitTestToolRouting`.
+
+## What is left
+
+- Sound monitors in the live-camera agent's own panel and combined conditions ("a dog barks and a person is in view"), and a camera snapshot as an alert.
+- The Windows microphone source, and listening with the app in the background (an Android foreground service; iOS background audio).
+- A threshold per sound: the defaults are untuned - 0.5 for speech was fine, a smoke alarm or a baby's cry needs real recordings to tune.
+- Run together with the camera loop and Gemma on a phone for a while (heat, battery): the models are small but nothing was timed together.
 - The model licence, as above.

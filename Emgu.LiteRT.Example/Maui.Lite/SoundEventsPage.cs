@@ -19,11 +19,8 @@ namespace Maui.Demo.Lite
         private readonly Label[] _names = new Label[Rows], _values = new Label[Rows];
         private readonly ProgressBar[] _bars = new ProgressBar[Rows];
         private readonly VerticalStackLayout _log;
-        private readonly object _lock = new object();
-        private readonly List<float> _buffer = new List<float>();
+        private readonly SoundWindower _windower = new SoundWindower();
         private ISoundSource _source;
-        private int _sinceWindow;
-        private volatile bool _busy;
         private Stopwatch _clock;
         private string _lastLogged;
         private bool _running;
@@ -116,7 +113,7 @@ namespace Maui.Demo.Lite
             {
                 await _detector.PrepareAsync(CpuThreadSettings.Count, text => MainThread.BeginInvokeOnMainThread(() => _status.Text = text), CancellationToken.None);
                 if (!_running) return;
-                lock (_lock) { _buffer.Clear(); _sinceWindow = 0; }
+                _windower.Reset();
                 _lastLogged = null;
                 _clock = Stopwatch.StartNew();
                 _log.Clear();
@@ -165,19 +162,7 @@ namespace Maui.Demo.Lite
         // last one is still being scored is skipped.
         private void OnSamples(float[] samples)
         {
-            float[] window = null;
-            lock (_lock)
-            {
-                _buffer.AddRange(samples);
-                if (_buffer.Count > 2 * YamNet.WindowSamples) _buffer.RemoveRange(0, _buffer.Count - 2 * YamNet.WindowSamples);
-                _sinceWindow += samples.Length;
-                if (_sinceWindow >= YamNet.HopSamples && _buffer.Count >= YamNet.WindowSamples && !_busy)
-                {
-                    _sinceWindow = 0;
-                    _busy = true;
-                    window = _buffer.GetRange(_buffer.Count - YamNet.WindowSamples, YamNet.WindowSamples).ToArray();
-                }
-            }
+            float[] window = _windower.Add(samples);
             if (window == null) return;
             Task.Run(() =>
             {
@@ -191,7 +176,7 @@ namespace Maui.Demo.Lite
                     MainThread.BeginInvokeOnMainThread(() => Show(top, watch.Elapsed.TotalMilliseconds, level, at));
                 }
                 catch { }
-                finally { _busy = false; }
+                finally { _windower.Done(); }
             });
         }
 

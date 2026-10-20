@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Agents.Vision;
 using Maui.Demo.Lite;
 using Microsoft.Agents.AI;
@@ -84,6 +85,9 @@ public class UnitTestToolRouting
         {
             new ToolGroup(ChatToolGroups.Camera, ChatToolGroups.CameraSummary, ChatToolGroups.CameraKeywords, Camera,
                 () => ChatPlannerInstructions.Camera + "\n\n" + VisualAgentTools.Instructions),
+            new ToolGroup(ChatToolGroups.Sound, ChatToolGroups.SoundSummary, ChatToolGroups.SoundKeywords,
+                () => SoundMonitorTools.Create((a, b, c, d, e, t) => Task.FromResult("ok"), () => "none", (a, b, t) => Task.FromResult("ok")),
+                () => SoundMonitorTools.Instructions),
             new ToolGroup(ChatToolGroups.DeviceActions, ChatToolGroups.DeviceActionsSummary, ChatToolGroups.DeviceActionsKeywords,
                 () => AgentTools.DeviceActions(DeviceActionKinds.Timer | DeviceActionKinds.Alarm | DeviceActionKinds.CalendarEvent | DeviceActionKinds.Directions,
                     (request, token) => { done?.Invoke(request.ToolName); return Task.FromResult(AgentTools.DeviceActionDone(request.Summary)); }),
@@ -119,6 +123,10 @@ public class UnitTestToolRouting
             ("What am I holding?", new[] { ChatToolGroups.Camera }),
             ("Switch the monitor to YOLOX", new[] { ChatToolGroups.Camera }),
             ("Can you read the label on this bottle through the camera?", new[] { ChatToolGroups.Camera }),
+            ("Let me know when you hear the doorbell", new[] { ChatToolGroups.Sound }),
+            ("Beep if my dog starts to bark", new[] { ChatToolGroups.Sound }),
+            ("Alert me when a baby cries", new[] { ChatToolGroups.Sound }),
+            ("Listen for the smoke alarm while I'm out", new[] { ChatToolGroups.Sound }),
             ("Set a 10 minute timer for the pasta", new[] { ChatToolGroups.DeviceActions }),
             ("Wake me up tomorrow at 6:45 am.", new[] { ChatToolGroups.DeviceActions }),
             ("Remind me to call mum on Sunday", new[] { ChatToolGroups.DeviceActions }),
