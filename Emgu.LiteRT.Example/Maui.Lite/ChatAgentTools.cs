@@ -25,11 +25,15 @@ namespace Maui.Demo.Lite
             Func<string, CancellationToken, Task<string>> findPhotos = null,
             Func<string, CancellationToken, Task<string>> generateImage = null,
             Func<string, CancellationToken, Task<string>> searchChats = null, bool privateChat = false,
-            Func<string, string, CancellationToken, Task<string>> searchDocuments = null)
+            Func<string, string, CancellationToken, Task<string>> searchDocuments = null,
+            bool readClipboard = false)
         {
             var tools = new List<AITool>(SessionTools(privateChat, memories, findPhotos, generateImage, searchChats, searchDocuments));
             if (location)
                 tools.Add(AgentTools.Location(GetCurrentLocationAsync));
+            // Only for a message that asks about what the user copied: a clipboard can hold passwords.
+            if (readClipboard)
+                tools.Add(AgentTools.ReadClipboard(ReadClipboardAsync));
             if (!webSearch)
                 return tools;
             tools.Add(AgentTools.Weather());
@@ -47,6 +51,11 @@ namespace Maui.Demo.Lite
             }
             return tools;
         }
+
+        // The text on the clipboard, or null. Android 12+ and iOS tell the user that the app read it.
+        public static Task<string> ReadClipboardAsync(CancellationToken cancellationToken) =>
+            MainThread.InvokeOnMainThreadAsync(async () =>
+                Clipboard.Default.HasText ? await Clipboard.Default.GetTextAsync() : null);
 
         // The user's location at about city level: the device's position (a recent known one, else a quick low-accuracy
         // fix), turned into a place name by the platform's geocoder (online: Apple / Google). Coordinates are rounded to

@@ -20,6 +20,7 @@
     <Compile Include="..\UnitTestDFine.cs" Link="UnitTestDFine.cs" />
     <Compile Include="..\UnitTestPicoDet.cs" Link="UnitTestPicoDet.cs" />
     <Compile Include="..\UnitTestMcp.cs" Link="UnitTestMcp.cs" />
+    <Compile Include="..\UnitTestClipboardTool.cs" Link="UnitTestClipboardTool.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\McpServers.cs" Link="McpServers.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\PicoDetImageInput.cs" Link="PicoDetImageInput.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\DFineImageInput.cs" Link="DFineImageInput.cs" />

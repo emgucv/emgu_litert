@@ -1890,7 +1890,8 @@ namespace Maui.Demo.Lite
                 Reasoning = SelectedChoice == ModelChoice.Server && _serverRejectsReasoning ? null
                     : new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink && !_voiceMode ? ReasoningEffort.Medium : ReasoningEffort.None },
                 Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
-                    !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, privateChat: IsPrivateChat),
+                    !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, privateChat: IsPrivateChat,
+                    readClipboard: AgentTools.MentionsClipboard(prompt)),
                 Instructions = JoinInstructions(await MemoryInstructionsAsync(), WebSearchInstructions(),
                     IsPrivateChat ? PrivateInstructions : null, ToolRouter.Instructions()),
                 ToolMode = ChatToolMode.Auto
