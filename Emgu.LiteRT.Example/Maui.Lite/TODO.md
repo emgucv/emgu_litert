@@ -1332,7 +1332,7 @@ platforms are unchanged): a 640x480 YUV image reader gives the preview and the d
 - [x] The action `record_clip` (`VisualHostCatalog.Clip`, `CameraClipFactory`; parameter `seconds`, 3 to 30, default 10; registered on Android only, with
       a sentence in the visual instructions); `LiveCamera.RecordClipAsync` (H.264 720p at 6 Mbps in an MP4, AAC sound when the microphone permission is
       already granted - an alert never asks for one - the orientation hint from the preview's rotation, cancelling discards the file);
-      `LiteRtLmChatPage.VisualClips.cs` (a transcript card with the first frame, Play, Share and Save to gallery - `PictureGallery.SaveVideoAsync`, Movies/Emgu
+      `LiteRtLmChatPage.VisualClips.cs` (a transcript card with the first frame, Play in the card - see item 46 - Full screen, Share and Save to gallery - `PictureGallery.SaveVideoAsync`, Movies/Emgu
       LiteRT - the latest five clips kept in the cache folder, New chat deletes them, session only, nothing sent to the model).
 - [x] Device results (S10 and Fold, the page's own code with a made-up event): the preview and detector frames kept coming during a clip (29.5-30 fps
       before, during and after), the session is configured again when the clip starts (0.25-0.44 s) and ends (0.25-0.36 s), a 5 s clip took 6.5 s from
@@ -1403,4 +1403,18 @@ platforms are unchanged): a 640x480 YUV image reader gives the preview and the d
       (the code is shared and builds, the camera label there only changes for monitors), and the photo/snapshot status text in the label.
 - [ ] The request isn't shown in the transcript's snapshot, clip and photo cards, which show the monitor's condition; the sound monitors' alerts could name their
       request too.
+
+## 46. Clips play in the chat — `InlineVideoView` (Android's VideoView) in the clip card
+
+- [x] Play on a clip card plays it in place (`InlineVideoView.cs`: a MAUI view with a handler around `VideoView`, no packages; registered in `MauiProgram`): the video replaces
+      the thumbnail, a portrait clip gets a taller box (300 instead of 150), Play/Pause, a progress bar and "0:02 / 0:05"; tapping the thumbnail also toggles; the end, an error,
+      another clip's Play, the card being evicted (latest five kept) and New chat put the thumbnail back and release the player; one clip plays at a time. "Full screen" opens the
+      system player as the old Play did. The sound monitors don't listen while a clip plays or for 2 s after (`BeginSoundMute`/`EndSoundMute`, a hold count shared with the alert audio).
+- [x] Checked on a Pixel Fold and a Galaxy S10 through the card's own buttons (2 clips of 4-5 s, state read from the controls, no screenshots): Play starts it with the position
+      advancing 0:00 -> 0:03, Pause freezes it (the same 0:02 a second later), resume continues, starting the second clip stops the first, the end restores the thumbnail and "Play",
+      the mute hold goes 0 -> 1 -> 0, New chat removes the cards. MediaPlayer reported the rotated size (portrait: taller box).
+- [ ] Not run: that the picture is actually drawn and upright (no screenshot - the camera would be in it), scrolling a playing card in a long transcript (a `VideoView` is a surface
+      and can draw over or behind other views while it scrolls), the camera panel overlapping a playing card, seeking by touch, and playing with sound from the clip while the
+      phone's volume is low or in a call.
+- [ ] A texture-based player (Media3/ExoPlayer, CommunityToolkit.Maui's MediaElement) if the surface misbehaves; seeking; the same for photos' full-screen view.
 

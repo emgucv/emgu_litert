@@ -32,6 +32,10 @@ public static class MauiProgram
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<ChatPromptEditor, ChatPromptEditorHandler>());
 #endif
 
+#if ANDROID
+        builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<InlineVideoView, InlineVideoHandler>());
+#endif
+
 		return builder.Build();
 	}
 }

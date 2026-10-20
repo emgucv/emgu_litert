@@ -5,11 +5,12 @@ using Emgu.LiteRT.LM.Agents.Events;
 namespace Maui.Demo.Lite;
 
 // The record_clip alert action (TODO item 43): a few seconds of video from the live camera (Camera2, LiveCamera.Camera2.cs), with sound when the
-// microphone is allowed, shown in the transcript with the first frame, Play, Share and Save to gallery. Session only, like the snapshots: the clips
+// microphone is allowed, shown in the transcript with the first frame, Play (in the card, InlineVideoView) / Full screen / Share / Save to gallery. Session only, like the snapshots: the clips
 // live in the app's cache folder, the latest five are kept, New chat deletes them, and nothing is sent to the model.
 public partial class LiteRtLmChatPage
 {
-    private readonly Queue<(View Row, string Path)> _visualClips = new();
+    private readonly Queue<(View Row, string Path, Action Stop)> _visualClips = new();
+    private Action _stopPlayingClip;   // the one clip that plays in the chat now
     private const int MaximumVisualClips = 5;
 
     private async Task RecordVisualClipAsync(VisualEvent occurrence, int seconds, CancellationToken token)
@@ -39,10 +40,10 @@ public partial class LiteRtLmChatPage
                 return;
             }
             string condition = _visualRuntime.Snapshot().FirstOrDefault(m => m.Id == occurrence.MonitorId)?.Condition;
-            var image = new Image { HeightRequest = 150, WidthRequest = 210, Aspect = Aspect.AspectFit, BackgroundColor = Theme.ImageBackground };
+            var image = new Image { Aspect = Aspect.AspectFit };
             if (thumbnail != null) image.Source = ImageUtil.ToImageSource(thumbnail);
-            image.OnTap(() => _ = PlayVisualClipAsync(clip.Path));
             SemanticProperties.SetDescription(image, "Camera clip. Tap to play.");
+            var host = new Grid { HeightRequest = 150, WidthRequest = 210, HorizontalOptions = LayoutOptions.Start, BackgroundColor = Theme.ImageBackground, Children = { image } };
             string size = (clip.Bytes / 1048576.0).ToString("0.0") + " MB";
             var caption = new Label
             {
@@ -51,10 +52,75 @@ public partial class LiteRtLmChatPage
                 FontSize = 12, FontFamily = Theme.BodyFont, TextColor = Theme.SecondaryText
             };
             var status = new Label { FontSize = 12, FontFamily = Theme.BodyFont, TextColor = Theme.SecondaryText, IsVisible = false };
+            var progress = new ProgressBar { WidthRequest = 150, VerticalOptions = LayoutOptions.Center, ProgressColor = Theme.Accent };
+            var time = new Label { FontSize = 11, TextColor = Theme.SecondaryText, VerticalOptions = LayoutOptions.Center };
+            var position = new HorizontalStackLayout { Spacing = 8, IsVisible = false, Children = { progress, time } };
             var play = MonitorButton("Play");
+            var fullScreen = MonitorButton("Full screen");
             var share = MonitorButton("Share");
             var save = MonitorButton("Save to gallery");
-            play.Clicked += async (_, _) => await PlayVisualClipAsync(clip.Path);
+
+            // Playing in the card: the video replaces the thumbnail; the end, an error, another clip or New chat put the thumbnail back.
+            InlineVideoView video = null;
+            IDispatcherTimer timer = null;
+            bool muted = false;
+            void StopPlayback()
+            {
+                if (_stopPlayingClip == StopPlayback) _stopPlayingClip = null;
+                timer?.Stop(); timer = null;
+                if (video != null) { try { video.Stop(); } catch (Exception) { } host.Children.Remove(video); video = null; }
+                image.IsVisible = true;
+                host.HeightRequest = 150;
+                position.IsVisible = false;
+                play.Text = "Play";
+                if (muted) { muted = false; EndSoundMute(); }
+            }
+            void StartPlayback()
+            {
+                _stopPlayingClip?.Invoke();
+                _stopPlayingClip = StopPlayback;
+                video = new InlineVideoView { Source = clip.Path };
+                video.Prepared += (duration, width, height) =>
+                {
+                    // A portrait clip needs a taller box than the thumbnail's.
+                    host.HeightRequest = height > width ? 300 : 150;
+                    time.Text = FormatClipTime(0) + " / " + FormatClipTime(duration);
+                    position.IsVisible = true;
+                    video.Play();
+                };
+                video.Completed += StopPlayback;
+                video.Failed += message => { StopPlayback(); status.Text = message + " Try Full screen."; status.IsVisible = true; };
+                host.Children.Add(video);
+                image.IsVisible = false;
+                play.Text = "Pause";
+                // A sound monitor would hear the clip: it doesn't listen while one plays.
+                muted = true; BeginSoundMute();
+                timer = Dispatcher.CreateTimer();
+                timer.Interval = TimeSpan.FromMilliseconds(250);
+                timer.Tick += (_, _) =>
+                {
+                    if (video == null) return;
+                    int length = (int)Math.Round(clip.Duration.TotalMilliseconds);
+                    int at = video.PositionMs;
+                    progress.Progress = Math.Clamp(at / Math.Max(1.0, length), 0, 1);
+                    time.Text = FormatClipTime(at) + " / " + FormatClipTime(length);
+                };
+                timer.Start();
+            }
+            void Toggle()
+            {
+                status.IsVisible = false;
+                if (video == null) StartPlayback();
+                else if (video.IsPlaying) { video.Pause(); play.Text = "Play"; }
+                else { video.Play(); play.Text = "Pause"; }
+            }
+            image.OnTap(Toggle);
+            play.Clicked += (_, _) => Toggle();
+            fullScreen.Clicked += async (_, _) =>
+            {
+                StopPlayback();
+                await PlayVisualClipAsync(clip.Path);
+            };
             share.Clicked += async (_, _) =>
             {
                 try { await Share.Default.RequestAsync(new ShareFileRequest("Camera clip", new ShareFile(clip.Path, "video/mp4"))); }
@@ -70,24 +136,29 @@ public partial class LiteRtLmChatPage
                 }
                 catch (Exception ex) { await DisplayAlertAsync("Couldn't save the clip", ex.Message, "OK"); save.IsEnabled = true; }
             };
+            var buttons = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, MaximumWidthRequest = 300, HorizontalOptions = LayoutOptions.Start };
+            foreach (Button button in new[] { play, fullScreen, share, save }) { button.Margin = new Thickness(0, 0, 6, 4); buttons.Children.Add(button); }
             var row = new VerticalStackLayout
             {
                 Spacing = 4, Margin = new Thickness(6, 4), HorizontalOptions = LayoutOptions.Start,
-                Children = { image, caption, new HorizontalStackLayout { Spacing = 6, Children = { play, share, save } }, status }
+                Children = { host, position, caption, buttons, status }
             };
             if (_transcript.Children.Contains(_emptyLabel)) _transcript.Children.Remove(_emptyLabel);
             int index = _agentBubble != null ? _transcript.Children.IndexOf(_agentBubble.Row) : -1;
             if (index >= 0) _transcript.Children.Insert(index, row); else _transcript.Children.Add(row);
-            _visualClips.Enqueue((row, clip.Path));
+            _visualClips.Enqueue((row, clip.Path, StopPlayback));
             while (_visualClips.Count > MaximumVisualClips)
             {
                 var old = _visualClips.Dequeue();
+                old.Stop();
                 _transcript.Children.Remove(old.Row);
                 try { File.Delete(old.Path); } catch (Exception) { }
             }
             ScrollToEnd();
         });
     }
+
+    private static string FormatClipTime(int milliseconds) => (milliseconds / 60000) + ":" + (milliseconds / 1000 % 60).ToString("00");
 
     private static byte[] ClipThumbnail(string path)
     {
@@ -115,6 +186,7 @@ public partial class LiteRtLmChatPage
         while (_visualClips.Count > 0)
         {
             var clip = _visualClips.Dequeue();
+            clip.Stop();
             _transcript.Children.Remove(clip.Row);
             try { File.Delete(clip.Path); } catch (Exception) { }
         }

@@ -32,6 +32,7 @@ public partial class LiteRtLmChatPage
     private Func<ISoundSource> _soundSourceFactory;
 #pragma warning restore CS0649
     private long _soundMutedUntil;
+    private int _soundMuteHolds;       // alert audio, or a clip playing in the chat: the microphone would hear it
     private bool _soundPaused, _soundDisposed;
     private string _soundStatus;
     private Border _soundPanel;
@@ -201,7 +202,7 @@ public partial class LiteRtLmChatPage
         {
             try
             {
-                if (Stopwatch.GetTimestamp() < Interlocked.Read(ref _soundMutedUntil)) return;
+                if (Volatile.Read(ref _soundMuteHolds) > 0 || Stopwatch.GetTimestamp() < Interlocked.Read(ref _soundMutedUntil)) return;
                 _soundRuntime?.Advance(_soundClock.Elapsed, _soundDetector.Scores(window));
             }
             catch (Exception) { }
@@ -211,7 +212,7 @@ public partial class LiteRtLmChatPage
 
     private async Task SoundAlertAsync(SoundEvent occurrence, SoundMonitorInfo monitor, CancellationToken token)
     {
-        Interlocked.Exchange(ref _soundMutedUntil, long.MaxValue);
+        BeginSoundMute();
         try
         {
             var actions = new List<Task>();
@@ -219,7 +220,16 @@ public partial class LiteRtLmChatPage
             if (monitor.SpeakText != null) actions.Add(MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(monitor.SpeakText, token)));
             await Task.WhenAll(actions);
         }
-        finally { Interlocked.Exchange(ref _soundMutedUntil, Stopwatch.GetTimestamp() + 2 * Stopwatch.Frequency); }
+        finally { EndSoundMute(); }
+    }
+
+    // Listening is off while something plays, and for 2 s after. Holds can overlap (an alert while a clip plays).
+    private void BeginSoundMute() => Interlocked.Increment(ref _soundMuteHolds);
+
+    private void EndSoundMute()
+    {
+        Interlocked.Exchange(ref _soundMutedUntil, Stopwatch.GetTimestamp() + 2 * Stopwatch.Frequency);
+        Interlocked.Decrement(ref _soundMuteHolds);
     }
 
     // ---------- the panel ----------
