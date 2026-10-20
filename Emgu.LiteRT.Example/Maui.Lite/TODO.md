@@ -1388,3 +1388,19 @@ platforms are unchanged): a 640x480 YUV image reader gives the preview and the d
 - [ ] A photo of the frame that triggered the alert (the photo is taken ~2 s after the alert fires, about a second after confirmation); a photo as a sound monitor's
       action; the same on Mac Catalyst and Windows (their cameras are OpenCV's).
 
+## 45. The monitors say what they are for — the user's request on each card, and a live status on the camera preview
+
+- [x] Each camera and sound monitor's card shows the user's own request that created it - "You asked: “...”", italic, two lines, the whole text when tapped
+      (`LiteRtLmChatPage.MonitorInfo.cs`; the message being sent when the model's tool call creates the monitor; cleaned to one line of at most 300
+      characters by `VisualHostCatalog.CleanRequest`; a monitor that already existed keeps the request that created it; kept in memory with the monitor, never in a
+      private chat, cleared by New chat and when the monitor is removed). The generated condition line stays above it as the precise version.
+- [x] The camera preview's label shows what the camera is doing instead of "not recording": "Watching · N monitors" (or "Live camera" with none), "● Recording
+      clip · N s left" counting down, "● Taking photo…" - back to watching afterwards.
+- [x] Checked on a Galaxy S10 (Gemma 4 E2B, a request of 190 characters): the label went "Watching · 1 monitor" -> "● Recording clip · 14 s left" ... -> back, the
+      request showed on the card and in the screen's accessibility text (read with `uiautomator dump`, no screenshot), a tap expanded it (2 lines -> all -> 2),
+      New chat cleared it. `UnitTestClipAction` checks the text cleaning.
+- [ ] Not run: the look of a long request on a narrow screen (only the text was read, not a screenshot - the camera preview would be in it), Windows and Mac Catalyst
+      (the code is shared and builds, the camera label there only changes for monitors), and the photo/snapshot status text in the label.
+- [ ] The request isn't shown in the transcript's snapshot, clip and photo cards, which show the monitor's condition; the sound monitors' alerts could name their
+      request too.
+

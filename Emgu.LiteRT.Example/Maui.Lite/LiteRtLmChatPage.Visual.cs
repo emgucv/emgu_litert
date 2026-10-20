@@ -98,6 +98,7 @@ public partial class LiteRtLmChatPage
     }
     private void UpdateVisualMonitorUi()
     {
+        UpdateCameraLabel();
         var monitors = _visualRuntime.Snapshot();
         _visualMonitorPanel.IsVisible = monitors.Count > 0;
         _visualMonitorRows.Children.Clear();
@@ -119,6 +120,7 @@ public partial class LiteRtLmChatPage
         {
             string detectorName = _visualAgents.Describe().FirstOrDefault(d => d.Id == monitor.AgentId)?.Name ?? monitor.AgentId;
             _visualMonitorRows.Children.Add(new Label { Text = monitor.Condition, FontSize = 12, TextColor = Theme.PrimaryText });
+            if (MonitorRequestLabel(monitor.Id) is View request) _visualMonitorRows.Children.Add(request);
             _visualMonitorRows.Children.Add(new Label { Text = detectorName + " · " + monitor.State + " · " + monitor.Status,
                 FontSize = 11, TextColor = Theme.SecondaryText });
             foreach (var action in monitor.Actions)
@@ -162,6 +164,7 @@ public partial class LiteRtLmChatPage
         {
             token.ThrowIfCancellationRequested();
             var monitor = _visualRuntime.CreateObjectMonitor(label, actions, minimumCount, confidence);
+            RememberMonitorRequest(monitor.Id);
             // Repeated requests return the existing rule, including its user-paused status.
             if (monitor.Enabled && monitor.State != VisualMonitorState.Faulted)
             {
@@ -190,7 +193,7 @@ public partial class LiteRtLmChatPage
                     string opened = await OpenCameraAsync(token);
                     if (_camera?.IsRunning != true) return "Monitor retained but paused. " + opened;
                     break;
-                case "remove": _visualRuntime.Remove(id); return "Monitor removed.";
+                case "remove": _visualRuntime.Remove(id); ForgetMonitorRequest(id); return "Monitor removed.";
                 default: return "Could not control monitor: operation must be pause, resume or remove.";
             }
             return JsonSerializer.Serialize(_visualRuntime.Snapshot().First(m => m.Id == id), VisualJson.Default.VisualMonitorInfo);

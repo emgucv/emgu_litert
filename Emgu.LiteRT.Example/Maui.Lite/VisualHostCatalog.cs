@@ -41,6 +41,16 @@ internal static class VisualHostCatalog
         "The user can open, share or save it. Android only.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
 
+    internal const int MaximumRequestLength = 300;
+
+    // The user's own words behind a monitor, for its card: one line of text, at most 300 characters (an ellipsis if cut); null if blank.
+    internal static string CleanRequest(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        string line = string.Join(" ", text.Split((char[])null, StringSplitOptions.RemoveEmptyEntries));
+        return line.Length <= MaximumRequestLength ? line : line.Substring(0, MaximumRequestLength - 1).TrimEnd() + "…";
+    }
+
     internal const int DefaultClipSeconds = 10, MinimumClipSeconds = 3, MaximumClipSeconds = 30;
 
     internal static readonly VisualActionDescriptor Clip = new("record_clip", "Video clip",

@@ -22,7 +22,10 @@ public partial class LiteRtLmChatPage
             return _camera;
         });
         string path = System.IO.Path.Combine(FileSystem.CacheDirectory, "photos", "photo-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".jpg");
-        LiveCamera.PhotoResult photo = await camera.TakePhotoAsync(path, token);
+        object activity = await MainThread.InvokeOnMainThreadAsync(() => BeginCameraActivity("Taking photo"));
+        LiveCamera.PhotoResult photo;
+        try { photo = await camera.TakePhotoAsync(path, token); }
+        finally { await MainThread.InvokeOnMainThreadAsync(() => EndCameraActivity(activity)); }
         byte[] thumbnail = PhotoThumbnail(photo.Path);
         DateTimeOffset at = DateTimeOffset.Now;
         await MainThread.InvokeOnMainThreadAsync(() =>

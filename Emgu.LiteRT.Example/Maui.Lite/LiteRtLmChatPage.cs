@@ -2581,6 +2581,7 @@ namespace Maui.Demo.Lite
             _ = CloseCameraAsync();
             _visualRuntime?.Clear();
             ClearSoundMonitors();
+            ForgetMonitorRequests();
             ClearCameraTurn();
             _sessionVersion++;
             if (IsPrivateChat) { ClearPrivateSessionContent(); ResetAgent(); }

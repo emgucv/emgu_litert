@@ -166,7 +166,7 @@ public partial class LiteRtLmChatPage
                 await CloseCameraCoreAsync();
                 return "The camera was closed because the chat left the foreground.";
             }
-            _cameraLabel.Text = "Live camera · not recording";
+            UpdateCameraLabel();
             _visualRuntime.SetFeedVisible(true);
             QueueVisualMonitorUi();
             return "The live camera preview is now open. No image has been captured for you yet. Tell the user they can ask what you see in the camera.";

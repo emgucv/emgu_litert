@@ -66,4 +66,17 @@ public class UnitTestClipAction
         Assert.That(photo.ParameterSchema.GetRawText(), Does.Contain("\"properties\":{}").And.Contain("\"additionalProperties\":false"));
         Assert.That(photo.Description, Does.Contain("full-resolution").And.Contain("Android only"));
     }
+
+    [Test]
+    public void TheRequestShownOnACardIsOneCleanLine()
+    {
+        Assert.That(VisualHostCatalog.CleanRequest("  When you see a person,\n take a   photo.  "), Is.EqualTo("When you see a person, take a photo."));
+        Assert.That(VisualHostCatalog.CleanRequest(""), Is.Null);
+        Assert.That(VisualHostCatalog.CleanRequest("  \n\t "), Is.Null);
+        Assert.That(VisualHostCatalog.CleanRequest(null), Is.Null);
+        string cut = VisualHostCatalog.CleanRequest(new string('a', 500));
+        Assert.That(cut.Length, Is.EqualTo(VisualHostCatalog.MaximumRequestLength));
+        Assert.That(cut, Does.EndWith("…"));
+        Assert.That(VisualHostCatalog.CleanRequest(new string('b', 300)).Length, Is.EqualTo(300));
+    }
 }

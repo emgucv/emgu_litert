@@ -24,7 +24,10 @@ public partial class LiteRtLmChatPage
         // Sound only if the microphone is already allowed: an alert shouldn't ask for permissions.
         bool withAudio = await MainThread.InvokeOnMainThreadAsync(async () => await Permissions.CheckStatusAsync<Permissions.Microphone>() == PermissionStatus.Granted);
         string path = System.IO.Path.Combine(FileSystem.CacheDirectory, "clips", "clip-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".mp4");
-        LiveCamera.ClipResult clip = await camera.RecordClipAsync(seconds, path, withAudio, token);
+        object activity = await MainThread.InvokeOnMainThreadAsync(() => BeginCameraActivity("Recording clip", TimeSpan.FromSeconds(seconds)));
+        LiveCamera.ClipResult clip;
+        try { clip = await camera.RecordClipAsync(seconds, path, withAudio, token); }
+        finally { await MainThread.InvokeOnMainThreadAsync(() => EndCameraActivity(activity)); }
         byte[] thumbnail = ClipThumbnail(clip.Path);
         DateTimeOffset at = DateTimeOffset.Now;
         await MainThread.InvokeOnMainThreadAsync(() =>

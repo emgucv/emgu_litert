@@ -89,6 +89,7 @@ public partial class LiteRtLmChatPage
             if (!SoundSupported) return "Sound monitoring isn't supported on this device yet.";
             await EnsureSoundRuntimeAsync(token);
             var monitor = _soundRuntime.Create(sound, threshold, minimumSeconds, new SoundAlert(playSound, speakText));
+            RememberMonitorRequest(monitor.Id);
             string status = await UpdateSoundListeningAsync();
             var current = _soundRuntime.Snapshot().First(m => m.Id == monitor.Id);
             return SoundMonitorTools.Describe(current) + " " + status;
@@ -112,6 +113,7 @@ public partial class LiteRtLmChatPage
                 case "resume": _soundRuntime.SetEnabled(id, true); break;
                 case "remove":
                     _soundRuntime.Remove(id);
+                    ForgetMonitorRequest(id);
                     await UpdateSoundListeningAsync();
                     return "Sound monitor removed.";
                 default: return "Could not control the monitor: operation must be pause, resume or remove.";
@@ -238,6 +240,7 @@ public partial class LiteRtLmChatPage
         foreach (var monitor in monitors)
         {
             _soundRows.Children.Add(new Label { Text = monitor.Description, FontSize = 12, TextColor = Theme.PrimaryText });
+            if (MonitorRequestLabel(monitor.Id) is View request) _soundRows.Children.Add(request);
             string state = !monitor.Enabled ? "Paused" : _soundSource != null ? "Listening" : _soundStatus ?? "Not listening";
             _soundRows.Children.Add(new Label { Text = state + (monitor.Heard > 0 ? " · heard " + monitor.Heard + (monitor.Heard == 1 ? " time" : " times") : ""),
                 FontSize = 11, TextColor = Theme.SecondaryText });
