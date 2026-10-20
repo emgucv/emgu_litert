@@ -95,6 +95,7 @@ public partial class LiteRtLmChatPage
         AlarmRequest => "⏰",
         CalendarEventRequest => "\U0001F4C5",
         ReminderRequest => "✅",
+        McpCallRequest => "\U0001F50C",
         DirectionsRequest => "\U0001F5FA️",
         _ => "⚙️"
     };

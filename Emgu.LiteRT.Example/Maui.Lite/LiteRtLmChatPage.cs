@@ -597,6 +597,8 @@ namespace Maui.Demo.Lite
                     Theme.Divider(),
                     BuildServerSection(),
                     Theme.Divider(),
+                    BuildMcpSection(),
+                    Theme.Divider(),
                     BuildEmbeddingModelSection(),
                     Theme.Divider(),
                     BuildPhotoSection(),
@@ -1131,6 +1133,7 @@ namespace Maui.Demo.Lite
                 return;
             }
             _pageStarted = true;
+            _ = ConnectMcpServersAsync();
             int index = 0;
             try
             {
@@ -1925,7 +1928,7 @@ namespace Maui.Demo.Lite
                             answer.Append(text.Text);
                             break;
                         case FunctionCallContent call:
-                            string step = AgentTools.Describe(call);
+                            string step = McpStepFor(call) ?? AgentTools.Describe(call);
                             UiStallWatchdog.Mark("Tool call: " + step);
                             steps[call.CallId] = AddStepLine(bubble, step + "...");
                             stepTools[call.CallId] = (call.Name, step);
@@ -1946,10 +1949,10 @@ namespace Maui.Demo.Lite
                                         _sendSteps[index] = "Already remembered";
                                 }
                                 else if (result.Exception == null && stepTools.TryGetValue(result.CallId, out var tool)
-                                    && DeviceActionTools.Contains(tool.Name))
+                                    && (DeviceActionTools.Contains(tool.Name) || IsMcpFunction(tool.Name)))
                                 {
-                                    // A device action: what the user chose, also in the saved chat.
-                                    string outcome = DeviceActionStepOutcome(resultText);
+                                    // A device action or a tool server's tool: what the user chose, also in the saved chat.
+                                    string outcome = IsMcpFunction(tool.Name) ? McpStepOutcome(resultText) : DeviceActionStepOutcome(resultText);
                                     line.Text = "\U0001F50E " + tool.Step + outcome;
                                     int index = _sendSteps.LastIndexOf(tool.Step);
                                     if (index >= 0)

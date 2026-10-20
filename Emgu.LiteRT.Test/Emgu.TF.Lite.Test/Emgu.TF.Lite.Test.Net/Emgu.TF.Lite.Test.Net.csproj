@@ -19,6 +19,8 @@
     <Compile Include="..\UnitTestYoloX.cs" Link="UnitTestYoloX.cs" />
     <Compile Include="..\UnitTestDFine.cs" Link="UnitTestDFine.cs" />
     <Compile Include="..\UnitTestPicoDet.cs" Link="UnitTestPicoDet.cs" />
+    <Compile Include="..\UnitTestMcp.cs" Link="UnitTestMcp.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\McpServers.cs" Link="McpServers.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\PicoDetImageInput.cs" Link="PicoDetImageInput.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\DFineImageInput.cs" Link="DFineImageInput.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\YoloXImageInput.cs" Link="YoloXImageInput.cs" />
@@ -129,5 +131,6 @@
        Emgu.LiteRT.LM.Extensions.AI in UnitTestLiteRtLm.cs. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI" Version="1.24.0" />
+    <PackageReference Include="ModelContextProtocol.Core" Version="2.2.0" />
   </ItemGroup>
 </Project>

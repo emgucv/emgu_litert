@@ -61,6 +61,7 @@ public partial class LiteRtLmChatPage
             groups.Add(new ToolGroup(ChatToolGroups.ImageGeneration, ChatToolGroups.ImageGenerationSummary, ChatToolGroups.ImageGenerationKeywords,
                 () => new AITool[] { AgentTools.GenerateImage(GenerateImageAsync) },
                 () => ImageInstructions));
+        groups.AddRange(McpGroups());
         // The clock/calendar/maps stub ends the request and RunAgentAsync sends the message again (rerunAfterStub).
         var router = new ToolRouter(groups, () => FunctionInvokingChatClient.CurrentContext?.Options,
             () => FunctionInvokingChatClient.CurrentContext.Terminate = true);
@@ -82,7 +83,8 @@ public partial class LiteRtLmChatPage
     // The groups in use, for the context estimate before a send (LiteRtLmChatClient counts the real size): the camera
     // group's tools and instructions are ~1,100 tokens, the others ~150-500.
     private int ToolGroupTokens => _toolRouter == null ? 0
-        : _toolRouter.Active.Sum(name => name == ChatToolGroups.Camera ? 1100 : name == ChatToolGroups.DeviceActions || name == ChatToolGroups.Goals ? 500 : 200);
+        : _toolRouter.Active.Sum(name => name == ChatToolGroups.Camera ? 1100 : name == ChatToolGroups.DeviceActions || name == ChatToolGroups.Goals ? 500
+            : name.StartsWith("mcp_", StringComparison.Ordinal) ? 400 : 200);
 
     // Choose the groups for a message (before its tools are put together): its words, and the app's state.
     private async Task RouteToolsAsync(string prompt, List<PendingAttachment> attachments)
