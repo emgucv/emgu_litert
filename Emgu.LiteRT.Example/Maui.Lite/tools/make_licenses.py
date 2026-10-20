@@ -194,6 +194,12 @@ def curated():
     add(data, "Frankfurter", "Free API (ECB reference rates)",
         "Currency conversion uses the Frankfurter API (https://frankfurter.dev), which publishes the European Central\n"
         "Bank's euro foreign exchange reference rates.", url="https://frankfurter.dev", used_for="convert_currency")
+    add(data, "ML Kit language identification (Android)", "Google ML Kit terms of service",
+        "On Android the language of a message is identified on the device by Google's ML Kit language identification\n"
+        "(com.google.mlkit:language-id, with its model bundled in the app; nothing is sent anywhere), under the ML Kit\n"
+        "terms of service (https://developers.google.com/ml-kit/terms). The .NET bindings (Xamarin.Google.MLKit.*) are\n"
+        "listed with the other .NET packages.", url="https://developers.google.com/ml-kit/language/identification",
+        used_for="Choosing a reading voice for Latin-script replies")
     add(data, "Tavily", "Tavily terms of service",
         "With a Tavily API key of the user's own, web search and page reading go through Tavily (https://tavily.com),\n"
         "under Tavily's terms of service.", url="https://tavily.com", used_for="search_web and read_web_page (optional)")

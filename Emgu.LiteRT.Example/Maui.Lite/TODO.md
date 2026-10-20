@@ -1179,3 +1179,30 @@ out). Not started.
       replying, and a test where a message tells the model to send mail.
 - [ ] Tests: the query builder and message parsing model-free (a canned API response); a Gemma 4 E2B check on a test
       account (search, read, summary); the confirmation card on Android and Mac Catalyst.
+
+## 39. The user's language: thinking in English shown in the user's language — language detection on Android done
+
+Gemma 4 thinks in English (the model's choice; the chat's instructions say nothing about language) even when asked in another
+language, and answers in the user's. Idea: let it think in English, where a small model is strongest, and translate the thinking
+for display, on demand - when the "Thought for N s" header is tapped - with the same model in a conversation of its own, cached
+with the message; the live "Thinking..." preview stays English.
+
+- [x] Language detection (`TextLanguage.cs`): the script check (`ReplySpeech.DetectLanguage`: Chinese, Japanese, Korean, Russian, Arabic,
+      Hebrew, Greek, Thai, Hindi) first, then on Android ML Kit's language identification (`Xamarin.Google.MLKit.Language.Id` 117.0.6.9, the
+      bundled model - on the device, no Play services model download; confidence threshold 0.5; "und" is unknown) for the Latin-script
+      languages. On a Galaxy S10: 26 of 26 phrases right - English, Spanish, French, German, Portuguese, Italian, Dutch, Polish, Turkish,
+      Swedish, Vietnamese, Indonesian, and the non-Latin ones - including the short "¿qué hora es?" and "wie spät ist es"; gibberish and a sum
+      gave none; 2-3 ms a call (66 ms for the first). 15 of the 26 were decided by ML Kit.
+- [x] `ReplySpeech` uses it to choose the voice: a Spanish or German reply used to be read with the device's default voice. (The voice
+      choice is by code only - not listened to.)
+- [x] ML Kit's Common library brings AndroidX Fragment 1.9.0, which contains `FragmentKt`, while the MAUI packages' Fragment.Ktx 1.8.8.1 still
+      defines it: D8 failed with "Type androidx.fragment.app.FragmentKt is defined multiple times". The demo pins `Xamarin.AndroidX.Fragment.Ktx`
+      1.9.0 for Android (NU1608 version-range warnings for AndroidX Lifecycle remain; the build and the S10 run were fine).
+- [ ] Other platforms: Apple's `NLLanguageRecognizer` (NaturalLanguage, nothing to ship) on iOS and Mac Catalyst; Windows has no built-in one
+      (SearchPioneer.Lingua, Apache-2.0, 79 languages, accurate on short text, but ~71 MB of models and net8+ only; or word lists for the
+      main Latin-script languages).
+- [ ] A language label per user message: a new `MessageRecord.Language` column (SQLite adds it), set when the message is sent.
+- [ ] The translation: on tapping a thought of a reply to a non-English message, translate it with the loaded model in a separate
+      conversation (tool names and code left alone), show "Translated" with a way back to the English, save it with the message.
+      Maybe a Settings switch "Think in my language" that just asks for the thinking in the user's language instead - test whether the
+      thinking gets worse (accuracy, tool calls, length) with Gemma 4 E2B in Spanish, Chinese and Japanese first.

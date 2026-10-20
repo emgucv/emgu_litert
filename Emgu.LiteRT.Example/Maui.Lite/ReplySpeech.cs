@@ -30,7 +30,7 @@ namespace Maui.Demo.Lite
             string speech = CleanForSpeech(text);
             if (speech.Length == 0)
                 return;
-            Locale locale = await ChooseLocaleAsync(DetectLanguage(speech));
+            Locale locale = await ChooseLocaleAsync(await TextLanguage.DetectAsync(speech));
             cancellationToken.ThrowIfCancellationRequested();
             await TextToSpeech.Default.SpeakAsync(speech, new SpeechOptions { Locale = locale }, cancellationToken);
         }
