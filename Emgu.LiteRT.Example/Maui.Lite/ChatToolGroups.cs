@@ -16,7 +16,8 @@ internal static class ChatToolGroups
         "let me know when", "let me know if", "tell me when", "tell me if", "notify me", "when someone",
         "when a person", "when a dog", "when a cat", "when a car", "if someone", "if a person",
         "appears", "shows up", "walks in", "comes in", "intruder", "visitor", "front door", "the door", "yolox", "mobilenet", "detector",
-        "thumb", "gesture", "peace sign", "open palm", "fist"
+        "thumb", "gesture", "peace sign", "open palm", "fist",
+        "wave", "waving", "raise", "raising", "raised", "arms up", "hands up", "stand up", "stands up", "sit down", "sits down", "lie down", "lies down", "lying down"
     };
 
     internal const string Sound = "sound_monitor";

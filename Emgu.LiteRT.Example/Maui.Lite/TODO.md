@@ -1505,3 +1505,11 @@ Sound monitors (item 42) could only chime, speak and show a card; the camera's c
 - [x] Checked in Python first (`pose_pipeline.py`), then in C# against MediaPipe on its test image and five copies (`UnitTestPoseTracker`: 7 model-free tests; `UnitTestPoseTrackerNative`: lite and full, `pose_reference.json`). Galaxy S10: 26 ms (lite) / 36 ms (full) a frame on the CPU; the GPU doesn't compile fully.
 - [ ] A `body-pose` visual agent and conditions (arms raised, sitting/standing, lying, hand above the head, a wave); tracking between frames; the Pixel Fold, M1 and GPU numbers; a real person on a live camera (nothing was tested on one). Not a fall detector: the model card rules out life-critical use.
 
+## 52. A body-pose visual agent — "take a picture when you see me waving"
+
+- [x] `body-pose` (`PoseVisualAgent.cs`, `Emgu.LiteRT.Models/PoseGestures.cs`, `VisualHostCatalog`): arms raised, hand raised, waving (over 2 s), standing, sitting, lying down as object classes of the camera monitors, from the pose landmarks, with the usual actions. Spine-relative thigh measure and per-leg knees (a lunge is neither), "lying" suppresses raised hands, a landmark below 0.5 visibility is never used, nothing maps to a fall. Details and the rules in `POSE.md`.
+- [x] The words people use (`CanonicalPose`), the planner instructions (body-pose, not hand-gesture or person), camera keywords (wave, raise, stand up, sit down, lie down...), and a fallback that reads the posture from the user's request when Gemma gives the person class or an agent's name as the label (`PostureForMonitor`).
+- [x] Tests: 40 model-free (`UnitTestPoseVisualAgent`: the postures on made-up people, tilt, cut-off legs, waving over time, the words, the registry, the request fallback; plus routing cases) and a native one (MediaPipe's photo: no posture for the warrior pose and its copies, `lying down` turned a quarter, nothing in a space shuttle).
+- [x] Galaxy S10 with Gemma 4 E2B (GPU): see POSE.md - waving and standing right first time, the other two after the request fallback; the lying-down monitor fired on the turned photo and not on the empty or upright ones.
+- [ ] Not tried on a real person and live camera (no frames were looked at), the Pixel Fold, or Mac Catalyst/iOS/Windows; waves faster than ~2 Hz at 5 frames a second; tracking between frames to cut the cost; more postures.
+

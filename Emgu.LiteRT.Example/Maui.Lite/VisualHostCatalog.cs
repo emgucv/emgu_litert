@@ -90,6 +90,108 @@ internal static class VisualHostCatalog
         }
     }
 
+    // The body-pose agent (PoseVisualAgent, TODO item 52): postures read from MediaPipe's 33 pose landmarks as the object classes a monitor can watch for.
+    internal static readonly string[] PoseClasses = PoseGestures.Names;
+
+    internal static VisualAgentDescriptor PoseDescriptor(bool requiresPreparation = true, string backend = null) => new(
+        "body-pose", "Body pose · MediaPipe" + (backend == null ? "" : " · LiteRT " + backend),
+        new[] { "object_detection", "body_pose" }, PoseClasses, requiresPreparation: requiresPreparation);
+
+    // The words people use for each posture. Nothing maps to a fall: the model's card rules out life-critical use.
+    private static readonly Dictionary<string, string> PoseWords = BuildPoseWords();
+
+    private static Dictionary<string, string> BuildPoseWords()
+    {
+        var words = new Dictionary<string, string>();
+        void Add(string pose, params string[] names) { foreach (string name in names) words[name] = pose; }
+        Add("arms raised", "arms raised", "arms up", "raise arms", "raising arms", "raised arms", "both arms up", "both arms raised", "hands up", "both hands up",
+            "hands raised", "hands in the air", "arms in the air", "🙌");
+        Add("hand raised", "hand raised", "raised hand", "raise hand", "raise a hand", "raise my hand", "raising a hand", "raising hand", "hand in the air",
+            "arm raised", "raise arm", "🙋");
+        Add("waving", "waving", "wave", "waves", "a wave", "wave hello", "waving hello", "wave goodbye", "waving goodbye", "wave hi", "waving hand", "👋");
+        Add("standing", "standing", "stand", "stands", "standing up", "stand up", "stands up", "on their feet");
+        Add("sitting", "sitting", "sit", "sits", "sitting down", "sit down", "sits down", "seated");
+        Add("lying down", "lying down", "lying", "lie down", "lies down", "laying down", "lay down", "lying flat");
+        return words;
+    }
+
+    /// <summary>The posture class for the words a person used (case and punctuation ignored, an agent prefix tolerated), or null if it isn't one.</summary>
+    internal static string CanonicalPose(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        string trimmed = text.Trim();
+        if (PoseWords.TryGetValue(trimmed, out string emoji)) return emoji;
+        string normalized = string.Join(" ", new string(trimmed.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
+            .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+        foreach (string prefix in new[] { "body pose ", "pose " })
+            if (normalized.StartsWith(prefix, StringComparison.Ordinal)) { normalized = normalized.Substring(prefix.Length); break; }
+        return PoseWords.TryGetValue(normalized, out string pose) ? pose : null;
+    }
+
+    // What the request itself says, for when the model's label is no use: Gemma 4 E2B gave "body-pose" (the agent) as the label for "raises their hand" and
+    // "person" for "lying down". Only unmistakable phrases count - "stands at the door" is a person, "stands up" a posture - and the first in the text wins.
+    private static readonly (string Pose, System.Text.RegularExpressions.Regex Pattern)[] PoseRequestPatterns =
+    {
+        ("arms raised", new(@"\b(both )?(arms|hands) (are |is )?(up|raised|in the air)\b|\braise[sd]? (both |their |his |her |my |your )?(arms|hands)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("hand raised", new(@"\braise[sd]?( up)? (a |one |their |his |her |my |your |the )?(hand|arm)\b|\braising (a |one |their |his |her |my |your |the )?(hand|arm)\b|\b(hand|arm) (raised|in the air)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("waving", new(@"\bwav(e|es|ed|ing)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("lying down", new(@"\b(lying|lies|lie|laying|lays|lay) down\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("standing", new(@"\bstand(s|ing)? up\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("sitting", new(@"\bsit(s|ting)? down\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+    };
+
+    /// <summary>The posture a request names in so many words ("take a picture when she raises her hand"), or null.</summary>
+    internal static string PoseFromRequest(string request)
+    {
+        if (string.IsNullOrWhiteSpace(request)) return null;
+        string best = null;
+        int position = int.MaxValue;
+        foreach (var (pose, pattern) in PoseRequestPatterns)
+        {
+            var match = pattern.Match(request);
+            if (match.Success && match.Index < position) { best = pose; position = match.Index; }
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// The posture class for a monitor's label: the words it holds if they are one, else - when the label is one the model puts there by mistake
+    /// (the person class, an agent's name, anything that isn't a class of any agent) - what the user's request says.
+    /// </summary>
+    internal static string PostureForMonitor(string label, string request)
+    {
+        string pose = CanonicalPose(label);
+        if (pose != null) return pose;
+        string normalized = string.Join(" ", new string((label ?? "").ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
+            .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+        bool mistaken = normalized.Length == 0 || normalized is "person" or "people" or "human" or "body pose" or "hand gesture" or "hand gestures" or "pose" or "body" ||
+            !(Classes.Contains(normalized) || Gestures.Contains(normalized));
+        return mistaken ? PoseFromRequest(request) : null;
+    }
+
+    /// <summary>
+    /// The postures of the person in a frame (and waving, from the detector's recent frames) as observations of their classes, each with the
+    /// box of the visible landmarks. <paramref name="pose"/> null (nobody in view) resets the wave detector.
+    /// </summary>
+    internal static IReadOnlyList<VisualObservation> PoseObservations(Pose pose, int width, int height, PoseGestures.WaveDetector wave, TimeSpan time) =>
+        PoseObservations(pose?.Landmarks, width, height, wave, time);
+
+    // Not an iterator: the wave detector must see every frame, whether or not the caller reads the result.
+    internal static IReadOnlyList<VisualObservation> PoseObservations(float[][] landmarks, int width, int height, PoseGestures.WaveDetector wave, TimeSpan time)
+    {
+        var readings = new List<PoseReading>();
+        if (landmarks != null) readings.AddRange(PoseGestures.Classify(landmarks, width, height));
+        PoseReading waving = wave?.Update(time, landmarks, width, height);
+        if (waving != null) readings.Add(waving);
+        var observations = new List<VisualObservation>();
+        if (landmarks == null) return observations;
+        float[] box = PoseGestures.BoxOf(landmarks);
+        foreach (PoseReading reading in readings)
+            observations.Add(new VisualObservation("object", reading.Name, Math.Clamp(reading.Score, 0f, 1f),
+                new VisualBox(box[0], box[1], Math.Max(0, box[2] - box[0]), Math.Max(0, box[3] - box[1]))));
+        return observations;
+    }
+
     internal static readonly VisualActionDescriptor Chime = new("play_sound", "Chime", "Play the bundled alert chime once.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
 

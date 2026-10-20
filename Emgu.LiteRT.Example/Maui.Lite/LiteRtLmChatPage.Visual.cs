@@ -26,8 +26,11 @@ public partial class LiteRtLmChatPage
     private static readonly string VisualInstructions = VisualAgentTools.Instructions +
         " Prefer coco-ssd-mobilenet-v3 for ordinary object monitors. Use the experimental coco-yolox-nano when the user asks for YOLOX." +
         " For a hand gesture use the hand-gesture agent and pick the label that matches the user's words: thumbs up = thumb up, thumbs down = thumb down, peace sign or V sign = victory, " +
-        "open hand or high five = open palm, fist = closed fist, pointing finger = pointing up, rock sign = i love you. The label is just the class, never prefixed by the agent id, and never person. " +
+        "open hand or high five = open palm, fist = closed fist, pointing finger = pointing up, rock sign = i love you. The label is just the class, never prefixed by the agent id, and never person. Raising or waving a hand is not a gesture: that is the body-pose agent. " +
         "It sees upright hands, a gesture held for about a second." +
+        " For what a person's body is doing - waving, raising a hand or both arms, standing, sitting, lying down - use the body-pose agent, not hand-gesture and not person: the label is exactly one of " +
+        "arms raised (both arms up, hands in the air), hand raised (raising a hand or arm), waving, standing, sitting, lying down. " +
+        "It sees one person with the head in view, within a few metres; waving takes about two seconds to show; standing and sitting need the legs in view. It can't detect falls or tell people apart." +
 #if ANDROID
         " The app switches between the back camera and the selfie (front) camera by itself when the user's request says so: don't refuse such a request, use the camera tools as usual and say which camera is used." +
 #endif
@@ -45,6 +48,7 @@ public partial class LiteRtLmChatPage
         _visualAgents.Register(new CocoVisualAgent());
         _visualAgents.Register(new CocoVisualAgent(useYoloX: true));
         _visualAgents.Register(new HandVisualAgent());
+        _visualAgents.Register(new PoseVisualAgent());
         _visualChime = new CameraChimeAction();
         _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(text, token)),
             occurrence => _visualRuntime.Snapshot().Any(m => m.Id == occurrence.MonitorId &&
@@ -173,6 +177,7 @@ public partial class LiteRtLmChatPage
             // "thumbs up" and the like are the hand-gesture agent's classes ("thumb up"); anything else goes as it came.
             string gesture = VisualHostCatalog.CanonicalGesture(label);
             if (gesture != null) { label = gesture; confidence = VisualHostCatalog.GestureConfidence(confidence); }
+            else if (VisualHostCatalog.PostureForMonitor(label, _routePrompt) is string posture) label = posture;
             var monitor = _visualRuntime.CreateObjectMonitor(label, actions, minimumCount, confidence);
             RememberMonitorRequest(monitor.Id);
             // Repeated requests return the existing rule, including its user-paused status.

@@ -77,10 +77,39 @@ The GPU doesn't compile either model fully on the S10's OpenCL (`IsFullyAccelera
 there. Which operation stops it hasn't been looked for. Lite at 26 ms is about 38 frames a second - more than a camera monitor needs.
 Not measured: the Pixel Fold, the M1 (the tests ran, without timing), the Metal GPU, the heavy model on a phone.
 
+## The visual agent (TODO item 52)
+
+`body-pose` (`PoseVisualAgent.cs`, `VisualHostCatalog.PoseDescriptor`; the geometry is `Emgu.LiteRT.Models/PoseGestures.cs`) makes six postures the
+object classes of the camera monitors, the way `hand-gesture` does for hands, so "take a picture when you see me waving" is an ordinary monitor with
+every action (chime, speech, snapshot, photo, clip). It runs the lite model on the CPU, analysing the camera's frames (about 5 a second) one person at a time.
+
+| Class | Rule (pixels, camera upright, every landmark used visible at 0.5 or more) |
+|---|---|
+| `arms raised` | both wrists above their shoulders by more than 0.4 shoulder widths |
+| `hand raised` | exactly one is |
+| `waving` | a raised wrist swings sideways at least twice, each at least 0.25 shoulder widths, within 2 s (`PoseGestures.WaveDetector`) |
+| `standing` | the spine within 35 degrees of upright and both knees more than 0.6 of the torso's length down the spine from the hips (ankles below the knees) |
+| `sitting` | the same, both knees less than 0.3 of it down the spine (level with the hips) |
+| `lying down` | the spine more than 60 degrees from upright (and then no raised hand) |
+
+The score is the least visibility among the landmarks a reading used. Thighs are measured along the spine, not straight down the image, so a tilted
+camera or a leaning body doesn't change them; and each leg on its own, so a lunge (the test photo: arms out sideways, one knee bent) is neither standing
+nor sitting. Nothing maps to a fall ("falls", "fell", "collapse" are not classes): the card rules out life-critical use.
+
+Gemma 4 E2B on a Galaxy S10 (GPU), the prompt and what it made: "Beep when you see me waving" - `waving` (it added a spoken "Beep" too, as it does for any
+"beep"); "Beep when I stand up" - `standing`; "Say hello when someone raises their hand" - first the agent's own name as the label, then, with the
+instructions changed to say raising a hand is not a hand gesture and the camera keywords widened, still `body-pose`; "Take a picture when the person is lying down" -
+the `person` class. So the host now reads the request itself when the label is no posture and is a mistake - the person class, an agent's name, or
+nothing that is a class of any agent (`VisualHostCatalog.PostureForMonitor` / `PoseFromRequest`: unmistakable phrases only, so "stands at the door" stays a
+person and "the dog sits down" a dog); after that both gave `hand raised` and `lying down`. Frames fed from the test photo: the monitor for "lying
+down" stayed quiet on an empty image and on the upright warrior pose, started on the photo turned a quarter and ended when it went away, taking its
+snapshot. Not run: a real person on a live camera - so nothing says how well the rules hold up on real webcam views (legs cut off at the desk, a
+person far away, a hand raised only to the shoulder) - and the wave detector has seen only made-up swings. The frames reach the agent at about 5 a second, so a
+wave faster than about 2 Hz is sampled thinly; a faster feed for this agent would help.
+
 ## What is left
 
-- A `body-pose` visual agent like `HandVisualAgent`: conditions from the landmarks (arms raised, a wave - needs the wrist's motion over frames -, sitting
-  versus standing, lying down, hand above the head), each with a threshold and the usual actions. The monitors need a person in view and the head visible.
+- More conditions (hands on the head, leaning, crouching, a person turned away) and thresholds tuned on real people.
 - Tracking: run the detector only when the last frame's landmarks are lost, using auxiliary landmarks 33 and 34 for the next region (as MediaPipe's
   video mode does) - it would roughly halve the time.
 - The GPU: find the rejected operation; the Pixel Fold and the M1's numbers; real people in front of the camera (this was tested on one photo and

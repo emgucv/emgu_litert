@@ -170,7 +170,7 @@ public class UnitTestPoseTracker
 [TestFixture, Category("Native")]
 public class UnitTestPoseTrackerNative
 {
-    private static async Task<string[]> ModelsAsync(PoseModelFiles.Variant variant)
+    internal static async Task<string[]> ModelsAsync(PoseModelFiles.Variant variant)
     {
         string subfolder = Path.Combine("Emgu.LiteRT.Tests", "Pose-" + variant.Name);
         string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), subfolder);
@@ -184,7 +184,7 @@ public class UnitTestPoseTrackerNative
     }
 
     // The test image and the copies the reference was made from (the same OpenCV calls as the Python script's).
-    private static Emgu.CV.Mat Variant(Emgu.CV.Mat image, string name)
+    internal static Emgu.CV.Mat Variant(Emgu.CV.Mat image, string name)
     {
         var result = new Emgu.CV.Mat();
         switch (name)
