@@ -523,18 +523,32 @@ speak again.
 - [ ] An automatic mode (Android 13+ `EXTRA_ENABLE_LANGUAGE_DETECTION` with the languages the user speaks); the language pack download isn't shown to the user
       (only the message to try again); the voice chat (hands-free) uses the same setting but has no way to change it on its full-screen view.
 
-## 23. Task mode: multi-step tasks with a visible plan
+## 23. Task mode: multi-step tasks with a visible plan — implemented; verified on Mac Catalyst with Gemma 4 E2B
 
 Gemma 4 already chains tools within a message, out of sight. For longer tasks ("plan a weekend in Paris: the weather,
-three museums open on Sunday, and a packing list as a document"), a task mode that shows the work.
+three museums open on Sunday, and a packing list as a document"), the **Plan** chip (next to Think and Web search, for models that
+use tools; off again after each message) shows the work.
 
-- [ ] The model first writes a short numbered plan (an instruction plus a structured output), shown as a checklist card.
-- [ ] Each step runs in turn (its tool calls as step lines), ticking the checklist; the user can stop, skip a step or
-      edit the plan.
-- [ ] Steps that change something outside the app (device actions, item 24, MCP tools with side effects) wait for the
-      user's approval in the card.
-- [ ] The context window: each step gets the plan and the earlier steps' short results, not their full tool output.
-- [ ] Turned on per message (a chip like "Think" / "Web search") or proposed by the model for long requests.
+- [x] The model first writes a short numbered plan (`TaskPlan.PlanPrompt`: 3 to 7 steps, given the tools' names, in the language of the
+      request; `TaskPlan.Parse` reads the numbered or bulleted lines), shown as a checklist card above the reply (`LiteRtLmChatPage.Task.cs`). A
+      request that comes out with fewer than two steps is answered as usual.
+- [x] The card waits for the user: Run plan, Edit (one step per line), "Just answer" (no plan) and, per step, Skip / Undo. Then each step runs in
+      turn - its tool calls as step lines, its short result under the step in the card - with Stop (the steps end, the card says "Stopped" and the
+      reply says what was done, written without calling the model again). A failed step is marked and the others go on.
+- [x] Steps that change something outside the app still ask: the device actions' and MCP tools' own Confirm / Cancel cards appear while the step runs.
+- [x] The context window: each step is a conversation of its own (a new session, no chat history) whose message holds the task, the plan and the
+      earlier steps' results cut to 700 characters (`TaskPlan.StepPrompt`) - not their tool output; tool groups start again from each step's words.
+      The final answer is written the same way from the results (`TaskPlan.FinalPrompt`, in the reply bubble). Afterwards the model is given the
+      conversation again (the request and the answer) with the next message.
+- [x] Tests: `UnitTestTaskPlan` (reading plans, the editor's lines, the step, final and stopped texts). On Mac Catalyst with Gemma 4 E2B on the GPU (a
+      temporary self-test): "Plan a weekend in Paris for me: check the weather for the coming days, pick three museums to visit, and write a short
+      packing list as a document." - a 6-step plan in 3-6 s; run in about 110 s (weather, Wikipedia, a page read, the document written), final answer
+      after 157 s in all; a follow-up about the museums was answered from the conversation. With the third step skipped and Stop pressed during the
+      fourth: the two finished steps kept their results, the rest showed as skipped, the reply summarized them, and the next message worked.
+- [ ] The plan card isn't saved with the chat (the request, the step lines and the final answer are), so it's not there after reopening.
+- [ ] The steps don't see the earlier chat (only the request): "plan the same trip but cheaper" has no "same trip" to go on.
+- [ ] Proposed by the model for long requests (now only the chip); the planner's steps are sometimes redundant (a "review" step at the end).
+- [ ] Try it on phones (E2B on a phone's 8k window with the tool definitions: the step prompts are ~1-1.5k tokens) and with a server model.
 
 ## 24. Agent tools: device actions, confirmed by the user — implemented; Android verified, iOS/Mac Catalyst untested
 

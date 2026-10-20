@@ -190,6 +190,8 @@ namespace Maui.Demo.Lite
         private const string TavilyKeyStorageName = "tavily_api_key";
         private const string AgentInstructions = ChatPlannerInstructions.Agent;
         private readonly ToggleChip _webSearchSwitch;
+        // Task mode (LiteRtLmChatPage.Task.cs): the next message is planned and run step by step; off again after it is sent.
+        private readonly ToggleChip _taskChip;
         private readonly Label _webSearchNotice;
         private readonly Entry _tavilyKeyEntry;
         private readonly Label _tavilyKeyStatus;
@@ -432,7 +434,9 @@ namespace Maui.Demo.Lite
             try { webSearch = Preferences.Default.Get(WebSearchPreference, false); } catch (Exception) { }
             _webSearchSwitch.IsToggled = webSearch;
             _webSearchSwitch.Toggled += OnWebSearchToggled;
-            _toggleRow = new HorizontalStackLayout { Spacing = 8, Children = { _thinkingSwitch, _webSearchSwitch, CreateVoiceChip() } };
+            _taskChip = new ToggleChip("\U0001F4CB Plan");
+            SemanticProperties.SetDescription(_taskChip, "Plan the next message as a task and run it step by step");
+            _toggleRow = new HorizontalStackLayout { Spacing = 8, Children = { _thinkingSwitch, _webSearchSwitch, _taskChip, CreateVoiceChip() } };
             _webSearchNotice = new Label
             {
                 Text = "Web search requires a Tavily API key. Add one in Settings > Web search. Without a key, Wikipedia, links you provide, weather and currency tools are still available.",
@@ -1143,6 +1147,7 @@ namespace Maui.Demo.Lite
             _talkButton.IsVisible = TakesVoice(option);
             _thinkingSwitch.IsVisible = option.CanThink;
             _webSearchSwitch.IsVisible = option.CanUseTools;
+            _taskChip.IsVisible = option.CanUseTools && !_voiceMode;
             _voiceChip.IsVisible = VoiceModeSupported;
             _toggleRow.IsVisible = option.CanThink || option.CanUseTools || _voiceChip.IsVisible;
             UpdateWebSearchNotice();
@@ -1786,13 +1791,16 @@ namespace Maui.Demo.Lite
                     });
                 };
 
+                // Task mode: for this message only.
+                bool planTask = _taskChip.IsToggled && UseAgent && !_voiceMode;
+                _taskChip.IsToggled = false;
                 ChatReply reply;
                 for (int attempt = 0; ; attempt++)
                 {
                     // Kept so teardown (OnNavigatedFrom / switching models) can wait for it instead of
                     // freeing the chat/engine while LiteRT-LM is still generating into it.
                     Task<ChatReply> generation = UseAgent
-                        ? RunAgentAsync(modelPrompt, attachments, bubble, replyCancel.Token)
+                        ? (planTask ? RunTaskAsync(modelPrompt, attachments, bubble, replyCancel.Token) : RunAgentAsync(modelPrompt, attachments, bubble, replyCancel.Token))
                         : _chat.SendAsync(modelPrompt, attachments.Select(a => a.Attachment), onChunk, replyCancel.Token);
                     _generation = generation;
                     try

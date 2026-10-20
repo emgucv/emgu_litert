@@ -25,6 +25,8 @@
     <Compile Include="..\UnitTestLanguageText.cs" Link="UnitTestLanguageText.cs" />
     <Compile Include="..\UnitTestVoiceTranscript.cs" Link="UnitTestVoiceTranscript.cs" />
     <Compile Include="..\UnitTestVoiceLanguages.cs" Link="UnitTestVoiceLanguages.cs" />
+    <Compile Include="..\UnitTestTaskPlan.cs" Link="UnitTestTaskPlan.cs" />
+    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\TaskPlan.cs" Link="TaskPlan.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\VoiceLanguages.cs" Link="VoiceLanguages.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\LanguageText.cs" Link="LanguageText.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui.Lite\PngMetadata.cs" Link="PngMetadata.cs" />
