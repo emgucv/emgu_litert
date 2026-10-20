@@ -209,6 +209,15 @@ internal static class VisualHostCatalog
         "The user can open, share or save it. Android only.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
 
+    // The play_file action (AlertSoundLibrary, TODO item 53): one of the app's alert sounds - the names change as the user adds some, so the descriptor is built on request.
+    internal static VisualActionDescriptor PlayFile(IReadOnlyList<string> names) => new("play_file", "Play a sound",
+        "Play one of the app's alert sounds when the alert fires: soft white noise, a lullaby, or sounds the user added. It plays once, or repeated for " +
+        "`seconds` (1 to 300) - use that for a lullaby or white noise meant to go on. The volume is the device's media volume. Available sounds: " +
+        (names.Count == 0 ? "none yet" : string.Join(", ", names)) + ".",
+        VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{\"sound\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":60}," +
+            "\"seconds\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":300}},\"required\":[\"sound\"],\"additionalProperties\":false}"),
+        names.Count > 0);
+
     internal const int MaximumRequestLength = 300;
 
     // The user's own words behind a monitor, for its card: one line of text, at most 300 characters (an ellipsis if cut); null if blank.

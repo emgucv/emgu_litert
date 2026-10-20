@@ -253,4 +253,40 @@ public class UnitTestSoundMonitors
         Assert.That(plain.JsonSchema.ToString(), Does.Not.Contain("clipSeconds"));
         Assert.That(create.JsonSchema.ToString(), Does.Contain("clipSeconds").And.Contain("takePhoto"));
     }
+
+    [Test]
+    public async Task APlayedSoundIsPartOfTheMonitor()
+    {
+        Assert.Throws<ArgumentException>(() => new SoundAlert(false, null, 0, false, "lullaby", -1));
+        Assert.Throws<ArgumentException>(() => new SoundAlert(false, null, 0, false, "lullaby", 301));
+        Assert.Throws<ArgumentException>(() => new SoundAlert(false, null, 0, false, new string('x', 61)));
+        Assert.That(new SoundAlert(false, null, 0, false, "lullaby").IsEmpty, Is.False);
+        Assert.That(new SoundAlert(false, null, 0, false, "  ", 30).PlayFileSeconds, Is.Zero);        // no sound, no repeat
+        var runtime = new SoundMonitorRuntime(Labels());
+        var once = runtime.Create("dog", 0.5, 0, new SoundAlert(false, null, 0, false, "lullaby"));
+        var minute = runtime.Create("dog", 0.5, 0, new SoundAlert(false, null, 0, false, "lullaby", 60));
+        Assert.That(once.PlayFile, Is.EqualTo("lullaby"));
+        Assert.That(once.PlayFileSeconds, Is.Zero);
+        Assert.That(once.Description, Does.EndWith("play 'lullaby'"));
+        Assert.That(minute.Description, Does.Contain("play 'lullaby' for 60 s"));
+        Assert.That(minute.Id, Is.Not.EqualTo(once.Id));
+        Assert.That(runtime.Create("dog", 0.5, 0, new SoundAlert(false, null, 0, false, "LULLABY", 60)).Id, Is.EqualTo(minute.Id));      // the same rule
+
+        string seen = null;
+        var tools = SoundMonitorTools.Create(
+            (sound, minimum, play, speak, threshold, seconds, photo, file, repeat, token) => { seen = $"{sound}|{seconds}|{photo}|{file}|{repeat}"; return Task.FromResult("ok"); },
+            () => "list", (id, operation, token) => Task.FromResult("ok"), true, new[] { "white noise", "lullaby", "rain" });
+        var create = (AIFunction)tools[0];
+        await create.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object> { ["sound"] = "baby_cry", ["playFile"] = "lullaby", ["playSeconds"] = 90 }));
+        Assert.That(seen, Is.EqualTo("baby_cry|0|False|lullaby|90"));
+        Assert.That(create.Description, Does.Contain("white noise, lullaby, rain"));
+        Assert.That(create.JsonSchema.ToString(), Does.Contain("playFile").And.Contain("playSeconds").And.Contain("clipSeconds"));
+        // Without the sounds (or with none) the tool has no playFile; without a camera, no clip.
+        var noFiles = (AIFunction)SoundMonitorTools.Create((a, b, c, d, e, f, g, h, i, t) => Task.FromResult("ok"), () => "none", (a, b, t) => Task.FromResult("ok"), true, null)[0];
+        Assert.That(noFiles.JsonSchema.ToString(), Does.Not.Contain("playFile").And.Contain("clipSeconds"));
+        var filesOnly = (AIFunction)SoundMonitorTools.Create((a, b, c, d, e, f, g, h, i, t) => Task.FromResult("ok"), () => "none", (a, b, t) => Task.FromResult("ok"), false, new[] { "lullaby" })[0];
+        Assert.That(filesOnly.JsonSchema.ToString(), Does.Contain("playFile").And.Not.Contain("clipSeconds"));
+        var emptyList = (AIFunction)SoundMonitorTools.Create((a, b, c, d, e, f, g, h, i, t) => Task.FromResult("ok"), () => "none", (a, b, t) => Task.FromResult("ok"), false, new string[0])[0];
+        Assert.That(emptyList.JsonSchema.ToString(), Does.Not.Contain("playFile"));
+    }
 }

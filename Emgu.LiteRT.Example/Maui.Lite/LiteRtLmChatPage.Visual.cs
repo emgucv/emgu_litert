@@ -28,6 +28,7 @@ public partial class LiteRtLmChatPage
         " For a hand gesture use the hand-gesture agent and pick the label that matches the user's words: thumbs up = thumb up, thumbs down = thumb down, peace sign or V sign = victory, " +
         "open hand or high five = open palm, fist = closed fist, pointing finger = pointing up, rock sign = i love you. The label is just the class, never prefixed by the agent id, and never person. Raising or waving a hand is not a gesture: that is the body-pose agent. " +
         "It sees upright hands, a gesture held for about a second." +
+        " To play a recorded sound when an alert fires - a lullaby, white noise, one of the user's own sounds - select play_file with parameters {sound: its name from list_visual_actions, seconds: how long to keep repeating it (60 if the user wants it to go on without saying for how long; leave out to play it once)}. " +
         " For what a person's body is doing - waving, raising a hand or both arms, standing, sitting, lying down - use the body-pose agent, not hand-gesture and not person: the label is exactly one of " +
         "arms raised (both arms up, hands in the air), hand raised (raising a hand or arm), waving, standing, sitting, lying down. " +
         "It sees one person with the head in view, within a few metres; waving takes about two seconds to show; standing and sitting need the legs in view. It can't detect falls or tell people apart." +
@@ -57,6 +58,7 @@ public partial class LiteRtLmChatPage
         _visualActions.Register(new CameraChimeFactory(_visualChime));
         _visualActions.Register(new CameraSpeechFactory(_alertAudio));
         _visualActions.Register(new CameraSnapshotFactory(TakeVisualSnapshotAsync));
+        _visualActions.Register(new PlayFileFactory(_alertSounds, PlayAlertSoundAsync));
 #if ANDROID
         _visualActions.Register(new CameraClipFactory(RecordVisualClipAsync));
         _visualActions.Register(new CameraPhotoFactory(TakeVisualPhotoAsync));

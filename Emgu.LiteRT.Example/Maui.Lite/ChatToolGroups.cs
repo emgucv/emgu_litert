@@ -21,10 +21,10 @@ internal static class ChatToolGroups
     };
 
     internal const string Sound = "sound_monitor";
-    internal const string SoundSummary = "listen through the microphone and alert the user when a sound happens (a doorbell, a dog barking, a baby crying, a smoke alarm, a knock...)";
+    internal const string SoundSummary = "listen through the microphone and alert the user when a sound is HEARD (a doorbell, a dog barking, a baby crying, a smoke alarm, a knock...) - never for something seen, and not for merely playing a sound";
     internal static readonly string[] SoundKeywords =
     {
-        "sound", "hear", "listen", "microphone", "noise", "doorbell", "door bell", "knock", "ringing", "rings", "bark", "meow", "siren",
+        "sound", "hear", "listen", "microphone", "noises", "loud noise", "a noise", "any noise", "strange noise", "that noise", "doorbell", "door bell", "knock", "ringing", "rings", "bark", "meow", "siren",
         "smoke alarm", "smoke detector", "baby cry", "baby crying", "cries", "crying", "cough", "snor", "glass break", "breaking glass", "honk"
     };
 

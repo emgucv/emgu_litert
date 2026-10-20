@@ -135,23 +135,38 @@ namespace Emgu.LiteRT.LM.Agents.Audio
         public int ClipSeconds { get; }
         /// <summary>Take a full-resolution photo with the host's camera.</summary>
         public bool TakePhoto { get; }
+        /// <summary>The name of one of the host's alert sounds to play (at most 60 characters), or null.</summary>
+        public string PlayFile { get; }
+        /// <summary>With <see cref="PlayFile"/>: 0 to play it once, else repeat it for this many seconds (1 to 300).</summary>
+        public int PlayFileSeconds { get; }
 
         /// <summary>The shortest and longest clip.</summary>
         public const int MinimumClipSeconds = 3, MaximumClipSeconds = 30, DefaultClipSeconds = 10;
+        /// <summary>The longest a sound is repeated, and how long it is when the user asked to keep it playing without saying how long.</summary>
+        public const int MaximumPlaySeconds = 300, DefaultPlaySeconds = 60;
 
-        /// <summary>Creates an alert, trimming the text. <paramref name="clipSeconds"/> is 0 for no clip, else 3 to 30.</summary>
-        public SoundAlert(bool chime = false, string speakText = null, int clipSeconds = 0, bool takePhoto = false)
+        /// <summary>
+        /// Creates an alert, trimming the text. <paramref name="clipSeconds"/> is 0 for no clip, else 3 to 30; <paramref name="playFile"/> names a sound
+        /// the host has and <paramref name="playFileSeconds"/> is 0 to play it once, else 1 to 300.
+        /// </summary>
+        public SoundAlert(bool chime = false, string speakText = null, int clipSeconds = 0, bool takePhoto = false, string playFile = null, int playFileSeconds = 0)
         {
             if (clipSeconds != 0 && (clipSeconds < MinimumClipSeconds || clipSeconds > MaximumClipSeconds))
                 throw new ArgumentException("The clip must be " + MinimumClipSeconds + " to " + MaximumClipSeconds + " seconds long.");
+            if (playFileSeconds < 0 || playFileSeconds > MaximumPlaySeconds)
+                throw new ArgumentException("The sound can be repeated for 1 to " + MaximumPlaySeconds + " seconds.");
             ClipSeconds = clipSeconds; TakePhoto = takePhoto;
             string text = string.IsNullOrWhiteSpace(speakText) ? null : speakText.Trim();
             if (text != null && text.Length > 200) throw new ArgumentException("The spoken message can have at most 200 characters.");
             Chime = chime; SpeakText = text;
+            string file = string.IsNullOrWhiteSpace(playFile) ? null : playFile.Trim();
+            if (file != null && file.Length > 60) throw new ArgumentException("The sound's name can have at most 60 characters.");
+            PlayFile = file; PlayFileSeconds = file == null ? 0 : playFileSeconds;
         }
         /// <summary>Whether it does anything.</summary>
-        public bool IsEmpty => !Chime && SpeakText == null && ClipSeconds == 0 && !TakePhoto;
-        internal string Key => (Chime ? "chime" : "") + "|" + (SpeakText ?? "") + "|" + ClipSeconds + (TakePhoto ? "|photo" : "");
+        public bool IsEmpty => !Chime && SpeakText == null && ClipSeconds == 0 && !TakePhoto && PlayFile == null;
+        internal string Key => (Chime ? "chime" : "") + "|" + (SpeakText ?? "") + "|" + ClipSeconds + (TakePhoto ? "|photo" : "") +
+            (PlayFile == null ? "" : "|file:" + PlayFile.ToLowerInvariant() + ":" + PlayFileSeconds);
     }
 
     /// <summary>Pure temporal state machine: advance it with each window's score and its monotonic time.</summary>
@@ -238,6 +253,10 @@ namespace Emgu.LiteRT.LM.Agents.Audio
         public int ClipSeconds { get; internal set; }
         /// <summary>Whether it takes a photo.</summary>
         public bool TakePhoto { get; internal set; }
+        /// <summary>The sound it plays, or null.</summary>
+        public string PlayFile { get; internal set; }
+        /// <summary>How long it repeats the sound (0: once).</summary>
+        public int PlayFileSeconds { get; internal set; }
         /// <summary>Whether it is listening (not paused by the user).</summary>
         public bool Enabled { get; internal set; }
         /// <summary>How many times its sound has been heard.</summary>
@@ -347,10 +366,11 @@ namespace Emgu.LiteRT.LM.Agents.Audio
             if (e.Alert.SpeakText != null) parts.Add("say \"" + e.Alert.SpeakText + "\"");
             if (e.Alert.TakePhoto) parts.Add("take a photo");
             if (e.Alert.ClipSeconds > 0) parts.Add("record a " + e.Alert.ClipSeconds + " s video clip");
+            if (e.Alert.PlayFile != null) parts.Add("play '" + e.Alert.PlayFile + "'" + (e.Alert.PlayFileSeconds > 0 ? " for " + e.Alert.PlayFileSeconds + " s" : ""));
             return new SoundMonitorInfo
             {
                 Id = e.Monitor.Id, Sound = e.Group.Id, Threshold = e.Monitor.Threshold, MinimumSeconds = e.Monitor.MinimumDuration.TotalSeconds,
-                Chime = e.Alert.Chime, SpeakText = e.Alert.SpeakText, ClipSeconds = e.Alert.ClipSeconds, TakePhoto = e.Alert.TakePhoto, Enabled = e.Enabled, Heard = e.Heard, LastHeard = e.LastHeard, LastEvent = e.LastEvent,
+                Chime = e.Alert.Chime, SpeakText = e.Alert.SpeakText, ClipSeconds = e.Alert.ClipSeconds, TakePhoto = e.Alert.TakePhoto, PlayFile = e.Alert.PlayFile, PlayFileSeconds = e.Alert.PlayFileSeconds, Enabled = e.Enabled, Heard = e.Heard, LastHeard = e.LastHeard, LastEvent = e.LastEvent,
                 Description = "Listen for " + e.Group.Name.ToLowerInvariant() +
                     (e.Monitor.MinimumDuration > TimeSpan.Zero ? " lasting at least " + e.Monitor.MinimumDuration.TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture) + " s" : "") +
                     (parts.Count > 0 ? ", then " + string.Join(" and ", parts) : ", and show it here")
@@ -460,6 +480,7 @@ namespace Emgu.LiteRT.LM.Agents.Audio
             "use create_sound_monitor with the sound in the user's words. It listens through the microphone while the app is open; the audio isn't recorded or sent anywhere, " +
             "and each time the sound is heard the app shows it. Set playSound only if the user wants a beep or chime, and speakText only to the exact words the user asked to hear, unchanged. " +
             "When the tool has clipSeconds and takePhoto, set them only if the user asked for a video, clip or photo when the sound is heard (\"when you hear the baby cry, take a video\"); the live camera is used. " +
+            "When it has playFile, set it only if the user asked for a recorded sound to be played (\"play the lullaby when the baby cries\"), to the name of one of the app's sounds. " +
             "Use list_sound_monitors and control_sound_monitor to pause, resume or remove monitors. After creating one, say in one short sentence what it listens for, and don't repeat the call.";
 
         /// <summary>The tools; each callback returns the text the model sees.</summary>
@@ -478,19 +499,64 @@ namespace Emgu.LiteRT.LM.Agents.Audio
         /// <param name="cameraActions">Whether the host can record clips and take photos</param>
         public static IList<AITool> Create(Func<string, double, bool, string, double, int, bool, CancellationToken, Task<string>> create,
             Func<string> list, Func<string, string, CancellationToken, Task<string>> control, bool cameraActions)
+            => Create((sound, minimumSeconds, playSound, speakText, threshold, clipSeconds, takePhoto, playFile, playSeconds, token) =>
+                    create(sound, minimumSeconds, playSound, speakText, threshold, clipSeconds, takePhoto, token), list, control, cameraActions, null);
+
+        /// <summary>The same tools, and with <paramref name="soundFiles"/> the monitor can also play one of the host's sounds (a lullaby, white noise...).</summary>
+        /// <param name="create">sound, minimumSeconds, playSound, speakText, threshold, clipSeconds (0 for none), takePhoto, playFile (null for none), playSeconds (0: once)</param>
+        /// <param name="list">The monitors as text</param>
+        /// <param name="control">monitorId, operation (pause, resume, remove)</param>
+        /// <param name="cameraActions">Whether the host can record clips and take photos</param>
+        /// <param name="soundFiles">The names of the sounds the host can play, or null if it can't play files</param>
+        public static IList<AITool> Create(Func<string, double, bool, string, double, int, bool, string, int, CancellationToken, Task<string>> create,
+            Func<string> list, Func<string, string, CancellationToken, Task<string>> control, bool cameraActions, IReadOnlyList<string> soundFiles)
         {
-            var tools = new List<AITool>
+            bool files = soundFiles != null && soundFiles.Count > 0;
+            string names = files ? string.Join(", ", soundFiles) : "";
+            string description = "Listens through the microphone for a kind of sound and alerts when it is heard (shown in the app, plus a chime or spoken words if asked" +
+                (cameraActions ? ", a video clip or a photo from the live camera" : "") + (files ? ", or a recorded sound played" : "") + "). " +
+                "Sounds: " + SoundGroups.Ids + ". Session only; runs while the app is open. Not for recording or understanding speech." +
+                (files ? " Recorded sounds the app can play (playFile): " + names + "." : "");
+            const string Sound = "The sound to listen for, in the user's words, e.g. doorbell, dog, baby_cry, smoke_alarm.";
+            const string Minimum = "Seconds the sound must last before it counts. Leave out unless the user gave a duration.";
+            const string Chime = "Set true only if the user asked for a beep, chime or sound when it is heard. Leave out otherwise.";
+            const string Speak = "Leave out unless the user said to say something aloud. Then the words they said to say, verbatim: for \"say hello when...\" it is hello.";
+            const string Threshold = "Sensitivity from 0.1 to 0.95. Leave out unless the user asked for more or less.";
+            const string Clip = "Set only if the user asked for a video or clip when the sound is heard: its length in seconds, 3 to 30 (10 if they gave none). Leave out otherwise.";
+            const string Photo = "Set true only if the user asked for a photo or picture when the sound is heard. Leave out otherwise.";
+            const string PlayFileText = "Set only if the user asked for a recorded sound - a lullaby, white noise, their own sound - to be played when the sound is heard: the name of one of the app's sounds, as listed in this tool's description. Leave out otherwise.";
+            const string PlaySeconds = "With playFile: repeat the sound for this many seconds, 1 to 300 (60 if the user asked to keep it playing without saying for how long). Leave out to play it once.";
+            AIFunction createTool;
+            if (cameraActions && files)
+                createTool = AIFunctionFactory.Create(
+                    ([Description(Sound)] string sound, [Description(Minimum)] double minimumSeconds = 0, [Description(Chime)] bool playSound = false,
+                     [Description(Speak)] string speakText = null, [Description(Threshold)] double threshold = 0.5, [Description(Clip)] int clipSeconds = 0,
+                     [Description(Photo)] bool takePhoto = false, [Description(PlayFileText)] string playFile = null, [Description(PlaySeconds)] int playSeconds = 0,
+                     CancellationToken cancellationToken = default) => create(sound, minimumSeconds, playSound, speakText, threshold <= 0 ? 0.5 : threshold, clipSeconds, takePhoto, playFile, playSeconds, cancellationToken),
+                    "create_sound_monitor", description);
+            else if (cameraActions)
+                createTool = AIFunctionFactory.Create(
+                    ([Description(Sound)] string sound, [Description(Minimum)] double minimumSeconds = 0, [Description(Chime)] bool playSound = false,
+                     [Description(Speak)] string speakText = null, [Description(Threshold)] double threshold = 0.5, [Description(Clip)] int clipSeconds = 0,
+                     [Description(Photo)] bool takePhoto = false,
+                     CancellationToken cancellationToken = default) => create(sound, minimumSeconds, playSound, speakText, threshold <= 0 ? 0.5 : threshold, clipSeconds, takePhoto, null, 0, cancellationToken),
+                    "create_sound_monitor", description);
+            else if (files)
+                createTool = AIFunctionFactory.Create(
+                    ([Description(Sound)] string sound, [Description(Minimum)] double minimumSeconds = 0, [Description(Chime)] bool playSound = false,
+                     [Description(Speak)] string speakText = null, [Description(Threshold)] double threshold = 0.5,
+                     [Description(PlayFileText)] string playFile = null, [Description(PlaySeconds)] int playSeconds = 0,
+                     CancellationToken cancellationToken = default) => create(sound, minimumSeconds, playSound, speakText, threshold <= 0 ? 0.5 : threshold, 0, false, playFile, playSeconds, cancellationToken),
+                    "create_sound_monitor", description);
+            else
+                createTool = AIFunctionFactory.Create(
+                    ([Description(Sound)] string sound, [Description(Minimum)] double minimumSeconds = 0, [Description(Chime)] bool playSound = false,
+                     [Description(Speak)] string speakText = null, [Description(Threshold)] double threshold = 0.5,
+                     CancellationToken cancellationToken = default) => create(sound, minimumSeconds, playSound, speakText, threshold <= 0 ? 0.5 : threshold, 0, false, null, 0, cancellationToken),
+                    "create_sound_monitor", description);
+            return new List<AITool>
             {
-                AIFunctionFactory.Create(
-                    ([Description("The sound to listen for, in the user's words, e.g. doorbell, dog, baby_cry, smoke_alarm.")] string sound,
-                     [Description("Seconds the sound must last before it counts. Leave out unless the user gave a duration.")] double minimumSeconds = 0,
-                     [Description("Set true only if the user asked for a beep, chime or sound when it is heard. Leave out otherwise.")] bool playSound = false,
-                     [Description("Leave out unless the user said to say something aloud. Then the words they said to say, verbatim: for \"say hello when...\" it is hello.")] string speakText = null,
-                     [Description("Sensitivity from 0.1 to 0.95. Leave out unless the user asked for more or less.")] double threshold = 0.5,
-                     CancellationToken cancellationToken = default) => create(sound, minimumSeconds, playSound, speakText, threshold <= 0 ? 0.5 : threshold, 0, false, cancellationToken),
-                    "create_sound_monitor",
-                    "Listens through the microphone for a kind of sound and alerts when it is heard (shown in the app, plus a chime or spoken words if asked). " +
-                    "Sounds: " + SoundGroups.Ids + ". Session only; runs while the app is open. Not for recording or understanding speech."),
+                createTool,
                 AIFunctionFactory.Create(list, "list_sound_monitors", "Lists the sound monitors, their IDs, states and when they last heard their sound."),
                 AIFunctionFactory.Create(
                     ([Description("Monitor ID from create_sound_monitor or list_sound_monitors.")] string monitorId,
@@ -498,20 +564,6 @@ namespace Emgu.LiteRT.LM.Agents.Audio
                      CancellationToken cancellationToken) => control(monitorId, operation, cancellationToken),
                     "control_sound_monitor", "Pauses, resumes or removes a sound monitor.")
             };
-            if (cameraActions)
-                tools[0] = AIFunctionFactory.Create(
-                    ([Description("The sound to listen for, in the user's words, e.g. doorbell, dog, baby_cry, smoke_alarm.")] string sound,
-                     [Description("Seconds the sound must last before it counts. Leave out unless the user gave a duration.")] double minimumSeconds = 0,
-                     [Description("Set true only if the user asked for a beep, chime or sound when it is heard. Leave out otherwise.")] bool playSound = false,
-                     [Description("Leave out unless the user said to say something aloud. Then the words they said to say, verbatim: for \"say hello when...\" it is hello.")] string speakText = null,
-                     [Description("Sensitivity from 0.1 to 0.95. Leave out unless the user asked for more or less.")] double threshold = 0.5,
-                     [Description("Set only if the user asked for a video or clip when the sound is heard: its length in seconds, 3 to 30 (10 if they gave none). Leave out otherwise.")] int clipSeconds = 0,
-                     [Description("Set true only if the user asked for a photo or picture when the sound is heard. Leave out otherwise.")] bool takePhoto = false,
-                     CancellationToken cancellationToken = default) => create(sound, minimumSeconds, playSound, speakText, threshold <= 0 ? 0.5 : threshold, clipSeconds, takePhoto, cancellationToken),
-                    "create_sound_monitor",
-                    "Listens through the microphone for a kind of sound and alerts when it is heard (shown in the app, plus a chime, spoken words, a video clip or a photo from the live camera if asked). " +
-                    "Sounds: " + SoundGroups.Ids + ". Session only; runs while the app is open. Not for recording or understanding speech.");
-            return tools;
         }
 
         /// <summary>One monitor as a line of text for a tool result.</summary>

@@ -19,7 +19,7 @@ public partial class LiteRtLmChatPage
     private const bool SoundSupported = false;     // no Windows microphone stream yet
 #endif
     private const string SoundInstructions = SoundMonitorTools.Instructions +
-        " Use the camera tools instead when the user wants to see something rather than hear it. When the user wants a video or photo taken because of a sound, " +
+        " Use the camera tools instead when the user wants to see something rather than hear it: \"when you see a person, play white noise\" is a camera monitor with the play_file action, not a sound monitor. When the user wants a video or photo taken because of a sound, " +
         "that is still a sound monitor: use create_sound_monitor with clipSeconds or takePhoto, not a camera monitor.";
 
     private SoundMonitorRuntime _soundRuntime;
@@ -79,7 +79,7 @@ public partial class LiteRtLmChatPage
     }
 
     private IEnumerable<AITool> SoundTools() => !SoundSupported ? Array.Empty<AITool>()
-        : SoundMonitorTools.Create(CreateSoundMonitorAsync, ListSoundMonitors, ControlSoundMonitorAsync, CameraAlertsSupported);
+        : SoundMonitorTools.Create(CreateSoundMonitorAsync, ListSoundMonitors, ControlSoundMonitorAsync, CameraAlertsSupported, _alertSounds.Names());
 
     // A sound can also set off the live camera's clip and photo, where the camera records (Android; TODO item 49).
 #if ANDROID
@@ -93,7 +93,7 @@ public partial class LiteRtLmChatPage
     // ---------- tools ----------
 
     private async Task<string> CreateSoundMonitorAsync(string sound, double minimumSeconds, bool playSound, string speakText, double threshold,
-        int clipSeconds, bool takePhoto, CancellationToken token)
+        int clipSeconds, bool takePhoto, string playFile, int playSeconds, CancellationToken token)
     {
         try
         {
@@ -102,7 +102,17 @@ public partial class LiteRtLmChatPage
             await EnsureSoundRuntimeAsync(token);
             if (!CameraAlertsSupported && (clipSeconds != 0 || takePhoto)) return "Recording a clip or taking a photo isn't supported on this device yet.";
             if (clipSeconds < 0 || (clipSeconds > 0 && clipSeconds < SoundAlert.MinimumClipSeconds)) clipSeconds = SoundAlert.DefaultClipSeconds;
-            var monitor = _soundRuntime.Create(sound, threshold, minimumSeconds, new SoundAlert(playSound, speakText, clipSeconds, takePhoto));
+            // A recorded sound is named in the user's words: find it now, so a wrong name is refused with the names there are, and keep its real name.
+            if (!string.IsNullOrWhiteSpace(playFile))
+            {
+                await _alertSounds.EnsureBuiltInsAsync(token);
+                AlertSound found = _alertSounds.Find(playFile, out string problem);
+                if (found == null) return "Could not create the sound monitor: " + problem;
+                playFile = found.Name;
+                if (playSeconds < 0 || playSeconds > SoundAlert.MaximumPlaySeconds) playSeconds = SoundAlert.DefaultPlaySeconds;
+            }
+            else playSeconds = 0;
+            var monitor = _soundRuntime.Create(sound, threshold, minimumSeconds, new SoundAlert(playSound, speakText, clipSeconds, takePhoto, playFile, playSeconds));
             RememberMonitorRequest(monitor.Id);
             string status = await UpdateSoundListeningAsync();
             var current = _soundRuntime.Snapshot().First(m => m.Id == monitor.Id);
@@ -237,6 +247,11 @@ public partial class LiteRtLmChatPage
         {
             var actions = new List<Task>();
             if (monitor.ClipSeconds > 0 || monitor.TakePhoto) actions.Add(SoundCameraAlertAsync(occurrence, monitor, token));
+            if (monitor.PlayFile != null)
+            {
+                AlertSound file = _alertSounds.Find(monitor.PlayFile, out string problem) ?? throw new InvalidOperationException(problem);
+                actions.Add(PlayAlertSoundAsync(file, monitor.PlayFileSeconds, token));
+            }
             if (monitor.Chime) actions.Add(_soundChime.ExecuteAsync(null, token));
             if (monitor.SpeakText != null) actions.Add(MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(monitor.SpeakText, token)));
             await Task.WhenAll(actions);

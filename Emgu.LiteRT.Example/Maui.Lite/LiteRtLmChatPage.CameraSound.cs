@@ -29,7 +29,6 @@ public partial class LiteRtLmChatPage
             Spacing = 6,
             Children =
             {
-                Theme.Divider(),
                 row,
                 new Label
                 {

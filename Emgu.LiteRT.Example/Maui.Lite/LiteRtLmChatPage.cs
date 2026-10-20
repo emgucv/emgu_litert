@@ -644,7 +644,10 @@ namespace Maui.Demo.Lite
                     Theme.Divider(),
 #if ANDROID
                     BuildCameraSoundSection(),
+                    Theme.Divider(),
 #endif
+                    BuildAlertSoundsSection(),
+                    Theme.Divider(),
                     BuildServerSection(),
                     Theme.Divider(),
                     BuildMcpSection(),
@@ -3456,6 +3459,7 @@ namespace Maui.Demo.Lite
             if (!Navigation.NavigationStack.Contains(this) && !Navigation.ModalStack.Contains(this))
             {
                 _ = DisposeVisualMonitoringAsync();
+                ReleaseAlertSounds();
                 _ = DisposeSoundMonitoringAsync();
                 _sessionVersion++;
                 if (_resumeWindow != null)
