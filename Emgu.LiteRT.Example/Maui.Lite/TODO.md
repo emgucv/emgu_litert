@@ -1321,3 +1321,28 @@ Details in [YAMNET.md](YAMNET.md#sound-monitors-in-the-chat-todo-item-42).
 - [ ] Windows microphone stream; listening in the background (Android foreground service, iOS background audio).
 - [ ] Run with the camera loop and Gemma together on a phone (heat, battery) - nothing was timed together.
 - [ ] Try on iOS (the `AVAudioEngine` tap and the microphone gate are built, not run).
+
+## 43. Video clips as a visual-alert action — Camera2 feasibility checked on a Galaxy S10 and a Pixel Fold; nothing built
+
+The camera is read through OpenCV's `VideoCapture` (Android camera API: one frame stream; the preview is drawn from it), and that session has no
+output for a video encoder. A temporary Camera2 test (not kept) checked whether Android can run a preview, an analysis image reader and a native
+video recorder in one session.
+
+- [x] Galaxy S10 (SM-G973W, Android 12), all four cameras (back LEVEL_3 and LIMITED, two front LIMITED): one `CameraCaptureSession` with a
+      640x480 preview `SurfaceTexture`, a 640x480 YUV_420_888 `ImageReader` (analysis) and a `MediaRecorder` surface (1280x720, H.264 MP4, 30 fps,
+      6 Mbps), with and without microphone audio: analysis kept 24-28 fps while recording, the files were ~2.7 MB per 4 s with the right size, a
+      duration within 0.3 s of the run, ~100 frames and (when asked for) an AAC track. `isSessionConfigurationSupported` isn't implemented by the S10
+      (`UnsupportedOperationException`), so a combination has to be tried. An `ImageReader` image has to be `Close()`d - disposing it doesn't - or the
+      reader runs out of images and throws on its handler thread, which killed the app.
+- [x] Pixel Fold (Android 17; both cameras FULL level, the back one and the front one): the same session passed, with and without audio: analysis
+      25.7-28.7 fps while recording, files ~2.6-2.9 MB per 4 s at 1280x720 with 106-117 frames, an AAC track when asked for.
+- [x] Microphone shared between a recording and a sound monitor's reader (an `AudioRecord` at 16 kHz mono, as `MicrophoneSoundSource` uses it) with
+      `MediaRecorder` audio, on the S10 (Android 12) and the Fold (Android 17), a steady tone played from the Mac: the reader heard it at -44..-30 dBFS
+      (S10) and -36..-34 (Fold) with the recorder started after it, before it, and with a Camera2 video + audio recording running - no silenced reads
+      (one empty read at startup on the S10 only) - and the recorded files' audio tracks (decoded on the Mac) had the same levels. So a clip can have sound
+      while the sound monitors keep listening, without a single shared reader. Only these two phones and OS versions; Android's rules for concurrent capture
+      depend on which app is in the foreground, so the app must be in front (as the camera needs anyway).
+- [ ] Not measured: the cost next to the detector and Gemma, longer clips, the cameras' other
+      sizes, and a recording that starts before the alert (a ring buffer of encoded frames, or a MediaCodec-based writer fed from the analysis frames).
+- [ ] If built: a Camera2 capture path next to `LiveCamera`'s OpenCV one on Android, a `record_clip` action (length, pre-roll), storage in Movies with a
+      chat thumbnail and Save/Share like the snapshots, and microphone coordination with `MicrophoneGate` (audio in the clip conflicts with sound monitors).
