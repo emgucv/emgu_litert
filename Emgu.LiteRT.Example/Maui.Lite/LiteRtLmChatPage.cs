@@ -250,6 +250,8 @@ namespace Maui.Demo.Lite
         {
             public string Role;
             public string Text;
+            // A user message's language (two-letter code), or null (LiteRtLmChatPage.Translation.cs).
+            public string Language;
             // Given to the model before the text of a user message: excerpts of the attached document (or null).
             public string Context;
             public string ModelText => string.IsNullOrEmpty(Context) ? Text : Context + Text;
@@ -1695,6 +1697,7 @@ namespace Maui.Demo.Lite
                 int dividerIndex = _transcript.Children.Contains(_emptyLabel) ? 0 : _transcript.Children.Count;
                 AddUserMessage(prompt, attachments);
                 var userItem = new HistoryItem { Role = MessageRecord.UserRole, Text = prompt, Context = document?.Text };
+                userItem.Language = await TextLanguage.DetectAsync(prompt);
                 if (dividerIndex < _transcript.Children.Count)
                     userItem.View = _transcript.Children[dividerIndex] as View;
                 foreach (PendingAttachment attachment in attachments)
@@ -1782,7 +1785,9 @@ namespace Maui.Demo.Lite
                     }
                 }
 
+                bubble.TargetLanguage = TranslationTarget(userItem.Language);
                 UpdateStreamingBubble(bubble, reply, true);
+                _ = CheckThinkingLanguageAsync(bubble);
                 MarkDocumentContextGiven(document);
                 UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
                 foreach (byte[] jpeg in _cameraTurnFrames)
@@ -1791,7 +1796,7 @@ namespace Maui.Demo.Lite
                     userItem.Tokens += ImageTokens;
                 }
                 ClearCameraTurn();
-                await SaveExchangeAsync(userItem, reply);
+                await SaveExchangeAsync(userItem, reply, bubble);
                 SetStatus(null);
                 if (interrupted)
                     _needsPrime = true;
@@ -2961,7 +2966,7 @@ namespace Maui.Demo.Lite
         // ---------- Saved chats ----------
 
         // Save a completed exchange: the message (with its attachments), any tool steps, and the reply.
-        private async Task SaveExchangeAsync(HistoryItem userItem, ChatReply reply)
+        private async Task SaveExchangeAsync(HistoryItem userItem, ChatReply reply, StreamingBubble bubble = null)
         {
             var replyItem = new HistoryItem { Role = MessageRecord.AssistantRole, Text = reply.Text };
             _historyItems.Add(userItem);
@@ -2994,7 +2999,7 @@ namespace Maui.Demo.Lite
                     _conversationId = await _store.CreateConversationAsync(title, SelectedChoice.ToString());
                 }
                 int id = _conversationId.Value;
-                userItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.UserRole, userItem.Text, null, userItem.Attachments, userItem.Context);
+                userItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.UserRole, userItem.Text, null, userItem.Attachments, userItem.Context, userItem.Language);
                 foreach (string step in _sendSteps)
                     await _store.AddMessageAsync(id, MessageRecord.StepRole, step, null);
                 // Pictures the reply drew are kept with it (shown again when the chat is reopened, not given to the model).
@@ -3004,6 +3009,8 @@ namespace Maui.Demo.Lite
                 // And the documents it wrote.
                 drawn.AddRange(TakeWrittenDocuments());
                 replyItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking, drawn);
+                if (bubble != null)
+                    bubble.MessageId = replyItem.MessageId;
                 // The document the chat uses now (or none), restored when it is opened again.
                 await _store.SetConversationDocumentAsync(id, _document?.Index != null ? _document.Id : null);
                 UpdateExportChatButton();
@@ -3232,6 +3239,7 @@ namespace Maui.Demo.Lite
                 bool contextStartFound = false;
 
                 var messages = await _store.GetMessagesAsync(id);
+                string lastUserLanguage = null;
                 var slice = System.Diagnostics.Stopwatch.StartNew();
                 int rendered = 0;
                 foreach (MessageRecord message in messages)
@@ -3259,6 +3267,12 @@ namespace Maui.Demo.Lite
                         continue;
                     }
                     var item = new HistoryItem { Role = message.Role, Text = message.Text, Context = message.Context, MessageId = message.Id };
+                    // The language of a user message (detected now for chats saved before it was kept).
+                    if (message.Role == MessageRecord.UserRole)
+                    {
+                        item.Language = message.Language ?? await TextLanguage.DetectAsync(message.Text);
+                        lastUserLanguage = item.Language;
+                    }
                     List<PendingAttachment> shown = new List<PendingAttachment>();
                     foreach (SavedAttachment attachment in _store.GetAttachments(message))
                     {
@@ -3295,8 +3309,13 @@ namespace Maui.Demo.Lite
                     else
                     {
                         StreamingBubble bubble = AddStreamingBubble();
+                        bubble.MessageId = message.Id;
+                        bubble.TargetLanguage = TranslationTarget(message.Language ?? lastUserLanguage);
+                        bubble.Translation = message.ThinkingTranslation;
+                        bubble.ShowTranslation = !string.IsNullOrEmpty(message.ThinkingTranslation);
                         UpdateStreamingBubble(bubble, new ChatReply(string.IsNullOrEmpty(message.Thinking)
                             ? message.Text : "<think>" + message.Thinking + "</think>" + message.Text), true);
+                        _ = CheckThinkingLanguageAsync(bubble);
                     }
                 }
 
@@ -3432,6 +3451,17 @@ namespace Maui.Demo.Lite
             public bool Done;
             public DateTime? ThinkingStarted;
             public TimeSpan? ThinkingTime;
+            // Translating the thinking (LiteRtLmChatPage.Translation.cs): the language of the message it answers when
+            // that isn't English (null: no translation offered), the translation, whether it is shown, whether one is
+            // being made, and the reply's id in the chat store.
+            public Label TranslateRow;
+            public string TargetLanguage;
+            public string Translation;
+            public bool ShowTranslation;
+            public bool Translating;
+            // The thinking's own language has been checked (it isn't the language it would be translated into).
+            public bool TranslateReady;
+            public int MessageId;
         }
 
         // While thinking, this much of the end of the thinking is shown (about three lines).
@@ -3447,8 +3477,10 @@ namespace Maui.Demo.Lite
                 ThinkingLabel = new Label { FontFamily = Theme.BodyFont, TextColor = ThinkingTextColor, FontSize = 13, IsVisible = false },
                 ThinkingBody = new ReplyBody(ThinkingTextColor, 13) { IsVisible = false },
                 Separator = new BoxView { HeightRequest = 1, Color = Theme.Chevron, IsVisible = false },
+                TranslateRow = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.Accent, IsVisible = false },
                 Body = new ReplyBody(ModelTextColor)
             };
+            bubbleViews.TranslateRow.OnTap(() => OnTranslateTapped(bubbleViews));
             var header = new Grid
             {
                 ColumnSpacing = 6,
@@ -3470,7 +3502,7 @@ namespace Maui.Demo.Lite
             Border bubble = ModelBubble(new VerticalStackLayout
             {
                 Spacing = 4,
-                Children = { header, bubbleViews.ThinkingLabel, bubbleViews.ThinkingBody, bubbleViews.Separator, bubbleViews.Body }
+                Children = { header, bubbleViews.TranslateRow, bubbleViews.ThinkingLabel, bubbleViews.ThinkingBody, bubbleViews.Separator, bubbleViews.Body }
             });
             AddBubbleRow(bubble, false);
             bubbleViews.Row = bubble;
@@ -3504,6 +3536,7 @@ namespace Maui.Demo.Lite
             bubble.ThinkingHeader.IsVisible = hasThinking;
             if (!hasThinking)
             {
+                bubble.TranslateRow.IsVisible = false;
                 bubble.ThinkingLabel.IsVisible = false;
                 bubble.ThinkingBody.IsVisible = false;
                 bubble.Separator.IsVisible = false;
@@ -3516,6 +3549,7 @@ namespace Maui.Demo.Lite
             if (thinkingNow)
             {
                 bubble.ThinkingTitle.Text = "Thinking...";
+                bubble.TranslateRow.IsVisible = false;
                 bubble.ThinkingLabel.IsVisible = true;
                 bubble.ThinkingLabel.Text = ThinkingPreview(ReplyBody.WithMath(thinking));
                 bubble.ThinkingBody.IsVisible = false;
@@ -3531,8 +3565,9 @@ namespace Maui.Demo.Lite
             SemanticProperties.SetDescription(bubble.ThinkingHeader, bubble.ThinkingTitle.Text + (expanded ? ", shown. Tap to hide." : ", hidden. Tap to show."));
             bubble.ThinkingLabel.IsVisible = false;
             bubble.ThinkingBody.IsVisible = expanded;
+            ShowTranslateRow(bubble, expanded);
             if (expanded)
-                bubble.ThinkingBody.SetText(thinking.Trim());
+                bubble.ThinkingBody.SetText(bubble.ShowTranslation && bubble.Translation != null ? bubble.Translation.Trim() : thinking.Trim());
             // A reply with code in its thinking may use the full width too.
             if (expanded && bubble.ThinkingBody.HasCode && bubble.Row.MaximumWidthRequest < double.PositiveInfinity)
                 bubble.Row.MaximumWidthRequest = double.PositiveInfinity;

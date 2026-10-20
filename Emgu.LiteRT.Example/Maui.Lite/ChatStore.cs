@@ -124,6 +124,15 @@ namespace Maui.Demo.Lite
         public string Thinking { get; set; }
 
         /// <summary>
+        /// A user message's language (a two-letter code such as "es", detected when it was sent; null if unknown - voice
+        /// messages, older chats). For a reply: the language its thinking was translated into (null: not translated).
+        /// </summary>
+        public string Language { get; set; }
+
+        /// <summary>The reply's thinking translated into <see cref="Language"/> on request (null: not translated).</summary>
+        public string ThinkingTranslation { get; set; }
+
+        /// <summary>
         /// What the model was given with a user message besides its text: excerpts of an attached document (null if
         /// none). The model sees it before the message; the transcript shows only the message.
         /// </summary>
@@ -298,11 +307,21 @@ namespace Maui.Demo.Lite
             return conversation.Id;
         }
 
+        /// <summary>Keep a reply's thinking translated into a language (shown again when the chat is reopened).</summary>
+        public async Task SetThinkingTranslationAsync(int messageId, string language, string translation)
+        {
+            if (IsPrivateSession || messageId <= 0) return;
+            SQLiteAsyncConnection db = await Db;
+            await db.ExecuteAsync("UPDATE Message SET Language = ?, ThinkingTranslation = ? WHERE Id = ?",
+                string.IsNullOrEmpty(language) ? null : language, string.IsNullOrEmpty(translation) ? null : translation, messageId);
+        }
+
         /// <summary>
         /// Add a message, saving its attachments (encoded bytes) as files; returns its id.
         /// </summary>
         public async Task<int> AddMessageAsync(int conversationId, string role, string text, string thinking,
-            IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments = null, string context = null)
+            IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments = null, string context = null,
+            string language = null)
         {
             if (IsPrivateSession) throw new InvalidOperationException("Private chats cannot be saved.");
             SQLiteAsyncConnection db = await Db;
@@ -313,6 +332,7 @@ namespace Maui.Demo.Lite
                 Text = text ?? string.Empty,
                 Thinking = string.IsNullOrEmpty(thinking) ? null : thinking,
                 Context = string.IsNullOrEmpty(context) ? null : context,
+                Language = string.IsNullOrEmpty(language) ? null : language,
                 Created = DateTime.UtcNow
             };
             await db.InsertAsync(record);

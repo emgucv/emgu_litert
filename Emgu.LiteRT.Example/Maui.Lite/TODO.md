@@ -1180,29 +1180,37 @@ out). Not started.
 - [ ] Tests: the query builder and message parsing model-free (a canned API response); a Gemma 4 E2B check on a test
       account (search, read, summary); the confirmation card on Android and Mac Catalyst.
 
-## 39. The user's language: thinking in English shown in the user's language — language detection on Android done
+## 39. The user's language: the thinking translated on request — implemented; verified on Mac Catalyst (Spanish, German, Chinese)
 
 Gemma 4 thinks in English (the model's choice; the chat's instructions say nothing about language) even when asked in another
-language, and answers in the user's. Idea: let it think in English, where a small model is strongest, and translate the thinking
-for display, on demand - when the "Thought for N s" header is tapped - with the same model in a conversation of its own, cached
-with the message; the live "Thinking..." preview stays English.
+language, and answers in the user's. The model keeps thinking in English, where a small model is strongest, and the thinking can be
+translated for display: **on request**, so unread thinking costs nothing.
 
 - [x] Language detection (`TextLanguage.cs`): the script check (`ReplySpeech.DetectLanguage`: Chinese, Japanese, Korean, Russian, Arabic,
-      Hebrew, Greek, Thai, Hindi) first, then on Android ML Kit's language identification (`Xamarin.Google.MLKit.Language.Id` 117.0.6.9, the
-      bundled model - on the device, no Play services model download; confidence threshold 0.5; "und" is unknown) for the Latin-script
-      languages. On a Galaxy S10: 26 of 26 phrases right - English, Spanish, French, German, Portuguese, Italian, Dutch, Polish, Turkish,
-      Swedish, Vietnamese, Indonesian, and the non-Latin ones - including the short "¿qué hora es?" and "wie spät ist es"; gibberish and a sum
-      gave none; 2-3 ms a call (66 ms for the first). 15 of the 26 were decided by ML Kit.
-- [x] `ReplySpeech` uses it to choose the voice: a Spanish or German reply used to be read with the device's default voice. (The voice
-      choice is by code only - not listened to.)
+      Hebrew, Greek, Thai, Hindi) first, then for Latin script: Android - ML Kit's language identification (`Xamarin.Google.MLKit.Language.Id`
+      117.0.6.9, the bundled model, on the device, confidence threshold 0.5), iOS and Mac Catalyst - Apple's `NLLanguageRecognizer` (at least 60%
+      sure); Windows tells Latin-script languages apart not yet. On a Galaxy S10 ML Kit got 26 of 26 phrases right (12 Latin-script languages and
+      the non-Latin ones, short ones like "¿qué hora es?" and "wie spät ist es" included; gibberish and a sum gave none), 2-3 ms a call.
+      `ReplySpeech` uses it to choose the reading voice, so a Spanish or German reply is no longer read with the default voice.
 - [x] ML Kit's Common library brings AndroidX Fragment 1.9.0, which contains `FragmentKt`, while the MAUI packages' Fragment.Ktx 1.8.8.1 still
       defines it: D8 failed with "Type androidx.fragment.app.FragmentKt is defined multiple times". The demo pins `Xamarin.AndroidX.Fragment.Ktx`
       1.9.0 for Android (NU1608 version-range warnings for AndroidX Lifecycle remain; the build and the S10 run were fine).
-- [ ] Other platforms: Apple's `NLLanguageRecognizer` (NaturalLanguage, nothing to ship) on iOS and Mac Catalyst; Windows has no built-in one
-      (SearchPioneer.Lingua, Apache-2.0, 79 languages, accurate on short text, but ~71 MB of models and net8+ only; or word lists for the
-      main Latin-script languages).
-- [ ] A language label per user message: a new `MessageRecord.Language` column (SQLite adds it), set when the message is sent.
-- [ ] The translation: on tapping a thought of a reply to a non-English message, translate it with the loaded model in a separate
-      conversation (tool names and code left alone), show "Translated" with a way back to the English, save it with the message.
-      Maybe a Settings switch "Think in my language" that just asks for the thinking in the user's language instead - test whether the
-      thinking gets worse (accuracy, tool calls, length) with Gemma 4 E2B in Spanish, Chinese and Japanese first.
+- [x] A language label per user message: `MessageRecord.Language` (SQLite adds the column), set when the message is sent (voice messages without
+      text: none); a reopened older chat is detected when it is opened.
+- [x] The translation (`LiteRtLmChatPage.Translation.cs`): a reply to a message in another language than English - unless its thinking already is
+      in that language (`CheckThinkingLanguageAsync`) - shows "Translate to <language>" above its opened thinking. Tapping it has the loaded model
+      translate the thinking in conversations of its own (pieces of at most ~1,200 tokens, cut at line ends - `LanguageText.SplitForTranslation`;
+      code, file and tool names, numbers and Markdown kept), the same way the summaries are made - the chat's and the agent's conversations are
+      released and the next message gives the model the conversation again (a server model translates through the server); then "Translated to
+      <language> · Show the English" switches between the two. The translation is saved with the reply (`MessageRecord.ThinkingTranslation`,
+      its `Language`) and comes back when the chat is reopened. The live "Thinking..." preview stays English.
+- [x] Tests: `UnitTestLanguageText` (language tags as two-letter codes, the splitting). On Mac Catalyst with Gemma 4 E2B on the GPU (a temporary
+      self-test): a Spanish question (thinking 911 characters, translated in 11 s), a German one (11 s) and a Chinese one (7 s) were translated; the code
+      block in the thinking stayed as it was; the switch to the English and back worked; the translation was saved with the reply and shown again
+      after reopening the chat; and a follow-up in each conversation was answered normally after the translation (the conversation is re-read).
+- [ ] Translation quality isn't measured: the Spanish one was fine to read but put a stray "¿" before the quoted question ("¿Tengo 3 cajas...").
+- [ ] Windows: no Latin-script detection (SearchPioneer.Lingua, Apache-2.0, 79 languages, accurate on short text, but ~71 MB of models and net8+
+      only; or word lists for the main Latin-script languages) - no translation offer for Spanish or German there yet.
+- [ ] Translate automatically after each reply (an option), if opening it often makes the wait a nuisance; a Settings switch "Think in my language"
+      that asks for the thinking in the user's language instead - test whether the thinking gets worse (accuracy, tool calls, length) first.
+- [ ] Try it on a phone (Android: the same code with ML Kit; the Catalyst run used Apple's recognizer for Spanish and German).

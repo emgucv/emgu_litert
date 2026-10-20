@@ -18,15 +18,6 @@ namespace Maui.Demo.Lite
     /// </summary>
     internal static class TextLanguage
     {
-        // The language code as a two-letter code: ML Kit's "zh-Latn" (romanized Chinese) is Chinese, "und" is unknown.
-        internal static string TwoLetter(string tag)
-        {
-            if (string.IsNullOrWhiteSpace(tag) || tag == "und")
-                return null;
-            int dash = tag.IndexOf('-');
-            return (dash > 0 ? tag.Substring(0, dash) : tag).ToLowerInvariant();
-        }
-
         public static async Task<string> DetectAsync(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -36,11 +27,35 @@ namespace Maui.Demo.Lite
                 return script;
 #if ANDROID
             return await DetectWithMlKitAsync(text);
+#elif IOS || MACCATALYST
+            await Task.CompletedTask;
+            return DetectWithApple(text);
 #else
             await Task.CompletedTask;
             return null;
 #endif
         }
+
+#if IOS || MACCATALYST
+        // Apple's NaturalLanguage recognizer (nothing to ship): the likeliest language if it is at least 60% sure.
+        private static string DetectWithApple(string text)
+        {
+            try
+            {
+                using var recognizer = new NaturalLanguage.NLLanguageRecognizer();
+                recognizer.Process(text);
+                var best = recognizer.GetNativeLanguageHypotheses(1);
+                foreach (var pair in best)
+                    if (pair.Value is Foundation.NSNumber probability && probability.DoubleValue >= 0.6)
+                        return LanguageText.TwoLetter(pair.Key.ToString());
+                return null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+#endif
 
 #if ANDROID
         private static Xamarin.Google.MLKit.NL.LanguageId.ILanguageIdentifier _identifier;
@@ -52,7 +67,7 @@ namespace Maui.Demo.Lite
                 _identifier ??= Xamarin.Google.MLKit.NL.LanguageId.LanguageIdentification.GetClient(
                     new Xamarin.Google.MLKit.NL.LanguageId.LanguageIdentificationOptions.Builder().SetConfidenceThreshold(0.5f).Build());
                 Java.Lang.Object tag = await Android.Gms.Extensions.TasksExtensions.AsAsync<Java.Lang.Object>(_identifier.IdentifyLanguage(text));
-                return TwoLetter(tag?.ToString());
+                return LanguageText.TwoLetter(tag?.ToString());
             }
             catch (Exception)
             {
