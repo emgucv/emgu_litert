@@ -35,6 +35,12 @@ internal static class VisualHostCatalog
         "Capture one fresh JPEG from the visible live camera after confirmed appearance and show it in this chat session. " +
         "Not sent to the model or saved automatically. The user can open the image and save it manually.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
+    internal static readonly VisualActionDescriptor Photo = new("take_photo", "Full-resolution photo",
+        "Take one full-resolution photo (the camera's largest JPEG, after exposure and focus settle) from the visible live camera after confirmed " +
+        "appearance and show it in this chat session. Slower than take_snapshot, which is a small frame. Not sent to the model or saved automatically. " +
+        "The user can open, share or save it. Android only.",
+        VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
+
     internal const int DefaultClipSeconds = 10, MinimumClipSeconds = 3, MaximumClipSeconds = 30;
 
     internal static readonly VisualActionDescriptor Clip = new("record_clip", "Video clip",

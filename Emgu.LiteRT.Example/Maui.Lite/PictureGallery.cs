@@ -53,6 +53,34 @@ internal static class PictureGallery
         }
         return "Saved to the gallery (Movies/Emgu LiteRT)";
     });
+
+    /// <summary>Add a JPEG file to the gallery (Pictures/Emgu LiteRT) without reading it into memory; returns a short description of where it went.</summary>
+    public static Task<string> SavePhotoAsync(string path, string fileName) => Task.Run(() =>
+    {
+        Android.Content.ContentResolver resolver = Android.App.Application.Context.ContentResolver;
+        var values = new Android.Content.ContentValues();
+        values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
+        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "image/jpeg");
+        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, "Pictures/Emgu LiteRT");
+        values.Put(Android.Provider.MediaStore.IMediaColumns.IsPending, 1);
+        Android.Net.Uri uri = resolver.Insert(Android.Provider.MediaStore.Images.Media.ExternalContentUri, values)
+            ?? throw new IOException("The gallery wouldn't take the photo.");
+        try
+        {
+            using (Stream output = resolver.OpenOutputStream(uri) ?? throw new IOException("The gallery wouldn't take the photo."))
+            using (Stream input = File.OpenRead(path))
+                input.CopyTo(output);
+            values.Clear();
+            values.Put(Android.Provider.MediaStore.IMediaColumns.IsPending, 0);
+            resolver.Update(uri, values, null, null);
+        }
+        catch
+        {
+            resolver.Delete(uri, null, null);
+            throw;
+        }
+        return "Saved to the gallery (Pictures/Emgu LiteRT)";
+    });
 #endif
 
     /// <summary>Add the picture; returns a short description of where it went. Call on the UI thread.</summary>

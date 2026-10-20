@@ -34,7 +34,8 @@ internal sealed partial class LiveCamera
     private CameraCaptureSession _session;
     private ImageReader _reader;
     private Handler _handler;
-    private Android.Util.Size _recordSize;
+    private Android.Util.Size _recordSize, _photoSize;
+    private int _photosPending;
     private volatile bool _camera2;
     private Mat _bgr, _rotatedBgr;
     private byte[] _y, _u, _v, _nv21;
@@ -87,6 +88,8 @@ internal sealed partial class LiveCamera
                 var map = (StreamConfigurationMap)characteristics.Get(CameraCharacteristics.ScalerStreamConfigurationMap);
                 analysisSize = Nearest(map.GetOutputSizes((int)ImageFormatType.Yuv420888), 640, 480);
                 _recordSize = Nearest(map.GetOutputSizes(Java.Lang.Class.FromType(typeof(MediaRecorder))), 1280, 720);
+                // The largest size the camera lists for JPEG (not its slower "high resolution" modes, which Camera2 doesn't guarantee beside a preview).
+                _photoSize = map.GetOutputSizes((int)ImageFormatType.Jpeg).OrderByDescending(x => (long)x.Width * x.Height).First();
             }
             thread = new HandlerThread("emgu-camera2");
             thread.Start();
@@ -144,24 +147,26 @@ internal sealed partial class LiveCamera
         if (!_stop.IsCancellationRequested) { _stop.Cancel(); Failed?.Invoke(message); }
     }
 
-    // A new session: the analysis reader, and a recorder's surface while a clip records. The old one is closed first.
-    private async Task ConfigureSessionAsync(Surface recorderSurface)
+    // A new session: the analysis reader, and one more output while a clip records or a photo is taken. The old session is closed first.
+    // The repeating request targets the extra output only for a clip (a still is a single capture of its own).
+    private async Task ConfigureSessionAsync(Surface extra, bool repeatToExtra = false, CameraCaptureSession.CaptureCallback callback = null,
+        ControlAFMode afMode = ControlAFMode.ContinuousVideo)
     {
         var device = _device ?? throw new InvalidOperationException("The camera is closed.");
         var old = _session;
         _session = null;
         try { old?.Close(); } catch (Exception) { }
         var surfaces = new List<Surface> { _reader.Surface };
-        if (recorderSurface != null) surfaces.Add(recorderSurface);
+        if (extra != null) surfaces.Add(extra);
         var configured = new SessionCallback();
         device.CreateCaptureSession(surfaces, configured, _handler);
         var session = await configured.Configured.Task.WaitAsync(TimeSpan.FromSeconds(10));
         _session = session;
         using var request = device.CreateCaptureRequest(CameraTemplate.Record);
         request.AddTarget(_reader.Surface);
-        if (recorderSurface != null) request.AddTarget(recorderSurface);
-        request.Set(CaptureRequest.ControlAfMode, (int)ControlAFMode.ContinuousVideo);
-        session.SetRepeatingRequest(request.Build(), null, _handler);
+        if (extra != null && repeatToExtra) request.AddTarget(extra);
+        request.Set(CaptureRequest.ControlAfMode, (int)afMode);
+        session.SetRepeatingRequest(request.Build(), callback, _handler);
     }
 
     // On the camera's thread, once per frame: to BGR, rotated as the page asks, to the preview and the detectors, and to a snapshot request.
@@ -228,6 +233,110 @@ internal sealed partial class LiveCamera
         CvInvoke.CvtColor(yuv, bgr, ColorConversion.Yuv2BgrNv21);
     }
 
+
+    internal sealed class PhotoResult
+    {
+        public string Path;
+        public int Width, Height;
+        public long Bytes;
+    }
+
+    private sealed class ConvergenceCallback : CameraCaptureSession.CaptureCallback
+    {
+        public volatile int Frames;
+        public volatile bool Settled;
+        public override void OnCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result)
+        {
+            Frames++;
+            var ae = result.Get(CaptureResult.ControlAeState) as Java.Lang.Integer;
+            var af = result.Get(CaptureResult.ControlAfState) as Java.Lang.Integer;
+            // Exposure converged, locked or needing flash (the photo can't do better), and focus not in the middle of a scan.
+            bool aeDone = ae == null || ae.IntValue() == 2 || ae.IntValue() == 3 || ae.IntValue() == 4;
+            bool afDone = af == null || af.IntValue() != 1 && af.IntValue() != 3;
+            if (Frames >= 6 && aeDone && afDone) Settled = true;
+        }
+    }
+
+    private sealed class StillListener(TaskCompletionSource<byte[]> done) : Java.Lang.Object, ImageReader.IOnImageAvailableListener
+    {
+        public int Width, Height;
+        public void OnImageAvailable(ImageReader reader)
+        {
+            Android.Media.Image image = null;
+            try
+            {
+                image = reader.AcquireNextImage();
+                if (image == null) return;
+                Width = image.Width; Height = image.Height;
+                Java.Nio.ByteBuffer buffer = image.GetPlanes()[0].Buffer;
+                var bytes = new byte[buffer.Remaining()];
+                buffer.Get(bytes);
+                done.TrySetResult(bytes);
+            }
+            catch (Exception ex) { done.TrySetException(ex); }
+            finally { image?.Close(); }
+        }
+    }
+
+    private sealed class StillCallback(TaskCompletionSource<byte[]> done) : CameraCaptureSession.CaptureCallback
+    {
+        public override void OnCaptureFailed(CameraCaptureSession session, CaptureRequest request, CaptureFailure failure) =>
+            done.TrySetException(new InvalidOperationException("The camera couldn't take the photo (" + failure.Reason + ")."));
+    }
+
+    /// <summary>
+    /// Takes one photo at the largest JPEG size the camera lists, into <paramref name="path"/>: a session with the analysis reader and a JPEG reader,
+    /// a short wait for exposure and focus to settle, then a still capture, then the session without the JPEG reader again (the preview and the
+    /// detectors pause briefly at both ends). The photo is upright (the JPEG orientation follows the preview's rotation).
+    /// </summary>
+    public async Task<PhotoResult> TakePhotoAsync(string path, CancellationToken token)
+    {
+        if (!CanRecordClip) throw new InvalidOperationException("Photos need the live camera, and it isn't running through Camera2.");
+        Interlocked.Increment(ref _photosPending);
+        try
+        {
+            await _recordGate.WaitAsync(token);
+            ImageReader jpeg = null;
+            bool done = false;
+            try
+            {
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+                var captured = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var listener = new StillListener(captured);
+                jpeg = ImageReader.NewInstance(_photoSize.Width, _photoSize.Height, ImageFormatType.Jpeg, 2);
+                jpeg.SetOnImageAvailableListener(listener, _handler);
+                var settle = new ConvergenceCallback();
+                await ConfigureSessionAsync(jpeg.Surface, repeatToExtra: false, settle, ControlAFMode.ContinuousPicture);
+                // Auto exposure and focus settle on the new session's first frames.
+                for (int i = 0; i < 30 && !settle.Settled; i++) await Task.Delay(50, token);
+                using (var request = _device.CreateCaptureRequest(CameraTemplate.StillCapture))
+                {
+                    request.AddTarget(jpeg.Surface);
+                    request.Set(CaptureRequest.ControlAfMode, (int)ControlAFMode.ContinuousPicture);
+                    request.Set(CaptureRequest.JpegOrientation, RotationDegrees?.Invoke() ?? 0);
+                    request.Set(CaptureRequest.JpegQuality, (Java.Lang.Byte)(sbyte)95);
+                    _session.Capture(request.Build(), new StillCallback(captured), _handler);
+                }
+                byte[] bytes = await captured.Task.WaitAsync(TimeSpan.FromSeconds(8), token);
+                await File.WriteAllBytesAsync(path, bytes, token);
+                done = true;
+                return new PhotoResult { Path = path, Width = listener.Width, Height = listener.Height, Bytes = bytes.Length };
+            }
+            finally
+            {
+                try
+                {
+                    if (!_stop.IsCancellationRequested && _device != null) await ConfigureSessionAsync(null);
+                }
+                catch (Exception) { }
+                try { jpeg?.Close(); } catch (Exception) { }
+                if (!done) { try { File.Delete(path); } catch (Exception) { } }
+                _recordGate.Release();
+            }
+        }
+        finally { Interlocked.Decrement(ref _photosPending); }
+    }
+
     /// <summary>
     /// Records <paramref name="seconds"/> of video (H.264, 720p, with sound from the microphone if asked) into an MP4 file while the preview and the
     /// detectors go on. Cancelling stops the recording and deletes the file.
@@ -235,6 +344,9 @@ internal sealed partial class LiveCamera
     public async Task<ClipResult> RecordClipAsync(int seconds, string path, bool withAudio, CancellationToken token)
     {
         if (!CanRecordClip) throw new InvalidOperationException("Video clips need the live camera, and it isn't running through Camera2.");
+        // A photo asked for with the clip comes first: it is quick, and the clip would hold the camera for its whole length.
+        await Task.Delay(150, token);
+        for (int i = 0; i < 200 && Volatile.Read(ref _photosPending) > 0; i++) await Task.Delay(50, token);
         await _recordGate.WaitAsync(token);
         MediaRecorder recorder = null;
         bool started = false, finished = false;
@@ -259,7 +371,7 @@ internal sealed partial class LiveCamera
             recorder.SetOrientationHint(RotationDegrees?.Invoke() ?? 0);
             recorder.Prepare();
             var clipStarted = Stopwatch.StartNew();
-            await ConfigureSessionAsync(recorder.Surface);
+            await ConfigureSessionAsync(recorder.Surface, repeatToExtra: true);
             recorder.Start();
             Android.Util.Log.Info("EmguLiteRT", "Clip session ready after " + clipStarted.ElapsedMilliseconds + " ms");
             started = true;

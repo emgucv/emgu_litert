@@ -3482,6 +3482,7 @@ namespace Maui.Demo.Lite
             ClearVisualSnapshots();
 #if ANDROID
             ClearVisualClips();
+            ClearVisualPhotos();
 #endif
             _transcript.Children.Clear();
             _transcript.Children.Add(_emptyLabel);

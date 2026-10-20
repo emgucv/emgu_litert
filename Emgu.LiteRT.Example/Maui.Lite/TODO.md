@@ -1366,3 +1366,25 @@ platforms are unchanged): a 640x480 YUV image reader gives the preview and the d
       (one empty read at startup on the S10 only) - and the recorded files' audio tracks (decoded on the Mac) had the same levels. So a clip can have sound
       while the sound monitors keep listening, without a single shared reader. Only these two phones and OS versions; Android's rules for concurrent capture
       depend on which app is in the foreground, so the app must be in front (as the camera needs anyway).
+
+## 44. Full-resolution photos as a visual-alert action — `take_photo` built for Android (Camera2); tested on a Galaxy S10 and a Pixel Fold
+
+`take_snapshot` is a frame of the 640x480 analysis stream. `take_photo` is a Camera2 still capture at the largest size the camera lists for JPEG.
+
+- [x] The action `take_photo` (no parameters; `VisualHostCatalog.Photo`, `CameraPhotoFactory`, Android only; the visual instructions tell the planner to use it for a
+      full resolution, high resolution or high quality photo and keep `take_snapshot` for a plain picture); `LiveCamera.TakePhotoAsync`: a session with the analysis
+      reader and a JPEG reader, a wait (at most 1.5 s) for auto exposure and focus to settle, a still request with JPEG quality 95 and the preview's rotation as the
+      JPEG orientation, then the session without the JPEG reader again; `LiteRtLmChatPage.VisualPhotos.cs`: a transcript card with a small thumbnail, the pixel size and
+      the file size, Open, Share and Save to gallery (`PictureGallery.SavePhotoAsync`, Pictures/Emgu LiteRT, copying the file); the latest five are kept in the cache
+      folder, New chat deletes them, session only, nothing sent to the model. A photo asked for together with a clip is taken first (the clip waits for it).
+- [x] Device results: Galaxy S10 4032x3024, ~3.3 MB, 1.8-1.9 s from call to card; Pixel Fold 4000x3000, ~4.2 MB, 1.3 s; EXIF orientation 6 on both (upright with the
+      phone held upright); preview and detector frames kept their 30 fps before and after, pausing briefly while the session is configured twice per photo; a photo
+      and a clip together: the photo at 1.4-1.9 s and the clip's card at 6.5-7.0 s (a 4 s clip); a photo cancelled halfway left no file or card.
+- [x] Gemma 4 E2B (GPU, both phones): "When you see a person, take a full resolution photo." -> `take_photo`; "Take a picture when a dog shows up." -> `take_snapshot`;
+      "When a cat appears, take a high quality photo and record a 5 second video." -> `take_photo` and `record_clip {"seconds":5}`.
+- [ ] Not run: a real detection triggering a photo (the action was called with a made-up event), the quality of the photos themselves (not looked at: only their
+      size and orientation were read), phones with other sensors, and the largest "high resolution" sizes some cameras list (e.g. 50 MP) - only the standard maximum
+      (12 MP here) is used, since Camera2 only guarantees that beside a preview stream.
+- [ ] A photo of the frame that triggered the alert (the photo is taken ~2 s after the alert fires, about a second after confirmation); a photo as a sound monitor's
+      action; the same on Mac Catalyst and Windows (their cameras are OpenCV's).
+

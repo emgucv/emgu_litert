@@ -27,7 +27,8 @@ public partial class LiteRtLmChatPage
         " Prefer coco-ssd-mobilenet-v3 for ordinary object monitors. Use the experimental coco-yolox-nano when the user asks for YOLOX." +
 #if ANDROID
         " For record a video or clip when an object appears, select record_clip with parameters {seconds: the requested length, default 10, from 3 to 30}. " +
-        "It records from the live camera with sound and shows the clip in this chat session; no automatic saving or model analysis. A request for both a picture and a clip uses take_snapshot and record_clip.";
+        "It records from the live camera with sound and shows the clip in this chat session; no automatic saving or model analysis. A request for both a picture and a clip uses take_snapshot and record_clip. " +
+        "For a full resolution, high resolution or high quality photo when an object appears, select take_photo (parameters {}), not take_snapshot; it is slower and shows the full-size photo in this chat session.";
 #else
         "";
 #endif
@@ -47,8 +48,12 @@ public partial class LiteRtLmChatPage
         _visualActions.Register(new CameraSnapshotFactory(TakeVisualSnapshotAsync));
 #if ANDROID
         _visualActions.Register(new CameraClipFactory(RecordVisualClipAsync));
-        // Clips are for the session: those of a session that ended without cleaning up (the app was killed) go now.
-        try { Directory.Delete(System.IO.Path.Combine(FileSystem.CacheDirectory, "clips"), true); } catch (Exception) { }
+        _visualActions.Register(new CameraPhotoFactory(TakeVisualPhotoAsync));
+        // Clips and photos are for the session: those of a session that ended without cleaning up (the app was killed) go now.
+        foreach (string folder in new[] { "clips", "photos" })
+        {
+            try { Directory.Delete(System.IO.Path.Combine(FileSystem.CacheDirectory, folder), true); } catch (Exception) { }
+        }
 #endif
         _visualRuntime = new VisualMonitorRuntime(_visualAgents, _visualActions, actionCoordinator: _alertAudio);
         _visualRuntime.Changed += QueueVisualMonitorUi;

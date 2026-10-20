@@ -55,4 +55,15 @@ public class UnitTestClipAction
         Assert.That(schema, Does.Contain("\"seconds\"").And.Contain("\"minimum\":3").And.Contain("\"maximum\":30").And.Contain("\"additionalProperties\":false"));
         Assert.That(clip.Description, Does.Contain("Android only"));
     }
+
+    [Test]
+    public void ThePhotoActionTakesNoParametersAndIsNotTheSnapshot()
+    {
+        VisualActionDescriptor photo = VisualHostCatalog.Photo;
+        Assert.That(photo.Id, Is.EqualTo("take_photo"));
+        Assert.That(photo.Id, Is.Not.EqualTo(VisualHostCatalog.Snapshot.Id));
+        Assert.That(photo.Available, Is.True);
+        Assert.That(photo.ParameterSchema.GetRawText(), Does.Contain("\"properties\":{}").And.Contain("\"additionalProperties\":false"));
+        Assert.That(photo.Description, Does.Contain("full-resolution").And.Contain("Android only"));
+    }
 }

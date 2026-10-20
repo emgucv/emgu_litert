@@ -67,3 +67,30 @@ internal sealed class CameraClipAction(Func<VisualEvent, int, CancellationToken,
     }
 }
 #endif
+
+#if ANDROID
+internal sealed class CameraPhotoFactory(Func<VisualEvent, CancellationToken, Task> take) : IVisualActionFactory
+{
+    public VisualActionDescriptor Descriptor => VisualHostCatalog.Photo;
+    public VisualActionBinding Bind(JsonElement parameters)
+    {
+        VisualActionParameters.AllowOnly(parameters);
+        return new VisualActionBinding(new CameraPhotoAction(take), VisualActionParameters.Empty);
+    }
+}
+
+internal sealed class CameraPhotoAction(Func<VisualEvent, CancellationToken, Task> take) : IVisualAction
+{
+    public string Id => "take_photo";
+    public async Task ExecuteAsync(VisualEvent occurrence, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        // A clip asked for with it may hold the camera first; the photo itself takes a few seconds.
+        timeout.CancelAfter(TimeSpan.FromSeconds(45));
+        try { await take(occurrence, timeout.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested && timeout.IsCancellationRequested)
+        { throw new TimeoutException("The photo took more than 45 seconds."); }
+    }
+}
+#endif
