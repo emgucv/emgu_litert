@@ -297,7 +297,7 @@ namespace Maui.Demo.Lite
                     string text = p.Stage + string.Format(CultureInfo.InvariantCulture, " ({0:F0} s)", watch.Elapsed.TotalSeconds);
                     MainThread.BeginInvokeOnMainThread(() => tile.Stage.Text = text);
                 }), cancel);
-                byte[] png = await Task.Run(() => EncodePng(result));
+                byte[] png = await Task.Run(() => AddPictureDetails(EncodePng(result), prompt, seed));
                 lock (_sendImages)
                     _sendImages.Add(png);
                 await MainThread.InvokeOnMainThreadAsync(() => ShowGeneratedImage(tile, png,
@@ -341,6 +341,15 @@ namespace Maui.Demo.Lite
             using Mat bgr = new Mat();
             CvInvoke.CvtColor(rgb, bgr, Emgu.CV.CvEnum.ColorConversion.Rgb2Bgr);
             return ImageUtil.Encode(bgr);
+        }
+
+        // The description and seed go into the PNG (PngMetadata): a saved chat keeps only the picture, and a saved or shared
+        // file then says how it was made.
+        private static byte[] AddPictureDetails(byte[] png, string prompt, long seed)
+        {
+            png = PngMetadata.AddText(png, "Description", prompt);
+            png = PngMetadata.AddText(png, "Seed", seed.ToString(CultureInfo.InvariantCulture));
+            return PngMetadata.AddText(png, "Software", "Emgu LiteRT, Z-Image-Turbo, 8 steps");
         }
 
         private sealed class ImageTile
@@ -414,37 +423,98 @@ namespace Maui.Demo.Lite
             {
                 Source = ImageUtil.ToImageSource(png),
                 Aspect = Aspect.AspectFit,
-                HeightRequest = Math.Max(240, Math.Min(Width, Height) * 0.65)
+                HeightRequest = Math.Max(200, Math.Min(Width, Height) * 0.45)
             };
-            var save = new Button { Text = "Save image…", FontFamily = Theme.TitleFont, HorizontalOptions = LayoutOptions.Fill };
+            var details = PngMetadata.ReadText(png);
+            details.TryGetValue("Description", out string description);
+            details.TryGetValue("Seed", out string seed);
             var status = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText, IsVisible = false };
-            SemanticProperties.SetDescription(save, "Save the original generated image as a PNG file");
-            string fileName = "generated-image-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".png";
-            save.Clicked += async (_, _) =>
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            string fileName = "generated-image-" + stamp + ".png";
+            var content = new VerticalStackLayout { Spacing = 10 };
+            content.Children.Add(image);
+            if (!string.IsNullOrEmpty(description))
             {
-                if (!save.IsEnabled) return;
-                save.IsEnabled = false;
+                // What it was drawn from, so it can be made again; the seed is what makes this exact picture.
+                var caption = new Label
+                {
+                    Text = description + (string.IsNullOrEmpty(seed) ? "" : "\nSeed " + seed + " · 8 steps"),
+                    FontFamily = Theme.BodyFont, FontSize = 13, TextColor = Theme.PrimaryText
+                };
+                SemanticProperties.SetDescription(caption, "Description and seed of this picture");
+                content.Children.Add(caption);
+            }
+
+            Button Action(string text, string hint)
+            {
+                var b = new Button { Text = text, FontFamily = Theme.TitleFont, HorizontalOptions = LayoutOptions.Fill };
+                SemanticProperties.SetDescription(b, hint);
+                return b;
+            }
+            // Runs a button's work with the button off, and tells the user how it went.
+            async Task Run(Button button, Func<Task<string>> work)
+            {
+                if (!button.IsEnabled) return;
+                button.IsEnabled = false;
                 status.IsVisible = false;
                 try
                 {
-                    using var stream = new System.IO.MemoryStream(png, writable: false);
-                    var result = await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream);
-                    if (result.IsSuccessful)
+                    string done = await work();
+                    if (done != null)
                     {
-                        status.Text = "Saved to " + result.FilePath;
+                        status.Text = done;
                         status.IsVisible = true;
                     }
-                    else if (!SaveWasCancelled(result.Exception))
-                        throw result.Exception ?? new System.IO.IOException("The image could not be saved.");
                 }
                 catch (OperationCanceledException) { }
                 catch (Exception ex)
                 {
-                    await DisplayAlertAsync("Couldn't save image", ex.Message, "OK");
+                    await DisplayAlertAsync("Couldn't " + button.Text.TrimEnd('…').ToLowerInvariant(), ex.Message, "OK");
                 }
-                finally { save.IsEnabled = true; }
+                finally { button.IsEnabled = true; }
+            }
+
+            var again = Action("Draw it again", "Draw the same description again with a new seed");
+            again.IsVisible = !string.IsNullOrEmpty(description);
+            again.Clicked += (_, _) => _sheet.Dismiss("again");
+            var gallery = Action("Add to " + PictureGallery.DestinationName, "Add the picture to the device's " + PictureGallery.DestinationName);
+            gallery.Clicked += async (_, _) => await Run(gallery, async () => await PictureGallery.SaveAsync(png, fileName));
+            var share = Action("Share…", "Share the picture with another app");
+            share.Clicked += async (_, _) => await Run(share, async () =>
+            {
+                string path = System.IO.Path.Combine(FileSystem.CacheDirectory, fileName);
+                await System.IO.File.WriteAllBytesAsync(path, png);
+                await Share.Default.RequestAsync(new ShareFileRequest { Title = "Picture", File = new ShareFile(path, "image/png") });
+                return null;
+            });
+            var save = Action("Save image…", "Save the original generated image as a PNG file");
+            save.Clicked += async (_, _) => await Run(save, async () =>
+            {
+                using var stream = new System.IO.MemoryStream(png, writable: false);
+                var result = await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream);
+                if (result.IsSuccessful)
+                    return "Saved to " + result.FilePath;
+                if (!SaveWasCancelled(result.Exception))
+                    throw result.Exception ?? new System.IO.IOException("The image could not be saved.");
+                return null;
+            });
+            // Two by two, so the sheet doesn't need scrolling to reach them.
+            var buttons = new Grid
+            {
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) },
+                RowDefinitions = { new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto) },
+                ColumnSpacing = 8,
+                RowSpacing = 8
             };
-            await _sheet.ShowViewAsync("Picture", new VerticalStackLayout { Spacing = 10, Children = { image, save, status } }, "Close");
+            buttons.Add(again, 0, 0);
+            buttons.Add(gallery, 1, 0);
+            buttons.Add(share, 0, 1);
+            buttons.Add(save, 1, 1);
+            content.Children.Add(buttons);
+            content.Children.Add(status);
+            string choice = await _sheet.ShowViewAsync("Picture", content, "Close");
+            if (choice == "again" && !string.IsNullOrEmpty(description) && !_busy)
+                await SendAsync("Draw this again, using exactly this description: " + description, new List<PendingAttachment>());
         }
 
         private async Task ReleaseImageModelAsync()

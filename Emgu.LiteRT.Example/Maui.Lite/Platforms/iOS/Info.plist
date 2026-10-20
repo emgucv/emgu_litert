@@ -59,6 +59,8 @@
 	<string>The LiteRT-LM chat turns your voice into text for models that don't understand speech, such as a model on your own server.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>The LiteRT-LM chat records your voice to send it to the on-device language model.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Lets the app add the pictures it draws to your Photos library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>With "Search my photos" on, the LiteRT-LM chat indexes your photos on this device so it can find them by what is in them. The photos and their index stay on the device.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

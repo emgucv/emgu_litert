@@ -358,16 +358,28 @@ model changes, filtering, and deletion. Windows (2026-10-17): the setting indexe
 Windows CPU verification with EmbeddingGemma 2 Text Vision 440M and Gemma 4 E2B passed: semantic queries retrieved
 the correct saved chats, and Gemma called `search_chats` and answered from the returned travel decision.
 
-## 17. Image generation extras
+## 17. Image generation extras — implemented; verified on Mac Catalyst (draw again) and a Galaxy S10 (gallery)
 
-- [ ] "Draw it again" with a new seed (a button on the picture, or the model calls the tool again with the same
-      description).
+The enlarged picture (tap it) now has a description and seed line and four buttons, two by two: "Draw it again", "Add to Photos" (the
+gallery / the Pictures folder), "Share..." and "Save image...".
+
+- [x] "Draw it again" with a new seed: closes the sheet and sends "Draw this again, using exactly this description: <description>", so the
+      model calls `generate_image` (every call draws with a fresh random seed) and the new picture is saved with the chat like any other
+      (a first wording, "...with a new variation", made Gemma 4 E2B add ", different variation" to the description). On Mac Catalyst: the first
+      picture had seed 142740836243, the second - the same description - 1080209213654, 69 s warm (222 s with the model cold).
 - [x] Save the original PNG to a user-selected file from the enlarged image view, including images reopened from saved
       chats (`CommunityToolkit.Maui.Core` FileSaver). Windows save dialog verified, and a cancelled dialog no longer shows a
       "Couldn't save" alert (the Windows picker reports a cancel as a plain exception).
-- [ ] Save the picture to Photos / the gallery.
-- [ ] Share the picture (MAUI `Share`).
-- [ ] Show the description and seed under the picture (tap), so a picture can be made again.
+- [x] Save the picture to Photos / the gallery (`PictureGallery.cs`): Android - MediaStore, Pictures/Emgu LiteRT (no permission needed to add
+      one's own pictures from Android 10; verified on the S10: the file was in the gallery with its mime type, then deleted); iOS and Mac
+      Catalyst - the Photos library through PhotoKit with add-only access (new `NSPhotoLibraryAddUsageDescription` in both Info.plist files;
+      compiled, not run, since the system asks the user the first time); Windows - the Pictures folder (not run).
+- [x] Share the picture (MAUI `Share` with a PNG in the cache folder): compiled; the share sheet wasn't opened.
+- [x] Show the description and seed under the picture (in the enlarged view): kept in the PNG itself as iTXt chunks (`PngMetadata.cs`:
+      Description, Seed, Software), so a saved chat shows them again - the picture is all the chat keeps - and a saved or shared file
+      says how it was made. `UnitTestPngMetadata` (round trip, UTF-8, first keyword wins, valid CRCs, other data untouched).
+- [ ] Pictures made before this have no description: the sheet shows only the picture and the buttons (without "Draw it again").
+- [ ] Try the Photos, Share and Save buttons by hand on an iPhone / Windows; the share sheet and the Photos permission prompt weren't driven.
 
 ## 18. Agent tool: create documents (`create_document`) — implemented; verified on Mac Catalyst with Gemma 4 E2B
 
