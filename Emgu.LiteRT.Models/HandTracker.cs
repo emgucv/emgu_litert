@@ -6,7 +6,7 @@ using System.Linq;
 namespace Emgu.LiteRT.Models
 {
     /// <summary>
-    /// The rotated square around a hand, found from a palm detection: where the landmark model is run. Coordinates are
+    /// The rotated square around a hand (from a palm detection) or a body (from a pose detection): where the landmark model is run. Coordinates are
     /// fractions of the image; <see cref="Rotation"/> is in radians (0 for a hand with its fingers up).
     /// </summary>
     public sealed class HandRect

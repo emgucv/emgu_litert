@@ -161,6 +161,10 @@ def curated():
         copyright="Google LLC / The MediaPipe Authors", url="https://github.com/google-ai-edge/mediapipe",
         used_for="Hand gesture demo: the palm detector, hand landmark model, gesture embedder and classifier of MediaPipe's "
         "gesture_recognizer.task, downloaded from Google on first use (not part of the app); the sample hand photos are MediaPipe's test images")
+    add(model, "MediaPipe pose landmarker (BlazePose)", "Apache-2.0", APACHE,
+        copyright="Google LLC / The MediaPipe Authors", url="https://github.com/google-ai-edge/mediapipe",
+        used_for="Body pose demo: the pose detector and pose landmark models of MediaPipe's pose_landmarker_{lite,full,heavy}.task (the model card says "
+        "Apache-2.0), downloaded from Google on first use (not part of the app); the sample photo is MediaPipe's test image")
     add(model, "YAMNet", "Apache-2.0", APACHE,
         copyright="Google LLC / The TensorFlow Authors", url="https://github.com/tensorflow/models/tree/master/research/audioset/yamnet",
         used_for="Sound event demo: the audio classifier as MediaPipe ships it (its metadata says Apache-2.0), downloaded from Google on first "

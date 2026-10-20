@@ -18,9 +18,12 @@ For an image it returns, for up to two hands: the palm score, 21 landmarks (x an
   SHA-256 `97952348cf6a6a4915c2ea1496b4b37ebabc50cbbf80571435643c455f2b0482`. It is a zip with `hand_landmarker.task`
   (`hand_detector.tflite`, `hand_landmarks_detector.tflite`) and `hand_gesture_recognizer.task` (`gesture_embedder.tflite`,
   `canned_gesture_classifier.tflite`), each a zip too.
-- **The model files' own licence terms haven't been confirmed.** Google's documentation pages say the page content is CC BY 4.0 and the code
-  samples Apache-2.0; the model cards (linked from the MediaPipe docs) are the place to check. So the bundle is **not** copied to Emgu's S3:
-  the demo and the test download it from Google's storage, check the hash and unpack it (`HandModelFiles`). Decide before hosting or bundling it.
+- **Licences (checked 2026-10-20 against the model cards).** The hand landmark card ("Model Card Hand Tracking (Lite_Full) with Fairness Oct
+  2021") says "LICENSED UNDER Apache License, Version 2.0"; the gesture classifier's card ("model_card_hand_gesture_classification_with_faireness_2022")
+  states no licence at all, only its intended and out-of-scope uses. Both list surveillance and identity recognition as out of scope, and neither
+  is for human life-critical decisions. Google's documentation pages say the page content is CC BY 4.0 and the code samples Apache-2.0. The
+  bundle is **not** copied to Emgu's S3: the demo and the test download it from Google's storage, check the hash and unpack it
+  (`HandModelFiles`). The classifier's missing licence line is the open point before hosting or bundling it.
 - The sample photos (`Resources/Raw/hand_*.jpg`) are MediaPipe's test images (its Apache-2.0 repository's test data, from Google's
   `mediapipe-assets` storage), used as in MediaPipe's own tests.
 

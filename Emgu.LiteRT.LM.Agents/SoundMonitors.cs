@@ -473,6 +473,8 @@ namespace Emgu.LiteRT.LM.Agents.Audio
 
         /// <summary>The same tools, and with <paramref name="cameraActions"/> the monitor can also record a video clip or take a photo (the host's camera).</summary>
         /// <param name="create">sound, minimumSeconds, playSound, speakText, threshold, clipSeconds (0 for none), takePhoto</param>
+        /// <param name="list">The monitors as text</param>
+        /// <param name="control">monitorId, operation (pause, resume, remove)</param>
         /// <param name="cameraActions">Whether the host can record clips and take photos</param>
         public static IList<AITool> Create(Func<string, double, bool, string, double, int, bool, CancellationToken, Task<string>> create,
             Func<string> list, Func<string, string, CancellationToken, Task<string>> control, bool cameraActions)
