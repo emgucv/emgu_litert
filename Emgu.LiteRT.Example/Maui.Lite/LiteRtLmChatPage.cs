@@ -462,6 +462,42 @@ namespace Maui.Demo.Lite
                 VerticalOptions = LayoutOptions.Center
             }, 0, 0);
             readAloudRow.Add(_readAloudSwitch, 1, 0);
+            // The language voice messages are recognized in (SpeechToText): the device's language unless chosen.
+            string voiceLanguage = string.Empty;
+            try { voiceLanguage = Preferences.Default.Get(SpeechToText.LanguagePreference, string.Empty); } catch (Exception) { }
+            var voiceLanguagePicker = new Picker
+            {
+                Title = "Voice language",
+                FontFamily = Theme.BodyFont,
+                FontSize = 15,
+                TextColor = Theme.PrimaryText,
+                TitleColor = Theme.SecondaryText
+            };
+            voiceLanguagePicker.Items.Add("Device language");
+            foreach (var language in VoiceLanguages.All)
+                voiceLanguagePicker.Items.Add(language.Name);
+            voiceLanguagePicker.SelectedIndex = Math.Max(0, VoiceLanguages.All.ToList().FindIndex(l => string.Equals(l.Tag, voiceLanguage, StringComparison.OrdinalIgnoreCase)) + 1);
+            voiceLanguagePicker.SelectedIndexChanged += (s, e) =>
+            {
+                string tag = voiceLanguagePicker.SelectedIndex <= 0 ? string.Empty : VoiceLanguages.All[voiceLanguagePicker.SelectedIndex - 1].Tag;
+                try { Preferences.Default.Set(SpeechToText.LanguagePreference, tag); } catch (Exception) { }
+            };
+            SemanticProperties.SetDescription(voiceLanguagePicker, "The language you speak in voice messages");
+            var voiceLanguageRow = new VerticalStackLayout
+            {
+                Spacing = 2,
+                IsVisible = SpeechToText.IsSupported,
+                Children =
+                {
+                    new Label { Text = "Voice language", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText },
+                    voiceLanguagePicker,
+                    new Label
+                    {
+                        Text = "The language of your voice messages, for the speech recognizer that writes them down - the words models that can't hear audio (Qwen, your own server) are given, and the transcript under a voice message. By default it listens in the device's language, so choose yours when it differs. The phone may need to download that language for offline use.",
+                        FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText
+                    }
+                }
+            };
             _tavilyKeyEntry = new Entry
             {
                 Placeholder = "Tavily API key (required for web search)",
@@ -579,6 +615,7 @@ namespace Maui.Demo.Lite
                     CpuThreadSettings.CreateView(ReloadCpuModelsAsync),
                     Theme.Divider(),
                     readAloudRow,
+                    voiceLanguageRow,
                     Theme.Divider(),
                     new Label { Text = "Web search", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     new Label

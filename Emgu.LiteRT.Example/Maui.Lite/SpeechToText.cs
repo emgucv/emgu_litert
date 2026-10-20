@@ -20,6 +20,20 @@ namespace Maui.Demo.Lite
     /// </summary>
     internal static class SpeechToText
     {
+        /// <summary>Preferences key of Settings > "Voice language": a BCP-47 tag, or "" for the device's language.</summary>
+        public const string LanguagePreference = "litert_lm_chat_voice_language";
+
+        /// <summary>The language to recognize: the one chosen in Settings, else the device's.</summary>
+        public static string LanguageTag
+        {
+            get
+            {
+                string chosen = string.Empty;
+                try { chosen = Preferences.Default.Get(LanguagePreference, string.Empty); } catch (Exception) { }
+                return VoiceLanguages.Resolve(chosen, System.Globalization.CultureInfo.CurrentUICulture.Name);
+            }
+        }
+
         public static bool IsSupported
         {
             get
@@ -118,15 +132,13 @@ namespace Maui.Demo.Lite
             Listener listener = new Listener();
             try
             {
-                await MainThread.InvokeOnMainThreadAsync(() =>
+                string tag = LanguageTag;
+                listener.Tag = tag;
+                await MainThread.InvokeOnMainThreadAsync(async () =>
                 {
-                    recognizer = Android.Speech.SpeechRecognizer.IsOnDeviceRecognitionAvailable(context)
-                        ? Android.Speech.SpeechRecognizer.CreateOnDeviceSpeechRecognizer(context)
-                        : Android.Speech.SpeechRecognizer.CreateSpeechRecognizer(context);
-                    recognizer.SetRecognitionListener(listener);
                     var intent = new Android.Content.Intent(Android.Speech.RecognizerIntent.ActionRecognizeSpeech);
                     intent.PutExtra(Android.Speech.RecognizerIntent.ExtraLanguageModel, Android.Speech.RecognizerIntent.LanguageModelFreeForm);
-                    intent.PutExtra(Android.Speech.RecognizerIntent.ExtraLanguage, Java.Util.Locale.Default.ToLanguageTag());
+                    intent.PutExtra(Android.Speech.RecognizerIntent.ExtraLanguage, tag);
                     intent.PutExtra(Android.Speech.RecognizerIntent.ExtraPreferOffline, true);
                     intent.PutExtra(Android.Speech.RecognizerIntent.ExtraPartialResults, true);
                     // A segmented session: the recognizer splits the recording at pauses and reports each stretch's words
@@ -136,6 +148,28 @@ namespace Maui.Demo.Lite
                     intent.PutExtra(Android.Speech.RecognizerIntent.ExtraAudioSourceChannelCount, 1);
                     intent.PutExtra(Android.Speech.RecognizerIntent.ExtraAudioSourceEncoding, (int)Android.Media.Encoding.Pcm16bit);
                     intent.PutExtra(Android.Speech.RecognizerIntent.ExtraAudioSourceSamplingRate, VoiceRecorder.SampleRate);
+                    recognizer = Android.Speech.SpeechRecognizer.IsOnDeviceRecognitionAvailable(context)
+                        ? Android.Speech.SpeechRecognizer.CreateOnDeviceSpeechRecognizer(context)
+                        : Android.Speech.SpeechRecognizer.CreateSpeechRecognizer(context);
+                    // The on-device recognizer listens only in the languages installed on the device (the device's own
+                    // by default): for another, ask for it to be installed for next time and use the normal recognizer,
+                    // which can recognize it online.
+                    Android.Speech.RecognitionSupport support = await CheckSupportAsync(recognizer, intent, context);
+                    if (support != null && !VoiceLanguages.IsListed(support.InstalledOnDeviceLanguages, tag))
+                    {
+                        bool downloading = VoiceLanguages.IsListed(support.SupportedOnDeviceLanguages, tag);
+                        if (downloading)
+                            recognizer.TriggerModelDownload(intent);
+                        recognizer.Destroy();
+                        // The normal recognizer (Google's service, which can use the network) lists the online languages.
+                        recognizer = Android.Speech.SpeechRecognizer.CreateSpeechRecognizer(context);
+                        Android.Speech.RecognitionSupport online = await CheckSupportAsync(recognizer, intent, context);
+                        if (online != null && !VoiceLanguages.IsListed(online.OnlineLanguages, tag)
+                            && !VoiceLanguages.IsListed(online.InstalledOnDeviceLanguages, tag))
+                            throw new InvalidOperationException(LanguageUnavailableMessage(tag, downloading));
+                        intent.PutExtra(Android.Speech.RecognizerIntent.ExtraPreferOffline, false);
+                    }
+                    recognizer.SetRecognitionListener(listener);
                     recognizer.StartListening(intent);
                 });
                 await Task.WhenAny(listener.Ready, listener.Done, Task.Delay(2000, token));
@@ -162,6 +196,71 @@ namespace Maui.Demo.Lite
                     catch (Exception) { }
                 });
             }
+        }
+
+        // What the recognizer can do in each language (Android 13+): installed on the device, downloadable, online. Null if it
+        // doesn't say within three seconds.
+        [System.Runtime.Versioning.SupportedOSPlatform("android33.0")]
+        private static async Task<Android.Speech.RecognitionSupport> CheckSupportAsync(
+            Android.Speech.SpeechRecognizer recognizer, Android.Content.Intent intent, Android.Content.Context context)
+        {
+            var result = new TaskCompletionSource<Android.Speech.RecognitionSupport>(TaskCreationOptions.RunContinuationsAsynchronously);
+            try
+            {
+                recognizer.CheckRecognitionSupport(intent, context.MainExecutor, new SupportCallback(result));
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+            Task finished = await Task.WhenAny(result.Task, Task.Delay(3000));
+            return finished == result.Task ? await result.Task : null;
+        }
+
+        private sealed class SupportCallback : Java.Lang.Object, Android.Speech.IRecognitionSupportCallback
+        {
+            private readonly TaskCompletionSource<Android.Speech.RecognitionSupport> _result;
+            public SupportCallback(TaskCompletionSource<Android.Speech.RecognitionSupport> result) { _result = result; }
+            public void OnSupportResult(Android.Speech.RecognitionSupport recognitionSupport) => _result.TrySetResult(recognitionSupport);
+            public void OnError(int error) => _result.TrySetResult(null);
+        }
+
+        internal static string LanguageUnavailableMessage(string tag, bool downloadRequested = false) =>
+            "Speech recognition isn't available for " + VoiceLanguages.NameOf(tag) + " on this phone: its offline speech language isn't " +
+            "installed" + (downloadRequested ? " (a download was requested - try again in a few minutes)" : "") +
+            " and it isn't offered online. Choose the language in Settings > Voice language.";
+
+        /// <summary>What the phone's recognizers say about a language, for diagnosing: installed, downloadable and online languages.</summary>
+        [System.Runtime.Versioning.SupportedOSPlatform("android33.0")]
+        internal static async Task<string> DescribeSupportAsync(string tag)
+        {
+            var context = Android.App.Application.Context;
+            var intent = new Android.Content.Intent(Android.Speech.RecognizerIntent.ActionRecognizeSpeech);
+            intent.PutExtra(Android.Speech.RecognizerIntent.ExtraLanguageModel, Android.Speech.RecognizerIntent.LanguageModelFreeForm);
+            intent.PutExtra(Android.Speech.RecognizerIntent.ExtraLanguage, tag);
+            var lines = new List<string>();
+            foreach (bool onDevice in new[] { true, false })
+            {
+                if (onDevice && !Android.Speech.SpeechRecognizer.IsOnDeviceRecognitionAvailable(context))
+                {
+                    lines.Add("on-device recognizer: not available");
+                    continue;
+                }
+                Android.Speech.SpeechRecognizer recognizer = null;
+                Android.Speech.RecognitionSupport support = null;
+                await MainThread.InvokeOnMainThreadAsync(async () =>
+                {
+                    recognizer = onDevice ? Android.Speech.SpeechRecognizer.CreateOnDeviceSpeechRecognizer(context)
+                        : Android.Speech.SpeechRecognizer.CreateSpeechRecognizer(context);
+                    support = await CheckSupportAsync(recognizer, intent, context);
+                    recognizer.Destroy();
+                });
+                string List(IList<string> items) => items == null ? "-" : string.Join(",", items);
+                lines.Add((onDevice ? "on-device" : "normal") + " recognizer: " + (support == null ? "no answer" :
+                    "installed [" + List(support.InstalledOnDeviceLanguages) + "] supported on device [" + List(support.SupportedOnDeviceLanguages) +
+                    "] pending [" + List(support.PendingOnDeviceLanguages) + "] online [" + List(support.OnlineLanguages) + "]"));
+            }
+            return string.Join("\n", lines);
         }
 
         // Writes the samples, then 0.6 s of silence, 20 ms at a time at the speed they were recorded.
@@ -204,6 +303,9 @@ namespace Maui.Demo.Lite
 
             public Task<string> Done => _done.Task;
             public Task Ready => _ready.Task;
+
+            // The language asked for, for the error message.
+            public string Tag { get; set; }
 
             // Set once the input has ended: an error after that (StopListening can report "Client") just ends it.
             public bool Stopping { get; set; }
@@ -252,6 +354,9 @@ namespace Maui.Demo.Lite
             {
                 if (error == Android.Speech.SpeechRecognizerError.ServerDisconnected)
                     _done.TrySetException(new RecognizerDisconnectedException());
+                else if ((error == Android.Speech.SpeechRecognizerError.LanguageNotSupported || error == Android.Speech.SpeechRecognizerError.LanguageUnavailable)
+                    && _stretches.Count == 0 && _partial.Length == 0)
+                    _done.TrySetException(new InvalidOperationException(LanguageUnavailableMessage(Tag)));
                 // No words heard is a result, not a failure.
                 else if (Stopping || _stretches.Count > 0 || _partial.Length > 0 || error == Android.Speech.SpeechRecognizerError.NoMatch
                     || error == Android.Speech.SpeechRecognizerError.SpeechTimeout)
@@ -284,9 +389,17 @@ namespace Maui.Demo.Lite
             if (await authorized.Task != Speech.SFSpeechRecognizerAuthorizationStatus.Authorized)
                 throw new UnauthorizedAccessException("Speech recognition isn't allowed. Turn it on for this app in the system's privacy settings.");
 
-            Speech.SFSpeechRecognizer recognizer = new Speech.SFSpeechRecognizer(Foundation.NSLocale.CurrentLocale) ?? new Speech.SFSpeechRecognizer();
-            if (recognizer == null || !recognizer.Available)
-                throw new InvalidOperationException("Speech recognition isn't available for this language right now.");
+            // The language chosen in Settings, else the device's.
+            string chosen = string.Empty;
+            try { chosen = Preferences.Default.Get(LanguagePreference, string.Empty); } catch (Exception) { }
+            string tag = string.IsNullOrWhiteSpace(chosen) ? null : VoiceLanguages.Resolve(chosen, null);
+            Speech.SFSpeechRecognizer recognizer = tag != null
+                ? new Speech.SFSpeechRecognizer(new Foundation.NSLocale(tag))
+                : new Speech.SFSpeechRecognizer(Foundation.NSLocale.CurrentLocale) ?? new Speech.SFSpeechRecognizer();
+            if (recognizer == null)
+                throw new InvalidOperationException("Speech recognition isn't supported for " + VoiceLanguages.NameOf(tag) + ". Choose another language in Settings > Voice language.");
+            if (!recognizer.Available)
+                throw new InvalidOperationException("Speech recognition isn't available for " + (tag != null ? VoiceLanguages.NameOf(tag) : "this language") + " right now.");
 
             string path = Path.Combine(Path.GetTempPath(), "speech-" + Guid.NewGuid().ToString("N") + ".wav");
             await File.WriteAllBytesAsync(path, wav, token);

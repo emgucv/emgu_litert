@@ -510,6 +510,18 @@ speak again.
       made the chat's title and was shown after reopening the chat. `UnitTestVoiceTranscript` (the store: the words, the title rule, empty
       words and private chats, also the language and translated-thinking columns of item 39).
 - [ ] Windows has no speech recognizer for this; an option to not keep the audio (only the words); the transcript isn't in the chat search.
+- [x] Voice language (Settings > "Voice language": Device language, English, 中文 (普通话/繁體), 粵語, 日本語, 한국어, Español, Français, Deutsch, ... -
+      `VoiceLanguages.cs`, Preferences `litert_lm_chat_voice_language`). `SpeechToText` told the recognizer to listen in the device's language, so
+      Chinese voice messages to an LM Studio model (which can't hear audio, so every one goes through the recognizer) came out as nothing on an English
+      phone ("I didn't catch any words"). It now uses the chosen language: Android 13+ checks what the phone's recognizer supports for it
+      (`CheckRecognitionSupport`: the on-device recognizer listens only in the installed languages, e.g. [ja-JP, en-US] on the Fold, lists Mandarin as
+      `cmn-Hans-CN`), requests the download of a downloadable language and uses the normal recognizer, which can use the network, meanwhile; a language
+      the phone doesn't offer gets an explaining message instead of an empty result. iOS and Mac Catalyst give `SFSpeechRecognizer` the chosen locale
+      (built, not run). On the Pixel Fold, with `say`-made recordings: the Chinese sentence with the device language (en-US) gave "" - the reported problem -
+      and with 中文 "明天早上去波士顿的火车几点出发" (right), the Japanese one with 日本語 "明日の朝ボストンきの電車は何時に出ますか" (one particle missing).
+      `UnitTestVoiceLanguages` (the tags, Android's Mandarin names, matching a recognizer's list).
+- [ ] An automatic mode (Android 13+ `EXTRA_ENABLE_LANGUAGE_DETECTION` with the languages the user speaks); the language pack download isn't shown to the user
+      (only the message to try again); the voice chat (hands-free) uses the same setting but has no way to change it on its full-screen view.
 
 ## 23. Task mode: multi-step tasks with a visible plan
 
