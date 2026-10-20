@@ -1259,3 +1259,29 @@ translated for display: **on request**, so unread thinking costs nothing.
 - [ ] Translate automatically after each reply (an option), if opening it often makes the wait a nuisance; a Settings switch "Think in my language"
       that asks for the thinking in the user's language instead - test whether the thinking gets worse (accuracy, tool calls, length) first.
 - [ ] Try it on a phone (Android: the same code with ML Kit; the Catalyst run used Apple's recognizer for Spanish and German).
+
+## 40. Hand gestures for the visual agents — prototype: MediaPipe's hand tracking on LiteRT; photo page only
+
+Real-time hand-gesture recognition for the camera agents ("take a picture when I give a thumbs up"). Details, contract and numbers in
+[HAND_GESTURES.md](HAND_GESTURES.md).
+
+- [x] `Emgu.LiteRT.Models/HandTracker.cs`: MediaPipe's palm detector, hand landmark model (21 landmarks, world landmarks, handedness) and gesture
+      embedder + classifier (closed fist, open palm, pointing up, thumb down, thumb up, victory, I love you, none) through `CompiledModel`, in C# with
+      no MediaPipe library; `HandModelFiles` unpacks Google's `gesture_recognizer.task` (8.4 MB, version 1, SHA-256 pinned) and sets the classifier's
+      dynamic batch dimension to 1 (CompiledModel can't run `-1`); the demo's `HandImageInput` (OpenCV) letterboxes and warps the images.
+- [x] The pipeline was first rebuilt in Python on the raw `.tflite` files and compared with MediaPipe's own Python Tasks API: the same gesture and
+      handedness on all five of its test images, landmarks within 14 px (mean offset 0-2 px); the detector wants 0..1 input and the gesture features
+      must not be rotated (rotating them broke `Thumb_Up`). `UnitTestHandTracker`: the anchors, letterbox, palm decoding and NMS, the hand rect and
+      its corners, landmark projection, gesture features, unpacking and the batch patch (model-free), and the whole pipeline against MediaPipe's
+      results and a no-hand image on the CPU and, explicitly, the Metal GPU (both pass).
+- [x] Speed: the vision models fit the GPU fully (M1: detector 2.2 ms, landmarks 2.0 ms against 7.8 and 5-6 on the CPU), but a whole frame on the
+      phones is as fast or faster on the CPU (4 threads: S10 19 ms, Fold 14-16 ms) than the GPU (27 and 26-32 ms), so the page defaults to the CPU.
+      Right gestures for all five photos on both phones, CPU and GPU.
+- [x] A "Hand gestures" photo page (`HandGesturePage.cs`, `HandGestureDetector.cs`): the skeleton of each hand, the gesture and its score; the
+      sample photos are MediaPipe's test images (`Resources/Raw/hand_*.jpg`); the licences page lists MediaPipe. Run on Mac Catalyst (a thumb up: 69%,
+      23 ms).
+- [ ] The model files' own licence terms (the model cards) before they are bundled or hosted; now they are downloaded from Google.
+- [ ] A live-camera `hand-gesture` visual agent: the gestures as its classes, monitors with a hold time, MediaPipe's video-mode tracking (the next
+      frame's hand rect from the previous landmarks, the palm detector only when the hand is lost) to halve the work; selfie cameras are mirrored,
+      which swaps left and right.
+- [ ] More gestures (OK, wave, rock) from the landmarks with rules, or a custom classifier on the gesture embedder.
