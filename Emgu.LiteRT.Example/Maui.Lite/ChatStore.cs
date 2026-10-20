@@ -133,6 +133,12 @@ namespace Maui.Demo.Lite
         public string ThinkingTranslation { get; set; }
 
         /// <summary>
+        /// The words of a voice message the model was given as audio (the platform's speech recognizer wrote them down
+        /// for the transcript; the model doesn't see them). Null: none, or not recognized.
+        /// </summary>
+        public string Transcript { get; set; }
+
+        /// <summary>
         /// What the model was given with a user message besides its text: excerpts of an attached document (null if
         /// none). The model sees it before the message; the transcript shows only the message.
         /// </summary>
@@ -305,6 +311,19 @@ namespace Maui.Demo.Lite
             };
             await (await Db).InsertAsync(conversation);
             return conversation.Id;
+        }
+
+        /// <summary>
+        /// Keep the words of a voice message; a chat still titled "Voice message" is titled with them.
+        /// </summary>
+        public async Task SetTranscriptAsync(int conversationId, int messageId, string transcript)
+        {
+            if (IsPrivateSession || messageId <= 0 || string.IsNullOrWhiteSpace(transcript)) return;
+            SQLiteAsyncConnection db = await Db;
+            await db.ExecuteAsync("UPDATE Message SET Transcript = ? WHERE Id = ?", transcript.Trim(), messageId);
+            if (await db.ExecuteAsync("UPDATE Conversation SET Title = ? WHERE Id = ? AND Title = ?",
+                    Shorten(transcript, 60), conversationId, "Voice message") > 0)
+                ChatsChanged?.Invoke();
         }
 
         /// <summary>Keep a reply's thinking translated into a language (shown again when the chat is reopened).</summary>

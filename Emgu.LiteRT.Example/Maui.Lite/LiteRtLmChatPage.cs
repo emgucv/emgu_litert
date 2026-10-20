@@ -252,6 +252,10 @@ namespace Maui.Demo.Lite
             public string Text;
             // A user message's language (two-letter code), or null (LiteRtLmChatPage.Translation.cs).
             public string Language;
+            // The words of a voice message the model was given as audio (written down by the platform's speech recognizer
+            // for the transcript, not given to the model), and the task that is writing them down.
+            public string Transcript;
+            public Task TranscriptTask;
             // Given to the model before the text of a user message: excerpts of the attached document (or null).
             public string Context;
             public string ModelText => string.IsNullOrEmpty(Context) ? Text : Context + Text;
@@ -1695,13 +1699,18 @@ namespace Maui.Demo.Lite
                     attachments.Add(document.Image);
                 // Where a "summarized" divider goes if this message makes the chat compact.
                 int dividerIndex = _transcript.Children.Contains(_emptyLabel) ? 0 : _transcript.Children.Count;
-                AddUserMessage(prompt, attachments);
+                // A voice message the model hears as audio gets its words written down for the transcript (the model doesn't
+                // see them), instead of just "Voice message".
+                bool transcribe = string.IsNullOrWhiteSpace(prompt) && SpeechToText.IsSupported && attachments.Any(IsVoiceRecording);
+                Label transcriptLabel = AddUserMessage(prompt, attachments, null, transcribe);
                 var userItem = new HistoryItem { Role = MessageRecord.UserRole, Text = prompt, Context = document?.Text };
                 userItem.Language = await TextLanguage.DetectAsync(prompt);
                 if (dividerIndex < _transcript.Children.Count)
                     userItem.View = _transcript.Children[dividerIndex] as View;
                 foreach (PendingAttachment attachment in attachments)
                     userItem.Attachments.Add((attachment.Image != null ? "image" : "audio", attachment.MediaType, attachment.Data));
+                if (transcribe && transcriptLabel != null)
+                    userItem.TranscriptTask = TranscribeVoiceMessageAsync(userItem, attachments.First(IsVoiceRecording).Data, transcriptLabel);
                 // Re-reading the earlier conversation (an opened chat, or after compacting) is what takes the time.
                 int compactions = _compactions;
                 bool rereading = await PrepareContextAsync(userItem, dividerIndex);
@@ -3000,6 +3009,8 @@ namespace Maui.Demo.Lite
                 }
                 int id = _conversationId.Value;
                 userItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.UserRole, userItem.Text, null, userItem.Attachments, userItem.Context, userItem.Language);
+                if (userItem.TranscriptTask != null)
+                    _ = SaveTranscriptWhenReadyAsync(id, userItem);
                 foreach (string step in _sendSteps)
                     await _store.AddMessageAsync(id, MessageRecord.StepRole, step, null);
                 // Pictures the reply drew are kept with it (shown again when the chat is reopened, not given to the model).
@@ -3302,7 +3313,8 @@ namespace Maui.Demo.Lite
                     if (message.Role == MessageRecord.UserRole)
                     {
                         int viewIndex = _transcript.Children.Contains(_emptyLabel) ? 0 : _transcript.Children.Count;
-                        AddUserMessage(message.Text, shown);
+                        item.Transcript = message.Transcript;
+                        AddUserMessage(message.Text, shown, message.Transcript);
                         if (viewIndex < _transcript.Children.Count)
                             item.View = _transcript.Children[viewIndex] as View;
                     }
@@ -3591,14 +3603,35 @@ namespace Maui.Demo.Lite
             return "\u2026" + tail;
         }
 
-        private void AddUserMessage(string text, IReadOnlyList<PendingAttachment> attachments)
+        // Returns the label under a voice message's chip for its words (null if the message has no voice recording), with
+        // the words if they are known, else "Writing down what you said..." when they are being written down.
+        private Label AddUserMessage(string text, IReadOnlyList<PendingAttachment> attachments, string transcript = null, bool transcribing = false)
         {
+            Label transcriptLabel = null;
             if (attachments.Count > 0)
             {
                 // The attachments right-aligned above the message bubble.
                 var media = new VerticalStackLayout { Spacing = 6, HorizontalOptions = LayoutOptions.End };
                 foreach (PendingAttachment attachment in attachments)
                     media.Children.Add(AttachmentChip(attachment, true));
+                if (string.IsNullOrEmpty(text) && attachments.Any(IsVoiceRecording))
+                {
+                    transcriptLabel = new Label
+                    {
+                        Text = !string.IsNullOrWhiteSpace(transcript) ? "\u201C" + transcript.Trim() + "\u201D"
+                            : transcribing ? "Writing down what you said..." : string.Empty,
+                        IsVisible = !string.IsNullOrWhiteSpace(transcript) || transcribing,
+                        FontFamily = Theme.BodyFont,
+                        FontSize = 14,
+                        FontAttributes = FontAttributes.Italic,
+                        TextColor = Theme.SecondaryText,
+                        HorizontalOptions = LayoutOptions.End,
+                        HorizontalTextAlignment = TextAlignment.End,
+                        MaximumWidthRequest = 420
+                    };
+                    SemanticProperties.SetDescription(transcriptLabel, "What the voice message says");
+                    media.Children.Add(transcriptLabel);
+                }
                 if (_transcript.Children.Contains(_emptyLabel))
                     _transcript.Children.Remove(_emptyLabel);
                 _transcript.Children.Add(media);
@@ -3607,6 +3640,7 @@ namespace Maui.Demo.Lite
                 AddBubbleRow(Bubble(text, UserBubbleColor, UserTextColor), true);
             else
                 ScrollToEnd();
+            return transcriptLabel;
         }
 
         private void AddBubbleRow(Border bubble, bool isUser)

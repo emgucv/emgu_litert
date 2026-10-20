@@ -499,6 +499,17 @@ speak again.
 - [ ] An iPhone with a real microphone, and any device with headphones (speaking over the reply).
 - [ ] Headphone detection (`VoiceRecorder.HeadphonesConnected`: the audio route on iOS/Mac Catalyst, output devices
       on Android) is untested; so is recording while text-to-speech plays on iOS.
+- [x] The words of a voice message under its chip: a model that hears audio (Gemma 4) is given the recording, so the chat only showed
+      "Voice message (0:05)" and a chat titled "Voice message". The platform's speech recognizer (`SpeechToText`: Android 13+, iOS, Mac Catalyst;
+      not Windows) writes the words down in the background while the model answers (`LiteRtLmChatPage.Transcript.cs`), shown under the chip
+      in italics, kept with the message (`MessageRecord.Transcript`; the model isn't given them), used as the title of a chat still called
+      "Voice message", shown again when the chat is reopened and included in an export ("Voice message, as written down: ..."). Models that
+      can't hear audio (Qwen, "Your server") already get the words as their message text. The recording itself is kept either way for audio
+      models (`chats/attachments/<chat>/<message>_0.wav`, deleted with the chat). Verified on the Pixel Fold (Android 17, Gemma 4 E2B on the
+      GPU): LiteRT-LM's `audio_sample.wav` was written down as "What paintings were inside the dead person's Old Kingdom tombs", saved,
+      made the chat's title and was shown after reopening the chat. `UnitTestVoiceTranscript` (the store: the words, the title rule, empty
+      words and private chats, also the language and translated-thinking columns of item 39).
+- [ ] Windows has no speech recognizer for this; an option to not keep the audio (only the words); the transcript isn't in the chat search.
 
 ## 23. Task mode: multi-step tasks with a visible plan
 

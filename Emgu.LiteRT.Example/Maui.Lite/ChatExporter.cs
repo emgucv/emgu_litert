@@ -36,6 +36,8 @@ namespace Maui.Demo.Lite
                 if (!string.IsNullOrWhiteSpace(message.Thinking))
                     Details(markdown, "Thinking", message.Thinking);
                 markdown.AppendLine(message.Text ?? string.Empty).AppendLine();
+                if (!string.IsNullOrWhiteSpace(message.Transcript))
+                    markdown.AppendLine("> Voice message, as written down: " + message.Transcript.Replace("\n", " ")).AppendLine();
                 if (!string.IsNullOrWhiteSpace(message.Context))
                     Details(markdown, "Document excerpts given to the model", message.Context);
                 int number = 0;
