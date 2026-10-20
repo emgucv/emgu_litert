@@ -1,4 +1,5 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+using System;
 using System.Linq;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Vision;
@@ -34,6 +35,29 @@ internal static class VisualHostCatalog
         "Capture one fresh JPEG from the visible live camera after confirmed appearance and show it in this chat session. " +
         "Not sent to the model or saved automatically. The user can open the image and save it manually.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
+    internal const int DefaultClipSeconds = 10, MinimumClipSeconds = 3, MaximumClipSeconds = 30;
+
+    internal static readonly VisualActionDescriptor Clip = new("record_clip", "Video clip",
+        "Record a short video clip (with sound if the microphone is allowed) from the visible live camera when the alert fires, " +
+        "and show it in this chat session. Not sent to the model or saved automatically. The user can play, share or save it. Android only.",
+        VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{\"seconds\":{\"type\":\"integer\",\"minimum\":" + MinimumClipSeconds +
+            ",\"maximum\":" + MaximumClipSeconds + "}},\"additionalProperties\":false}"));
+
+    // The clip's length in seconds (the default if none is given) and its normalized parameters; rejects anything else.
+    internal static int ClipSeconds(System.Text.Json.JsonElement parameters, out System.Text.Json.JsonElement normalized)
+    {
+        VisualActionParameters.AllowOnly(parameters, "seconds");
+        int seconds = DefaultClipSeconds;
+        if (parameters.TryGetProperty("seconds", out var value))
+        {
+            if (value.ValueKind != System.Text.Json.JsonValueKind.Number || !value.TryGetInt32(out seconds) ||
+                seconds < MinimumClipSeconds || seconds > MaximumClipSeconds)
+                throw new ArgumentException("seconds must be a whole number from " + MinimumClipSeconds + " to " + MaximumClipSeconds + ".");
+        }
+        normalized = VisualActionParameters.Parse("{\"seconds\":" + seconds + "}");
+        return seconds;
+    }
+
     internal static string MonitorResult(VisualMonitorInfo monitor) =>
         "Monitor " + monitor.Id + ": " + monitor.State + ". " + monitor.Status + ". " + monitor.Condition +
         ". Actions: " + string.Join(", ", monitor.Actions.Select(a => a.ActionId)) + ".";

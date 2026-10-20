@@ -25,6 +25,36 @@ internal static class PictureGallery
         "Photos";
 #endif
 
+#if ANDROID
+    /// <summary>Add a video file to the gallery (Movies/Emgu LiteRT); returns a short description of where it went.</summary>
+    public static Task<string> SaveVideoAsync(string path, string fileName) => Task.Run(() =>
+    {
+        Android.Content.ContentResolver resolver = Android.App.Application.Context.ContentResolver;
+        var values = new Android.Content.ContentValues();
+        values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
+        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "video/mp4");
+        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, "Movies/Emgu LiteRT");
+        values.Put(Android.Provider.MediaStore.IMediaColumns.IsPending, 1);
+        Android.Net.Uri uri = resolver.Insert(Android.Provider.MediaStore.Video.Media.ExternalContentUri, values)
+            ?? throw new IOException("The gallery wouldn't take the video.");
+        try
+        {
+            using (Stream output = resolver.OpenOutputStream(uri) ?? throw new IOException("The gallery wouldn't take the video."))
+            using (Stream input = File.OpenRead(path))
+                input.CopyTo(output);
+            values.Clear();
+            values.Put(Android.Provider.MediaStore.IMediaColumns.IsPending, 0);
+            resolver.Update(uri, values, null, null);
+        }
+        catch
+        {
+            resolver.Delete(uri, null, null);
+            throw;
+        }
+        return "Saved to the gallery (Movies/Emgu LiteRT)";
+    });
+#endif
+
     /// <summary>Add the picture; returns a short description of where it went. Call on the UI thread.</summary>
     public static async Task<string> SaveAsync(byte[] png, string fileName)
     {

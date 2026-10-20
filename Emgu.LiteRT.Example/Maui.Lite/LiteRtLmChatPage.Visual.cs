@@ -23,8 +23,14 @@ public partial class LiteRtLmChatPage
     private VerticalStackLayout _visualMonitorRows;
     private int _visualUiQueued;
     private long _visualFrameId, _lastVisualFrame;
-    private const string VisualInstructions = VisualAgentTools.Instructions +
-        " Prefer coco-ssd-mobilenet-v3 for ordinary object monitors. Use the experimental coco-yolox-nano when the user asks for YOLOX.";
+    private static readonly string VisualInstructions = VisualAgentTools.Instructions +
+        " Prefer coco-ssd-mobilenet-v3 for ordinary object monitors. Use the experimental coco-yolox-nano when the user asks for YOLOX." +
+#if ANDROID
+        " For record a video or clip when an object appears, select record_clip with parameters {seconds: the requested length, default 10, from 3 to 30}. " +
+        "It records from the live camera with sound and shows the clip in this chat session; no automatic saving or model analysis. A request for both a picture and a clip uses take_snapshot and record_clip.";
+#else
+        "";
+#endif
 
     private void BuildVisualMonitoring()
     {
@@ -39,6 +45,11 @@ public partial class LiteRtLmChatPage
         _visualActions.Register(new CameraChimeFactory(_visualChime));
         _visualActions.Register(new CameraSpeechFactory(_alertAudio));
         _visualActions.Register(new CameraSnapshotFactory(TakeVisualSnapshotAsync));
+#if ANDROID
+        _visualActions.Register(new CameraClipFactory(RecordVisualClipAsync));
+        // Clips are for the session: those of a session that ended without cleaning up (the app was killed) go now.
+        try { Directory.Delete(System.IO.Path.Combine(FileSystem.CacheDirectory, "clips"), true); } catch (Exception) { }
+#endif
         _visualRuntime = new VisualMonitorRuntime(_visualAgents, _visualActions, actionCoordinator: _alertAudio);
         _visualRuntime.Changed += QueueVisualMonitorUi;
         _visualMonitorRows = new VerticalStackLayout { Spacing = 6 };
@@ -107,7 +118,8 @@ public partial class LiteRtLmChatPage
                 FontSize = 11, TextColor = Theme.SecondaryText });
             foreach (var action in monitor.Actions)
             {
-                string detail = action.ActionId == "speak_text" ? "“" + action.Parameters.GetProperty("text").GetString() + "”" : null;
+                string detail = action.ActionId == "speak_text" ? "“" + action.Parameters.GetProperty("text").GetString() + "”"
+                    : action.ActionId == "record_clip" ? action.Parameters.GetProperty("seconds").GetInt32() + " s" : null;
                 var result = monitor.LastActionResults.FirstOrDefault(r => r.ActionId == action.ActionId);
                 _visualMonitorRows.Children.Add(new Label { Text = action.Name + (detail == null ? "" : ": " + detail) +
                     (result == null ? "" : " · " + result.State + " · " + result.Message), FontSize = 11, TextColor = Theme.SecondaryText });

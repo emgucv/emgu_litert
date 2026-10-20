@@ -1322,11 +1322,35 @@ Details in [YAMNET.md](YAMNET.md#sound-monitors-in-the-chat-todo-item-42).
 - [ ] Run with the camera loop and Gemma together on a phone (heat, battery) - nothing was timed together.
 - [ ] Try on iOS (the `AVAudioEngine` tap and the microphone gate are built, not run).
 
-## 43. Video clips as a visual-alert action — Camera2 feasibility checked on a Galaxy S10 and a Pixel Fold; nothing built
+## 43. Video clips as a visual-alert action — `record_clip` built for Android (Camera2); tested on a Galaxy S10 and a Pixel Fold
 
-The camera is read through OpenCV's `VideoCapture` (Android camera API: one frame stream; the preview is drawn from it), and that session has no
-output for a video encoder. A temporary Camera2 test (not kept) checked whether Android can run a preview, an analysis image reader and a native
-video recorder in one session.
+When a camera monitor fires, the Android app records a few seconds of video, with sound, from the live camera and shows it in the chat. The camera on
+Android now runs through Camera2 (`LiveCamera.Camera2.cs`; OpenCV's camera backend is the fallback when Camera2 can't be set up, and the other
+platforms are unchanged): a 640x480 YUV image reader gives the preview and the detectors the same BGR frames as before, and a clip adds a
+`MediaRecorder` surface.
+
+- [x] The action `record_clip` (`VisualHostCatalog.Clip`, `CameraClipFactory`; parameter `seconds`, 3 to 30, default 10; registered on Android only, with
+      a sentence in the visual instructions); `LiveCamera.RecordClipAsync` (H.264 720p at 6 Mbps in an MP4, AAC sound when the microphone permission is
+      already granted - an alert never asks for one - the orientation hint from the preview's rotation, cancelling discards the file);
+      `LiteRtLmChatPage.VisualClips.cs` (a transcript card with the first frame, Play, Share and Save to gallery - `PictureGallery.SaveVideoAsync`, Movies/Emgu
+      LiteRT - the latest five clips kept in the cache folder, New chat deletes them, session only, nothing sent to the model).
+- [x] Device results (S10 and Fold, the page's own code with a made-up event): the preview and detector frames kept coming during a clip (29.5-30 fps
+      before, during and after), the session is configured again when the clip starts (0.25-0.44 s) and ends (0.25-0.36 s), a 5 s clip took 6.5 s from
+      call to card (the start, the clip, the end, the thumbnail), the file was 3.7 MB, 1280x720, rotation 90, with an audio track, duration 4.93 s; a clip
+      cancelled halfway left no file or card and the camera went on at 27-29 fps. A persistent MediaCodec input surface, which would have avoided the
+      reconfiguring, isn't accepted when a session is created (a surface with no size): "couldn't be configured".
+- [x] Gemma 4 E2B (GPU, S10): "When you see a person, record a 5 second video." made a person monitor with `record_clip {"seconds":5}`; "Record a video clip
+      when a dog shows up, and also take a picture." made a dog monitor with `take_snapshot` and `record_clip {"seconds":10}`. 12 model-free tests
+      (`UnitTestClipAction`: default, limits, rejected values, the descriptor).
+- [ ] Not run: a real detection triggering a clip (nobody in front of the camera - the action was called directly), clips longer than 6 s, the cost next to
+      Gemma generating, and a clip while the voice recorder or a sound monitor holds the microphone (the earlier test shows the microphone can be shared).
+- [ ] The clip starts when the alert fires (about a second after the person appears, plus the 0.3 s reconfiguration) and the frames pause that long at
+      each end. A pre-roll (the seconds before the alert) needs a ring buffer of encoded frames: an always-running MediaCodec encoder muxed with
+      MediaMuxer instead of MediaRecorder; and a MediaRecorder prepared in advance would remove the start's pause.
+- [ ] Other platforms: Mac Catalyst and Windows have no clip action (their cameras are OpenCV's), iOS has no live camera at all.
+- [ ] A clip as the action of a sound monitor ("record a clip when the dog barks") - the sound monitors have chime and speech only.
+
+## Notes from the feasibility checks (before it was built)
 
 - [x] Galaxy S10 (SM-G973W, Android 12), all four cameras (back LEVEL_3 and LIMITED, two front LIMITED): one `CameraCaptureSession` with a
       640x480 preview `SurfaceTexture`, a 640x480 YUV_420_888 `ImageReader` (analysis) and a `MediaRecorder` surface (1280x720, H.264 MP4, 30 fps,
@@ -1342,7 +1366,3 @@ video recorder in one session.
       (one empty read at startup on the S10 only) - and the recorded files' audio tracks (decoded on the Mac) had the same levels. So a clip can have sound
       while the sound monitors keep listening, without a single shared reader. Only these two phones and OS versions; Android's rules for concurrent capture
       depend on which app is in the foreground, so the app must be in front (as the camera needs anyway).
-- [ ] Not measured: the cost next to the detector and Gemma, longer clips, the cameras' other
-      sizes, and a recording that starts before the alert (a ring buffer of encoded frames, or a MediaCodec-based writer fed from the analysis frames).
-- [ ] If built: a Camera2 capture path next to `LiveCamera`'s OpenCV one on Android, a `record_clip` action (length, pre-roll), storage in Movies with a
-      chat thumbnail and Save/Share like the snapshots, and microphone coordination with `MicrophoneGate` (audio in the clip conflicts with sound monitors).

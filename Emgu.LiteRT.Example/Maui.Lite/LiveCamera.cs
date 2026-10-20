@@ -8,7 +8,7 @@ namespace Maui.Demo.Lite;
 
 // One worker owns the native capture and Mats. Preview consumers must copy a frame before returning.
 // Only requested snapshots are JPEG-encoded; the live preview receives raw pixels.
-internal sealed class LiveCamera
+internal sealed partial class LiveCamera
 {
     public static bool Supported => DeviceInfo.Platform == DevicePlatform.Android ||
         DeviceInfo.Platform == DevicePlatform.MacCatalyst || DeviceInfo.Platform == DevicePlatform.WinUI;
@@ -58,6 +58,11 @@ internal sealed class LiveCamera
     {
         try
         {
+#if ANDROID
+            // Camera2 first: it can record a video clip while the preview and the detector keep running (LiveCamera.Camera2.cs);
+            // OpenCV's camera backend below takes over on a device where Camera2 can't be set up.
+            if (await RunCamera2Async()) return;
+#endif
 #if WINDOWS
             // The default Media Foundation backend took 11-12 s to open a Logitech StreamCam (DirectShow 1.3 s) - longer
             // than the start timeout; fall back to it for cameras DirectShow can't open.

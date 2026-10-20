@@ -41,3 +41,29 @@ internal sealed class CameraSpeechAction(AlertAudioCoordinator audio, string tex
     }
 }
 #endif
+
+#if ANDROID
+internal sealed class CameraClipFactory(Func<VisualEvent, int, CancellationToken, Task> record) : IVisualActionFactory
+{
+    public VisualActionDescriptor Descriptor => VisualHostCatalog.Clip;
+    public VisualActionBinding Bind(JsonElement parameters)
+    {
+        int seconds = VisualHostCatalog.ClipSeconds(parameters, out JsonElement normalized);
+        return new VisualActionBinding(new CameraClipAction(record, seconds), normalized);
+    }
+}
+
+internal sealed class CameraClipAction(Func<VisualEvent, int, CancellationToken, Task> record, int seconds) : IVisualAction
+{
+    public string Id => "record_clip";
+    public async Task ExecuteAsync(VisualEvent occurrence, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(seconds + 20));
+        try { await record(occurrence, seconds, timeout.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested && timeout.IsCancellationRequested)
+        { throw new TimeoutException("The clip took more than " + (seconds + 20) + " seconds."); }
+    }
+}
+#endif
