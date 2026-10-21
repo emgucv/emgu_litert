@@ -150,7 +150,7 @@ public partial class LiteRtLmChatPage
         try
         {
             if (!LiveCamera.Supported) return "Live camera is not supported on this platform yet.";
-            if (!_pageVisible || _cameraSuspended) return "The chat must be visible in the foreground to open the camera.";
+            if (!CameraUsable) return "The chat must be visible in the foreground to open the camera.";
 #if ANDROID
             string facing = followRequest ? VisualHostCatalog.CameraFacingRequest(_routePrompt) : null;
             if (facing != null && (facing == "front") != _cameraFront)
@@ -169,7 +169,7 @@ public partial class LiteRtLmChatPage
             var permission = await Permissions.RequestAsync<Permissions.Camera>();
             if (permission != PermissionStatus.Granted) return "Camera permission was not granted. Allow Camera for this app in system settings to use the live preview.";
             token.ThrowIfCancellationRequested();
-            if (!_pageVisible || _cameraSuspended) return "The chat is no longer in the foreground; the camera was not opened.";
+            if (!CameraUsable) return "The chat is no longer in the foreground; the camera was not opened.";
             UpdateCameraRotation();
             DeviceDisplay.Current.MainDisplayInfoChanged += CameraDisplayChanged;
             _cameraPanel.IsVisible = true;
@@ -185,7 +185,7 @@ public partial class LiteRtLmChatPage
                 });
             };
             await camera.StartAsync(token);
-            if (!_pageVisible || _cameraSuspended)
+            if (!CameraUsable)
             {
                 await CloseCameraCoreAsync();
                 return "The camera was closed because the chat left the foreground.";

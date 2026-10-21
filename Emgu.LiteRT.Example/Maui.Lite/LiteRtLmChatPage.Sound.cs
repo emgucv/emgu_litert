@@ -57,6 +57,7 @@ public partial class LiteRtLmChatPage
             _soundPanel.WidthRequest = Math.Min(310, Math.Max(180, _mainColumn.Width - 16));
             _soundPanel.MaximumHeightRequest = Math.Max(90, Math.Min(220, _scroll.Height - 16));
         };
+        StartMonitoringStopButton();
         MicrophoneGate.Pausing = PauseSoundListeningAsync;
         MicrophoneGate.Released = () => { _soundPaused = false; _ = UpdateSoundListeningAsync(); };
     }
@@ -66,6 +67,7 @@ public partial class LiteRtLmChatPage
         _soundDisposed = true;
         MicrophoneGate.Pausing = null;
         MicrophoneGate.Released = null;
+        EndMonitoringStopButton();
         _soundRuntime?.Dispose();
         await UpdateSoundListeningAsync();
         _soundDetector.Dispose();
@@ -218,6 +220,7 @@ public partial class LiteRtLmChatPage
                 _soundStatus = _soundPaused ? "Paused while the microphone is used for a voice message." : null;
             }
             QueueSoundUi();
+            await SyncMonitoringServiceAsync();
             return _soundSource != null ? "Listening through the microphone." : _soundStatus ?? "Not listening.";
         }
         finally { _soundGate.Release(); }
@@ -242,6 +245,7 @@ public partial class LiteRtLmChatPage
 
     private async Task SoundAlertAsync(SoundEvent occurrence, SoundMonitorInfo monitor, CancellationToken token)
     {
+        NotifySoundAlert(occurrence, monitor);
         BeginSoundMute();
         try
         {
@@ -274,8 +278,13 @@ public partial class LiteRtLmChatPage
         string cause() => "Heard " + (occurrence.Label ?? monitor.Sound).ToLowerInvariant() + " at " + occurrence.At.ToString("HH:mm:ss") +
             " (" + Math.Round(occurrence.Score * 100) + "%) · " + monitor.Description;
         // A failure reaches the monitor's card through the runtime ("The alert failed: ...").
-        if (monitor.TakePhoto) await TakePhotoAsync(cause, token);
-        if (monitor.ClipSeconds > 0) await RecordClipAsync(cause, monitor.ClipSeconds, token);
+        try
+        {
+            if (monitor.TakePhoto) await TakePhotoAsync(cause, token);
+            if (monitor.ClipSeconds > 0) await RecordClipAsync(cause, monitor.ClipSeconds, token);
+        }
+        // Opened for the alert while the app was hidden: closed again, so the camera isn't left on in the background.
+        finally { if (AppInBackground) await CloseCameraAsync(); }
 #else
         await Task.CompletedTask;
 #endif
@@ -302,6 +311,7 @@ public partial class LiteRtLmChatPage
     {
         var monitors = _soundRuntime?.Snapshot() ?? (IReadOnlyList<SoundMonitorInfo>)Array.Empty<SoundMonitorInfo>();
         _soundPanel.IsVisible = monitors.Count > 0;
+        _ = SyncMonitoringServiceAsync();
         _soundRows.Children.Clear();
         if (monitors.Count == 0) return;
         _soundRows.Children.Add(new Label { Text = "Sound monitors · session only", FontSize = 13, FontFamily = Theme.TitleFont, TextColor = Theme.PrimaryText });

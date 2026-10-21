@@ -20,7 +20,7 @@ public partial class LiteRtLmChatPage
         LiveCamera camera = await MainThread.InvokeOnMainThreadAsync(() =>
         {
             token.ThrowIfCancellationRequested();
-            if (!_pageVisible || _cameraSuspended || !_cameraPanel.IsVisible || _camera?.IsRunning != true)
+            if (!CameraUsable || !_cameraPanel.IsVisible || _camera?.IsRunning != true)
                 throw new InvalidOperationException("A photo needs the visible live camera.");
             return _camera;
         });
@@ -34,7 +34,7 @@ public partial class LiteRtLmChatPage
         DateTimeOffset at = DateTimeOffset.Now;
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
-            if (token.IsCancellationRequested || !_pageVisible)
+            if (token.IsCancellationRequested || !(_pageVisible || BackgroundCapture))
             {
                 try { File.Delete(photo.Path); } catch (Exception) { }
                 token.ThrowIfCancellationRequested();
