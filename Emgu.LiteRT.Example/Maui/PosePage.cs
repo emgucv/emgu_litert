@@ -11,7 +11,7 @@ using Emgu.LiteRT.Models;
 namespace Maui.Demo.Lite
 {
     // The body in a photo: 33 landmarks drawn as a skeleton, with MediaPipe's pose landmarker (BlazePose). The first step towards pose
-    // monitors for the camera agent (POSE.md).
+    // monitors for the camera agent (Emgu.LiteRT.Models/POSE.md).
     public class PosePage : DemoPage
     {
         private PoseDetector _detector;

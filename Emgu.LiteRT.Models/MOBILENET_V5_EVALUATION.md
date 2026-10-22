@@ -61,7 +61,7 @@ pickle weights are loaded. Run from the repository root:
 python3.12 -m venv /private/tmp/emgu-mnv5-venv
 /private/tmp/emgu-mnv5-venv/bin/python -m pip install torch==2.14.1 torchvision==0.29.1 timm==1.0.30
 HF_HOME=/private/tmp/emgu-mnv5-cache /private/tmp/emgu-mnv5-venv/bin/python \
-  Emgu.LiteRT.Example/Maui/tools/probe_mobilenet_v5.py \
+  Emgu.LiteRT.Models/tools/probe_mobilenet_v5.py \
   --cache /private/tmp/emgu-mnv5-cache/hub
 ```
 

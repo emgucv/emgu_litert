@@ -28,7 +28,7 @@ WEIGHTS_SHA256 = "affbbd57927c4138b783564d98603ef54530eb02ddf25cbabf79a4b2ce0fb3
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--image", type=Path, default=Path(__file__).resolve().parent.parent / "Resources/Raw/surfers.jpg")
+    parser.add_argument("--image", type=Path, default=Path(__file__).resolve().parents[2] / "Emgu.LiteRT.Example/Maui/Resources/Raw/surfers.jpg")
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--size", type=int, choices=(256, 512, 768), default=256)
     parser.add_argument("--threads", type=int, default=4)

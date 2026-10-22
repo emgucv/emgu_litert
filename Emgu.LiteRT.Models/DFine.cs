@@ -6,7 +6,7 @@ using System.Linq;
 namespace Emgu.LiteRT.Models
 {
     /// <summary>
-    /// D-FINE-N (COCO) converted to float32 NHWC LiteRT with static shapes (see the demo's DFINE_EVALUATION.md, which
+    /// D-FINE-N (COCO) converted to float32 NHWC LiteRT with static shapes (see DFINE_EVALUATION.md in this folder, which
     /// also has the conversion recipe). The square input (640 is what it was trained at; 416 and 480 were converted
     /// too) is the image resized without keeping its aspect ratio, as RGB divided by 255. The two outputs are
     /// <c>pred_logits</c> [1,300,80] (before the sigmoid) and <c>pred_boxes</c> [1,300,4] (centre x, centre y, width,

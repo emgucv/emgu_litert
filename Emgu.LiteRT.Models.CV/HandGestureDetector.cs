@@ -9,7 +9,7 @@ namespace Emgu.LiteRT.Models;
 // MediaPipe's hand landmarks and gestures (HandTracker) for the demo: downloads Google's gesture_recognizer.task (8.4 MB, SHA-256
 // checked, not copied to Emgu's server), unpacks the four models, and uses the GPU for the two vision models when they compile fully
 // for it and give the same gesture and landmarks as the CPU on a bundled photo, else the CPU. (No speed check: the CPU/GPU comparison
-// the other detectors use alternates the two and, with models this small, made the CPU look 2-3 times slower than it is alone.) See HAND_GESTURES.md.
+// the other detectors use alternates the two and, with models this small, made the CPU look 2-3 times slower than it is alone.) See Emgu.LiteRT.Models/HAND_GESTURES.md.
 /// <summary>MediaPipe hand landmarks and gestures (<see cref="HandTracker"/>) for Emgu CV images. Callers serialize <c>PrepareAsync</c>, <c>Detect</c> and <c>Dispose</c> off the UI thread.</summary>
 public sealed class HandGestureDetector : IDisposable
 {

@@ -11,7 +11,7 @@ using Emgu.LiteRT.Models;
 namespace Maui.Demo.Lite
 {
     // Hands in a photo: 21 landmarks each, drawn as a skeleton, and MediaPipe's gesture (closed fist, open palm, pointing up, thumb
-    // up or down, victory, "I love you"). The first step towards a hand-gesture visual agent (HAND_GESTURES.md).
+    // up or down, victory, "I love you"). The first step towards a hand-gesture visual agent (Emgu.LiteRT.Models/HAND_GESTURES.md).
     public class HandGesturePage : DemoPage
     {
         private HandGestureDetector _detector;
@@ -47,7 +47,7 @@ namespace Maui.Demo.Lite
         {
             _backend = new Picker { Title = "Backend", FontFamily = Theme.BodyFont, FontSize = 16, TextColor = Theme.PrimaryText, TitleColor = Theme.SecondaryText };
             // The CPU by default: for two models this small it was as fast or faster than the GPU in a whole frame on the
-            // Galaxy S10 and the Pixel Fold (HAND_GESTURES.md); the GPU is a choice.
+            // Galaxy S10 and the Pixel Fold (Emgu.LiteRT.Models/HAND_GESTURES.md); the GPU is a choice.
             _backend.Items.Add("CPU");
             if (CocoDetector.CanTryGpu) _backend.Items.Add("GPU (CPU fallback)");
             _backend.SelectedIndex = 0;

@@ -40,8 +40,8 @@ onnxruntime 1.26.0, ai-edge-litert 2.1.2, onnxsim 0.6.5, opencv-python 4.13.0.92
 python3.12 -m venv /private/tmp/emgu-picodet-venv
 /private/tmp/emgu-picodet-venv/bin/python -m pip install onnx onnxruntime onnxsim 'onnx2tf[tensorflow]==2.6.9' tensorflow==2.21.0 \
   tf-keras==2.21.0 ai-edge-litert==2.1.2 opencv-python numpy sng4onnx onnx_graphsurgeon psutil
-/private/tmp/emgu-picodet-venv/bin/python Emgu.LiteRT.Example/Maui/tools/prepare_picodet_s.py --output /private/tmp/emgu-picodet-model
-/private/tmp/emgu-picodet-venv/bin/python Emgu.LiteRT.Example/Maui/tools/check_picodet_conversion.py \
+/private/tmp/emgu-picodet-venv/bin/python Emgu.LiteRT.Models/tools/prepare_picodet_s.py --output /private/tmp/emgu-picodet-model
+/private/tmp/emgu-picodet-venv/bin/python Emgu.LiteRT.Models/tools/check_picodet_conversion.py \
   --onnx /private/tmp/emgu-picodet-model/picodet_s_416_coco_lcnet.onnx \
   --tflite /private/tmp/emgu-picodet-model/conversion/litert/picodet_s_416_gpu_float32.tflite
 ```
@@ -97,4 +97,4 @@ made every number about ten times slower; these are from the unlocked phone.
 GPU first with explicit FP32, kept only if its detections match the CPU's on `surfers.jpg` and it is faster, otherwise the CPU)
 and `PicoDetImageInput`, the "PicoDet S" page (`CocoSsdMobilenetPage(usePicoDet: true)`), tests `UnitTestPicoDet` (decoding, no
 model) and `UnitTestPicoDetNative` (parity with `picodet_reference.json`; set `PICODET_MODEL` to a local file to skip the download) and
-the licences entry in `tools/make_licenses.py`. No visual agent; adding one would follow `CocoVisualAgent`'s YOLOX pattern.
+the licences entry in `Emgu.LiteRT.Example/Maui/tools/make_licenses.py`. No visual agent; adding one would follow `CocoVisualAgent`'s YOLOX pattern.

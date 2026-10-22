@@ -8,7 +8,7 @@ namespace Emgu.LiteRT.Models
     /// <summary>
     /// Official YOLOX-Nano raw-output graph, converted to float32 NHWC LiteRT (416 square).
     /// Pixels are BGR in 0..255, with top-left letterboxing and padding 114. No RGB swap or normalization.
-    /// Calls are serialized by the host. See the demo's YOLOX_EVALUATION.md for model provenance.
+    /// Calls are serialized by the host. See YOLOX_EVALUATION.md in this folder for model provenance.
     /// </summary>
     public sealed class YoloX : IDisposable
     {

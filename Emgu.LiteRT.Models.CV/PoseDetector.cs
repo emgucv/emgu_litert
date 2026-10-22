@@ -8,7 +8,7 @@ namespace Emgu.LiteRT.Models;
 
 // MediaPipe's pose landmarker (PoseTracker) for the demo: downloads Google's pose_landmarker_{lite,full,heavy}.task (5.8 / 9.4 / 30.7 MB, SHA-256
 // checked, not copied to Emgu's server), unpacks the two models, and uses the GPU only if asked and only if both compile fully for it and give the
-// CPU's landmarks on a bundled photo. See POSE.md.
+// CPU's landmarks on a bundled photo. See Emgu.LiteRT.Models/POSE.md.
 /// <summary>MediaPipe pose landmarks (<see cref="PoseTracker"/>) for Emgu CV images. Callers serialize <c>PrepareAsync</c>, <c>Detect</c> and <c>Dispose</c> off the UI thread.</summary>
 public sealed class PoseDetector : IDisposable
 {

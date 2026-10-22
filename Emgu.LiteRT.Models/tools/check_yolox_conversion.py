@@ -52,7 +52,7 @@ def main():
     lite.allocate_tensors()
     input_info, = lite.get_input_details()
     output_info, = lite.get_output_details()
-    images = Path(__file__).resolve().parent.parent / "Resources/Raw"
+    images = Path(__file__).resolve().parents[2] / "Emgu.LiteRT.Example/Maui/Resources/Raw"
     samples = []
     for name in ("surfers.jpg", "dog416.png", "space_shuttle.jpg", "tulips.jpg"):
         image = cv2.imread(str(images / name))

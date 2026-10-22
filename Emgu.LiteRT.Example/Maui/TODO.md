@@ -1057,14 +1057,14 @@ near its context limit. Record enabled tool/settings differences, history size a
       Galaxy S10 (31.4 vs 62.6 ms) and the Pixel Fold (36.2 vs 42.6 ms), full pipeline.
 - [ ] YOLOX quantization, COCO validation and sustained camera/memory/thermal comparison (GPU alongside a loaded Gemma too);
       live camera plus Gemma selecting YOLOX in chat remains an end-to-end check.
-      [Usage, provenance, reproduction and results](YOLOX_EVALUATION.md).
+      [Usage, provenance, reproduction and results](../../Emgu.LiteRT.Models/YOLOX_EVALUATION.md).
 
 ### D-FINE-N — converts and matches; a Mac Catalyst photo detector only
 
-- [x] Official D-FINE-N (COCO, Apache-2.0) converted to float32 LiteRT with static shapes (`tools/prepare_dfine_n.py`, TF converter with
+- [x] Official D-FINE-N (COCO, Apache-2.0) converted to float32 LiteRT with static shapes (`Emgu.LiteRT.Models/tools/prepare_dfine_n.py`, TF converter with
       Erf replaced; reproduced bit for bit at 640 and 416) and checked against its ONNX export on the four bundled images
-      (`tools/check_dfine_conversion.py`: identical detections). Recipe, pitfalls, licence notes and results in
-      [DFINE_EVALUATION.md](DFINE_EVALUATION.md).
+      (`Emgu.LiteRT.Models/tools/check_dfine_conversion.py`: identical detections). Recipe, pitfalls, licence notes and results in
+      [DFINE_EVALUATION.md](../../Emgu.LiteRT.Models/DFINE_EVALUATION.md).
 - [x] Measured on the M1, a Galaxy S10 and the Pixel Fold: 1.4-2.7x YOLOX-Nano's CPU time at 416 px, 2x at 640 px, and no GPU path
       (the GPU compile fails on Metal and OpenCL; GPU+CPU is slower than CPU). Less accurate at 416 than at 640. Decision: keep
       YOLOX-Nano as the optional detector; D-FINE only as a Mac-only photo detector at 640.
@@ -1078,9 +1078,9 @@ near its context limit. Record enabled tool/settings differences, history size a
 ### PicoDet-S — converts, matches, runs on the GPU; a "PicoDet S" photo page
 
 - [x] Official PP-PicoDet-S 416 (COCO AP 32.5, Apache-2.0) from Baidu's ONNX export, converted to float32 LiteRT with
-      `tools/prepare_picodet_s.py` (reproduced bit for bit) and checked against ONNX Runtime on the four bundled images
-      (`tools/check_picodet_conversion.py`: identical detections). Results, recipe and licence notes in
-      [PICODET_EVALUATION.md](PICODET_EVALUATION.md).
+      `Emgu.LiteRT.Models/tools/prepare_picodet_s.py` (reproduced bit for bit) and checked against ONNX Runtime on the four bundled images
+      (`Emgu.LiteRT.Models/tools/check_picodet_conversion.py`: identical detections). Results, recipe and licence notes in
+      [PICODET_EVALUATION.md](../../Emgu.LiteRT.Models/PICODET_EVALUATION.md).
 - [x] GPU: the first conversion failed to compile on Metal and OpenCL because of `RELU_0_TO_1` (from the two HardSigmoid nodes);
       rewriting them as Mul/Add/Relu/Sub makes it fully accelerated: 3.9 ms (M1), 17.8 ms (S10), 16.7 ms (Fold). On the phones'
       CPUs it is 25-45% faster than YOLOX-Nano with about 6 AP more.
@@ -1099,7 +1099,7 @@ near its context limit. Record enabled tool/settings differences, history size a
       finite `[1, 2048, 16, 16]` spatial features and `[1, 2048]` pooled output; four threads, 256×256,
       median 766.10 ms over three warmed forwards. This is PyTorch encoder timing, not a LiteRT detector benchmark.
 - [x] Checked the replacement contract: the available weights have no COCO class/score/box head. Keep V3 as the
-      working detector. [Evidence, reproducible probe and required next steps](MOBILENET_V5_EVALUATION.md).
+      working detector. [Evidence, reproducible probe and required next steps](../../Emgu.LiteRT.Models/MOBILENET_V5_EVALUATION.md).
 - [ ] Obtain/train a V5 detection head before attempting LiteRT export and a same-device V3/V5 detection comparison.
 
 ## 35. Privacy manifests for an App Store release (iOS, Mac Catalyst)
@@ -1263,7 +1263,7 @@ translated for display: **on request**, so unread thinking costs nothing.
 ## 40. Hand gestures for the visual agents — prototype: MediaPipe's hand tracking on LiteRT; photo page only
 
 Real-time hand-gesture recognition for the camera agents ("take a picture when I give a thumbs up"). Details, contract and numbers in
-[HAND_GESTURES.md](HAND_GESTURES.md).
+[HAND_GESTURES.md](../../Emgu.LiteRT.Models/HAND_GESTURES.md).
 
 - [x] `Emgu.LiteRT.Models/HandTracker.cs`: MediaPipe's palm detector, hand landmark model (21 landmarks, world landmarks, handedness) and gesture
       embedder + classifier (closed fist, open palm, pointing up, thumb down, thumb up, victory, I love you, none) through `CompiledModel`, in C# with
@@ -1498,19 +1498,19 @@ Sound monitors (item 42) could only chime, speak and show a card; the camera's c
 - [x] `take_photo` (camera monitors and sound monitors alike, Android) plays a short click - `Resources/Raw/camera_click.wav`, synthesized for this (two filtered-noise bursts, 0.1 s, no licence) - through `CameraChimeAction("camera_click.wav")` while the photo is taken, so a photo taken with nobody touching the phone has a sign. Settings > "Camera sounds" (on by default, Preferences `litert_lm_chat_camera_sound`) turns it off, for a baby's room. Clips and `take_snapshot` stay silent. The click runs inside the sound mute, so a sound monitor can't hear it as a sound, and a failing click never loses the photo.
 - [x] Verified on a Galaxy S10 with a temporary harness (removed): the click took 215-290 ms to play with the setting on and nothing with it off, the mute count returned to 0, and the photo was taken. Not heard by a person (no one was there), and not run on the Fold.
 
-## 51. Body pose — a prototype: MediaPipe's pose landmarker on LiteRT; a photo page only (POSE.md)
+## 51. Body pose — a prototype: MediaPipe's pose landmarker on LiteRT; a photo page only (Emgu.LiteRT.Models/POSE.md)
 
-- [x] Licences checked against the model cards (2026-10-20): pose, face mesh, blendshapes, the segmenters and the hand landmarks are Apache-2.0; the gesture classifier's card states none; all list surveillance/identity recognition (and "life-critical decisions") as out of scope, and the pose card says a single person within about 4 m with the head in view. Recorded in `POSE.md`, `HAND_GESTURES.md` and the licences list (`tools/make_licenses.py`; rerun it to refresh `licenses.json.gz`).
+- [x] Licences checked against the model cards (2026-10-20): pose, face mesh, blendshapes, the segmenters and the hand landmarks are Apache-2.0; the gesture classifier's card states none; all list surveillance/identity recognition (and "life-critical decisions") as out of scope, and the pose card says a single person within about 4 m with the head in view. Recorded in `Emgu.LiteRT.Models/POSE.md`, `Emgu.LiteRT.Models/HAND_GESTURES.md` and the licences list (`tools/make_licenses.py`; rerun it to refresh `licenses.json.gz`).
 - [x] `Emgu.LiteRT.Models/PoseTracker.cs` (detector 224 px with 2254 anchors, region from the detector's first two keypoints x 1.25, landmark model 256 px, 33 landmarks + world landmarks), `PoseModelFiles.cs` (the three bundles' URLs and hashes, unpacking), the demo's `PoseImageInput.cs` (OpenCV, also linked into the tests), `PoseDetector.cs` and a "Body pose" photo page.
 - [x] Checked in Python first (`pose_pipeline.py`), then in C# against MediaPipe on its test image and five copies (`UnitTestPoseTracker`: 7 model-free tests; `UnitTestPoseTrackerNative`: lite and full, `pose_reference.json`). Galaxy S10: 26 ms (lite) / 36 ms (full) a frame on the CPU; the GPU doesn't compile fully.
 - [ ] A `body-pose` visual agent and conditions (arms raised, sitting/standing, lying, hand above the head, a wave); tracking between frames; the Pixel Fold, M1 and GPU numbers; a real person on a live camera (nothing was tested on one). Not a fall detector: the model card rules out life-critical use.
 
 ## 52. A body-pose visual agent — "take a picture when you see me waving"
 
-- [x] `body-pose` (`PoseVisualAgent.cs`, `Emgu.LiteRT.Models/PoseGestures.cs`, `VisualHostCatalog`): arms raised, hand raised, waving (over 2 s), standing, sitting, lying down as object classes of the camera monitors, from the pose landmarks, with the usual actions. Spine-relative thigh measure and per-leg knees (a lunge is neither), "lying" suppresses raised hands, a landmark below 0.5 visibility is never used, nothing maps to a fall. Details and the rules in `POSE.md`.
+- [x] `body-pose` (`PoseVisualAgent.cs`, `Emgu.LiteRT.Models/PoseGestures.cs`, `VisualHostCatalog`): arms raised, hand raised, waving (over 2 s), standing, sitting, lying down as object classes of the camera monitors, from the pose landmarks, with the usual actions. Spine-relative thigh measure and per-leg knees (a lunge is neither), "lying" suppresses raised hands, a landmark below 0.5 visibility is never used, nothing maps to a fall. Details and the rules in `Emgu.LiteRT.Models/POSE.md`.
 - [x] The words people use (`CanonicalPose`), the planner instructions (body-pose, not hand-gesture or person), camera keywords (wave, raise, stand up, sit down, lie down...), and a fallback that reads the posture from the user's request when Gemma gives the person class or an agent's name as the label (`PostureForMonitor`).
 - [x] Tests: 40 model-free (`UnitTestPoseVisualAgent`: the postures on made-up people, tilt, cut-off legs, waving over time, the words, the registry, the request fallback; plus routing cases) and a native one (MediaPipe's photo: no posture for the warrior pose and its copies, `lying down` turned a quarter, nothing in a space shuttle).
-- [x] Galaxy S10 with Gemma 4 E2B (GPU): see POSE.md - waving and standing right first time, the other two after the request fallback; the lying-down monitor fired on the turned photo and not on the empty or upright ones.
+- [x] Galaxy S10 with Gemma 4 E2B (GPU): see Emgu.LiteRT.Models/POSE.md - waving and standing right first time, the other two after the request fallback; the lying-down monitor fired on the turned photo and not on the empty or upright ones.
 - [ ] Not tried on a real person and live camera (no frames were looked at), the Pixel Fold, or Mac Catalyst/iOS/Windows; waves faster than ~2 Hz at 5 frames a second; tracking between frames to cut the cost; more postures.
 
 ## 53. Alert sounds — "play the lullaby when the baby cries" (`play_file`)

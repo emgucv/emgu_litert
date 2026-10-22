@@ -95,7 +95,7 @@ def main():
     parser.add_argument("--threads", type=int, default=2)
     parser.add_argument("--write-reference", type=Path, help="Write the ONNX detections as the C# test's fixture")
     parser.add_argument("--images", nargs="*", type=Path,
-                        default=[Path(__file__).resolve().parent.parent / "Resources" / "Raw" / n for n in DEFAULT_IMAGES])
+                        default=[Path(__file__).resolve().parents[2] / "Emgu.LiteRT.Example" / "Maui" / "Resources" / "Raw" / n for n in DEFAULT_IMAGES])
     args = parser.parse_args()
 
     options = ort.SessionOptions()

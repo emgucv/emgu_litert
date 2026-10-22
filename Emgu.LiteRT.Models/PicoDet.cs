@@ -7,7 +7,7 @@ namespace Emgu.LiteRT.Models
 {
     /// <summary>
     /// Baidu's PP-PicoDet-S (416, COCO, LCNet; PaddleDetection, Apache-2.0) converted to float32 NHWC LiteRT, without
-    /// post-processing (see the demo's PICODET_EVALUATION.md, which also has the conversion recipe). The input is the
+    /// post-processing (see PICODET_EVALUATION.md in this folder, which also has the conversion recipe). The input is the
     /// image resized to 416 x 416 without keeping its aspect ratio (cubic interpolation), as RGB, divided by 255, minus
     /// the ImageNet mean and divided by its standard deviation. For the strides 8, 16, 32 and 64 the network returns the
     /// class scores (already sigmoid) [1,N,80] and the box distributions [1,N,32] - 8 bins for each of the four sides,

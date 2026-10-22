@@ -9,7 +9,7 @@ namespace Emgu.LiteRT.Models;
 // Tries the GPU first (Metal on Mac Catalyst, OpenCL on Android) with explicit FP32 and keeps it only if it matches the
 // CPU's detections on a bundled image and is faster; otherwise the CPU detector is used (GpuFailure says why). The model's
 // HardSigmoid ops are rewritten at conversion time, since the GPU compilers reject the RELU_0_TO_1 they became. See
-// PICODET_EVALUATION.md.
+// Emgu.LiteRT.Models/PICODET_EVALUATION.md.
 /// <summary>PP-PicoDet-S object detector (80 COCO classes). Callers serialize <c>PrepareAsync</c>, <c>Detect</c> and <c>Dispose</c> off the UI thread.</summary>
 public sealed class PicoDetDetector : ICocoDetector
 {

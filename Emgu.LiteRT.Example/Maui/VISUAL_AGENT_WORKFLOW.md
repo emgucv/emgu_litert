@@ -109,7 +109,7 @@ An optional second registration, `coco-yolox-nano`, uses `CocoVisualAgent(useYol
 Ask explicitly, for example: "Use YOLOX to watch for a person and play a sound." This path downloads the official
 YOLOX-Nano weights from Emgu public S3 on first use, verifies SHA-256 and caches them, then runs them on the LiteRT GPU when that passes an accuracy and speed check against the CPU (else on CPU). It uses BGR float pixels, top-left padding, grid decoding and NMS before returning
 the same observations to the monitor; the event/action pipeline is shared. It is experimental and was slower than V3
-on the tested Mac and Pixel Fold. See [the evaluation](YOLOX_EVALUATION.md) for provenance and measured results.
+on the tested Mac and Pixel Fold. See [the evaluation](../../Emgu.LiteRT.Models/YOLOX_EVALUATION.md) for provenance and measured results.
 
 Android/OpenCL and Mac Catalyst/Metal try GPU compilation with `Gpu | Cpu`: the model's custom
 `TFLite_Detection_PostProcess` operation needs CPU execution. Before accepting GPU execution, the adapter

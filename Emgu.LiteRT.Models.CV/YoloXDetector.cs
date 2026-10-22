@@ -8,7 +8,7 @@ namespace Emgu.LiteRT.Models;
 
 // Tries the GPU first (Metal on Mac Catalyst, OpenCL on Android) with explicit FP32 - the default precision failed the
 // upstream parity check on both - and keeps it only if it matches the CPU's detections on a bundled image and is
-// faster; otherwise the CPU detector is used (GpuFailure says why). See YOLOX_EVALUATION.md.
+// faster; otherwise the CPU detector is used (GpuFailure says why). See Emgu.LiteRT.Models/YOLOX_EVALUATION.md.
 /// <summary>YOLOX-Nano object detector (80 COCO classes). Callers serialize <c>PrepareAsync</c>, <c>Detect</c> and <c>Dispose</c> off the UI thread.</summary>
 public sealed class YoloXDetector : ICocoDetector
 {

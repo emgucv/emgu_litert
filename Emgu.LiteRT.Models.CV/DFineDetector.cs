@@ -5,7 +5,7 @@ using Emgu.LiteRT.Models;
 
 namespace Emgu.LiteRT.Models;
 
-// D-FINE-N at 640 px on the CPU. The GPU compilers reject the graph (DFINE_EVALUATION.md), and it's 1.4-2.7x slower than
+// D-FINE-N at 640 px on the CPU. The GPU compilers reject the graph (Emgu.LiteRT.Models/DFINE_EVALUATION.md), and it's 1.4-2.7x slower than
 // YOLOX-Nano, so this is for single photos where accuracy matters more than speed (COCO AP 42.8 vs 25.8), on desktops.
 /// <summary>D-FINE-N object detector (80 COCO classes), on the CPU. Callers serialize <c>PrepareAsync</c>, <c>Detect</c> and <c>Dispose</c> off the UI thread.</summary>
 public sealed class DFineDetector : ICocoDetector
