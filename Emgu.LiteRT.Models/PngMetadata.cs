@@ -4,15 +4,17 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.Models;
 
 // Text in a PNG file: the generated pictures carry their description and seed (iTXt chunks, UTF-8), so a picture shows
 // them again when a saved chat is opened - the picture is all that is kept - and a saved or shared file knows how it was
 // made. No MAUI types: linked into the tests.
-internal static class PngMetadata
+public static class PngMetadata
 {
     private static readonly byte[] Signature = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
     private static uint[] _crcTable;
+    // ISO-8859-1, which PNG keywords use (Encoding.Latin1 is .NET 5+; this code page is built in everywhere).
+    private static readonly Encoding Latin1 = Encoding.GetEncoding(28591);
 
     /// <summary>The PNG with one more text chunk (before IEND). Returns the PNG unchanged if it isn't a PNG.</summary>
     public static byte[] AddText(byte[] png, string keyword, string text)
@@ -25,7 +27,7 @@ internal static class PngMetadata
         if (iend < 0)
             return png;
         var data = new List<byte>();
-        data.AddRange(Encoding.Latin1.GetBytes(keyword));
+        data.AddRange(Latin1.GetBytes(keyword));
         data.Add(0); // end of keyword
         data.Add(0); // not compressed
         data.Add(0); // compression method
@@ -58,10 +60,10 @@ internal static class PngMetadata
                 int zero = Array.IndexOf(png, (byte)0, start, length);
                 if (zero > start)
                 {
-                    string keyword = Encoding.Latin1.GetString(png, start, zero - start);
+                    string keyword = Latin1.GetString(png, start, zero - start);
                     string text = null;
                     if (type == "tEXt")
-                        text = Encoding.Latin1.GetString(png, zero + 1, end - zero - 1);
+                        text = Latin1.GetString(png, zero + 1, end - zero - 1);
                     else if (zero + 2 < end && png[zero + 1] == 0) // not compressed
                     {
                         int p = zero + 3; // after the flag and the method

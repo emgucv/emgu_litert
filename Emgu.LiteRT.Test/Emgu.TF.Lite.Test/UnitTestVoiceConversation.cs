@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Maui.Demo.Lite;
+using Emgu.LiteRT.LM.Agents.Audio;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;

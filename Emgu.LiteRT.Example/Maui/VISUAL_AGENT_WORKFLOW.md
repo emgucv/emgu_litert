@@ -247,6 +247,6 @@ monitoring remain future additions.
 | Action contracts, factories and validation | [VisualActions.cs](../../Emgu.LiteRT.LM.Agents/VisualActions.cs) |
 | MAUI factories and fixed speech | [CameraActionFactories.cs](CameraActionFactories.cs) |
 | Snapshot action | [CameraSnapshotAction.cs](CameraSnapshotAction.cs), [LiteRtLmChatPage.VisualSnapshots.cs](LiteRtLmChatPage.VisualSnapshots.cs) |
-| Audio arbitration | [AlertAudioCoordinator.cs](AlertAudioCoordinator.cs) |
+| Audio arbitration | [AlertAudioCoordinator.cs](../../Emgu.LiteRT.LM.Agents/AlertAudioCoordinator.cs) |
 | Native chime playback | [CameraChimeAction.cs](CameraChimeAction.cs) |
 | Regression tests | [UnitTestVisualAgents.cs](../../Emgu.LiteRT.Test/Emgu.TF.Lite.Test/UnitTestVisualAgents.cs) |

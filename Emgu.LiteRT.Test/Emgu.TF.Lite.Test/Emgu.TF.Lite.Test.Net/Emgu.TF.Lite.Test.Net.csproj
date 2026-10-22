@@ -26,19 +26,17 @@
     <Compile Include="..\UnitTestVoiceTranscript.cs" Link="UnitTestVoiceTranscript.cs" />
     <Compile Include="..\UnitTestVoiceLanguages.cs" Link="UnitTestVoiceLanguages.cs" />
     <Compile Include="..\UnitTestTaskPlan.cs" Link="UnitTestTaskPlan.cs" />
+    <Compile Include="..\UnitTestMathText.cs" Link="UnitTestMathText.cs" />
     <Compile Include="..\UnitTestGoalHistory.cs" Link="UnitTestGoalHistory.cs" />
     <Compile Include="..\UnitTestHandTracker.cs" Link="UnitTestHandTracker.cs" />
     <Compile Include="..\UnitTestPoseTracker.cs" Link="UnitTestPoseTracker.cs" />
     <Compile Include="..\UnitTestPoseVisualAgent.cs" Link="UnitTestPoseVisualAgent.cs" />
     <Compile Include="..\UnitTestAlertSounds.cs" Link="UnitTestAlertSounds.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\AlertSoundLibrary.cs" Link="AlertSoundLibrary.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\PlayFileAction.cs" Link="PlayFileAction.cs" />
     <Compile Include="..\UnitTestYamNet.cs" Link="UnitTestYamNet.cs" />
     <Compile Include="..\UnitTestSoundMonitors.cs" Link="UnitTestSoundMonitors.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\TaskPlan.cs" Link="TaskPlan.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\VoiceLanguages.cs" Link="VoiceLanguages.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\LanguageText.cs" Link="LanguageText.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\PngMetadata.cs" Link="PngMetadata.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\McpServers.cs" Link="McpServers.cs" />
     <Compile Include="..\UnitTestCocoBackendBenchmark.cs" Link="UnitTestCocoBackendBenchmark.cs" />
     <Compile Include="..\UnitTestZImageTurbo.cs" Link="UnitTestZImageTurbo.cs" />
@@ -50,7 +48,6 @@
     <Compile Include="..\UnitTestAgentGoals.cs" Link="UnitTestAgentGoals.cs" />
     <Compile Include="..\UnitTestToolRouting.cs" Link="UnitTestToolRouting.cs" />
     <Compile Include="..\UnitTestDocumentWriter.cs" Link="UnitTestDocumentWriter.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\VoiceConversation.cs" Link="VoiceConversation.cs" />
     <Compile Include="..\UnitTestAgentRegression.cs" Link="UnitTestAgentRegression.cs" />
     <Compile Include="..\UnitTestCameraTools.cs" Link="UnitTestCameraTools.cs" />
     <Compile Include="..\UnitTestCameraHardware.cs" Link="UnitTestCameraHardware.cs" />
@@ -63,7 +60,6 @@
     <Compile Include="..\UnitTestVisualActions.cs" Link="UnitTestVisualActions.cs" />
     <Compile Include="..\UnitTestClipAction.cs" Link="UnitTestClipAction.cs" />
     <Compile Include="..\UnitTestHandVisualAgent.cs" Link="UnitTestHandVisualAgent.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\AlertAudioCoordinator.cs" Link="AlertAudioCoordinator.cs" />
     <Compile Include="..\UnitTestVisualAgents.cs" Link="UnitTestVisualAgents.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\WorkloadPolicy.cs" Link="WorkloadPolicy.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\DownloadActivity.cs" Link="DownloadActivity.cs" />

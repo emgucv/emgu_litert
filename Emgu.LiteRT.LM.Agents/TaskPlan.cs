@@ -5,20 +5,20 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Agents;
 
 // Task mode (TODO item 23): a request is first broken into a short numbered plan, shown as a checklist, then each step runs
 // on its own, with the plan and the earlier steps' short results - not their tool output - so a small model's window isn't
 // filled. No MAUI types: linked into the tests.
-internal sealed class TaskPlan
+public sealed class TaskPlan
 {
     public const int MaxSteps = 8;
     // What of a step's reply is kept for the later steps and the final answer.
     public const int ResultLength = 700;
 
-    internal enum State { Pending, Running, Done, Skipped, Failed }
+    public enum State { Pending, Running, Done, Skipped, Failed }
 
-    internal sealed class Step
+    public sealed class Step
     {
         public string Text;
         public State State;

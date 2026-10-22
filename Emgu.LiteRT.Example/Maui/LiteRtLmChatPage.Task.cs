@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Maui.Controls.Shapes;
+using Emgu.LiteRT.LM.Agents;
 
 namespace Maui.Demo.Lite;
 

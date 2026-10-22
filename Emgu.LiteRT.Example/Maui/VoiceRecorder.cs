@@ -7,6 +7,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Agents.Audio;
 
 namespace Maui.Demo.Lite
 {

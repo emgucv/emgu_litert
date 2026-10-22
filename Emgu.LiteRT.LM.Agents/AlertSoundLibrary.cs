@@ -6,10 +6,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Agents.Audio;
 
 /// <summary>A sound an alert can play: one of the app's own or one the user added.</summary>
-internal sealed class AlertSound
+public sealed class AlertSound
 {
     /// <summary>The name people say it by ("lullaby", "rain")</summary>
     public string Name { get; init; }
@@ -25,7 +25,7 @@ internal sealed class AlertSound
 /// They live in one folder: the built-in ones copied from the app package the first time, the user's in a subfolder. Names are what people say
 /// ("play the lullaby", "my rain sound"); <see cref="Find"/> matches loosely and says when it can't choose.
 /// </summary>
-internal sealed class AlertSoundLibrary
+public sealed class AlertSoundLibrary
 {
     /// <summary>The built-in sounds: the name and the asset in the app package</summary>
     public static readonly (string Name, string Asset)[] BuiltIns = { ("white noise", "alert_white_noise.wav"), ("lullaby", "alert_lullaby.wav") };
@@ -67,7 +67,12 @@ internal sealed class AlertSoundLibrary
                 using (Stream source = await _openAsset(asset, token).ConfigureAwait(false))
                 using (var target = File.Create(temporary))
                     await source.CopyToAsync(target, 81920, token).ConfigureAwait(false);
+#if NETCOREAPP3_0_OR_GREATER
                 File.Move(temporary, path, true);
+#else
+                if (File.Exists(path)) File.Delete(path);
+                File.Move(temporary, path);
+#endif
             }
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }

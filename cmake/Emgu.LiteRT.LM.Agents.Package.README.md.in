@@ -44,6 +44,10 @@ using (Gemma4E2B model = new Gemma4E2B())
 
 Sound monitors (`Emgu.LiteRT.LM.Agents.Audio`): `SoundMonitorTools.Create(...)` gives an agent `create_sound_monitor`, `list_sound_monitors` and `control_sound_monitor` ("tell me when the doorbell rings"), backed by a `SoundMonitorRuntime` that your app feeds with each window's 521 YAMNet class scores (`runtime.Advance(time, scores)`); it confirms sounds (`SoundGroups`: doorbell, dog, baby crying, smoke alarm... as groups of YAMNet classes), and runs your alert callback. The microphone and the classifier are yours - `Emgu.LiteRT.Models`' `YamNet` runs the model.
 
+Also in `Emgu.LiteRT.LM.Agents.Audio`: `AlertSoundLibrary` (named sounds an alert can play, built-in or added by the user, matched loosely by name), `AlertAudioCoordinator` (keeps alert sounds and spoken replies from talking over each other), and for voice chats `VoiceActivityDetector` (decides when a spoken message has ended, from microphone levels) and `SpeechSegmenter` (splits a streaming reply into sentences to read aloud, skipping code and tables).
+
+`TaskPlan` is task mode: a prompt that has the model write a short numbered plan, the parser for it, and the prompts that run each step and write the final answer from the steps' results.
+
 `AgentTools.Describe(call)` describes a tool call (e.g. "Searching Wikipedia for “Ada Lovelace”"), to show while it runs.
 
 ## Visual agents and event monitors

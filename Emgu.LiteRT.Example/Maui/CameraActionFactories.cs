@@ -2,6 +2,7 @@
 #if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Text.Json;
 using Emgu.LiteRT.LM.Agents.Events;
+using Emgu.LiteRT.LM.Agents.Audio;
 
 namespace Maui.Demo.Lite;
 

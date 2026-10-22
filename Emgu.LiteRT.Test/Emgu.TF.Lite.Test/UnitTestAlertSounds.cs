@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Vision;
+using Emgu.LiteRT.LM.Agents.Audio;
 using Maui.Demo.Lite;
 using NUnit.Framework;
 

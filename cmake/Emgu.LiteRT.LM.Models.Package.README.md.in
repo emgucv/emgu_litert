@@ -51,6 +51,8 @@ string excerpts = string.Join("\n\n", result.Passages.Take(3).Select(m => m.Item
 // ...send the excerpts and the question to a LanguageModel's Chat
 ```
 
+`MathText.ToUnicode(latex)` turns a LaTeX maths expression of the kind models write - the text between `$...$`, `\(...\)` or `$$...$$`, e.g. `x^2 + \frac{a}{b}`, `\sqrt{2}`, `\alpha \le 1` - into Unicode text (x² + a/b, √2, α ≤ 1), for showing or reading a reply where there is no maths typesetting.
+
 To use the models with Microsoft.Extensions.AI (`IChatClient`, tool calling) or Microsoft Agent Framework, add the ${EMGU_LITERT_LM_EXTENSIONS_AI_NUGET_ID} package.
 
 For online documentation please visit

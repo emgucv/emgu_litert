@@ -5,12 +5,12 @@
 using System;
 using System.Collections.Generic;
 
-namespace Maui.Demo.Lite
+namespace Emgu.LiteRT.LM.Agents.Audio
 {
     /// <summary>
     /// What <see cref="VoiceActivityDetector.Process"/> found in a stretch of microphone input.
     /// </summary>
-    internal enum VoiceActivity
+    public enum VoiceActivity
     {
         None,
         /// <summary>Speech began (it has lasted <see cref="VoiceActivityDetector.MinSpeech"/>).</summary>
@@ -26,7 +26,7 @@ namespace Maui.Demo.Lite
     /// a quieter level at once and a louder one slowly, so speech doesn't become the new background. No MAUI types, so
     /// the unit tests use it too.
     /// </summary>
-    internal sealed class VoiceActivityDetector
+    public sealed class VoiceActivityDetector
     {
         /// <summary>How far above the background a level must be to count as speech starting.</summary>
         public double StartMarginDb { get; set; } = 12;
@@ -172,7 +172,7 @@ namespace Maui.Demo.Lite
     /// The microphone, as a voice conversation uses it: <see cref="VoiceRecorder"/>, or a recording played in its place
     /// (the demo's self-tests).
     /// </summary>
-    internal interface IVoiceInput
+    public interface IVoiceInput
     {
         bool IsRecording { get; }
 
@@ -193,7 +193,7 @@ namespace Maui.Demo.Lite
     /// returns the pieces completed since the last. The pieces keep their Markdown, which
     /// <see cref="ReplySpeech.CleanForSpeech"/> removes. No MAUI types, so the unit tests use it too.
     /// </summary>
-    internal sealed class SpeechSegmenter
+    public sealed class SpeechSegmenter
     {
         private int _lineStart;   // where the line being read starts
         private int _spoken;      // how much of that line has been returned

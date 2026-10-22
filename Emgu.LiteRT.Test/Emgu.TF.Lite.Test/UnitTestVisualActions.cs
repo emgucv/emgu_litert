@@ -9,6 +9,7 @@ using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Vision;
 using Microsoft.Extensions.AI;
 using Emgu.LiteRT.LM.Extensions.AI;
+using Emgu.LiteRT.LM.Agents.Audio;
 using Maui.Demo.Lite;
 using NUnit.Framework;
 

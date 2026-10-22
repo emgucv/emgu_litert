@@ -4,11 +4,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents.Events;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Agents.Audio;
 
 // No MAUI dependency: the host supplies speech playback, including its UI-thread dispatch.
 // Visual groups reserve audio first; chime and one speech action can then run concurrently.
-internal sealed class AlertAudioCoordinator : IVisualActionGroupCoordinator
+public sealed class AlertAudioCoordinator : IVisualActionGroupCoordinator
 {
     private readonly Func<string, CancellationToken, Task> _speak;
     private readonly Func<VisualEvent, bool> _requiresAudio;
@@ -50,7 +50,7 @@ internal sealed class AlertAudioCoordinator : IVisualActionGroupCoordinator
                     }
                     wait = _changed.Task;
                 }
-                await wait.WaitAsync(stop.Token).ConfigureAwait(false);
+                await WaitAsync(wait, stop.Token).ConfigureAwait(false);
             }
             stop.Token.ThrowIfCancellationRequested();
             await _speak(text, stop.Token).ConfigureAwait(false);
@@ -67,6 +67,26 @@ internal sealed class AlertAudioCoordinator : IVisualActionGroupCoordinator
             completed?.TrySetResult(true); // Complete only after native speech has unwound.
         }
     }
+    // Task.WaitAsync(CancellationToken) is .NET 6+; the netstandard2.0 build waits for the task or the token instead.
+    private static Task WaitAsync(Task task, CancellationToken token)
+    {
+#if NET6_0_OR_GREATER
+        return task.WaitAsync(token);
+#else
+        return WaitOrCancelAsync(task, token);
+#endif
+    }
+
+#if !NET6_0_OR_GREATER
+    private static async Task WaitOrCancelAsync(Task task, CancellationToken token)
+    {
+        if (task.IsCompleted || !token.CanBeCanceled) { await task.ConfigureAwait(false); return; }
+        var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using (token.Register(() => cancelled.TrySetCanceled(token)))
+            await (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false)).ConfigureAwait(false);
+    }
+#endif
+
     public async Task<IDisposable> EnterAsync(VisualEvent occurrence, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -79,7 +99,7 @@ internal sealed class AlertAudioCoordinator : IVisualActionGroupCoordinator
             {
                 _reserved = true; reply = _reply; _replyStop?.Cancel();
             }
-            if (reply != null) await reply.WaitAsync(token).ConfigureAwait(false);
+            if (reply != null) await WaitAsync(reply, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             return new Reservation(this);
         }

@@ -2,20 +2,18 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if WINDOWS || IOS || ANDROID || MACCATALYST
-
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Maui.Demo.Lite
+namespace Emgu.LiteRT.LM.Models
 {
     /// <summary>
     /// Turns the LaTeX the models write for maths ($O(n)$, $x^2 + y^2 = r^2$, \frac{a}{b}, \sqrt{2}, \alpha, \le, ...)
     /// into plain Unicode text (O(n), x² + y² = r², a/b, √2, α, ≤) that a Label can show. It doesn't typeset:
     /// fractions are written a/b, and anything it doesn't know is shown without its backslash.
     /// </summary>
-    internal static class MathText
+    public static class MathText
     {
         public static string ToUnicode(string latex)
         {
@@ -345,4 +343,3 @@ namespace Maui.Demo.Lite
     }
 }
 
-#endif

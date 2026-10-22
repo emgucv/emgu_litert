@@ -7,6 +7,7 @@
 using System.Diagnostics;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Maui.Controls.Shapes;
+using Emgu.LiteRT.LM.Agents.Audio;
 
 namespace Maui.Demo.Lite;
 

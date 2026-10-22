@@ -5,6 +5,7 @@ using System.Linq;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.Models;
 using Emgu.LiteRT.LM.Agents.Vision;
+using Emgu.LiteRT.LM.Agents.Audio;
 
 namespace Maui.Demo.Lite;
 

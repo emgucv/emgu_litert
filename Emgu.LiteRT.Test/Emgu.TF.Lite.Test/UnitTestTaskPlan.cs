@@ -1,6 +1,6 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using System.Linq;
-using Maui.Demo.Lite;
+using Emgu.LiteRT.LM.Agents;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;

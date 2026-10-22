@@ -1,5 +1,7 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 #if ANDROID || MACCATALYST || WINDOWS || IOS
+using Emgu.LiteRT.LM.Agents.Audio;
+
 namespace Maui.Demo.Lite;
 
 // Plays an alert sound file (AlertSoundLibrary) through the platform's own player (TODO item 53): once, or repeated for a number of seconds. It returns when
