@@ -6,8 +6,8 @@
 IF(HAVE_ANDROID_LITE OR HAVE_IOS_LITE OR HAVE_WINDESKTOP_LITE)
   INSTALL(
     DIRECTORY
-    "${CMAKE_CURRENT_SOURCE_DIR}/Maui.Lite"
-    DESTINATION Emgu.LiteRT.Example/Maui.Lite
+    "${CMAKE_CURRENT_SOURCE_DIR}/Maui"
+    DESTINATION Emgu.LiteRT.Example/Maui
     COMPONENT emgulitert_example_source
     FILES_MATCHING 
     PATTERN "*.cs"

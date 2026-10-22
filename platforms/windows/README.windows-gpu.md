@@ -106,7 +106,7 @@ After generating project properties and native NuGet packages with
 `build_emgu_litert.ps1 -NugetFlag nuget`, build the demo:
 
 ```powershell
-dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-windows10.0.22621.0 -p:WindowsPackageType=None -p:RestoreAdditionalProjectSources="$PWD/platforms/nuget"
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-windows10.0.22621.0 -p:WindowsPackageType=None -p:RestoreAdditionalProjectSources="$PWD/platforms/nuget"
 ```
 
 The demo automatically references the GPU NuGet package when the default
@@ -118,7 +118,7 @@ and keeps GPU output in a separate `webgpu` subfolder to avoid stale DLLs when
 alternating CPU and GPU builds. Use `-p:EnableWindowsGpu=false` for a CPU-only
 build, or `-p:EnableWindowsGpu=true` to require the GPU package even when the
 source bundle is not on this machine. The CPU-only build displays the GPU setting as unavailable. The Debug
-GPU executable is `Emgu.LiteRT.Example/Maui.Lite/bin/Debug/webgpu/net10.0-windows10.0.22621.0/win-x64/Maui.Demo.Lite.exe`.
+GPU executable is `Emgu.LiteRT.Example/Maui/bin/Debug/webgpu/net10.0-windows10.0.22621.0/win-x64/Maui.Demo.Lite.exe`.
 
 In Chat's model picker, choose an entry under **CPU models** or **GPU models**.
 The five verified GPU chat models have GPU entries when the GPU runtime is included.

@@ -13,7 +13,7 @@ using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
 
-// The long-chat measurements in Emgu.LiteRT.Example/Maui.Lite/Performance.md, for the machine running them: a history
+// The long-chat measurements in Emgu.LiteRT.Example/Maui/Performance.md, for the machine running them: a history
 // that fills the context window (a fact at the start - "the secret code is 7341" - then filler) is loaded, and the
 // model is asked for the fact, for the fact plus one, and for a long answer. One configuration per process, as the
 // numbers there were taken (a fresh process per window size):

@@ -56,5 +56,5 @@ Directory.Build.props
 /platforms/nuget/*.snupkg
 
 # This Mac's development signing identity and provisioning profile
-/Emgu.LiteRT.Example/Maui.Lite/MacCatalyst.Signing.props
-/Emgu.LiteRT.Example/Maui.Lite/tools/.license_cache/
+/Emgu.LiteRT.Example/Maui/MacCatalyst.Signing.props
+/Emgu.LiteRT.Example/Maui/tools/.license_cache/

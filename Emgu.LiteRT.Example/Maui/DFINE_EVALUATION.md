@@ -62,9 +62,9 @@ python3.12 -m venv /private/tmp/emgu-dfine-venv
   opencv-python==4.13.0.92 tensorboard faster-coco-eval calflops transformers
 git clone https://github.com/Peterande/D-FINE.git /private/tmp/emgu-dfine-upstream
 git -C /private/tmp/emgu-dfine-upstream checkout 956d1709314c2c6a4df6f34de232054578a7449f
-/private/tmp/emgu-dfine-venv/bin/python Emgu.LiteRT.Example/Maui.Lite/tools/prepare_dfine_n.py \
+/private/tmp/emgu-dfine-venv/bin/python Emgu.LiteRT.Example/Maui/tools/prepare_dfine_n.py \
   --upstream /private/tmp/emgu-dfine-upstream --output /private/tmp/emgu-dfine-model --size 640
-/private/tmp/emgu-dfine-venv/bin/python Emgu.LiteRT.Example/Maui.Lite/tools/check_dfine_conversion.py \
+/private/tmp/emgu-dfine-venv/bin/python Emgu.LiteRT.Example/Maui/tools/check_dfine_conversion.py \
   --onnx /private/tmp/emgu-dfine-model/dfine_n_coco_640.onnx \
   --tflite /private/tmp/emgu-dfine-model/conversion_640/litert/dfine_n_640_float32.tflite --size 640
 ```

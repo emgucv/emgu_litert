@@ -11,7 +11,7 @@ found - use your version's number otherwise).
 
 ## 1. One-time setup
 
-- .NET SDK with the MAUI workloads: `dotnet workload restore Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj`
+- .NET SDK with the MAUI workloads: `dotnet workload restore Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj`
 - For the native builds: Bazel (the version in `LiteRT-LM/.bazelversion`; Bazelisk picks it automatically) and
   CMake 3.16 or later; Xcode for Mac Catalyst and iOS; the Android SDK, NDK and a JDK for Android.
 - The LiteRT-LM submodule's prebuilt libraries are stored with Git LFS: `git -C LiteRT-LM lfs pull`.
@@ -46,8 +46,8 @@ target frameworks") or after switching .NET SDKs.
 ### Mac Catalyst
 
 ```bash
-dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false
-open "Emgu.LiteRT.Example/Maui.Lite/bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/Emgu LiteRT.app"
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false
+open "Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/Emgu LiteRT.app"
 ```
 
 `-p:ValidateXcodeVersion=false` is needed when the .NET Mac Catalyst SDK pack doesn't match the installed Xcode
@@ -57,8 +57,8 @@ running its executable from a terminal) makes macOS ask for microphone access fo
 ### iOS simulator
 
 ```bash
-dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug -p:ValidateXcodeVersion=false -p:RuntimeIdentifier=iossimulator-arm64
-xcrun simctl install booted Emgu.LiteRT.Example/Maui.Lite/bin/Debug/net10.0-ios/iossimulator-arm64/Maui.Demo.Lite.app
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug -p:ValidateXcodeVersion=false -p:RuntimeIdentifier=iossimulator-arm64
+xcrun simctl install booted Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios/iossimulator-arm64/Maui.Demo.Lite.app
 xcrun simctl launch booted com.emgu.litert
 ```
 
@@ -71,7 +71,7 @@ Device builds need code signing (an Apple developer team and provisioning profil
 
 ```bash
 xcrun xctrace list devices                     # find the device's UDID
-dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -t:Run -f net10.0-ios -c Release -r ios-arm64 -p:_DeviceName=<UDID>
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -t:Run -f net10.0-ios -c Release -r ios-arm64 -p:_DeviceName=<UDID>
 ```
 
 (Not yet verified with this version of the demo.)
@@ -81,7 +81,7 @@ dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -t:Run -f net10
 Start an emulator or connect a device, then:
 
 ```bash
-dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-android -c Debug -p:RuntimeIdentifier=android-arm64 -t:Run
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-android -c Debug -p:RuntimeIdentifier=android-arm64 -t:Run
 ```
 
 - `-p:RuntimeIdentifier=android-arm64` builds only the ABI you need (use `android-x64` for an x86_64 emulator).
@@ -121,7 +121,7 @@ Open the project in Visual Studio, or after the native build and `build_emgu_lit
 
 ```powershell
 platforms\windows\build_emgu_litert.ps1 "" nuget
-dotnet build Emgu.LiteRT.Example\Maui.Lite\Maui.Demo.Lite.csproj -f net10.0-windows10.0.22621.0 -t:Run
+dotnet build Emgu.LiteRT.Example\Maui\Maui.Demo.Lite.csproj -f net10.0-windows10.0.22621.0 -t:Run
 ```
 
 For GPU chat on Windows, first build the matching runtime bundle with
@@ -270,7 +270,7 @@ again.
   Obtain a Mac Catalyst development profile for `com.emgu.litert` using your Apple developer team, then build with:
 
   ```bash
-  dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: Your Name (CERTIFICATE_ID)" -p:CodesignProvision="PROFILE_UUID"
+  dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: Your Name (CERTIFICATE_ID)" -p:CodesignProvision="PROFILE_UUID"
   ```
 
   The project includes `Platforms/MacCatalyst/Keychain.entitlements.plist` when `CodesignProvision` is supplied; its Keychain

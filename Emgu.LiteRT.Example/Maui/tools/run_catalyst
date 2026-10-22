@@ -18,9 +18,9 @@ shift || true
 entitlements="$(mktemp -d)/empty.entitlements.plist"
 printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict/></plist>\n' > "$entitlements"
 cd "$root"
-dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false \
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false \
     -p:CodesignKey=- -p:CodesignProvision= -p:CodesignEntitlements="$entitlements"
-src="$root/Emgu.LiteRT.Example/Maui.Lite/bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/Emgu LiteRT.app"
+src="$root/Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/Emgu LiteRT.app"
 app="$dest/Emgu LiteRT.app"
 mkdir -p "$dest"
 [ -e "$app" ] && mv "$app" "$app.old.$$" && rm -rf "$app.old.$$"

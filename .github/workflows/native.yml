@@ -185,13 +185,13 @@ jobs:
     - name: Build the MAUI demo for the iOS simulator
       # ValidateXcodeVersion=false: the runner's Xcode needn't be the exact version the .NET iOS SDK pack names.
       run: >
-        dotnet build Emgu.LiteRT.Example/Maui.Lite/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug
+        dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug
         -p:RuntimeIdentifier=iossimulator-arm64 -p:ValidateXcodeVersion=false
     - name: Check the app bundle's frameworks
       # Each framework must be embedded, be a simulator binary, and find the frameworks it links in the app's
       # Frameworks folder.
       run: |
-        APP=$(ls -d Emgu.LiteRT.Example/Maui.Lite/bin/Debug/net10.0-ios/iossimulator-arm64/*.app)
+        APP=$(ls -d Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios/iossimulator-arm64/*.app)
         echo "$APP"
         ls "$APP/Frameworks"
         for NAME in LiteRt tfliteextern LiteRtLm GemmaModelConstraintProvider; do

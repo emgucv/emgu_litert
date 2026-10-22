@@ -7,7 +7,7 @@
 # doesn't hash it again either (if the marker doesn't match, it just hashes once).
 #
 # Needs a Debug build (run-as only works for debuggable apps) and ANDROID_HOME. Usage:
-#   Emgu.LiteRT.Example/Maui.Lite/tools/deploy_android [serial ...]
+#   Emgu.LiteRT.Example/Maui/tools/deploy_android [serial ...]
 #   NO_BUILD=1 .../deploy_android [serial ...]   # only copy the models
 #   MODELS_OVERRIDE="gemma-4-E2B-it.litertlm" .../deploy_android [serial ...]   # copy only these models
 set -e

@@ -40,8 +40,8 @@ onnxruntime 1.26.0, ai-edge-litert 2.1.2, onnxsim 0.6.5, opencv-python 4.13.0.92
 python3.12 -m venv /private/tmp/emgu-picodet-venv
 /private/tmp/emgu-picodet-venv/bin/python -m pip install onnx onnxruntime onnxsim 'onnx2tf[tensorflow]==2.6.9' tensorflow==2.21.0 \
   tf-keras==2.21.0 ai-edge-litert==2.1.2 opencv-python numpy sng4onnx onnx_graphsurgeon psutil
-/private/tmp/emgu-picodet-venv/bin/python Emgu.LiteRT.Example/Maui.Lite/tools/prepare_picodet_s.py --output /private/tmp/emgu-picodet-model
-/private/tmp/emgu-picodet-venv/bin/python Emgu.LiteRT.Example/Maui.Lite/tools/check_picodet_conversion.py \
+/private/tmp/emgu-picodet-venv/bin/python Emgu.LiteRT.Example/Maui/tools/prepare_picodet_s.py --output /private/tmp/emgu-picodet-model
+/private/tmp/emgu-picodet-venv/bin/python Emgu.LiteRT.Example/Maui/tools/check_picodet_conversion.py \
   --onnx /private/tmp/emgu-picodet-model/picodet_s_416_coco_lcnet.onnx \
   --tflite /private/tmp/emgu-picodet-model/conversion/litert/picodet_s_416_gpu_float32.tflite
 ```

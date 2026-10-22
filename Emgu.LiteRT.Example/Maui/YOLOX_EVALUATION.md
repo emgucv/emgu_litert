@@ -120,9 +120,9 @@ python3.12 -m venv /private/tmp/emgu-yolox-venv
   onnxruntime==1.26.0 ai-edge-litert==2.1.2 opencv-python==4.13.0.92
 git clone https://github.com/Megvii-BaseDetection/YOLOX.git /private/tmp/emgu-yolox-upstream
 git -C /private/tmp/emgu-yolox-upstream checkout 6ddff4824372906469a7fae2dc3206c7aa4bbaee
-/private/tmp/emgu-yolox-venv/bin/python Emgu.LiteRT.Example/Maui.Lite/tools/prepare_yolox_nano.py \
+/private/tmp/emgu-yolox-venv/bin/python Emgu.LiteRT.Example/Maui/tools/prepare_yolox_nano.py \
   --output /private/tmp/emgu-yolox-model
-/private/tmp/emgu-yolox-venv/bin/python Emgu.LiteRT.Example/Maui.Lite/tools/check_yolox_conversion.py \
+/private/tmp/emgu-yolox-venv/bin/python Emgu.LiteRT.Example/Maui/tools/check_yolox_conversion.py \
   --models /private/tmp/emgu-yolox-model --upstream /private/tmp/emgu-yolox-upstream
 ```
 
