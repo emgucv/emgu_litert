@@ -2,6 +2,7 @@
 #if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Runtime.InteropServices;
 using Emgu.CV;
+using Emgu.LiteRT.Models;
 using Emgu.CV.CvEnum;
 using Emgu.LiteRT.LM.Agents.Vision;
 
@@ -15,7 +16,7 @@ internal sealed class CocoVisualAgent : IVisualAgent
     internal CocoVisualAgent(bool useYoloX = false)
     {
         _useYoloX = useYoloX;
-        _detector = useYoloX ? new YoloXDetector() : new CocoDetector();
+        _detector = useYoloX ? DetectorFactory.YoloX() : DetectorFactory.Coco();
     }
     internal static readonly string[] Classes = VisualHostCatalog.Classes;
     public VisualAgentDescriptor Descriptor => _useYoloX

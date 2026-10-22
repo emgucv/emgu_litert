@@ -4,24 +4,42 @@ using Emgu.LiteRT.Models;
 using Emgu.LiteRT.Util;
 using Emgu.CV;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.Models;
 
 // MediaPipe's pose landmarker (PoseTracker) for the demo: downloads Google's pose_landmarker_{lite,full,heavy}.task (5.8 / 9.4 / 30.7 MB, SHA-256
 // checked, not copied to Emgu's server), unpacks the two models, and uses the GPU only if asked and only if both compile fully for it and give the
 // CPU's landmarks on a bundled photo. See POSE.md.
-internal sealed class PoseDetector : IDisposable
+/// <summary>MediaPipe pose landmarks (<see cref="PoseTracker"/>) for Emgu CV images. Callers serialize <c>PrepareAsync</c>, <c>Detect</c> and <c>Dispose</c> off the UI thread.</summary>
+public sealed class PoseDetector : IDisposable
 {
+    private readonly string _cacheDirectory;
+    private readonly Func<string, Task<Mat>> _validationImage;
+
+    /// <summary>Creates the detector.</summary>
+    /// <param name="cacheDirectory">Where the weights are downloaded to (default: a folder in the temp path).</param>
+    /// <param name="validationImage">Returns a bundled image by file name (e.g. "surfers.jpg"), used to check a GPU's
+    /// results against the CPU's before trusting it. Without it the GPU is never used.</param>
+    public PoseDetector(string cacheDirectory = null, Func<string, Task<Mat>> validationImage = null)
+    {
+        _cacheDirectory = cacheDirectory ?? DetectorDefaults.CacheDirectory;
+        _validationImage = validationImage;
+    }
+
     private PoseTracker _tracker;
+    /// <summary>True once <see cref="PrepareAsync"/> has completed.</summary>
     public bool Imported => _tracker != null;
+    /// <summary>The backend in use ("CPU" or "GPU"), or null before <see cref="PrepareAsync"/> has completed.</summary>
     public string Backend { get; private set; }
+    /// <summary>Why the GPU was not used, or null if it was used or never tried.</summary>
     public string GpuFailure { get; private set; }
 
+    /// <summary>Downloads the models if needed and compiles them, trying the GPU first when <paramref name="preferGpu"/> is set and the platform supports it; the CPU otherwise or on failure.</summary>
     public async Task PrepareAsync(PoseModelFiles.Variant variant, bool preferGpu, int numThreads, Action<string> progress, CancellationToken token)
     {
         if (Imported) return;
         token.ThrowIfCancellationRequested();
-        string folder = Path.Combine(FileSystem.CacheDirectory, "mediapipe-pose-" + variant.Name);
-        string file = Path.Combine(FileSystem.CacheDirectory, "pose_landmarker_" + variant.Name + ".task");
+        string folder = Path.Combine(_cacheDirectory, "mediapipe-pose-" + variant.Name);
+        string file = Path.Combine(_cacheDirectory, "pose_landmarker_" + variant.Name + ".task");
         var bundle = new DownloadableFile(variant.Url, "PoseLandmarker", variant.Sha256) { LocalFile = file };
         var downloads = new FileDownloadManager();
         downloads.AddFile(bundle);
@@ -34,7 +52,7 @@ internal sealed class PoseDetector : IDisposable
         string[] models = await Task.Run(() => PoseModelFiles.Extract(file, folder), token).ConfigureAwait(false);
 
         GpuFailure = null;
-        if (preferGpu && CocoDetector.CanTryGpu)
+        if (preferGpu && CocoDetector.CanTryGpu && _validationImage != null)
         {
             try
             {
@@ -64,12 +82,12 @@ internal sealed class PoseDetector : IDisposable
     }
 
     // Fully accelerated, and the landmarks within 3% of the image of the CPU's on the bundled photo.
-    private static async Task ValidateGpuAsync(PoseTracker gpu, string[] models, int numThreads, CancellationToken token)
+    private async Task ValidateGpuAsync(PoseTracker gpu, string[] models, int numThreads, CancellationToken token)
     {
         if (!gpu.IsFullyAccelerated)
             throw new InvalidOperationException("The pose models don't compile fully for the GPU.");
         using var cpu = await Task.Run(() => new PoseTracker(models[0], models[1], numThreads), token).ConfigureAwait(false);
-        using var image = ImageUtil.Decode(await ImageUtil.ReadAppFileAsync("pose_standing.jpg").ConfigureAwait(false));
+        using var image = await _validationImage("pose_standing.jpg").ConfigureAwait(false) ?? throw new InvalidOperationException("The validation image " + "pose_standing.jpg" + " is not available.");
         await Task.Run(() =>
         {
             var expected = PoseImageInput.Track(cpu, image);
@@ -82,11 +100,13 @@ internal sealed class PoseDetector : IDisposable
         }, token).ConfigureAwait(false);
     }
 
+    /// <summary>Detects people's poses in an 8-bit BGR image.</summary>
     public List<Pose> Detect(Mat bgr)
     {
         if (!Imported) throw new InvalidOperationException("Prepare the pose models first.");
         return PoseImageInput.Track(_tracker, bgr);
     }
 
+    /// <summary>Releases the compiled models.</summary>
     public void Dispose() { _tracker?.Dispose(); _tracker = null; Backend = null; }
 }

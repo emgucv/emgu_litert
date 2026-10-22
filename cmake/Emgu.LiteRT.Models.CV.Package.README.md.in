@@ -1,0 +1,39 @@
+## About this package
+
+Ready-to-use vision models for Emgu LiteRT that take Emgu CV images (`Emgu.CV.Mat`, 8-bit BGR). It is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It depends on the managed Emgu CV library; to deploy, also add an Emgu CV runtime package for your platform (`Emgu.CV.runtime.*`). `${EMGU_LITERT_MODELS_NUGET_ID}` itself has no Emgu CV dependency.
+
+Detectors, on LiteRT's CompiledModel API (`Emgu.LiteRT`). Each downloads its weights on first use (`PrepareAsync`), then `Detect(Mat)`:
+
+- `CocoDetector`: COCO SSD MobileNet V3, 80 COCO classes
+- `YoloXDetector`: YOLOX-Nano
+- `PicoDetDetector`: PP-PicoDet-S
+- `DFineDetector`: D-FINE-N (CPU only, the most accurate and the slowest)
+- `HandGestureDetector`: MediaPipe's hand landmarks and gestures
+- `PoseDetector`: MediaPipe's pose landmarks (33 body landmarks)
+
+On Android and Mac Catalyst a detector tries the GPU, keeps it only if it gives the CPU's results on a known image and is faster, and otherwise runs on the CPU. For that check pass `validationImage`, which returns bundled images by name (`surfers.jpg`, `hand_thumb_up.jpg`, `pose_standing.jpg`); without it the CPU is always used.
+
+```csharp
+using (var detector = new Emgu.LiteRT.Models.YoloXDetector(cacheDirectory: weightsFolder))
+{
+    await detector.PrepareAsync(preferGpu: false, numThreads: 4, progress: null, CancellationToken.None);
+    using Mat image = CvInvoke.Imread("surfers.jpg");
+    foreach (var r in detector.Detect(image))
+        Console.WriteLine($"{r.Label}: {r.Score:P0}");
+}
+```
+
+For the Interpreter-based `Mobilenet` and `Inception` of `Emgu.TF.Lite.Models`, `InterpreterMatInput` adds `Recognize(Mat)` and `WriteInput(Mat)`:
+
+```csharp
+using Emgu.TF.Lite.Models;
+var best = mobilenet.Recognize(image)[0];
+```
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>
+
+## Note
+
+To deploy Emgu LiteRT to a specific platform, you will also need to add one of the ${EMGU_LITERT_NUGET_ID}.runtime.{platform} nuget packages to your executable project, use the following link to search for an ${EMGU_LITERT_NUGET_ID}.runtime nuget packages:
+<https://www.nuget.org/packages?q=${EMGU_LITERT_NUGET_ID}.runtime>

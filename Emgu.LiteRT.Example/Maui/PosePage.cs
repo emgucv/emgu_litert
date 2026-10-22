@@ -55,7 +55,7 @@ namespace Maui.Demo.Lite
             _backend.IsEnabled = false; _variant.IsEnabled = false;
             try
             {
-                _detector ??= new PoseDetector();
+                _detector ??= DetectorFactory.Pose();
                 await _detector.PrepareAsync(Variant, _backend.SelectedIndex == 1, CpuThreadSettings.Count, ShowProgress, CancellationToken.None);
                 ShowProgress("Finding the pose...");
                 return await Task.Run(() =>

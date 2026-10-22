@@ -576,6 +576,9 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # Emgu.LiteRT.Models/: the same models run with LiteRT's CompiledModel API (Emgu.LiteRT).
   SET(EMGU_LITERT_MODELS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Models")
   SET(EMGU_LITERT_MODELS_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Models")
+  # Emgu.LiteRT.Models.CV/: the detectors and image input that need Emgu CV (kept out of Emgu.LiteRT.Models so that package has no Emgu CV dependency).
+  SET(EMGU_LITERT_MODELS_CV_NUGET_ID "${EMGU_LITERT_MODELS_NUGET_ID}.CV")
+  SET(EMGU_LITERT_MODELS_CV_NUGET_TITLE "${EMGU_LITERT_MODELS_NUGET_TITLE} CV")
 
   # Select the paired core before configuring dependent runtime package IDs.
   SET(EMGU_LITERT_GPU_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.GPU.runtime.windows")
@@ -1205,6 +1208,18 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models/NetStandard/docs/README.md)
 
+# Emgu.LiteRT.Models.CV: the vision models that take Emgu CV images (YOLOX, PicoDet, D-FINE, COCO SSD, MediaPipe hands and
+# pose, Mat input for the Interpreter-based MobileNet/Inception). Its own nuget package, depending on Emgu CV (managed),
+# Emgu.LiteRT.Models and Emgu.TF.Lite.Models.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.CV.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models.CV/NetStandard/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models.CV/NetStandard/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models.CV/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.CV.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models.CV/NetStandard/docs/README.md)
+
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/README.md)
 
@@ -1266,6 +1281,7 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.TF.Lite.ImageIO)
   ADD_SUBDIRECTORY(Emgu.TF.Lite.Models)
   ADD_SUBDIRECTORY(Emgu.LiteRT.Models)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.Models.CV)
 ENDIF()
 
 IF (HAVE_LITE_BUILD)

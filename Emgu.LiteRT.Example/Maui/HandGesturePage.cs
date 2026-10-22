@@ -66,7 +66,7 @@ namespace Maui.Demo.Lite
             _backend.IsEnabled = false;
             try
             {
-                _detector ??= new HandGestureDetector();
+                _detector ??= DetectorFactory.Hand();
                 await _detector.PrepareAsync(_backend.SelectedIndex == 1, CpuThreadSettings.Count, ShowProgress, CancellationToken.None);
                 ShowProgress("Finding hands...");
                 return await Task.Run(() =>

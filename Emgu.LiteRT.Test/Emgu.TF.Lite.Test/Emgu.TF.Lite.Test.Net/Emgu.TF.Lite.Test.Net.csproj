@@ -35,18 +35,12 @@
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\PlayFileAction.cs" Link="PlayFileAction.cs" />
     <Compile Include="..\UnitTestYamNet.cs" Link="UnitTestYamNet.cs" />
     <Compile Include="..\UnitTestSoundMonitors.cs" Link="UnitTestSoundMonitors.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\HandImageInput.cs" Link="HandImageInput.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\PoseImageInput.cs" Link="PoseImageInput.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\TaskPlan.cs" Link="TaskPlan.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\VoiceLanguages.cs" Link="VoiceLanguages.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\LanguageText.cs" Link="LanguageText.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\PngMetadata.cs" Link="PngMetadata.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\McpServers.cs" Link="McpServers.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\PicoDetImageInput.cs" Link="PicoDetImageInput.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\DFineImageInput.cs" Link="DFineImageInput.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\YoloXImageInput.cs" Link="YoloXImageInput.cs" />
     <Compile Include="..\UnitTestCocoBackendBenchmark.cs" Link="UnitTestCocoBackendBenchmark.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\CocoBackendBenchmark.cs" Link="CocoBackendBenchmark.cs" />
     <Compile Include="..\UnitTestZImageTurbo.cs" Link="UnitTestZImageTurbo.cs" />
     <Compile Include="..\UnitTestDownloads.cs" Link="UnitTestDownloads.cs" />
     <Compile Include="..\UnitTestBackgroundDownloads.cs" Link="UnitTestBackgroundDownloads.cs" />
@@ -145,6 +139,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Emgu.TF.Lite.Models\NetStandard\Emgu.TF.Lite.Models.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Models\NetStandard\Emgu.LiteRT.Models.csproj" />
+    <ProjectReference Include="..\..\..\Emgu.LiteRT.Models.CV\NetStandard\Emgu.LiteRT.Models.CV.csproj" />
     <ProjectReference Include="..\..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT\NetStandard\Emgu.LiteRT.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />

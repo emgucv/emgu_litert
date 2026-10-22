@@ -101,7 +101,7 @@ public class UnitTestDFineNative
         {
             string name = sample.GetProperty("image").GetString();
             using var image = Emgu.CV.CvInvoke.Imread(Path.Combine(root, name), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
-            Maui.Demo.Lite.DFineImageInput.Write(model, image);
+            Emgu.LiteRT.Models.DFineImageInput.Write(model, image);
             var actual = model.Run().ToList();
             var expected = sample.GetProperty("detections_xyxy_score_class").EnumerateArray().ToArray();
             Assert.That(actual.Count, Is.EqualTo(expected.Length), name);

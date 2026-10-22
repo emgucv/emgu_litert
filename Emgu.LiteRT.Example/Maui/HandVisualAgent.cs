@@ -2,6 +2,7 @@
 #if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Runtime.InteropServices;
 using Emgu.CV;
+using Emgu.LiteRT.Models;
 using Emgu.CV.CvEnum;
 using Emgu.LiteRT.LM.Agents.Vision;
 
@@ -14,7 +15,7 @@ namespace Maui.Demo.Lite;
 // for these small models on the phones (HAND_GESTURES.md).
 internal sealed class HandVisualAgent : IVisualAgent
 {
-    private readonly HandGestureDetector _detector = new HandGestureDetector();
+    private readonly HandGestureDetector _detector = DetectorFactory.Hand();
 
     public VisualAgentDescriptor Descriptor => VisualHostCatalog.HandDetector(!_detector.Imported, _detector.Backend);
 

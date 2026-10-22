@@ -6,7 +6,7 @@ using Emgu.CV.Structure;
 using Emgu.LiteRT;
 using Emgu.LiteRT.Models;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.Models;
 
 // Shared with native regression tests so the resize, color order and normalization use the production path.
 internal static class PicoDetImageInput

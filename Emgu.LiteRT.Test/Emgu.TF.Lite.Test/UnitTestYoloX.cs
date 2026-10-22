@@ -118,7 +118,7 @@ public class UnitTestYoloXNative
         {
             string name = sample.GetProperty("image").GetString();
             using var image = Emgu.CV.CvInvoke.Imread(Path.Combine(root, name), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
-            Maui.Demo.Lite.YoloXImageInput.Write(model, image);
+            Emgu.LiteRT.Models.YoloXImageInput.Write(model, image);
             var actual = model.Run(image.Width, image.Height).ToList();
             var expected = sample.GetProperty("detections_xyxy_score_class").EnumerateArray().ToArray();
             Assert.That(actual.Count, Is.EqualTo(expected.Length), name);

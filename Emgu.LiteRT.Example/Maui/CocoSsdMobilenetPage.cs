@@ -4,6 +4,7 @@
 
 using System.Diagnostics;
 using Emgu.CV;
+using Emgu.LiteRT.Models;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 using Emgu.TF.Lite.ImageIO;
@@ -63,7 +64,7 @@ namespace Maui.Demo.Lite
             _backend.IsEnabled = false;
             try
             {
-                _detector ??= _usePicoDet ? new PicoDetDetector() : _useDFine ? new DFineDetector() : _useYoloX ? new YoloXDetector() : new CocoDetector();
+                _detector ??= _usePicoDet ? DetectorFactory.PicoDet() : _useDFine ? DetectorFactory.DFine() : _useYoloX ? DetectorFactory.YoloX() : DetectorFactory.Coco();
                 await _detector.PrepareAsync(_backend.SelectedIndex == 1, CpuThreadSettings.Count,
                     ShowProgress, CancellationToken.None);
                 ShowProgress("Detecting objects...");

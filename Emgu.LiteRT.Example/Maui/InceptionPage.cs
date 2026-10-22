@@ -56,15 +56,7 @@ namespace Maui.Demo.Lite
             Inception model = _inception;
             (Inception.RecognitionResult[] result, long ms) = await Task.Run(() =>
             {
-                Tensor t = model.InputTensor;
-                System.Drawing.Size s = new System.Drawing.Size(299, 299);
-                using (Mat resizedMat = new Mat(s, DepthType.Cv8U, 3))
-                using (Mat tensorMat = new Mat(s, DepthType.Cv32F, 3, t.DataPointer, 3 * s.Width * Marshal.SizeOf<float>()))
-                {
-                    CvInvoke.Resize(input, resizedMat, s);
-                    CvInvoke.CvtColor(resizedMat, resizedMat, ColorConversion.Bgr2Rgb);
-                    resizedMat.ConvertTo(tensorMat, DepthType.Cv32F, 1.0 / 255.0, -0.0);
-                }
+                model.WriteInput(input);
                 Stopwatch watch = Stopwatch.StartNew();
                 var r = model.Invoke();
                 watch.Stop();

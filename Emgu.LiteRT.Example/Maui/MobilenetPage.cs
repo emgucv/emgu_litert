@@ -89,14 +89,7 @@ namespace Maui.Demo.Lite
             Mobilenet model = _mobilenet;
             (Mobilenet.RecognitionResult[] result, long ms) = await Task.Run(() =>
             {
-                Tensor t = model.InputTensor;
-                System.Drawing.Size s = new System.Drawing.Size(224, 224);
-                using (Mat resizedMat = new Mat(s, DepthType.Cv8U, 3))
-                using (Mat tensorMat = new Mat(s, DepthType.Cv32F, 3, t.DataPointer, 3 * s.Width * Marshal.SizeOf<float>()))
-                {
-                    CvInvoke.Resize(input, resizedMat, s);
-                    resizedMat.ConvertTo(tensorMat, DepthType.Cv32F, 1.0 / 128.0, -1.0 / 128.0);
-                }
+                model.WriteInput(input);
                 Stopwatch watch = Stopwatch.StartNew();
                 var r = model.Invoke();
                 watch.Stop();

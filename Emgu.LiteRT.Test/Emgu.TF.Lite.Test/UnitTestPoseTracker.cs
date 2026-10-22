@@ -229,7 +229,7 @@ public class UnitTestPoseTrackerNative
         foreach (var image in reference.RootElement.GetProperty("images").EnumerateObject())
         {
             using var bgr = Variant(source, image.Name);
-            var poses = Maui.Demo.Lite.PoseImageInput.Track(tracker, bgr);
+            var poses = Emgu.LiteRT.Models.PoseImageInput.Track(tracker, bgr);
             Assert.That(poses.Count, Is.EqualTo(1), image.Name);
             var expected = image.Value.GetProperty(variantName);
             int index = 0;
@@ -258,7 +258,7 @@ public class UnitTestPoseTrackerNative
         }
         // An image without a person has none.
         using var shuttle = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "space_shuttle.jpg"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
-        Assert.That(Maui.Demo.Lite.PoseImageInput.Track(tracker, shuttle), Is.Empty);
+        Assert.That(Emgu.LiteRT.Models.PoseImageInput.Track(tracker, shuttle), Is.Empty);
         tracker.Dispose();
         Assert.Throws<ObjectDisposedException>(() => tracker.Detect(100, 100));
     }

@@ -3,13 +3,16 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.Models;
 
 internal readonly record struct CocoBackendTiming(double CpuMilliseconds, double GpuMilliseconds)
 {
     // Ties and invalid measurements keep the CPU backend.
-    public bool UseGpu => double.IsFinite(CpuMilliseconds) && double.IsFinite(GpuMilliseconds)
+    public bool UseGpu => IsFinite(CpuMilliseconds) && IsFinite(GpuMilliseconds)
         && CpuMilliseconds > 0 && GpuMilliseconds > 0 && GpuMilliseconds < CpuMilliseconds;
+
+    // double.IsFinite is .NET Core 3.0+; this builds for netstandard2.0 too.
+    private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 }
 
 internal static class CocoBackendBenchmark
@@ -50,6 +53,6 @@ internal static class CocoBackendBenchmark
     {
         long start = Stopwatch.GetTimestamp();
         run();
-        return Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+        return (Stopwatch.GetTimestamp() - start) * 1000.0 / Stopwatch.Frequency;
     }
 }

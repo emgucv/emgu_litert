@@ -5,11 +5,25 @@ using Emgu.LiteRT;
 using Emgu.LiteRT.Models;
 using Emgu.LiteRT.Util;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.Models;
 
 // Shared by the photo demo and live visual agent. Callers serialize prepare/detect/dispose off the UI thread.
-internal sealed class CocoDetector : ICocoDetector
+/// <summary>COCO SSD MobileNet V3 object detector (80 COCO classes). Callers serialize <c>PrepareAsync</c>, <c>Detect</c> and <c>Dispose</c> off the UI thread.</summary>
+public sealed class CocoDetector : ICocoDetector
 {
+    private readonly string _cacheDirectory;
+    private readonly Func<string, Task<Mat>> _validationImage;
+
+    /// <summary>Creates the detector.</summary>
+    /// <param name="cacheDirectory">Where the weights are downloaded to (default: a folder in the temp path).</param>
+    /// <param name="validationImage">Returns a bundled image by file name (e.g. "surfers.jpg"), used to check a GPU's
+    /// results against the CPU's before trusting it. Without it the GPU is never used.</param>
+    public CocoDetector(string cacheDirectory = null, Func<string, Task<Mat>> validationImage = null)
+    {
+        _cacheDirectory = cacheDirectory ?? DetectorDefaults.CacheDirectory;
+        _validationImage = validationImage;
+    }
+
     private CocoSsdMobilenetV3 _model;
     private readonly DownloadableFile _weights = new(
         "https://github.com/emgucv/models/raw/master/coco_ssd_mobilenet_v3_small_2020_01_14/model.tflite",
@@ -18,9 +32,13 @@ internal sealed class CocoDetector : ICocoDetector
         "https://github.com/emgucv/models/raw/master/coco_ssd_mobilenet_v3_small_2020_01_14/labelmap.txt",
         "CocoSsdMobilenetV3", "C7E79C855F73CBBA9F33D649D60E1676EB0A974021A41696D1AC0D4B7F7E0211");
 
+    /// <inheritdoc/>
     public bool Imported => _model?.Imported == true;
+    /// <inheritdoc/>
     public string Backend { get; private set; }
+    /// <inheritdoc/>
     public string GpuFailure { get; private set; }
+    /// <summary>True on platforms where a detector may try the GPU (Android and Mac Catalyst).</summary>
     public static bool CanTryGpu =>
 #if ANDROID || MACCATALYST
         true;
@@ -28,6 +46,7 @@ internal sealed class CocoDetector : ICocoDetector
         false;
 #endif
 
+    /// <inheritdoc/>
     public async Task PrepareAsync(bool preferGpu, int numThreads, Action<string> progress, CancellationToken token)
     {
         if (Imported) return;
@@ -40,7 +59,7 @@ internal sealed class CocoDetector : ICocoDetector
         if (!downloads.AllFilesDownloaded) throw new IOException("COCO detector download failed. Check the connection and retry.");
 
         GpuFailure = null;
-        if (preferGpu && CanTryGpu)
+        if (preferGpu && CanTryGpu && _validationImage != null)
         {
             try
             {
@@ -92,7 +111,7 @@ internal sealed class CocoDetector : ICocoDetector
         using var cpu = new CocoSsdMobilenetV3 { NumThreads = numThreads };
         await cpu.Init(_weights, _labels, HwAccelerators.Cpu).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
-        using var image = ImageUtil.Decode(await ImageUtil.ReadAppFileAsync("surfers.jpg").ConfigureAwait(false));
+        using var image = await _validationImage("surfers.jpg").ConfigureAwait(false) ?? throw new InvalidOperationException("The validation image " + "surfers.jpg" + " is not available.");
         await Task.Run(() =>
         {
             var expected = Detect(cpu, image).Where(r => r.Score >= 0.5).ToArray();
@@ -121,6 +140,7 @@ internal sealed class CocoDetector : ICocoDetector
         token.ThrowIfCancellationRequested();
     }
 
+    /// <inheritdoc/>
     public CocoSsdMobilenet.RecognitionResult[] Detect(Mat bgr)
     {
         if (!Imported) throw new InvalidOperationException("Prepare the COCO detector first.");
@@ -145,5 +165,6 @@ internal sealed class CocoDetector : ICocoDetector
         return model.GetResults(0);
     }
 
+    /// <inheritdoc/>
     public void Dispose() { _model?.Dispose(); _model = null; Backend = null; }
 }

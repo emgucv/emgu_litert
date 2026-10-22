@@ -15,7 +15,7 @@ namespace Maui.Demo.Lite;
 // VisualMonitorRuntime, which is also what makes one wave detector per agent enough.
 internal sealed class PoseVisualAgent : IVisualAgent
 {
-    private readonly PoseDetector _detector = new PoseDetector();
+    private readonly PoseDetector _detector = DetectorFactory.Pose();
     private readonly PoseGestures.WaveDetector _wave = new PoseGestures.WaveDetector();
 
     public VisualAgentDescriptor Descriptor => VisualHostCatalog.PoseDescriptor(!_detector.Imported, _detector.Backend);

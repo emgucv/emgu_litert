@@ -5,7 +5,7 @@ using Emgu.CV.CvEnum;
 using Emgu.LiteRT;
 using Emgu.LiteRT.Models;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.Models;
 
 // Shared with native regression tests so the resize, color order and scale use the production path.
 internal static class DFineImageInput

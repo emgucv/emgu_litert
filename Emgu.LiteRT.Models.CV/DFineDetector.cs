@@ -3,25 +3,43 @@ using Emgu.LiteRT.Util;
 using Emgu.CV;
 using Emgu.LiteRT.Models;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.Models;
 
 // D-FINE-N at 640 px on the CPU. The GPU compilers reject the graph (DFINE_EVALUATION.md), and it's 1.4-2.7x slower than
 // YOLOX-Nano, so this is for single photos where accuracy matters more than speed (COCO AP 42.8 vs 25.8), on desktops.
-internal sealed class DFineDetector : ICocoDetector
+/// <summary>D-FINE-N object detector (80 COCO classes), on the CPU. Callers serialize <c>PrepareAsync</c>, <c>Detect</c> and <c>Dispose</c> off the UI thread.</summary>
+public sealed class DFineDetector : ICocoDetector
 {
+    private readonly string _cacheDirectory;
+    private readonly Func<string, Task<Mat>> _validationImage;
+
+    /// <summary>Creates the detector.</summary>
+    /// <param name="cacheDirectory">Where the weights are downloaded to (default: a folder in the temp path).</param>
+    /// <param name="validationImage">Returns a bundled image by file name (e.g. "surfers.jpg"), used to check a GPU's
+    /// results against the CPU's before trusting it. Without it the GPU is never used.</param>
+    public DFineDetector(string cacheDirectory = null, Func<string, Task<Mat>> validationImage = null)
+    {
+        _cacheDirectory = cacheDirectory ?? DetectorDefaults.CacheDirectory;
+        _validationImage = validationImage;
+    }
+
     internal const string ModelUrl = "https://emgu-public.s3.amazonaws.com/dfine/dfine_n_coco_640_float32.tflite";
     internal const string Asset = "dfine_n_coco_640_float32.tflite";
     internal const string AssetSha256 = "1F7C2FA937E414D4D728B007C4295ADDB106FD56C113EA188155193D2A6E80BC";
     private DFine _model;
+    /// <inheritdoc/>
     public bool Imported => _model != null;
+    /// <inheritdoc/>
     public string Backend => Imported ? "CPU" : null;
+    /// <inheritdoc/>
     public string GpuFailure => null;
 
+    /// <inheritdoc/>
     public async Task PrepareAsync(bool preferGpu, int numThreads, Action<string> progress, CancellationToken token)
     {
         if (Imported) return;
         token.ThrowIfCancellationRequested();
-        string file = Path.Combine(FileSystem.CacheDirectory, Asset);
+        string file = Path.Combine(_cacheDirectory, Asset);
         var weights = new DownloadableFile(ModelUrl, "DFine", AssetSha256) { LocalFile = file };
         var downloads = new FileDownloadManager();
         downloads.AddFile(weights);
@@ -36,6 +54,7 @@ internal sealed class DFineDetector : ICocoDetector
         progress?.Invoke("D-FINE-N ready · LiteRT CPU");
     }
 
+    /// <inheritdoc/>
     public CocoSsdMobilenet.RecognitionResult[] Detect(Mat bgr)
     {
         if (!Imported) throw new InvalidOperationException("Prepare D-FINE-N first.");
@@ -44,5 +63,6 @@ internal sealed class DFineDetector : ICocoDetector
             { Class = r.Class, Label = r.Label, Score = r.Score, Rectangle = r.Rectangle }).ToArray();
     }
 
+    /// <inheritdoc/>
     public void Dispose() { _model?.Dispose(); _model = null; }
 }

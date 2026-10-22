@@ -283,7 +283,7 @@ public class UnitTestHandTrackerNative
         foreach (var image in reference.RootElement.GetProperty("images").EnumerateObject())
         {
             using var bgr = Emgu.CV.CvInvoke.Imread(Path.Combine(root, image.Name), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
-            var hands = Maui.Demo.Lite.HandImageInput.Track(tracker, bgr);
+            var hands = Emgu.LiteRT.Models.HandImageInput.Track(tracker, bgr);
             Assert.That(hands.Count, Is.EqualTo(1), image.Name);
             var hand = hands[0];
             var expected = image.Value;
@@ -302,7 +302,7 @@ public class UnitTestHandTrackerNative
         }
         // An image without a hand has none.
         using var shuttle = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "space_shuttle.jpg"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
-        Assert.That(Maui.Demo.Lite.HandImageInput.Track(tracker, shuttle), Is.Empty);
+        Assert.That(Emgu.LiteRT.Models.HandImageInput.Track(tracker, shuttle), Is.Empty);
         tracker.Dispose();
         Assert.Throws<ObjectDisposedException>(() => tracker.DetectPalms(100, 100));
     }
@@ -349,9 +349,9 @@ public class UnitTestHandTrackerTiltNative
             {
                 using var turned = angle == 0 ? original.Clone() : Turn(original, angle);
                 tracker.TiltAngles = Array.Empty<double>();
-                var a = Maui.Demo.Lite.HandImageInput.Track(tracker, turned);
+                var a = Emgu.LiteRT.Models.HandImageInput.Track(tracker, turned);
                 tracker.TiltAngles = new double[] { -30, 30, -60, 60 };
-                var b = Maui.Demo.Lite.HandImageInput.Track(tracker, turned);
+                var b = Emgu.LiteRT.Models.HandImageInput.Track(tracker, turned);
                 string ga = a.Count == 0 ? "-" : a[0].Gesture + $" {a[0].GestureScore:0.00}", gb = b.Count == 0 ? "-" : b[0].Gesture + $" {b[0].GestureScore:0.00}@{b[0].GestureRotation}";
                 report.AppendLine($"{name} {angle,4}: plain {ga,-18} turned {gb,-22} hands {a.Count}/{b.Count}");
                 if (Math.Abs(angle) > 60) { string claimed = b.Count == 1 ? b[0].Gesture : "-"; if (claimed != "None" && claimed != "-" && claimed != expected) { wrongClaims++; report.AppendLine($"   ^ wrong claim at {angle}: {claimed}"); } if (a.Count == 1 && a[0].Gesture != "None" && a[0].Gesture != expected) plainWrong++; }
