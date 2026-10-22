@@ -1289,14 +1289,14 @@ Real-time hand-gesture recognition for the camera agents ("take a picture when I
 ## 41. Sound events for the visual agents — prototype: YAMNet on LiteRT; a "Sound events" page only
 
 Audio event detection (speech, laughter, a dog barking, a doorbell, a siren...: 521 AudioSet classes) for monitors like "tell me when the doorbell
-rings", next to the camera agents'. Details and numbers in [YAMNET.md](YAMNET.md).
+rings", next to the camera agents'. Details and numbers in [YAMNET.md](../../Emgu.LiteRT.Models/YAMNET.md).
 
 - [x] `Emgu.LiteRT.Models/YamNet.cs`: MediaPipe's float32 YAMNet (15,600 samples at 16 kHz in, 521 scores out; static shapes, the labels are a zip
       appended to the file) through `CompiledModel`, WAV reading and resampling; the file is downloaded from Google (4.1 MB, SHA-256 pinned; its metadata
       says Apache-2.0).
 - [x] Python reference (the TFLite interpreter, four signals and the windows of a speech clip): same top classes, scores within 0.02-0.03
       (`UnitTestYamNet`, `yamnet_reference.json`).
-- [x] The "Sound events" page (`SoundEventsPage.cs`, `SoundSource.cs`, `YamNetDetector.cs`): the microphone (`AudioRecord` on Android, an `AVAudioEngine` tap
+- [x] The "Sound events" page (`SoundEventsPage.cs`, `SoundSource.cs`, `YamNetDetector.cs` - now `Emgu.LiteRT.Models`' `YamNetClassifier`): the microphone (`AudioRecord` on Android, an `AVAudioEngine` tap
       on Apple, not Windows) or two sample clips, the best five sounds twice a second (Mac 3-5 ms and S10 7-17 ms a window on the CPU), a log of what was heard.
       Checked on Mac Catalyst with the samples and on a Galaxy S10 with its microphone; the Apple microphone path isn't run yet.
 - [ ] The model's licence beyond its metadata (Google has no licence file beside it), before bundling or hosting it.
@@ -1306,7 +1306,7 @@ rings", next to the camera agents'. Details and numbers in [YAMNET.md](YAMNET.md
 
 ## 42. Sound monitors in the chat — "tell me when the doorbell rings"; YAMNet scores the microphone, no model per sound
 
-Details in [YAMNET.md](YAMNET.md#sound-monitors-in-the-chat-todo-item-42).
+Details in [YAMNET.md](../../Emgu.LiteRT.Models/YAMNET.md#sound-monitors-in-the-chat-todo-item-42).
 
 - [x] `Emgu.LiteRT.LM.Agents` (`Audio/SoundMonitors.cs`): 30 sound groups of YAMNet classes with the users' words, the presence state machine
       (threshold, minimum duration, gaps, 3 s release), `SoundMonitorRuntime` (8 monitors, alerts on their own worker) and the chat tools

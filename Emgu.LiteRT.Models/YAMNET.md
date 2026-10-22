@@ -1,7 +1,7 @@
 # YAMNet sound events (a "Sound events" page in the demo)
 
-Prototype of audio event detection for the visual agents ("tell me when the doorbell rings"). The classes are `Emgu.LiteRT.Models/YamNet.cs`
-(the model, WAV reading, resampling) and, in the demo, `YamNetDetector.cs`, `SoundSource.cs` and `SoundEventsPage.cs`. Tests are
+Prototype of audio event detection for the visual agents ("tell me when the doorbell rings"). The classes are `YamNet.cs`
+(the model, WAV reading, resampling) and `YamNetClassifier.cs` (download and load), both in this folder, and in the demo (`Emgu.LiteRT.Example/Maui/`) `SoundSource.cs` and `SoundEventsPage.cs`. Tests are
 `UnitTestYamNet` (WAV and resampling, model-free) and `UnitTestYamNetNative` (the model against Python, `yamnet_reference.json`).
 
 ## Provenance and licence

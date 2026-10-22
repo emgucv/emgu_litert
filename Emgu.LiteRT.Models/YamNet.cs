@@ -23,7 +23,7 @@ namespace Emgu.LiteRT.Models
     /// MediaPipe's audio classifier ships it: a float32 graph taking 15,600 mono samples at 16 kHz (0.975 s, in -1..1) and returning 521
     /// sigmoid scores, with the mel spectrogram inside the graph. The label list is appended to the file as a zip. The model is not
     /// copied to Emgu's server: it is downloaded from Google's (<see cref="ModelUrl"/>) and checked against <see cref="ModelSha256"/>.
-    /// Calls are serialized by the host. See the demo's YAMNET.md.
+    /// Calls are serialized by the host. See YAMNET.md in this folder.
     /// </summary>
     public sealed class YamNet : IDisposable
     {

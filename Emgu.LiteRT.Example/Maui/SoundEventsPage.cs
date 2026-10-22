@@ -8,12 +8,12 @@ using Emgu.LiteRT.Models;
 namespace Maui.Demo.Lite
 {
     // What the microphone hears, named by YAMNet (521 sound classes: speech, laughter, a dog barking, a doorbell, a siren, music...), about
-    // twice a second. The first step towards a sound-event monitor for the visual agents (YAMNET.md). Sample clips play at their own
+    // twice a second. The first step towards a sound-event monitor for the visual agents (Emgu.LiteRT.Models/YAMNET.md). Sample clips play at their own
     // speed through the same path, so the page can be tried without a microphone.
     public class SoundEventsPage : ContentPage
     {
         private const int Rows = 5;
-        private readonly YamNetDetector _detector = new YamNetDetector();
+        private readonly YamNetClassifier _detector = new YamNetClassifier(FileSystem.CacheDirectory);
         private readonly Button _listen, _speech, _tone;
         private readonly Label _status, _timing;
         private readonly Label[] _names = new Label[Rows], _values = new Label[Rows];

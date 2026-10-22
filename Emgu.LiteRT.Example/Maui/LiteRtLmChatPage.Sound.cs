@@ -6,7 +6,7 @@ using Microsoft.Extensions.AI;
 
 namespace Maui.Demo.Lite;
 
-// Sound monitors (TODO item 42, YAMNET.md): "tell me when the doorbell rings". The agent's create_sound_monitor tool (Emgu.LiteRT.LM.Agents'
+// Sound monitors (TODO item 42, Emgu.LiteRT.Models/YAMNET.md): "tell me when the doorbell rings". The agent's create_sound_monitor tool (Emgu.LiteRT.LM.Agents'
 // SoundMonitorTools) adds a monitor to a SoundMonitorRuntime; while any is enabled the page listens through the microphone, cuts the audio
 // into YAMNet windows (SoundWindower) and feeds each window's 521 scores to the runtime, which confirms sounds and runs the alerts - the
 // chime and spoken words - on a worker of its own. No audio is kept or sent anywhere, and the language model isn't involved per sound.
@@ -23,7 +23,7 @@ public partial class LiteRtLmChatPage
         "that is still a sound monitor: use create_sound_monitor with clipSeconds or takePhoto, not a camera monitor.";
 
     private SoundMonitorRuntime _soundRuntime;
-    private readonly YamNetDetector _soundDetector = new YamNetDetector();
+    private readonly Emgu.LiteRT.Models.YamNetClassifier _soundDetector = new Emgu.LiteRT.Models.YamNetClassifier(FileSystem.CacheDirectory);
     private readonly SemaphoreSlim _soundGate = new SemaphoreSlim(1, 1);
     private readonly SoundWindower _soundWindower = new SoundWindower();
     private readonly Stopwatch _soundClock = Stopwatch.StartNew();
