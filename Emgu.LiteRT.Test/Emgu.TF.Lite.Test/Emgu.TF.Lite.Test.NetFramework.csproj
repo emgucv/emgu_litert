@@ -86,7 +86,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Emgu.CV.runtime.windows">
-      <Version>4.13.0.5924</Version>
+      <Version>4.12.0.5764</Version>
     </PackageReference>
     <PackageReference Include="MSTest.TestAdapter">
       <Version>3.8.2</Version>

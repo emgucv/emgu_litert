@@ -482,7 +482,7 @@ def native():
 
 def opencv():
     category = "Emgu CV and OpenCV"
-    emgu = os.path.join(NUGET, "emgu.cv", "4.13.0.5924", "LICENSE.txt")
+    emgu = os.path.join(NUGET, "emgu.cv", "4.12.0.5764", "LICENSE.txt")
     add(category, "Emgu CV", "GPL-3.0 or Emgu commercial licence", read(emgu), version="4.13.0",
         copyright="Copyright (C) Emgu Corporation", url="https://www.emgu.com", used_for="Image decoding and drawing in the demos")
     cv = "https://raw.githubusercontent.com/opencv/opencv/4.13.0/"
