@@ -249,6 +249,30 @@ Each step builds the demo and is checked before the next. Device checks: Mac Cat
      (after hiding empty step/card lists, which left gaps). Not yet checked: the feature cards (6c).
    - **6c - the feature cards**: generated images, photo search, documents, device actions, written documents, the
      camera and sound monitors, task mode and the voice chat, as decorations and notices; device checks per group.
+     Done. Checked with a temporary self-test of the page on Mac Catalyst (Gemma 4 E2B on the CPU) and the Galaxy S10
+     (Gemma 4 E2B on the GPU):
+     - a document's answer (14 people) with its step line;
+     - the written-document card, and on the Mac a generated picture (226 s);
+     - the reopened chat restores its cards and steps;
+     - a cancelled reminder (Mac) / timer (S10): the step reads "- cancelled". With thinking off on the Mac, Gemma 4 E2B
+       still said the reminder was set; with thinking on it said it was cancelled;
+     - photo search turned off answers where to turn it on (S10);
+     - "Translate to español" offered and done;
+     - an interrupted reply keeps its "…";
+     - task mode: plan, steps (weather, Wikipedia, a page) and the final plan. On the S10 this needs the Web search chip
+       on; with it off, the steps rightly had no weather or Wikipedia tool;
+     - a voice message the model heard and answered. The S10 has Android 12, so the speech recognizer gives no transcript
+       there (it needs Android 13+);
+     - a private chat saves nothing.
+
+     One regression, fixed: `ChatView` used a `BindableLayout`, which builds every message's views at once, so opening
+     a saved 120-message chat held the S10's UI thread for 19 s. The old page drew 16 ms slices. `ChatView` now makes the
+     views itself (`RenderTranscript`): about one frame's worth at a time, newest first, and changes made together (e.g.
+     `Load`) are rendered once. `IsRenderingTranscript` tells whether some are still missing. Opening now returns in
+     0.6 s, all messages are shown after 24 s, and there are no stalls.
+
+     Not checked: your own server (LM Studio), MCP, the voice chat with a microphone, live camera and sound monitors,
+     and photo search with results.
    - **6d - remove the page's old code; docs.**
 7. **Docs**: package README with the sample, `CLAUDE.md`, the demo `README.md`.
 

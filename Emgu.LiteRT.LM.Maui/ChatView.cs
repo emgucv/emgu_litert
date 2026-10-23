@@ -105,6 +105,9 @@ namespace Emgu.LiteRT.LM.Maui
         private CancellationTokenSource _replyCancel;
         private bool _atEnd = true;
         private bool _ownsClient;
+        // The transcript's view of each message, and whether a pass that creates the missing ones is scheduled.
+        private readonly Dictionary<ChatMessageItem, View> _messageViews = new Dictionary<ChatMessageItem, View>();
+        private bool _renderScheduled;
 
         /// <summary>The on-device model to chat with; the view loads it (downloading it first, after asking), or null.</summary>
         public LanguageModel Model
@@ -376,8 +379,11 @@ namespace Emgu.LiteRT.LM.Maui
         {
             if (_transcript == null)
                 return;
-            BindableLayout.SetItemTemplateSelector(_transcript, MessageTemplateSelector);
-            BindableLayout.SetItemsSource(_transcript, Conversation?.Messages);
+            // The views are made by the view itself rather than a BindableLayout, so that a long saved chat appears a few
+            // messages at a time (the latest first) instead of holding the UI thread until all of them are laid out.
+            _transcript.Children.Clear();
+            _messageViews.Clear();
+            RenderTranscript();
             UpdateEmpty();
             ScrollToEnd();
         }
@@ -385,6 +391,12 @@ namespace Emgu.LiteRT.LM.Maui
         private void OnMessagesChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             UpdateEmpty();
+            // Changes made together (e.g. loading a chat) are rendered together, once the caller is done.
+            if (!_renderScheduled)
+            {
+                _renderScheduled = true;
+                Dispatcher.Dispatch(RenderTranscript);
+            }
             // A new message (the user's or the reply) brings the transcript to the end.
             if (e.Action == NotifyCollectionChangedAction.Add)
             {
@@ -395,6 +407,64 @@ namespace Emgu.LiteRT.LM.Maui
                 if (reply != null && ReadAloud)
                     ReplySpeaker?.Start(reply);
             }
+        }
+
+        /// <summary>True while some messages have no view yet (a long chat is still being shown).</summary>
+        public bool IsRenderingTranscript
+        {
+            get { return Conversation != null && _messageViews.Count < Conversation.Messages.Count; }
+        }
+
+        // Make the transcript's children the views of the conversation's messages, in order: removes the views of removed
+        // messages and creates the missing ones, the latest first, for about one frame; the rest in later passes.
+        private void RenderTranscript()
+        {
+            _renderScheduled = false;
+            if (_transcript == null)
+                return;
+            IList<ChatMessageItem> messages = (IList<ChatMessageItem>)Conversation?.Messages ?? Array.Empty<ChatMessageItem>();
+            HashSet<ChatMessageItem> present = new HashSet<ChatMessageItem>(messages);
+            foreach (ChatMessageItem gone in _messageViews.Keys.Where(m => !present.Contains(m)).ToList())
+            {
+                _transcript.Children.Remove(_messageViews[gone]);
+                _messageViews.Remove(gone);
+            }
+            // How many of the messages before each one have a view, i.e. where its view goes.
+            int[] before = new int[messages.Count];
+            for (int i = 1; i < messages.Count; i++)
+                before[i] = before[i - 1] + (_messageViews.ContainsKey(messages[i - 1]) ? 1 : 0);
+            System.Diagnostics.Stopwatch slice = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = messages.Count - 1; i >= 0; i--)
+            {
+                ChatMessageItem message = messages[i];
+                if (!_messageViews.TryGetValue(message, out View view))
+                {
+                    if (slice.ElapsedMilliseconds >= 16)
+                    {
+                        // Let input and layout run, then go on.
+                        _renderScheduled = true;
+                        Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(16), RenderTranscript);
+                        return;
+                    }
+                    view = CreateMessageView(message);
+                    _messageViews[message] = view;
+                }
+                int index = before[i];
+                if (index < _transcript.Children.Count && _transcript.Children[index] == view)
+                    continue;
+                _transcript.Children.Remove(view);
+                _transcript.Children.Insert(Math.Min(index, _transcript.Children.Count), view);
+            }
+        }
+
+        private View CreateMessageView(ChatMessageItem message)
+        {
+            DataTemplate template = MessageTemplateSelector?.SelectTemplate(message, _transcript);
+            while (template is DataTemplateSelector selector)
+                template = selector.SelectTemplate(message, _transcript);
+            View view = template?.CreateContent() as View ?? new Label { Text = message.Text };
+            view.BindingContext = message;
+            return view;
         }
 
         private void UpdateEmpty()
