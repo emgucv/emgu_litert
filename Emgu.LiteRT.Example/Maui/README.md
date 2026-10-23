@@ -187,9 +187,15 @@ again.
 
 ## Using the chat page
 
-The chat page is built on the reusable chat libraries: `Emgu.LiteRT.LM.Chat`'s `ChatConversation` (sending, tools,
-compaction, saved chats) and `Emgu.LiteRT.LM.Maui`'s `ChatView`, with the demo's own templates in `ChatTemplates.xaml`
-(see [the plan](CHAT_LIBRARY_PLAN.md); `Emgu.LiteRT.Example/MauiChat` is a minimal app using them).
+The chat page is built on the reusable chat libraries:
+
+- `Emgu.LiteRT.LM.Chat`'s `ChatConversation`: sending, tools and compaction.
+- `Emgu.LiteRT.LM.Maui`'s `ChatView`, with the demo's own templates in `ChatTemplates.xaml`, and its `VoiceRecorder` and
+  `SpeechRecognizer` for voice messages.
+- `Emgu.LiteRT.LM.Chat.Sqlite`'s `ChatHistoryStore`, the base of the page's `ChatStore`, for saved chats.
+
+See [CHAT_LIBRARY_PLAN.md](CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HISTORY_PLAN.md](CHAT_VOICE_AND_HISTORY_PLAN.md);
+[`Emgu.LiteRT.Example/MauiChat`](../MauiChat/README.md) is a minimal app using them.
 
 - Choosing a model you haven't downloaded yet shows its download size (Qwen3 0.6B ~350 MB, Qwen3.5 0.8B ~1.3 GB,
   Gemma 4 E2B ~2.6 GB, E4B ~3.7 GB, Qwen3.5 4B ~2.8 GB) with a Download button; models already on the device start

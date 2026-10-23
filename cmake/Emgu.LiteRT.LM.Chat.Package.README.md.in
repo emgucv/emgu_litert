@@ -56,7 +56,9 @@ Before each message the conversation counts its tokens. If the message wouldn't 
 
 ### Saving and reopening
 
-`ExchangeCompleted` is raised after each reply: save the message and the reply then. To reopen a chat, build its `ChatMessageItem`s and call `Load(messages, summary, contextStart)`; the next message gives the model the conversation again.
+`${EMGU_LITERT_LM_CHAT_SQLITE_NUGET_ID}` saves chats in a SQLite database and reopens them: `store.Attach(conversation)` saves each exchange and the compaction point, and `(await store.LoadAsync(chatId)).Load(conversation)` shows a saved chat and continues it.
+
+To save chats your own way, use `ExchangeCompleted`, which is raised after each reply: save the message and the reply then, and `Compacted` for the compaction point (`ContextStart`, `Summary`). To reopen a chat, build its `ChatMessageItem`s and call `Load(messages, summary, contextStart)`; the next message gives the model the conversation again.
 
 ### For apps
 

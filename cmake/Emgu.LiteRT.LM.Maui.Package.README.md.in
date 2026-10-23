@@ -27,7 +27,21 @@ public MainPage()
 
 That is a whole chat app. Instead of `Model`, give the view a `ChatClient` (a server, another provider, or a client with tools - with `Model` too if it runs that model), or a `Conversation` of your own, e.g. one opened from a saved chat with `ChatConversation.Load`. Other properties: `ThinkingEnabled`, `Options` (copied for each message: tools, the longest reply...), `Placeholder`, `AttachmentKinds` / `ShowAttachButton` / `AttachmentSource` (by default `MediaChatAttachmentSource`: the photo library, the camera or an audio file; images are scaled to 1024 px JPEG by `ChatImages.PrepareAsync`; taking photos needs the camera permission in the app's manifest / Info.plist), `ReadAloud` / `ReplySpeaker` (by default `TextToSpeechReplySpeaker`, sentence by sentence while the reply streams) and `Header` (a view above the transcript). `LoadState` (a `ModelLoadState`) tells how loading the model goes, `ExchangeCompleted` is raised after each reply (save it then) and `ModelLoadFailed` when the model can't be loaded. `SendAsync(text, attachments, context)` sends a message from code.
 
-The sample app `Emgu.LiteRT.Example/MauiChat` in the source repository is such an app, with a restyled Send button and user messages.
+The sample app `Emgu.LiteRT.Example/MauiChat` in the source repository is such an app, with a restyled Send button and user messages, and it reopens its last chat after a restart.
+
+### Saving chats
+
+`${EMGU_LITERT_LM_CHAT_SQLITE_NUGET_ID}` keeps chats in a SQLite database. Attach it to the view's conversation to save every exchange, and load a saved chat into it to continue:
+
+```csharp
+var store = new ChatHistoryStore(Path.Combine(FileSystem.AppDataDirectory, "MyApp", "chats"));
+ChatHistory history = await store.LoadAsync(lastChatId);    // null if there is none
+history?.Load(Chat.Conversation);
+ChatHistoryBinding saving = store.Attach(Chat.Conversation, history != null ? lastChatId : 0, "Qwen3");
+saving.ChatCreated += (s, e) => Preferences.Default.Set("last_chat", saving.ChatId);
+```
+
+Give the store a folder named after the app: on Mac Catalyst, `FileSystem.AppDataDirectory` can be `~/Library` itself, which other apps use too.
 
 ### Voice messages
 

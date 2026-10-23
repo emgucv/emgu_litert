@@ -1,6 +1,6 @@
 # Plan: voice messages and saved chats for the chat libraries
 
-Status: proposed 2026-10-23; steps 1-5 done 2026-10-23. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
+Status: done 2026-10-23 (all 6 steps). The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
 parts of the demo's chat page that any chat app would want, moved into libraries the same way.
 
 ## Goal
@@ -231,6 +231,17 @@ history.Attach(chat.Conversation, chatId);         // saves each exchange and co
      - On the S10 one 1.3 s UI stall: a frame waited on the GPU while Gemma 4 E2B started loading there, as the test
        switched models.
 6. **Docs**: the two READMEs (`ChatView`'s microphone and permissions; the new package), `CLAUDE.md`, and this plan.
+
+   **Done 2026-10-23:**
+   - Package READMEs:
+     - `Emgu.LiteRT.LM.Maui`: voice messages and their permissions (step 2), and a "Saving chats" section with the
+       store attached to `ChatView.Conversation`, in a folder named after the app;
+     - `Emgu.LiteRT.LM.Chat.Sqlite`: written in steps 3-4;
+     - `Emgu.LiteRT.LM.Chat`: "Saving and reopening" now points to the new package first.
+   - New `Emgu.LiteRT.Example/MauiChat/README.md`: what the sample shows, how to build it, and where it keeps its
+     chats.
+   - The demo's `README.md` lists the libraries the chat page is built on, with both plans.
+   - `CLAUDE.md` describes the new package next to the other two chat packages.
 
 ## Risks and open questions
 
