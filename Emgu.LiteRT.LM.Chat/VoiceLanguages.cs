@@ -1,14 +1,19 @@
-// Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Chat;
 
-// The languages Settings > "Voice language" offers for the speech recognizer that writes down voice messages
-// (SpeechToText.cs): by default the device's language, which is why Chinese speech wasn't recognized on an English phone.
-// No MAUI types: linked into the tests.
-internal static class VoiceLanguages
+/// <summary>
+/// Languages for a speech recognizer that writes down voice messages (Emgu.LiteRT.LM.Maui's <c>SpeechRecognizer</c>),
+/// e.g. for a language setting: the recognizer listens in the device's language unless told otherwise, so Chinese
+/// speech wasn't recognized on an English phone.
+/// </summary>
+public static class VoiceLanguages
 {
     /// <summary>BCP-47 tags with the names people know them by (in the language itself, so they can be found).</summary>
     public static readonly IReadOnlyList<(string Tag, string Name)> All = new (string, string)[]
@@ -75,7 +80,7 @@ internal static class VoiceLanguages
         if (listed == null || string.IsNullOrWhiteSpace(tag))
             return false;
         string wanted = Resolve(tag, null);
-        bool noRegion = !wanted.Contains('-');
+        bool noRegion = wanted.IndexOf('-') < 0;
         foreach (string item in listed)
         {
             string other = Resolve(item, null);

@@ -1,11 +1,11 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using System.Linq;
-using Maui.Demo.Lite;
+using Emgu.LiteRT.LM.Chat;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
 
-// The voice languages of Settings (VoiceLanguages.cs).
+// The languages for the speech recognizer (Emgu.LiteRT.LM.Chat's VoiceLanguages).
 [TestFixture]
 public class UnitTestVoiceLanguages
 {

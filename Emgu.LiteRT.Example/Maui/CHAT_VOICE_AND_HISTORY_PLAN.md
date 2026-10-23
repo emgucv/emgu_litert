@@ -1,6 +1,6 @@
 # Plan: voice messages and saved chats for the chat libraries
 
-Status: proposed 2026-10-23; nothing started. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
+Status: proposed 2026-10-23; step 1 done 2026-10-23. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
 parts of the demo's chat page that any chat app would want, moved into libraries the same way.
 
 ## Goal
@@ -62,6 +62,23 @@ history.Attach(chat.Conversation, chatId);         // saves each exchange and co
    - The demo uses them from the library: its talk button, voice chat and sound monitors keep working unchanged.
    - Checks: builds for all platforms, then on the Galaxy S10 (Android 12: audio to Gemma 4, no recognizer) a voice
      message, the voice chat and a sound monitor.
+
+   **Done 2026-10-23:**
+   - `VoiceRecorder`, `SpeechRecognizer` and `MicrophoneGate` are public in `Emgu.LiteRT.LM.Maui`, and their docs say
+     which permissions an app declares.
+   - `VoiceLanguages` went into `Emgu.LiteRT.LM.Chat` instead: it has no MAUI types, and the tests (net10.0) can't
+     reference a MAUI library. `UnitTestVoiceLanguages` now tests the library's.
+   - `SpeechRecognizer.Language` replaces the demo's Preferences lookup, and the demo sets it from its setting.
+     `ChooseLanguageHint` ends the "can't recognize this language" errors (the demo's "Choose the language in Settings
+     > Voice language.").
+   - The unused diagnostic `DescribeSupportAsync` was dropped.
+   - Checked with a temporary self-test on the Galaxy S10:
+     - the recorder recorded 2.08 s as a valid WAV, with real levels;
+     - a listening sound monitor let go of the microphone while recording and took it back afterwards;
+     - the recognizer got the language and hint, and correctly reported itself unsupported on Android 12.
+   - The voice chat uses the same recorder through `IVoiceInput`; it wasn't run with speech.
+   - The demo builds for Android, the iOS simulator and Mac Catalyst (which stops at code signing on this Mac); the
+     model-free tests pass (386).
 2. **`ChatView`'s microphone.**
    - A `PART_Talk` part with a `ChatTalkButtonStyle` and the `ShowTalkButton` and `MaxVoiceLength` (30 s) properties,
      and the status "Listening... 0:03 - tap again to send".

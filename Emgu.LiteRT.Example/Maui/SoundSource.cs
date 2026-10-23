@@ -117,29 +117,6 @@ internal sealed class SoundWindower
     public void Reset() { lock (_lock) { _buffer.Clear(); _since = 0; } }
 }
 
-// Whoever else wants the microphone (the voice message recorder, the voice chat) goes through here first, so a listening monitor lets go
-// of it before the recorder starts, and takes it back when the last recorder is done.
-internal static class MicrophoneGate
-{
-    private static int _holders;
-    public static Func<Task> Pausing;
-    public static Action Released;
-
-    public static async Task EnterAsync()
-    {
-        if (Interlocked.Increment(ref _holders) == 1)
-        {
-            Func<Task> pausing = Pausing;
-            if (pausing != null) await pausing();
-        }
-    }
-
-    public static void Exit()
-    {
-        if (Interlocked.Decrement(ref _holders) == 0) Released?.Invoke();
-    }
-}
-
 #if ANDROID || IOS || MACCATALYST
 // The microphone: AudioRecord at 16 kHz on Android, an AVAudioEngine input tap on iOS and Mac Catalyst.
 internal sealed class MicrophoneSoundSource : ISoundSource

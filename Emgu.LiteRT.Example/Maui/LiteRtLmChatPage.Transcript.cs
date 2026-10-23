@@ -7,11 +7,12 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 
 // The words of a voice message. A model that hears audio (Gemma 4) is given the recording itself, so the chat only showed a
-// "Voice message" chip. The platform's speech recognizer (SpeechToText: Android 13+, iOS, Mac Catalyst) writes the words
+// "Voice message" chip. The platform's speech recognizer (SpeechRecognizer: Android 13+, iOS, Mac Catalyst) writes the words
 // down in the background while the model answers, they are shown under the chip and kept with the message
 // (MessageRecord.Transcript) - for the transcript, the chat's title and the export, not given to the model. A model that
 // can't hear audio already gets the words as its message.
@@ -23,7 +24,7 @@ public partial class LiteRtLmChatPage
         string words = null;
         try
         {
-            words = (await SpeechToText.TranscribeAsync(wav, CancellationToken.None))?.Trim();
+            words = (await SpeechRecognizer.TranscribeAsync(wav, CancellationToken.None))?.Trim();
         }
         catch (Exception ex)
         {

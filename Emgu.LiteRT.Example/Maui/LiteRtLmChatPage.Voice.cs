@@ -8,6 +8,7 @@ using System.Diagnostics;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Agents.Audio;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 
@@ -40,7 +41,7 @@ public partial class LiteRtLmChatPage
     private ReplyReader _replyReader;
 
     // Gemma 4 takes speech; measuring the microphone's level needs a recorder that reports it (not Windows').
-    // With a model that doesn't take audio, what was said is sent as text (SpeechToText).
+    // With a model that doesn't take audio, what was said is sent as text (SpeechRecognizer).
     private bool VoiceModeSupported => VoiceRecorder.SupportsLevel && TakesVoice(SelectedOption);
 
     private ToggleChip CreateVoiceChip()

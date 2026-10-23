@@ -211,6 +211,8 @@ namespace Maui.Demo.Lite
         // GPU (Android): whether the loaded model runs on it, whether the one loading will, and whether it failed to
         // load there (then the CPU is used for the rest of the session).
         private const string UseGpuPreference = "litert_lm_chat_use_gpu";
+        // Settings > "Voice language": a BCP-47 tag, or "" for the device's language.
+        private const string VoiceLanguagePreference = "litert_lm_chat_voice_language";
         private bool _selectedGpu;
         private static string BackendPreference => UseGpuPreference + "_" + DeviceInfo.Platform;
         private bool _loadedOnGpu;
@@ -500,9 +502,12 @@ namespace Maui.Demo.Lite
                 VerticalOptions = LayoutOptions.Center
             }, 0, 0);
             readAloudRow.Add(_readAloudSwitch, 1, 0);
-            // The language voice messages are recognized in (SpeechToText): the device's language unless chosen.
+            // The language voice messages are recognized in (Emgu.LiteRT.LM.Maui's SpeechRecognizer): the device's
+            // language unless chosen.
             string voiceLanguage = string.Empty;
-            try { voiceLanguage = Preferences.Default.Get(SpeechToText.LanguagePreference, string.Empty); } catch (Exception) { }
+            try { voiceLanguage = Preferences.Default.Get(VoiceLanguagePreference, string.Empty); } catch (Exception) { }
+            SpeechRecognizer.Language = voiceLanguage;
+            SpeechRecognizer.ChooseLanguageHint = "Choose the language in Settings > Voice language.";
             var voiceLanguagePicker = new Picker
             {
                 Title = "Voice language",
@@ -518,13 +523,14 @@ namespace Maui.Demo.Lite
             voiceLanguagePicker.SelectedIndexChanged += (s, e) =>
             {
                 string tag = voiceLanguagePicker.SelectedIndex <= 0 ? string.Empty : VoiceLanguages.All[voiceLanguagePicker.SelectedIndex - 1].Tag;
-                try { Preferences.Default.Set(SpeechToText.LanguagePreference, tag); } catch (Exception) { }
+                try { Preferences.Default.Set(VoiceLanguagePreference, tag); } catch (Exception) { }
+                SpeechRecognizer.Language = tag;
             };
             SemanticProperties.SetDescription(voiceLanguagePicker, "The language you speak in voice messages");
             var voiceLanguageRow = new VerticalStackLayout
             {
                 Spacing = 2,
-                IsVisible = SpeechToText.IsSupported,
+                IsVisible = SpeechRecognizer.IsSupported,
                 Children =
                 {
                     new Label { Text = "Voice language", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText },
@@ -1757,7 +1763,7 @@ namespace Maui.Demo.Lite
                     attachments.Add(document.Image);
                 // A voice message the model hears as audio gets its words written down for the transcript (the model doesn't
                 // see them), instead of just "Voice message".
-                bool transcribe = string.IsNullOrWhiteSpace(prompt) && SpeechToText.IsSupported && attachments.Any(IsVoiceRecording);
+                bool transcribe = string.IsNullOrWhiteSpace(prompt) && SpeechRecognizer.IsSupported && attachments.Any(IsVoiceRecording);
                 var info = new UserMessageInfo { Language = await TextLanguage.DetectAsync(prompt), Transcribing = transcribe };
 
                 // Task mode: for this message only.
@@ -1911,7 +1917,7 @@ namespace Maui.Demo.Lite
         // ---------- Voice for models without audio ----------
 
         // A voice message can be sent to the model: as audio, or as text the platform's speech recognizer wrote.
-        private static bool TakesVoice(ModelOption option) => option.AcceptsAudio || SpeechToText.IsSupported;
+        private static bool TakesVoice(ModelOption option) => option.AcceptsAudio || SpeechRecognizer.IsSupported;
 
         private static bool IsVoiceRecording(PendingAttachment attachment) =>
             attachment.Image == null && attachment.MediaType != null && attachment.MediaType.StartsWith("audio/", StringComparison.Ordinal);
@@ -1927,7 +1933,7 @@ namespace Maui.Demo.Lite
             {
                 foreach (PendingAttachment recording in attachments.Where(IsVoiceRecording).ToList())
                 {
-                    string text = (await SpeechToText.TranscribeAsync(recording.Data, token))?.Trim();
+                    string text = (await SpeechRecognizer.TranscribeAsync(recording.Data, token))?.Trim();
                     if (!string.IsNullOrEmpty(text))
                         words.Add(text);
                     attachments.Remove(recording);

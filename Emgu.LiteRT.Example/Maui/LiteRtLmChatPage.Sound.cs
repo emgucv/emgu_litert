@@ -3,6 +3,7 @@
 using System.Diagnostics;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Microsoft.Extensions.AI;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 

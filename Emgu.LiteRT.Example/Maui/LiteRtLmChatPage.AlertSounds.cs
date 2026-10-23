@@ -2,6 +2,7 @@
 #if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Globalization;
 using Emgu.LiteRT.LM.Agents.Audio;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 

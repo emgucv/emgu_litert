@@ -2,38 +2,41 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if WINDOWS || IOS || ANDROID || MACCATALYST
+using Emgu.LiteRT.LM.Chat;
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace Maui.Demo.Lite
+namespace Emgu.LiteRT.LM.Maui
 {
     /// <summary>
     /// Turns a voice recording (<see cref="VoiceRecorder"/>'s 16 kHz mono WAV) into text with the platform's speech
-    /// recognizer - on the device where it can be - so models that don't take audio (a server's model, the Qwen models)
+    /// recognizer - on the device where it can be - so models that don't take audio (a server's model, small text models)
     /// can be talked to: Android's SpeechRecognizer fed the recording (Android 13+), and Apple's Speech framework on iOS
-    /// and Mac Catalyst. Not on Windows. The language is the device's.
+    /// and Mac Catalyst. Not on Windows.
+    /// <para>
+    /// iOS and Mac Catalyst ask the user the first time, which needs <c>NSSpeechRecognitionUsageDescription</c> in
+    /// Info.plist. On Android the on-device recognizer is used when it has the language; otherwise the normal one, which
+    /// may send the audio to Google's service (and a download of the on-device language is requested for next time).
+    /// </para>
     /// </summary>
-    internal static class SpeechToText
+    public static class SpeechRecognizer
     {
-        /// <summary>Preferences key of Settings > "Voice language": a BCP-47 tag, or "" for the device's language.</summary>
-        public const string LanguagePreference = "litert_lm_chat_voice_language";
+        /// <summary>
+        /// The language to listen in, a BCP-47 tag such as "zh-CN" (e.g. one of <see cref="VoiceLanguages.All"/>), or
+        /// null / empty for the device's language.
+        /// </summary>
+        public static string Language { get; set; }
 
-        /// <summary>The language to recognize: the one chosen in Settings, else the device's.</summary>
-        public static string LanguageTag
-        {
-            get
-            {
-                string chosen = string.Empty;
-                try { chosen = Preferences.Default.Get(LanguagePreference, string.Empty); } catch (Exception) { }
-                return VoiceLanguages.Resolve(chosen, System.Globalization.CultureInfo.CurrentUICulture.Name);
-            }
-        }
+        /// <summary>
+        /// Added to the errors that say a language can't be recognized, e.g. where the app lets the user choose another
+        /// ("Choose the language in Settings > Voice language."); or null.
+        /// </summary>
+        public static string ChooseLanguageHint { get; set; }
 
+        private static string Hint => string.IsNullOrEmpty(ChooseLanguageHint) ? string.Empty : " " + ChooseLanguageHint;
+
+        /// <summary>The language recognized: <see cref="Language"/>, else the device's, as a plain language-region tag.</summary>
+        public static string LanguageTag => VoiceLanguages.Resolve(Language, System.Globalization.CultureInfo.CurrentUICulture.Name);
+
+        /// <summary>True if this device can write down a recording (Android 13+ with a recognizer, iOS, Mac Catalyst).</summary>
         public static bool IsSupported
         {
             get
@@ -56,7 +59,11 @@ namespace Maui.Demo.Lite
         /// <summary>
         /// The words in the recording, or an empty string if none were recognised.
         /// </summary>
-        public static async Task<string> TranscribeAsync(byte[] wav, CancellationToken token)
+        /// <param name="wav">A 16 kHz mono 16-bit WAV recording, as <see cref="VoiceRecorder.StopAsync"/> returns</param>
+        /// <param name="token">Stops recognizing</param>
+        /// <exception cref="PlatformNotSupportedException">Where <see cref="IsSupported"/> is false</exception>
+        /// <exception cref="InvalidOperationException">The language can't be recognized, or recognition failed</exception>
+        public static async Task<string> TranscribeAsync(byte[] wav, CancellationToken token = default)
         {
 #if ANDROID
             if (!OperatingSystem.IsAndroidVersionAtLeast(33))
@@ -225,43 +232,10 @@ namespace Maui.Demo.Lite
             public void OnError(int error) => _result.TrySetResult(null);
         }
 
-        internal static string LanguageUnavailableMessage(string tag, bool downloadRequested = false) =>
+        private static string LanguageUnavailableMessage(string tag, bool downloadRequested = false) =>
             "Speech recognition isn't available for " + VoiceLanguages.NameOf(tag) + " on this phone: its offline speech language isn't " +
             "installed" + (downloadRequested ? " (a download was requested - try again in a few minutes)" : "") +
-            " and it isn't offered online. Choose the language in Settings > Voice language.";
-
-        /// <summary>What the phone's recognizers say about a language, for diagnosing: installed, downloadable and online languages.</summary>
-        [System.Runtime.Versioning.SupportedOSPlatform("android33.0")]
-        internal static async Task<string> DescribeSupportAsync(string tag)
-        {
-            var context = Android.App.Application.Context;
-            var intent = new Android.Content.Intent(Android.Speech.RecognizerIntent.ActionRecognizeSpeech);
-            intent.PutExtra(Android.Speech.RecognizerIntent.ExtraLanguageModel, Android.Speech.RecognizerIntent.LanguageModelFreeForm);
-            intent.PutExtra(Android.Speech.RecognizerIntent.ExtraLanguage, tag);
-            var lines = new List<string>();
-            foreach (bool onDevice in new[] { true, false })
-            {
-                if (onDevice && !Android.Speech.SpeechRecognizer.IsOnDeviceRecognitionAvailable(context))
-                {
-                    lines.Add("on-device recognizer: not available");
-                    continue;
-                }
-                Android.Speech.SpeechRecognizer recognizer = null;
-                Android.Speech.RecognitionSupport support = null;
-                await MainThread.InvokeOnMainThreadAsync(async () =>
-                {
-                    recognizer = onDevice ? Android.Speech.SpeechRecognizer.CreateOnDeviceSpeechRecognizer(context)
-                        : Android.Speech.SpeechRecognizer.CreateSpeechRecognizer(context);
-                    support = await CheckSupportAsync(recognizer, intent, context);
-                    recognizer.Destroy();
-                });
-                string List(IList<string> items) => items == null ? "-" : string.Join(",", items);
-                lines.Add((onDevice ? "on-device" : "normal") + " recognizer: " + (support == null ? "no answer" :
-                    "installed [" + List(support.InstalledOnDeviceLanguages) + "] supported on device [" + List(support.SupportedOnDeviceLanguages) +
-                    "] pending [" + List(support.PendingOnDeviceLanguages) + "] online [" + List(support.OnlineLanguages) + "]"));
-            }
-            return string.Join("\n", lines);
-        }
+            " and it isn't offered online." + Hint;
 
         // Writes the samples, then 0.6 s of silence, 20 ms at a time at the speed they were recorded.
         private static Task FeedAsync(Android.OS.ParcelFileDescriptor pipe, byte[] pcm, Task done, CancellationToken token)
@@ -389,15 +363,14 @@ namespace Maui.Demo.Lite
             if (await authorized.Task != Speech.SFSpeechRecognizerAuthorizationStatus.Authorized)
                 throw new UnauthorizedAccessException("Speech recognition isn't allowed. Turn it on for this app in the system's privacy settings.");
 
-            // The language chosen in Settings, else the device's.
-            string chosen = string.Empty;
-            try { chosen = Preferences.Default.Get(LanguagePreference, string.Empty); } catch (Exception) { }
+            // The language chosen, else the device's.
+            string chosen = Language;
             string tag = string.IsNullOrWhiteSpace(chosen) ? null : VoiceLanguages.Resolve(chosen, null);
             Speech.SFSpeechRecognizer recognizer = tag != null
                 ? new Speech.SFSpeechRecognizer(new Foundation.NSLocale(tag))
                 : new Speech.SFSpeechRecognizer(Foundation.NSLocale.CurrentLocale) ?? new Speech.SFSpeechRecognizer();
             if (recognizer == null)
-                throw new InvalidOperationException("Speech recognition isn't supported for " + VoiceLanguages.NameOf(tag) + ". Choose another language in Settings > Voice language.");
+                throw new InvalidOperationException("Speech recognition isn't supported for " + VoiceLanguages.NameOf(tag) + "." + Hint);
             if (!recognizer.Available)
                 throw new InvalidOperationException("Speech recognition isn't available for " + (tag != null ? VoiceLanguages.NameOf(tag) : "this language") + " right now.");
 
@@ -445,4 +418,3 @@ namespace Maui.Demo.Lite
 #endif
     }
 }
-#endif

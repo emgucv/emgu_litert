@@ -2,25 +2,28 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if WINDOWS || IOS || ANDROID || MACCATALYST
-
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents.Audio;
 
-namespace Maui.Demo.Lite
+namespace Emgu.LiteRT.LM.Maui
 {
     /// <summary>
     /// Records from the microphone into a WAV file in memory (16 kHz, mono, 16-bit PCM), a format LiteRT-LM's
     /// audio decoder (miniaudio) reads and the sample rate Gemma 4's audio encoder works at. MAUI has no
     /// recorder of its own, so each platform uses its native API: AVAudioRecorder on iOS / Mac Catalyst,
     /// AudioRecord on Android and MediaCapture on Windows.
+    /// <para>
+    /// The app must declare microphone access: <c>android.permission.RECORD_AUDIO</c> in AndroidManifest.xml,
+    /// <c>NSMicrophoneUsageDescription</c> in Info.plist (iOS, Mac Catalyst), the <c>microphone</c> capability on Windows.
+    /// Recordings go through <see cref="MicrophoneGate"/>. As an <see cref="IVoiceInput"/> it can feed a voice chat
+    /// (Emgu.LiteRT.LM.Agents' <c>VoiceActivityDetector</c> reads <see cref="ReadLevelDb"/>).
+    /// </para>
     /// </summary>
-    internal sealed class VoiceRecorder : IVoiceInput
+    public sealed class VoiceRecorder : IVoiceInput
     {
+        /// <summary>The recordings' sample rate: 16 kHz.</summary>
         public const int SampleRate = 16000;
 
+        /// <summary>True while recording.</summary>
         public bool IsRecording { get; private set; }
 
         /// <summary>
@@ -117,7 +120,7 @@ namespace Maui.Demo.Lite
             if (status != PermissionStatus.Granted)
                 return false;
 
-            // A sound monitor lets go of the microphone first (SoundSource.cs).
+            // An app's always-on listener lets go of the microphone first.
             await MicrophoneGate.EnterAsync();
             try { await StartPlatformAsync(); }
             catch
@@ -323,5 +326,3 @@ namespace Maui.Demo.Lite
 #endif
     }
 }
-
-#endif
