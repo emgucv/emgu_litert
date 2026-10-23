@@ -13,20 +13,19 @@ using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Chat.Sqlite;
 
 var store = new ChatHistoryStore(Path.Combine(appDataFolder, "chats"));
-int chatId = 0;
-conversation.ExchangeCompleted += async (s, e) =>
-{
-    if (chatId == 0)
-        chatId = await store.CreateChatAsync(ChatHistoryStore.TitleOf(e.Message), "Qwen3");
-    await store.SaveExchangeAsync(chatId, e.Message, e.Reply);
-};
-conversation.Compacted += async (s, e) => await store.SaveCompactionAsync(chatId, conversation);
 
-// Later: the saved chats, newest first, and one of them reopened in a conversation.
+// Save a conversation as it goes on: the first exchange creates the chat (saving.ChatId).
+ChatHistoryBinding saving = store.Attach(conversation, model: "Qwen3");
+
+// Later: the saved chats, newest first, and one of them reopened in a conversation and saved from there on.
 List<ChatRecord> chats = await store.GetChatsAsync();
 ChatHistory history = await store.LoadAsync(chats[0].Id);
+saving.Dispose();             // stop saving the conversation into the chat it was in
 history.Load(conversation);   // shown, and given to the model with the next message
+saving = store.Attach(conversation, chats[0].Id);
 ```
+
+`Attach` saves each completed exchange, a regenerated reply in place of the one before, the compaction point, and a voice message's transcript written down after the message was saved. The saves run in order, in the background: `FlushAsync()` waits for them, `SaveFailed` reports a failure, and `Dispose()` stops saving (e.g. before a new chat). To save by hand instead, call `CreateChatAsync`, `SaveExchangeAsync`, `ReplaceReplyAsync` and `SaveCompactionAsync` from the conversation's `ExchangeCompleted` and `Compacted` events. The `MauiChat` sample in the source repository reopens its last chat this way.
 
 - **Files:** the database is `chats.db3` in the folder, and images and audio are files in `attachments/<chat id>/`. `DeleteChatAsync` removes a chat with its files.
 - **Your own data:** `CreateTablesAsync` (override it) and `GetConnectionAsync()` keep your own tables in the same database. To keep more columns about a chat or a message, derive records from `ChatRecord` / `ChatMessageRecord` with the same `[Table]` name; `LoadAsync<TMessage>` reads them, and `ChatHistory.RecordOf(message)` has them. `SaveExchangeAsync` also keeps files of your own kinds with a reply (e.g. a picture it drew), which `ChatHistory.AttachmentsOf(message)` gives back.

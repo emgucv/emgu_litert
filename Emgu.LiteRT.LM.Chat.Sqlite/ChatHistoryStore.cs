@@ -226,12 +226,79 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             Remember(message, messageId);
             foreach (ChatToolStep step in reply.Steps.ToList())
                 await InsertAsync(chatId, ChatMessageRecord.StepRole, step.Description, null, null, null, null).ConfigureAwait(false);
-            string text = reply.State == ChatMessageState.Interrupted ? (reply.Text.Length > 0 ? reply.Text + " …" : "…") : reply.Text;
-            int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, text, reply.Thinking, replyAttachments, null, null).ConfigureAwait(false);
+            int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, ReplyText(reply), reply.Thinking, replyAttachments, null, null).ConfigureAwait(false);
             Remember(reply, replyId);
             await TouchAsync(chatId).ConfigureAwait(false);
             OnChatsChanged();
             return new ChatSavedExchange(messageId, replyId);
+        }
+
+        /// <summary>
+        /// Replace the saved reply to a message - the reply and its step lines, the rows saved after the message - with a
+        /// new one, e.g. after <see cref="ChatConversation.RegenerateAsync"/> (<see cref="ChatExchangeEventArgs.Regenerated"/>).
+        /// The message must have been saved by this store (or loaded from it) and be the chat's latest; if it wasn't saved,
+        /// the exchange is saved as a new one.
+        /// </summary>
+        /// <param name="chatId">The chat</param>
+        /// <param name="message">The user's message</param>
+        /// <param name="reply">The new reply</param>
+        /// <param name="replyAttachments">Files of the app's own kinds to keep with the reply, or null</param>
+        /// <returns>The ids of the message and the new reply</returns>
+        public async Task<ChatSavedExchange> ReplaceReplyAsync(int chatId, ChatMessageItem message, ChatMessageItem reply,
+            IEnumerable<(string Kind, string MediaType, byte[] Data)> replyAttachments = null)
+        {
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
+            if (reply == null)
+                throw new ArgumentNullException(nameof(reply));
+            int messageId = GetMessageId(message);
+            if (messageId <= 0)
+                return await SaveExchangeAsync(chatId, message, reply, replyAttachments).ConfigureAwait(false);
+            ThrowIfPrivate();
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            List<ChatMessageRecord> after = await db.Table<ChatMessageRecord>()
+                .Where(m => m.ConversationId == chatId && m.Id > messageId).ToListAsync().ConfigureAwait(false);
+            foreach (ChatMessageRecord row in after)
+            {
+                foreach (ChatSavedAttachment file in GetAttachments(row))
+                {
+                    try { File.Delete(file.Path); }
+                    catch (Exception) { }
+                }
+                await db.DeleteAsync<ChatMessageRecord>(row.Id).ConfigureAwait(false);
+            }
+            foreach (ChatToolStep step in reply.Steps.ToList())
+                await InsertAsync(chatId, ChatMessageRecord.StepRole, step.Description, null, null, null, null).ConfigureAwait(false);
+            int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, ReplyText(reply), reply.Thinking, replyAttachments, null, null).ConfigureAwait(false);
+            Remember(reply, replyId);
+            await TouchAsync(chatId).ConfigureAwait(false);
+            OnChatsChanged();
+            return new ChatSavedExchange(messageId, replyId);
+        }
+
+        // An interrupted reply is kept as cut off.
+        private static string ReplyText(ChatMessageItem reply) =>
+            reply.State == ChatMessageState.Interrupted ? (reply.Text.Length > 0 ? reply.Text + " …" : "…") : reply.Text;
+
+        /// <summary>
+        /// Save a conversation from now on: each completed exchange (creating the chat with the first), a regenerated
+        /// reply in place of the one before, the compaction point, and a voice message's transcript written down after the
+        /// message was saved. Nothing is saved while <see cref="IsPrivate"/>.
+        /// <code>
+        /// ChatHistory history = await store.LoadAsync(chatId);   // a saved chat, to continue
+        /// history.Load(conversation);
+        /// using var saving = store.Attach(conversation, chatId);
+        /// </code>
+        /// </summary>
+        /// <param name="conversation">The conversation</param>
+        /// <param name="chatId">The saved chat it continues (e.g. one loaded into it), or 0 to create one with the first exchange</param>
+        /// <param name="model">The model, in the app's words, for a chat it creates; or null</param>
+        /// <returns>The binding: dispose it to stop saving (e.g. for a new chat)</returns>
+        public ChatHistoryBinding Attach(ChatConversation conversation, int chatId = 0, string model = null)
+        {
+            if (conversation == null)
+                throw new ArgumentNullException(nameof(conversation));
+            return new ChatHistoryBinding(this, conversation, chatId, model);
         }
 
         /// <summary>

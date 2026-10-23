@@ -275,6 +275,143 @@ namespace Emgu.TF.Lite.Test
             _store = new ChatHistoryStore(_folder);
         }
 
+        // ---------- Attach: saving a conversation as it goes on ----------
+
+        // Streams the next scripted reply; answers summary requests (their prompt starts with "Summarize").
+        private sealed class ReplyingClient : IChatClient
+        {
+            public readonly Queue<string> Replies = new Queue<string>();
+
+            public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null, System.Threading.CancellationToken cancellationToken = default)
+            {
+                await Task.Yield();
+                List<ChatMessage> list = messages.ToList();
+                if (list.Count == 1 && list[0].Text.StartsWith("Summarize", StringComparison.Ordinal))
+                    return new ChatResponse(new ChatMessage(ChatRole.Assistant, "The user said hello twice."));
+                return new ChatResponse(new ChatMessage(ChatRole.Assistant, Replies.Dequeue()));
+            }
+
+            public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null,
+                [System.Runtime.CompilerServices.EnumeratorCancellation] System.Threading.CancellationToken cancellationToken = default)
+            {
+                await Task.Yield();
+                yield return new ChatResponseUpdate(ChatRole.Assistant, Replies.Dequeue()) { MessageId = "a" };
+            }
+
+            public object GetService(Type serviceType, object serviceKey = null) => null;
+
+            public void Dispose()
+            {
+            }
+        }
+
+        [Test]
+        public async Task SavesAnAttachedConversationAsItGoesOn()
+        {
+            var client = new ReplyingClient();
+            client.Replies.Enqueue("Hello!");
+            client.Replies.Enqueue("Hello again!");
+            var conversation = new ChatConversation(client);
+            int created = 0;
+            using (ChatHistoryBinding saving = _store.Attach(conversation, model: "Qwen3"))
+            {
+                saving.ChatCreated += (s, e) => created++;
+                await conversation.SendAsync("Hi");
+                await conversation.SendAsync("Hi again");
+                await saving.FlushAsync();
+                Assert.That(created, Is.EqualTo(1));
+                Assert.That(saving.ChatId, Is.GreaterThan(0));
+                ChatRecord chat = await _store.GetChatAsync(saving.ChatId);
+                Assert.That(chat.Title, Is.EqualTo("Hi"));
+                Assert.That(chat.Model, Is.EqualTo("Qwen3"));
+
+                // Compacted: everything but the latest exchange is summarized.
+                Assert.That(await conversation.CompactAsync(), Is.True);
+                await saving.FlushAsync();
+                ChatHistory history = await _store.LoadAsync(saving.ChatId);
+                Assert.That(history.Messages.Select(m => m.Text), Is.EqualTo(new[] { "Hi", "Hello!", "Hi again", "Hello again!" }));
+                Assert.That(history.Summary, Is.EqualTo("The user said hello twice."));
+                Assert.That(history.ContextStart, Is.EqualTo(conversation.ContextStart));
+
+                // Reopened in another conversation and continued in the same chat.
+                var reopened = new ChatConversation(client);
+                history.Load(reopened);
+                using (ChatHistoryBinding continuing = _store.Attach(reopened, saving.ChatId))
+                {
+                    client.Replies.Enqueue("Goodbye!");
+                    await reopened.SendAsync("Bye");
+                    await continuing.FlushAsync();
+                }
+                Assert.That((await _store.LoadAsync(saving.ChatId)).Messages.Count, Is.EqualTo(6));
+                Assert.That(await _store.GetChatsAsync(), Has.Count.EqualTo(1));
+            }
+
+            // Not attached any more: nothing more is saved.
+            client.Replies.Enqueue("Not saved.");
+            await conversation.SendAsync("Anyone there?");
+            Assert.That((await _store.GetChatsAsync()).Single().Id, Is.Not.Zero);
+            Assert.That((await _store.LoadAsync((await _store.GetChatsAsync()).Single().Id)).Messages.Count, Is.EqualTo(6));
+        }
+
+        [Test]
+        public async Task ReplacesARegeneratedReply()
+        {
+            var client = new ReplyingClient();
+            client.Replies.Enqueue("First answer.");
+            client.Replies.Enqueue("Better answer.");
+            var conversation = new ChatConversation(client);
+            using (ChatHistoryBinding saving = _store.Attach(conversation))
+            {
+                ChatMessageItem reply = await conversation.SendAsync("Question");
+                reply.Steps.Add(new ChatToolStep("A step of the first answer"));
+                await saving.FlushAsync();
+                await conversation.RegenerateAsync(reply);
+                await saving.FlushAsync();
+                ChatHistory history = await _store.LoadAsync(saving.ChatId);
+                Assert.That(history.Messages.Select(m => m.Text), Is.EqualTo(new[] { "Question", "Better answer." }));
+                Assert.That(history.Messages[1].Steps, Is.Empty);
+                Assert.That(await _store.GetMessagesAsync<ChatMessageRecord>(saving.ChatId), Has.Count.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public async Task SavesATranscriptWrittenDownLater()
+        {
+            var client = new ReplyingClient();
+            client.Replies.Enqueue("Rome.");
+            var conversation = new ChatConversation(client);
+            using (ChatHistoryBinding saving = _store.Attach(conversation))
+            {
+                await conversation.SendAsync(string.Empty, new[] { new DataContent(Wav, "audio/wav") });
+                await saving.FlushAsync();
+                Assert.That((await _store.GetChatAsync(saving.ChatId)).Title, Is.EqualTo("Voice message"));
+                conversation.Messages[0].Transcript = "What is the capital of Italy?";
+                await saving.FlushAsync();
+                Assert.That((await _store.LoadAsync(saving.ChatId)).Messages[0].Transcript, Is.EqualTo("What is the capital of Italy?"));
+                Assert.That((await _store.GetChatAsync(saving.ChatId)).Title, Is.EqualTo("What is the capital of Italy?"));
+            }
+        }
+
+        [Test]
+        public async Task SavesNothingOfAnAttachedPrivateConversation()
+        {
+            var client = new ReplyingClient();
+            client.Replies.Enqueue("Hello.");
+            var conversation = new ChatConversation(client);
+            _store.IsPrivate = true;
+            Exception failed = null;
+            using (ChatHistoryBinding saving = _store.Attach(conversation))
+            {
+                saving.SaveFailed += (s, e) => failed = e;
+                await conversation.SendAsync("Secret");
+                await saving.FlushAsync();
+                Assert.That(saving.ChatId, Is.Zero);
+            }
+            Assert.That(failed, Is.Null);
+            _store.IsPrivate = false;
+            Assert.That(await _store.GetChatsAsync(), Is.Empty);
+        }
+
         // A client that is never called (the conversations above are only loaded).
         private sealed class ThrowingClient : IChatClient
         {

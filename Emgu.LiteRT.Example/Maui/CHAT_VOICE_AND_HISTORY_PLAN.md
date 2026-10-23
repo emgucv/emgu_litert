@@ -1,6 +1,6 @@
 # Plan: voice messages and saved chats for the chat libraries
 
-Status: proposed 2026-10-23; steps 1-3 done 2026-10-23. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
+Status: proposed 2026-10-23; steps 1-4 done 2026-10-23. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
 parts of the demo's chat page that any chat app would want, moved into libraries the same way.
 
 ## Goal
@@ -164,6 +164,31 @@ history.Attach(chat.Conversation, chatId);         // saves each exchange and co
    - The model-free suite passes, now 394 tests.
 4. **`Attach(conversation, chatId)`.** It saves on `ExchangeCompleted` and `Compacted`, so a simple app needs no code of
    its own. The sample reopens its last chat after a restart.
+
+   **Done 2026-10-23:**
+   - `ChatHistoryStore.Attach(conversation, chatId = 0, model = null)` returns a `ChatHistoryBinding`. It saves:
+     - each completed exchange; the first creates the chat (`ChatId`, `ChatCreated`);
+     - a regenerated reply in place of the one before, through the new `ReplaceReplyAsync`, which deletes the rows
+       saved after the message, with their files;
+     - the compaction point;
+     - a voice message's transcript written down after the message was saved.
+   - Saves are chained, so they run in order in the background. `FlushAsync` waits for them, `SaveFailed` reports a
+     failure, and `Dispose` stops saving. Nothing is saved while `IsPrivate`.
+   - Four more tests in `UnitTestChatHistoryStore` (11 in all):
+     - an attached conversation is saved, compacted, reopened in another conversation and continued in the same
+       chat, and nothing is saved after `Dispose`;
+     - a regenerated reply replaces the saved one with its steps;
+     - a late transcript is saved and renames a "Voice message" chat;
+     - a private conversation saves nothing and reports no failure.
+   - The `MauiChat` sample keeps its chats in `MauiChat/chats` in the app data folder, a folder of its own: on Mac
+     Catalyst that folder is `~/Library`, where the demo keeps `chats/`. It reopens the last chat (Preferences
+     `last_chat`) and has a New chat toolbar button.
+   - Checked on Mac Catalyst with a temporary self-test across app restarts:
+     - "My favourite colour is green." was saved;
+     - after a restart the chat reopened with both messages, and Qwen3 answered "What is my favourite colour?" with
+       "Your favorite color is green!", so the model was given the reopened chat;
+     - New chat started a second chat.
+   - The test chats and the preference were deleted afterwards.
 5. **The demo onto the store.**
    - `ChatStore` derives from `ChatHistoryStore` and keeps its own tables and columns.
    - `SaveExchangeAsync` and `OpenConversationAsync` shrink to what is the demo's own: cards, documents, translations,
