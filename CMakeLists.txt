@@ -550,6 +550,13 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # Emgu.LiteRT.LM.Agents/: ready-made tools for chat agents (Microsoft.Extensions.AI functions), for any IChatClient.
   SET(EMGU_LITERT_LM_AGENTS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Agents")
   SET(EMGU_LITERT_LM_AGENTS_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} Agents")
+  # Emgu.LiteRT.LM.Chat/: the conversation logic of a chat (no UI) over any IChatClient - messages, streaming,
+  # context window management.
+  SET(EMGU_LITERT_LM_CHAT_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Chat")
+  SET(EMGU_LITERT_LM_CHAT_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} Chat")
+  # Emgu.LiteRT.LM.Maui/: a MAUI chat control (XAML templates) on top of Emgu.LiteRT.LM.Chat.
+  SET(EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Maui")
+  SET(EMGU_LITERT_LM_MAUI_CONTROL_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} MAUI")
 
   SET(EMGU_LITERT_UTIL_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Util")
   SET(EMGU_LITERT_UTIL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Util")
@@ -1176,6 +1183,28 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Agents.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents/NetStandard/docs/README.md)
 
+# Emgu.LiteRT.LM.Chat: the conversation logic of a chat, without UI. Its own nuget package, depending on
+# Emgu.LiteRT.LM.Extensions.AI, Emgu.LiteRT.LM.Models and Microsoft.Extensions.AI.Abstractions.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Chat.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Chat/NetStandard/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Chat/NetStandard/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Chat/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Chat.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Chat/NetStandard/docs/README.md)
+
+# Emgu.LiteRT.LM.Maui: a MAUI chat control built with XAML templates. Its own nuget package (Android, iOS, Mac Catalyst,
+# Windows), depending on Emgu.LiteRT.LM.Chat and Microsoft.Maui.Controls; no native runtime dependency.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui/Maui/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui/Maui/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui/Maui/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui/Maui/docs/README.md)
+
 # Emgu.TF.Lite.ImageIO: NativeImageIO/JpegData (renamed from Emgu.Models, then Emgu.LiteRT.ImageIO).
 # Its own nuget package, depending on Emgu.LiteRT.Util (Annotation) and Emgu.TF.Lite
 # (Emgu.TF.Lite.Toolbox's native pixel-conversion P/Invokes).
@@ -1274,6 +1303,8 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Models)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Extensions.AI)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Agents)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Chat)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui)
   # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and later to Emgu.TF.Lite.ImageIO/, and made
   # its own project+package (it used to be shared source imported directly into
   # Emgu.LiteRT.Tflite.Models.csproj and CVInterop.Lite.csproj). Depends on Emgu.TF.Lite

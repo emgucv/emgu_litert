@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<AssemblyName>Emgu.LiteRT.LM.Chat</AssemblyName>
+	<TargetName>$(AssemblyName)</TargetName>
+	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
+	<LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TensorflowBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\lib))</TensorflowBinaryDir>
+	<OutputPath>$(TensorflowBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <Import Project="..\Emgu.LiteRT.LM.Chat.Shared.projitems" Label="Shared" />
+
+  <!--
+  Emgu.LiteRT.LM.Chat is the conversation logic of a chat, without UI: the messages, streaming replies with thinking
+  and tool steps, and keeping the conversation within the model's context window (summarizing or dropping earlier
+  messages). It works over any IChatClient; Emgu.LiteRT.LM.Models' LanguageModel (through Emgu.LiteRT.LM.Extensions.AI)
+  adds token counting and the context window size. Emgu.LiteRT.LM.Maui's ChatView is built on it, and apps with their
+  own UI can use it directly. The references become nuget package dependencies when this project is packed.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Emgu.LiteRT.LM.Extensions.AI\NetStandard\Emgu.LiteRT.LM.Extensions.AI.csproj" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.10.1" />
+  </ItemGroup>
+</Project>

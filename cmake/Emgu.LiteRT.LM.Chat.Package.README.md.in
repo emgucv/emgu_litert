@@ -1,0 +1,17 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Chat.dll`: the conversation logic of a chat, without UI, over any `IChatClient` ([Microsoft.Extensions.AI](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-ai)). It keeps the messages and their attachments, streams replies with thinking and tool steps, and keeps the conversation within the model's context window by summarizing or dropping earlier messages. Token counting comes from the on-device `${EMGU_LITERT_LM_MODELS_NUGET_ID}` language models (through `${EMGU_LITERT_LM_EXTENSIONS_AI_NUGET_ID}`) when one is used.
+
+`${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s chat control is built on this package. Apps with their own UI, or no MAUI, can use it directly.
+
+This package is new: its API is being written, and will be described here once it exists.
+
+## Getting Started
+
+The language models run on the device through LiteRT-LM: add the LiteRT-LM native runtime package for your platform, as for `${EMGU_LITERT_LM_MODELS_NUGET_ID}`.
+
+## Documentation
+
+${NUGET_EMGU_URL}/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/

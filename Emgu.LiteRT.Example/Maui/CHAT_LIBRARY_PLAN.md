@@ -1,6 +1,6 @@
 # Plan: a reusable MAUI chat control (`Emgu.LiteRT.LM.Maui`)
 
-Status: proposal, decisions taken 2026-10-22 (below). No code has moved yet.
+Status: decisions taken 2026-10-22 (below). Step 1 (scaffolding) done 2026-10-23; no code has moved yet.
 
 ## Decisions
 
@@ -110,9 +110,13 @@ Each step builds the demo and is checked before the next. Device checks: Mac Cat
 
 1. **Project scaffolding** for both packages: `Emgu.LiteRT.LM.Chat/` and `Emgu.LiteRT.LM.Maui/` with
    `.shproj`/`.projitems`, CMake-generated `Directory.Build.props` from `cmake/Emgu.LiteRT.LM.{Chat,Maui}.*.in`,
-   package ids from `EMGU_LITERT_LM_CHAT_NUGET_ID` / `EMGU_LITERT_LM_MAUI_NUGET_ID`, READMEs, solution entries (as for
+   package ids from `EMGU_LITERT_LM_CHAT_NUGET_ID` / `EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID`, READMEs, solution entries (as for
    `Emgu.LiteRT.Models.CV`). The MAUI project compiles XAML (`MauiXaml` items, `UseMaui`). Both build empty for all
-   their platforms.
+   their platforms. **Done:** `Emgu.LiteRT.LM.Chat/NetStandard/` (netstandard2.0, net8.0) and
+   `Emgu.LiteRT.LM.Maui/Maui/` (android, ios, maccatalyst; windows on Windows hosts), the latter with an empty
+   `Themes/ChatStyles.xaml` dictionary to prove the XAML compiles; both pack, in the CrossPlatform solution only (the
+   other LM packages aren't in any solution). `EMGU_LITERT_LM_MAUI_NUGET_ID` was taken (the LM runtime aggregator
+   `Emgu.LiteRT.LM.runtime.maui`), hence `..._MAUI_CONTROL_...`. Not yet built on Windows.
 2. **`ReplyView` and `ThinkingView`** as templated controls with `Themes/ChatStyles.xaml`; move `ReplyBody`'s Markdown
    parsing into a UI-free part (layer 1 or internal) and its view building into `ReplyView`. The demo uses them from
    the package. Check: Markdown, code blocks, maths and thinking look the same as before (screenshots before/after on

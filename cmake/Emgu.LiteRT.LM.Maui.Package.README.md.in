@@ -1,0 +1,17 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Maui.dll`: a MAUI chat control for the on-device `${EMGU_LITERT_LM_MODELS_NUGET_ID}` language models, or any `IChatClient`. It is built with XAML control templates, message templates and styles (`ChatStyles`, merged in `App.xaml`), so an app can restyle any part of it by replacing a template or a style.
+
+The conversation logic comes from `${EMGU_LITERT_LM_CHAT_NUGET_ID}`.
+
+This package is new: its controls are being written, and will be described here once they exist.
+
+## Getting Started
+
+The package has no native runtime dependency. Add the LiteRT-LM native runtime packages for your platforms, as for `${EMGU_LITERT_LM_MODELS_NUGET_ID}`.
+
+## Documentation
+
+${NUGET_EMGU_URL}/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/

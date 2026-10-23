@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  The default styles and colours of the chat controls. An app merges them once, in App.xaml:
+
+    <ResourceDictionary.MergedDictionaries>
+      <chat:ChatStyles />
+    </ResourceDictionary.MergedDictionaries>
+
+  (xmlns:chat="clr-namespace:Emgu.LiteRT.LM.Maui;assembly=Emgu.LiteRT.LM.Maui"), and overrides any style or template
+  by defining one with the same key after it. Filled in as the controls are added.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                    x:Class="Emgu.LiteRT.LM.Maui.ChatStyles">
+</ResourceDictionary>

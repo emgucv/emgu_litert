@@ -15,6 +15,11 @@ namespace Emgu.LiteRT.LM.Models
     /// </summary>
     public static class MathText
     {
+        /// <summary>
+        /// Convert LaTeX maths (without its $ or \( \) delimiters) to Unicode text.
+        /// </summary>
+        /// <param name="latex">The LaTeX, e.g. "x^2 + \frac{1}{2}"</param>
+        /// <returns>The text, e.g. "x² + 1/2"; empty for null or empty input</returns>
         public static string ToUnicode(string latex)
         {
             if (string.IsNullOrEmpty(latex))

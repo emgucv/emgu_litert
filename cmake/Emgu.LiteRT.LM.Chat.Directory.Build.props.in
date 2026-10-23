@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<Project>
+ <PropertyGroup>
+
+    <!-- Pure managed code. net8.0 for current runtimes (including net*-android/ios/maccatalyst): the netstandard2.0
+         build gets IAsyncEnumerable from the Microsoft.Bcl.AsyncInterfaces package, which isn't deployed with apps on
+         runtimes that have it built in (as for Emgu.LiteRT.LM.Extensions.AI). -->
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+
+    <PackageId>${EMGU_LITERT_LM_CHAT_NUGET_ID}</PackageId>
+	<title>${EMGU_LITERT_LM_CHAT_NUGET_TITLE}</title>
+    <version>${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>The conversation logic of a chat over any IChatClient: streaming replies with thinking and tool steps, and staying within the model's context window.</summary>
+    <Description>The conversation logic of a chat, without UI: the messages and their attachments, streaming replies with thinking and tool steps, cancelling, restoring a saved conversation, and keeping the conversation within the model's context window by summarizing or dropping earlier messages. Works over any IChatClient, with token counting for the Emgu LiteRT LM language models running on the device. The base of Emgu.LiteRT.LM.Maui's chat control; apps with their own UI can use it directly.</Description>
+    <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM Chat, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
+
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\platforms\nuget))</PackageOutputPath>
+	<PackageTags>litert litert-lm llm gemma chat conversation context-window microsoft-extensions-ai emgu emgutflite ai</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+
+ </PropertyGroup>
+
+    <ItemGroup>
+      <None Include="..\..\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="..\..\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+
+  <!-- https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022 -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />
+</Project>

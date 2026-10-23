@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>716bc486-0663-4a2e-83af-e7cbf32054d0</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Emgu.LiteRT.LM.Maui</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)*.cs" />
+    <!-- Themes/: the default control templates, message templates and styles (XAML), with their code-behind. The MAUI
+         SDK only finds XAML files under the project's own folder, so they are listed here. -->
+    <Compile Include="$(MSBuildThisFileDirectory)Themes\*.xaml.cs">
+      <DependentUpon>%(Filename)</DependentUpon>
+    </Compile>
+    <MauiXaml Include="$(MSBuildThisFileDirectory)Themes\*.xaml" />
+  </ItemGroup>
+</Project>
