@@ -185,6 +185,12 @@ Like the Emgu CV demo, the home page has two tabs: **LiteRT-LM**, with the chat,
 Lite (Interpreter API) demos - object detection, image recognition and the model checker. The tab used last opens
 again.
 
+The photo demos - Coco SSD MobileNet, YOLOX Nano, PicoDet S, Hand gestures, Body pose, Mobilenet and Inception - also
+have a **Live Camera** button on Android, Mac Catalyst and Windows: the same model, with the backend chosen on the page,
+runs on every camera frame, full screen, with what it found drawn on the frame and the top results, the time per frame
+and the frame rate below (`LiveDemoPage.cs`; Flip switches to the selfie camera on Android). D-FINE Nano stays on
+photos (it takes a few times longer). iOS has no live camera yet: `LiveCamera` has no iOS capture.
+
 ## Using the chat page
 
 The chat page is built on the reusable chat libraries:

@@ -109,6 +109,8 @@ namespace Maui.Demo.Lite
         private readonly Image _resultsCheck;
         private readonly Label _resultsTimeLabel;
         private readonly Button _runButton;
+        private Button _liveButton;
+        private Action<string> _progressTarget;
         private readonly LoadingOverlay _loading;
         private readonly BottomSheet _sheet;
 
@@ -214,8 +216,69 @@ namespace Maui.Demo.Lite
 
         private int _cpuReloadVersion = CpuThreadSettings.ReloadVersion;
 
-        /// <summary>Run the model on the image. Called on the UI thread; push heavy work to a background thread.</summary>
-        protected abstract Task<DemoResult> RunAsync(Mat input);
+        /// <summary>
+        /// Run the model on the image. Called on the UI thread; push heavy work to a background thread. By default:
+        /// <see cref="PrepareAsync"/>, then <see cref="Analyze"/> on a background thread.
+        /// </summary>
+        protected virtual async Task<DemoResult> RunAsync(Mat input)
+        {
+            await PrepareAsync();
+            ShowProgress(AnalyzingText);
+            return await Task.Run(() =>
+            {
+                Mat render = input.Clone();
+                DemoResult result = Analyze(input, render);
+                if (DrawsOnPhoto)
+                    result.Annotated = render;
+                else
+                    render.Dispose();
+                return result;
+            });
+        }
+
+        /// <summary>Load the model (on the first run, or after <see cref="ReleaseModel"/>). Called on the UI thread.</summary>
+        protected virtual Task PrepareAsync() => Task.CompletedTask;
+
+        /// <summary>
+        /// Run the prepared model on an image and draw what it found into <paramref name="render"/>, a copy of the image:
+        /// the rows, and a summary such as the time it took. Called on a background thread - for each frame of the live
+        /// camera too, so keep it quick.
+        /// </summary>
+        protected virtual DemoResult Analyze(Mat input, Mat render) => throw new NotSupportedException();
+
+        /// <summary>True if the page implements <see cref="PrepareAsync"/> and <see cref="Analyze"/>, which gives it a live camera.</summary>
+        protected virtual bool SupportsLiveCamera => false;
+
+        /// <summary>True (the default) to show what <see cref="Analyze"/> drew on a photo; false for a list only (a classifier).</summary>
+        protected virtual bool DrawsOnPhoto => true;
+
+        /// <summary>The progress text while a photo is analyzed.</summary>
+        protected virtual string AnalyzingText => "Analyzing...";
+
+        /// <summary>Enable or disable the page's options (e.g. a backend picker) while its model is in use.</summary>
+        protected virtual void SetOptionsEnabled(bool enabled)
+        {
+        }
+
+        // For LiveDemoPage: the same model, prepared and run frame by frame, with the progress shown there.
+        internal async Task PrepareForLiveAsync(Action<string> progress)
+        {
+            _progressTarget = progress;
+            try
+            {
+                if (_cpuReloadVersion != CpuThreadSettings.ReloadVersion)
+                {
+                    ReleaseModel();
+                    _cpuReloadVersion = CpuThreadSettings.ReloadVersion;
+                }
+                await PrepareAsync();
+            }
+            finally { _progressTarget = null; }
+        }
+
+        internal DemoResult AnalyzeLive(Mat input, Mat render) => Analyze(input, render);
+
+        internal void SetOptionsEnabledForLive(bool enabled) => SetOptionsEnabled(enabled);
 
         /// <summary>Free native model objects when the page is popped.</summary>
         protected virtual void ReleaseModel()
@@ -229,7 +292,11 @@ namespace Maui.Demo.Lite
 
         protected void ShowProgress(string message)
         {
-            MainThread.BeginInvokeOnMainThread(() => _loading.SetMessage(message));
+            Action<string> target = _progressTarget;
+            if (target != null)
+                target(message);
+            else
+                MainThread.BeginInvokeOnMainThread(() => _loading.SetMessage(message));
         }
 
         protected void OnDownloadProgress(long? totalBytesToReceive, long bytesReceived, double? progressPercentage)
@@ -243,6 +310,13 @@ namespace Maui.Demo.Lite
         protected override async void OnAppearing()
         {
             base.OnAppearing();
+            // The live camera: where LiveCamera runs, for pages that analyze frame by frame.
+            if (_liveButton == null && SupportsLiveCamera && LiveCamera.Supported)
+            {
+                _liveButton = Theme.SecondaryButton("Live Camera", Theme.GlyphCamera);
+                _liveButton.Clicked += OnLiveClicked;
+                _content.Children.Insert(_content.Children.IndexOf(_runButton) + 1, _liveButton);
+            }
             if (!_defaultLoaded)
             {
                 _defaultLoaded = true;
@@ -350,6 +424,14 @@ namespace Maui.Demo.Lite
 
         // ---------- Running ----------
 
+        private async void OnLiveClicked(object sender, EventArgs e)
+        {
+            UiStallWatchdog.Mark("Live camera: " + Title);
+            if (_running)
+                return;
+            await Navigation.PushAsync(new LiveDemoPage(this, Title), false);
+        }
+
         private async void OnRunClicked(object sender, EventArgs e)
         {
             UiStallWatchdog.Mark("Run: " + Title);
@@ -358,6 +440,7 @@ namespace Maui.Demo.Lite
 
             _running = true;
             _runButton.IsEnabled = false;
+            SetOptionsEnabled(false);
             _loading.Show("Preparing...");
             try
             {
@@ -406,6 +489,7 @@ namespace Maui.Demo.Lite
             {
                 _running = false;
                 _runButton.IsEnabled = true;
+                SetOptionsEnabled(true);
                 _loading.Hide();
             }
         }

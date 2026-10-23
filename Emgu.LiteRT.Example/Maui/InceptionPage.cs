@@ -40,7 +40,14 @@ namespace Maui.Demo.Lite
             _inception = null;
         }
 
-        protected override async Task<DemoResult> RunAsync(Mat input)
+        protected override bool SupportsLiveCamera => true;
+
+        // A classifier: the list is the result; live frames get the top labels drawn on them.
+        protected override bool DrawsOnPhoto => false;
+
+        protected override string AnalyzingText => "Classifying...";
+
+        protected override async Task PrepareAsync()
         {
             if (_inception == null)
             {
@@ -51,21 +58,19 @@ namespace Maui.Demo.Lite
             await _inception.Init();
             if (!_inception.Imported)
                 throw new Exception("Failed to initialize the Inception model.");
+        }
 
-            ShowProgress("Classifying...");
-            Inception model = _inception;
-            (Inception.RecognitionResult[] result, long ms) = await Task.Run(() =>
-            {
-                model.WriteInput(input);
-                Stopwatch watch = Stopwatch.StartNew();
-                var r = model.Invoke();
-                watch.Stop();
-                return (r, watch.ElapsedMilliseconds);
-            });
+        protected override DemoResult Analyze(Mat input, Mat render)
+        {
+            _inception.WriteInput(input);
+            Stopwatch watch = Stopwatch.StartNew();
+            Inception.RecognitionResult[] result = _inception.Invoke();
+            watch.Stop();
 
-            DemoResult demo = new DemoResult { Summary = $"Recognized in {ms} ms" };
+            DemoResult demo = new DemoResult { Summary = $"Recognized in {watch.ElapsedMilliseconds} ms" };
             foreach (var r in result.Take(5))
                 demo.Rows.Add(new ResultRow(r.Label, $"{r.Probability * 100:0.#}%", r.Probability));
+            MobilenetPage.DrawLabels(render, result.Take(3).Select(r => (r.Label, r.Probability)));
             return demo;
         }
     }

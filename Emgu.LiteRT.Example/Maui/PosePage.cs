@@ -50,44 +50,50 @@ namespace Maui.Demo.Lite
 
         private PoseModelFiles.Variant Variant => _variant.SelectedIndex == 2 ? PoseModelFiles.Heavy : _variant.SelectedIndex == 1 ? PoseModelFiles.Full : PoseModelFiles.Lite;
 
-        protected override async Task<DemoResult> RunAsync(Mat input)
+        protected override bool SupportsLiveCamera => true;
+
+        protected override string AnalyzingText => "Finding the pose...";
+
+        protected override void SetOptionsEnabled(bool enabled)
         {
-            _backend.IsEnabled = false; _variant.IsEnabled = false;
-            try
+            _backend.IsEnabled = enabled;
+            _variant.IsEnabled = enabled;
+        }
+
+        protected override async Task PrepareAsync()
+        {
+            _detector ??= DetectorFactory.Pose();
+            await _detector.PrepareAsync(Variant, _backend.SelectedIndex == 1, CpuThreadSettings.Count, ShowProgress, CancellationToken.None);
+            _preparedVariant = Variant.Name;
+        }
+
+        private string _preparedVariant;
+
+        protected override DemoResult Analyze(Mat input, Mat render)
+        {
+            Stopwatch watch = Stopwatch.StartNew();
+            var poses = _detector.Detect(input);
+            watch.Stop();
+            DemoResult demo = new DemoResult
             {
-                _detector ??= DetectorFactory.Pose();
-                await _detector.PrepareAsync(Variant, _backend.SelectedIndex == 1, CpuThreadSettings.Count, ShowProgress, CancellationToken.None);
-                ShowProgress("Finding the pose...");
-                return await Task.Run(() =>
-                {
-                    Stopwatch watch = Stopwatch.StartNew();
-                    var poses = _detector.Detect(input);
-                    watch.Stop();
-                    Mat render = input.Clone();
-                    DemoResult demo = new DemoResult
-                    {
-                        Annotated = render,
-                        Summary = $"LiteRT {_detector.Backend} · {Variant.Name} · {watch.ElapsedMilliseconds} ms" + (_detector.GpuFailure != null ? " · GPU unavailable, using CPU" : "")
-                    };
-                    MCvScalar bone = new MCvScalar(247, 123, 61), joint = new MCvScalar(255, 255, 255), faint = new MCvScalar(160, 160, 160);
-                    foreach (Pose pose in poses)
-                    {
-                        float[] L(int i) => pose.Landmarks[i];
-                        System.Drawing.Point P(int i) => new System.Drawing.Point((int)(L(i)[0] * render.Width), (int)(L(i)[1] * render.Height));
-                        // A landmark the model thinks is hidden is drawn grey.
-                        foreach (int[] b in PoseTracker.Bones)
-                            CvInvoke.Line(render, P(b[0]), P(b[1]), L(b[0])[3] < 0.5f || L(b[1])[3] < 0.5f ? faint : bone, 2);
-                        for (int i = 0; i < PoseTracker.LandmarkCount; i++)
-                            CvInvoke.Circle(render, P(i), 3, L(i)[3] < 0.5f ? faint : joint, -1);
-                        int visible = pose.Landmarks.Count(p => p[3] >= 0.5f);
-                        demo.Rows.Add(new ResultRow("Person", $"{visible} of 33 landmarks visible", pose.Presence));
-                    }
-                    if (poses.Count == 0)
-                        demo.Rows.Add(new ResultRow("No person found", ""));
-                    return demo;
-                });
+                Summary = $"LiteRT {_detector.Backend} · {_preparedVariant} · {watch.ElapsedMilliseconds} ms" + (_detector.GpuFailure != null ? " · GPU unavailable, using CPU" : "")
+            };
+            MCvScalar bone = new MCvScalar(247, 123, 61), joint = new MCvScalar(255, 255, 255), faint = new MCvScalar(160, 160, 160);
+            foreach (Pose pose in poses)
+            {
+                float[] L(int i) => pose.Landmarks[i];
+                System.Drawing.Point P(int i) => new System.Drawing.Point((int)(L(i)[0] * render.Width), (int)(L(i)[1] * render.Height));
+                // A landmark the model thinks is hidden is drawn grey.
+                foreach (int[] b in PoseTracker.Bones)
+                    CvInvoke.Line(render, P(b[0]), P(b[1]), L(b[0])[3] < 0.5f || L(b[1])[3] < 0.5f ? faint : bone, 2);
+                for (int i = 0; i < PoseTracker.LandmarkCount; i++)
+                    CvInvoke.Circle(render, P(i), 3, L(i)[3] < 0.5f ? faint : joint, -1);
+                int visible = pose.Landmarks.Count(p => p[3] >= 0.5f);
+                demo.Rows.Add(new ResultRow("Person", $"{visible} of 33 landmarks visible", pose.Presence));
             }
-            finally { _backend.IsEnabled = true; _variant.IsEnabled = true; }
+            if (poses.Count == 0)
+                demo.Rows.Add(new ResultRow("No person found", ""));
+            return demo;
         }
     }
 }

@@ -61,47 +61,46 @@ namespace Maui.Demo.Lite
             _detector = null;
         }
 
-        protected override async Task<DemoResult> RunAsync(Mat input)
+        protected override bool SupportsLiveCamera => true;
+
+        protected override string AnalyzingText => "Finding hands...";
+
+        protected override void SetOptionsEnabled(bool enabled) => _backend.IsEnabled = enabled;
+
+        protected override async Task PrepareAsync()
         {
-            _backend.IsEnabled = false;
-            try
+            _detector ??= DetectorFactory.Hand();
+            await _detector.PrepareAsync(_backend.SelectedIndex == 1, CpuThreadSettings.Count, ShowProgress, CancellationToken.None);
+        }
+
+        protected override DemoResult Analyze(Mat input, Mat render)
+        {
+            Stopwatch watch = Stopwatch.StartNew();
+            var hands = _detector.Detect(input);
+            watch.Stop();
+            DemoResult demo = new DemoResult
             {
-                _detector ??= DetectorFactory.Hand();
-                await _detector.PrepareAsync(_backend.SelectedIndex == 1, CpuThreadSettings.Count, ShowProgress, CancellationToken.None);
-                ShowProgress("Finding hands...");
-                return await Task.Run(() =>
-                {
-                    Stopwatch watch = Stopwatch.StartNew();
-                    var hands = _detector.Detect(input);
-                    watch.Stop();
-                    Mat render = input.Clone();
-                    DemoResult demo = new DemoResult
-                    {
-                        Annotated = render,
-                        Summary = $"LiteRT {_detector.Backend} · {watch.ElapsedMilliseconds} ms" + (_detector.GpuFailure != null ? " · GPU unavailable, using CPU" : "")
-                    };
-                    MCvScalar bone = new MCvScalar(247, 123, 61), joint = new MCvScalar(255, 255, 255);
-                    foreach (Hand hand in hands)
-                    {
-                        System.Drawing.Point P(int i) => new System.Drawing.Point((int)(hand.Landmarks[i][0] * render.Width), (int)(hand.Landmarks[i][1] * render.Height));
-                        foreach (int[] b in Bones)
-                            CvInvoke.Line(render, P(b[0]), P(b[1]), bone, 2);
-                        for (int i = 0; i < HandTracker.LandmarkCount; i++)
-                            CvInvoke.Circle(render, P(i), 3, joint, -1);
-                        string name = hand.Gesture == "None" ? "no gesture" : hand.Gesture.Replace('_', ' ');
-                        // The label with a dark outline, so it can be read over any photo.
-                        var at = new System.Drawing.Point(Math.Max(4, P(0).X - 60), Math.Min(render.Height - 8, P(0).Y + 24));
-                        string label = $"{name} {hand.GestureScore * 100:0}%";
-                        CvInvoke.PutText(render, label, at, FontFace.HersheyDuplex, 0.6, new MCvScalar(0, 0, 0), 3);
-                        CvInvoke.PutText(render, label, at, FontFace.HersheyDuplex, 0.6, new MCvScalar(255, 255, 255), 1);
-                        demo.Rows.Add(new ResultRow(name, $"{hand.GestureScore * 100:0}% · {hand.Handedness.ToLowerInvariant()} hand", hand.GestureScore));
-                    }
-                    if (hands.Count == 0)
-                        demo.Rows.Add(new ResultRow("No hand found", ""));
-                    return demo;
-                });
+                Summary = $"LiteRT {_detector.Backend} · {watch.ElapsedMilliseconds} ms" + (_detector.GpuFailure != null ? " · GPU unavailable, using CPU" : "")
+            };
+            MCvScalar bone = new MCvScalar(247, 123, 61), joint = new MCvScalar(255, 255, 255);
+            foreach (Hand hand in hands)
+            {
+                System.Drawing.Point P(int i) => new System.Drawing.Point((int)(hand.Landmarks[i][0] * render.Width), (int)(hand.Landmarks[i][1] * render.Height));
+                foreach (int[] b in Bones)
+                    CvInvoke.Line(render, P(b[0]), P(b[1]), bone, 2);
+                for (int i = 0; i < HandTracker.LandmarkCount; i++)
+                    CvInvoke.Circle(render, P(i), 3, joint, -1);
+                string name = hand.Gesture == "None" ? "no gesture" : hand.Gesture.Replace('_', ' ');
+                // The label with a dark outline, so it can be read over any photo.
+                var at = new System.Drawing.Point(Math.Max(4, P(0).X - 60), Math.Min(render.Height - 8, P(0).Y + 24));
+                string label = $"{name} {hand.GestureScore * 100:0}%";
+                CvInvoke.PutText(render, label, at, FontFace.HersheyDuplex, 0.6, new MCvScalar(0, 0, 0), 3);
+                CvInvoke.PutText(render, label, at, FontFace.HersheyDuplex, 0.6, new MCvScalar(255, 255, 255), 1);
+                demo.Rows.Add(new ResultRow(name, $"{hand.GestureScore * 100:0}% · {hand.Handedness.ToLowerInvariant()} hand", hand.GestureScore));
             }
-            finally { _backend.IsEnabled = true; }
+            if (hands.Count == 0)
+                demo.Rows.Add(new ResultRow("No hand found", ""));
+            return demo;
         }
     }
 }

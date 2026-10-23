@@ -291,24 +291,8 @@ public partial class LiteRtLmChatPage
     private void CameraDisplayChanged(object sender, DisplayInfoChangedEventArgs e) => UpdateCameraRotation();
     private void UpdateCameraRotation()
     {
-#if ANDROID
-        var manager = (Android.Hardware.Camera2.CameraManager)Android.App.Application.Context.GetSystemService(Android.Content.Context.CameraService);
-        string id = LiveCamera.FindCameraId(_cameraFront) ?? manager.GetCameraIdList().FirstOrDefault();
-        if (id != null)
-        {
-            using var characteristics = manager.GetCameraCharacteristics(id);
-            int sensor = ((Java.Lang.Integer)characteristics.Get(Android.Hardware.Camera2.CameraCharacteristics.SensorOrientation)).IntValue();
-            int display = DeviceDisplay.Current.MainDisplayInfo.Rotation switch
-            {
-                DisplayRotation.Rotation90 => 90,
-                DisplayRotation.Rotation180 => 180,
-                DisplayRotation.Rotation270 => 270,
-                _ => 0
-            };
-            // Android's rotation compensation: a front camera turns the other way.
-            _cameraRotation = _cameraFront ? (sensor + display) % 360 : (sensor - display + 360) % 360;
-        }
-#endif
+        int? rotation = LiveCamera.FrameRotation(_cameraFront);
+        if (rotation != null) _cameraRotation = rotation.Value;
     }
 
     private async void CameraWindowStopped(object sender, EventArgs e)

@@ -65,7 +65,16 @@ namespace Maui.Demo.Lite
             _delegateApplied = false;
         }
 
-        protected override async Task<DemoResult> RunAsync(Mat input)
+        protected override bool SupportsLiveCamera => true;
+
+        // A classifier: the list is the result; live frames get the top labels drawn on them.
+        protected override bool DrawsOnPhoto => false;
+
+        protected override string AnalyzingText => "Classifying...";
+
+        protected override void SetOptionsEnabled(bool enabled) => _picker.IsEnabled = enabled;
+
+        protected override async Task PrepareAsync()
         {
             if (_mobilenet == null)
             {
@@ -84,22 +93,34 @@ namespace Maui.Demo.Lite
                     _mobilenet.Interpreter.ModifyGraphWithDelegate(TfLiteInvoke.DefaultGpuDelegateV2);
                 _delegateApplied = true;
             }
+        }
 
-            ShowProgress("Classifying...");
-            Mobilenet model = _mobilenet;
-            (Mobilenet.RecognitionResult[] result, long ms) = await Task.Run(() =>
-            {
-                model.WriteInput(input);
-                Stopwatch watch = Stopwatch.StartNew();
-                var r = model.Invoke();
-                watch.Stop();
-                return (r, watch.ElapsedMilliseconds);
-            });
+        protected override DemoResult Analyze(Mat input, Mat render)
+        {
+            _mobilenet.WriteInput(input);
+            Stopwatch watch = Stopwatch.StartNew();
+            Mobilenet.RecognitionResult[] result = _mobilenet.Invoke();
+            watch.Stop();
 
-            DemoResult demo = new DemoResult { Summary = $"Recognized in {ms} ms" };
+            DemoResult demo = new DemoResult { Summary = $"Recognized in {watch.ElapsedMilliseconds} ms" };
             foreach (var r in result.Take(5))
                 demo.Rows.Add(new ResultRow(r.Label, $"{r.Probability * 100:0.#}%", r.Probability));
+            DrawLabels(render, result.Take(3).Select(r => (r.Label, r.Probability)));
             return demo;
+        }
+
+        // The top labels at the top of a live frame, outlined so they can be read over any picture.
+        internal static void DrawLabels(Mat render, IEnumerable<(string Label, double Probability)> top)
+        {
+            int y = 28;
+            foreach (var (label, probability) in top)
+            {
+                string text = $"{label} {probability * 100:0}%";
+                var at = new System.Drawing.Point(10, y);
+                CvInvoke.PutText(render, text, at, FontFace.HersheyDuplex, 0.7, new Emgu.CV.Structure.MCvScalar(0, 0, 0), 4);
+                CvInvoke.PutText(render, text, at, FontFace.HersheyDuplex, 0.7, new Emgu.CV.Structure.MCvScalar(255, 255, 255), 1);
+                y += 28;
+            }
         }
     }
 }

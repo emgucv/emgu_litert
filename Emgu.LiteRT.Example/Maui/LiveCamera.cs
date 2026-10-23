@@ -24,6 +24,34 @@ internal sealed partial class LiveCamera
     public Func<int> RotationDegrees;
     /// <summary>The selfie camera instead of the back one (Android, Camera2 only); set before <see cref="StartAsync"/>.</summary>
     public bool Front { get; init; }
+    // Frames larger than this (on the long side) are scaled down: the detectors work at 192-640 px anyway.
+    private const int MaxFrameSide = 960;
+
+    /// <summary>
+    /// How far to turn the camera's frames so they are upright on the display as it is now (for
+    /// <see cref="RotationDegrees"/>); null where the frames need no turning (only Android's cameras do).
+    /// </summary>
+    public static int? FrameRotation(bool front)
+    {
+#if ANDROID
+        var manager = (Android.Hardware.Camera2.CameraManager)Android.App.Application.Context.GetSystemService(Android.Content.Context.CameraService);
+        string id = FindCameraId(front) ?? manager.GetCameraIdList().FirstOrDefault();
+        if (id == null) return null;
+        using var characteristics = manager.GetCameraCharacteristics(id);
+        int sensor = ((Java.Lang.Integer)characteristics.Get(Android.Hardware.Camera2.CameraCharacteristics.SensorOrientation)).IntValue();
+        int display = DeviceDisplay.Current.MainDisplayInfo.Rotation switch
+        {
+            DisplayRotation.Rotation90 => 90,
+            DisplayRotation.Rotation180 => 180,
+            DisplayRotation.Rotation270 => 270,
+            _ => 0
+        };
+        // Android's rotation compensation: a front camera turns the other way.
+        return front ? (sensor + display) % 360 : (sensor - display + 360) % 360;
+#else
+        return null;
+#endif
+    }
 
     public async Task StartAsync(CancellationToken token)
     {
@@ -82,8 +110,14 @@ internal sealed partial class LiveCamera
             );
 #endif
             if (!capture.IsOpened) throw new InvalidOperationException("No camera could be opened. Check that a camera is connected and available to this app.");
+#if !MACCATALYST && !IOS
             capture.Set(CapProp.FrameWidth, 640);
             capture.Set(CapProp.FrameHeight, 480);
+#endif
+            // On Mac Catalyst OpenCV's AVFoundation backend applies a size it is given as the output's video settings,
+            // and AVFoundation throws an Objective-C exception - which ends the app - when that is larger than the
+            // camera's active format (it was, for a Logitech StreamCam). So the camera's own size is kept there, and
+            // large frames are scaled down below.
 #if ANDROID
             // OpenCV's Android camera backend defaults to raw NV21/YV12, not a displayable BGR image.
             if (!capture.Set(CapProp.FourCC, VideoWriter.Fourcc('B', 'G', 'R', '3')))
@@ -91,18 +125,36 @@ internal sealed partial class LiveCamera
 #endif
             using var frame = new Mat();
             using var rotated = new Mat();
+            using var smaller = new Mat();
+            long opened = Stopwatch.GetTimestamp();
             while (!_stop.IsCancellationRequested)
             {
                 long started = Stopwatch.GetTimestamp();
                 // A request registered after this point must wait for the next frame, not receive an older preview.
                 TaskCompletionSource<byte[]> request;
                 lock (_gate) request = _snapshot;
-                if (!capture.Read(frame) || frame.IsEmpty) throw new InvalidOperationException("The camera stopped delivering frames.");
+                if (!capture.Read(frame) || frame.IsEmpty)
+                {
+                    // AVFoundation (Mac Catalyst) starts the camera asynchronously: the first reads can come back empty.
+                    if (!_ready.Task.IsCompleted && Stopwatch.GetElapsedTime(opened) < TimeSpan.FromSeconds(3))
+                    {
+                        await Task.Delay(50, _stop.Token);
+                        continue;
+                    }
+                    throw new InvalidOperationException(_ready.Task.IsCompleted ? "The camera stopped delivering frames." : "The camera delivered no frames.");
+                }
                 Mat image = frame;
+                int longest = Math.Max(frame.Width, frame.Height);
+                if (longest > MaxFrameSide)
+                {
+                    double scale = (double)MaxFrameSide / longest;
+                    CvInvoke.Resize(frame, smaller, new System.Drawing.Size((int)(frame.Width * scale), (int)(frame.Height * scale)), 0, 0, Inter.Area);
+                    image = smaller;
+                }
                 int rotation = RotationDegrees?.Invoke() ?? 0;
                 if (rotation != 0)
                 {
-                    CvInvoke.Rotate(frame, rotated, rotation == 90 ? RotateFlags.Rotate90Clockwise :
+                    CvInvoke.Rotate(image, rotated, rotation == 90 ? RotateFlags.Rotate90Clockwise :
                         rotation == 180 ? RotateFlags.Rotate180 : RotateFlags.Rotate90CounterClockwise);
                     image = rotated;
                 }

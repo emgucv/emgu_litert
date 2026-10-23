@@ -59,41 +59,42 @@ namespace Maui.Demo.Lite
             _detector = null;
         }
 
-        protected override async Task<DemoResult> RunAsync(Mat input)
-        {
-            _backend.IsEnabled = false;
-            try
-            {
-                _detector ??= _usePicoDet ? DetectorFactory.PicoDet() : _useDFine ? DetectorFactory.DFine() : _useYoloX ? DetectorFactory.YoloX() : DetectorFactory.Coco();
-                await _detector.PrepareAsync(_backend.SelectedIndex == 1, CpuThreadSettings.Count,
-                    ShowProgress, CancellationToken.None);
-                ShowProgress("Detecting objects...");
-                return await Task.Run(() =>
-                {
-                    Stopwatch watch = Stopwatch.StartNew();
-                    var result = _detector.Detect(input).Where(r => r.Score >= 0.5f).ToArray();
-                    watch.Stop();
+        // D-FINE takes a few times longer than the others: single photos only.
+        protected override bool SupportsLiveCamera => !_useDFine;
 
-                    Mat render = input.Clone();
-                    DemoResult demo = new DemoResult { Annotated = render, Summary = $"LiteRT {_detector.Backend} · {watch.ElapsedMilliseconds} ms" +
-                        (_detector.GpuFailure != null ? " · GPU unavailable, using CPU" : "") };
-                    MCvScalar color = new MCvScalar(247, 123, 61);
-                    foreach (var r in result.OrderByDescending(x => x.Score))
-                    {
-                        demo.Rows.Add(new ResultRow(r.Label, $"{r.Score * 100:0}%", r.Score));
-                        if (r.Rectangle == null)
-                            continue;
-                        float[] rects = NativeImageIO.ScaleLocation(r.Rectangle, render.Width, render.Height);
-                        System.Drawing.RectangleF rect = new System.Drawing.RectangleF(
-                            rects[0], rects[1], rects[2] - rects[0], rects[3] - rects[1]);
-                        CvInvoke.Rectangle(render, System.Drawing.Rectangle.Round(rect), color, 2);
-                        CvInvoke.PutText(render, $"{r.Label} {r.Score * 100:0}%", System.Drawing.Point.Round(rect.Location),
-                            FontFace.HersheyDuplex, _useYoloX || _useDFine || _usePicoDet ? 0.45 : 0.8, color, _useYoloX || _useDFine || _usePicoDet ? 1 : 2);
-                    }
-                    return demo;
-                });
+        protected override string AnalyzingText => "Detecting objects...";
+
+        protected override void SetOptionsEnabled(bool enabled) => _backend.IsEnabled = enabled;
+
+        protected override async Task PrepareAsync()
+        {
+            _detector ??= _usePicoDet ? DetectorFactory.PicoDet() : _useDFine ? DetectorFactory.DFine() : _useYoloX ? DetectorFactory.YoloX() : DetectorFactory.Coco();
+            await _detector.PrepareAsync(_backend.SelectedIndex == 1, CpuThreadSettings.Count, ShowProgress, CancellationToken.None);
+        }
+
+        protected override DemoResult Analyze(Mat input, Mat render)
+        {
+            Stopwatch watch = Stopwatch.StartNew();
+            var result = _detector.Detect(input).Where(r => r.Score >= 0.5f).ToArray();
+            watch.Stop();
+
+            DemoResult demo = new DemoResult { Summary = $"LiteRT {_detector.Backend} · {watch.ElapsedMilliseconds} ms" +
+                (_detector.GpuFailure != null ? " · GPU unavailable, using CPU" : "") };
+            MCvScalar color = new MCvScalar(247, 123, 61);
+            bool small = _useYoloX || _useDFine || _usePicoDet;
+            foreach (var r in result.OrderByDescending(x => x.Score))
+            {
+                demo.Rows.Add(new ResultRow(r.Label, $"{r.Score * 100:0}%", r.Score));
+                if (r.Rectangle == null)
+                    continue;
+                float[] rects = NativeImageIO.ScaleLocation(r.Rectangle, render.Width, render.Height);
+                System.Drawing.RectangleF rect = new System.Drawing.RectangleF(
+                    rects[0], rects[1], rects[2] - rects[0], rects[3] - rects[1]);
+                CvInvoke.Rectangle(render, System.Drawing.Rectangle.Round(rect), color, 2);
+                CvInvoke.PutText(render, $"{r.Label} {r.Score * 100:0}%", System.Drawing.Point.Round(rect.Location),
+                    FontFace.HersheyDuplex, small ? 0.45 : 0.8, color, small ? 1 : 2);
             }
-            finally { _backend.IsEnabled = true; }
+            return demo;
         }
     }
 }
