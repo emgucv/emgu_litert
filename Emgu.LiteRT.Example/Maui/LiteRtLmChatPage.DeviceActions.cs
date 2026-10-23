@@ -159,12 +159,7 @@ public partial class LiteRtLmChatPage
             Content = content
         };
         SemanticProperties.SetDescription(card.View, request.Title + ": " + string.Join(", ", request.Details));
-        int index = bubble != null ? _transcript.Children.IndexOf(bubble.Row) : -1;
-        if (index < 0)
-            _transcript.Children.Add(card.View);
-        else
-            _transcript.Children.Insert(index, card.View);
-        ScrollToEnd();
+        AddCard(bubble, card.View);
         return card;
     }
 }

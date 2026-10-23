@@ -383,14 +383,7 @@ namespace Maui.Demo.Lite
                 Children = { tile.Frame, tile.Stage }
             };
             SemanticProperties.SetDescription(tile.View, "Picture of " + prompt);
-            int index = bubble != null ? _transcript.Children.IndexOf(bubble.Row) : -1;
-            if (_transcript.Children.Contains(_emptyLabel))
-                _transcript.Children.Remove(_emptyLabel);
-            if (index < 0)
-                _transcript.Children.Add(tile.View);
-            else
-                _transcript.Children.Insert(index, tile.View);
-            ScrollToEnd();
+            AddCard(bubble, tile.View);
             return tile;
         }
 
@@ -410,9 +403,10 @@ namespace Maui.Demo.Lite
         }
 
         // A saved chat's picture, above the saved reply.
-        private void AddSavedGeneratedImage(byte[] png)
+        // A picture a saved reply drew, above it again when the chat is reopened.
+        private void AddSavedGeneratedImage(StreamingBubble bubble, byte[] png)
         {
-            ImageTile tile = AddImageTile(null, string.Empty);
+            ImageTile tile = AddImageTile(bubble, string.Empty);
             ShowGeneratedImage(tile, png, string.Empty);
             tile.Stage.IsVisible = false;
         }

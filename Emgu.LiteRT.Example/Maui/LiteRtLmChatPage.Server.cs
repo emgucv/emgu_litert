@@ -369,9 +369,10 @@ public partial class LiteRtLmChatPage
         _loadedContextTokens = 0;
         _modelChipLabel.Text = ServerModelLabel;
         RefreshModelList();
-        // A conversation in progress (another model before, or the server reconnected) is given to the server.
-        if (_historyItems.Count > 0 || _summary != null)
-            _needsPrime = true;
+        // A conversation in progress (another model before, or the server reconnected) is given to the server, through a
+        // new client for it.
+        ResetAgent();
+        _rereadNext = ChatMessages.Any();
         ClearLoading(option.Choice);
         HideLoadCard();
         UpdateMemoryLabel();

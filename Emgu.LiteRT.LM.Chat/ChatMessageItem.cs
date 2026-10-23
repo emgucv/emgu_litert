@@ -152,6 +152,7 @@ namespace Emgu.LiteRT.LM.Chat
         private object _tag;
         private bool _startsContext;
         private string _context;
+        private readonly List<DataContent> _attachments;
 
         /// <summary>
         /// Create a message, e.g. to restore a saved conversation with <see cref="ChatConversation.Load"/>.
@@ -165,7 +166,10 @@ namespace Emgu.LiteRT.LM.Chat
             Role = role;
             _text = text ?? string.Empty;
             _context = context;
-            Attachments = new List<DataContent>(attachments ?? Array.Empty<DataContent>()).AsReadOnly();
+            _attachments = new List<DataContent>(attachments ?? Array.Empty<DataContent>());
+            Attachments = _attachments.AsReadOnly();
+            Steps.CollectionChanged += (s, e) => Raise(nameof(HasSteps));
+            Decorations.CollectionChanged += (s, e) => Raise(nameof(HasDecorations));
             _state = ChatMessageState.Done;
         }
 
@@ -224,6 +228,12 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>True if the message has attachments.</summary>
         public bool HasAttachments => Attachments.Count > 0;
 
+        /// <summary>True if the reply has step lines (e.g. to hide an empty list in a template).</summary>
+        public bool HasSteps => Steps.Count > 0;
+
+        /// <summary>True if the message has decorations (e.g. to hide an empty list in a template).</summary>
+        public bool HasDecorations => Decorations.Count > 0;
+
         /// <summary>True while the reply is being written.</summary>
         public bool IsStreaming => _state == ChatMessageState.Streaming;
 
@@ -255,6 +265,20 @@ namespace Emgu.LiteRT.LM.Chat
 
         /// <summary>A user message's images and audio.</summary>
         public IReadOnlyList<DataContent> Attachments { get; }
+
+        /// <summary>
+        /// Add an attachment to a message after it was sent - e.g. camera frames a tool took while the reply was written -
+        /// so the model is given it with the conversation from now on. (A UI bound to <see cref="Attachments"/> isn't told.)
+        /// </summary>
+        /// <param name="attachment">The image or audio</param>
+        public void AddAttachment(DataContent attachment)
+        {
+            if (attachment == null)
+                return;
+            _attachments.Add(attachment);
+            Tokens = -1;
+            Raise(nameof(HasAttachments));
+        }
 
         /// <summary>Text given to the model before a user message's text (e.g. document excerpts), not shown in the transcript; or null.</summary>
         public string Context

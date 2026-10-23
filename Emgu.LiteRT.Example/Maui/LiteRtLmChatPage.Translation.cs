@@ -41,7 +41,7 @@ public partial class LiteRtLmChatPage
     // only after this check does the row appear.
     private async Task CheckThinkingLanguageAsync(StreamingBubble bubble)
     {
-        string thinking = bubble.Reply?.Thinking;
+        string thinking = bubble.Thinking;
         if (bubble.TargetLanguage == null || string.IsNullOrEmpty(thinking))
             return;
         string sample = thinking.Length > 600 ? thinking.Substring(0, 600) : thinking;
@@ -51,14 +51,21 @@ public partial class LiteRtLmChatPage
             if (language == bubble.TargetLanguage && bubble.Translation == null)
                 bubble.TargetLanguage = null;
             bubble.TranslateReady = true;
-            ShowThinking(bubble);
+            ShowTranslation(bubble);
         });
     }
 
-    // The line above an opened thinking: translate it, or switch between the translation and the English.
-    private void ShowTranslateRow(StreamingBubble bubble, bool expanded)
+    // The thinking shown (the translation or the English) and the row above it, which the ThinkingView shows while the
+    // thinking is open: translate it, or switch between the translation and the English.
+    private void ShowTranslation(StreamingBubble bubble)
     {
-        bool offer = expanded && bubble.TranslateReady && bubble.TargetLanguage != null && !string.IsNullOrEmpty(bubble.Reply?.Thinking);
+        ShowTranslateRow(bubble);
+        bubble.Refresh();
+    }
+
+    private void ShowTranslateRow(StreamingBubble bubble)
+    {
+        bool offer = bubble.TranslateReady && bubble.TargetLanguage != null && !string.IsNullOrEmpty(bubble.Thinking);
         bubble.TranslateRow.IsVisible = offer;
         if (bubble.TargetLanguage == null)
             return;
@@ -77,7 +84,7 @@ public partial class LiteRtLmChatPage
         if (bubble.Translation != null)
         {
             bubble.ShowTranslation = !bubble.ShowTranslation;
-            ShowThinking(bubble);
+            ShowTranslation(bubble);
             return;
         }
         if (_busy || _reloadingCpuThreads)
@@ -90,10 +97,10 @@ public partial class LiteRtLmChatPage
             SetStatus("Load the model first.");
             return;
         }
-        string thinking = bubble.Reply?.Thinking;
+        string thinking = bubble.Thinking;
         string language = bubble.TargetLanguage;
         bubble.Translating = true;
-        ShowThinking(bubble);
+        ShowTranslation(bubble);
         SetBusy(true);
         SetStatus("Translating the thinking...");
         try
@@ -113,13 +120,13 @@ public partial class LiteRtLmChatPage
         {
             bubble.Translating = false;
             SetBusy(false);
-            ShowThinking(bubble);
+            ShowTranslation(bubble);
         }
     }
 
-    // Translate a text with the model, in conversations of their own - one per piece if it is long, since the window is
-    // small. The chat's and the agent's own conversations are released first (as for a summary) and given the conversation
-    // again with the next message.
+    // Translate a text with the model, in requests of their own - one per piece if it is long, since the window is small.
+    // The conversation's client takes them as new conversations (as for a summary) and is given the chat again with the
+    // next message.
     private async Task<string> TranslateTextAsync(string text, string language)
     {
         string name = LanguageName(language, true);
@@ -137,28 +144,13 @@ public partial class LiteRtLmChatPage
                 result.Append(result.Length > 0 ? "\n\n" : "").Append(await SummarizeOnServerAsync(Prompt(piece)));
             return result.ToString();
         }
-        LanguageModel model = _model;
-        ResetAgent();
-        _chat?.LoadHistory(Array.Empty<Emgu.LiteRT.LM.Models.ChatMessage>());
-        _needsPrime = true;
         foreach (string piece in pieces)
         {
-            Chat translator = model.CreateChat();
-            try
-            {
-                // A language can need more tokens than the English (Hindi, Thai: about three times).
-                translator.MaxOutputTokens = Math.Max(256, Math.Min(ContextWindow - pieceTokens - 200, pieceTokens * 3));
-                translator.EnableThinking = false;
-                ChatReply reply = await translator.SendAsync(Prompt(piece));
-                string translated = reply.Text.Trim();
-                if (translated.Length == 0)
-                    throw new Exception("The translation is empty");
-                result.Append(result.Length > 0 ? "\n\n" : "").Append(translated);
-            }
-            finally
-            {
-                await Task.Run(() => translator.Dispose());
-            }
+            // A language can need more tokens than the English (Hindi, Thai: about three times).
+            string translated = await AskModelOnceAsync(Prompt(piece), Math.Max(256, Math.Min(ContextWindow - pieceTokens - 200, pieceTokens * 3)));
+            if (translated.Length == 0)
+                throw new Exception("The translation is empty");
+            result.Append(result.Length > 0 ? "\n\n" : "").Append(translated);
         }
         return result.ToString();
     }

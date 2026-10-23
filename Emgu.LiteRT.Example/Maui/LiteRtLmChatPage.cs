@@ -16,6 +16,7 @@ using Emgu.LiteRT.Util;
 using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Chat;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
@@ -166,9 +167,6 @@ namespace Maui.Demo.Lite
         private readonly Border _newChatButton;
         private readonly HorizontalStackLayout _toggleRow;
         private readonly ToggleChip _thinkingSwitch;
-        private readonly VerticalStackLayout _transcript;
-        private readonly Label _emptyLabel;
-        private readonly ScrollView _scroll;
         private readonly Label _statusLabel;
         private readonly Editor _promptEditor;
         private readonly Button _sendButton;
@@ -209,12 +207,11 @@ namespace Maui.Demo.Lite
         private readonly Switch _memorySwitch;
         private readonly Label _memoryCountLabel;
         private string _tavilyKey = string.Empty;
+        // The model's (or the server's) client with function invocation, which _conversation reaches through
+        // _clientProxy; made again for another model or backend, while the conversation goes on.
         private IChatClient _chatClient;
-        private ChatClientAgent _agent;
-        private AgentSession _session;
 
         private LanguageModel _model;
-        private Chat _chat;
         private ModelChoice? _loaded;
         // GPU (Android): whether the loaded model runs on it, whether the one loading will, and whether it failed to
         // load there (then the CPU is used for the rest of the session).
@@ -236,63 +233,105 @@ namespace Maui.Demo.Lite
         private bool _updatingContextChips;
         private bool _gpuUnavailable;
 
-        // Saved chats (ChatStore, SQLite): the current chat's id once its first exchange is saved, and its messages,
-        // used to give the model the earlier conversation when a saved chat is opened (or the agent's tools change).
+        // Saved chats (ChatStore, SQLite): the current chat's id once its first exchange is saved.
         private const string HistoryIconPath = "M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z";
         private readonly ChatStore _store = new ChatStore();
         private int? _conversationId;
-        private readonly List<HistoryItem> _historyItems = new List<HistoryItem>();
-        private List<AIChatMessage> _agentPrimeHistory;
-        private readonly List<string> _sendSteps = new List<string>();
         private readonly Border _historyButton;
         private readonly VerticalStackLayout _sideChatList;
 
-        // A message of the current chat, as given to the model.
-        private sealed class HistoryItem
+        // The conversation (Emgu.LiteRT.LM.Chat's ChatConversation): its messages - shown by _chatView, Emgu.LiteRT.LM.Maui's
+        // ChatView with the demo's templates (ChatTemplates.xaml) - streaming the replies, and keeping what the model is
+        // given within its context window: before a message that would make it too long, the earlier messages are
+        // summarized by the model (CanSummarize) or dropped, and the model continues from the summary and the latest
+        // messages, while the transcript keeps everything. Sizes are estimates (the model's tokenizer, plus measured costs
+        // of images, audio and tool calls - the conversation's defaults).
+        private readonly ChatView _chatView;
+        private readonly PageChatClient _clientProxy;
+        private readonly ChatConversation _conversation;
+        // The model reads the whole conversation with the next message (a reopened chat, after compacting, or a model
+        // loaded again): the status says so.
+        private bool _rereadNext;
+
+        // The page's own data for a user message, in its ChatMessageItem.Tag (the demo's message template binds to it).
+        private sealed class UserMessageInfo : System.ComponentModel.INotifyPropertyChanged
         {
-            public string Role;
-            public string Text;
-            // A user message's language (two-letter code), or null (LiteRtLmChatPage.Translation.cs).
+            private string _transcript;
+            private bool _transcribing;
+            private string _dividerText;
+
+            // Its language (two-letter code), or null (LiteRtLmChatPage.Translation.cs).
             public string Language;
-            // The words of a voice message the model was given as audio (written down by the platform's speech recognizer
-            // for the transcript, not given to the model), and the task that is writing them down.
-            public string Transcript;
-            public Task TranscriptTask;
-            // Given to the model before the text of a user message: excerpts of the attached document (or null).
-            public string Context;
-            public string ModelText => string.IsNullOrEmpty(Context) ? Text : Context + Text;
-            public List<(string Kind, string MediaType, byte[] Data)> Attachments = new List<(string, string, byte[])>();
             // Its id in the ChatStore (0 if not saved).
             public int MessageId;
-            // Its size in the model's context (estimated, see EstimateTokens), or -1 until counted; ExtraTokens is
-            // what the model's own conversation holds on top until it is rebuilt: the reply's thinking, tool calls
-            // and their results.
-            public int Tokens = -1;
-            public int ExtraTokens;
-            // A user message's first view in the transcript, to put a compaction divider above it.
-            public View View;
+            // The task writing down the words of a voice message (LiteRtLmChatPage.Transcript.cs).
+            public Task TranscriptTask;
+
+            // The words of a voice message the model was given as audio, written down by the platform's speech recognizer
+            // for the transcript (not given to the model).
+            public string Transcript
+            {
+                get => _transcript;
+                set { _transcript = value; Raise(nameof(TranscriptText)); Raise(nameof(HasTranscript)); }
+            }
+
+            public bool Transcribing
+            {
+                get => _transcribing;
+                set { _transcribing = value; Raise(nameof(TranscriptText)); Raise(nameof(HasTranscript)); }
+            }
+
+            public string TranscriptText => !string.IsNullOrWhiteSpace(_transcript) ? "\u201C" + _transcript.Trim() + "\u201D"
+                : _transcribing ? "Writing down what you said..." : string.Empty;
+
+            public bool HasTranscript => !string.IsNullOrWhiteSpace(_transcript) || _transcribing;
+
+            // Above the first message the model still sees after compacting: whether the earlier ones were summarized.
+            public string DividerText
+            {
+                get => _dividerText ?? "Earlier messages summarized \u00B7 tap to read";
+                set { _dividerText = value; Raise(nameof(DividerText)); }
+            }
+
+            public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+
+            private void Raise(string name) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
         }
 
-        // Context window: a chat that outgrows it fails ("Input token ids are too long"), so before a message is sent
-        // that would make it too long, the earlier messages are summarized by the model (CanSummarize) or dropped, and
-        // the model continues from the summary and the latest messages. The transcript keeps everything. Sizes are
-        // estimates: text is counted with the model's tokenizer, plus measured costs of images and audio.
-        private const int ReplyReserveTokens = 1024;      // room left for the reply
-        private const int ChatOverheadTokens = 50;        // chat template
-        private const int AgentOverheadTokens = 900;      // the agent's instructions, tool definitions and memories
-        private const int MessageOverheadTokens = 8;      // per message (role markers)
-        private const int ImageTokens = 270;              // measured: Gemma 4 and Qwen3.5 VL, 1024x1024 image
-        private const int AudioTokensPerSecond = 25;      // measured: Gemma 4
-        private const int ToolStepTokens = 450;           // a tool call and its (truncated) result
+        // The conversation's client: forwards to the current model's or server's client (_chatClient), which is made again
+        // when the model is reloaded or changed - the conversation and its messages stay.
+        private sealed class PageChatClient : IChatClient
+        {
+            private readonly Func<IChatClient> _current;
+
+            public PageChatClient(Func<IChatClient> current)
+            {
+                _current = current;
+            }
+
+            public Task<ChatResponse> GetResponseAsync(IEnumerable<AIChatMessage> messages, ChatOptions options = null,
+                CancellationToken cancellationToken = default)
+                => _current().GetResponseAsync(messages, options, cancellationToken);
+
+            public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<AIChatMessage> messages,
+                ChatOptions options = null, CancellationToken cancellationToken = default)
+                => _current().GetStreamingResponseAsync(messages, options, cancellationToken);
+
+            public object GetService(Type serviceType, object serviceKey = null) => null;
+
+            public void Dispose()
+            {
+            }
+        }
+
+        // The messages of the chat (not the page's notices).
+        private IEnumerable<ChatMessageItem> ChatMessages => _conversation.Messages.Where(m => m.Role != ChatMessageRole.Notice);
+
+        // Room for what the model's conversation holds besides the messages: the chat template, or the agent's
+        // instructions, tool definitions and memories (LiteRtLmChatClient budgets the real sizes when it sends).
+        private const int ChatOverheadTokens = 50;
+        private const int AgentOverheadTokens = 900;
         private const int SummaryMaxTokens = 400;
-        private const string SummaryIntro = "Here is a summary of our conversation so far:\n";
-        private const string SummaryAcknowledgement = "Thanks, I have the summary and will continue from there.";
-        // The first message of _historyItems the model sees; the ones before it are covered by _summary (if any).
-        private int _contextStart;
-        private string _summary;
-        private int _summaryTokens;
-        // The model has to be given the conversation again (after compacting, or when a saved chat is opened).
-        private bool _needsPrime;
         private readonly Label _memoryLabel;
         private readonly Label _compactButton;
 
@@ -683,17 +722,17 @@ namespace Maui.Demo.Lite
                 }
             };
 
-            _emptyLabel = new Label
+            // The transcript: the conversation's messages in Emgu.LiteRT.LM.Maui's ChatView, with the demo's templates
+            // (ChatTemplates.xaml: its ChatViewTemplate has only the transcript - the page has its own message box).
+            _clientProxy = new PageChatClient(() => EnsureClient());
+            _conversation = new ChatConversation(_clientProxy)
             {
-                Text = "Ask anything - the model runs entirely on this device.",
-                FontFamily = Theme.BodyFont,
-                FontSize = 15,
-                HorizontalTextAlignment = TextAlignment.Center,
-                TextColor = Theme.SecondaryText,
-                Margin = new Thickness(24)
+                DescribeToolCall = call => McpStepFor(call) ?? AgentTools.Describe(call)
             };
-            _transcript = new VerticalStackLayout { Spacing = 10, Padding = new Thickness(4), Children = { _emptyLabel } };
-            _scroll = new ScrollView { Content = _transcript };
+            _conversation.Messages.CollectionChanged += OnConversationMessagesChanged;
+            _conversation.Compacted += OnConversationCompacted;
+            _conversation.Summarizing += (s, summarizing) => SetStatus(summarizing ? "Summarizing the earlier conversation..." : "Generating...");
+            _chatView = new ChatView { Conversation = _conversation };
 
             _statusLabel = new Label
             {
@@ -879,7 +918,7 @@ namespace Maui.Demo.Lite
             _loadCard.IsVisible = false;
             _loadCard.VerticalOptions = LayoutOptions.Start;
             _loadCard.Margin = new Thickness(0, 4, 0, 0);
-            _mainColumn.Add(new Grid { Children = { _scroll, _loadCard } }, 0, 1);
+            _mainColumn.Add(new Grid { Children = { _chatView, _loadCard } }, 0, 1);
             _mainColumn.Add(_statusLabel, 0, 2);
             _mainColumn.Add(composerCard, 0, 3);
             BuildCameraPanel();
@@ -1378,14 +1417,13 @@ namespace Maui.Demo.Lite
             }
 
             _model = model;
-            _chat = model.CreateChat();
-            _chat.EnableThinking = _thinkingSwitch.IsToggled && option.CanThink;
             _loaded = option.Choice;
             _loadedOnGpu = onGpu;
             _loadedContextTokens = contextTokens;
-            // Reloaded on another backend in the middle of a chat: the new engine is given the conversation.
-            if (_historyItems.Count > 0 || _summary != null)
-                _needsPrime = true;
+            // Reloaded on another backend in the middle of a chat: a new client for the new engine, which is given the
+            // conversation with the next message.
+            ResetAgent();
+            _rereadNext = ChatMessages.Any();
             if (_gpuUnavailable && WantsGpuSetting(option))
                 SetStatus("The GPU isn't available on this device - using the CPU.");
             ClearLoading(option.Choice);
@@ -1678,8 +1716,6 @@ namespace Maui.Demo.Lite
         private void OnThinkingToggled(object sender, ToggledEventArgs e)
         {
             try { Preferences.Default.Set(ThinkPreference, e.Value); } catch (Exception) { }
-            if (_chat != null)
-                _chat.EnableThinking = e.Value && SelectedOption.CanThink;
         }
 
         // ---------- Sending a message ----------
@@ -1712,7 +1748,6 @@ namespace Maui.Demo.Lite
         private async Task SendAsync(string prompt, List<PendingAttachment> attachments)
         {
             ClearCameraTurn();
-            _sendSteps.Clear();
             lock (_sendImages)
                 _sendImages.Clear();
             ClearWrittenDocuments();
@@ -1723,8 +1758,6 @@ namespace Maui.Demo.Lite
             // Cancelled when the user interrupts the reply (voice chat).
             CancellationTokenSource replyCancel = new CancellationTokenSource();
             _replyCancel = replyCancel;
-            _latestPartial = null;
-            bool interrupted = false;
             SetBusy(true);
             try
             {
@@ -1745,122 +1778,98 @@ namespace Maui.Demo.Lite
                 DocumentContext document = await GetDocumentContextAsync(prompt);
                 if (document?.Image != null)
                     attachments.Add(document.Image);
-                // Where a "summarized" divider goes if this message makes the chat compact.
-                int dividerIndex = _transcript.Children.Contains(_emptyLabel) ? 0 : _transcript.Children.Count;
                 // A voice message the model hears as audio gets its words written down for the transcript (the model doesn't
                 // see them), instead of just "Voice message".
                 bool transcribe = string.IsNullOrWhiteSpace(prompt) && SpeechToText.IsSupported && attachments.Any(IsVoiceRecording);
-                Label transcriptLabel = AddUserMessage(prompt, attachments, null, transcribe);
-                var userItem = new HistoryItem { Role = MessageRecord.UserRole, Text = prompt, Context = document?.Text };
-                userItem.Language = await TextLanguage.DetectAsync(prompt);
-                if (dividerIndex < _transcript.Children.Count)
-                    userItem.View = _transcript.Children[dividerIndex] as View;
-                foreach (PendingAttachment attachment in attachments)
-                    userItem.Attachments.Add((attachment.Image != null ? "image" : "audio", attachment.MediaType, attachment.Data));
-                if (transcribe && transcriptLabel != null)
-                    userItem.TranscriptTask = TranscribeVoiceMessageAsync(userItem, attachments.First(IsVoiceRecording).Data, transcriptLabel);
-                // Re-reading the earlier conversation (an opened chat, or after compacting) is what takes the time.
-                int compactions = _compactions;
-                bool rereading = await PrepareContextAsync(userItem, dividerIndex);
-                if (document != null && _compactions != compactions)
-                    document = await RefreshDocumentContextAsync(prompt, document, userItem, attachments);
-                SetStatus(rereading ? "Reading the conversation so far..." : "Generating...");
-
-                // Stream the reply into its own bubble as it's generated, rather than waiting for the
-                // full answer. onChunk fires on a LiteRT-LM background thread with each incremental piece
-                // of text (including any <think>...</think> block), so re-splitting the text accumulated
-                // so far through ChatReply on every chunk gives the same thinking/answer split a finished
-                // reply would show, just filled in live.
-                StreamingBubble bubble = AddStreamingBubble();
-                if (document?.Step != null)
-                {
-                    AddStepLine(bubble, document.Step);
-                    _sendSteps.Add(document.Step);
-                }
-                string modelPrompt = userItem.ModelText;
-                StringBuilder streamed = new StringBuilder();
-                bool firstChunk = true;
-                Action<string> onChunk = chunk =>
-                {
-                    streamed.Append(chunk);
-                    ChatReply partial = new ChatReply(streamed.ToString());
-                    MainThread.BeginInvokeOnMainThread(() =>
-                    {
-                        if (firstChunk)
-                        {
-                            firstChunk = false;
-                            SetStatus(null);
-                        }
-                        UpdateStreamingBubble(bubble, partial);
-                        _latestPartial = partial;
-                        reader?.Update(partial.Text);
-                    });
-                };
+                var info = new UserMessageInfo { Language = await TextLanguage.DetectAsync(prompt), Transcribing = transcribe };
 
                 // Task mode: for this message only.
                 bool planTask = _taskChip.IsToggled && UseAgent && !_voiceMode;
                 _taskChip.IsToggled = false;
-                ChatReply reply;
+                ChatOptions options = await MessageOptionsAsync(prompt, attachments);
+                ConfigureConversation();
+                // The model is given references to the attached images for the camera tools.
+                int attachedImages = attachments.Count(a => a.Image != null);
+                string imageReferences = UseAgent && attachedImages > 0 && LiveCamera.Supported
+                    ? "Attached image references for analyze_visual_image: " + string.Join(", ", Enumerable.Range(1, attachedImages).Select(i => "image-" + i)) + "\n"
+                    : null;
+                int compactionsBefore = _conversation.CompactionCount;
+                int searchedAt = compactionsBefore;
+                ChatMessageItem userItem = null;
+                _conversation.BeforeStreaming = async (message, token) =>
+                {
+                    userItem = message;
+                    // Compacting may have summarized or dropped excerpts given before: they are searched again.
+                    if (document != null && _conversation.CompactionCount != searchedAt)
+                    {
+                        searchedAt = _conversation.CompactionCount;
+                        document = await RefreshDocumentContextAsync(prompt, document, message, attachments);
+                        message.Context = JoinContext(imageReferences, document?.Text);
+                    }
+                    // Re-reading the earlier conversation (an opened chat, after compacting) is what takes the time.
+                    SetStatus(_rereadNext || _conversation.CompactionCount != compactionsBefore ? "Reading the conversation so far..." : "Generating...");
+                    _rereadNext = false;
+                };
+                // The reply's bubble is made when it is added (OnConversationMessagesChanged); these go with it.
+                _pendingUserInfo = info;
+                _pendingVoice = transcribe ? attachments.First(IsVoiceRecording).Data : null;
+                _pendingDocumentStep = document?.Step;
+                _pendingReader = reader;
+
+                List<DataContent> contents = attachments.Select(a => new DataContent(a.Data, a.MediaType) { Name = a.Name }).ToList();
+                IChatClient client = planTask ? new TaskModeClient(this, prompt, contents) : null;
+                ChatMessageItem reply = null;
                 for (int attempt = 0; ; attempt++)
                 {
-                    // Kept so teardown (OnNavigatedFrom / switching models) can wait for it instead of
-                    // freeing the chat/engine while LiteRT-LM is still generating into it.
-                    Task<ChatReply> generation = UseAgent
-                        ? (planTask ? RunTaskAsync(modelPrompt, attachments, bubble, replyCancel.Token) : RunAgentAsync(modelPrompt, attachments, bubble, replyCancel.Token))
-                        : _chat.SendAsync(modelPrompt, attachments.Select(a => a.Attachment), onChunk, replyCancel.Token);
-                    _generation = generation;
                     try
                     {
+                        Task<ChatMessageItem> generation = reply == null
+                            ? _conversation.SendAsync(prompt, contents, options, JoinContext(imageReferences, document?.Text), replyCancel.Token, client)
+                            : _conversation.RegenerateAsync(reply, options, replyCancel.Token, client);
+                        // Kept so teardown (OnNavigatedFrom / switching models) can wait for it instead of freeing the
+                        // engine while LiteRT-LM is still generating into it.
+                        _generation = generation;
                         reply = await generation;
-                        break;
-                    }
-                    catch (Exception) when (replyCancel.IsCancellationRequested)
-                    {
-                        // Interrupted: the chat keeps what was written so far, and the model is given the conversation
-                        // again with the next message (LiteRT-LM can't continue a cancelled one).
-                        UiStallWatchdog.Mark("Reply interrupted");
-                        interrupted = true;
-                        reply = InterruptedReply();
-                        break;
                     }
                     catch (System.ClientModel.ClientResultException ex) when (attempt == 0 && ServerRejectedReasoning(ex))
                     {
-                        // The server doesn't take reasoning_effort: send it again without (the agent's session only keeps
-                        // a message once its reply is complete).
+                        // The server doesn't take reasoning_effort: send it again without.
                         UiStallWatchdog.Mark("Server rejected reasoning_effort: " + ex.Message);
-                        streamed.Clear();
-                        _sendSteps.Clear();
+                        reply = ChatMessages.LastOrDefault(m => m.Role == ChatMessageRole.Assistant);
+                        options.Reasoning = null;
+                        continue;
                     }
-                    catch (Exception ex) when (attempt == 0 && !UseAgent && IsContextFull(ex))
+                    if (attempt == 0 && reply.State == ChatMessageState.Done && ToolRouter.TakeRerun() && !replyCancel.IsCancellationRequested)
                     {
-                        // The estimate was short, so don't rely on it: drop the earlier messages (a summary made before
-                        // stays) and try once more.
-                        UiStallWatchdog.Mark("Context full: " + ex.Message);
-                        streamed.Clear();
-                        _sendSteps.Clear();
-                        ClearCameraTurn(true);
-                        await CompactAsync(false, 0, dividerIndex);
-                        PrimeModel();
-                        SetStatus("Generating...");
+                        // A stub ended the request (ToolRouter, rerunAfterStub): the message again, now with its group -
+                        // without the stub's turn, which the model handled worse.
+                        UiStallWatchdog.Mark("Sending the message again with the tool group: " + string.Join(", ", ToolRouter.Active));
+                        options = await MessageOptionsAsync(prompt, attachments);
+                        continue;
                     }
+                    break;
                 }
 
-                bubble.TargetLanguage = TranslationTarget(userItem.Language);
-                UpdateStreamingBubble(bubble, reply, true);
-                _ = CheckThinkingLanguageAsync(bubble);
+                bool interrupted = reply.State == ChatMessageState.Interrupted;
+                if (interrupted)
+                    UiStallWatchdog.Mark("Reply interrupted");
+                StreamingBubble bubble = reply.Tag as StreamingBubble;
+                if (bubble != null)
+                {
+                    bubble.TargetLanguage = TranslationTarget(info.Language);
+                    bubble.Refresh();
+                    _ = CheckThinkingLanguageAsync(bubble);
+                }
                 MarkDocumentContextGiven(document);
                 UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
+                // The camera frames the tools took are given to the model with the conversation from now on.
                 foreach (byte[] jpeg in _cameraTurnFrames)
-                {
-                    userItem.Attachments.Add(("image", "image/jpeg", jpeg));
-                    userItem.Tokens += ImageTokens;
-                }
+                    userItem?.AddAttachment(new DataContent(jpeg, "image/jpeg"));
                 ClearCameraTurn();
-                await SaveExchangeAsync(userItem, reply, bubble);
+                if (userItem != null)
+                    await SaveExchangeAsync(userItem, reply, bubble);
                 SetStatus(null);
-                if (interrupted)
-                    _needsPrime = true;
-                else
+                if (!interrupted)
                     reader?.Finish(reply.Text);
             }
             catch (Exception ex)
@@ -1870,6 +1879,11 @@ namespace Maui.Demo.Lite
             }
             finally
             {
+                _conversation.BeforeStreaming = null;
+                _pendingUserInfo = null;
+                _pendingVoice = null;
+                _pendingDocumentStep = null;
+                _pendingReader = null;
                 // Not read aloud if the model wasn't ready (the reader has nothing to read).
                 reader?.Finish(string.Empty);
                 if (ReferenceEquals(_replyCancel, replyCancel))
@@ -1884,6 +1898,38 @@ namespace Maui.Demo.Lite
                 _ = RefreshServerContextAsync();
             }
         }
+
+        // Given to the model before a message: image references for the tools, then document excerpts; null for none.
+        private static string JoinContext(string imageReferences, string document)
+        {
+            string context = (imageReferences ?? string.Empty) + (document ?? string.Empty);
+            return context.Length > 0 ? context : null;
+        }
+
+        // The conversation's settings for the selected model: its context window and tokenizer, what the instructions and
+        // tools take, and how it compacts (summaries by the model - CanSummarize - or dropping, for the small models).
+        private void ConfigureConversation()
+        {
+            _conversation.CountTokens = text => TokenCounter(text);
+            _conversation.ContextWindow = ContextWindow;
+            _conversation.OverheadTokens = UseAgent ? AgentOverheadTokens + ToolGroupTokens : ChatOverheadTokens;
+            _conversation.Compaction = SelectedOption.CanSummarize ? ChatCompaction.Summarize : ChatCompaction.Drop;
+            _conversation.SummaryMaxTokens = SummaryMaxTokens;
+            // A server's model may think anyway (LM Studio runs Gemma 4 with thinking on), which used up the summary's tokens.
+            _conversation.SummaryOptions = SelectedChoice == ModelChoice.Server
+                ? new ChatOptions
+                {
+                    MaxOutputTokens = SummaryMaxTokens + 1600,
+                    Reasoning = _serverRejectsReasoning ? null : new ReasoningOptions { Effort = ReasoningEffort.None }
+                }
+                : null;
+        }
+
+        // The reply being written: its bubble gets the user message's data, the document step and the reader of this send.
+        private UserMessageInfo _pendingUserInfo;
+        private byte[] _pendingVoice;
+        private string _pendingDocumentStep;
+        private ReplyReader _pendingReader;
 
         // ---------- Voice for models without audio ----------
 
@@ -1932,128 +1978,32 @@ namespace Maui.Demo.Lite
         // the location if shared, the search tools with the Web search chip on), so changing them keeps the conversation.
         private bool UseAgent => SelectedOption.CanUseTools;
 
-        // Send a message through the agent, streaming its reply into the bubble and showing each tool call as a step
-        // line above it. Runs on the UI thread (the await foreach resumes on it).
-        private async Task<ChatReply> RunAgentAsync(string prompt, List<PendingAttachment> attachments, StreamingBubble bubble,
-            CancellationToken cancellationToken)
+        // The options of a message: for models that use tools (the agent), its tools - the core ones (date and time,
+        // calculator, units, memories, the location if the user shares it, the web tools with the Web search chip on), then
+        // the groups the conversation needs (LiteRtLmChatPage.Tools.cs), with a stub for each other group - and the
+        // instructions; thinking for all (Think chip). A voice chat answers without thinking first: a spoken reply should
+        // start quickly. (Sent to a server as reasoning_effort, unless it rejected that - then its model thinks as the
+        // server is set up to.)
+        private async Task<ChatOptions> MessageOptionsAsync(string prompt, List<PendingAttachment> attachments)
         {
-            _agentBubble = bubble;
-            await EnsureAgentAsync();
-
-            List<AIContent> contents = new List<AIContent>();
-            foreach (PendingAttachment attachment in attachments)
-                contents.Add(new DataContent(attachment.Data, attachment.MediaType));
-            contents.Add(new TextContent(prompt));
-            // The tools for this message: the core ones (date and time, calculator, units, memories, the location if the
-            // user shares it, the web tools with the Web search chip on), then the groups the conversation needs
-            // (LiteRtLmChatPage.Tools.cs) - with a stub for each other group.
-            await RouteToolsAsync(prompt, attachments);
             ChatOptions options = new ChatOptions
             {
-                // A voice chat answers without thinking first: a spoken reply should start quickly. (Sent to a server as
-                // reasoning_effort, unless it rejected that - then its model thinks as the server is set up to.)
                 Reasoning = SelectedChoice == ModelChoice.Server && _serverRejectsReasoning ? null
-                    : new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink && !_voiceMode ? ReasoningEffort.Medium : ReasoningEffort.None },
-                Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
-                    !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, privateChat: IsPrivateChat,
-                    readClipboard: AgentTools.MentionsClipboard(prompt)),
-                Instructions = JoinInstructions(await MemoryInstructionsAsync(), WebSearchInstructions(),
-                    IsPrivateChat ? PrivateInstructions : null, ToolRouter.Instructions()),
-                ToolMode = ChatToolMode.Auto
+                    : new ReasoningOptions { Effort = _thinkingSwitch.IsToggled && SelectedOption.CanThink && !_voiceMode ? ReasoningEffort.Medium : ReasoningEffort.None }
             };
+            if (!UseAgent)
+                return options;
+            await RouteToolsAsync(prompt, attachments);
+            options.Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
+                !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, privateChat: IsPrivateChat,
+                readClipboard: AgentTools.MentionsClipboard(prompt));
             foreach (AITool tool in ToolRouter.Tools())
                 options.Tools.Add(tool);
-            int attachedImages = attachments.Count(a => a.Image != null);
-            if (attachedImages > 0 && LiveCamera.Supported)
-                contents.Add(new TextContent("Attached image references for analyze_visual_image: " +
-                    string.Join(", ", Enumerable.Range(1, attachedImages).Select(i => "image-" + i))));
-
-            StringBuilder thinking = new StringBuilder();
-            StringBuilder answer = new StringBuilder();
-            Dictionary<string, Label> steps = new Dictionary<string, Label>();
-            Dictionary<string, (string Name, string Step)> stepTools = new Dictionary<string, (string, string)>();
-            // A restored chat: the first message of the session carries the earlier conversation.
-            List<AIChatMessage> messages = new List<AIChatMessage>();
-            if (_agentPrimeHistory != null)
-            {
-                messages.AddRange(_agentPrimeHistory);
-                _agentPrimeHistory = null;
-            }
-            messages.Add(new AIChatMessage(ChatRole.User, contents));
-            await foreach (AgentResponseUpdate update in _agent.RunStreamingAsync(
-                messages, _session, new ChatClientAgentRunOptions(options), cancellationToken))
-            {
-                foreach (AIContent content in update.Contents)
-                {
-                    switch (content)
-                    {
-                        case TextReasoningContent reasoning:
-                            thinking.Append(reasoning.Text);
-                            break;
-                        case TextContent text:
-                            answer.Append(text.Text);
-                            break;
-                        case FunctionCallContent call:
-                            string step = McpStepFor(call) ?? AgentTools.Describe(call);
-                            UiStallWatchdog.Mark("Tool call: " + step);
-                            steps[call.CallId] = AddStepLine(bubble, step + "...");
-                            stepTools[call.CallId] = (call.Name, step);
-                            _sendSteps.Add(step);
-                            SetStatus(step + "...");
-                            break;
-                        case FunctionResultContent result:
-                            UiStallWatchdog.Mark("Tool result" + (result.Exception != null ? ": " + result.Exception.Message : ""));
-                            if (steps.TryGetValue(result.CallId, out Label line))
-                            {
-                                // A fact the model tried to save again isn't a new memory: say so instead of "Remembering".
-                                string resultText = result.Result?.ToString() ?? string.Empty;
-                                if (resultText.StartsWith("Already remembered", StringComparison.Ordinal))
-                                {
-                                    line.Text = "\U0001F50E Already remembered";
-                                    int index = _sendSteps.FindIndex(t => t.StartsWith("Remembering", StringComparison.Ordinal));
-                                    if (index >= 0)
-                                        _sendSteps[index] = "Already remembered";
-                                }
-                                else if (result.Exception == null && stepTools.TryGetValue(result.CallId, out var tool)
-                                    && (DeviceActionTools.Contains(tool.Name) || IsMcpFunction(tool.Name)))
-                                {
-                                    // A device action or a tool server's tool: what the user chose, also in the saved chat.
-                                    string outcome = IsMcpFunction(tool.Name) ? McpStepOutcome(resultText) : DeviceActionStepOutcome(resultText);
-                                    line.Text = "\U0001F50E " + tool.Step + outcome;
-                                    int index = _sendSteps.LastIndexOf(tool.Step);
-                                    if (index >= 0)
-                                        _sendSteps[index] = tool.Step + outcome;
-                                }
-                                else
-                                    line.Text = line.Text.TrimEnd('.') + (result.Exception != null ? " - failed: " + result.Exception.Message : "");
-                            }
-                            SetStatus("Generating...");
-                            break;
-                    }
-                }
-                if (thinking.Length > 0 || answer.Length > 0)
-                {
-                    if (!steps.Values.Any(l => l.Text.EndsWith("...")))
-                        SetStatus(null);
-                    ChatReply partial = ToReply(thinking, answer);
-                    UpdateStreamingBubble(bubble, partial);
-                    _latestPartial = partial;
-                    _replyReader?.Update(partial.Text);
-                }
-            }
-            if (ToolRouter.TakeRerun() && !cancellationToken.IsCancellationRequested)
-            {
-                // A stub ended the request (ToolRouter, rerunAfterStub): send the message again with its group, in a new
-                // session given the conversation so far - without the stub's turn, which the model handled worse.
-                UiStallWatchdog.Mark("Sending the message again with the tool group: " + string.Join(", ", ToolRouter.Active));
-                int stubStep = _sendSteps.LastIndexOf("Getting more tools");
-                if (stubStep >= 0)
-                    _sendSteps.RemoveAt(stubStep);
-                _session = await _agent.CreateSessionAsync();
-                _agentPrimeHistory = ToAgentMessages(ContextItems());
-                return await RunAgentAsync(prompt, attachments, bubble, cancellationToken);
-            }
-            return ToReply(thinking, answer);
+            options.Instructions = JoinInstructions(IsPrivateChat ? PrivateInstructions : AgentInstructions,
+                await MemoryInstructionsAsync(), WebSearchInstructions(), IsPrivateChat ? PrivateInstructions : null,
+                ToolRouter.Instructions());
+            options.ToolMode = ChatToolMode.Auto;
+            return options;
         }
 
         private static string JoinInstructions(params string[] parts)
@@ -2062,65 +2012,34 @@ namespace Maui.Demo.Lite
             return joined.Length > 0 ? joined : null;
         }
 
-        private static ChatReply ToReply(StringBuilder thinking, StringBuilder answer)
+        // The client of the selected model - LiteRT-LM's, or the server's - with function invocation for the tools passed
+        // with each message (so the settings and the Web search chip can change them during a conversation); made on first
+        // use, and again for another model or backend.
+        private IChatClient EnsureClient()
         {
-            return new ChatReply(thinking.Length > 0 ? "<think>" + thinking + "</think>" + answer : answer.ToString());
-        }
-
-        // The agent, its tools and its session (the conversation) are created on first use; a new Tavily key means
-        // new tools, and so a new agent.
-        private async Task EnsureAgentAsync()
-        {
-            if (_chatClient == null && SelectedChoice == ModelChoice.Server)
-                _chatClient = CreateServerChatClient();
-            if (_chatClient == null)
+            if (_chatClient != null)
+                return _chatClient;
+            IChatClient inner;
+            if (SelectedChoice == ModelChoice.Server)
+                inner = CreateServerChatClient();
+            else
             {
+                if (_model == null)
+                    throw new InvalidOperationException("The model isn't loaded.");
                 var localClient = new LiteRtLmChatClient(_model);
                 localClient.EnableContextManagement = true;
                 localClient.ContextChanged += info => UiStallWatchdog.Mark("Context: " + info);
-                _chatClient = localClient;
+                inner = localClient;
             }
-            // The tools are passed with each message (RunAgentAsync), so the settings and the Web search chip can change
-            // them during a conversation.
-            if (_agent == null)
-            {
-                _agent = new ChatClientAgent(_chatClient, IsPrivateChat ? PrivateInstructions : AgentInstructions, "Assistant", null, null);
-                _session = null;
-            }
-            if (_session == null)
-            {
-                _session = await _agent.CreateSessionAsync();
-                // A new conversation for the model: the tool groups start again from what its messages need.
-                _toolRouter?.Reset();
-            }
+            _chatClient = new ChatClientBuilder(inner).UseFunctionInvocation().Build();
+            return _chatClient;
         }
 
+        // Release the client (and with it the model's open conversation); the conversation's messages stay.
         private void ResetAgent()
         {
-            _agent = null;
-            _session = null;
             _chatClient?.Dispose();
             _chatClient = null;
-        }
-
-        // A grey line above the reply bubble, describing a tool call.
-        private Label AddStepLine(StreamingBubble bubble, string text)
-        {
-            Label line = new Label
-            {
-                Text = "\U0001F50E " + text,
-                FontFamily = Theme.BodyFont,
-                FontSize = 13,
-                TextColor = Theme.SecondaryText,
-                Margin = new Thickness(6, 0)
-            };
-            int index = _transcript.Children.IndexOf(bubble.Row);
-            if (index < 0)
-                _transcript.Children.Add(line);
-            else
-                _transcript.Children.Insert(index, line);
-            ScrollToEnd();
-            return line;
         }
 
         private void OnWebSearchToggled(object sender, ToggledEventArgs e)
@@ -2592,16 +2511,11 @@ namespace Maui.Demo.Lite
             ClearCameraTurn();
             _sessionVersion++;
             if (IsPrivateChat) { ClearPrivateSessionContent(); ResetAgent(); }
-            _chat?.ClearHistory();
-            _session = null;
             _conversationId = null;
             UpdateExportChatButton();
-            _historyItems.Clear();
-            _agentPrimeHistory = null;
-            _contextStart = 0;
-            _summary = null;
-            _summaryTokens = 0;
-            _needsPrime = false;
+            _rereadNext = false;
+            // A new conversation for the model: the tool groups start again from what its messages need.
+            _toolRouter?.Reset();
             ResetDocumentContext();
             ClearTranscript();
             UpdateMemoryLabel();
@@ -2625,187 +2539,23 @@ namespace Maui.Demo.Lite
             }
         }
 
-        // Early estimate for history summarization before a send. The native chat client additionally budgets
-        // rendered instructions/tools, actual cache occupancy and each pending tool round at execution time.
-        private int ContextBudget => ContextWindow - ReplyReserveTokens - (UseAgent
-            ? AgentOverheadTokens + ToolGroupTokens
-
-            : ChatOverheadTokens);
-
-        // The estimated size of a message in the model's context. Runs the tokenizer: call it off the UI thread.
-        private static int EstimateTokens(Func<string, int> countTokens, HistoryItem item)
+        // The conversation was compacted (before a message, or "compact now"): the excerpts given with the messages that
+        // were summarized or dropped are no longer in the model's context, the tool groups start again, the transcript gets
+        // its divider, and the summary is saved with the chat.
+        private async void OnConversationCompacted(object sender, ChatCompactedEventArgs e)
         {
-            int tokens = countTokens(item.ModelText ?? string.Empty) + MessageOverheadTokens;
-            foreach (var attachment in item.Attachments)
-                tokens += attachment.Kind == "image" ? ImageTokens : AudioTokens(attachment.Data);
-            return tokens;
-        }
-
-        // Audio by its length, from the WAV header; other formats (MP3, FLAC) count as the longest voice message.
-        private static int AudioTokens(byte[] data)
-        {
-            double seconds = MaxVoiceLength.TotalSeconds;
-            if (data != null && data.Length > 44
-                && Encoding.ASCII.GetString(data, 0, 4) == "RIFF" && Encoding.ASCII.GetString(data, 8, 4) == "WAVE")
-            {
-                int byteRate = BitConverter.ToInt32(data, 28);
-                if (byteRate > 0)
-                    seconds = (data.Length - 44) / (double)byteRate;
-            }
-            return (int)Math.Ceiling(seconds * AudioTokensPerSecond) + 10;
-        }
-
-        private static int Cost(HistoryItem item) => Math.Max(0, item.Tokens) + item.ExtraTokens;
-
-        // The size of what the model sees now, without the next message.
-        private int ContextTokens()
-        {
-            int tokens = _summary != null ? _summaryTokens : 0;
-            foreach (HistoryItem item in _historyItems.Skip(_contextStart))
-                tokens += Cost(item);
-            return tokens;
-        }
-
-        // Count the messages the model sees that aren't counted yet (e.g. of a saved chat that was opened), the summary,
-        // and the next message.
-        private async Task CountTokensAsync(HistoryItem next)
-        {
-            Func<string, int> countTokens = TokenCounter;
-            List<HistoryItem> items = _historyItems.Skip(_contextStart).Where(i => i.Tokens < 0).ToList();
-            if (next != null && next.Tokens < 0)
-                items.Add(next);
-            string summary = _summary != null && _summaryTokens == 0 ? _summary : null;
-            if (items.Count == 0 && summary == null)
-                return;
-            int summaryTokens = await Task.Run(() =>
-            {
-                foreach (HistoryItem item in items)
-                    item.Tokens = EstimateTokens(countTokens, item);
-                return summary == null ? 0
-                    : countTokens(SummaryIntro + summary + SummaryAcknowledgement) + 2 * MessageOverheadTokens;
-            });
-            if (summary != null && summary == _summary)
-                _summaryTokens = summaryTokens;
-        }
-
-        // Before a message is sent: compact the conversation if the message would make it too long for the model, and
-        // give the model the conversation again if it needs it. Returns true if the model has to read earlier messages
-        // again.
-        private async Task<bool> PrepareContextAsync(HistoryItem next, int dividerIndex)
-        {
-            try
-            {
-                await CountTokensAsync(next);
-                int budget = ContextBudget - next.Tokens;
-                if (ContextTokens() > budget)
-                {
-                    // Summarizing keeps the latest exchanges up to a quarter of the window, so it doesn't happen again
-                    // soon; dropping keeps as many as fit.
-                    bool summarize = SelectedOption.CanSummarize;
-                    int keep = summarize
-                        ? Math.Min(budget - SummaryMaxTokens - 2 * MessageOverheadTokens, ContextWindow / 4)
-                        : budget - _summaryTokens;
-                    await CompactAsync(summarize, keep, dividerIndex);
-                }
-            }
-            catch (Exception ex)
-            {
-                // Sent anyway; if it's too long, SendAsync drops more and retries.
-                UiStallWatchdog.Mark("Preparing the context failed: " + ex.Message);
-            }
-            if (!_needsPrime)
-                return false;
-            PrimeModel();
-            return _summary != null || _contextStart < _historyItems.Count;
-        }
-
-        // LiteRT-LM's errors for a conversation longer than the context window: "Input token ids are too long..." for a
-        // new conversation, "Prefill input length exceeds available state entries..." for one that is continued.
-        private static bool IsContextFull(Exception ex)
-        {
-            for (Exception e = ex; e != null; e = e.InnerException)
-                if (e.Message.IndexOf("too long", StringComparison.OrdinalIgnoreCase) >= 0
-                    || e.Message.IndexOf("exceeds available state", StringComparison.OrdinalIgnoreCase) >= 0)
-                    return true;
-            return false;
-        }
-
-        // Give the model the conversation: the summary and the messages since. The agent starts a new session with
-        // them; Chat replaces its history.
-        private void PrimeModel()
-        {
-            List<HistoryItem> items = ContextItems();
-            foreach (HistoryItem item in _historyItems)
-                item.ExtraTokens = 0;
-            if (UseAgent)
-            {
-                _session = null;
-                _agentPrimeHistory = ToAgentMessages(items);
-            }
-            else
-            {
-                _chat?.LoadHistory(ToChatMessages(items));
-            }
-            _needsPrime = false;
-        }
-
-        // Make room in the context: the messages before the latest exchanges that fit keepTokens are summarized - into
-        // one summary with the previous one - or dropped. dividerIndex is where the divider goes if no message is kept.
-        // Returns false if there is nothing to compact.
-        private async Task<bool> CompactAsync(bool summarize, int keepTokens, int dividerIndex)
-        {
-            await CountTokensAsync(null);
-            int keepStart = _historyItems.Count;
-            int kept = 0;
-            while (keepStart - 2 >= _contextStart)
-            {
-                int exchange = Cost(_historyItems[keepStart - 2]) + Cost(_historyItems[keepStart - 1]);
-                if (keepTokens <= 0 || kept + exchange > keepTokens)
-                    break;
-                kept += exchange;
-                keepStart -= 2;
-            }
-            if (keepStart <= _contextStart)
-                return false;
-
-            List<HistoryItem> older = _historyItems.GetRange(_contextStart, keepStart - _contextStart);
-            UiStallWatchdog.Mark(string.Format("Compacting {0} messages, summarize {1}", older.Count, summarize));
-            string summary = _summary;
-            bool summarized = false;
-            if (summarize)
-            {
-                SetStatus("Summarizing the earlier conversation...");
-                try
-                {
-                    Task<string> task = SummarizeAsync(_summary, older);
-                    _generation = task;
-                    summary = await task;
-                    summarized = true;
-                }
-                catch (Exception ex)
-                {
-                    // Dropped instead.
-                    UiStallWatchdog.Mark("Summary failed: " + ex.Message);
-                }
-            }
-            _summary = summary;
-            _summaryTokens = 0;
-            _contextStart = keepStart;
-            _needsPrime = true;
-            // Excerpts given with the messages that were summarized or dropped are no longer in the model's context.
+            UiStallWatchdog.Mark(string.Format("Compacted at message {0}, summarized {1}", e.ContextStart, e.Summarized));
             ResetDocumentContext();
-            _compactions++;
-            await CountTokensAsync(null);
-            // Above the first message the model still sees, or (when it sees none) where the next one goes.
-            View firstKept = keepStart < _historyItems.Count ? _historyItems[keepStart].View : null;
-            int index = firstKept != null ? _transcript.Children.IndexOf(firstKept) : -1;
-            AddCompactionDivider(index >= 0 ? index : dividerIndex, summarized ? summary : null);
-            int upTo = older[older.Count - 1].MessageId;
-            if (_conversationId != null && upTo > 0)
+            _toolRouter?.Reset();
+            _rereadNext = true;
+            if (e.ContextStart < _conversation.Messages.Count && _conversation.Messages[e.ContextStart].Tag is UserMessageInfo info)
+                info.DividerText = e.Summary != null ? "Earlier messages summarized \u00B7 tap to read" : "Earlier messages dropped from the model's memory";
+            int upTo = _conversation.Messages.Take(e.ContextStart).Select(MessageIdOf).Where(id => id > 0).DefaultIfEmpty(0).Last();
+            if (_conversationId != null && upTo > 0 && !IsPrivateChat)
             {
                 try
                 {
-                    await _store.SetSummaryAsync(_conversationId.Value, _summary, upTo);
+                    await _store.SetSummaryAsync(_conversationId.Value, e.Summary, upTo);
                 }
                 catch (Exception ex)
                 {
@@ -2813,62 +2563,11 @@ namespace Maui.Demo.Lite
                 }
             }
             UpdateMemoryLabel();
-            return true;
         }
 
-        // Have the model summarize the messages (and the summary of those before them) in a conversation of its own.
-        private async Task<string> SummarizeAsync(string previous, List<HistoryItem> messages)
-        {
-            const string Instructions =
-                "Summarize the conversation below between a user and an assistant, so the assistant can continue it " +
-                "without seeing it again. Keep what may matter later: facts about the user, names, numbers, decisions, " +
-                "code and file names, and open questions. Write short bullet points that are full sentences starting " +
-                "with who is meant (\"The user ...\" or \"The assistant ...\"), at most 150 words, and write only the " +
-                "summary.";
-            LanguageModel model = _model;
-            Func<string, int> countTokens = TokenCounter;
-            // Release the chat's and the agent's conversations first; they are given the conversation again afterwards.
-            ResetAgent();
-            _chat?.LoadHistory(Array.Empty<Emgu.LiteRT.LM.Models.ChatMessage>());
-            int inputBudget = ContextWindow - SummaryMaxTokens - 200;
-            string prompt = await Task.Run(() =>
-            {
-                string head = Instructions
-                    + (previous != null ? "\n\nSummary of the conversation before this part:\n" + previous : string.Empty)
-                    + "\n\nConversation:\n";
-                List<string> lines = messages.Select(DescribeForSummary).ToList();
-                // If it's still too long for the model, the oldest messages go.
-                while (lines.Count > 1 && countTokens(head + string.Join("\n", lines)) > inputBudget)
-                    lines.RemoveAt(0);
-                return head + string.Join("\n", lines);
-            });
-            if (SelectedChoice == ModelChoice.Server)
-                return await SummarizeOnServerAsync(prompt);
-            Chat summarizer = model.CreateChat();
-            try
-            {
-                summarizer.MaxOutputTokens = SummaryMaxTokens;
-                summarizer.EnableThinking = false;
-                ChatReply reply = await summarizer.SendAsync(prompt);
-                string summary = reply.Text.Trim();
-                if (summary.Length == 0)
-                    throw new Exception("The summary is empty");
-                return summary;
-            }
-            finally
-            {
-                await Task.Run(() => summarizer.Dispose());
-            }
-        }
-
-        private static string DescribeForSummary(HistoryItem item)
-        {
-            string text = item.Text ?? string.Empty;
-            if (text.Length > 2000)
-                text = text.Substring(0, 2000) + "...";
-            string media = string.Concat(item.Attachments.Select(a => a.Kind == "image" ? "[image] " : "[voice message] "));
-            return (item.Role == MessageRecord.UserRole ? "User: " : "Assistant: ") + media + text;
-        }
+        // A message's id in the chat store (0 if not saved).
+        private static int MessageIdOf(ChatMessageItem item) =>
+            item.Tag is UserMessageInfo info ? info.MessageId : item.Tag is StreamingBubble bubble ? bubble.MessageId : 0;
 
         // Compact now (Settings): everything but the latest exchange.
         private async void OnCompactTapped()
@@ -2886,10 +2585,8 @@ namespace Maui.Demo.Lite
             SetBusy(true);
             try
             {
-                await CountTokensAsync(null);
-                int count = _historyItems.Count;
-                int keep = count - 2 >= _contextStart ? Cost(_historyItems[count - 2]) + Cost(_historyItems[count - 1]) : 0;
-                if (!await CompactAsync(SelectedOption.CanSummarize, keep, _transcript.Children.Count))
+                ConfigureConversation();
+                if (!await _conversation.CompactAsync())
                     SetStatus("Nothing to compact yet.");
                 else
                     SetStatus(null);
@@ -2905,53 +2602,32 @@ namespace Maui.Demo.Lite
             }
         }
 
-        private void UpdateMemoryLabel()
+        private void UpdateMemoryLabel() => _ = UpdateMemoryLabelAsync();
+
+        private async Task UpdateMemoryLabelAsync()
         {
             if (_memoryLabel == null)
                 return;
             string text = string.Format(
                 "The model takes in about {0:N0} tokens. Longer chats are summarized - or, for the small models, their " +
                 "earliest messages are dropped - so it keeps up; the conversation here stays complete.", ContextWindow);
-            int visible = _historyItems.Count - _contextStart;
-            if (ModelReady && visible > 0 && _historyItems.Skip(_contextStart).All(i => i.Tokens >= 0))
+            int visible = ChatMessages.Skip(Math.Min(_conversation.ContextStart, _conversation.Messages.Count)).Count();
+            if (ModelReady && visible > 0 && !_busy)
             {
-                // With what the chat template, or the agent's instructions and tools, take.
-                int used = ContextTokens() + ContextWindow - ReplyReserveTokens - ContextBudget;
-                text += string.Format(" This chat uses about {0:N0} ({1:P0}).", used, Math.Min(1.0, used / (double)ContextWindow));
+                try
+                {
+                    // With what the chat template, or the agent's instructions and tools, take.
+                    ConfigureConversation();
+                    ChatContextUsage usage = await _conversation.GetContextUsageAsync();
+                    text += string.Format(" This chat uses about {0:N0} ({1:P0}).", usage.UsedTokens, usage.Fraction);
+                }
+                catch (Exception)
+                {
+                    // Not counted (e.g. the model is reloading).
+                }
             }
             _memoryLabel.Text = text;
             _compactButton.IsVisible = visible >= 4;
-        }
-
-        // A line in the transcript where the model's memory of the chat starts; tap it to read the summary.
-        private void AddCompactionDivider(int index, string summary)
-        {
-            var label = new Label
-            {
-                Text = summary != null ? "Earlier messages summarized · tap to read" : "Earlier messages dropped from the model's memory",
-                FontFamily = Theme.BodyFont,
-                FontSize = 12,
-                TextColor = Theme.SecondaryText,
-                HorizontalTextAlignment = TextAlignment.Center,
-                VerticalOptions = LayoutOptions.Center
-            };
-            var row = new Grid
-            {
-                ColumnSpacing = 8,
-                Margin = new Thickness(8, 4),
-                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) }
-            };
-            row.Add(new BoxView { HeightRequest = 1, Color = Theme.Chevron, VerticalOptions = LayoutOptions.Center }, 0, 0);
-            row.Add(label, 1, 0);
-            row.Add(new BoxView { HeightRequest = 1, Color = Theme.Chevron, VerticalOptions = LayoutOptions.Center }, 2, 0);
-            if (summary != null)
-            {
-                SemanticProperties.SetDescription(row, "Earlier messages were summarized. Tap to read the summary.");
-                row.OnTap(async () => await DisplayAlertAsync("Summary of earlier messages", summary, "OK"));
-            }
-            if (_transcript.Children.Contains(_emptyLabel))
-                _transcript.Children.Remove(_emptyLabel);
-            _transcript.Children.Insert(Math.Max(0, Math.Min(index, _transcript.Children.Count)), row);
         }
 
         // ---------- Memories about the user ----------
@@ -3029,53 +2705,40 @@ namespace Maui.Demo.Lite
         // ---------- Saved chats ----------
 
         // Save a completed exchange: the message (with its attachments), any tool steps, and the reply.
-        private async Task SaveExchangeAsync(HistoryItem userItem, ChatReply reply, StreamingBubble bubble = null)
+        private async Task SaveExchangeAsync(ChatMessageItem userItem, ChatMessageItem reply, StreamingBubble bubble = null)
         {
-            var replyItem = new HistoryItem { Role = MessageRecord.AssistantRole, Text = reply.Text };
-            _historyItems.Add(userItem);
-            _historyItems.Add(replyItem);
+            if (IsPrivateChat) return; // Write nothing to SQLite or attachments.
+            UserMessageInfo info = userItem.Tag as UserMessageInfo ?? new UserMessageInfo();
+            // An interrupted reply is kept as cut off.
+            string replyText = reply.State == ChatMessageState.Interrupted ? (reply.Text.Length > 0 ? reply.Text + " \u2026" : "\u2026") : reply.Text;
             try
             {
-                Func<string, int> countTokens = TokenCounter;
-                // The document step line isn't a tool call: its excerpts are counted with the message.
-                int steps = _sendSteps.Count(IsToolStep);
-                await Task.Run(() =>
-                {
-                    replyItem.Tokens = EstimateTokens(countTokens, replyItem);
-                    // Until the conversation is rebuilt, the model's own conversation also holds the thinking and the
-                    // tool calls.
-                    replyItem.ExtraTokens = (string.IsNullOrEmpty(reply.Thinking) ? 0 : countTokens(reply.Thinking))
-                        + steps * ToolStepTokens;
-                });
-            }
-            catch (Exception)
-            {
-                replyItem.Tokens = reply.Text.Length / 3 + MessageOverheadTokens;
-            }
-            if (IsPrivateChat) return; // Keep in-session history/token counts above; write nothing to SQLite or attachments.
-            try
-            {
+                List<(string Kind, string MediaType, byte[] Data)> attachments = userItem.Attachments
+                    .Select(a => (a.HasTopLevelMediaType("image") ? "image" : "audio", a.MediaType, a.Data.ToArray())).ToList();
                 if (_conversationId == null)
                 {
                     string title = !string.IsNullOrWhiteSpace(userItem.Text) ? userItem.Text
-                        : userItem.Attachments.Any(a => a.Kind == "image") ? "Image" : "Voice message";
+                        : attachments.Any(a => a.Kind == "image") ? "Image" : "Voice message";
                     _conversationId = await _store.CreateConversationAsync(title, SelectedChoice.ToString());
                 }
                 int id = _conversationId.Value;
-                userItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.UserRole, userItem.Text, null, userItem.Attachments, userItem.Context, userItem.Language);
-                if (userItem.TranscriptTask != null)
-                    _ = SaveTranscriptWhenReadyAsync(id, userItem);
-                foreach (string step in _sendSteps)
-                    await _store.AddMessageAsync(id, MessageRecord.StepRole, step, null);
+                info.MessageId = await _store.AddMessageAsync(id, MessageRecord.UserRole, userItem.Text, null, attachments, userItem.Context, info.Language);
+                if (info.TranscriptTask != null)
+                    _ = SaveTranscriptWhenReadyAsync(id, info);
+                // The step lines: the document's (a card above the reply), then the tool calls.
+                if (bubble?.DocumentStep != null)
+                    await _store.AddMessageAsync(id, MessageRecord.StepRole, bubble.DocumentStep, null);
+                foreach (ChatToolStep step in reply.Steps)
+                    await _store.AddMessageAsync(id, MessageRecord.StepRole, step.Description, null);
                 // Pictures the reply drew are kept with it (shown again when the chat is reopened, not given to the model).
                 List<(string Kind, string MediaType, byte[] Data)> drawn;
                 lock (_sendImages)
                     drawn = _sendImages.Select(png => (GeneratedKind, "image/png", png)).ToList();
                 // And the documents it wrote.
                 drawn.AddRange(TakeWrittenDocuments());
-                replyItem.MessageId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, reply.Text, reply.Thinking, drawn);
+                int replyId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, replyText, reply.Thinking, drawn);
                 if (bubble != null)
-                    bubble.MessageId = replyItem.MessageId;
+                    bubble.MessageId = replyId;
                 // The document the chat uses now (or none), restored when it is opened again.
                 await _store.SetConversationDocumentAsync(id, _document?.Index != null ? _document.Id : null);
                 UpdateExportChatButton();
@@ -3085,49 +2748,6 @@ namespace Maui.Demo.Lite
             {
                 SetStatus("Could not save the chat: " + ex.Message);
             }
-        }
-
-        // The conversation as the model is given it: the summary of the earlier messages (if any), then the messages
-        // from _contextStart on.
-        private List<HistoryItem> ContextItems()
-        {
-            List<HistoryItem> items = new List<HistoryItem>();
-            if (_summary != null)
-            {
-                items.Add(new HistoryItem { Role = MessageRecord.UserRole, Text = SummaryIntro + _summary });
-                items.Add(new HistoryItem { Role = MessageRecord.AssistantRole, Text = SummaryAcknowledgement });
-            }
-            items.AddRange(_historyItems.Skip(_contextStart));
-            return items;
-        }
-
-        private static List<AIChatMessage> ToAgentMessages(List<HistoryItem> items)
-        {
-            List<AIChatMessage> messages = new List<AIChatMessage>();
-            foreach (HistoryItem item in items)
-            {
-                List<AIContent> contents = new List<AIContent>();
-                foreach (var attachment in item.Attachments)
-                    if (attachment.Data != null)
-                        contents.Add(new DataContent(attachment.Data, attachment.MediaType));
-                contents.Add(new TextContent(item.ModelText ?? string.Empty));
-                messages.Add(new AIChatMessage(item.Role == MessageRecord.UserRole ? ChatRole.User : ChatRole.Assistant, contents));
-            }
-            return messages.Count > 0 ? messages : null;
-        }
-
-        private static List<Emgu.LiteRT.LM.Models.ChatMessage> ToChatMessages(List<HistoryItem> items)
-        {
-            List<Emgu.LiteRT.LM.Models.ChatMessage> messages = new List<Emgu.LiteRT.LM.Models.ChatMessage>();
-            foreach (HistoryItem item in items)
-            {
-                List<ChatAttachment> attachments = new List<ChatAttachment>();
-                foreach (var attachment in item.Attachments)
-                    if (attachment.Data != null)
-                        attachments.Add(attachment.Kind == "image" ? ChatAttachment.Image(attachment.Data) : ChatAttachment.Audio(attachment.Data));
-                messages.Add(new Emgu.LiteRT.LM.Models.ChatMessage(item.Role, item.ModelText ?? string.Empty, attachments));
-            }
-            return messages;
         }
 
         private async void OnHistoryTapped()
@@ -3300,103 +2920,74 @@ namespace Maui.Demo.Lite
                 RemoveDocument();
                 _conversationId = id;
                 UpdateExportChatButton();
-                _summary = chat.Summary;
-                bool contextStartFound = false;
 
+                // The messages, with each reply's step lines and cards; the model sees those after the last compaction
+                // (and the summary of the ones before).
                 var messages = await _store.GetMessagesAsync(id);
+                var items = new List<ChatMessageItem>();
+                var steps = new List<string>();
+                int contextStart = -1;
                 string lastUserLanguage = null;
-                var slice = System.Diagnostics.Stopwatch.StartNew();
-                int rendered = 0;
                 foreach (MessageRecord message in messages)
                 {
-                    // Native view attachment and Markdown formatting belong on the UI thread, but a whole saved
-                    // conversation must not monopolize it. Let input/layout run between short rendering slices.
-                    if (slice.ElapsedMilliseconds >= 16)
-                    {
-                        SetStatus($"Opening conversation: {rendered} of {messages.Count} messages...");
-                        await Task.Delay(16);
-                        slice.Restart();
-                    }
-                    rendered++;
-                    // The model sees the messages after the last compaction (and the summary of those before).
-                    if (!contextStartFound && message.Id > chat.SummaryUpTo && message.Role != MessageRecord.StepRole)
-                    {
-                        contextStartFound = true;
-                        _contextStart = _historyItems.Count;
-                        if (chat.SummaryUpTo > 0)
-                            AddCompactionDivider(_transcript.Children.Count, chat.Summary);
-                    }
                     if (message.Role == MessageRecord.StepRole)
                     {
-                        AddSavedStep(message.Text);
+                        steps.Add(message.Text);
                         continue;
                     }
-                    var item = new HistoryItem { Role = message.Role, Text = message.Text, Context = message.Context, MessageId = message.Id };
-                    // The language of a user message (detected now for chats saved before it was kept).
+                    if (contextStart < 0 && message.Id > chat.SummaryUpTo)
+                        contextStart = items.Count;
                     if (message.Role == MessageRecord.UserRole)
                     {
-                        item.Language = message.Language ?? await TextLanguage.DetectAsync(message.Text);
-                        lastUserLanguage = item.Language;
+                        var info = new UserMessageInfo
+                        {
+                            // The language of a user message (detected now for chats saved before it was kept).
+                            Language = message.Language ?? await TextLanguage.DetectAsync(message.Text),
+                            Transcript = message.Transcript,
+                            MessageId = message.Id
+                        };
+                        if (chat.Summary == null)
+                            info.DividerText = "Earlier messages dropped from the model's memory";
+                        lastUserLanguage = info.Language;
+                        var attachments = new List<DataContent>();
+                        foreach (SavedAttachment attachment in _store.GetAttachments(message))
+                            attachments.Add(new DataContent(await System.IO.File.ReadAllBytesAsync(attachment.Path), attachment.MediaType)
+                            {
+                                Name = System.IO.Path.GetFileName(attachment.Path)
+                            });
+                        items.Add(new ChatMessageItem(ChatMessageRole.User, message.Text, attachments, message.Context) { Tag = info });
+                        continue;
                     }
-                    List<PendingAttachment> shown = new List<PendingAttachment>();
+                    var reply = new ChatMessageItem(ChatMessageRole.Assistant, message.Text) { Thinking = message.Thinking ?? string.Empty };
+                    StreamingBubble bubble = BubbleFor(reply);
+                    bubble.MessageId = message.Id;
+                    bubble.TargetLanguage = TranslationTarget(message.Language ?? lastUserLanguage);
+                    bubble.Translation = message.ThinkingTranslation;
+                    bubble.ShowTranslation = !string.IsNullOrEmpty(message.ThinkingTranslation);
+                    foreach (string step in steps)
+                        reply.Steps.Add(new ChatToolStep(step));
+                    steps.Clear();
                     foreach (SavedAttachment attachment in _store.GetAttachments(message))
                     {
                         byte[] data = await System.IO.File.ReadAllBytesAsync(attachment.Path);
+                        // A document the reply wrote, or a picture it drew: cards above it, not given to the model.
                         if (attachment.Kind == DocumentKind)
-                        {
-                            // A document the reply wrote: a card above it, not part of what the model is given.
-                            AddSavedDocumentCard(attachment.MediaType, data);
-                            continue;
-                        }
-                        if (attachment.Kind == GeneratedKind)
-                        {
-                            // A picture the reply drew: shown above it, not part of what the model is given.
-                            AddSavedGeneratedImage(data);
-                            continue;
-                        }
-                        item.Attachments.Add((attachment.Kind, attachment.MediaType, data));
-                        shown.Add(new PendingAttachment
-                        {
-                            Image = attachment.Kind == "image" ? data : null,
-                            Data = data,
-                            MediaType = attachment.MediaType,
-                            Name = System.IO.Path.GetFileName(attachment.Path)
-                        });
+                            AddSavedDocumentCard(bubble, attachment.MediaType, data);
+                        else if (attachment.Kind == GeneratedKind)
+                            AddSavedGeneratedImage(bubble, data);
                     }
-                    _historyItems.Add(item);
-                    if (message.Role == MessageRecord.UserRole)
-                    {
-                        int viewIndex = _transcript.Children.Contains(_emptyLabel) ? 0 : _transcript.Children.Count;
-                        item.Transcript = message.Transcript;
-                        AddUserMessage(message.Text, shown, message.Transcript);
-                        if (viewIndex < _transcript.Children.Count)
-                            item.View = _transcript.Children[viewIndex] as View;
-                    }
-                    else
-                    {
-                        StreamingBubble bubble = AddStreamingBubble();
-                        bubble.MessageId = message.Id;
-                        bubble.TargetLanguage = TranslationTarget(message.Language ?? lastUserLanguage);
-                        bubble.Translation = message.ThinkingTranslation;
-                        bubble.ShowTranslation = !string.IsNullOrEmpty(message.ThinkingTranslation);
-                        UpdateStreamingBubble(bubble, new ChatReply(string.IsNullOrEmpty(message.Thinking)
-                            ? message.Text : "<think>" + message.Thinking + "</think>" + message.Text), true);
-                        _ = CheckThinkingLanguageAsync(bubble);
-                    }
+                    items.Add(reply);
+                    _ = CheckThinkingLanguageAsync(bubble);
                 }
-
-                if (!contextStartFound)
-                {
-                    _contextStart = _historyItems.Count;
-                    if (chat.SummaryUpTo > 0)
-                        AddCompactionDivider(_transcript.Children.Count, chat.Summary);
-                }
+                SetStatus($"Opening conversation: {items.Count} messages...");
+                await Task.Yield();
+                _conversation.Load(items, chat.SummaryUpTo > 0 ? chat.Summary : null, contextStart < 0 ? items.Count : contextStart);
+                // The model is given the conversation with the next message, once its size is known (compacting it first if
+                // it doesn't fit, e.g. a long chat saved before compaction existed).
+                _rereadNext = items.Count > 0;
                 // The document the chat used, from its saved index.
                 if (!string.IsNullOrEmpty(chat.DocumentId))
                     _ = RestoreDocumentAsync(chat.DocumentId);
-                // The model is given the conversation with the next message, once its size is known (compacting it first if
-                // it doesn't fit, e.g. a long chat saved before compaction existed).
-                _needsPrime = true;
                 UpdateMemoryLabel();
                 await RefreshChatListAsync();
                 SetStatus(null);
@@ -3408,20 +2999,6 @@ namespace Maui.Demo.Lite
                 SetBusy(false);
                 ScrollToEnd(false);
             }
-        }
-
-        private void AddSavedStep(string text)
-        {
-            if (_transcript.Children.Contains(_emptyLabel))
-                _transcript.Children.Remove(_emptyLabel);
-            _transcript.Children.Add(new Label
-            {
-                Text = "\U0001F50E " + text,
-                FontFamily = Theme.BodyFont,
-                FontSize = 13,
-                TextColor = Theme.SecondaryText,
-                Margin = new Thickness(6, 0)
-            });
         }
 
         // Wait for any in-flight generation before freeing the chat/engine: Chat.Send and the engine it
@@ -3439,18 +3016,12 @@ namespace Maui.Demo.Lite
 
             // The chat client's conversation must be released before the model's engine.
             ResetAgent();
-            Chat chat = _chat;
             LanguageModel model = _model;
-            _chat = null;
             _model = null;
             _loaded = null;
             _serverConnected = null;
             // Freeing an engine can take a moment: not on the UI thread.
-            await Task.Run(() =>
-            {
-                chat?.Dispose();
-                model?.Dispose();
-            });
+            await Task.Run(() => model?.Dispose());
         }
 
         protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
@@ -3493,32 +3064,32 @@ namespace Maui.Demo.Lite
             ClearVisualClips();
             ClearVisualPhotos();
 #endif
-            _transcript.Children.Clear();
-            _transcript.Children.Add(_emptyLabel);
+            _agentBubble = null;
+            _conversation.Clear();
         }
 
-        // The views of a model bubble that is still streaming, so each chunk can update it in place
-        // instead of adding a new bubble per chunk. The thinking takes little room (Emgu.LiteRT.LM.Maui's ThinkingView):
-        // while the model thinks, a "Thinking..." header and the last few lines of it; once the answer starts, only a
-        // "Thought for N s" header, which expands the whole thinking when tapped.
-        private sealed class StreamingBubble
+        // The page's own data for a reply, in its ChatMessageItem.Tag (the demo's reply template binds to it): the translate
+        // row under the thinking's header and the thinking shown (the translation, when chosen); and the page's handle for
+        // the cards that features put above the reply (AddCard).
+        private sealed class StreamingBubble : System.ComponentModel.INotifyPropertyChanged
         {
-            public ThinkingView Thinking;
-            public BoxView Separator;
-            // The answer, with Markdown, code blocks and maths (Emgu.LiteRT.LM.Maui's ReplyView).
-            public ReplyView Body;
-            // The bubble in the transcript, so tool steps can be inserted above it.
-            public View Row;
-            // The last thinking / answer shown, and how long the thinking took (from its first text to the answer's;
-            // null if unknown, e.g. for a reopened chat).
-            public ChatReply Reply;
-            public bool Done;
-            public DateTime? ThinkingStarted;
-            public TimeSpan? ThinkingTime;
+            public StreamingBubble(ChatMessageItem item, Label translateRow)
+            {
+                Item = item;
+                TranslateRow = translateRow;
+                item.Tag = this;
+            }
+
+            public ChatMessageItem Item { get; }
+
+            // The row that offers the translation of the thinking (LiteRtLmChatPage.Translation.cs), the ThinkingView's accessory.
+            public Label TranslateRow { get; }
+
+            public string Thinking => Item.Thinking;
+
             // Translating the thinking (LiteRtLmChatPage.Translation.cs): the language of the message it answers when
             // that isn't English (null: no translation offered), the translation, whether it is shown, whether one is
             // being made, and the reply's id in the chat store.
-            public Label TranslateRow;
             public string TargetLanguage;
             public string Translation;
             public bool ShowTranslation;
@@ -3526,196 +3097,137 @@ namespace Maui.Demo.Lite
             // The thinking's own language has been checked (it isn't the language it would be translated into).
             public bool TranslateReady;
             public int MessageId;
+            // The document's step line ("Looked in report.pdf..."), a card above the reply.
+            public string DocumentStep;
+
+            // What the thinking shows when opened: the translation, when chosen; null for the thinking itself.
+            public string ThinkingDisplayText => ShowTranslation && Translation != null ? Translation.Trim() : null;
+
+            public void Refresh() => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ThinkingDisplayText)));
+
+            public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
         }
 
-        private StreamingBubble AddStreamingBubble()
+        // A reply's bubble data, with its translate row.
+        private StreamingBubble BubbleFor(ChatMessageItem item)
         {
-            var bubbleViews = new StreamingBubble
-            {
-                Separator = new BoxView { HeightRequest = 1, Color = Theme.Chevron, IsVisible = false },
-                TranslateRow = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.Accent, IsVisible = false },
-                Body = NewReplyView(ModelTextColor, 15)
-            };
-            bubbleViews.TranslateRow.OnTap(() => OnTranslateTapped(bubbleViews));
-            // The thinking's look is the demo's ThinkingViewTemplate (ChatTemplates.xaml); the translate row goes under
-            // its header while the thinking is shown.
-            bubbleViews.Thinking = new ThinkingView { Accessory = bubbleViews.TranslateRow };
-            bubbleViews.Thinking.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(ThinkingView.IsExpanded))
-                    ShowThinking(bubbleViews);
-            };
-
-            Border bubble = ModelBubble(new VerticalStackLayout
-            {
-                Spacing = 4,
-                Children = { bubbleViews.Thinking, bubbleViews.Separator, bubbleViews.Body }
-            });
-            AddBubbleRow(bubble, false);
-            bubbleViews.Row = bubble;
-            return bubbleViews;
+            var row = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.Accent, IsVisible = false };
+            var bubble = new StreamingBubble(item, row);
+            row.OnTap(() => OnTranslateTapped(bubble));
+            return bubble;
         }
 
-        // Called on the UI thread with the thinking/answer split of everything streamed so far, or with the finished
-        // reply (done; also for the replies of a reopened chat).
-        private void UpdateStreamingBubble(StreamingBubble bubble, ChatReply partial, bool done = false)
+        // A message the conversation adds: the user's gets the data of the send (its language, its voice message's words),
+        // a reply its bubble data - which tools that show cards use (_agentBubble) - with the send's document step, and
+        // updates the status, the read-aloud and the step lines while it streams.
+        private void OnConversationMessagesChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
-            if (!string.IsNullOrEmpty(partial.Thinking) && bubble.ThinkingStarted == null && !done)
-                bubble.ThinkingStarted = DateTime.UtcNow;
-            if (!string.IsNullOrEmpty(partial.Text) && bubble.ThinkingStarted != null && bubble.ThinkingTime == null)
-                bubble.ThinkingTime = DateTime.UtcNow - bubble.ThinkingStarted.Value;
-            bubble.Reply = partial;
-            bubble.Done = done;
-            ShowThinking(bubble);
-            bubble.Body.Text = partial.Text ?? string.Empty;
-            // A reply with code may use the full width, so less of the code wraps.
-            if (bubble.Body.HasCode && bubble.Row.MaximumWidthRequest < double.PositiveInfinity)
-                bubble.Row.MaximumWidthRequest = double.PositiveInfinity;
-            ScrollToEnd();
-        }
-
-        private void ShowThinking(StreamingBubble bubble)
-        {
-            string thinking = bubble.Reply?.Thinking;
-            bool hasThinking = !string.IsNullOrEmpty(thinking);
-            bool hasAnswer = !string.IsNullOrEmpty(bubble.Reply?.Text);
-            ThinkingView view = bubble.Thinking;
-            // Still thinking: a spinner and the end of the thinking so far. A reply that ended without an answer (e.g.
-            // cut off while thinking) shows its thinking.
-            view.IsThinking = hasThinking && !hasAnswer && !bubble.Done;
-            view.AlwaysExpanded = !hasAnswer;
-            view.Duration = bubble.ThinkingTime;
-            view.DisplayText = bubble.ShowTranslation && bubble.Translation != null ? bubble.Translation : null;
-            view.Thinking = thinking ?? string.Empty;
-            bool expanded = view.ShowsThinking;
-            ShowTranslateRow(bubble, expanded);
-            // A reply with code in its thinking may use the full width too.
-            if (view.HasCode && bubble.Row.MaximumWidthRequest < double.PositiveInfinity)
-                bubble.Row.MaximumWidthRequest = double.PositiveInfinity;
-            bubble.Separator.IsVisible = expanded && hasAnswer;
-        }
-
-        // An answer (or the thinking's) view in the demo's fonts and colours; its code blocks use the demo's
-        // CodeBlockViewTemplate (ChatTemplates.xaml).
-        private static ReplyView NewReplyView(Color textColor, double fontSize)
-        {
-            return new ReplyView
+            if (e.Action != System.Collections.Specialized.NotifyCollectionChangedAction.Add || e.NewItems == null)
+                return;
+            foreach (ChatMessageItem item in e.NewItems)
             {
-                TextColor = textColor,
-                FontSize = fontSize,
-                FontFamily = Theme.BodyFont,
-                LinkColor = Theme.Accent,
-                SecondaryTextColor = Theme.SecondaryText,
-                QuoteMarkColor = Theme.Chevron
-            };
-        }
-
-        // Returns the label under a voice message's chip for its words (null if the message has no voice recording), with
-        // the words if they are known, else "Writing down what you said..." when they are being written down.
-        private Label AddUserMessage(string text, IReadOnlyList<PendingAttachment> attachments, string transcript = null, bool transcribing = false)
-        {
-            Label transcriptLabel = null;
-            if (attachments.Count > 0)
-            {
-                // The attachments right-aligned above the message bubble.
-                var media = new VerticalStackLayout { Spacing = 6, HorizontalOptions = LayoutOptions.End };
-                foreach (PendingAttachment attachment in attachments)
-                    media.Children.Add(AttachmentChip(attachment, true));
-                if (string.IsNullOrEmpty(text) && attachments.Any(IsVoiceRecording))
+                if (item.Tag != null)
+                    continue; // restored, or the page's own
+                if (item.Role == ChatMessageRole.User && _pendingUserInfo != null)
                 {
-                    transcriptLabel = new Label
-                    {
-                        Text = !string.IsNullOrWhiteSpace(transcript) ? "\u201C" + transcript.Trim() + "\u201D"
-                            : transcribing ? "Writing down what you said..." : string.Empty,
-                        IsVisible = !string.IsNullOrWhiteSpace(transcript) || transcribing,
-                        FontFamily = Theme.BodyFont,
-                        FontSize = 14,
-                        FontAttributes = FontAttributes.Italic,
-                        TextColor = Theme.SecondaryText,
-                        HorizontalOptions = LayoutOptions.End,
-                        HorizontalTextAlignment = TextAlignment.End,
-                        MaximumWidthRequest = 420
-                    };
-                    SemanticProperties.SetDescription(transcriptLabel, "What the voice message says");
-                    media.Children.Add(transcriptLabel);
+                    UserMessageInfo info = _pendingUserInfo;
+                    item.Tag = info;
+                    if (_pendingVoice != null)
+                        info.TranscriptTask = TranscribeVoiceMessageAsync(info, _pendingVoice);
                 }
-                if (_transcript.Children.Contains(_emptyLabel))
-                    _transcript.Children.Remove(_emptyLabel);
-                _transcript.Children.Add(media);
+                else if (item.Role == ChatMessageRole.Assistant)
+                {
+                    StreamingBubble bubble = BubbleFor(item);
+                    _agentBubble = bubble;
+                    if (_pendingDocumentStep != null)
+                    {
+                        bubble.DocumentStep = _pendingDocumentStep;
+                        AddCard(bubble, StepLine(_pendingDocumentStep));
+                    }
+                    WatchReply(item, _pendingReader);
+                }
             }
-            if (!string.IsNullOrEmpty(text))
-                AddBubbleRow(Bubble(text, UserBubbleColor, UserTextColor), true);
-            else
-                ScrollToEnd();
-            return transcriptLabel;
         }
 
-        private void AddBubbleRow(Border bubble, bool isUser)
+        // While a reply streams: the status ("Generating..." until it starts, the tool being called), the read-aloud, and
+        // the step lines' outcomes.
+        private void WatchReply(ChatMessageItem item, ReplyReader reader)
         {
-            if (_transcript.Children.Contains(_emptyLabel))
-                _transcript.Children.Remove(_emptyLabel);
+            item.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(ChatMessageItem.Text))
+                {
+                    if (item.IsStreaming && item.Steps.All(step => !step.IsRunning))
+                        SetStatus(null);
+                    reader?.Update(item.Text);
+                }
+                else if (e.PropertyName == nameof(ChatMessageItem.Thinking) && item.Text.Length == 0 && item.IsStreaming && item.Steps.All(step => !step.IsRunning))
+                    SetStatus(null);
+            };
+            item.Steps.CollectionChanged += (s, e) =>
+            {
+                if (e.NewItems == null)
+                    return;
+                foreach (ChatToolStep step in e.NewItems)
+                {
+                    if (step.Call == null)
+                        continue;
+                    UiStallWatchdog.Mark("Tool call: " + step.Description);
+                    SetStatus(step.Description + "...");
+                    string described = step.Description;
+                    step.PropertyChanged += (o, p) =>
+                    {
+                        if (p.PropertyName != nameof(ChatToolStep.IsRunning) || step.IsRunning)
+                            return;
+                        UiStallWatchdog.Mark("Tool result" + (step.Error != null ? ": " + step.Error : ""));
+                        string resultText = step.Result?.Result?.ToString() ?? string.Empty;
+                        // A fact the model tried to save again isn't a new memory: say so instead of "Remembering".
+                        if (resultText.StartsWith("Already remembered", StringComparison.Ordinal))
+                            step.Description = "Already remembered";
+                        else if (step.Error == null && (DeviceActionTools.Contains(step.Name) || IsMcpFunction(step.Name)))
+                            // A device action or a tool server's tool: what the user chose, also in the saved chat.
+                            step.Description = described + (IsMcpFunction(step.Name) ? McpStepOutcome(resultText) : DeviceActionStepOutcome(resultText));
+                        SetStatus("Generating...");
+                    };
+                }
+            };
+        }
 
-            bubble.HorizontalOptions = isUser ? LayoutOptions.End : LayoutOptions.Start;
-            bubble.MaximumWidthRequest = 420;
+        // A grey step line like the tool calls', for the page's own steps (the document's).
+        private static Label StepLine(string text) => new Label
+        {
+            Text = "\U0001F50E " + text,
+            FontFamily = Theme.BodyFont,
+            FontSize = 13,
+            TextColor = Theme.SecondaryText,
+            Margin = new Thickness(6, 0)
+        };
 
-            _transcript.Children.Add(bubble);
+        // A card above a reply (one of its decorations); without a reply, a notice of its own in the transcript.
+        private void AddCard(StreamingBubble bubble, View card)
+        {
+            if (bubble != null)
+                bubble.Item.Decorations.Add(card);
+            else
+                _conversation.AddNotice(card);
             ScrollToEnd();
         }
 
-        private static Border Bubble(string text, Color background, Color textColor)
+        // Take a card out of the transcript again. (A notice left empty stays - it shows nothing - since removing it would
+        // move the conversation's ContextStart index.)
+        private void RemoveCard(View card)
         {
-            return new Border
-            {
-                BackgroundColor = background,
-                Stroke = Colors.Transparent,
-                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(18) },
-                Padding = new Thickness(12, 9),
-                Content = new Label { Text = text, TextColor = textColor, FontFamily = Theme.BodyFont, FontSize = 15 }
-            };
-        }
-
-        private static Border ModelBubble(View content)
-        {
-            return new Border
-            {
-                BackgroundColor = ModelBubbleColor,
-                Stroke = Colors.Transparent,
-                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(18) },
-                Padding = new Thickness(12, 9),
-                Content = content
-            };
+            foreach (ChatMessageItem item in _conversation.Messages)
+                if (item.Decorations.Remove(card))
+                    return;
         }
 
         private bool _restoringTranscript;
-        private bool _scrollQueued;
-        private bool _scrollRequested;
-        private bool _animateScroll;
 
-        private async void ScrollToEnd(bool animated = true)
+        private void ScrollToEnd(bool animated = true)
         {
-            if (_restoringTranscript) return;
-            _scrollRequested = true;
-            _animateScroll = animated;
-            if (_scrollQueued) return;
-            _scrollQueued = true;
-            try
-            {
-                // One request per frame/animation, rather than one animated scroll per restored row or token.
-                // Remember updates arriving during an animation so the final token still reaches the bottom.
-                while (_scrollRequested)
-                {
-                    await Task.Delay(16);
-                    if (_restoringTranscript) return;
-                    _scrollRequested = false;
-                    // Android doesn't clamp double.MaxValue; use the actual bottom of the laid-out transcript.
-                    double bottom = Math.Max(0, _transcript.Height - _scroll.Height);
-                    await _scroll.ScrollToAsync(0, bottom, _animateScroll);
-                }
-            }
-            catch (Exception)
-            {
-            }
-            finally { _scrollQueued = false; }
+            if (!_restoringTranscript)
+                _chatView.ScrollToEnd(animated);
         }
 
         // ---------- Busy / status ----------

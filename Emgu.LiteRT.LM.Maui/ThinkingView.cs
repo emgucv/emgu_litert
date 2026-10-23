@@ -133,6 +133,10 @@ namespace Emgu.LiteRT.LM.Maui
             set => SetValue(AccessoryProperty, value);
         }
 
+        /// <summary>True if the whole thinking is shown now (bindable, e.g. for a line between the thinking and the answer).</summary>
+        public static readonly BindableProperty ShowsThinkingProperty = BindableProperty.Create(
+            nameof(ShowsThinking), typeof(bool), typeof(ThinkingView), false, BindingMode.OneWayToSource);
+
         /// <summary>
         /// True if the whole thinking is shown now: there is thinking, the model has finished it, and it is expanded.
         /// </summary>
@@ -190,6 +194,8 @@ namespace Emgu.LiteRT.LM.Maui
             string thinking = Thinking;
             bool hasThinking = !string.IsNullOrEmpty(thinking);
             IsVisible = hasThinking;
+            if ((bool)GetValue(ShowsThinkingProperty) != ShowsThinking)
+                SetValue(ShowsThinkingProperty, ShowsThinking);
             if (!hasThinking)
                 return;
             bool expanded = ShowsThinking;

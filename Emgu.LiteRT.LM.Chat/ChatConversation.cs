@@ -194,6 +194,12 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>The longest summary, in tokens.</summary>
         public int SummaryMaxTokens { get; set; } = 400;
 
+        /// <summary>
+        /// Options for the summary requests, or null: by default at most <see cref="SummaryMaxTokens"/> tokens and no thinking.
+        /// E.g. a server's model that thinks anyway needs a larger <see cref="ChatOptions.MaxOutputTokens"/>.
+        /// </summary>
+        public ChatOptions SummaryOptions { get; set; }
+
         /// <summary>Describes a tool call for its step line; defaults to "Calling {name}".</summary>
         public Func<FunctionCallContent, string> DescribeToolCall { get; set; } = call => "Calling " + call.Name;
 
@@ -233,9 +239,11 @@ namespace Emgu.LiteRT.LM.Chat
         /// longest reply... <see cref="Instructions"/> is added to its instructions. Null for none.</param>
         /// <param name="context">Text given to the model before the message (e.g. document excerpts), not shown; or null</param>
         /// <param name="cancellationToken">Stops the reply: it keeps what was written so far (<see cref="ChatMessageState.Interrupted"/>)</param>
+        /// <param name="client">A client for this message only (e.g. one that runs a multi-step task), or null for <see cref="Client"/>;
+        /// its reply is given to <see cref="Client"/> as text afterwards</param>
         /// <returns>The reply. If sending fails, the reply is marked <see cref="ChatMessageState.Failed"/> and the exception thrown.</returns>
         public async Task<ChatMessageItem> SendAsync(string text, IEnumerable<DataContent> attachments = null, ChatOptions options = null,
-            string context = null, CancellationToken cancellationToken = default)
+            string context = null, CancellationToken cancellationToken = default, IChatClient client = null)
         {
             if (_busy)
                 throw new InvalidOperationException("A message is already being sent.");
@@ -247,7 +255,10 @@ namespace Emgu.LiteRT.LM.Chat
                 Messages.Add(message);
                 await PrepareAsync(message, cancellationToken);
                 Messages.Add(reply);
-                await StreamWithRetryAsync(message, reply, options, cancellationToken);
+                await StreamWithRetryAsync(message, reply, options, client ?? Client, cancellationToken);
+                // Another client's messages aren't the main client's conversation: the reply is given to it as text.
+                if (client != null && client != Client)
+                    reply.ModelMessages = null;
                 ExchangeCompleted?.Invoke(this, new ChatExchangeEventArgs(message, reply, false));
                 return reply;
             }
@@ -270,8 +281,10 @@ namespace Emgu.LiteRT.LM.Chat
         /// <param name="reply">The latest reply</param>
         /// <param name="options">Options for the new reply, as for <see cref="SendAsync"/></param>
         /// <param name="cancellationToken">Stops the reply (<see cref="ChatMessageState.Interrupted"/>)</param>
+        /// <param name="client">A client for this reply only, or null for <see cref="Client"/></param>
         /// <returns>The reply. If sending fails, the reply is marked <see cref="ChatMessageState.Failed"/> and the exception thrown.</returns>
-        public async Task<ChatMessageItem> RegenerateAsync(ChatMessageItem reply, ChatOptions options = null, CancellationToken cancellationToken = default)
+        public async Task<ChatMessageItem> RegenerateAsync(ChatMessageItem reply, ChatOptions options = null, CancellationToken cancellationToken = default,
+            IChatClient client = null)
         {
             if (_busy)
                 throw new InvalidOperationException("A message is already being sent.");
@@ -290,7 +303,9 @@ namespace Emgu.LiteRT.LM.Chat
                 reply.Error = null;
                 reply.State = ChatMessageState.Streaming;
                 await PrepareAsync(message, cancellationToken);
-                await StreamWithRetryAsync(message, reply, options, cancellationToken);
+                await StreamWithRetryAsync(message, reply, options, client ?? Client, cancellationToken);
+                if (client != null && client != Client)
+                    reply.ModelMessages = null;
                 ExchangeCompleted?.Invoke(this, new ChatExchangeEventArgs(message, reply, true));
                 return reply;
             }
@@ -346,14 +361,14 @@ namespace Emgu.LiteRT.LM.Chat
         }
 
         private async Task StreamWithRetryAsync(ChatMessageItem message, ChatMessageItem reply, ChatOptions options,
-            CancellationToken cancellationToken)
+            IChatClient client, CancellationToken cancellationToken)
         {
             ChatOptions requestOptions = WithInstructions(options);
             for (int attempt = 0; ; attempt++)
             {
                 try
                 {
-                    await StreamReplyAsync(message, reply, requestOptions, cancellationToken);
+                    await StreamReplyAsync(message, reply, requestOptions, client, cancellationToken);
                     reply.State = ChatMessageState.Done;
                     break;
                 }
@@ -552,7 +567,7 @@ namespace Emgu.LiteRT.LM.Chat
 
         // Stream the reply into its item. Continues on the caller's context, so the item changes there.
         private async Task StreamReplyAsync(ChatMessageItem message, ChatMessageItem reply, ChatOptions options,
-            CancellationToken cancellationToken)
+            IChatClient client, CancellationToken cancellationToken)
         {
             List<ChatMessage> request = RequestMessages(message);
             List<ChatResponseUpdate> updates = new List<ChatResponseUpdate>();
@@ -560,7 +575,7 @@ namespace Emgu.LiteRT.LM.Chat
             StringBuilder answer = new StringBuilder();
             Dictionary<string, ChatToolStep> steps = new Dictionary<string, ChatToolStep>();
             DateTime? thinkingStarted = null;
-            await foreach (ChatResponseUpdate update in Client.GetStreamingResponseAsync(request, options, cancellationToken))
+            await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(request, options, cancellationToken))
             {
                 updates.Add(update);
                 foreach (AIContent content in update.Contents)
@@ -808,7 +823,7 @@ namespace Emgu.LiteRT.LM.Chat
                     lines.RemoveAt(0);
                 return head + string.Join("\n", lines);
             });
-            ChatOptions options = new ChatOptions
+            ChatOptions options = SummaryOptions?.Clone() ?? new ChatOptions
             {
                 MaxOutputTokens = SummaryMaxTokens,
                 Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }

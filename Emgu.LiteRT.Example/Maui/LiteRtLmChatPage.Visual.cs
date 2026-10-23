@@ -85,10 +85,10 @@ public partial class LiteRtLmChatPage
         {
             if (e.PropertyName == IsVisibleProperty.PropertyName && !_cameraPanel.IsVisible) PauseVisualFeed();
         };
-        _scroll.SizeChanged += (_, _) =>
+        _chatView.SizeChanged += (_, _) =>
         {
             _visualMonitorPanel.WidthRequest = Math.Min(310, Math.Max(180, _mainColumn.Width - 16));
-            _visualMonitorPanel.MaximumHeightRequest = Math.Max(90, Math.Min(220, _scroll.Height - 16));
+            _visualMonitorPanel.MaximumHeightRequest = Math.Max(90, Math.Min(220, _chatView.Height - 16));
         };
     }
 

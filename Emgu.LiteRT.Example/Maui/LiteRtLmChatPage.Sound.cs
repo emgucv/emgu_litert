@@ -52,10 +52,10 @@ public partial class LiteRtLmChatPage
         _soundPanel.IsVisible = false;
         _soundPanel.ZIndex = 6;
         _mainColumn.Add(_soundPanel, 0, 1);
-        _scroll.SizeChanged += (_, _) =>
+        _chatView.SizeChanged += (_, _) =>
         {
             _soundPanel.WidthRequest = Math.Min(310, Math.Max(180, _mainColumn.Width - 16));
-            _soundPanel.MaximumHeightRequest = Math.Max(90, Math.Min(220, _scroll.Height - 16));
+            _soundPanel.MaximumHeightRequest = Math.Max(90, Math.Min(220, _chatView.Height - 16));
         };
         StartMonitoringStopButton();
         MicrophoneGate.Pausing = PauseSoundListeningAsync;

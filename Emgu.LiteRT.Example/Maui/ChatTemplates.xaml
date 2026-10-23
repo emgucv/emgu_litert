@@ -1,12 +1,146 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
   The demo's look for Emgu.LiteRT.LM.Maui's chat controls: their templates replaced by key (see the library's
-  Themes/ChatStyles.xaml), with the demo's Inter fonts and its Material Symbols chevron. Merged in App.xaml.
+  Themes/ChatStyles.xaml), with the demo's Inter fonts, its colours (Theme.cs) and its Material Symbols chevron. Merged in
+  App.xaml. The chat page (LiteRtLmChatPage) uses ChatView for the transcript only - it has its own message box - and its
+  messages' Tag holds the page's data for them (UserMessageInfo, StreamingBubble), which these templates bind to.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                     xmlns:chat="clr-namespace:Emgu.LiteRT.LM.Maui;assembly=Emgu.LiteRT.LM.Maui"
+                    xmlns:lm="clr-namespace:Emgu.LiteRT.LM.Chat;assembly=Emgu.LiteRT.LM.Chat"
+                    xmlns:ai="clr-namespace:Microsoft.Extensions.AI;assembly=Microsoft.Extensions.AI.Abstractions"
+                    xmlns:local="clr-namespace:Maui.Demo.Lite"
                     x:Class="Maui.Demo.Lite.ChatTemplates">
+
+    <local:AllTrueConverter x:Key="AllTrue" />
+
+    <!-- The transcript only: the page has its own message box, status line and model card. -->
+    <ControlTemplate x:Key="ChatViewTemplate">
+        <ScrollView x:Name="PART_Scroll">
+            <VerticalStackLayout Padding="4" Spacing="10">
+                <Label x:Name="PART_Empty" Text="Ask anything - the model runs entirely on this device." FontFamily="InterRegular"
+                       FontSize="15" HorizontalTextAlignment="Center" TextColor="#8A8FA3" Margin="24" />
+                <VerticalStackLayout x:Name="PART_Transcript" Spacing="10" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </ControlTemplate>
+
+    <Style x:Key="ChatDecorationTextStyle" TargetType="Label">
+        <Setter Property="FontFamily" Value="InterRegular" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Margin" Value="6,0" />
+        <Setter Property="TextColor" Value="#8A8FA3" />
+    </Style>
+
+    <!-- An image as a thumbnail, audio as an icon and its name, as the page's own attachment chips. -->
+    <ControlTemplate x:Key="ChatAttachmentViewTemplate">
+        <Border BackgroundColor="White" Stroke="Transparent" Padding="4" HorizontalOptions="End">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="10" />
+            </Border.StrokeShape>
+            <Grid>
+                <Image x:Name="PART_Image" HeightRequest="140" MaximumWidthRequest="240" Aspect="AspectFit" />
+                <Label x:Name="PART_Label" FontFamily="InterRegular" FontSize="13" TextColor="#1A1C2E" Padding="4,2"
+                       LineBreakMode="MiddleTruncation" MaximumWidthRequest="220" VerticalOptions="Center" />
+            </Grid>
+        </Border>
+    </ControlTemplate>
+
+    <DataTemplate x:Key="ChatUserMessageTemplate" x:DataType="lm:ChatMessageItem">
+        <VerticalStackLayout Spacing="6">
+            <!-- Where the model's memory of the chat starts; tap it to read the summary. -->
+            <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="8" Margin="8,4" IsVisible="{Binding StartsContext}">
+                <BoxView HeightRequest="1" Color="#C2C7D6" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding Tag.DividerText, x:DataType={x:Null}}" FontFamily="InterRegular" FontSize="12"
+                       TextColor="#8A8FA3" HorizontalTextAlignment="Center" VerticalOptions="Center" />
+                <BoxView Grid.Column="2" HeightRequest="1" Color="#C2C7D6" VerticalOptions="Center" />
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type chat:ChatView}}, Path=ShowSummaryCommand, x:DataType=chat:ChatView}" />
+                </Grid.GestureRecognizers>
+            </Grid>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Attachments}" Spacing="6" HorizontalOptions="End"
+                                 IsVisible="{Binding HasAttachments}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="ai:DataContent">
+                        <chat:ChatAttachmentView Attachment="{Binding .}" HorizontalOptions="End" />
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+            <!-- The words of a voice message, written down by the speech recognizer. -->
+            <Label Text="{Binding Tag.TranscriptText, x:DataType={x:Null}}" IsVisible="{Binding Tag.HasTranscript, x:DataType={x:Null}}"
+                   FontFamily="InterRegular" FontSize="14" FontAttributes="Italic" TextColor="#8A8FA3"
+                   HorizontalOptions="End" HorizontalTextAlignment="End" MaximumWidthRequest="420" />
+            <Border HorizontalOptions="End" MaximumWidthRequest="420" Padding="12,9" Stroke="Transparent" BackgroundColor="#3D7BF7"
+                    IsVisible="{Binding HasText}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="18" />
+                </Border.StrokeShape>
+                <Label Text="{Binding Text}" TextColor="White" FontFamily="InterRegular" FontSize="15" />
+            </Border>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Decorations}" IsVisible="{Binding HasDecorations}" Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="x:Object">
+                        <chat:ChatDecorationView Decoration="{Binding .}" />
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </DataTemplate>
+
+    <DataTemplate x:Key="ChatReplyTemplate" x:DataType="lm:ChatMessageItem">
+        <VerticalStackLayout Spacing="10">
+            <!-- The tool calls, then the cards they made (a picture, photo results, a device action...). -->
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Steps}" IsVisible="{Binding HasSteps}" Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="lm:ChatToolStep">
+                        <Label Text="{Binding Text, StringFormat='&#x1F50E; {0}'}" FontFamily="InterRegular" FontSize="13"
+                               TextColor="#8A8FA3" Margin="6,0" />
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+            <!-- The page's cards for the reply, and the document's step line. -->
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Decorations}" IsVisible="{Binding HasDecorations}" Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="x:Object">
+                        <chat:ChatDecorationView Decoration="{Binding .}" />
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+            <Border x:Name="Bubble" HorizontalOptions="Start" MaximumWidthRequest="420" Padding="12,9" Stroke="Transparent"
+                    BackgroundColor="#E8EFFE">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="18" />
+                </Border.StrokeShape>
+                <!-- A reply with code may use the full width, so less of the code wraps. -->
+                <Border.Triggers>
+                    <DataTrigger TargetType="Border" Binding="{Binding Source={x:Reference Body}, Path=HasCode, x:DataType=chat:ReplyView}" Value="True">
+                        <Setter Property="MaximumWidthRequest" Value="100000" />
+                    </DataTrigger>
+                </Border.Triggers>
+                <VerticalStackLayout Spacing="4">
+                    <chat:ThinkingView x:Name="Thinking" Thinking="{Binding Thinking}" IsThinking="{Binding IsThinking}"
+                                       Duration="{Binding ThinkingDuration}" AlwaysExpanded="{Binding IsFinishedWithoutAnswer}"
+                                       DisplayText="{Binding Tag.ThinkingDisplayText, x:DataType={x:Null}}"
+                                       Accessory="{Binding Tag.TranslateRow, x:DataType={x:Null}}" />
+                    <BoxView HeightRequest="1" Color="#C2C7D6">
+                        <BoxView.IsVisible>
+                            <MultiBinding Converter="{StaticResource AllTrue}">
+                                <Binding Source="{x:Reference Thinking}" Path="ShowsThinking" x:DataType="chat:ThinkingView" />
+                                <Binding Path="HasAnswer" />
+                            </MultiBinding>
+                        </BoxView.IsVisible>
+                    </BoxView>
+                    <chat:ReplyView x:Name="Body" Text="{Binding Text}" IsVisible="{Binding HasAnswer}" FontFamily="InterRegular"
+                                    FontSize="15" TextColor="#1A1C2E" LinkColor="#3D7BF7" SecondaryTextColor="#8A8FA3"
+                                    QuoteMarkColor="#C2C7D6" />
+                    <Label Text="…" IsVisible="{Binding IsInterrupted}" FontFamily="InterRegular" FontSize="15" TextColor="#8A8FA3" />
+                    <Label Text="{Binding Error, StringFormat='Error: {0}'}" IsVisible="{Binding IsFailed}" FontFamily="InterRegular"
+                           FontSize="14" TextColor="#D93B3B" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </DataTemplate>
 
     <ControlTemplate x:Key="CodeBlockViewTemplate">
         <Border BackgroundColor="#1F2430" Stroke="Transparent" Padding="10,6,10,10">

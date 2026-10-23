@@ -69,7 +69,7 @@ namespace Maui.Demo.Lite
 
         private Task<bool> ConfirmEndPrivateChatAsync()
         {
-            if (_historyItems.Count == 0 && _pending.Count == 0 && _document == null && string.IsNullOrWhiteSpace(_promptEditor.Text))
+            if (!ChatMessages.Any() && _pending.Count == 0 && _document == null && string.IsNullOrWhiteSpace(_promptEditor.Text))
                 return Task.FromResult(true);
             return DisplayAlertAsync("End private chat?", "This conversation and its session pictures and documents will be discarded. It cannot be reopened.", "End private chat", "Cancel");
         }
@@ -136,7 +136,6 @@ namespace Maui.Demo.Lite
             _promptEditor.Text = string.Empty;
             lock (_sendImages) _sendImages.Clear();
             ClearWrittenDocuments();
-            _sendSteps.Clear();
             _agentBubble = null;
             _statusLabel.Text = string.Empty;
             _statusLabel.IsVisible = false;
@@ -174,9 +173,6 @@ namespace Maui.Demo.Lite
                 await FinishPrivateDocumentsAsync();
                 ClearPrivateSessionContent();
                 _sheet.Dismiss(null);
-                _historyItems.Clear();
-                _summary = null;
-                _agentPrimeHistory = null;
                 ClearTranscript();
             }
             finally { _privateDiagnostics?.Dispose(); _privateDiagnostics = null; }

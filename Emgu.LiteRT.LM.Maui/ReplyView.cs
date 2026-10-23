@@ -140,12 +140,16 @@ namespace Emgu.LiteRT.LM.Maui
             set => SetValue(InlineCodeBackgroundColorProperty, value);
         }
 
+        /// <summary>True if the reply contains a code block (bindable: a chat may then let the reply use the full width).</summary>
+        public static readonly BindableProperty HasCodeProperty = BindableProperty.Create(
+            nameof(HasCode), typeof(bool), typeof(ReplyView), false, BindingMode.OneWayToSource);
+
         /// <summary>
         /// True if the reply contains a code block (a chat may then let the reply use the full width).
         /// </summary>
         public bool HasCode
         {
-            get { return _shown.Exists(p => p.Block.Kind == ReplyBlockKind.Code); }
+            get { return (bool)GetValue(HasCodeProperty); }
         }
 
         /// <summary>
@@ -206,6 +210,9 @@ namespace Emgu.LiteRT.LM.Maui
             }
             while (_shown.Count > blocks.Count)
                 RemoveLast();
+            bool hasCode = _shown.Exists(p => p.Block.Kind == ReplyBlockKind.Code);
+            if (hasCode != HasCode)
+                SetValue(HasCodeProperty, hasCode);
         }
 
         private void RemoveLast()

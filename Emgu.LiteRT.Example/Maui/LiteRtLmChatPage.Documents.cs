@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Models;
+using Emgu.LiteRT.LM.Chat;
 
 namespace Maui.Demo.Lite
 {
@@ -86,10 +87,6 @@ namespace Maui.Demo.Lite
         // conversation was last compacted.
         private readonly HashSet<int> _givenPassages = new HashSet<int>();
         private readonly HashSet<int> _givenImages = new HashSet<int>();
-        // Counts compactions, so a send can tell that its own compaction dropped excerpts it left out as already given.
-        private int _compactions;
-
-        private static bool IsToolStep(string step) => !step.StartsWith(DocumentStepPrefix, StringComparison.Ordinal);
 
         // ---------- Attaching ----------
 
@@ -384,7 +381,8 @@ namespace Maui.Demo.Lite
         // A reopened chat already gave the model the excerpts in its messages: don't send them again.
         private void MarkGivenFromHistory(DocumentIndex index)
         {
-            List<string> contexts = _historyItems.Skip(_contextStart).Select(i => i.Context).Where(c => !string.IsNullOrEmpty(c)).ToList();
+            List<string> contexts = _conversation.Messages.Skip(_conversation.ContextStart)
+                .Where(m => m.Role == ChatMessageRole.User).Select(m => m.Context).Where(c => !string.IsNullOrEmpty(c)).ToList();
             if (contexts.Count == 0)
                 return;
             foreach (DocumentPassage passage in index.Passages)
@@ -661,7 +659,7 @@ namespace Maui.Demo.Lite
         // compacting may just have summarized or dropped (a question about one then got no excerpt and was answered from
         // the summary alone). Search again, now that nothing counts as given; a picture already attached is kept.
         private async Task<DocumentContext> RefreshDocumentContextAsync(string prompt, DocumentContext document,
-            HistoryItem userItem, List<PendingAttachment> attachments)
+            ChatMessageItem userItem, List<PendingAttachment> attachments)
         {
             DocumentContext again = await GetDocumentContextAsync(prompt);
             if (again == null)
@@ -677,11 +675,8 @@ namespace Maui.Demo.Lite
             else if (again.Image != null)
             {
                 attachments.Add(again.Image);
-                userItem.Attachments.Add(("image", again.Image.MediaType, again.Image.Data));
+                userItem.AddAttachment(new Microsoft.Extensions.AI.DataContent(again.Image.Data, again.Image.MediaType));
             }
-            userItem.Context = again.Text;
-            // Counted again before sending.
-            userItem.Tokens = -1;
             return again;
         }
 

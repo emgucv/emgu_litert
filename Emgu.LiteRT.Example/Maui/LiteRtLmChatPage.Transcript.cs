@@ -17,7 +17,8 @@ namespace Maui.Demo.Lite;
 // can't hear audio already gets the words as its message.
 public partial class LiteRtLmChatPage
 {
-    private async Task TranscribeVoiceMessageAsync(HistoryItem item, byte[] wav, Label label)
+    // The words are shown under the message by the demo's template (UserMessageInfo.TranscriptText).
+    private async Task TranscribeVoiceMessageAsync(UserMessageInfo item, byte[] wav)
     {
         string words = null;
         try
@@ -28,16 +29,15 @@ public partial class LiteRtLmChatPage
         {
             UiStallWatchdog.Mark("Voice message transcript failed: " + ex.Message);
         }
-        item.Transcript = string.IsNullOrEmpty(words) ? null : words;
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
-            label.Text = item.Transcript == null ? string.Empty : "\u201C" + item.Transcript + "\u201D";
-            label.IsVisible = item.Transcript != null;
+            item.Transcript = string.IsNullOrEmpty(words) ? null : words;
+            item.Transcribing = false;
         });
     }
 
     // Once the message is saved and its words are ready: keep them (and title a chat still called "Voice message" with them).
-    private async Task SaveTranscriptWhenReadyAsync(int conversationId, HistoryItem item)
+    private async Task SaveTranscriptWhenReadyAsync(int conversationId, UserMessageInfo item)
     {
         try
         {

@@ -35,18 +35,15 @@ public partial class LiteRtLmChatPage
                 FontSize = 12, FontFamily = Theme.BodyFont, TextColor = Theme.SecondaryText };
             var row = new VerticalStackLayout { Spacing = 4, Margin = new Thickness(6, 4), HorizontalOptions = LayoutOptions.Start,
                 Children = { image, caption } };
-            if (_transcript.Children.Contains(_emptyLabel)) _transcript.Children.Remove(_emptyLabel);
-            int index = _agentBubble != null ? _transcript.Children.IndexOf(_agentBubble.Row) : -1;
-            if (index >= 0) _transcript.Children.Insert(index, row); else _transcript.Children.Add(row);
+            AddCard(_agentBubble, row);
             _visualSnapshotViews.Enqueue(row);
-            if (_visualSnapshotViews.Count > MaximumVisualSnapshots) _transcript.Children.Remove(_visualSnapshotViews.Dequeue());
-            ScrollToEnd();
+            if (_visualSnapshotViews.Count > MaximumVisualSnapshots) RemoveCard(_visualSnapshotViews.Dequeue());
         });
     }
 
     private void ClearVisualSnapshots()
     {
-        while (_visualSnapshotViews.Count > 0) _transcript.Children.Remove(_visualSnapshotViews.Dequeue());
+        while (_visualSnapshotViews.Count > 0) RemoveCard(_visualSnapshotViews.Dequeue());
     }
 
     private async void ShowVisualSnapshotLarge(byte[] jpeg, DateTimeOffset capturedAt)

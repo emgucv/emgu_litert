@@ -337,12 +337,7 @@ namespace Maui.Demo.Lite
                 Margin = new Thickness(6, 0),
                 Content = row
             };
-            int index = bubble != null ? _transcript.Children.IndexOf(bubble.Row) : -1;
-            if (index < 0)
-                _transcript.Children.Add(strip);
-            else
-                _transcript.Children.Insert(index, strip);
-            ScrollToEnd();
+            AddCard(bubble, strip);
         }
 
         private static async Task LoadThumbnailAsync(Image image, string photoId)

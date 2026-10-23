@@ -76,17 +76,14 @@ public partial class LiteRtLmChatPage
                 Spacing = 4, Margin = new Thickness(6, 4), HorizontalOptions = LayoutOptions.Start,
                 Children = { image, caption, new HorizontalStackLayout { Spacing = 6, Children = { open, share, save } }, status }
             };
-            if (_transcript.Children.Contains(_emptyLabel)) _transcript.Children.Remove(_emptyLabel);
-            int index = _agentBubble != null ? _transcript.Children.IndexOf(_agentBubble.Row) : -1;
-            if (index >= 0) _transcript.Children.Insert(index, row); else _transcript.Children.Add(row);
+            AddCard(_agentBubble, row);
             _visualPhotos.Enqueue((row, photo.Path));
             while (_visualPhotos.Count > MaximumVisualPhotos)
             {
                 var old = _visualPhotos.Dequeue();
-                _transcript.Children.Remove(old.Row);
+                RemoveCard(old.Row);
                 try { File.Delete(old.Path); } catch (Exception) { }
             }
-            ScrollToEnd();
         });
     }
 
@@ -126,7 +123,7 @@ public partial class LiteRtLmChatPage
         while (_visualPhotos.Count > 0)
         {
             var photo = _visualPhotos.Dequeue();
-            _transcript.Children.Remove(photo.Row);
+            RemoveCard(photo.Row);
             try { File.Delete(photo.Path); } catch (Exception) { }
         }
     }

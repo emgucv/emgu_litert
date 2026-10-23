@@ -227,6 +227,26 @@ Each step builds the demo and is checked before the next. Device checks: Mac Cat
      the conversation now holds, and `ToolRouter` reads `FunctionInvokingChatClient.CurrentContext` either way - and
      its transcript, thinking, steps, compaction divider, saved chats (`ExchangeCompleted`, `Load`), translation
      (the `ThinkingView` accessory) and read-aloud move to `ChatView`. Checks on Mac Catalyst and the Galaxy S10.
+     **Done 2026-10-23:** library additions - a per-message client for `SendAsync`/`RegenerateAsync` (its reply is
+     then given to the main client as text), `SummaryOptions`, `ChatMessageItem.AddAttachment`, `HasSteps`/
+     `HasDecorations`, `ChatView.Header` and `ScrollToEnd()`, bindable `ReplyView.HasCode` and `ThinkingView.ShowsThinking`.
+     The page: one `ChatConversation` (`_conversation`) over `PageChatClient` -> `EnsureClient()` (the model's
+     `LiteRtLmChatClient` with context management, or the server's, wrapped by `UseFunctionInvocation()`), configured per
+     send (`ConfigureConversation`: window, tokenizer, overhead incl. tool groups, summarize/drop, a server's summary
+     options); `SendAsync` keeps the voice transcription, document excerpts (re-searched in `BeforeStreaming` after a
+     compaction), task mode, camera frames (`AddAttachment`), read-aloud and saving, and retries with `RegenerateAsync` for
+     a server rejecting `reasoning_effort` and for `ToolRouter`'s re-run; `MessageOptionsAsync` replaces `RunAgentAsync`;
+     tool step outcomes ("Already remembered", device/MCP outcomes) are written onto the `ChatToolStep`s; saving reads
+     the items (the document step is a card and saved first); reopening builds the items and `Load`s them (steps and
+     cards with their reply, the divider at the saved compaction point); task mode is `TaskModeClient`. The transcript is
+     a `ChatView` with the demo's templates (`ChatTemplates.xaml`, transcript-only `ChatViewTemplate`); every "insert
+     above the reply bubble" became `AddCard(bubble, view)` (a decoration, or a notice without a reply) and removals
+     `RemoveCard`. ~300 lines of the page's own context-window code are gone (31 files, -280 lines). Checked with a
+     temporary self-test of the page: on Mac Catalyst (Gemma 4 E2B, CPU threads; Qwen3) and the Galaxy S10 (Gemma 4 E2B
+     on the GPU) - a calculator tool step (838,102.05), a Spanish question offering "Translate to español", recall,
+     "compact now" and an answer from the summary, reopening the saved chat (8 messages, its steps, the summary, the
+     divider at the right message) and continuing it, Qwen3 answering through the same path; transcript look as before
+     (after hiding empty step/card lists, which left gaps). Not yet checked: the feature cards (6c).
    - **6c - the feature cards**: generated images, photo search, documents, device actions, written documents, the
      camera and sound monitors, task mode and the voice chat, as decorations and notices; device checks per group.
    - **6d - remove the page's old code; docs.**

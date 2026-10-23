@@ -54,7 +54,8 @@ public partial class LiteRtLmChatPage
     }
 
     // A saved chat's document: its name and type from the media type.
-    private void AddSavedDocumentCard(string mediaType, byte[] data)
+    // A document a saved reply wrote, above it again when the chat is reopened.
+    private void AddSavedDocumentCard(StreamingBubble bubble, string mediaType, byte[] data)
     {
         string type = mediaType, name = "Document";
         int parameter = mediaType.IndexOf(';');
@@ -66,7 +67,7 @@ public partial class LiteRtLmChatPage
                 name = rest.Substring(5);
         }
         string format = type == DocumentWriter.PdfMediaType ? "PDF" : type == DocumentWriter.MarkdownMediaType ? "Markdown" : "Word";
-        AddDocumentCard(null, name, type, format, data);
+        AddDocumentCard(bubble, name, type, format, data);
     }
 
     private static string SizeText(long bytes) =>
@@ -148,12 +149,7 @@ public partial class LiteRtLmChatPage
             Content = content
         };
         SemanticProperties.SetDescription(card, "Document " + fileName + ", " + format);
-        int index = bubble != null ? _transcript.Children.IndexOf(bubble.Row) : -1;
-        if (index < 0)
-            _transcript.Children.Add(card);
-        else
-            _transcript.Children.Insert(index, card);
-        ScrollToEnd();
+        AddCard(bubble, card);
     }
 
     // Open and Share need a file: written to the cache, in a folder of its own so the name stays as it is.

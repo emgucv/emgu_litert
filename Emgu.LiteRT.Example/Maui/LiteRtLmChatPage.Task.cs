@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Agents;
+using Microsoft.Extensions.AI;
 
 namespace Maui.Demo.Lite;
 
@@ -40,63 +41,84 @@ public partial class LiteRtLmChatPage
         return string.Join(", ", tools);
     }
 
-    // One question to the model in a conversation of its own (like a summary): its reply.
+    // One question to the model in a request of its own (like a summary): its reply. The conversation's client takes it as
+    // a new conversation and is given the chat again with the next message.
     private async Task<string> AskModelOnceAsync(string prompt, int maxTokens)
     {
         if (SelectedChoice == ModelChoice.Server)
             return await SummarizeOnServerAsync(prompt);
-        LanguageModel model = _model;
-        ResetAgent();
-        _chat?.LoadHistory(Array.Empty<Emgu.LiteRT.LM.Models.ChatMessage>());
-        Chat asker = model.CreateChat();
-        try
-        {
-            asker.MaxOutputTokens = maxTokens;
-            asker.EnableThinking = false;
-            return (await asker.SendAsync(prompt)).Text.Trim();
-        }
-        finally
-        {
-            await Task.Run(() => asker.Dispose());
-        }
+        ChatResponse response = await _clientProxy.GetResponseAsync(new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, prompt) },
+            new ChatOptions { MaxOutputTokens = maxTokens, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } });
+        return new ChatReply(response.Text ?? string.Empty).Text.Trim();
     }
 
-    private async Task<ChatReply> RunTaskAsync(string request, List<PendingAttachment> attachments, StreamingBubble bubble,
-        CancellationToken token)
+    // A task, as the chat client of the message that asks for it (ChatConversation.SendAsync with this client): it plans
+    // the task, shows the plan above the reply and waits for Run (or "Just answer"); then each step runs as a request of its
+    // own, given the task, the plan and the earlier steps' short results (TaskPlan.StepPrompt), its tool calls streamed as
+    // the reply's step lines; last the final answer is written from the results and streamed as the reply. Not a task to
+    // break up, or answered without the plan: the message goes to the model as usual.
+    private sealed class TaskModeClient : IChatClient
     {
-        SetStatus("Planning...");
-        UiStallWatchdog.Mark("Task mode: planning");
-        List<string> steps = TaskPlan.Parse(await AskModelOnceAsync(TaskPlan.PlanPrompt(request, TaskToolSummary()), 400));
-        if (steps.Count < 2)
+        private readonly LiteRtLmChatPage _page;
+        private readonly string _request;
+        private readonly IList<DataContent> _attachments;
+
+        public TaskModeClient(LiteRtLmChatPage page, string request, IList<DataContent> attachments)
         {
-            // Not a task to break up: answer it as usual.
-            UiStallWatchdog.Mark("Task mode: no plan");
-            SetStatus("Generating...");
-            return await RunAgentAsync(request, attachments, bubble, token);
-        }
-        var plan = new TaskPlan(steps);
-        _taskPlan = plan;
-        var decision = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _taskDecision = decision;
-        TaskCard card = await MainThread.InvokeOnMainThreadAsync(() => AddTaskCard(bubble, plan, decision));
-        _taskCard = card;
-        SetStatus("Review the plan, then run it.");
-        bool run;
-        using (token.Register(() => decision.TrySetCanceled(token)))
-            run = await decision.Task;
-        _taskDecision = null;
-        if (!run)
-        {
-            await MainThread.InvokeOnMainThreadAsync(() => card.Close("Answering without a plan"));
-            SetStatus("Generating...");
-            return await RunAgentAsync(request, attachments, bubble, token);
+            _page = page;
+            _request = request;
+            _attachments = attachments;
         }
 
-        using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
-        card.Stop = stop.Cancel;
-        await MainThread.InvokeOnMainThreadAsync(card.Begin);
-        try
+        public async Task<ChatResponse> GetResponseAsync(IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, ChatOptions options = null,
+            CancellationToken cancellationToken = default)
         {
+            var updates = new List<ChatResponseUpdate>();
+            await foreach (ChatResponseUpdate update in GetStreamingResponseAsync(messages, options, cancellationToken))
+                updates.Add(update);
+            return updates.ToChatResponse();
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages,
+            ChatOptions options = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken token = default)
+        {
+            LiteRtLmChatPage page = _page;
+            IChatClient client = page._clientProxy;
+            page.SetStatus("Planning...");
+            UiStallWatchdog.Mark("Task mode: planning");
+            List<string> steps = TaskPlan.Parse(await page.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, page.TaskToolSummary()), 400));
+            bool run = false;
+            TaskPlan plan = null;
+            TaskCard card = null;
+            if (steps.Count >= 2)
+            {
+                plan = new TaskPlan(steps);
+                page._taskPlan = plan;
+                var decision = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                page._taskDecision = decision;
+                card = await MainThread.InvokeOnMainThreadAsync(() => page.AddTaskCard(page._agentBubble, plan, decision));
+                page._taskCard = card;
+                page.SetStatus("Review the plan, then run it.");
+                using (token.Register(() => decision.TrySetCanceled(token)))
+                    run = await decision.Task;
+                page._taskDecision = null;
+                if (!run)
+                    await MainThread.InvokeOnMainThreadAsync(() => card.Close("Answering without a plan"));
+            }
+            else
+                UiStallWatchdog.Mark("Task mode: no plan");
+            if (!run)
+            {
+                // Not a task to break up: answered as usual.
+                page.SetStatus("Generating...");
+                await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(messages, options, token))
+                    yield return update;
+                yield break;
+            }
+
+            using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
+            card.Stop = stop.Cancel;
+            await MainThread.InvokeOnMainThreadAsync(card.Begin);
             for (int i = 0; i < plan.Steps.Count && !stop.IsCancellationRequested; i++)
             {
                 TaskPlan.Step step = plan.Steps[i];
@@ -104,69 +126,80 @@ public partial class LiteRtLmChatPage
                     continue;
                 step.State = TaskPlan.State.Running;
                 await MainThread.InvokeOnMainThreadAsync(card.Refresh);
-                SetStatus(string.Format("Step {0} of {1}: {2}", i + 1, plan.Steps.Count, step.Text));
+                page.SetStatus(string.Format("Step {0} of {1}: {2}", i + 1, plan.Steps.Count, step.Text));
                 UiStallWatchdog.Mark("Task mode: step " + (i + 1));
-                // A conversation of its own: the task, the plan and the results so far are in the message.
-                _session = null;
-                _agentPrimeHistory = null;
-                StreamingBubble stepBubble = await MainThread.InvokeOnMainThreadAsync(() => AddStepBubble(bubble));
+                // A request of its own: the task, the plan and the results so far are in the message.
+                var contents = new List<AIContent>();
+                if (i == 0)
+                    contents.AddRange(_attachments);
+                contents.Add(new TextContent(plan.StepPrompt(_request, i)));
+                var stepMessages = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, contents) };
+                var answer = new System.Text.StringBuilder();
+                var tools = new List<ChatResponseUpdate>();
+                IAsyncEnumerator<ChatResponseUpdate> stream = client.GetStreamingResponseAsync(stepMessages, options, stop.Token).GetAsyncEnumerator(stop.Token);
                 try
                 {
-                    ChatReply reply = await RunAgentAsync(plan.StepPrompt(request, i), i == 0 ? attachments : new List<PendingAttachment>(), stepBubble, stop.Token);
-                    step.Result = TaskPlan.ShortResult(reply.Text);
+                    while (true)
+                    {
+                        ChatResponseUpdate update;
+                        try
+                        {
+                            if (!await stream.MoveNextAsync())
+                                break;
+                            update = stream.Current;
+                        }
+                        catch (OperationCanceledException) when (stop.IsCancellationRequested)
+                        {
+                            step.State = TaskPlan.State.Skipped;
+                            break;
+                        }
+                        catch (Exception ex) when (!stop.IsCancellationRequested)
+                        {
+                            step.State = TaskPlan.State.Failed;
+                            step.Result = TaskPlan.ShortResult(ex.Message);
+                            UiStallWatchdog.Mark("Task mode: step failed: " + ex.Message);
+                            break;
+                        }
+                        answer.Append(update.Contents.OfType<TextContent>().Select(t => t.Text).DefaultIfEmpty(string.Empty).Aggregate(string.Concat));
+                        // The step's tool calls and results are the reply's step lines; its text is only its result.
+                        var calls = update.Contents.Where(c => c is FunctionCallContent || c is FunctionResultContent).ToList();
+                        if (calls.Count > 0)
+                            yield return new ChatResponseUpdate(update.Role, calls);
+                    }
+                }
+                finally
+                {
+                    await stream.DisposeAsync();
+                }
+                if (step.State == TaskPlan.State.Running)
+                {
+                    step.Result = TaskPlan.ShortResult(new ChatReply(answer.ToString()).Text);
                     step.State = TaskPlan.State.Done;
                 }
-                catch (OperationCanceledException) when (stop.IsCancellationRequested)
-                {
-                    step.State = TaskPlan.State.Skipped;
-                }
-                catch (Exception ex) when (!stop.IsCancellationRequested)
-                {
-                    step.State = TaskPlan.State.Failed;
-                    step.Result = TaskPlan.ShortResult(ex.Message);
-                    UiStallWatchdog.Mark("Task mode: step failed: " + ex.Message);
-                }
-                await MainThread.InvokeOnMainThreadAsync(() =>
-                {
-                    stepBubble.Row.IsVisible = false;
-                    card.Refresh();
-                });
+                await MainThread.InvokeOnMainThreadAsync(card.Refresh);
             }
             token.ThrowIfCancellationRequested();
             if (stop.IsCancellationRequested)
             {
-                foreach (TaskPlan.Step pending in plan.Steps.Where(s => s.State == TaskPlan.State.Pending))
+                foreach (TaskPlan.Step pending in plan.Steps.Where(st => st.State == TaskPlan.State.Pending))
                     pending.State = TaskPlan.State.Skipped;
                 await MainThread.InvokeOnMainThreadAsync(() => card.Close("Stopped"));
-                return new ChatReply(plan.StoppedSummary());
+                yield return new ChatResponseUpdate(ChatRole.Assistant, plan.StoppedSummary());
+                yield break;
             }
             await MainThread.InvokeOnMainThreadAsync(() => card.Close("Done"));
             // The final answer, from the results, in the reply.
-            SetStatus("Writing the answer...");
-            _session = null;
-            _agentPrimeHistory = null;
-            return await RunAgentAsync(plan.FinalPrompt(request), new List<PendingAttachment>(), bubble, token);
+            page.SetStatus("Writing the answer...");
+            var final = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, plan.FinalPrompt(_request)) };
+            await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(final, options, token))
+                yield return update;
         }
-        finally
-        {
-            // The model is given the conversation (the request and the answer) again with the next message.
-            _needsPrime = true;
-            _session = null;
-        }
-    }
 
-    // A step's bubble goes above the reply's (before it in the transcript); it isn't shown - the plan card and the tool step lines are.
-    private StreamingBubble AddStepBubble(StreamingBubble before)
-    {
-        StreamingBubble stepBubble = AddStreamingBubble();
-        stepBubble.Row.IsVisible = false; // the plan card and the step lines show the progress
-        _transcript.Children.Remove(stepBubble.Row);
-        int index = _transcript.Children.IndexOf(before.Row);
-        if (index < 0)
-            _transcript.Children.Add(stepBubble.Row);
-        else
-            _transcript.Children.Insert(index, stepBubble.Row);
-        return stepBubble;
+        public object GetService(Type serviceType, object serviceKey = null) => null;
+
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class TaskCard
@@ -358,12 +391,7 @@ public partial class LiteRtLmChatPage
             Refresh();
         };
         Refresh();
-        int index = _transcript.Children.IndexOf(before.Row);
-        if (index < 0)
-            _transcript.Children.Add(card.View);
-        else
-            _transcript.Children.Insert(index, card.View);
-        ScrollToEnd();
+        AddCard(before, card.View);
         return card;
     }
 }

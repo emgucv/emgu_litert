@@ -38,7 +38,6 @@ public partial class LiteRtLmChatPage
     // The reply being generated (an interruption cancels it), the reader reading it aloud and its latest text.
     private CancellationTokenSource _replyCancel;
     private ReplyReader _replyReader;
-    private ChatReply _latestPartial;
 
     // Gemma 4 takes speech; measuring the microphone's level needs a recorder that reports it (not Windows').
     // With a model that doesn't take audio, what was said is sent as text (SpeechToText).
@@ -425,12 +424,6 @@ public partial class LiteRtLmChatPage
         _replyReader = null;
     }
 
-    // What an interrupted reply leaves in the chat: the text so far, marked as cut off.
-    private ChatReply InterruptedReply()
-    {
-        string text = _latestPartial?.Text ?? string.Empty;
-        return new ChatReply(text.Length > 0 ? text + " …" : "…");
-    }
 
     /// <summary>
     /// Reads a reply aloud while it is being written: <see cref="SpeechSegmenter"/> cuts it into sentences and lines

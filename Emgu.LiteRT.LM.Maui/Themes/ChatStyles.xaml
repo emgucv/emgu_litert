@@ -14,8 +14,8 @@
                            PART_Preview, PART_Body (a ReplyView)
     ModelLoadCardTemplate  ModelLoadCard: PART_Title, PART_Status, PART_Note (Labels), PART_Progress (a ProgressBar),
                            PART_Download, PART_Cancel, PART_Retry (Buttons)
-    ChatViewTemplate       ChatView: PART_Scroll, PART_Transcript, PART_Empty, PART_LoadCard, PART_Status, PART_Input,
-                           PART_Send, PART_Stop, PART_Attach
+    ChatViewTemplate       ChatView: PART_Scroll, PART_Transcript, PART_Empty, PART_Header, PART_LoadCard, PART_Status,
+                           PART_Input, PART_Send, PART_Stop, PART_Attach, PART_Attachments
     ChatUserMessageTemplate, ChatReplyTemplate, ChatNoticeTemplate
                            ChatView's messages and notices (DataTemplates of an Emgu.LiteRT.LM.Chat ChatMessageItem); they
                            show the item's Decorations with ChatDecorationView, and the user template's "Earlier messages
@@ -109,6 +109,7 @@
         <Grid RowDefinitions="*,Auto,Auto" Padding="12,0,12,12" RowSpacing="6">
             <ScrollView x:Name="PART_Scroll">
                 <VerticalStackLayout Padding="0,12" Spacing="8">
+                    <ContentView x:Name="PART_Header" IsVisible="False" />
                     <chat:ModelLoadCard x:Name="PART_LoadCard" />
                     <Label x:Name="PART_Empty" Text="Ask me anything." HorizontalOptions="Center" Margin="0,40" FontSize="15"
                            TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
@@ -186,7 +187,7 @@
                 </Border.StrokeShape>
                 <Label Text="{Binding Text}" TextColor="White" FontSize="15" />
             </Border>
-            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Decorations}" Spacing="6" HorizontalOptions="End">
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Decorations}" IsVisible="{Binding HasDecorations}" Spacing="6" HorizontalOptions="End">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="x:Object">
                         <chat:ChatDecorationView Decoration="{Binding .}" />
@@ -200,7 +201,7 @@
     <DataTemplate x:Key="ChatNoticeTemplate" x:DataType="lm:ChatMessageItem">
         <VerticalStackLayout Spacing="6">
             <Label Text="{Binding Text}" IsVisible="{Binding HasText}" Style="{StaticResource ChatDecorationTextStyle}" />
-            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Decorations}" Spacing="6">
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Decorations}" IsVisible="{Binding HasDecorations}" Spacing="6">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="x:Object">
                         <chat:ChatDecorationView Decoration="{Binding .}" />
@@ -212,7 +213,7 @@
 
     <DataTemplate x:Key="ChatReplyTemplate" x:DataType="lm:ChatMessageItem">
         <VerticalStackLayout Spacing="4">
-            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Steps}" Spacing="2">
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Steps}" IsVisible="{Binding HasSteps}" Spacing="2">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="lm:ChatToolStep">
                         <Label Text="{Binding Text, StringFormat='&#x1F50E; {0}'}" FontSize="13" Margin="6,0"
@@ -221,7 +222,7 @@
                 </BindableLayout.ItemTemplate>
             </VerticalStackLayout>
             <!-- The app's cards for the reply (e.g. a generated picture), above its bubble. -->
-            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Decorations}" Spacing="6">
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Decorations}" IsVisible="{Binding HasDecorations}" Spacing="6">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="x:Object">
                         <chat:ChatDecorationView Decoration="{Binding .}" />

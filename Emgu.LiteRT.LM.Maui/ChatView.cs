@@ -23,7 +23,8 @@ namespace Emgu.LiteRT.LM.Maui
     /// ScrollView), "PART_Transcript" (a Layout the messages are added to), "PART_Empty" (shown while there are no
     /// messages), "PART_LoadCard" (a <see cref="ModelLoadCard"/>), "PART_Status" (a Label), "PART_Input" (an InputView,
     /// e.g. an Editor), "PART_Send", "PART_Stop" and "PART_Attach" (Buttons, or views that are tapped) and
-    /// "PART_Attachments" (a Layout for the attachments waiting to be sent). The messages use
+    /// "PART_Attachments" (a Layout for the attachments waiting to be sent) and "PART_Header" (a ContentView showing
+    /// <see cref="Header"/>). The messages use
     /// <see cref="MessageTemplateSelector"/>, and the Send, Stop and attach buttons the styles "ChatSendButtonStyle",
     /// "ChatStopButtonStyle" and "ChatAttachButtonStyle" unless the template gives them one. Attachments come from
     /// <see cref="AttachmentSource"/>; with <see cref="ReadAloud"/> on, <see cref="ReplySpeaker"/> reads the replies.
@@ -86,7 +87,12 @@ namespace Emgu.LiteRT.LM.Maui
         public static readonly BindableProperty ReplySpeakerProperty = BindableProperty.Create(
             nameof(ReplySpeaker), typeof(IReplySpeaker), typeof(ChatView), null, defaultValueCreator: b => new TextToSpeechReplySpeaker());
 
+        /// <summary>A view shown above the transcript, scrolling with it (e.g. an app's own model card), or null.</summary>
+        public static readonly BindableProperty HeaderProperty = BindableProperty.Create(
+            nameof(Header), typeof(View), typeof(ChatView), null, propertyChanged: (b, o, n) => ((ChatView)b).ShowHeader());
+
         private ScrollView _scroll;
+        private ContentView _header;
         private Layout _transcript;
         private View _empty;
         private ModelLoadCard _loadCard;
@@ -193,6 +199,13 @@ namespace Emgu.LiteRT.LM.Maui
                 : (Model.SupportsImages ? ChatAttachmentKinds.Image : ChatAttachmentKinds.None)
                   | (Model.SupportsAudio ? ChatAttachmentKinds.Audio : ChatAttachmentKinds.None));
 
+        /// <summary>A view shown above the transcript, scrolling with it (e.g. an app's own model card), or null.</summary>
+        public View Header
+        {
+            get => (View)GetValue(HeaderProperty);
+            set => SetValue(HeaderProperty, value);
+        }
+
         /// <summary>The message box's placeholder.</summary>
         public string Placeholder
         {
@@ -249,6 +262,8 @@ namespace Emgu.LiteRT.LM.Maui
             _stop = GetTemplateChild("PART_Stop") as View;
             _attach = GetTemplateChild("PART_Attach") as View;
             _attachments = GetTemplateChild("PART_Attachments") as Layout;
+            _header = GetTemplateChild("PART_Header") as ContentView;
+            ShowHeader();
             Hook(_send, "ChatSendButtonStyle", () => _ = SendAsync());
             Hook(_stop, "ChatStopButtonStyle", StopReply);
             Hook(_attach, "ChatAttachButtonStyle", () => _ = AttachAsync());
@@ -527,6 +542,24 @@ namespace Emgu.LiteRT.LM.Maui
         }
 
         // ---------- Attachments ----------
+
+        private void ShowHeader()
+        {
+            if (_header != null)
+            {
+                _header.Content = Header;
+                _header.IsVisible = Header != null;
+            }
+        }
+
+        /// <summary>
+        /// Scroll the transcript to its end (e.g. after the app added a card to a message).
+        /// </summary>
+        public void ScrollToEnd(bool animated = false)
+        {
+            _atEnd = true;
+            ScrollToEnd();
+        }
 
         private void UpdateAttach()
         {

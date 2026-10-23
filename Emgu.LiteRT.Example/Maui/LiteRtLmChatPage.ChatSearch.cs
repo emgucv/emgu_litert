@@ -159,10 +159,7 @@ namespace Maui.Demo.Lite
                     new Label { Text = ChatStore.Shorten(entry.Text, 220), FontFamily = Theme.BodyFont,
                         FontSize = 12, TextColor = Theme.SecondaryText, MaxLines = 3, LineBreakMode = LineBreakMode.TailTruncation } } });
             }
-            int index = bubble != null ? _transcript.Children.IndexOf(bubble.Row) : -1;
-            if (index < 0) _transcript.Children.Add(links);
-            else _transcript.Children.Insert(index, links);
-            ScrollToEnd();
+            AddCard(bubble, links);
         }
     }
 }
