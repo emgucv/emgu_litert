@@ -29,6 +29,8 @@
 	-->
 	<ItemGroup>
 		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Chat\NetStandard\Emgu.LiteRT.LM.Chat.csproj" />
+		<!-- SpeechSegmenter, which cuts a streamed reply into sentences for read-aloud. -->
+		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Agents\NetStandard\Emgu.LiteRT.LM.Agents.csproj" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 	</ItemGroup>
 </Project>

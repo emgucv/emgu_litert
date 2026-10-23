@@ -171,6 +171,7 @@ namespace Emgu.LiteRT.LM.Chat
                     if (HasAnswer != hadAnswer)
                     {
                         Raise(nameof(HasAnswer));
+                        Raise(nameof(HasText));
                         Raise(nameof(IsFinishedWithoutAnswer));
                     }
                 }
@@ -201,6 +202,12 @@ namespace Emgu.LiteRT.LM.Chat
 
         /// <summary>True if the reply has answer text (not only thinking).</summary>
         public bool HasAnswer => _text.Length > 0;
+
+        /// <summary>True if the message has text (a user message may have only attachments).</summary>
+        public bool HasText => _text.Length > 0;
+
+        /// <summary>True if the message has attachments.</summary>
+        public bool HasAttachments => Attachments.Count > 0;
 
         /// <summary>True while the reply is being written.</summary>
         public bool IsStreaming => _state == ChatMessageState.Streaming;

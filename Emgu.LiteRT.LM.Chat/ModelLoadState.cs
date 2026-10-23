@@ -30,6 +30,8 @@ namespace Emgu.LiteRT.LM.Chat
         private Task _loading;
         private SynchronizationContext _context;
         private bool _progressPosted;
+        private string _displayName;
+        private long _downloadSize;
 
         /// <summary>
         /// Prepare to load a model.
@@ -59,10 +61,18 @@ namespace Emgu.LiteRT.LM.Chat
         public Action<EngineSettings> ConfigureSettings { get; set; }
 
         /// <summary>A name for the model to show, e.g. "Gemma 4 E2B"; defaults to the model's class name.</summary>
-        public string DisplayName { get; set; }
+        public string DisplayName
+        {
+            get => _displayName;
+            set => Set(ref _displayName, value);
+        }
 
         /// <summary>The size of the download, to show before it starts (the model doesn't know it before then); 0 if unknown.</summary>
-        public long DownloadSize { get; set; }
+        public long DownloadSize
+        {
+            get => _downloadSize;
+            set => Set(ref _downloadSize, value);
+        }
 
         /// <summary>
         /// True if the model's file is on the device and was verified before (a cheap check that doesn't read the file):

@@ -18,13 +18,16 @@
                            PART_Send, PART_Stop, PART_Attach
     ChatUserMessageTemplate, ChatReplyTemplate
                            ChatView's messages (DataTemplates of an Emgu.LiteRT.LM.Chat ChatMessageItem)
-    ChatSendButtonStyle, ChatStopButtonStyle
-                           ChatView's Send and Stop buttons (Button styles)
+    ChatSendButtonStyle, ChatStopButtonStyle, ChatAttachButtonStyle
+                           ChatView's Send, Stop and attach buttons (Button styles)
+    ChatAttachmentViewTemplate
+                           ChatAttachmentView: PART_Image, PART_Label, PART_Remove
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                     xmlns:chat="clr-namespace:Emgu.LiteRT.LM.Maui"
                     xmlns:lm="clr-namespace:Emgu.LiteRT.LM.Chat;assembly=Emgu.LiteRT.LM.Chat"
+                    xmlns:ai="clr-namespace:Microsoft.Extensions.AI;assembly=Microsoft.Extensions.AI.Abstractions"
                     x:Class="Emgu.LiteRT.LM.Maui.ChatStyles">
 
     <Color x:Key="ChatPrimaryTextLight">#1A1C2E</Color>
@@ -60,6 +63,38 @@
         <Setter Property="VerticalOptions" Value="End" />
     </Style>
 
+    <Style x:Key="ChatAttachButtonStyle" TargetType="Button">
+        <Setter Property="Text" Value="+" />
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ChatReplyBubbleLight}, Dark={StaticResource ChatReplyBubbleDark}}" />
+        <Setter Property="TextColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="WidthRequest" Value="36" />
+        <Setter Property="HeightRequest" Value="36" />
+        <Setter Property="VerticalOptions" Value="End" />
+    </Style>
+
+    <!-- An image as a thumbnail, audio as a chip; the remove button for attachments not sent yet. -->
+    <ControlTemplate x:Key="ChatAttachmentViewTemplate">
+        <Grid>
+            <Border StrokeThickness="0" Padding="0" BackgroundColor="Transparent">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+                <Grid>
+                    <Image x:Name="PART_Image" Aspect="AspectFill" WidthRequest="96" HeightRequest="96" />
+                    <Label x:Name="PART_Label" FontSize="14" Padding="12,8" LineBreakMode="TailTruncation" MaximumWidthRequest="260"
+                           BackgroundColor="{AppThemeBinding Light={StaticResource ChatReplyBubbleLight}, Dark={StaticResource ChatReplyBubbleDark}}"
+                           TextColor="{AppThemeBinding Light={StaticResource ChatPrimaryTextLight}, Dark={StaticResource ChatPrimaryTextDark}}" />
+                </Grid>
+            </Border>
+            <Label x:Name="PART_Remove" Text="✕" FontSize="12" TextColor="White" BackgroundColor="#99000000"
+                   WidthRequest="22" HeightRequest="22" HorizontalTextAlignment="Center" VerticalTextAlignment="Center"
+                   HorizontalOptions="End" VerticalOptions="Start" Margin="4" />
+        </Grid>
+    </ControlTemplate>
+
     <ControlTemplate x:Key="ChatViewTemplate">
         <Grid RowDefinitions="*,Auto,Auto" Padding="12,0,12,12" RowSpacing="6">
             <ScrollView x:Name="PART_Scroll">
@@ -77,12 +112,15 @@
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="22" />
                 </Border.StrokeShape>
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                    <Button x:Name="PART_Attach" Text="+" IsVisible="False" />
-                    <Editor x:Name="PART_Input" Grid.Column="1" AutoSize="TextChanges" MaximumHeightRequest="140" FontSize="15"
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+                    <ScrollView Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                        <HorizontalStackLayout x:Name="PART_Attachments" Spacing="8" Padding="0,4,0,0" IsVisible="False" />
+                    </ScrollView>
+                    <Button x:Name="PART_Attach" Grid.Row="1" IsVisible="False" />
+                    <Editor x:Name="PART_Input" Grid.Row="1" Grid.Column="1" AutoSize="TextChanges" MaximumHeightRequest="140" FontSize="15"
                             BackgroundColor="Transparent" VerticalOptions="Center"
                             TextColor="{AppThemeBinding Light={StaticResource ChatPrimaryTextLight}, Dark={StaticResource ChatPrimaryTextDark}}" />
-                    <Grid Grid.Column="2" VerticalOptions="End">
+                    <Grid Grid.Row="1" Grid.Column="2" VerticalOptions="End">
                         <Button x:Name="PART_Send" />
                         <Button x:Name="PART_Stop" IsVisible="False" />
                     </Grid>
@@ -118,7 +156,15 @@
             <!-- Where the model's memory of the chat starts after it was compacted. -->
             <Label Text="Earlier messages were summarized" IsVisible="{Binding StartsContext}" HorizontalOptions="Center" FontSize="12"
                    TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
-            <Border HorizontalOptions="End" MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0"
+            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Attachments}" Spacing="6" HorizontalOptions="End"
+                                   IsVisible="{Binding HasAttachments}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="ai:DataContent">
+                        <chat:ChatAttachmentView Attachment="{Binding .}" />
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </HorizontalStackLayout>
+            <Border HorizontalOptions="End" MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0" IsVisible="{Binding HasText}"
                     BackgroundColor="{StaticResource ChatAccent}">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="18" />

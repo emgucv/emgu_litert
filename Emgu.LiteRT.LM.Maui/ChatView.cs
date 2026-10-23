@@ -22,9 +22,11 @@ namespace Emgu.LiteRT.LM.Maui
     /// Its look is the "ChatViewTemplate" template (see <see cref="ChatStyles"/>), with the parts "PART_Scroll" (a
     /// ScrollView), "PART_Transcript" (a Layout the messages are added to), "PART_Empty" (shown while there are no
     /// messages), "PART_LoadCard" (a <see cref="ModelLoadCard"/>), "PART_Status" (a Label), "PART_Input" (an InputView,
-    /// e.g. an Editor), "PART_Send" and "PART_Stop" (Buttons, or views that are tapped) and "PART_Attach" (unused yet). The
-    /// messages use <see cref="MessageTemplateSelector"/>, and the Send and Stop buttons the styles "ChatSendButtonStyle"
-    /// and "ChatStopButtonStyle" unless the template gives them one.
+    /// e.g. an Editor), "PART_Send", "PART_Stop" and "PART_Attach" (Buttons, or views that are tapped) and
+    /// "PART_Attachments" (a Layout for the attachments waiting to be sent). The messages use
+    /// <see cref="MessageTemplateSelector"/>, and the Send, Stop and attach buttons the styles "ChatSendButtonStyle",
+    /// "ChatStopButtonStyle" and "ChatAttachButtonStyle" unless the template gives them one. Attachments come from
+    /// <see cref="AttachmentSource"/>; with <see cref="ReadAloud"/> on, <see cref="ReplySpeaker"/> reads the replies.
     /// </para>
     /// </summary>
     public class ChatView : TemplatedView
@@ -64,6 +66,26 @@ namespace Emgu.LiteRT.LM.Maui
         public static readonly BindableProperty PlaceholderProperty = BindableProperty.Create(
             nameof(Placeholder), typeof(string), typeof(ChatView), "Message", propertyChanged: (b, o, n) => ((ChatView)b).ApplyPlaceholder());
 
+        /// <summary>Where attachments come from when the attach button is tapped.</summary>
+        public static readonly BindableProperty AttachmentSourceProperty = BindableProperty.Create(
+            nameof(AttachmentSource), typeof(IChatAttachmentSource), typeof(ChatView), null, defaultValueCreator: b => new MediaChatAttachmentSource());
+
+        /// <summary>What can be attached; null (the default) for what the <see cref="Model"/> takes (nothing without one).</summary>
+        public static readonly BindableProperty AttachmentKindsProperty = BindableProperty.Create(
+            nameof(AttachmentKinds), typeof(ChatAttachmentKinds?), typeof(ChatView), null, propertyChanged: (b, o, n) => ((ChatView)b).UpdateAttach());
+
+        /// <summary>True to show the attach button when something can be attached.</summary>
+        public static readonly BindableProperty ShowAttachButtonProperty = BindableProperty.Create(
+            nameof(ShowAttachButton), typeof(bool), typeof(ChatView), true, propertyChanged: (b, o, n) => ((ChatView)b).UpdateAttach());
+
+        /// <summary>True to read replies aloud as they are written.</summary>
+        public static readonly BindableProperty ReadAloudProperty = BindableProperty.Create(
+            nameof(ReadAloud), typeof(bool), typeof(ChatView), false, propertyChanged: (b, o, n) => { if (!(bool)n) ((ChatView)b).ReplySpeaker?.Stop(); });
+
+        /// <summary>Reads the replies aloud when <see cref="ReadAloud"/> is on.</summary>
+        public static readonly BindableProperty ReplySpeakerProperty = BindableProperty.Create(
+            nameof(ReplySpeaker), typeof(IReplySpeaker), typeof(ChatView), null, defaultValueCreator: b => new TextToSpeechReplySpeaker());
+
         private ScrollView _scroll;
         private Layout _transcript;
         private View _empty;
@@ -73,6 +95,7 @@ namespace Emgu.LiteRT.LM.Maui
         private View _send;
         private View _stop;
         private View _attach;
+        private Layout _attachments;
         private CancellationTokenSource _replyCancel;
         private bool _atEnd = true;
         private bool _ownsClient;
@@ -126,6 +149,50 @@ namespace Emgu.LiteRT.LM.Maui
             set => SetValue(MessageTemplateSelectorProperty, value);
         }
 
+        /// <summary>Where attachments come from when the attach button is tapped.</summary>
+        public IChatAttachmentSource AttachmentSource
+        {
+            get => (IChatAttachmentSource)GetValue(AttachmentSourceProperty);
+            set => SetValue(AttachmentSourceProperty, value);
+        }
+
+        /// <summary>What can be attached; null (the default) for what the <see cref="Model"/> takes (nothing without one).</summary>
+        public ChatAttachmentKinds? AttachmentKinds
+        {
+            get => (ChatAttachmentKinds?)GetValue(AttachmentKindsProperty);
+            set => SetValue(AttachmentKindsProperty, value);
+        }
+
+        /// <summary>True to show the attach button when something can be attached.</summary>
+        public bool ShowAttachButton
+        {
+            get => (bool)GetValue(ShowAttachButtonProperty);
+            set => SetValue(ShowAttachButtonProperty, value);
+        }
+
+        /// <summary>True to read replies aloud as they are written.</summary>
+        public bool ReadAloud
+        {
+            get => (bool)GetValue(ReadAloudProperty);
+            set => SetValue(ReadAloudProperty, value);
+        }
+
+        /// <summary>Reads the replies aloud when <see cref="ReadAloud"/> is on.</summary>
+        public IReplySpeaker ReplySpeaker
+        {
+            get => (IReplySpeaker)GetValue(ReplySpeakerProperty);
+            set => SetValue(ReplySpeakerProperty, value);
+        }
+
+        /// <summary>The attachments waiting to be sent with the next message (shown above the message box).</summary>
+        public System.Collections.ObjectModel.ObservableCollection<DataContent> PendingAttachments { get; } = new System.Collections.ObjectModel.ObservableCollection<DataContent>();
+
+        /// <summary>What can be attached now: <see cref="AttachmentKinds"/>, or what the model takes.</summary>
+        public ChatAttachmentKinds EffectiveAttachmentKinds =>
+            AttachmentKinds ?? (Model == null ? ChatAttachmentKinds.None
+                : (Model.SupportsImages ? ChatAttachmentKinds.Image : ChatAttachmentKinds.None)
+                  | (Model.SupportsAudio ? ChatAttachmentKinds.Audio : ChatAttachmentKinds.None));
+
         /// <summary>The message box's placeholder.</summary>
         public string Placeholder
         {
@@ -166,10 +233,12 @@ namespace Emgu.LiteRT.LM.Maui
             _send = GetTemplateChild("PART_Send") as View;
             _stop = GetTemplateChild("PART_Stop") as View;
             _attach = GetTemplateChild("PART_Attach") as View;
+            _attachments = GetTemplateChild("PART_Attachments") as Layout;
             Hook(_send, "ChatSendButtonStyle", () => _ = SendAsync());
             Hook(_stop, "ChatStopButtonStyle", StopReply);
-            if (_attach != null)
-                _attach.IsVisible = false;
+            Hook(_attach, "ChatAttachButtonStyle", () => _ = AttachAsync());
+            UpdateAttach();
+            ShowPendingAttachments();
             if (_input is Entry entry)
                 entry.Completed += (s, e) => _ = SendAsync();
             if (_scroll != null)
@@ -182,6 +251,14 @@ namespace Emgu.LiteRT.LM.Maui
             BindTranscript();
             UpdateBusy();
             SetStatus(null);
+        }
+
+        /// <summary>
+        /// Create the view; it shows nothing until it has a template (when it is added to a page).
+        /// </summary>
+        public ChatView()
+        {
+            PendingAttachments.CollectionChanged += (s, e) => ShowPendingAttachments();
         }
 
         private static void Hook(View view, string styleKey, Action action)
@@ -230,6 +307,7 @@ namespace Emgu.LiteRT.LM.Maui
             Conversation = client != null ? new ChatConversation(client, model) : new ChatConversation(model);
             if (Parent != null && LoadState != null && LoadState.IsDownloaded)
                 _ = LoadModelAsync();
+            UpdateAttach();
         }
 
         private void OnConversationChanged(ChatConversation old)
@@ -282,6 +360,10 @@ namespace Emgu.LiteRT.LM.Maui
             {
                 _atEnd = true;
                 ScrollToEnd();
+                // A new reply is read aloud as it is written.
+                ChatMessageItem reply = e.NewItems?.OfType<ChatMessageItem>().FirstOrDefault(m => m.Role == ChatMessageRole.Assistant && m.IsStreaming);
+                if (reply != null && ReadAloud)
+                    ReplySpeaker?.Start(reply);
             }
         }
 
@@ -317,11 +399,14 @@ namespace Emgu.LiteRT.LM.Maui
         public async Task SendAsync()
         {
             ChatConversation conversation = Conversation;
-            string text = _input?.Text?.Trim();
-            if (conversation == null || conversation.IsBusy || _replyCancel != null || string.IsNullOrEmpty(text))
+            string text = _input?.Text?.Trim() ?? string.Empty;
+            if (conversation == null || conversation.IsBusy || _replyCancel != null || (text.Length == 0 && PendingAttachments.Count == 0))
                 return;
-            _input.Text = string.Empty;
-            await SendAsync(text);
+            List<DataContent> attachments = PendingAttachments.ToList();
+            if (_input != null)
+                _input.Text = string.Empty;
+            PendingAttachments.Clear();
+            await SendAsync(text, attachments);
         }
 
         /// <summary>
@@ -337,6 +422,7 @@ namespace Emgu.LiteRT.LM.Maui
                 return;
             CancellationTokenSource cancel = new CancellationTokenSource();
             _replyCancel = cancel;
+            ReplySpeaker?.Stop();
             UpdateBusy();
             try
             {
@@ -421,6 +507,47 @@ namespace Emgu.LiteRT.LM.Maui
         public void StopReply()
         {
             _replyCancel?.Cancel();
+            ReplySpeaker?.Stop();
+        }
+
+        // ---------- Attachments ----------
+
+        private void UpdateAttach()
+        {
+            if (_attach != null)
+                _attach.IsVisible = ShowAttachButton && EffectiveAttachmentKinds != ChatAttachmentKinds.None;
+        }
+
+        private async Task AttachAsync()
+        {
+            ChatAttachmentKinds kinds = EffectiveAttachmentKinds;
+            IChatAttachmentSource source = AttachmentSource;
+            if (source == null || kinds == ChatAttachmentKinds.None)
+                return;
+            try
+            {
+                foreach (DataContent attachment in await source.PickAsync(kinds, this))
+                    PendingAttachments.Add(attachment);
+            }
+            catch (Exception ex) when (!(ex is OperationCanceledException))
+            {
+                SetStatus("Couldn't attach the file: " + ex.Message);
+            }
+        }
+
+        private void ShowPendingAttachments()
+        {
+            Layout layout = _attachments;
+            if (layout == null)
+                return;
+            layout.Clear();
+            foreach (DataContent attachment in PendingAttachments)
+            {
+                ChatAttachmentView view = new ChatAttachmentView { Attachment = attachment, CanRemove = true };
+                view.RemoveRequested += (s, e) => PendingAttachments.Remove(attachment);
+                layout.Add(view);
+            }
+            layout.IsVisible = PendingAttachments.Count > 0;
         }
 
         private void UpdateBusy()

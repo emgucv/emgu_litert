@@ -1,7 +1,8 @@
 # Plan: a reusable MAUI chat control (`Emgu.LiteRT.LM.Maui`)
 
 Status: decisions taken 2026-10-22 (below). Steps 1 (scaffolding), 2 (`ReplyView`, `ThinkingView`), 3
-(`ChatConversation`) and 4 (`ChatView`, `ModelLoadCard`, the `MauiChat` sample) done 2026-10-23.
+(`ChatConversation`), 4 (`ChatView`, `ModelLoadCard`, the `MauiChat` sample) and 5 (attachments, read-aloud) done
+2026-10-23.
 
 ## Decisions
 
@@ -177,6 +178,25 @@ Each step builds the demo and is checked before the next. Device checks: Mac Cat
    a write fails ("cannot append buffer to cache file", SIGABRT) - not catchable from .NET. iOS and Windows not built;
    attachments and read-aloud are step 5.
 5. **Attachments and read-aloud** (`IChatAttachmentSource`, `IReplySpeaker`).
+   **Done:** `Emgu.LiteRT.LM.Chat`'s `ReplySpeechText` (`CleanForSpeech`, `DetectScriptLanguage` - the demo's
+   `ReplySpeech` now calls them; `UnitTestReplySpeechText`). `Emgu.LiteRT.LM.Maui`: `IChatAttachmentSource` /
+   `MediaChatAttachmentSource` (a menu of photo library, camera where supported, audio file - WAV/MP3/FLAC - by what the
+   model takes; `ChatAttachmentKinds`), `ChatImages.PrepareAsync` (at most 1024 px, JPEG, upright: Android applies the
+   EXIF orientation itself with `BitmapFactory`/`ExifInterface`, Apple's decoders already do; no Emgu CV),
+   `ChatAttachmentView` (thumbnail or audio chip with its length, ✕ for pending ones; `ChatAttachmentViewTemplate`),
+   `IReplySpeaker` / `TextToSpeechReplySpeaker` (reads a reply sentence by sentence while it streams with
+   `Emgu.LiteRT.LM.Agents`' `SpeechSegmenter` - a new dependency of the package - in a voice for its language, the
+   demo's locale choice; `DetectLanguage` can be replaced, e.g. with a platform identifier; `SpeakAsync` is virtual).
+   `ChatView`: `AttachmentSource`, `AttachmentKinds` (null: the model's `SupportsImages` / `SupportsAudio`),
+   `ShowAttachButton`, `PendingAttachments` (shown in `PART_Attachments`; a message may be only attachments),
+   `ReadAloud`, `ReplySpeaker` (stopped by Stop and by the next message); `ChatAttachButtonStyle`; the user template
+   shows attachments and hides an empty bubble (`HasText`, `HasAttachments`). `ModelLoadState.DisplayName` /
+   `DownloadSize` now notify (the card kept the class name when they were set after it was shown). Checked with a
+   temporary self-test: Mac Catalyst with Gemma 4 E2B - a photo tagged EXIF orientation 6 prepared upright (333 x 500
+   from 500 x 333), shown as a pending chip, sent, answered ("These are tulips..."), and the reply passed to the speaker
+   in two sentences while streaming (a logging speaker - nothing was spoken); Galaxy S10 - the same photo upright on
+   Android, the chip, the Attach menu (photo library, take photo, audio file; the library wasn't opened), ✕ removing it.
+   Not run: picking from the library or camera, audio attachments end to end, real speech output, Windows.
 6. **Move the demo's chat page onto `ChatView`**, feature by feature (agent tools, documents, photos, camera,
    voice, server, task mode...), keeping each verified behaviour: compaction after reopening a saved chat, the
    "Provided less images than expected" workaround (`FilterChannelContentFromKvCache`), voice interruption, model

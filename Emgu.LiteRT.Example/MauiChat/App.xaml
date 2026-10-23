@@ -7,6 +7,8 @@
 <Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:lm="clr-namespace:Emgu.LiteRT.LM.Chat;assembly=Emgu.LiteRT.LM.Chat"
+             xmlns:chat="clr-namespace:Emgu.LiteRT.LM.Maui;assembly=Emgu.LiteRT.LM.Maui"
+             xmlns:ai="clr-namespace:Microsoft.Extensions.AI;assembly=Microsoft.Extensions.AI.Abstractions"
              x:Class="MauiChat.App">
     <Application.Resources>
         <ResourceDictionary>
@@ -22,11 +24,19 @@
                 <Setter Property="VerticalOptions" Value="End" />
             </Style>
 
-            <!-- The user's messages: a green, square-cornered bubble with "You" above it. -->
+            <!-- The user's messages: a green, square-cornered bubble with "You" above it, and any images or audio. -->
             <DataTemplate x:Key="ChatUserMessageTemplate" x:DataType="lm:ChatMessageItem">
                 <VerticalStackLayout Spacing="2" HorizontalOptions="End">
                     <Label Text="You" FontSize="12" TextColor="#1E9E6A" HorizontalOptions="End" />
-                    <Border MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0" BackgroundColor="#1E9E6A">
+                    <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Attachments}" Spacing="6" HorizontalOptions="End"
+                                           IsVisible="{Binding HasAttachments}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="ai:DataContent">
+                                <chat:ChatAttachmentView Attachment="{Binding .}" />
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </HorizontalStackLayout>
+                    <Border MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0" BackgroundColor="#1E9E6A" IsVisible="{Binding HasText}">
                         <Border.StrokeShape>
                             <RoundRectangle CornerRadius="4" />
                         </Border.StrokeShape>
