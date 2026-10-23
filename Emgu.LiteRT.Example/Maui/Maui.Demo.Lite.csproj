@@ -133,7 +133,7 @@
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.Runtime\Maui\Metal\Mac\Emgu.LiteRT.Metal.runtime.maui.macos.csproj" />
 
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-		<PackageReference Include="Emgu.CV.runtime.maui.mini" Version="4.12.0.5764" />
+		<PackageReference Include="Emgu.CV.runtime.maui.mini" Version="4.13.0.5924" />
 		<!--
 		Emgu.CV.Models (pulled in by Emgu.CV.runtime.maui.mini) has no Android target, so Android resolves its
 		netstandard2.0 dependency on System.Drawing.Common. That package's Windows-only System.Private.Windows.Core.dll

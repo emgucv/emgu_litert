@@ -21,14 +21,10 @@
   </ItemGroup>
 
   <!-- Emgu CV's managed library only: an app adds the Emgu CV runtime package for its platform (Emgu.CV.runtime.*), at the
-       same version. netstandard2.0 uses the version Emgu.TF.Lite.ImageIO's netstandard2.0 build already depends on (a lower
-       one would be a package downgrade); the iOS/Android/Mac Catalyst builds use the MAUI demo's Emgu.CV.runtime.maui.mini
-       version, since a higher managed version would run against its older native library. -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+       same version - 4.13, as Emgu.TF.Lite.ImageIO's netstandard2.0 build and the MAUI demo's Emgu.CV.runtime.maui.mini use (a
+       managed version above the runtime's would run against an older native library). -->
+  <ItemGroup>
     <PackageReference Include="Emgu.CV" Version="4.13.0.5924" />
-  </ItemGroup>
-  <ItemGroup Condition="'$(TargetFramework)' != 'netstandard2.0'">
-    <PackageReference Include="Emgu.CV" Version="4.12.0.5764" />
   </ItemGroup>
 
   <!-- The tests drive the image input helpers and the CPU/GPU benchmark directly. -->
