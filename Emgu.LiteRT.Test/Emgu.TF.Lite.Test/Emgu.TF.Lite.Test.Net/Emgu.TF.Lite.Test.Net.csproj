@@ -28,6 +28,7 @@
     <Compile Include="..\UnitTestTaskPlan.cs" Link="UnitTestTaskPlan.cs" />
     <Compile Include="..\UnitTestMathText.cs" Link="UnitTestMathText.cs" />
     <Compile Include="..\UnitTestReplyMarkdown.cs" Link="UnitTestReplyMarkdown.cs" />
+    <Compile Include="..\UnitTestChatConversation.cs" Link="UnitTestChatConversation.cs" />
     <Compile Include="..\UnitTestGoalHistory.cs" Link="UnitTestGoalHistory.cs" />
     <Compile Include="..\UnitTestHandTracker.cs" Link="UnitTestHandTracker.cs" />
     <Compile Include="..\UnitTestPoseTracker.cs" Link="UnitTestPoseTracker.cs" />

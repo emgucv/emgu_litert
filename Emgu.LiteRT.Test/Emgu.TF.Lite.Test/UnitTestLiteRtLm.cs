@@ -1232,6 +1232,53 @@ namespace Emgu.TF.Lite.Test
             await TestGemma4Chat(new Gemma4E4B());
         }
 
+        // Emgu.LiteRT.LM.Chat's ChatConversation over LiteRtLmChatClient: a fact is recalled in the next message, the
+        // conversation is compacted by a summary the model writes, and the fact is recalled from the summary.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestChatConversationGemma4E2B()
+        {
+            RequireLiteRtLm();
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                await model.Init();
+                using (LiteRtLmChatClient client = new LiteRtLmChatClient(model))
+                {
+                    var conversation = new Emgu.LiteRT.LM.Chat.ChatConversation(client, model)
+                    {
+                        Instructions = "You are a helpful assistant. Answer in one short sentence."
+                    };
+                    ChatOptions options = new ChatOptions
+                    {
+                        MaxOutputTokens = 64,
+                        Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }
+                    };
+                    Emgu.LiteRT.LM.Chat.ChatMessageItem first = await conversation.SendAsync("My favourite colour is teal. Please remember it.", options: options);
+                    Console.WriteLine("1: " + first.Text);
+                    Emgu.LiteRT.LM.Chat.ChatMessageItem second = await conversation.SendAsync("What is my favourite colour?", options: options);
+                    Console.WriteLine("2: " + second.Text);
+                    Assert.That(second.Text.ToLowerInvariant(), Does.Contain("teal"));
+
+                    Assert.That(await conversation.CompactAsync(), Is.True);
+                    Console.WriteLine("Summary: " + conversation.Summary);
+                    Assert.That(conversation.Summary, Is.Not.Null);
+                    Assert.That(conversation.ContextStart, Is.EqualTo(2));
+                    Emgu.LiteRT.LM.Chat.ChatMessageItem third = await conversation.SendAsync("Remind me: which colour did I say I like?", options: options);
+                    Console.WriteLine("3: " + third.Text);
+                    Assert.That(third.Text.ToLowerInvariant(), Does.Contain("teal"));
+                    Emgu.LiteRT.LM.Chat.ChatContextUsage usage = await conversation.GetContextUsageAsync();
+                    Console.WriteLine("Context: " + usage.UsedTokens + " of " + usage.WindowTokens);
+                    Assert.That(usage.UsedTokens, Is.GreaterThan(0));
+                }
+            }
+        }
+
         private static async Task TestGemma4Chat(Gemma4 gemma)
         {
             RequireLiteRtLm();

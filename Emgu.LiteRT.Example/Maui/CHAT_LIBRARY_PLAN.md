@@ -1,6 +1,7 @@
 # Plan: a reusable MAUI chat control (`Emgu.LiteRT.LM.Maui`)
 
-Status: decisions taken 2026-10-22 (below). Steps 1 (scaffolding) and 2 (`ReplyView`, `ThinkingView`) done 2026-10-23.
+Status: decisions taken 2026-10-22 (below). Steps 1 (scaffolding), 2 (`ReplyView`, `ThinkingView`) and 3
+(`ChatConversation`) done 2026-10-23.
 
 ## Decisions
 
@@ -137,6 +138,18 @@ Each step builds the demo and is checked before the next. Device checks: Mac Cat
    `RunAgentAsync`, `PrepareContextAsync`, `CompactAsync`, `SummarizeAsync`, `PrimeModel`, `EstimateTokens`. Unit tests
    with a fake `IChatClient`: streaming updates, cancel keeps the partial reply, compaction by summary and by dropping,
    the context-full retry, restoring.
+   **Done:** `ChatConversation` (`SendAsync(text, attachments, options, context, token)`, `CompactAsync`,
+   `GetContextUsageAsync`, `Load(messages, summary, contextStart)`, `Clear`; events `ExchangeCompleted`, `Compacted`,
+   `Summarizing`; the demo's estimates and limits as settable properties) and `ChatMessageItem` / `ChatToolStep`
+   (`INotifyPropertyChanged`; `ChatMessageState` streaming / done / interrupted / failed). Differences from the page:
+   the client is stateless (every request carries the summary pair, the messages the model sees and the new one), so
+   there is no separate "prime" step; each finished reply is sent back as the client's own response messages (tool
+   calls and results included), which `LiteRtLmChatClient` matches by its message keys and so doesn't rebuild its open
+   conversation, and as text after compaction or restoring; the summary is a request of its own on the same client; a
+   failed exchange is kept in `Messages` but not given to the model again; `SendAsync` continues on the caller's
+   context, so the items change on the UI thread. `UnitTestChatConversation` (9 tests, scripted `IChatClient`, no model)
+   and `TestChatConversationGemma4E2B` (`TEST_MODELS`: a fact recalled, a summary written, the fact recalled from it;
+   9 s on an M1's CPU). The demo doesn't use it yet (step 6).
 4. **`ChatView` with plain chat and `ModelLoadCard`** (control template, message templates and selector), plus a
    minimal sample app (`Emgu.LiteRT.Example/MauiChat/`, one page, Gemma 4 E2B or Qwen3) that proves the few-lines goal
    and restyles one message template and the send button to show the templates work.
