@@ -15,7 +15,6 @@ namespace Maui.Demo.Lite
             BackgroundColor = Theme.PageBackground;
 
             String tensorflowVer = Emgu.TF.Lite.TfLiteInvoke.Version;
-            bool hasXnnPack = Emgu.TF.Lite.TfLiteInvoke.HasXNNPack;
 
             // LiteRT has no runtime-queryable version API; its Major.Minor.Patch is baked into the
             // Emgu.LiteRT assembly's version at build time, so read it back via reflection. The
@@ -24,6 +23,28 @@ namespace Maui.Demo.Lite
             String liteRtVer = (asmVer == null)
                 ? "unknown"
                 : String.Format("{0}.{1}.{2}", asmVer.Major, asmVer.Minor, asmVer.Build);
+
+            // LiteRT-LM has no version function either; Emgu.LiteRT.LM's assembly version carries it (from
+            // LiteRT-LM/version.bzl) the same way. Shown once liblitert-lm loads, which isn't in every build (e.g. Android
+            // armeabi-v7a / x86) - in the background, since it is ~30 MB.
+            Version lmAsmVer = typeof(Emgu.LiteRT.LM.Engine).Assembly.GetName().Version;
+            String liteRtLmVer = (lmAsmVer == null)
+                ? "unknown"
+                : String.Format("{0}.{1}.{2}", lmAsmVer.Major, lmAsmVer.Minor, lmAsmVer.Build);
+            View liteRtLmRow = InfoRow("LiteRT-LM", "\u2026", out Label liteRtLmLabel);
+            _ = Task.Run(() =>
+            {
+                String shown;
+                try
+                {
+                    shown = Emgu.LiteRT.LM.LiteRtLmInvoke.IsV018OrLater ? liteRtLmVer : "older than 0.18.0";
+                }
+                catch (Exception ex) when (ex is DllNotFoundException || ex is EntryPointNotFoundException || ex is BadImageFormatException)
+                {
+                    shown = "Not included";
+                }
+                MainThread.BeginInvokeOnMainThread(() => liteRtLmLabel.Text = shown);
+            });
 
             var versions = new VerticalStackLayout
             {
@@ -34,7 +55,7 @@ namespace Maui.Demo.Lite
                     Theme.Divider(),
                     InfoRow("LiteRT", liteRtVer),
                     Theme.Divider(),
-                    InfoRow("XNNPack", hasXnnPack ? "Yes" : "No")
+                    liteRtLmRow
                 }
             };
 
@@ -66,6 +87,11 @@ namespace Maui.Demo.Lite
 
         private static View InfoRow(string name, string value)
         {
+            return InfoRow(name, value, out _);
+        }
+
+        private static View InfoRow(string name, string value, out Label valueLabel)
+        {
             var g = new Grid
             {
                 Padding = new Thickness(0, 12),
@@ -73,7 +99,8 @@ namespace Maui.Demo.Lite
                 ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
             };
             g.Add(new Label { Text = name, FontFamily = Theme.BodyFont, FontSize = 16, TextColor = Theme.SecondaryText }, 0, 0);
-            g.Add(new Label { Text = value, FontFamily = Theme.TitleFont, FontSize = 16, TextColor = Theme.PrimaryText }, 1, 0);
+            valueLabel = new Label { Text = value, FontFamily = Theme.TitleFont, FontSize = 16, TextColor = Theme.PrimaryText };
+            g.Add(valueLabel, 1, 0);
             return g;
         }
 
