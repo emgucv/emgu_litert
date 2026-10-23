@@ -1,0 +1,39 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Chat.Sqlite.dll`: saved chats for `${EMGU_LITERT_LM_CHAT_NUGET_ID}` in a SQLite database ([sqlite-net](https://github.com/praeclarum/sqlite-net)). `ChatHistoryStore` saves each exchange of a `ChatConversation` - the user's message with its images, audio, context and voice transcript, the reply with its thinking and tool step lines - and where the model's memory of the chat starts after it was compacted, with the summary of the messages before. It reads a chat back to show and continue it.
+
+It is a separate package so that `${EMGU_LITERT_LM_CHAT_NUGET_ID}` has no SQLite dependency. It has no UI and no native dependency of its own (sqlite-net brings SQLite), so it works with `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `ChatView` or any other UI.
+
+## Getting Started
+
+```csharp
+using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Chat.Sqlite;
+
+var store = new ChatHistoryStore(Path.Combine(appDataFolder, "chats"));
+int chatId = 0;
+conversation.ExchangeCompleted += async (s, e) =>
+{
+    if (chatId == 0)
+        chatId = await store.CreateChatAsync(ChatHistoryStore.TitleOf(e.Message), "Qwen3");
+    await store.SaveExchangeAsync(chatId, e.Message, e.Reply);
+};
+conversation.Compacted += async (s, e) => await store.SaveCompactionAsync(chatId, conversation);
+
+// Later: the saved chats, newest first, and one of them reopened in a conversation.
+List<ChatRecord> chats = await store.GetChatsAsync();
+ChatHistory history = await store.LoadAsync(chats[0].Id);
+history.Load(conversation);   // shown, and given to the model with the next message
+```
+
+- **Files:** the database is `chats.db3` in the folder, and images and audio are files in `attachments/<chat id>/`. `DeleteChatAsync` removes a chat with its files.
+- **Your own data:** `CreateTablesAsync` (override it) and `GetConnectionAsync()` keep your own tables in the same database. To keep more columns about a chat or a message, derive records from `ChatRecord` / `ChatMessageRecord` with the same `[Table]` name; `LoadAsync<TMessage>` reads them, and `ChatHistory.RecordOf(message)` has them. `SaveExchangeAsync` also keeps files of your own kinds with a reply (e.g. a picture it drew), which `ChatHistory.AttachmentsOf(message)` gives back.
+- **Private chats:** with `IsPrivate` on, nothing is saved and no saved chat is read.
+- **Message ids:** the store remembers which row each message it saved or loaded is (`GetMessageId`), so saving the compaction point needs nothing else.
+- **Schema:** the database records its schema version (`SchemaVersion`, 1). The tables are the ones the Emgu LiteRT MAUI demo's chat page wrote before this package existed, so chats it saved open unchanged.
+
+## Documentation
+
+${NUGET_EMGU_URL}/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/

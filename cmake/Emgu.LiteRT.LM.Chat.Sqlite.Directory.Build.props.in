@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<Project>
+ <PropertyGroup>
+
+    <!-- Managed code (sqlite-net-pcl brings SQLitePCLRaw's SQLite). The same frameworks as Emgu.LiteRT.LM.Chat. -->
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+
+    <PackageId>${EMGU_LITERT_LM_CHAT_SQLITE_NUGET_ID}</PackageId>
+	<title>${EMGU_LITERT_LM_CHAT_SQLITE_NUGET_TITLE}</title>
+    <version>${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>Saved chats for Emgu.LiteRT.LM.Chat in a SQLite database: messages, thinking, tool steps, images and audio, and the compaction point.</summary>
+    <Description>Saves chats - Emgu.LiteRT.LM.Chat's ChatConversation messages - in a SQLite database and reads them back to continue them: the user's messages with their images, audio, context and voice transcripts, the replies with their thinking and tool step lines, and where the model's memory starts after the conversation was compacted, with its summary. An app keeps its own tables and columns in the same database.</Description>
+    <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM Chat SQLite, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
+
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\platforms\nuget))</PackageOutputPath>
+	<PackageTags>litert litert-lm llm chat conversation history sqlite emgu emgutflite ai</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+
+ </PropertyGroup>
+
+    <ItemGroup>
+      <None Include="..\..\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="..\..\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+
+  <!-- https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022 -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />
+</Project>

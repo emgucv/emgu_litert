@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<AssemblyName>Emgu.LiteRT.LM.Chat.Sqlite</AssemblyName>
+	<TargetName>$(AssemblyName)</TargetName>
+	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
+	<LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TensorflowBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\lib))</TensorflowBinaryDir>
+	<OutputPath>$(TensorflowBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <Import Project="..\Emgu.LiteRT.LM.Chat.Sqlite.Shared.projitems" Label="Shared" />
+
+  <!--
+  Emgu.LiteRT.LM.Chat.Sqlite saves chats (Emgu.LiteRT.LM.Chat's ChatConversation messages) in a SQLite database, and
+  reads them back to continue them. Kept out of Emgu.LiteRT.LM.Chat so that package has no SQLite dependency. The
+  tables are the ones the MAUI demo's chat page wrote before this package existed, so its saved chats open unchanged.
+  The references become nuget package dependencies when this project is packed.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Emgu.LiteRT.LM.Chat\NetStandard\Emgu.LiteRT.LM.Chat.csproj" />
+    <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
+  </ItemGroup>
+</Project>

@@ -554,6 +554,9 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # context window management.
   SET(EMGU_LITERT_LM_CHAT_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Chat")
   SET(EMGU_LITERT_LM_CHAT_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} Chat")
+  # Emgu.LiteRT.LM.Chat.Sqlite/: saved chats for Emgu.LiteRT.LM.Chat in a SQLite database.
+  SET(EMGU_LITERT_LM_CHAT_SQLITE_NUGET_ID "${EMGU_LITERT_LM_CHAT_NUGET_ID}.Sqlite")
+  SET(EMGU_LITERT_LM_CHAT_SQLITE_NUGET_TITLE "${EMGU_LITERT_LM_CHAT_NUGET_TITLE} SQLite")
   # Emgu.LiteRT.LM.Maui/: a MAUI chat control (XAML templates) on top of Emgu.LiteRT.LM.Chat.
   SET(EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Maui")
   SET(EMGU_LITERT_LM_MAUI_CONTROL_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} MAUI")
@@ -1196,6 +1199,17 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Chat.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Chat/NetStandard/docs/README.md)
 
+# Emgu.LiteRT.LM.Chat.Sqlite: saved chats in a SQLite database. Its own nuget package, depending on Emgu.LiteRT.LM.Chat
+# and sqlite-net-pcl (so Emgu.LiteRT.LM.Chat itself has no SQLite dependency).
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Chat.Sqlite.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Chat.Sqlite/NetStandard/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Chat.Sqlite/NetStandard/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Chat.Sqlite/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Chat.Sqlite.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Chat.Sqlite/NetStandard/docs/README.md)
+
 # Emgu.LiteRT.LM.Maui: a MAUI chat control built with XAML templates. Its own nuget package (Android, iOS, Mac Catalyst,
 # Windows), depending on Emgu.LiteRT.LM.Chat and Microsoft.Maui.Controls; no native runtime dependency.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui/Maui/Directory.Build.props)
@@ -1306,6 +1320,7 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Extensions.AI)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Agents)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Chat)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Chat.Sqlite)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui)
   # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and later to Emgu.TF.Lite.ImageIO/, and made
   # its own project+package (it used to be shared source imported directly into

@@ -1,6 +1,6 @@
 # Plan: voice messages and saved chats for the chat libraries
 
-Status: proposed 2026-10-23; steps 1-2 done 2026-10-23. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
+Status: proposed 2026-10-23; steps 1-3 done 2026-10-23. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
 parts of the demo's chat page that any chat app would want, moved into libraries the same way.
 
 ## Goal
@@ -129,6 +129,39 @@ history.Attach(chat.Conversation, chatId);         // saves each exchange and co
      - saving and loading round trips with steps and attachments, and deleting removes the files;
      - private mode, and compaction mapped to a message id and back;
      - a database written by today's demo schema opens and loads.
+
+   **Done 2026-10-23:**
+   - `Emgu.LiteRT.LM.Chat.Sqlite/` (namespace `Emgu.LiteRT.LM.Chat.Sqlite`, package id
+     `EMGU_LITERT_LM_CHAT_SQLITE_NUGET_ID`, netstandard2.0 + net8.0, depends on `Emgu.LiteRT.LM.Chat` and
+     `sqlite-net-pcl` 1.11.285) is in CMake, the cross-platform solution and `.gitignore`. It builds with no warnings
+     and packs.
+   - `ChatRecord` and `ChatMessageRecord` are the demo's `Conversation` and `Message` tables without its own columns
+     (`DocumentId`, `Language`, `ThinkingTranslation`). An app derives from them, with the same `[Table]` name, for
+     its columns.
+   - A `SchemaVersion` table records version 1.
+   - `ChatHistoryStore`:
+     - chats: `GetChatsAsync`, `GetChatAsync`, `CreateChatAsync` and `TitleOf`;
+     - saving: `SaveExchangeAsync` (with files of the app's own kinds for the reply), `AddMessageAsync`,
+       `SetTranscriptAsync` (it renames a chat still titled "Voice message", as the demo does),
+       `SaveCompactionAsync(chatId, conversation)` and `SetSummaryAsync`;
+     - reading back: `LoadAsync` / `LoadAsync<TMessage>`, which return a `ChatHistory` (messages, summary, context
+       start, `RecordOf`, `AttachmentsOf`, `Load(conversation)`), plus `GetMessagesAsync<T>` and `GetAttachments`;
+     - `DeleteChatAsync` (with the `DeletingChat` hook), `IsPrivate` and `ChatsChanged`;
+     - for an app's own tables: `GetConnectionAsync` and `CreateTablesAsync`.
+   - The store remembers which row each message it saved or loaded is (a `ConditionalWeakTable`; `GetMessageId`), so
+     saving the compaction point needs no app data in `Tag`.
+   - The demo's formats are kept: attachment lines "kind|media type|file", files named `<id>_<n>.<ext>`, dates as
+     ticks, an interrupted reply ending in "…", and step lines saved just before their reply.
+   - `UnitTestChatHistoryStore` (7 tests, model-free, so they run in CI):
+     - an exchange round trip (image, audio, context, transcript, thinking, steps);
+     - an app's own reply files, and deleting a chat with its files;
+     - compaction with a summary and dropped;
+     - a private chat saves and reads nothing;
+     - a voice-message chat gets its title from the words;
+     - an app's own column;
+     - `ReadsTheChatsTheDemoSaved`: chats written by the demo's current `ChatStore` open with everything, and the demo
+       still reads the database after the store has added its schema table and an exchange.
+   - The model-free suite passes, now 394 tests.
 4. **`Attach(conversation, chatId)`.** It saves on `ExchangeCompleted` and `Compacted`, so a simple app needs no code of
    its own. The sample reopens its last chat after a restart.
 5. **The demo onto the store.**
