@@ -1536,24 +1536,6 @@ namespace Maui.Demo.Lite
             _contextNote.Text = note;
         }
 
-        // LiteRT's GPU accelerator keeps its compiled programs and converted weights next to the model
-        // (<model file>_<...>_mldrift_program_cache.bin / _mldrift_weight_cache.bin, ~0.8 GB for Gemma 4 E2B).
-        private static void DeleteGpuCache(ModelOption option)
-        {
-            try
-            {
-                string modelFile = option.File.LocalFile;
-                string folder = System.IO.Path.GetDirectoryName(modelFile);
-                if (!System.IO.Directory.Exists(folder))
-                    return;
-                foreach (string file in System.IO.Directory.GetFiles(folder, System.IO.Path.GetFileName(modelFile) + "_*_mldrift_*"))
-                    System.IO.File.Delete(file);
-            }
-            catch (Exception)
-            {
-            }
-        }
-
         private static LanguageModel CreateModel(ModelChoice choice)
         {
             switch (choice)
