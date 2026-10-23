@@ -152,6 +152,7 @@ namespace Emgu.LiteRT.LM.Chat
         private object _tag;
         private bool _startsContext;
         private string _context;
+        private string _transcript;
         private readonly List<DataContent> _attachments;
 
         /// <summary>
@@ -291,6 +292,23 @@ namespace Emgu.LiteRT.LM.Chat
                     Tokens = -1;
             }
         }
+
+        /// <summary>
+        /// The words of a voice message the model was given as audio, written down by a speech recognizer for the
+        /// transcript; or null. Shown, never given to the model (it hears the audio).
+        /// </summary>
+        public string Transcript
+        {
+            get => _transcript;
+            set
+            {
+                if (Set(ref _transcript, string.IsNullOrWhiteSpace(value) ? null : value.Trim()))
+                    Raise(nameof(HasTranscript));
+            }
+        }
+
+        /// <summary>True if the message has a <see cref="Transcript"/>.</summary>
+        public bool HasTranscript => _transcript != null;
 
         /// <summary>
         /// The app's own views or objects shown with the message - for a reply above its bubble (e.g. a generated picture,

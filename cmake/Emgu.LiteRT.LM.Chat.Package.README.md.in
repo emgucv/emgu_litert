@@ -60,12 +60,13 @@ Before each message the conversation counts its tokens. If the message wouldn't 
 
 ### For apps
 
-- `ChatMessageItem.Decorations`: your own objects (or views) shown with a message, e.g. cards above a reply; `ChatMessageItem.Tag`: your own data for a message.
+- `ChatMessageItem.Decorations`: your own objects (or views) shown with a message, e.g. cards above a reply; `ChatMessageItem.Tag`: your own data for a message; `ChatMessageItem.Transcript`: a voice message's words, shown but never given to the model (it hears the audio).
 - `AddNotice(content, text)`: a transcript item the model never sees, e.g. an alert.
 - `ChatToolStep`: step lines of your own ("Looked in report.pdf...").
 - `BeforeStreaming`: runs after any compaction and before the reply streams, e.g. to change the message's `Context`.
 - `ModelLoadState`: downloading and loading a `LanguageModel` for a UI - stage, progress, errors, `LoadAsync` / `Cancel`.
 - `ReplyMarkdown` (the Markdown of replies, read without UI) and `ReplySpeechText` (a reply as text to read aloud).
+- `VoiceLanguages`: languages for a speech recognizer, e.g. for a language setting (`Resolve`, `NameOf`).
 
 ## Documentation
 

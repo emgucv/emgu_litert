@@ -35,5 +35,9 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The chat records your voice messages.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>The chat writes your voice messages down, for the model to read.</string>
 </dict>
 </plist>

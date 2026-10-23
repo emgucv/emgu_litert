@@ -22,15 +22,17 @@ namespace Emgu.LiteRT.LM.Maui
     /// Its look is the "ChatViewTemplate" template (see <see cref="ChatStyles"/>), with the parts "PART_Scroll" (a
     /// ScrollView), "PART_Transcript" (a Layout the messages are added to), "PART_Empty" (shown while there are no
     /// messages), "PART_LoadCard" (a <see cref="ModelLoadCard"/>), "PART_Status" (a Label), "PART_Input" (an InputView,
-    /// e.g. an Editor), "PART_Send", "PART_Stop" and "PART_Attach" (Buttons, or views that are tapped) and
+    /// e.g. an Editor), "PART_Send", "PART_Stop", "PART_Attach" and "PART_Talk" (Buttons, or views that are tapped),
     /// "PART_Attachments" (a Layout for the attachments waiting to be sent) and "PART_Header" (a ContentView showing
     /// <see cref="Header"/>). The messages use
-    /// <see cref="MessageTemplateSelector"/>, and the Send, Stop and attach buttons the styles "ChatSendButtonStyle",
-    /// "ChatStopButtonStyle" and "ChatAttachButtonStyle" unless the template gives them one. Attachments come from
+    /// <see cref="MessageTemplateSelector"/>, and the Send, Stop, attach and microphone buttons the styles
+    /// "ChatSendButtonStyle", "ChatStopButtonStyle", "ChatAttachButtonStyle" and "ChatTalkButtonStyle" (while recording
+    /// "ChatTalkStopButtonStyle") unless the template gives them one. Attachments come from
     /// <see cref="AttachmentSource"/>; with <see cref="ReadAloud"/> on, <see cref="ReplySpeaker"/> reads the replies.
+    /// The microphone records voice messages (<see cref="VoiceMessages"/>).
     /// </para>
     /// </summary>
-    public class ChatView : TemplatedView
+    public partial class ChatView : TemplatedView
     {
         private const string TemplateKey = "ChatViewTemplate";
 
@@ -244,6 +246,9 @@ namespace Emgu.LiteRT.LM.Maui
         protected override void OnParentSet()
         {
             base.OnParentSet();
+            // Taken off the page: a recording in progress is discarded.
+            if (Parent == null)
+                _ = CancelRecordingAsync();
             ChatResources.ApplyDefaultTemplate(this, TemplateKey);
             // A model already on the device starts loading straight away; one that needs a download waits for the card's
             // Download button (or the first message).
@@ -266,6 +271,7 @@ namespace Emgu.LiteRT.LM.Maui
             _attach = GetTemplateChild("PART_Attach") as View;
             _attachments = GetTemplateChild("PART_Attachments") as Layout;
             _header = GetTemplateChild("PART_Header") as ContentView;
+            ApplyTalkPart(GetTemplateChild("PART_Talk") as View);
             ShowHeader();
             Hook(_send, "ChatSendButtonStyle", () => _ = SendAsync());
             Hook(_stop, "ChatStopButtonStyle", StopReply);
@@ -635,6 +641,7 @@ namespace Emgu.LiteRT.LM.Maui
         {
             if (_attach != null)
                 _attach.IsVisible = ShowAttachButton && EffectiveAttachmentKinds != ChatAttachmentKinds.None;
+            UpdateTalk();
         }
 
         private async Task AttachAsync()
@@ -676,6 +683,7 @@ namespace Emgu.LiteRT.LM.Maui
                 _send.IsVisible = !busy;
             if (_stop != null)
                 _stop.IsVisible = busy;
+            UpdateTalk();
         }
 
         private void SetStatus(string text)

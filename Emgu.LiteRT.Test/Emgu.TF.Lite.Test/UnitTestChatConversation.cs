@@ -409,4 +409,32 @@ public class UnitTestChatConversation
         await conversation.SendAsync("Thanks");
         Assert.ThrowsAsync<ArgumentException>(() => conversation.RegenerateAsync(reply));
     }
+
+    [Test]
+    public async Task KeepsAVoiceMessagesTranscriptFromTheModel()
+    {
+        FakeChatClient client = new FakeChatClient();
+        client.Reply(new TextContent("Rome."));
+        client.Reply(new TextContent("About 2.8 million."));
+        ChatConversation conversation = Conversation(client);
+        DataContent recording = new DataContent(new byte[] { 1, 2, 3 }, "audio/wav");
+        int changes = 0;
+
+        await conversation.SendAsync(string.Empty, new[] { recording });
+        ChatMessageItem message = conversation.Messages[0];
+        message.PropertyChanged += (s, e) => { if (e.PropertyName == nameof(ChatMessageItem.HasTranscript)) changes++; };
+        message.Transcript = "  What is the capital of Italy?  ";
+        await conversation.SendAsync("How many people live there?");
+
+        Assert.That(message.Transcript, Is.EqualTo("What is the capital of Italy?"));
+        Assert.That(message.HasTranscript, Is.True);
+        Assert.That(changes, Is.EqualTo(1));
+        // The model hears the audio, and is never given the words written down for the transcript.
+        List<ChatMessage> second = client.Requests[1].Messages;
+        Assert.That(second.SelectMany(m => m.Contents).OfType<DataContent>().Single().MediaType, Is.EqualTo("audio/wav"));
+        Assert.That(Texts(second), Does.Not.Contain("capital"));
+        message.Transcript = " ";
+        Assert.That(message.Transcript, Is.Null);
+        Assert.That(message.HasTranscript, Is.False);
+    }
 }

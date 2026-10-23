@@ -15,7 +15,7 @@
     ModelLoadCardTemplate  ModelLoadCard: PART_Title, PART_Status, PART_Note (Labels), PART_Progress (a ProgressBar),
                            PART_Download, PART_Cancel, PART_Retry (Buttons)
     ChatViewTemplate       ChatView: PART_Scroll, PART_Transcript, PART_Empty, PART_Header, PART_LoadCard, PART_Status,
-                           PART_Input, PART_Send, PART_Stop, PART_Attach, PART_Attachments
+                           PART_Input, PART_Send, PART_Stop, PART_Attach, PART_Attachments, PART_Talk
     ChatUserMessageTemplate, ChatReplyTemplate, ChatNoticeTemplate
                            ChatView's messages and notices (DataTemplates of an Emgu.LiteRT.LM.Chat ChatMessageItem); they
                            show the item's Decorations with ChatDecorationView, and the user template's "Earlier messages
@@ -24,6 +24,8 @@
                            a decoration that isn't a View (Label style)
     ChatSendButtonStyle, ChatStopButtonStyle, ChatAttachButtonStyle
                            ChatView's Send, Stop and attach buttons (Button styles)
+    ChatTalkButtonStyle, ChatTalkStopButtonStyle
+                           ChatView's microphone, idle and while recording (Button styles)
     ChatAttachmentViewTemplate
                            ChatAttachmentView: PART_Image, PART_Label, PART_Remove
 -->
@@ -85,6 +87,31 @@
         <Setter Property="VerticalOptions" Value="End" />
     </Style>
 
+    <!-- The microphone: ChatTalkButtonStyle while idle, ChatTalkStopButtonStyle while recording (tap to send). -->
+    <Style x:Key="ChatTalkButtonStyle" TargetType="Button">
+        <Setter Property="Text" Value="&#x1F3A4;" />
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ChatReplyBubbleLight}, Dark={StaticResource ChatReplyBubbleDark}}" />
+        <Setter Property="TextColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="WidthRequest" Value="36" />
+        <Setter Property="HeightRequest" Value="36" />
+        <Setter Property="VerticalOptions" Value="End" />
+    </Style>
+
+    <Style x:Key="ChatTalkStopButtonStyle" TargetType="Button">
+        <Setter Property="Text" Value="&#x25A0;" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="BackgroundColor" Value="{StaticResource ChatDanger}" />
+        <Setter Property="TextColor" Value="White" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="WidthRequest" Value="36" />
+        <Setter Property="HeightRequest" Value="36" />
+        <Setter Property="VerticalOptions" Value="End" />
+    </Style>
+
     <!-- An image as a thumbnail, audio as a chip; the remove button for attachments not sent yet. -->
     <ControlTemplate x:Key="ChatAttachmentViewTemplate">
         <Grid>
@@ -123,15 +150,16 @@
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="22" />
                 </Border.StrokeShape>
-                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
-                    <ScrollView Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+                    <ScrollView Grid.ColumnSpan="4" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
                         <HorizontalStackLayout x:Name="PART_Attachments" Spacing="8" Padding="0,4,0,0" IsVisible="False" />
                     </ScrollView>
                     <Button x:Name="PART_Attach" Grid.Row="1" IsVisible="False" />
                     <Editor x:Name="PART_Input" Grid.Row="1" Grid.Column="1" AutoSize="TextChanges" MaximumHeightRequest="140" FontSize="15"
                             BackgroundColor="Transparent" VerticalOptions="Center"
                             TextColor="{AppThemeBinding Light={StaticResource ChatPrimaryTextLight}, Dark={StaticResource ChatPrimaryTextDark}}" />
-                    <Grid Grid.Row="1" Grid.Column="2" VerticalOptions="End">
+                    <Button x:Name="PART_Talk" Grid.Row="1" Grid.Column="2" IsVisible="False" />
+                    <Grid Grid.Row="1" Grid.Column="3" VerticalOptions="End">
                         <Button x:Name="PART_Send" />
                         <Button x:Name="PART_Stop" IsVisible="False" />
                     </Grid>
@@ -180,6 +208,10 @@
                     </DataTemplate>
                 </BindableLayout.ItemTemplate>
             </HorizontalStackLayout>
+            <!-- A voice message's words, written down by the speech recognizer (the model heard the audio). -->
+            <Label Text="{Binding Transcript, StringFormat='“{0}”'}" IsVisible="{Binding HasTranscript}" HorizontalOptions="End"
+                   HorizontalTextAlignment="End" MaximumWidthRequest="420" FontSize="13" FontAttributes="Italic"
+                   TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
             <Border HorizontalOptions="End" MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0" IsVisible="{Binding HasText}"
                     BackgroundColor="{StaticResource ChatAccent}">
                 <Border.StrokeShape>

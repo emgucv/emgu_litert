@@ -1,6 +1,6 @@
 # Plan: voice messages and saved chats for the chat libraries
 
-Status: proposed 2026-10-23; step 1 done 2026-10-23. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
+Status: proposed 2026-10-23; steps 1-2 done 2026-10-23. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
 parts of the demo's chat page that any chat app would want, moved into libraries the same way.
 
 ## Goal
@@ -91,6 +91,30 @@ history.Attach(chat.Conversation, chatId);         // saves each exchange and co
    - Checks: Mac Catalyst (Apple Speech: built, never run before), the S10 (audio path, Gemma 4), and an Android 13+
      device for the transcription path. That device is the Pixel Fold or the Pixel 8 emulator; I'll ask before using
      the Fold.
+
+   **Done 2026-10-23:**
+   - `ChatView.Voice.cs`: `PART_Talk` with `ChatTalkButtonStyle` / `ChatTalkStopButtonStyle` (the view switches them
+     unless the template styles the part itself), `VoiceMessages` (`ChatVoiceMessages`: `Auto`, `Audio`, `Text`,
+     `Off`), `EffectiveVoiceMessages`, `MaxVoiceLength`, `TranscribeVoiceMessages` and `IsRecording`.
+   - While recording, Send and attach are disabled. A recording under 0.5 s isn't sent, and leaving the page discards
+     one in progress.
+   - In `Audio` mode the words are matched to the user message that carries the recording, once both exist.
+   - `ChatMessageItem.Transcript` / `HasTranscript` (trimmed; blank is null). The default user template shows it in
+     quotes under the attachments; `UnitTestChatConversation.KeepsAVoiceMessagesTranscriptFromTheModel` checks that
+     it isn't sent to the model.
+   - `MauiChat` declares `RECORD_AUDIO`, the `RecognitionService` query, `NSMicrophoneUsageDescription` and
+     `NSSpeechRecognitionUsageDescription`.
+   - Checked with a temporary page in the demo (a `ChatView` with the library's own templates: the demo's `App.xaml`
+     replaces `ChatViewTemplate` app-wide with its transcript-only one). While recording, the test played a spoken
+     "What is the capital of Italy?" through the device's speaker:
+     - **Galaxy S10** (Android 12): with Qwen3 there is no microphone, since no recognizer is available. Gemma 4 E2B
+       on the GPU got the recording as audio and answered "The capital of Italy is Rome." The microphone turned into
+       the red stop button with "Listening... 0:01". No transcript, as expected on Android 12.
+     - **Mac Catalyst**, the first run of Apple's Speech framework: Qwen3 got the words ("What is the capital of
+       Italy?") and answered Rome. Gemma 4 E2B got the audio, with the transcript "What is the capital of Italy?"
+       shown under it. No permission prompt was needed.
+   - Not done: an Android 13+ device for the transcription path. Android's recognizer code is unchanged since its
+     checks on a Pixel Fold.
 3. **`Emgu.LiteRT.LM.Chat.Sqlite` scaffolding and store.**
    - The project, CMake, props/README, package id, solution entry (as for `Emgu.LiteRT.LM.Chat`).
    - `ChatHistoryStore(folder)` with these methods:

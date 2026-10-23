@@ -2,7 +2,7 @@
 
 This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
 
-- `Emgu.LiteRT.LM.Maui.dll`: `ChatView`, a MAUI chat control for the on-device `${EMGU_LITERT_LM_MODELS_NUGET_ID}` language models, or any `IChatClient`. It shows the user's messages and the replies - streamed as they are written, with their thinking, tool steps, Markdown, code blocks with Copy, and maths - a message box with Send and Stop, an attach button for images and audio, and for an on-device model a card that downloads and loads it. Replies can be read aloud.
+- `Emgu.LiteRT.LM.Maui.dll`: `ChatView`, a MAUI chat control for the on-device `${EMGU_LITERT_LM_MODELS_NUGET_ID}` language models, or any `IChatClient`. It shows the user's messages and the replies - streamed as they are written, with their thinking, tool steps, Markdown, code blocks with Copy, and maths - a message box with Send and Stop, an attach button for images and audio, a microphone for voice messages, and for an on-device model a card that downloads and loads it. Replies can be read aloud.
 
 The conversation logic comes from `${EMGU_LITERT_LM_CHAT_NUGET_ID}` (`ChatConversation`). The package has no native runtime dependency: add the LiteRT-LM native runtime packages for your platforms, as for `${EMGU_LITERT_LM_MODELS_NUGET_ID}`.
 
@@ -29,6 +29,18 @@ That is a whole chat app. Instead of `Model`, give the view a `ChatClient` (a se
 
 The sample app `Emgu.LiteRT.Example/MauiChat` in the source repository is such an app, with a restyled Send button and user messages.
 
+### Voice messages
+
+The microphone records a voice message (tap, speak, tap again to send; at most `MaxVoiceLength`, 30 s). With `VoiceMessages = Auto` (the default) a model that takes audio, such as Gemma 4, gets the recording, and the words are written down under it (`ChatMessageItem.Transcript`, never given to the model; `TranscribeVoiceMessages`). Any other model or client gets the words the platform's speech recognizer writes down, where it can: Android 13 and later, iOS and Mac Catalyst. Elsewhere, such as on Android 12 with a text-only model, there is no microphone. `Audio`, `Text` and `Off` choose it yourself, and `EffectiveVoiceMessages` tells what it is now.
+
+The app declares the permissions:
+
+- Android: `android.permission.RECORD_AUDIO`, and a `<queries>` entry for the `android.speech.RecognitionService` intent;
+- iOS and Mac Catalyst: `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` in Info.plist;
+- Windows: the `microphone` capability. Windows has no speech recognizer here, so only models that take audio get a microphone.
+
+The parts are public for an app's own UI: `VoiceRecorder` (16 kHz mono WAV, with microphone levels for a voice chat), `SpeechRecognizer` (`TranscribeAsync`; `Language` - one of `Emgu.LiteRT.LM.Chat`'s `VoiceLanguages`, or the device's) and `MicrophoneGate`, which an always-on listener such as a sound monitor uses to let go of the microphone while a recording needs it. On Android the on-device recognizer is used when it has the language; otherwise the normal one, which may send the audio to Google's service.
+
 ## Changing the look
 
 The controls are templated. Each finds its template, and the styles of its buttons, by key - first in the app's resources, then in the package's own `ChatStyles` - so an app replaces one by defining a resource with its key in `App.xaml`; nothing needs to be merged:
@@ -43,11 +55,12 @@ The controls are templated. Each finds its template, and the styles of its butto
 | `ThinkingViewTemplate` | The thinking: "Thinking...", then "Thought for N s", tapped to show it (`ThinkingView`) |
 | `ChatAttachmentViewTemplate` | An image or audio attachment (`ChatAttachmentView`) |
 | `ChatSendButtonStyle`, `ChatStopButtonStyle`, `ChatAttachButtonStyle`, `ChatDecorationTextStyle` | Styles of the buttons and of text decorations |
+| `ChatTalkButtonStyle`, `ChatTalkStopButtonStyle` | The microphone, and the microphone while recording |
 | `ChatAccent`, `ChatDanger`, `ChatPrimaryText{Light,Dark}`, `ChatSecondaryText{Light,Dark}`, `ChatReplyBubble{Light,Dark}`, `ChatSurface{Light,Dark}` | The colours the default templates use |
 
-A control template names its working parts `PART_...`; a template without one of them just doesn't have that feature (e.g. no `PART_Attach`, no attach button). `ChatViewTemplate`'s parts are `PART_Scroll` (a ScrollView), `PART_Transcript` (the Layout the messages go in), `PART_Empty`, `PART_LoadCard` (a `ModelLoadCard`), `PART_Status` (a Label), `PART_Input` (an InputView, e.g. an Editor), `PART_Send`, `PART_Stop`, `PART_Attach` (Buttons, or views that are tapped), `PART_Attachments` (a Layout for attachments waiting to be sent) and `PART_Header` (a ContentView). The other controls list theirs in their documentation; `Themes/ChatStyles.xaml` in the source repository is a complete example.
+A control template names its working parts `PART_...`; a template without one of them just doesn't have that feature (e.g. no `PART_Attach`, no attach button). `ChatViewTemplate`'s parts are `PART_Scroll` (a ScrollView), `PART_Transcript` (the Layout the messages go in), `PART_Empty`, `PART_LoadCard` (a `ModelLoadCard`), `PART_Status` (a Label), `PART_Input` (an InputView, e.g. an Editor), `PART_Send`, `PART_Stop`, `PART_Attach`, `PART_Talk` (Buttons, or views that are tapped), `PART_Attachments` (a Layout for attachments waiting to be sent) and `PART_Header` (a ContentView). The other controls list theirs in their documentation; `Themes/ChatStyles.xaml` in the source repository is a complete example.
 
-Message templates bind to `ChatMessageItem` (`Text`, `Thinking`, `Steps`, `Attachments`, `Decorations`, `IsStreaming`, `IsInterrupted`, `IsFailed`, `StartsContext`...), and can use the package's `ReplyView`, `ThinkingView`, `ChatAttachmentView` and `ChatDecorationView` (which shows a decoration: a view as it is, anything else as text). A long saved chat is shown a few messages at a time, the latest first, so opening it doesn't hold the UI thread (`IsRenderingTranscript`).
+Message templates bind to `ChatMessageItem` (`Text`, `Thinking`, `Steps`, `Attachments`, `Transcript`, `Decorations`, `IsStreaming`, `IsInterrupted`, `IsFailed`, `StartsContext`...), and can use the package's `ReplyView`, `ThinkingView`, `ChatAttachmentView` and `ChatDecorationView` (which shows a decoration: a view as it is, anything else as text). A long saved chat is shown a few messages at a time, the latest first, so opening it doesn't hold the UI thread (`IsRenderingTranscript`).
 
 ## Documentation
 
