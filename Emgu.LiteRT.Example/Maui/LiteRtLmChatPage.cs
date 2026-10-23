@@ -15,6 +15,7 @@ using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.Util;
 using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Maui;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
@@ -140,7 +141,6 @@ namespace Maui.Demo.Lite
         private static readonly Color ModelBubbleColor = Theme.TileBackground;
         private static readonly Color UserTextColor = Colors.White;
         private static readonly Color ModelTextColor = Theme.PrimaryText;
-        private static readonly Color ThinkingTextColor = Theme.SecondaryText;
 
         // Layout: a one-line header, the conversation, and the message box with per-message toggle chips. The model
         // list and the settings open in bottom sheets on narrow screens, and sit in a side panel on wide ones.
@@ -3498,28 +3498,20 @@ namespace Maui.Demo.Lite
         }
 
         // The views of a model bubble that is still streaming, so each chunk can update it in place
-        // instead of adding a new bubble per chunk. The thinking takes little room: while the model thinks, a
-        // "Thinking..." header and the last few lines of it; once the answer starts, only a "Thought for N s" header,
-        // which expands the whole thinking when tapped.
+        // instead of adding a new bubble per chunk. The thinking takes little room (Emgu.LiteRT.LM.Maui's ThinkingView):
+        // while the model thinks, a "Thinking..." header and the last few lines of it; once the answer starts, only a
+        // "Thought for N s" header, which expands the whole thinking when tapped.
         private sealed class StreamingBubble
         {
-            public Grid ThinkingHeader;
-            public ActivityIndicator ThinkingSpinner;
-            public Label ThinkingTitle;
-            public Image ThinkingChevron;
-            // The last few lines while the model thinks (plain text, maths converted - a tail cut out of a code block
-            // or list can't be laid out), and the whole thinking, formatted like the answer, when expanded.
-            public Label ThinkingLabel;
-            public ReplyBody ThinkingBody;
+            public ThinkingView Thinking;
             public BoxView Separator;
-            // The answer, with code blocks shown as code (ReplyBody).
-            public ReplyBody Body;
+            // The answer, with Markdown, code blocks and maths (Emgu.LiteRT.LM.Maui's ReplyView).
+            public ReplyView Body;
             // The bubble in the transcript, so tool steps can be inserted above it.
             public View Row;
-            // The last thinking / answer shown, whether the whole thinking is shown, and how long the thinking took
-            // (from its first text to the answer's; null if unknown, e.g. for a reopened chat).
+            // The last thinking / answer shown, and how long the thinking took (from its first text to the answer's;
+            // null if unknown, e.g. for a reopened chat).
             public ChatReply Reply;
-            public bool Expanded;
             public bool Done;
             public DateTime? ThinkingStarted;
             public TimeSpan? ThinkingTime;
@@ -3536,45 +3528,28 @@ namespace Maui.Demo.Lite
             public int MessageId;
         }
 
-        // While thinking, this much of the end of the thinking is shown (about three lines).
-        private const int ThinkingPreviewLength = 180;
-
         private StreamingBubble AddStreamingBubble()
         {
             var bubbleViews = new StreamingBubble
             {
-                ThinkingSpinner = new ActivityIndicator { IsRunning = false, IsVisible = false, Color = Theme.SecondaryText, WidthRequest = 14, HeightRequest = 14, VerticalOptions = LayoutOptions.Center },
-                ThinkingTitle = new Label { FontFamily = Theme.TitleFont, FontSize = 13, TextColor = ThinkingTextColor, VerticalOptions = LayoutOptions.Center },
-                ThinkingChevron = Theme.MakeIcon(Theme.GlyphChevronRight, Theme.SecondaryText, 16),
-                ThinkingLabel = new Label { FontFamily = Theme.BodyFont, TextColor = ThinkingTextColor, FontSize = 13, IsVisible = false },
-                ThinkingBody = new ReplyBody(ThinkingTextColor, 13) { IsVisible = false },
                 Separator = new BoxView { HeightRequest = 1, Color = Theme.Chevron, IsVisible = false },
                 TranslateRow = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.Accent, IsVisible = false },
-                Body = new ReplyBody(ModelTextColor)
+                Body = NewReplyView(ModelTextColor, 15)
             };
             bubbleViews.TranslateRow.OnTap(() => OnTranslateTapped(bubbleViews));
-            var header = new Grid
+            // The thinking's look is the demo's ThinkingViewTemplate (ChatTemplates.xaml); the translate row goes under
+            // its header while the thinking is shown.
+            bubbleViews.Thinking = new ThinkingView { Accessory = bubbleViews.TranslateRow };
+            bubbleViews.Thinking.PropertyChanged += (s, e) =>
             {
-                ColumnSpacing = 6,
-                IsVisible = false,
-                ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto) }
+                if (e.PropertyName == nameof(ThinkingView.IsExpanded))
+                    ShowThinking(bubbleViews);
             };
-            header.Add(bubbleViews.ThinkingSpinner, 0, 0);
-            header.Add(bubbleViews.ThinkingTitle, 1, 0);
-            header.Add(bubbleViews.ThinkingChevron, 2, 0);
-            header.OnTap(() =>
-            {
-                if (!bubbleViews.ThinkingChevron.IsVisible)
-                    return;
-                bubbleViews.Expanded = !bubbleViews.Expanded;
-                ShowThinking(bubbleViews);
-            });
-            bubbleViews.ThinkingHeader = header;
 
             Border bubble = ModelBubble(new VerticalStackLayout
             {
                 Spacing = 4,
-                Children = { header, bubbleViews.TranslateRow, bubbleViews.ThinkingLabel, bubbleViews.ThinkingBody, bubbleViews.Separator, bubbleViews.Body }
+                Children = { bubbleViews.Thinking, bubbleViews.Separator, bubbleViews.Body }
             });
             AddBubbleRow(bubble, false);
             bubbleViews.Row = bubble;
@@ -3592,7 +3567,7 @@ namespace Maui.Demo.Lite
             bubble.Reply = partial;
             bubble.Done = done;
             ShowThinking(bubble);
-            bubble.Body.SetText(partial.Text);
+            bubble.Body.Text = partial.Text ?? string.Empty;
             // A reply with code may use the full width, so less of the code wraps.
             if (bubble.Body.HasCode && bubble.Row.MaximumWidthRequest < double.PositiveInfinity)
                 bubble.Row.MaximumWidthRequest = double.PositiveInfinity;
@@ -3602,65 +3577,37 @@ namespace Maui.Demo.Lite
         private void ShowThinking(StreamingBubble bubble)
         {
             string thinking = bubble.Reply?.Thinking;
-            string answer = bubble.Reply?.Text;
             bool hasThinking = !string.IsNullOrEmpty(thinking);
-            bool hasAnswer = !string.IsNullOrEmpty(answer);
-            bubble.ThinkingHeader.IsVisible = hasThinking;
-            if (!hasThinking)
-            {
-                bubble.TranslateRow.IsVisible = false;
-                bubble.ThinkingLabel.IsVisible = false;
-                bubble.ThinkingBody.IsVisible = false;
-                bubble.Separator.IsVisible = false;
-                return;
-            }
-            // Still thinking: a spinner and the end of the thinking so far.
-            bool thinkingNow = !hasAnswer && !bubble.Done;
-            bubble.ThinkingSpinner.IsVisible = bubble.ThinkingSpinner.IsRunning = thinkingNow;
-            bubble.ThinkingChevron.IsVisible = !thinkingNow;
-            if (thinkingNow)
-            {
-                bubble.ThinkingTitle.Text = "Thinking...";
-                bubble.TranslateRow.IsVisible = false;
-                bubble.ThinkingLabel.IsVisible = true;
-                bubble.ThinkingLabel.Text = ThinkingPreview(ReplyBody.WithMath(thinking));
-                bubble.ThinkingBody.IsVisible = false;
-                bubble.Separator.IsVisible = false;
-                return;
-            }
-            // A reply that ended without an answer (e.g. cut off while thinking) shows its thinking.
-            bool expanded = bubble.Expanded || !hasAnswer;
-            bubble.ThinkingTitle.Text = bubble.ThinkingTime != null
-                ? string.Format("Thought for {0:N0} s", Math.Max(1, bubble.ThinkingTime.Value.TotalSeconds))
-                : "Thoughts";
-            bubble.ThinkingChevron.Source = Theme.MakeGlyphSource(expanded ? Theme.GlyphExpandMore : Theme.GlyphChevronRight, Theme.SecondaryText, 16);
-            SemanticProperties.SetDescription(bubble.ThinkingHeader, bubble.ThinkingTitle.Text + (expanded ? ", shown. Tap to hide." : ", hidden. Tap to show."));
-            bubble.ThinkingLabel.IsVisible = false;
-            bubble.ThinkingBody.IsVisible = expanded;
+            bool hasAnswer = !string.IsNullOrEmpty(bubble.Reply?.Text);
+            ThinkingView view = bubble.Thinking;
+            // Still thinking: a spinner and the end of the thinking so far. A reply that ended without an answer (e.g.
+            // cut off while thinking) shows its thinking.
+            view.IsThinking = hasThinking && !hasAnswer && !bubble.Done;
+            view.AlwaysExpanded = !hasAnswer;
+            view.Duration = bubble.ThinkingTime;
+            view.DisplayText = bubble.ShowTranslation && bubble.Translation != null ? bubble.Translation : null;
+            view.Thinking = thinking ?? string.Empty;
+            bool expanded = view.ShowsThinking;
             ShowTranslateRow(bubble, expanded);
-            if (expanded)
-                bubble.ThinkingBody.SetText(bubble.ShowTranslation && bubble.Translation != null ? bubble.Translation.Trim() : thinking.Trim());
             // A reply with code in its thinking may use the full width too.
-            if (expanded && bubble.ThinkingBody.HasCode && bubble.Row.MaximumWidthRequest < double.PositiveInfinity)
+            if (view.HasCode && bubble.Row.MaximumWidthRequest < double.PositiveInfinity)
                 bubble.Row.MaximumWidthRequest = double.PositiveInfinity;
             bubble.Separator.IsVisible = expanded && hasAnswer;
         }
 
-        // The end of the thinking so far, from a word boundary, without the Markdown markers (code fences, **, `, #) a
-        // tail cut out of formatted text can't be laid out with.
-        private static string ThinkingPreview(string thinking)
+        // An answer (or the thinking's) view in the demo's fonts and colours; its code blocks use the demo's
+        // CodeBlockViewTemplate (ChatTemplates.xaml).
+        private static ReplyView NewReplyView(Color textColor, double fontSize)
         {
-            string text = System.Text.RegularExpressions.Regex.Replace(thinking.Replace("\r", ""), @"^\s*```.*$\n?", string.Empty,
-                System.Text.RegularExpressions.RegexOptions.Multiline);
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"\*\*|__|`|^#{1,6}\s+", string.Empty,
-                System.Text.RegularExpressions.RegexOptions.Multiline).Trim();
-            if (text.Length <= ThinkingPreviewLength)
-                return text;
-            string tail = text.Substring(text.Length - ThinkingPreviewLength);
-            int space = tail.IndexOfAny(new[] { ' ', '\n' });
-            if (space > 0 && space < 40)
-                tail = tail.Substring(space + 1);
-            return "\u2026" + tail;
+            return new ReplyView
+            {
+                TextColor = textColor,
+                FontSize = fontSize,
+                FontFamily = Theme.BodyFont,
+                LinkColor = Theme.Accent,
+                SecondaryTextColor = Theme.SecondaryText,
+                QuoteMarkColor = Theme.Chevron
+            };
         }
 
         // Returns the label under a voice message's chip for its words (null if the message has no voice recording), with

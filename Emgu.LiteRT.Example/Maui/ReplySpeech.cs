@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Models;
 
 namespace Maui.Demo.Lite
@@ -47,7 +48,7 @@ namespace Maui.Demo.Lite
             // Maths as text (x², √2, ≤) rather than its LaTeX: display maths (possibly over lines), then inline.
             s = Regex.Replace(s, @"\$\$(.+?)\$\$|\\\[(.+?)\\\]",
                 m => " " + MathText.ToUnicode(m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value) + ". ", RegexOptions.Singleline);
-            s = ReplyBody.WithMath(s);
+            s = ReplyMarkdown.WithMath(s);
             s = Regex.Replace(s, @"\[([^\]]*)\]\([^)]*\)", "$1");                          // [text](url) -> text
             s = Regex.Replace(s, @"https?://\S+", " ");                                     // bare URLs
             s = Regex.Replace(s, @"^\s{0,3}(#{1,6}|>|[-*+]|\d+[.)])\s+", "", RegexOptions.Multiline); // headings, quotes, list markers

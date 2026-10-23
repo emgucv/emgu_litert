@@ -27,6 +27,7 @@
     <Compile Include="..\UnitTestVoiceLanguages.cs" Link="UnitTestVoiceLanguages.cs" />
     <Compile Include="..\UnitTestTaskPlan.cs" Link="UnitTestTaskPlan.cs" />
     <Compile Include="..\UnitTestMathText.cs" Link="UnitTestMathText.cs" />
+    <Compile Include="..\UnitTestReplyMarkdown.cs" Link="UnitTestReplyMarkdown.cs" />
     <Compile Include="..\UnitTestGoalHistory.cs" Link="UnitTestGoalHistory.cs" />
     <Compile Include="..\UnitTestHandTracker.cs" Link="UnitTestHandTracker.cs" />
     <Compile Include="..\UnitTestPoseTracker.cs" Link="UnitTestPoseTracker.cs" />
@@ -142,6 +143,7 @@
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Extensions.AI\NetStandard\Emgu.LiteRT.LM.Extensions.AI.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Agents\NetStandard\Emgu.LiteRT.LM.Agents.csproj" />
+    <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Chat\NetStandard\Emgu.LiteRT.LM.Chat.csproj" />
     <!-- Annotation/DownloadableFile/FileDownloadManager moved from Emgu.Models into
          Emgu.LiteRT.Util - needs a direct reference now for UnitTest1.cs to compile. -->
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />

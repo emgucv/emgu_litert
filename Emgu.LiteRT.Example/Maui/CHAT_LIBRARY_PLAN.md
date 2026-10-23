@@ -1,6 +1,6 @@
 # Plan: a reusable MAUI chat control (`Emgu.LiteRT.LM.Maui`)
 
-Status: decisions taken 2026-10-22 (below). Step 1 (scaffolding) done 2026-10-23; no code has moved yet.
+Status: decisions taken 2026-10-22 (below). Steps 1 (scaffolding) and 2 (`ReplyView`, `ThinkingView`) done 2026-10-23.
 
 ## Decisions
 
@@ -121,6 +121,18 @@ Each step builds the demo and is checked before the next. Device checks: Mac Cat
    parsing into a UI-free part (layer 1 or internal) and its view building into `ReplyView`. The demo uses them from
    the package. Check: Markdown, code blocks, maths and thinking look the same as before (screenshots before/after on
    Mac Catalyst and Android), and a restyled template in the sample takes effect.
+   **Done:** `Emgu.LiteRT.LM.Chat`'s `ReplyMarkdown` (`SplitBlocks`, `ParseLine`, `ParseInline`, `WithMath`,
+   `Preview`; `UnitTestReplyMarkdown`, model-free) and `Emgu.LiteRT.LM.Maui`'s `ReplyView`, `CodeBlockView` and
+   `ThinkingView` (`TemplatedView`s: templates found by key - the app's resources, else `Themes/ChatStyles.xaml` - and
+   `PART_` elements bound in `OnApplyTemplate`; a missing part is skipped). The demo's bubble uses them; its
+   `ChatTemplates.xaml` (merged in `App.xaml`) replaces `CodeBlockViewTemplate` and `ThinkingViewTemplate` to keep the
+   Inter fonts and the Material Symbols chevron, which is also the restyling check. Checked with a temporary page
+   showing the old `ReplyBody` beside the new views (three thinking states, headings, lists, quote, link, rule, inline
+   and display maths, code, prices): identical on Mac Catalyst and the Pixel 8 emulator, the header tap expands; the
+   library's own templates also render (demo overrides removed at run time); and a real Gemma 4 E2B reply with
+   thinking streamed correctly on Mac Catalyst. iOS simulator build passes. Not checked: Windows, dark mode.
+   Naming note for step 3: inside `Emgu.LiteRT.LM.*` namespaces `Chat` resolves to the namespace
+   `Emgu.LiteRT.LM.Chat`, so `Emgu.LiteRT.LM.Models.Chat` needs a qualified name or an alias there.
 3. **`ChatConversation` and `ChatMessageItem` (layer 1, `Emgu.LiteRT.LM.Chat`)**, extracted from `SendAsync`,
    `RunAgentAsync`, `PrepareContextAsync`, `CompactAsync`, `SummarizeAsync`, `PrimeModel`, `EstimateTokens`. Unit tests
    with a fake `IChatClient`: streaming updates, cancel keeps the partial reply, compaction by summary and by dropping,

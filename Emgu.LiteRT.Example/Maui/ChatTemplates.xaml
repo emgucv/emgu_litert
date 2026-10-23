@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  The demo's look for Emgu.LiteRT.LM.Maui's chat controls: their templates replaced by key (see the library's
+  Themes/ChatStyles.xaml), with the demo's Inter fonts and its Material Symbols chevron. Merged in App.xaml.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                    xmlns:chat="clr-namespace:Emgu.LiteRT.LM.Maui;assembly=Emgu.LiteRT.LM.Maui"
+                    x:Class="Maui.Demo.Lite.ChatTemplates">
+
+    <ControlTemplate x:Key="CodeBlockViewTemplate">
+        <Border BackgroundColor="#1F2430" Stroke="Transparent" Padding="10,6,10,10">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="10" />
+            </Border.StrokeShape>
+            <VerticalStackLayout Spacing="4">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label x:Name="PART_Language" FontFamily="InterRegular" FontSize="12" TextColor="#9AA3B5" VerticalOptions="Center" />
+                    <Label x:Name="PART_Copy" Grid.Column="1" Text="Copy" FontFamily="InterSemiBold" FontSize="12"
+                           TextColor="#9AA3B5" Padding="8,2" HorizontalOptions="End" />
+                </Grid>
+                <Label x:Name="PART_Code" FontSize="13" TextColor="#E6E9F0" LineBreakMode="WordWrap" />
+            </VerticalStackLayout>
+        </Border>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="ThinkingViewTemplate">
+        <VerticalStackLayout Spacing="4">
+            <Grid x:Name="PART_Header" ColumnSpacing="6" ColumnDefinitions="Auto,Auto,Auto">
+                <ActivityIndicator x:Name="PART_Spinner" Color="#8A8FA3" WidthRequest="14" HeightRequest="14" VerticalOptions="Center" />
+                <Label x:Name="PART_Title" Grid.Column="1" FontFamily="InterSemiBold" FontSize="13" TextColor="#8A8FA3" VerticalOptions="Center" />
+                <!-- chevron_right; ThinkingView turns it a quarter turn (expand_more) while the thinking is shown. -->
+                <Image x:Name="PART_Chevron" Grid.Column="2" WidthRequest="16" HeightRequest="16" VerticalOptions="Center" HorizontalOptions="Center">
+                    <Image.Source>
+                        <FontImageSource FontFamily="MaterialSymbols" Glyph="&#xE5CC;" Color="#8A8FA3" Size="16" />
+                    </Image.Source>
+                </Image>
+            </Grid>
+            <ContentView x:Name="PART_Accessory" />
+            <Label x:Name="PART_Preview" FontFamily="InterRegular" FontSize="13" TextColor="#8A8FA3" />
+            <chat:ReplyView x:Name="PART_Body" FontFamily="InterRegular" FontSize="13" TextColor="#8A8FA3" />
+        </VerticalStackLayout>
+    </ControlTemplate>
+</ResourceDictionary>

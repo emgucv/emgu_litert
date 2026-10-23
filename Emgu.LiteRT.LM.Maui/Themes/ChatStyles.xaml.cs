@@ -5,8 +5,10 @@
 namespace Emgu.LiteRT.LM.Maui
 {
     /// <summary>
-    /// The default styles, colours and templates of the chat controls. Merge it into the app's resources (App.xaml);
-    /// a style or template defined later with the same key replaces the default one.
+    /// The default templates and styles of the chat controls. The controls find them by key, first in the app's
+    /// resources and then here, so an app replaces one by defining a resource with the same key (e.g. its own
+    /// "CodeBlockViewTemplate" in App.xaml); it doesn't need to merge this dictionary. The keys and template parts are
+    /// listed in ChatStyles.xaml and on each control.
     /// </summary>
     public partial class ChatStyles : ResourceDictionary
     {

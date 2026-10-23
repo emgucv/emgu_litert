@@ -1,15 +1,79 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-  The default styles and colours of the chat controls. An app merges them once, in App.xaml:
+  The default templates and styles of the chat controls. The controls find them by key, first in the app's resources
+  (App.xaml, including merged dictionaries) and then here, so an app replaces one by defining a resource with the same
+  key, e.g. its own "CodeBlockViewTemplate". A replaced template keeps working as long as it has the parts (x:Name
+  "PART_...") the control documents; a part that is left out is just not shown.
 
-    <ResourceDictionary.MergedDictionaries>
-      <chat:ChatStyles />
-    </ResourceDictionary.MergedDictionaries>
-
-  (xmlns:chat="clr-namespace:Emgu.LiteRT.LM.Maui;assembly=Emgu.LiteRT.LM.Maui"), and overrides any style or template
-  by defining one with the same key after it. Filled in as the controls are added.
+  Keys:
+    ReplyViewTemplate      ReplyView: PART_Blocks (a Layout the reply's parts are added to)
+    ReplyParagraphStyle    ReplyView: the Label of a block of Markdown text
+    ReplyMathStyle         ReplyView: the Label of display maths
+    CodeBlockViewTemplate  CodeBlockView: PART_Language, PART_Code (Labels), PART_Copy (tapped to copy)
+    ThinkingViewTemplate   ThinkingView: PART_Header, PART_Spinner, PART_Title, PART_Chevron, PART_Accessory,
+                           PART_Preview, PART_Body (a ReplyView)
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                    xmlns:chat="clr-namespace:Emgu.LiteRT.LM.Maui"
                     x:Class="Emgu.LiteRT.LM.Maui.ChatStyles">
+
+    <Color x:Key="ChatPrimaryTextLight">#1A1C2E</Color>
+    <Color x:Key="ChatPrimaryTextDark">#E8EAF2</Color>
+    <Color x:Key="ChatSecondaryTextLight">#8A8FA3</Color>
+    <Color x:Key="ChatSecondaryTextDark">#9AA0B4</Color>
+
+    <ControlTemplate x:Key="ReplyViewTemplate">
+        <VerticalStackLayout x:Name="PART_Blocks" Spacing="8" />
+    </ControlTemplate>
+
+    <Style x:Key="ReplyParagraphStyle" TargetType="Label">
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ChatPrimaryTextLight}, Dark={StaticResource ChatPrimaryTextDark}}" />
+        <Setter Property="LineBreakMode" Value="WordWrap" />
+    </Style>
+
+    <Style x:Key="ReplyMathStyle" TargetType="Label">
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ChatPrimaryTextLight}, Dark={StaticResource ChatPrimaryTextDark}}" />
+        <Setter Property="HorizontalTextAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,2" />
+    </Style>
+
+    <!-- A dark panel in both light and dark themes, as code editors show code. -->
+    <ControlTemplate x:Key="CodeBlockViewTemplate">
+        <Border BackgroundColor="#1F2430" Stroke="Transparent" Padding="10,6,10,10">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="10" />
+            </Border.StrokeShape>
+            <VerticalStackLayout Spacing="4">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label x:Name="PART_Language" FontSize="12" TextColor="#9AA3B5" VerticalOptions="Center" />
+                    <Label x:Name="PART_Copy" Grid.Column="1" Text="Copy" FontSize="12" FontAttributes="Bold"
+                           TextColor="#9AA3B5" Padding="8,2" HorizontalOptions="End" />
+                </Grid>
+                <!-- Long lines wrap: a horizontal ScrollView around the label (to keep lines whole) is measured once
+                     and doesn't grow as streamed code gets longer, showing only its first line. -->
+                <Label x:Name="PART_Code" FontSize="13" TextColor="#E6E9F0" LineBreakMode="WordWrap" />
+            </VerticalStackLayout>
+        </Border>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="ThinkingViewTemplate">
+        <VerticalStackLayout Spacing="4">
+            <Grid x:Name="PART_Header" ColumnSpacing="6" ColumnDefinitions="Auto,Auto,Auto" HorizontalOptions="Start">
+                <ActivityIndicator x:Name="PART_Spinner" WidthRequest="14" HeightRequest="14" VerticalOptions="Center"
+                                   Color="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
+                <Label x:Name="PART_Title" Grid.Column="1" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
+                <!-- A chevron pointing right; the control turns it to point down while the thinking is shown. -->
+                <Path x:Name="PART_Chevron" Grid.Column="2" Data="M 6,3 L 11,8 L 6,13" StrokeThickness="1.6"
+                      WidthRequest="16" HeightRequest="16" VerticalOptions="Center"
+                      Stroke="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
+            </Grid>
+            <ContentView x:Name="PART_Accessory" />
+            <Label x:Name="PART_Preview" FontSize="13"
+                   TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
+            <chat:ReplyView x:Name="PART_Body" FontSize="13"
+                            TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
+        </VerticalStackLayout>
+    </ControlTemplate>
 </ResourceDictionary>
