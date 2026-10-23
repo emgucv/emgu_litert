@@ -18,4 +18,5 @@ internal static class DetectorFactory
     public static DFineDetector DFine() => new(FileSystem.CacheDirectory, ValidationImage);
     public static HandGestureDetector Hand() => new(FileSystem.CacheDirectory, ValidationImage);
     public static PoseDetector Pose() => new(FileSystem.CacheDirectory, ValidationImage);
+    public static FaceDetector Face() => new(FileSystem.CacheDirectory, ValidationImage);
 }

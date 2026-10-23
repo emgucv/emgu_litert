@@ -34,6 +34,7 @@
     <Compile Include="..\UnitTestGoalHistory.cs" Link="UnitTestGoalHistory.cs" />
     <Compile Include="..\UnitTestHandTracker.cs" Link="UnitTestHandTracker.cs" />
     <Compile Include="..\UnitTestPoseTracker.cs" Link="UnitTestPoseTracker.cs" />
+    <Compile Include="..\UnitTestFaceTracker.cs" Link="UnitTestFaceTracker.cs" />
     <Compile Include="..\UnitTestPoseVisualAgent.cs" Link="UnitTestPoseVisualAgent.cs" />
     <Compile Include="..\UnitTestAlertSounds.cs" Link="UnitTestAlertSounds.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\PlayFileAction.cs" Link="PlayFileAction.cs" />
@@ -89,6 +90,8 @@
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui\Resources\Raw\hand_pointing_up_rotated.jpg" Link="hand_pointing_up_rotated.jpg" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\hand_reference.json" Link="hand_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\pose_reference.json" Link="pose_reference.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\TestData\face_reference.json" Link="face_reference.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\Emgu.LiteRT.Example\Maui\Resources\Raw\face_portrait.png" Link="face_portrait.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui\Resources\Raw\pose_standing.jpg" Link="pose_standing.jpg" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\yamnet_reference.json" Link="yamnet_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\picodet_reference.json" Link="picodet_reference.json" CopyToOutputDirectory="PreserveNewest" />

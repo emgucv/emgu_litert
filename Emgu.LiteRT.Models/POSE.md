@@ -34,8 +34,9 @@ frame) - and 33 world landmarks in metres from the hips, turned upright. The nam
 - The other MediaPipe models we might use, by their cards (2026-10-20): Face Mesh V2, Blendshape V2, Selfie segmentation, Multiclass segmentation and
   Hair segmentation all say Apache-2.0 and "not for human life-critical decisions"; Selfie and Multiclass segmentation also exclude surveillance and
   identity recognition, and Face Mesh and Blendshape V2 say instead that their output "do[es] not provide facial recognition or identification". The
-  hand landmark card says Apache-2.0 too; the gesture classifier's card states no licence (HAND_GESTURES.md). No card was found for the face
-  detector (BlazeFace), the image classifier/embedder or the object detector.
+  hand landmark card says Apache-2.0 too; the gesture classifier's card states no licence (HAND_GESTURES.md). The face detector's card ("MediaPipe BlazeFace Model Card (Short Range)", found 2026-10-23) says
+  Apache-2.0 and excludes surveillance and identity recognition (FACE.md). No card was found for the image classifier/embedder or the object
+  detector.
 - The sample photo (`Resources/Raw/pose_standing.jpg`) is MediaPipe's test image `pose.jpg` (its Apache-2.0 repository's test data, from
   Google's `mediapipe-assets` storage).
 
