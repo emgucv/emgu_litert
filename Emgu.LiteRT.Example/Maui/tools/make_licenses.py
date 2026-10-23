@@ -165,6 +165,11 @@ def curated():
         copyright="Google LLC / The MediaPipe Authors", url="https://github.com/google-ai-edge/mediapipe",
         used_for="Body pose demo: the pose detector and pose landmark models of MediaPipe's pose_landmarker_{lite,full,heavy}.task (the model card says "
         "Apache-2.0), downloaded from Google on first use (not part of the app); the sample photo is MediaPipe's test image")
+    add(model, "MediaPipe face landmarker (BlazeFace, Face Mesh V2, Blendshape V2)", "Apache-2.0", APACHE,
+        copyright="Google LLC / The MediaPipe Authors", url="https://github.com/google-ai-edge/mediapipe",
+        used_for="Face demo: the face detector, face landmark and blendshape models of MediaPipe's face_landmarker.task (the model "
+        "cards say Apache-2.0), downloaded from Google on first use (not part of the app); the sample face is synthetic, drawn "
+        "by Z-Image-Turbo - no real person")
     add(model, "YAMNet", "Apache-2.0", APACHE,
         copyright="Google LLC / The TensorFlow Authors", url="https://github.com/tensorflow/models/tree/master/research/audioset/yamnet",
         used_for="Sound event demo: the audio classifier as MediaPipe ships it (its metadata says Apache-2.0), downloaded from Google on first "
@@ -483,10 +488,10 @@ def native():
 def opencv():
     category = "Emgu CV and OpenCV"
     emgu = os.path.join(NUGET, "emgu.cv", "4.12.0.5764", "LICENSE.txt")
-    add(category, "Emgu CV", "GPL-3.0 or Emgu commercial licence", read(emgu), version="4.13.0",
+    add(category, "Emgu CV", "GPL-3.0 or Emgu commercial licence", read(emgu), version="4.12.0",
         copyright="Copyright (C) Emgu Corporation", url="https://www.emgu.com", used_for="Image decoding and drawing in the demos")
-    cv = "https://raw.githubusercontent.com/opencv/opencv/4.13.0/"
-    add(category, "OpenCV", "Apache-2.0", fetch(cv + "LICENSE") + "\n\n" + fetch(cv + "COPYRIGHT"), version="4.13.0",
+    cv = "https://raw.githubusercontent.com/opencv/opencv/4.12.0/"
+    add(category, "OpenCV", "Apache-2.0", fetch(cv + "LICENSE") + "\n\n" + fetch(cv + "COPYRIGHT"), version="4.12.0",
         url="https://opencv.org")
     # The libraries OpenCV builds into Emgu CV's runtime ("3rdparty dependencies" in its build information).
     for name, version, license, path, url in [
@@ -505,7 +510,7 @@ def opencv():
     # Carotene has no licence file of its own: its sources carry it.
     header = fetch(cv + "hal/carotene/src/add.cpp").split("*/")[0]
     add(category, "Carotene", "BSD-3-Clause", re.sub(r"^\s*/?\*+ ?", "", header, flags=re.MULTILINE),
-        copyright="Copyright (C) 2014, NVIDIA Corporation", url="https://github.com/opencv/opencv/tree/4.13.0/hal/carotene")
+        copyright="Copyright (C) 2014, NVIDIA Corporation", url="https://github.com/opencv/opencv/tree/4.12.0/hal/carotene")
     add(category, "KleidiCV", "Apache-2.0", APACHE, version="0.5.0", copyright="Arm Limited",
         url="https://gitlab.arm.com/kleidi/kleidicv")
     add(category, "Tesseract OCR", "Apache-2.0", fetch("https://raw.githubusercontent.com/tesseract-ocr/tesseract/5.5.0/LICENSE"),
