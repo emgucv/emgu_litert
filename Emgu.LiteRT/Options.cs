@@ -56,7 +56,11 @@ namespace Emgu.LiteRT
         {
             if (cpuOptions == null)
                 throw new ArgumentNullException("cpuOptions");
-            AddOpaqueOptions("xnnpack", cpuOptions.ToToml());
+            // LiteRT renamed the CPU accelerator's identifier from "xnnpack" to "cpu_options" (LiteRT ca21dc99, LiteRT-LM
+            // v0.18.1), and each runtime ignores the other's, so the payload goes under both and works with either libLiteRt.
+            String toml = cpuOptions.ToToml();
+            AddOpaqueOptions("cpu_options", toml);
+            AddOpaqueOptions("xnnpack", toml);
         }
 
         /// <summary>

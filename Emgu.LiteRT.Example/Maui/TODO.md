@@ -199,6 +199,21 @@ LocalApplicationData folder through the package's copy, so test models copied in
 LiteRT-LM v0.18.0 is the current pin. The next release brings upstream fixes and unblocks the embedding models' GPU
 (item 11: its `main` already pins a LiteRT with `dd3db3123`).
 
+**v0.18.1 (tagged 2026-10-20) was skipped: it doesn't build.** It changes no LiteRT-LM source, only appends a second
+`LITERT_REF` (`ca21dc99`, which contains `dd3db3123`) and `TENSORFLOW_REF` (`a1179d3c`) to `WORKSPACE`, and that
+TensorFlow loads `compatibility_proxy_repo` from `@rules_cc//cc:extensions.bzl`, which the WORKSPACE's `rules_cc`
+lacks - the failure the WORKSPACE's own comment above the first `TENSORFLOW_REF` warns about. Our macOS build and all six
+of Google's CI workflows on the tag failed with it. `main` fixed it by pinning `rules_cc` 1.9.0 (CI-Mac green on
+`25016d6e`, 2026-10-23), so wait for the next tag (v0.18.2 or later). Found while checking v0.18.1, still true for
+the next release:
+- LiteRT renamed the CPU accelerator's options identifier from `"xnnpack"` to `"cpu_options"` (`ca21dc99`); each
+  runtime ignores the other's. `Emgu.LiteRT`'s `Options.AddCpuOptions` already sends the payload under both, so thread
+  counts and the XNNPACK weight cache (Z-Image-Turbo) keep working - checked with v0.18.0's `libLiteRt` (the weight
+  cache is written). The GPU options keys and identifier (`"gpu_options"`) are unchanged.
+- `ca21dc99` only adds exports (12: delegation metrics, local response normalization options), so the checked-in
+  `litert_windows_exports.def` still links; regenerate it on Windows (`generate_litert_windows_exports.ps1`) to
+  export them. All 39 functions `Emgu.LiteRT` imports are still there.
+
 - [ ] Move `LiteRT-LM` to the release and `litert` to its `LITERT_REF` (CLAUDE.md, "The `litert` submodule must match
       LiteRT-LM's LiteRT version").
 - [ ] Rebuild the natives for macOS, Mac Catalyst, iOS, Android (all four ABIs) and Windows; check the Windows export
