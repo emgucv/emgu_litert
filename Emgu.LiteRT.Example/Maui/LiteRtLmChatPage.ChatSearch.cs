@@ -29,7 +29,7 @@ namespace Maui.Demo.Lite
             try { enabled = Preferences.Default.Get(ChatSearchPreference, false); } catch (Exception) { }
             _chatSearchSwitch = new Switch { IsToggled = enabled, OnColor = Theme.Accent };
             _chatSearchSwitch.Toggled += OnChatSearchToggled;
-            _store.ChatsChanged += () => MainThread.BeginInvokeOnMainThread(StartChatIndexing);
+            _store.ChatsChanged += (_, _) => MainThread.BeginInvokeOnMainThread(StartChatIndexing);
             var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
             row.Add(new Label { Text = "Search past chats", FontFamily = Theme.BodyFont, FontSize = 15,
                 TextColor = Theme.PrimaryText, VerticalOptions = LayoutOptions.Center }, 0, 0);

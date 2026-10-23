@@ -1,6 +1,6 @@
 # Plan: voice messages and saved chats for the chat libraries
 
-Status: proposed 2026-10-23; steps 1-4 done 2026-10-23. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
+Status: proposed 2026-10-23; steps 1-5 done 2026-10-23. The follow-up to `CHAT_LIBRARY_PLAN.md` (all 7 steps done): two more
 parts of the demo's chat page that any chat app would want, moved into libraries the same way.
 
 ## Goal
@@ -198,6 +198,38 @@ history.Attach(chat.Conversation, chatId);         // saves each exchange and co
        content.
      - Open chats saved before the change on Mac Catalyst and the S10 (messages, steps, pictures, the summary divider),
        continue one, compact, delete one.
+
+   **Done 2026-10-23:**
+   - `ChatStore` derives from `ChatHistoryStore`. `ConversationRecord` (with `DocumentId`) and `MessageRecord` (with
+     `Language` and `ThinkingTranslation`) derive from the library's records, and its own tables are created in
+     `CreateTablesAsync`.
+   - A deleted chat's search-index rows go in `DeletingChat`.
+   - The library's `SetTranscriptAsync`, `SetSummaryAsync`, `GetAttachments` (`ChatSavedAttachment` replaces
+     `SavedAttachment`), `Shorten` and the file naming replace the demo's own. `IsPrivateSession` became `IsPrivate`,
+     and `ChatsChanged` is an `EventHandler`.
+   - `AddMessageAsync` keeps the demo's meaning (its last parameter is the language) and hides the library's.
+     `SetLanguageAsync` is new.
+   - The page:
+     - `SaveExchangeAsync` calls `ChatHistoryStore.SaveExchangeAsync`. It got a `steps` parameter, so the document's
+       step line still comes before the tool steps.
+     - `OpenConversationAsync` builds on `LoadAsync<MessageRecord>`, `RecordOf` and `AttachmentsOf`, then
+       `ChatHistory.Load`.
+     - `OnConversationCompacted` calls `SaveCompactionAsync`; `MessageIdOf` is gone.
+   - The existing `ChatStore` tests (private chats, export, chat search, storage, voice transcripts) pass unchanged;
+     the model-free suite passes (398).
+   - Checked with a temporary self-test, after copying `~/Library/chats` to `~/chats-backup-2026-10-23`:
+     - **Existing chats** opened (counts only logged, never text): the three most recent of 5 on the Mac, and both
+       on the Galaxy S10, with their steps and attachments. 180-600 ms each.
+     - **A new test chat** with Gemma 4 E2B (Metal on the Mac, OpenCL on the S10):
+       - the calculator step and the Word-document card;
+       - compaction (summary and context start 2 saved);
+       - reopened with all of it, and continued: it still knew 838,102.05;
+       - the first message's language was saved;
+       - deleting it removed its files.
+     - Afterwards the Mac's database had the same 5 chats and 41 messages as the backup, with identical attachments;
+       the only addition is the `SchemaVersion` table.
+     - On the S10 one 1.3 s UI stall: a frame waited on the GPU while Gemma 4 E2B started loading there, as the test
+       switched models.
 6. **Docs**: the two READMEs (`ChatView`'s microphone and permissions; the new package), `CLAUDE.md`, and this plan.
 
 ## Risks and open questions

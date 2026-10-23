@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Chat.Sqlite;
 using SQLite;
 
 namespace Maui.Demo.Lite
@@ -16,30 +17,8 @@ namespace Maui.Demo.Lite
     /// A saved chat: one row per conversation.
     /// </summary>
     [Table("Conversation")]
-    public class ConversationRecord
+    public class ConversationRecord : ChatRecord
     {
-        [PrimaryKey, AutoIncrement]
-        public int Id { get; set; }
-
-        /// <summary>The first message, shortened</summary>
-        public string Title { get; set; }
-
-        /// <summary>The model's ModelChoice name, e.g. "Gemma4E2B"</summary>
-        public string Model { get; set; }
-
-        public DateTime Created { get; set; }
-
-        public DateTime Updated { get; set; }
-
-        /// <summary>
-        /// When the chat outgrew the model's context window: a summary of the messages up to SummaryUpTo, given to the
-        /// model in their place; null if they were dropped without one (or the chat was never compacted)
-        /// </summary>
-        public string Summary { get; set; }
-
-        /// <summary>The id of the last message the model no longer sees (summarized or dropped); 0 for none</summary>
-        public int SummaryUpTo { get; set; }
-
         /// <summary>The attached document (DocumentRecord.Id), restored when the chat is opened; null if none</summary>
         public string DocumentId { get; set; }
     }
@@ -104,25 +83,8 @@ namespace Maui.Demo.Lite
     /// A message of a saved chat.
     /// </summary>
     [Table("Message")]
-    public class MessageRecord
+    public class MessageRecord : ChatMessageRecord
     {
-        public const string UserRole = "user";
-        public const string AssistantRole = "assistant";
-        /// <summary>A tool call shown in the transcript (e.g. "Searching Wikipedia for ..."); not sent to the model</summary>
-        public const string StepRole = "step";
-
-        [PrimaryKey, AutoIncrement]
-        public int Id { get; set; }
-
-        [Indexed]
-        public int ConversationId { get; set; }
-
-        public string Role { get; set; }
-
-        public string Text { get; set; }
-
-        public string Thinking { get; set; }
-
         /// <summary>
         /// A user message's language (a two-letter code such as "es", detected when it was sent; null if unknown - voice
         /// messages, older chats). For a reply: the language its thinking was translated into (null: not translated).
@@ -131,26 +93,6 @@ namespace Maui.Demo.Lite
 
         /// <summary>The reply's thinking translated into <see cref="Language"/> on request (null: not translated).</summary>
         public string ThinkingTranslation { get; set; }
-
-        /// <summary>
-        /// The words of a voice message the model was given as audio (the platform's speech recognizer wrote them down
-        /// for the transcript; the model doesn't see them). Null: none, or not recognized.
-        /// </summary>
-        public string Transcript { get; set; }
-
-        /// <summary>
-        /// What the model was given with a user message besides its text: excerpts of an attached document (null if
-        /// none). The model sees it before the message; the transcript shows only the message.
-        /// </summary>
-        public string Context { get; set; }
-
-        /// <summary>
-        /// Attachments, one per line: "image|audio", the media type and the file's name in the conversation's folder,
-        /// separated by '|'
-        /// </summary>
-        public string Attachments { get; set; }
-
-        public DateTime Created { get; set; }
     }
 
     /// <summary>A passage of a saved message, embedded with the selected search model.</summary>
@@ -232,161 +174,84 @@ namespace Maui.Demo.Lite
     }
 
     /// <summary>
-    /// An attachment of a saved message: its kind ("image" or "audio"), media type and file.
-    /// </summary>
-    public sealed class SavedAttachment
-    {
-        public string Kind;
-        public string MediaType;
-        public string Path;
-    }
-
-    /// <summary>
     /// The chat page's saved chats: a SQLite database (chats/chats.db3 in the app's data folder), with images and
     /// audio stored as files in chats/attachments/{conversation id}/ and only their names in the database. (A
-    /// subfolder, since the app data folder of an unsandboxed Mac Catalyst app is ~/Library itself.)
+    /// subfolder, since the app data folder of an unsandboxed Mac Catalyst app is ~/Library itself.) The chats themselves
+    /// are Emgu.LiteRT.LM.Chat.Sqlite's ChatHistoryStore; the page's own data - documents, memories, goals, the chat and
+    /// photo search indexes, a message's language and translated thinking, a chat's document - is kept here, in the same
+    /// database.
     /// </summary>
-    internal sealed partial class ChatStore : IAgentMemoryStore
+    internal sealed partial class ChatStore : ChatHistoryStore, IAgentMemoryStore
     {
-        private readonly string _attachmentRoot;
-        private readonly Lazy<Task<SQLiteAsyncConnection>> _connection;
-
-        public event Action ChatsChanged;
-        // Per-page/session state, never persisted. Enforce the boundary here as well as in the UI/tool selection.
-        private volatile bool _isPrivateSession;
-        public bool IsPrivateSession { get => _isPrivateSession; set => _isPrivateSession = value; }
-
-        internal ChatStore(string folder)
+        internal ChatStore(string folder) : base(folder)
         {
-            Directory.CreateDirectory(folder);
-            _attachmentRoot = Path.Combine(folder, "attachments");
-            _connection = new Lazy<Task<SQLiteAsyncConnection>>(async () =>
-            {
-                var connection = new SQLiteAsyncConnection(Path.Combine(folder, "chats.db3"),
-                    SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache);
-                await connection.CreateTableAsync<ConversationRecord>();
-                await connection.CreateTableAsync<MessageRecord>();
-                await connection.CreateTableAsync<ChatEmbeddingRecord>();
-                await connection.CreateTableAsync<MemoryRecord>();
-                await connection.CreateTableAsync<GoalRecord>();
-                await connection.CreateTableAsync<GoalProgressRecord>();
-                await connection.CreateTableAsync<PhotoEmbeddingRecord>();
-                await connection.CreateTableAsync<DocumentRecord>();
-                await connection.CreateTableAsync<DocumentItemRecord>();
-                return connection;
-            });
         }
 
-        private Task<SQLiteAsyncConnection> Db => _connection.Value;
-
-        internal async Task CloseAsync()
+        // The page's own tables, and its columns of the chats and messages (DocumentId, Language, ThinkingTranslation).
+        protected override async Task CreateTablesAsync(SQLiteAsyncConnection connection)
         {
-            if (_connection.IsValueCreated)
-                await (await Db).CloseAsync();
+            await connection.CreateTableAsync<ConversationRecord>();
+            await connection.CreateTableAsync<MessageRecord>();
+            await connection.CreateTableAsync<ChatEmbeddingRecord>();
+            await connection.CreateTableAsync<MemoryRecord>();
+            await connection.CreateTableAsync<GoalRecord>();
+            await connection.CreateTableAsync<GoalProgressRecord>();
+            await connection.CreateTableAsync<PhotoEmbeddingRecord>();
+            await connection.CreateTableAsync<DocumentRecord>();
+            await connection.CreateTableAsync<DocumentItemRecord>();
         }
 
-        /// <summary>The saved chats, most recently updated first.</summary>
+        // A deleted chat's messages leave the chat search index too.
+        protected override void DeletingChat(SQLiteConnection connection, int chatId)
+        {
+            connection.Execute("DELETE FROM ChatEmbedding WHERE MessageId IN (SELECT Id FROM Message WHERE ConversationId = ?)", chatId);
+        }
+
+        private Task<SQLiteAsyncConnection> Db => GetConnectionAsync();
+
+        /// <summary>The saved chats, most recently updated first (also while private: the list stays visible).</summary>
         public async Task<List<ConversationRecord>> GetConversationsAsync()
         {
             return await (await Db).Table<ConversationRecord>().OrderByDescending(c => c.Updated).ToListAsync();
         }
 
-        public async Task<List<MessageRecord>> GetMessagesAsync(int conversationId)
-        {
-            if (IsPrivateSession) return new List<MessageRecord>();
-            return await (await Db).Table<MessageRecord>().Where(m => m.ConversationId == conversationId)
-                .OrderBy(m => m.Id).ToListAsync();
-        }
+        public Task<List<MessageRecord>> GetMessagesAsync(int conversationId) => GetMessagesAsync<MessageRecord>(conversationId);
 
         /// <summary>Start a saved chat; returns its id.</summary>
-        public async Task<int> CreateConversationAsync(string title, string model)
-        {
-            if (IsPrivateSession) throw new InvalidOperationException("Private chats cannot be saved.");
-            var conversation = new ConversationRecord
-            {
-                Title = Shorten(title, 60),
-                Model = model,
-                Created = DateTime.UtcNow,
-                Updated = DateTime.UtcNow
-            };
-            await (await Db).InsertAsync(conversation);
-            return conversation.Id;
-        }
-
-        /// <summary>
-        /// Keep the words of a voice message; a chat still titled "Voice message" is titled with them.
-        /// </summary>
-        public async Task SetTranscriptAsync(int conversationId, int messageId, string transcript)
-        {
-            if (IsPrivateSession || messageId <= 0 || string.IsNullOrWhiteSpace(transcript)) return;
-            SQLiteAsyncConnection db = await Db;
-            await db.ExecuteAsync("UPDATE Message SET Transcript = ? WHERE Id = ?", transcript.Trim(), messageId);
-            if (await db.ExecuteAsync("UPDATE Conversation SET Title = ? WHERE Id = ? AND Title = ?",
-                    Shorten(transcript, 60), conversationId, "Voice message") > 0)
-                ChatsChanged?.Invoke();
-        }
+        public Task<int> CreateConversationAsync(string title, string model) => CreateChatAsync(title, model);
 
         /// <summary>Keep a reply's thinking translated into a language (shown again when the chat is reopened).</summary>
         public async Task SetThinkingTranslationAsync(int messageId, string language, string translation)
         {
-            if (IsPrivateSession || messageId <= 0) return;
+            if (IsPrivate || messageId <= 0) return;
             SQLiteAsyncConnection db = await Db;
             await db.ExecuteAsync("UPDATE Message SET Language = ?, ThinkingTranslation = ? WHERE Id = ?",
                 string.IsNullOrEmpty(language) ? null : language, string.IsNullOrEmpty(translation) ? null : translation, messageId);
         }
 
         /// <summary>
-        /// Add a message, saving its attachments (encoded bytes) as files; returns its id.
+        /// Add a message, saving its attachments (encoded bytes) as files, with its language; returns its id. (It hides
+        /// ChatHistoryStore.AddMessageAsync, whose last parameter is a voice message's transcript.)
         /// </summary>
-        public async Task<int> AddMessageAsync(int conversationId, string role, string text, string thinking,
+        public new async Task<int> AddMessageAsync(int conversationId, string role, string text, string thinking,
             IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments = null, string context = null,
             string language = null)
         {
-            if (IsPrivateSession) throw new InvalidOperationException("Private chats cannot be saved.");
-            SQLiteAsyncConnection db = await Db;
-            var record = new MessageRecord
-            {
-                ConversationId = conversationId,
-                Role = role,
-                Text = text ?? string.Empty,
-                Thinking = string.IsNullOrEmpty(thinking) ? null : thinking,
-                Context = string.IsNullOrEmpty(context) ? null : context,
-                Language = string.IsNullOrEmpty(language) ? null : language,
-                Created = DateTime.UtcNow
-            };
-            await db.InsertAsync(record);
+            int id = await base.AddMessageAsync(conversationId, role, text, thinking, attachments, context);
+            await SetLanguageAsync(id, language);
+            return id;
+        }
 
-            List<string> saved = new List<string>();
-            int index = 0;
-            foreach (var attachment in attachments ?? Enumerable.Empty<(string, string, byte[])>())
-            {
-                if (attachment.Data == null)
-                    continue;
-                string folder = Path.Combine(_attachmentRoot, conversationId.ToString());
-                Directory.CreateDirectory(folder);
-                string name = string.Format("{0}_{1}{2}", record.Id, index++, Extension(attachment.MediaType));
-                await File.WriteAllBytesAsync(Path.Combine(folder, name), attachment.Data);
-                saved.Add(string.Join("|", attachment.Kind, attachment.MediaType, name));
-            }
-            if (saved.Count > 0)
-            {
-                record.Attachments = string.Join("\n", saved);
-                await db.UpdateAsync(record);
-            }
-
-            var conversation = await db.FindAsync<ConversationRecord>(conversationId);
-            if (conversation != null)
-            {
-                conversation.Updated = DateTime.UtcNow;
-                await db.UpdateAsync(conversation);
-            }
-            ChatsChanged?.Invoke();
-            return record.Id;
+        /// <summary>Keep a user message's language.</summary>
+        public async Task SetLanguageAsync(int messageId, string language)
+        {
+            if (IsPrivate || messageId <= 0 || string.IsNullOrEmpty(language)) return;
+            await (await Db).ExecuteAsync("UPDATE Message SET Language = ? WHERE Id = ?", language, messageId);
         }
 
         public async Task<List<MessageRecord>> GetSearchMessagesAsync()
         {
-            if (IsPrivateSession) return new List<MessageRecord>();
+            if (IsPrivate) return new List<MessageRecord>();
             return await (await Db).QueryAsync<MessageRecord>(
                 "SELECT m.* FROM Message m INNER JOIN Conversation c ON c.Id = m.ConversationId " +
                 "WHERE m.Role IN ('user', 'assistant') AND length(trim(m.Text)) > 0 ORDER BY m.Id");
@@ -394,7 +259,7 @@ namespace Maui.Demo.Lite
 
         public async Task<List<ChatSearchRecord>> GetChatEmbeddingsAsync()
         {
-            if (IsPrivateSession) return new List<ChatSearchRecord>();
+            if (IsPrivate) return new List<ChatSearchRecord>();
             return await (await Db).QueryAsync<ChatSearchRecord>(
                 "SELECT e.*, m.ConversationId, m.Role, m.Created, c.Title FROM ChatEmbedding e " +
                 "INNER JOIN Message m ON m.Id = e.MessageId INNER JOIN Conversation c ON c.Id = m.ConversationId");
@@ -403,7 +268,7 @@ namespace Maui.Demo.Lite
         // Never resurrect an index entry if the chat was deleted while its embedding was computed.
         public async Task SaveChatEmbeddingsAsync(int messageId, List<ChatEmbeddingRecord> passages)
         {
-            if (IsPrivateSession) return;
+            if (IsPrivate) return;
             await (await Db).RunInTransactionAsync(connection =>
             {
                 connection.Execute("DELETE FROM ChatEmbedding WHERE MessageId = ?", messageId);
@@ -417,30 +282,17 @@ namespace Maui.Demo.Lite
             await (await Db).DeleteAllAsync<ChatEmbeddingRecord>();
         }
 
-        /// <summary>Record that the model sees the messages up to upToMessageId only as the summary (or not at all).</summary>
-        public async Task SetSummaryAsync(int conversationId, string summary, int upToMessageId)
-        {
-            if (IsPrivateSession) return;
-            SQLiteAsyncConnection db = await Db;
-            var conversation = await db.FindAsync<ConversationRecord>(conversationId);
-            if (conversation == null)
-                return;
-            conversation.Summary = summary;
-            conversation.SummaryUpTo = upToMessageId;
-            await db.UpdateAsync(conversation);
-        }
-
         // ---------- Documents ----------
 
         public async Task<DocumentRecord> GetDocumentAsync(string id)
         {
-            if (IsPrivateSession) return null;
+            if (IsPrivate) return null;
             return await (await Db).FindAsync<DocumentRecord>(id);
         }
 
         public async Task<List<DocumentItemRecord>> GetDocumentItemsAsync(string id)
         {
-            if (IsPrivateSession) return new List<DocumentItemRecord>();
+            if (IsPrivate) return new List<DocumentItemRecord>();
             return await (await Db).Table<DocumentItemRecord>().Where(i => i.DocumentId == id).OrderBy(i => i.Position).ToListAsync();
         }
 
@@ -451,7 +303,7 @@ namespace Maui.Demo.Lite
         public async Task<List<(DocumentRecord Document, DocumentItemRecord Item)>> GetDocumentPassagesAsync(string embeddingFile)
         {
             var result = new List<(DocumentRecord, DocumentItemRecord)>();
-            if (IsPrivateSession) return result;
+            if (IsPrivate) return result;
             SQLiteAsyncConnection db = await Db;
             foreach (DocumentRecord document in await db.Table<DocumentRecord>().ToListAsync())
             {
@@ -468,7 +320,7 @@ namespace Maui.Demo.Lite
         /// <summary>Save a document's index, replacing an older one of the same file.</summary>
         public async Task SaveDocumentAsync(DocumentRecord document, IEnumerable<DocumentItemRecord> items)
         {
-            if (IsPrivateSession) return;
+            if (IsPrivate) return;
             SQLiteAsyncConnection db = await Db;
             List<DocumentItemRecord> list = items.ToList();
             await db.RunInTransactionAsync(connection =>
@@ -482,7 +334,7 @@ namespace Maui.Demo.Lite
         /// <summary>Record the document a chat uses (null for none).</summary>
         public async Task SetConversationDocumentAsync(int conversationId, string documentId)
         {
-            if (IsPrivateSession) return;
+            if (IsPrivate) return;
             SQLiteAsyncConnection db = await Db;
             var conversation = await db.FindAsync<ConversationRecord>(conversationId);
             if (conversation == null || conversation.DocumentId == documentId)
@@ -494,7 +346,7 @@ namespace Maui.Demo.Lite
         /// <summary>Delete the documents no saved chat uses, except keepId (e.g. the one attached now).</summary>
         public async Task DeleteUnusedDocumentsAsync(string keepId = null)
         {
-            if (IsPrivateSession) return;
+            if (IsPrivate) return;
             SQLiteAsyncConnection db = await Db;
             HashSet<string> used = new HashSet<string>((await db.Table<ConversationRecord>().ToListAsync())
                 .Where(c => c.DocumentId != null).Select(c => c.DocumentId));
@@ -509,58 +361,20 @@ namespace Maui.Demo.Lite
             }
         }
 
-        /// <summary>A saved message's attachments, with their full paths.</summary>
-        public List<SavedAttachment> GetAttachments(MessageRecord message, bool includeMissing = false)
-        {
-            List<SavedAttachment> result = new List<SavedAttachment>();
-            if (string.IsNullOrEmpty(message.Attachments))
-                return result;
-            foreach (string line in message.Attachments.Split('\n'))
-            {
-                string[] parts = line.Split('|');
-                if (parts.Length != 3 || string.IsNullOrWhiteSpace(parts[2])
-                    || parts[2].IndexOfAny(new[] { '/', '\\', ':' }) >= 0 || parts[2] == "." || parts[2] == "..")
-                    continue;
-                string path = Path.Combine(_attachmentRoot, message.ConversationId.ToString(), parts[2]);
-                if (includeMissing || File.Exists(path))
-                    result.Add(new SavedAttachment { Kind = parts[0], MediaType = parts[1], Path = path });
-            }
-            return result;
-        }
-
         /// <summary>Delete a saved chat, its messages and attachment files.</summary>
-        public async Task DeleteConversationAsync(int conversationId)
-        {
-            SQLiteAsyncConnection db = await Db;
-            await db.RunInTransactionAsync(connection =>
-            {
-                connection.Execute("DELETE FROM ChatEmbedding WHERE MessageId IN (SELECT Id FROM Message WHERE ConversationId = ?)", conversationId);
-                connection.Execute("DELETE FROM Message WHERE ConversationId = ?", conversationId);
-                connection.Delete<ConversationRecord>(conversationId);
-            });
-            ChatsChanged?.Invoke();
-            string folder = Path.Combine(_attachmentRoot, conversationId.ToString());
-            try
-            {
-                if (Directory.Exists(folder))
-                    Directory.Delete(folder, true);
-            }
-            catch (Exception)
-            {
-            }
-        }
+        public Task DeleteConversationAsync(int conversationId) => DeleteChatAsync(conversationId);
 
         /// <summary>The memories, oldest first.</summary>
         public async Task<List<MemoryRecord>> GetMemoriesAsync()
         {
-            if (IsPrivateSession) return new List<MemoryRecord>();
+            if (IsPrivate) return new List<MemoryRecord>();
             return await (await Db).Table<MemoryRecord>().OrderBy(m => m.Id).ToListAsync();
         }
 
         /// <summary>Remember something; returns false if the same text is already remembered.</summary>
         public async Task<bool> AddMemoryAsync(string text)
         {
-            if (IsPrivateSession) return false;
+            if (IsPrivate) return false;
             text = (text ?? string.Empty).Trim();
             if (text.Length == 0)
                 return false;
@@ -598,7 +412,7 @@ namespace Maui.Demo.Lite
 
         public async Task DeleteMemoryAsync(int id)
         {
-            if (IsPrivateSession) return;
+            if (IsPrivate) return;
             await (await Db).DeleteAsync<MemoryRecord>(id);
         }
 
@@ -611,30 +425,6 @@ namespace Maui.Demo.Lite
         Task IAgentMemoryStore.DeleteMemoryAsync(string id)
         {
             return DeleteMemoryAsync(int.Parse(id, System.Globalization.CultureInfo.InvariantCulture));
-        }
-
-        private static string Extension(string mediaType)
-        {
-            int parameter = mediaType?.IndexOf(';') ?? -1;
-            if (parameter >= 0)
-                mediaType = mediaType.Substring(0, parameter).Trim();
-            switch (mediaType)
-            {
-                case "application/vnd.openxmlformats-officedocument.wordprocessingml.document": return ".docx";
-                case "application/pdf": return ".pdf";
-                case "text/markdown": return ".md";
-                case "image/jpeg": return ".jpg";
-                case "image/png": return ".png";
-                case "audio/mpeg": return ".mp3";
-                case "audio/flac": return ".flac";
-                default: return mediaType != null && mediaType.StartsWith("audio") ? ".wav" : ".bin";
-            }
-        }
-
-        public static string Shorten(string text, int length)
-        {
-            text = (text ?? string.Empty).Replace('\n', ' ').Trim();
-            return text.Length <= length ? text : text.Substring(0, length - 1).TrimEnd() + "…";
         }
     }
 }

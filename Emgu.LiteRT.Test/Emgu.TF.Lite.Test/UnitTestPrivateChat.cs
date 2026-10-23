@@ -37,7 +37,7 @@ namespace Emgu.TF.Lite.Test
         [Test]
         public async Task PrivatePersistenceGuardsDoNotCreateDatabaseOrAttachments()
         {
-            _store.IsPrivateSession = true;
+            _store.IsPrivate = true;
             Assert.ThrowsAsync<InvalidOperationException>(() => _store.CreateConversationAsync("PRIVATE TITLE", "Gemma4E2B"));
             Assert.ThrowsAsync<InvalidOperationException>(() => _store.AddMessageAsync(1, MessageRecord.UserRole, "PRIVATE TEXT", "PRIVATE THINKING",
                 new[] { ("image", "image/png", new byte[] { 1, 2, 3 }) }));
@@ -77,7 +77,7 @@ namespace Emgu.TF.Lite.Test
                 return copy.ToArray();
             }
             byte[] before = ReadDatabase();
-            _store.IsPrivateSession = true;
+            _store.IsPrivate = true;
             IAgentMemoryStore agentMemory = _store;
             Assert.That(await agentMemory.GetMemoriesAsync(), Is.Empty);
             Assert.That(await agentMemory.AddMemoryAsync("Private fact"), Is.False);
@@ -88,7 +88,7 @@ namespace Emgu.TF.Lite.Test
             Assert.That(await _store.GetMessagesAsync(chat), Is.Empty);
             Assert.That(await _store.GetDocumentAsync("normal"), Is.Null);
             Assert.That(ReadDatabase(), Is.EqualTo(before));
-            _store.IsPrivateSession = false;
+            _store.IsPrivate = false;
             Assert.That((await _store.GetMemoriesAsync()).Single().Text, Is.EqualTo("Normal memory"));
             Assert.That((await _store.GetMessagesAsync(chat)).Single().Text, Is.EqualTo("Normal text"));
             Assert.That((await _store.GetDocumentAsync("normal")).Name, Is.EqualTo("normal.pdf"));
@@ -107,7 +107,7 @@ namespace Emgu.TF.Lite.Test
             int message = await _store.AddMessageAsync(chat, MessageRecord.UserRole, "Paris", null);
             await _store.SaveChatEmbeddingsAsync(message, new List<ChatEmbeddingRecord> {
                 new ChatEmbeddingRecord { Id = "e", MessageId = message, Model = "model-a", Text = "Paris", Embedding = new byte[8] } });
-            _store.IsPrivateSession = true;
+            _store.IsPrivate = true;
             var found = await new ChatSearchIndex(_store).SearchAsync("model-a", ChatSearch.Parse("Paris", DateTime.Now), null,
                 (_, _) => throw new Exception("Private chat must not perform a semantic query."), CancellationToken.None);
             Assert.That(found, Is.Empty);

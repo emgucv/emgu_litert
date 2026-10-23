@@ -210,9 +210,11 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         /// <param name="message">The user's message</param>
         /// <param name="reply">The reply</param>
         /// <param name="replyAttachments">Files of the app's own kinds to keep with the reply (e.g. a picture it drew), or null</param>
+        /// <param name="steps">The step lines to keep with the reply, or null for its <see cref="ChatMessageItem.Steps"/>
+        /// (e.g. an app's own line first, which isn't one of the reply's steps)</param>
         /// <returns>The ids of the message and the reply</returns>
         public async Task<ChatSavedExchange> SaveExchangeAsync(int chatId, ChatMessageItem message, ChatMessageItem reply,
-            IEnumerable<(string Kind, string MediaType, byte[] Data)> replyAttachments = null)
+            IEnumerable<(string Kind, string MediaType, byte[] Data)> replyAttachments = null, IEnumerable<string> steps = null)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
@@ -224,8 +226,8 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 .ToList();
             int messageId = await InsertAsync(chatId, ChatMessageRecord.UserRole, message.Text, null, files, message.Context, message.Transcript).ConfigureAwait(false);
             Remember(message, messageId);
-            foreach (ChatToolStep step in reply.Steps.ToList())
-                await InsertAsync(chatId, ChatMessageRecord.StepRole, step.Description, null, null, null, null).ConfigureAwait(false);
+            foreach (string step in (steps ?? reply.Steps.Select(s => s.Description)).ToList())
+                await InsertAsync(chatId, ChatMessageRecord.StepRole, step, null, null, null, null).ConfigureAwait(false);
             int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, ReplyText(reply), reply.Thinking, replyAttachments, null, null).ConfigureAwait(false);
             Remember(reply, replyId);
             await TouchAsync(chatId).ConfigureAwait(false);

@@ -45,7 +45,7 @@ namespace Emgu.TF.Lite.Test
                 new[] { ("audio", "audio/wav", new byte[] { 1, 2, 3 }) });
             Assert.That((await Message(chat, voice)).Transcript, Is.Null);
             int changes = 0;
-            _store.ChatsChanged += () => changes++;
+            _store.ChatsChanged += (_, _) => changes++;
             await _store.SetTranscriptAsync(chat, voice, "  What is the weather like in Paris?  ");
             Assert.That((await Message(chat, voice)).Transcript, Is.EqualTo("What is the weather like in Paris?"));
             Assert.That((await _store.GetConversationsAsync()).Single().Title, Is.EqualTo("What is the weather like in Paris?"));
@@ -73,9 +73,9 @@ namespace Emgu.TF.Lite.Test
             await _store.SetTranscriptAsync(chat, 0, "words");
             Assert.That((await Message(chat, voice)).Transcript, Is.Null);
             Assert.That((await _store.GetConversationsAsync()).Single().Title, Is.EqualTo("Voice message"));
-            _store.IsPrivateSession = true;
+            _store.IsPrivate = true;
             await _store.SetTranscriptAsync(chat, voice, "words");
-            _store.IsPrivateSession = false;
+            _store.IsPrivate = false;
             Assert.That((await Message(chat, voice)).Transcript, Is.Null);
         }
 
@@ -96,9 +96,9 @@ namespace Emgu.TF.Lite.Test
             Assert.That(saved.Thinking, Is.EqualTo("Thinking Process: 36 - 7 = 29"));
             // Nothing for an unsaved reply (id 0) or in a private chat.
             await _store.SetThinkingTranslationAsync(0, "es", "x");
-            _store.IsPrivateSession = true;
+            _store.IsPrivate = true;
             await _store.SetThinkingTranslationAsync(reply, "fr", "changed");
-            _store.IsPrivateSession = false;
+            _store.IsPrivate = false;
             Assert.That((await Message(chat, reply)).ThinkingTranslation, Is.EqualTo("Proceso de pensamiento: 36 - 7 = 29"));
         }
     }

@@ -20,6 +20,7 @@ using Emgu.LiteRT.LM.Chat;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
+using Emgu.LiteRT.LM.Chat.Sqlite;
 
 namespace Maui.Demo.Lite
 {
@@ -2533,12 +2534,12 @@ namespace Maui.Demo.Lite
             _rereadNext = true;
             if (e.ContextStart < _conversation.Messages.Count && _conversation.Messages[e.ContextStart].Tag is UserMessageInfo info)
                 info.DividerText = e.Summary != null ? "Earlier messages summarized \u00B7 tap to read" : "Earlier messages dropped from the model's memory";
-            int upTo = _conversation.Messages.Take(e.ContextStart).Select(MessageIdOf).Where(id => id > 0).DefaultIfEmpty(0).Last();
-            if (_conversationId != null && upTo > 0 && !IsPrivateChat)
+            // The store knows each message it saved or loaded, so it finds the last one the model no longer sees.
+            if (_conversationId != null && !IsPrivateChat)
             {
                 try
                 {
-                    await _store.SetSummaryAsync(_conversationId.Value, e.Summary, upTo);
+                    await _store.SaveCompactionAsync(_conversationId.Value, _conversation);
                 }
                 catch (Exception ex)
                 {
@@ -2547,10 +2548,6 @@ namespace Maui.Demo.Lite
             }
             UpdateMemoryLabel();
         }
-
-        // A message's id in the chat store (0 if not saved).
-        private static int MessageIdOf(ChatMessageItem item) =>
-            item.Tag is UserMessageInfo info ? info.MessageId : item.Tag is StreamingBubble bubble ? bubble.MessageId : 0;
 
         // Compact now (Settings): everything but the latest exchange.
         private async void OnCompactTapped()
@@ -2692,36 +2689,30 @@ namespace Maui.Demo.Lite
         {
             if (IsPrivateChat) return; // Write nothing to SQLite or attachments.
             UserMessageInfo info = userItem.Tag as UserMessageInfo ?? new UserMessageInfo();
-            // An interrupted reply is kept as cut off.
-            string replyText = reply.State == ChatMessageState.Interrupted ? (reply.Text.Length > 0 ? reply.Text + " \u2026" : "\u2026") : reply.Text;
             try
             {
-                List<(string Kind, string MediaType, byte[] Data)> attachments = userItem.Attachments
-                    .Select(a => (a.HasTopLevelMediaType("image") ? "image" : "audio", a.MediaType, a.Data.ToArray())).ToList();
-                if (_conversationId == null)
-                {
-                    string title = !string.IsNullOrWhiteSpace(userItem.Text) ? userItem.Text
-                        : attachments.Any(a => a.Kind == "image") ? "Image" : "Voice message";
-                    _conversationId = await _store.CreateConversationAsync(title, SelectedChoice.ToString());
-                }
+                // The message, its images and audio, the step lines and the reply (an interrupted one ends with "…") are
+                // saved by Emgu.LiteRT.LM.Chat.Sqlite's ChatHistoryStore; the language, the chat's document and the cards are the page's.
+                _conversationId ??= await _store.CreateConversationAsync(ChatHistoryStore.TitleOf(userItem), SelectedChoice.ToString());
                 int id = _conversationId.Value;
-                info.MessageId = await _store.AddMessageAsync(id, MessageRecord.UserRole, userItem.Text, null, attachments, userItem.Context, info.Language);
-                if (info.TranscriptTask != null)
-                    _ = SaveTranscriptWhenReadyAsync(id, info);
                 // The step lines: the document's (a card above the reply), then the tool calls.
+                List<string> steps = new List<string>();
                 if (bubble?.DocumentStep != null)
-                    await _store.AddMessageAsync(id, MessageRecord.StepRole, bubble.DocumentStep, null);
-                foreach (ChatToolStep step in reply.Steps)
-                    await _store.AddMessageAsync(id, MessageRecord.StepRole, step.Description, null);
+                    steps.Add(bubble.DocumentStep);
+                steps.AddRange(reply.Steps.Select(step => step.Description));
                 // Pictures the reply drew are kept with it (shown again when the chat is reopened, not given to the model).
                 List<(string Kind, string MediaType, byte[] Data)> drawn;
                 lock (_sendImages)
                     drawn = _sendImages.Select(png => (GeneratedKind, "image/png", png)).ToList();
                 // And the documents it wrote.
                 drawn.AddRange(TakeWrittenDocuments());
-                int replyId = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, replyText, reply.Thinking, drawn);
+                ChatSavedExchange saved = await _store.SaveExchangeAsync(id, userItem, reply, drawn, steps);
+                info.MessageId = saved.MessageId;
+                await _store.SetLanguageAsync(saved.MessageId, info.Language);
+                if (info.TranscriptTask != null)
+                    _ = SaveTranscriptWhenReadyAsync(id, info);
                 if (bubble != null)
-                    bubble.MessageId = replyId;
+                    bubble.MessageId = saved.ReplyId;
                 // The document the chat uses now (or none), restored when it is opened again.
                 await _store.SetConversationDocumentAsync(id, _document?.Index != null ? _document.Id : null);
                 UpdateExportChatButton();
@@ -2904,77 +2895,59 @@ namespace Maui.Demo.Lite
                 _conversationId = id;
                 UpdateExportChatButton();
 
-                // The messages, with each reply's step lines and cards; the model sees those after the last compaction
-                // (and the summary of the ones before).
-                var messages = await _store.GetMessagesAsync(id);
-                var items = new List<ChatMessageItem>();
-                var steps = new List<string>();
-                int contextStart = -1;
+                // The messages, with each reply's step lines (ChatHistoryStore reads them back, and the model sees those
+                // after the last compaction and the summary of the ones before); the page's data and cards with them.
+                ChatHistory history = await _store.LoadAsync<MessageRecord>(id);
+                if (history == null)
+                    return;
                 string lastUserLanguage = null;
-                foreach (MessageRecord message in messages)
+                foreach (ChatMessageItem item in history.Messages)
                 {
-                    if (message.Role == MessageRecord.StepRole)
-                    {
-                        steps.Add(message.Text);
-                        continue;
-                    }
-                    if (contextStart < 0 && message.Id > chat.SummaryUpTo)
-                        contextStart = items.Count;
-                    if (message.Role == MessageRecord.UserRole)
+                    var record = (MessageRecord)history.RecordOf(item);
+                    if (item.Role == ChatMessageRole.User)
                     {
                         var info = new UserMessageInfo
                         {
                             // The language of a user message (detected now for chats saved before it was kept).
-                            Language = message.Language ?? await TextLanguage.DetectAsync(message.Text),
-                            Transcript = message.Transcript,
-                            MessageId = message.Id
+                            Language = record.Language ?? await TextLanguage.DetectAsync(item.Text),
+                            Transcript = item.Transcript,
+                            MessageId = record.Id
                         };
                         if (chat.Summary == null)
                             info.DividerText = "Earlier messages dropped from the model's memory";
                         lastUserLanguage = info.Language;
-                        var attachments = new List<DataContent>();
-                        foreach (SavedAttachment attachment in _store.GetAttachments(message))
-                            attachments.Add(new DataContent(await System.IO.File.ReadAllBytesAsync(attachment.Path), attachment.MediaType)
-                            {
-                                Name = System.IO.Path.GetFileName(attachment.Path)
-                            });
-                        items.Add(new ChatMessageItem(ChatMessageRole.User, message.Text, attachments, message.Context) { Tag = info });
+                        item.Tag = info;
                         continue;
                     }
-                    var reply = new ChatMessageItem(ChatMessageRole.Assistant, message.Text) { Thinking = message.Thinking ?? string.Empty };
-                    StreamingBubble bubble = BubbleFor(reply);
-                    bubble.MessageId = message.Id;
-                    bubble.TargetLanguage = TranslationTarget(message.Language ?? lastUserLanguage);
-                    bubble.Translation = message.ThinkingTranslation;
-                    bubble.ShowTranslation = !string.IsNullOrEmpty(message.ThinkingTranslation);
-                    foreach (string step in steps)
-                        reply.Steps.Add(new ChatToolStep(step));
-                    steps.Clear();
-                    foreach (SavedAttachment attachment in _store.GetAttachments(message))
+                    StreamingBubble bubble = BubbleFor(item);
+                    bubble.MessageId = record.Id;
+                    bubble.TargetLanguage = TranslationTarget(record.Language ?? lastUserLanguage);
+                    bubble.Translation = record.ThinkingTranslation;
+                    bubble.ShowTranslation = !string.IsNullOrEmpty(record.ThinkingTranslation);
+                    foreach (ChatSavedAttachment attachment in history.AttachmentsOf(item))
                     {
-                        byte[] data = await System.IO.File.ReadAllBytesAsync(attachment.Path);
                         // A document the reply wrote, or a picture it drew: cards above it, not given to the model.
                         if (attachment.Kind == DocumentKind)
-                            AddSavedDocumentCard(bubble, attachment.MediaType, data);
+                            AddSavedDocumentCard(bubble, attachment.MediaType, await System.IO.File.ReadAllBytesAsync(attachment.Path));
                         else if (attachment.Kind == GeneratedKind)
-                            AddSavedGeneratedImage(bubble, data);
+                            AddSavedGeneratedImage(bubble, await System.IO.File.ReadAllBytesAsync(attachment.Path));
                     }
-                    items.Add(reply);
                     _ = CheckThinkingLanguageAsync(bubble);
                 }
-                SetStatus($"Opening conversation: {items.Count} messages...");
+                SetStatus($"Opening conversation: {history.Messages.Count} messages...");
                 await Task.Yield();
-                _conversation.Load(items, chat.SummaryUpTo > 0 ? chat.Summary : null, contextStart < 0 ? items.Count : contextStart);
+                history.Load(_conversation);
+                int messageCount = history.Messages.Count;
                 // The model is given the conversation with the next message, once its size is known (compacting it first if
                 // it doesn't fit, e.g. a long chat saved before compaction existed).
-                _rereadNext = items.Count > 0;
+                _rereadNext = messageCount > 0;
                 // The document the chat used, from its saved index.
                 if (!string.IsNullOrEmpty(chat.DocumentId))
                     _ = RestoreDocumentAsync(chat.DocumentId);
                 UpdateMemoryLabel();
                 await RefreshChatListAsync();
                 SetStatus(null);
-                UiStallWatchdog.Mark($"Opened saved chat: {messages.Count} messages");
+                UiStallWatchdog.Mark($"Opened saved chat: {messageCount} messages");
             }
             finally
             {

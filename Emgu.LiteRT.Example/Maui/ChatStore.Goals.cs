@@ -63,13 +63,13 @@ namespace Maui.Demo.Lite
 
         public async Task<IList<AgentGoal>> GetGoalsAsync()
         {
-            if (IsPrivateSession) return new List<AgentGoal>();
+            if (IsPrivate) return new List<AgentGoal>();
             return (await (await Db).Table<GoalRecord>().OrderBy(g => g.Id).ToListAsync()).Select(ToGoal).ToList();
         }
 
         public async Task<string> AddGoalAsync(AgentGoal goal)
         {
-            if (IsPrivateSession) throw new InvalidOperationException("Goals aren't saved in a private chat.");
+            if (IsPrivate) throw new InvalidOperationException("Goals aren't saved in a private chat.");
             GoalRecord record = new GoalRecord { Text = goal.Text, Target = goal.Target, Unit = goal.Unit, Period = (int)goal.Period, Created = goal.Created };
             await (await Db).InsertAsync(record);
             return record.Id.ToString(CultureInfo.InvariantCulture);
@@ -77,7 +77,7 @@ namespace Maui.Demo.Lite
 
         public async Task UpdateGoalAsync(AgentGoal goal)
         {
-            if (IsPrivateSession) return;
+            if (IsPrivate) return;
             await (await Db).UpdateAsync(new GoalRecord
             {
                 Id = GoalId(goal.Id), Text = goal.Text, Target = goal.Target, Unit = goal.Unit, Period = (int)goal.Period, Created = goal.Created
@@ -86,7 +86,7 @@ namespace Maui.Demo.Lite
 
         public async Task DeleteGoalAsync(string id)
         {
-            if (IsPrivateSession) return;
+            if (IsPrivate) return;
             SQLiteAsyncConnection db = await Db;
             int goalId = GoalId(id);
             await db.ExecuteAsync("DELETE FROM GoalProgress WHERE GoalId = ?", goalId);
@@ -95,7 +95,7 @@ namespace Maui.Demo.Lite
 
         public async Task<IList<GoalProgress>> GetProgressAsync(string goalId, DateTime since)
         {
-            if (IsPrivateSession) return new List<GoalProgress>();
+            if (IsPrivate) return new List<GoalProgress>();
             int id = GoalId(goalId);
             List<GoalProgressRecord> records = await (await Db).Table<GoalProgressRecord>()
                 .Where(p => p.GoalId == id && p.When >= since).OrderBy(p => p.When).ToListAsync();
@@ -104,14 +104,14 @@ namespace Maui.Demo.Lite
 
         public async Task AddProgressAsync(GoalProgress progress)
         {
-            if (IsPrivateSession) throw new InvalidOperationException("Progress isn't saved in a private chat.");
+            if (IsPrivate) throw new InvalidOperationException("Progress isn't saved in a private chat.");
             await (await Db).InsertAsync(new GoalProgressRecord { GoalId = GoalId(progress.GoalId), Amount = progress.Amount, When = progress.When });
         }
 
         // The latest progress entry of a goal, for undoing one in Settings.
         public async Task<bool> DeleteLastProgressAsync(string goalId)
         {
-            if (IsPrivateSession) return false;
+            if (IsPrivate) return false;
             SQLiteAsyncConnection db = await Db;
             int id = GoalId(goalId);
             GoalProgressRecord last = await db.Table<GoalProgressRecord>().Where(p => p.GoalId == id)

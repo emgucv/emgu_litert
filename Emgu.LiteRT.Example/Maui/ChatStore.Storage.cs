@@ -15,8 +15,7 @@ namespace Maui.Demo.Lite
 
     internal sealed partial class ChatStore
     {
-        internal string StorageFolder => Path.GetDirectoryName(_attachmentRoot);
-        internal string AttachmentFolder => _attachmentRoot;
+        internal string StorageFolder => Folder;
 
         public async Task<List<DocumentStorageInfo>> GetDocumentStorageAsync()
         {
@@ -45,7 +44,7 @@ namespace Maui.Demo.Lite
 
         public async Task DeleteAllAttachmentsAsync()
         {
-            StorageFiles.DeleteDirectory(StorageFolder, _attachmentRoot);
+            StorageFiles.DeleteDirectory(StorageFolder, AttachmentFolder);
             await (await Db).ExecuteAsync("UPDATE Message SET Attachments = NULL");
         }
 

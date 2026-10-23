@@ -15,7 +15,7 @@ namespace Maui.Demo.Lite
         private readonly List<Task> _privateDocumentTasks = new();
         private int _sessionVersion;
         private bool _changingPrivateMode;
-        private bool IsPrivateChat => _store.IsPrivateSession;
+        private bool IsPrivateChat => _store.IsPrivate;
         private const string PrivateInstructions = "This is a private chat. Do not claim to remember or save anything for future chats. " +
             "You cannot access saved memories or past conversations. Use only this conversation and the available tools.";
 
@@ -102,7 +102,7 @@ namespace Maui.Demo.Lite
                     _zimageInit = null;
                     if (ImageGenerationSupported) _zimage = new ZImageTurbo();
                 }
-                _store.IsPrivateSession = value;
+                _store.IsPrivate = value;
                 if (value) { _privateDiagnostics ??= UiStallWatchdog.SuppressPrivateDetails(); }
                 else { _privateDiagnostics?.Dispose(); _privateDiagnostics = null; }
                 StartNewChat();
