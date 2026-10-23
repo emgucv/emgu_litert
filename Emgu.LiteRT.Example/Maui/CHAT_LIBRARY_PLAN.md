@@ -274,6 +274,12 @@ Each step builds the demo and is checked before the next. Device checks: Mac Cat
      Not checked: your own server (LM Studio), MCP, the voice chat with a microphone, live camera and sound monitors,
      and photo search with results.
    - **6d - remove the page's old code; docs.**
+     **Done 2026-10-23:** 6b had already removed the old send path, so a scan for members referenced nowhere found
+     only four bubble colours left from the old transcript, now gone. Two stale comments and descriptions now say the
+     message is sent again with `RegenerateAsync` (they described the old agent session). The demo's `README.md` says
+     the page is built on `ChatConversation`/`ChatView`, and `PixelFoldFreeze.md` records the move of its restore
+     batching into `ChatView`. Left alone: `DeleteGpuCache`, unused since the GPU switch became the model list's
+     CPU/GPU groups (2026-10-14), so a GPU cache (~0.8 GB for Gemma 4 E2B) is no longer deleted by anything.
 7. **Docs**: package README with the sample, `CLAUDE.md`, the demo `README.md`.
 
 ## Risks and open questions

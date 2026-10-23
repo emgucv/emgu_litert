@@ -174,7 +174,8 @@ the battery and temperature allow. It does not restrict document indexing, image
 The opt-in [agent regression suite](../../Emgu.LiteRT.Test/Emgu.TF.Lite.Test/AgentRegression.md) checks Gemma 4 E2B's
 tool selection, arguments and final replies with offline fake tools. Run it after runtime/model or tool wording changes.
 
-Saved chats restore in short UI batches with one final scroll; streamed replies share a coalesced scroll request.
+Saved chats open at once and their messages appear about a frame's worth at a time, newest first (`ChatView`);
+streamed replies share a coalesced scroll request.
 The [Pixel Fold investigation](PixelFoldFreeze.md) records the measured stalls, device checks and remaining limits.
 Debug builds retain `UiStallWatchdog` logs in the app data folder as `ui_stalls.log`.
 
@@ -185,6 +186,10 @@ Lite (Interpreter API) demos - object detection, image recognition and the model
 again.
 
 ## Using the chat page
+
+The chat page is built on the reusable chat libraries: `Emgu.LiteRT.LM.Chat`'s `ChatConversation` (sending, tools,
+compaction, saved chats) and `Emgu.LiteRT.LM.Maui`'s `ChatView`, with the demo's own templates in `ChatTemplates.xaml`
+(see [the plan](CHAT_LIBRARY_PLAN.md); `Emgu.LiteRT.Example/MauiChat` is a minimal app using them).
 
 - Choosing a model you haven't downloaded yet shows its download size (Qwen3 0.6B ~350 MB, Qwen3.5 0.8B ~1.3 GB,
   Gemma 4 E2B ~2.6 GB, E4B ~3.7 GB, Qwen3.5 4B ~2.8 GB) with a Download button; models already on the device start

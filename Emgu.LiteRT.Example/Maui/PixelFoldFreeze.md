@@ -91,3 +91,11 @@ For another occurrence, keep the app-specific `files/ui_stalls.log` and collect
 `adb shell dumpsys activity exit-info com.emgu.litert`, along with the time, selected model/backend, active operation
 and whether a fold/background transition occurred. An empty/idle Java stack alone is insufficient to identify the
 blocked operation.
+
+## Update (2026-10-23): rendering moved into `ChatView`
+
+Since chat library step 6b, the page loads a saved chat into `ChatConversation` in one call and `Emgu.LiteRT.LM.Maui`'s
+`ChatView` makes the message views. Its first version used a `BindableLayout`, which builds every view at once: a
+120-message chat held a Galaxy S10's UI thread for 19 s. `ChatView.RenderTranscript` now keeps the 16 ms budget
+above - it creates views for about one frame, newest first, then yields - so opening returns in 0.6 s with no watchdog
+event, and all 120 messages are shown after 24 s (`IsRenderingTranscript` is true until then).

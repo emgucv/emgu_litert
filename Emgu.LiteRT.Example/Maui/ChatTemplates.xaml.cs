@@ -19,7 +19,7 @@ namespace Maui.Demo.Lite
     }
 
     /// <summary>
-    /// The demo's templates for Emgu.LiteRT.LM.Maui's code blocks and thinking, merged in App.xaml.
+    /// The demo's templates for Emgu.LiteRT.LM.Maui's chat view, messages, attachments, code blocks and thinking, merged in App.xaml.
     /// </summary>
     public partial class ChatTemplates : ResourceDictionary
     {

@@ -138,11 +138,6 @@ namespace Maui.Demo.Lite
 #endif
         };
 
-        private static readonly Color UserBubbleColor = Theme.Accent;
-        private static readonly Color ModelBubbleColor = Theme.TileBackground;
-        private static readonly Color UserTextColor = Colors.White;
-        private static readonly Color ModelTextColor = Theme.PrimaryText;
-
         // Layout: a one-line header, the conversation, and the message box with per-message toggle chips. The model
         // list and the settings open in bottom sheets on narrow screens, and sit in a side panel on wide ones.
         private const double WideLayoutWidth = 820;

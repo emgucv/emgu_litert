@@ -65,7 +65,7 @@ public partial class LiteRtLmChatPage
                 () => new AITool[] { AgentTools.GenerateImage(GenerateImageAsync) },
                 () => ImageInstructions));
         groups.AddRange(McpGroups());
-        // The clock/calendar/maps stub ends the request and RunAgentAsync sends the message again (rerunAfterStub).
+        // The clock/calendar/maps stub ends the request and SendAsync sends the message again into the same reply (rerunAfterStub, RegenerateAsync).
         var router = new ToolRouter(groups, () => FunctionInvokingChatClient.CurrentContext?.Options,
             () => FunctionInvokingChatClient.CurrentContext.Terminate = true);
         router.GroupRequested += name => UiStallWatchdog.Mark("Tool group requested by the model: " + name);
