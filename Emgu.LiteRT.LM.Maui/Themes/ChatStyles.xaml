@@ -12,16 +12,149 @@
     CodeBlockViewTemplate  CodeBlockView: PART_Language, PART_Code (Labels), PART_Copy (tapped to copy)
     ThinkingViewTemplate   ThinkingView: PART_Header, PART_Spinner, PART_Title, PART_Chevron, PART_Accessory,
                            PART_Preview, PART_Body (a ReplyView)
+    ModelLoadCardTemplate  ModelLoadCard: PART_Title, PART_Status, PART_Note (Labels), PART_Progress (a ProgressBar),
+                           PART_Download, PART_Cancel, PART_Retry (Buttons)
+    ChatViewTemplate       ChatView: PART_Scroll, PART_Transcript, PART_Empty, PART_LoadCard, PART_Status, PART_Input,
+                           PART_Send, PART_Stop, PART_Attach
+    ChatUserMessageTemplate, ChatReplyTemplate
+                           ChatView's messages (DataTemplates of an Emgu.LiteRT.LM.Chat ChatMessageItem)
+    ChatSendButtonStyle, ChatStopButtonStyle
+                           ChatView's Send and Stop buttons (Button styles)
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                     xmlns:chat="clr-namespace:Emgu.LiteRT.LM.Maui"
+                    xmlns:lm="clr-namespace:Emgu.LiteRT.LM.Chat;assembly=Emgu.LiteRT.LM.Chat"
                     x:Class="Emgu.LiteRT.LM.Maui.ChatStyles">
 
     <Color x:Key="ChatPrimaryTextLight">#1A1C2E</Color>
     <Color x:Key="ChatPrimaryTextDark">#E8EAF2</Color>
     <Color x:Key="ChatSecondaryTextLight">#8A8FA3</Color>
     <Color x:Key="ChatSecondaryTextDark">#9AA0B4</Color>
+    <Color x:Key="ChatAccent">#3D7BF7</Color>
+    <Color x:Key="ChatDanger">#D93B3B</Color>
+    <Color x:Key="ChatReplyBubbleLight">#E8EFFE</Color>
+    <Color x:Key="ChatReplyBubbleDark">#262A38</Color>
+    <Color x:Key="ChatSurfaceLight">#FFFFFF</Color>
+    <Color x:Key="ChatSurfaceDark">#1B1E29</Color>
+
+    <Style x:Key="ChatSendButtonStyle" TargetType="Button">
+        <Setter Property="Text" Value="Send" />
+        <Setter Property="BackgroundColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="TextColor" Value="White" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="HeightRequest" Value="36" />
+        <Setter Property="VerticalOptions" Value="End" />
+    </Style>
+
+    <Style x:Key="ChatStopButtonStyle" TargetType="Button">
+        <Setter Property="Text" Value="Stop" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ChatReplyBubbleLight}, Dark={StaticResource ChatReplyBubbleDark}}" />
+        <Setter Property="TextColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="HeightRequest" Value="36" />
+        <Setter Property="VerticalOptions" Value="End" />
+    </Style>
+
+    <ControlTemplate x:Key="ChatViewTemplate">
+        <Grid RowDefinitions="*,Auto,Auto" Padding="12,0,12,12" RowSpacing="6">
+            <ScrollView x:Name="PART_Scroll">
+                <VerticalStackLayout Padding="0,12" Spacing="8">
+                    <chat:ModelLoadCard x:Name="PART_LoadCard" />
+                    <Label x:Name="PART_Empty" Text="Ask me anything." HorizontalOptions="Center" Margin="0,40" FontSize="15"
+                           TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
+                    <VerticalStackLayout x:Name="PART_Transcript" Spacing="8" />
+                </VerticalStackLayout>
+            </ScrollView>
+            <Label x:Name="PART_Status" Grid.Row="1" FontSize="13" Margin="6,0" TextColor="{StaticResource ChatAccent}" />
+            <Border Grid.Row="2" Padding="10,6" StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light=#E1E5EF, Dark=#353A4A}"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource ChatSurfaceLight}, Dark={StaticResource ChatSurfaceDark}}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="22" />
+                </Border.StrokeShape>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <Button x:Name="PART_Attach" Text="+" IsVisible="False" />
+                    <Editor x:Name="PART_Input" Grid.Column="1" AutoSize="TextChanges" MaximumHeightRequest="140" FontSize="15"
+                            BackgroundColor="Transparent" VerticalOptions="Center"
+                            TextColor="{AppThemeBinding Light={StaticResource ChatPrimaryTextLight}, Dark={StaticResource ChatPrimaryTextDark}}" />
+                    <Grid Grid.Column="2" VerticalOptions="End">
+                        <Button x:Name="PART_Send" />
+                        <Button x:Name="PART_Stop" IsVisible="False" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="ModelLoadCardTemplate">
+        <Border Padding="16,12" StrokeThickness="0"
+                BackgroundColor="{AppThemeBinding Light={StaticResource ChatSurfaceLight}, Dark={StaticResource ChatSurfaceDark}}">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="16" />
+            </Border.StrokeShape>
+            <VerticalStackLayout Spacing="8">
+                <Label x:Name="PART_Title" FontSize="16" FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource ChatPrimaryTextLight}, Dark={StaticResource ChatPrimaryTextDark}}" />
+                <Label x:Name="PART_Status" FontSize="14"
+                       TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
+                <ProgressBar x:Name="PART_Progress" ProgressColor="{StaticResource ChatAccent}" />
+                <Label x:Name="PART_Note" FontSize="13" TextColor="{StaticResource ChatDanger}" />
+                <HorizontalStackLayout Spacing="8">
+                    <Button x:Name="PART_Download" Text="Download" Style="{StaticResource ChatSendButtonStyle}" />
+                    <Button x:Name="PART_Retry" Text="Retry" Style="{StaticResource ChatSendButtonStyle}" />
+                    <Button x:Name="PART_Cancel" Text="Cancel" Style="{StaticResource ChatStopButtonStyle}" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+    </ControlTemplate>
+
+    <DataTemplate x:Key="ChatUserMessageTemplate" x:DataType="lm:ChatMessageItem">
+        <VerticalStackLayout Spacing="8">
+            <!-- Where the model's memory of the chat starts after it was compacted. -->
+            <Label Text="Earlier messages were summarized" IsVisible="{Binding StartsContext}" HorizontalOptions="Center" FontSize="12"
+                   TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
+            <Border HorizontalOptions="End" MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0"
+                    BackgroundColor="{StaticResource ChatAccent}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="18" />
+                </Border.StrokeShape>
+                <Label Text="{Binding Text}" TextColor="White" FontSize="15" />
+            </Border>
+        </VerticalStackLayout>
+    </DataTemplate>
+
+    <DataTemplate x:Key="ChatReplyTemplate" x:DataType="lm:ChatMessageItem">
+        <VerticalStackLayout Spacing="4">
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Steps}" Spacing="2">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="lm:ChatToolStep">
+                        <Label Text="{Binding Text, StringFormat='&#x1F50E; {0}'}" FontSize="13" Margin="6,0"
+                               TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+            <Border HorizontalOptions="Start" MaximumWidthRequest="640" Padding="12,9" StrokeThickness="0"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource ChatReplyBubbleLight}, Dark={StaticResource ChatReplyBubbleDark}}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="18" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Spacing="4">
+                    <chat:ThinkingView Thinking="{Binding Thinking}" IsThinking="{Binding IsThinking}"
+                                       Duration="{Binding ThinkingDuration}" AlwaysExpanded="{Binding IsFinishedWithoutAnswer}" />
+                    <chat:ReplyView Text="{Binding Text}" IsVisible="{Binding HasAnswer}" />
+                    <Label Text="…" IsVisible="{Binding IsInterrupted}" FontSize="15"
+                           TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
+                    <Label Text="{Binding Error, StringFormat='Error: {0}'}" IsVisible="{Binding IsFailed}" FontSize="14"
+                           TextColor="{StaticResource ChatDanger}" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </DataTemplate>
 
     <ControlTemplate x:Key="ReplyViewTemplate">
         <VerticalStackLayout x:Name="PART_Blocks" Spacing="8" />

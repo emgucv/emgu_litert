@@ -137,11 +137,12 @@ namespace Emgu.LiteRT.LM.Chat
 
         /// <summary>
         /// Create a conversation with an on-device model, through its <see cref="LiteRtLmChatClient"/> (without tool
-        /// calling: for tools, build a client with function invocation and use the other constructor).
+        /// calling: for tools, build a client with function invocation and use the other constructor). The model may still
+        /// be loading: its client is created with the first message, which needs it loaded (<see cref="LanguageModel.Init"/>).
         /// </summary>
-        /// <param name="model">The model, loaded (<see cref="LanguageModel.Init"/>)</param>
+        /// <param name="model">The model</param>
         public ChatConversation(LanguageModel model)
-            : this(new LiteRtLmChatClient(model ?? throw new ArgumentNullException(nameof(model))), model)
+            : this(new ModelChatClient(model ?? throw new ArgumentNullException(nameof(model))), model)
         {
         }
 
@@ -347,6 +348,14 @@ namespace Emgu.LiteRT.LM.Chat
             _summary = summary;
             _summaryTokens = 0;
             ContextStart = Math.Max(0, Math.Min(contextStart, Messages.Count));
+            MarkContextStart();
+        }
+
+        // The message the model's memory starts with, after a compaction (none before the first one).
+        private void MarkContextStart()
+        {
+            for (int i = 0; i < Messages.Count; i++)
+                Messages[i].StartsContext = i == ContextStart && ContextStart > 0;
         }
 
         /// <summary>
@@ -358,6 +367,45 @@ namespace Emgu.LiteRT.LM.Chat
         }
 
         // ---------- Sending ----------
+
+        // A model's LiteRtLmChatClient, created on first use: LiteRtLmChatClient needs the model loaded.
+        private sealed class ModelChatClient : IChatClient
+        {
+            private readonly LanguageModel _model;
+            private LiteRtLmChatClient _client;
+
+            public ModelChatClient(LanguageModel model)
+            {
+                _model = model;
+            }
+
+            private IChatClient Client
+            {
+                get
+                {
+                    if (_client == null)
+                        _client = new LiteRtLmChatClient(_model);
+                    return _client;
+                }
+            }
+
+            public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null,
+                CancellationToken cancellationToken = default)
+                => Client.GetResponseAsync(messages, options, cancellationToken);
+
+            public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
+                ChatOptions options = null, CancellationToken cancellationToken = default)
+                => Client.GetStreamingResponseAsync(messages, options, cancellationToken);
+
+            public object GetService(Type serviceType, object serviceKey = null)
+                => _client?.GetService(serviceType, serviceKey) ?? (serviceType.IsInstanceOfType(this) ? this : null);
+
+            public void Dispose()
+            {
+                _client?.Dispose();
+                _client = null;
+            }
+        }
 
         private ChatOptions WithInstructions(ChatOptions options)
         {
@@ -451,6 +499,9 @@ namespace Emgu.LiteRT.LM.Chat
                     thinkingText = split.Thinking;
                     answerText = split.Text;
                 }
+                // After thinking, models start the answer with line breaks.
+                if (thinkingText.Length > 0)
+                    answerText = answerText.TrimStart();
                 if (thinkingText.Length > 0 && thinkingStarted == null)
                     thinkingStarted = DateTime.UtcNow;
                 if (answerText.Length > 0 && thinkingStarted != null && reply.ThinkingDuration == null)
@@ -627,6 +678,7 @@ namespace Emgu.LiteRT.LM.Chat
             _summaryTokens = 0;
             ChatMessageItem firstKept = keepStart < items.Count ? items[keepStart] : next;
             ContextStart = firstKept != null ? Messages.IndexOf(firstKept) : Messages.Count;
+            MarkContextStart();
             // The model is given the conversation again, as text: what its own conversation held on top is gone.
             foreach (ChatMessageItem item in Messages)
             {

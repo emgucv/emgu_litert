@@ -844,6 +844,8 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Maui.Demo.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/Maui/Directory.Build.props)
+# The minimal chat sample (Emgu.LiteRT.Example/MauiChat): one page with Emgu.LiteRT.LM.Maui's ChatView.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.MauiChat.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/MauiChat/Directory.Build.props)
 IF (HAVE_WINDESKTOP_LITE)
     IF (HAVE_WINDESKTOP_X64_LITE)
       SET(EMGU_WINDOWS_MSVCRT_X64_NUGET_TITLE "MSVC x64 runtime for windows")

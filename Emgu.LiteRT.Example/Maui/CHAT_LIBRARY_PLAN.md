@@ -1,7 +1,7 @@
 # Plan: a reusable MAUI chat control (`Emgu.LiteRT.LM.Maui`)
 
-Status: decisions taken 2026-10-22 (below). Steps 1 (scaffolding), 2 (`ReplyView`, `ThinkingView`) and 3
-(`ChatConversation`) done 2026-10-23.
+Status: decisions taken 2026-10-22 (below). Steps 1 (scaffolding), 2 (`ReplyView`, `ThinkingView`), 3
+(`ChatConversation`) and 4 (`ChatView`, `ModelLoadCard`, the `MauiChat` sample) done 2026-10-23.
 
 ## Decisions
 
@@ -153,6 +153,29 @@ Each step builds the demo and is checked before the next. Device checks: Mac Cat
 4. **`ChatView` with plain chat and `ModelLoadCard`** (control template, message templates and selector), plus a
    minimal sample app (`Emgu.LiteRT.Example/MauiChat/`, one page, Gemma 4 E2B or Qwen3) that proves the few-lines goal
    and restyles one message template and the send button to show the templates work.
+   **Done:** `Emgu.LiteRT.LM.Chat`'s `ModelLoadState` (wraps `LanguageModel.Init`: `IsDownloaded` - the cheap verified
+   check - stage, download progress throttled to one queued update, error, `LoadAsync` / `Cancel`; changes on the
+   caller's context), binding flags on `ChatMessageItem` (`HasAnswer`, `IsStreaming`, `IsInterrupted`, `IsFailed`,
+   `IsFinishedWithoutAnswer`, `StartsContext` for the compaction divider) and `ChatToolStep.Text`; `ChatConversation(model)`
+   now creates the model's `LiteRtLmChatClient` with the first message (its constructor needs the model loaded, which
+   crashed the first sample run), and answers lose the line breaks models put after their thinking.
+   `Emgu.LiteRT.LM.Maui`: `ChatView` (`Model` / `ChatClient` / `Conversation`, `Instructions`, `ThinkingEnabled` - sent as
+   `ReasoningEffort` - `Options`, `MessageTemplateSelector`, `Placeholder`; `SendAsync`, `StopReply`; events
+   `ExchangeCompleted`, `ModelLoadFailed`; a downloaded model loads as soon as the view is shown, otherwise the card offers
+   the download or the first message starts it; Stop while a message waits for the model gives up the message), the
+   transcript a `BindableLayout` with `ChatMessageTemplateSelector` (`ChatUserMessageTemplate`, `ChatReplyTemplate`: steps,
+   bubble with `ThinkingView`/`ReplyView`, "…" when interrupted, the error when failed), `ModelLoadCard` (stage,
+   progress, Wi-Fi note, Download/Load, Cancel, Retry), styles `ChatSendButtonStyle`/`ChatStopButtonStyle` given to the
+   parts by code (a template's `StaticResource` would only see the library's own dictionary), light and dark colours.
+   Sample `Emgu.LiteRT.Example/MauiChat/` (namespace `MauiChat`: under `Emgu.LiteRT.*`, `Environment` resolves to
+   `Emgu.LiteRT.Environment`; android, ios, maccatalyst; props from `cmake/Emgu.LiteRT.MauiChat.Directory.Build.props.in`;
+   in the CrossPlatform solution): one page, `ChatView` with Qwen3 0.6B (`ChatCompaction.Drop`), `App.xaml` replacing
+   `ChatSendButtonStyle` ("Ask", green) and `ChatUserMessageTemplate`. Checked with a temporary self-test: Mac Catalyst
+   (dark theme; streaming thinking preview, Stop, 12 x 12 = 144 and the name recalled in the second turn) and the Pixel 8
+   emulator (light theme; the card downloading Qwen3 with progress and Cancel, then the same two answers). On the emulator
+   the first load aborted the app: its data partition was full and LiteRT's XNNPACK weight cache aborts the process when
+   a write fails ("cannot append buffer to cache file", SIGABRT) - not catchable from .NET. iOS and Windows not built;
+   attachments and read-aloud are step 5.
 5. **Attachments and read-aloud** (`IChatAttachmentSource`, `IReplySpeaker`).
 6. **Move the demo's chat page onto `ChatView`**, feature by feature (agent tools, documents, photos, camera,
    voice, server, task mode...), keeping each verified behaviour: compaction after reopening a saved chat, the

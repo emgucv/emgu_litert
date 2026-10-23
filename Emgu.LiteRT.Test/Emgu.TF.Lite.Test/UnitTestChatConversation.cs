@@ -117,6 +117,8 @@ public class UnitTestChatConversation
         Assert.That(reply.State, Is.EqualTo(ChatMessageState.Done));
         Assert.That(reply.Thinking, Is.EqualTo("Let me think."));
         Assert.That(reply.Text, Is.EqualTo("Hello there."));
+        Assert.That(reply.HasAnswer, Is.True);
+        Assert.That(reply.IsStreaming, Is.False);
         Assert.That(reply.ThinkingDuration, Is.Not.Null);
         Assert.That(reply.IsThinking, Is.False);
         Assert.That(seen, Is.EqualTo(new[] { "thinking: Let me ", "text: Hello", "text: Hello there." }));
@@ -213,8 +215,9 @@ public class UnitTestChatConversation
         Assert.That(request[1].Role, Is.EqualTo(ChatRole.Assistant));
         Assert.That(request.Skip(2).Select(m => m.Text.Split(' ')[0] + " " + m.Text.Split(' ')[1]),
             Is.EqualTo(new[] { "question 2", "answer 2", "question 3" }));
-        // The transcript keeps everything.
+        // The transcript keeps everything, with the first message the model still sees marked (for a divider).
         Assert.That(conversation.Messages.Count, Is.EqualTo(8));
+        Assert.That(conversation.Messages.Select(m => m.StartsContext), Is.EqualTo(new[] { false, false, false, false, true, false, false, false }));
     }
 
     [Test]

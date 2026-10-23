@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<Project>
+  <PropertyGroup>
+  	<TargetFrameworks>net${DOTNET_VERSION_MAJOR}.0-android</TargetFrameworks>
+	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-ios;net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFrameworks>
+    ${MAUI_VERSION_MSBUILD}
+  </PropertyGroup>
+</Project>

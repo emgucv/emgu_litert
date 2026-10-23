@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Restyling the chat: Emgu.LiteRT.LM.Maui's controls find their templates and styles by key, here first, so defining a
+  resource with one of their keys replaces it (the keys are listed in the library's Themes/ChatStyles.xaml). This app
+  replaces the Send button's style and the template of the user's messages; everything else keeps the default look.
+-->
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:lm="clr-namespace:Emgu.LiteRT.LM.Chat;assembly=Emgu.LiteRT.LM.Chat"
+             x:Class="MauiChat.App">
+    <Application.Resources>
+        <ResourceDictionary>
+
+            <Style x:Key="ChatSendButtonStyle" TargetType="Button">
+                <Setter Property="Text" Value="Ask" />
+                <Setter Property="BackgroundColor" Value="#1E9E6A" />
+                <Setter Property="TextColor" Value="White" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="20,0" />
+                <Setter Property="HeightRequest" Value="36" />
+                <Setter Property="VerticalOptions" Value="End" />
+            </Style>
+
+            <!-- The user's messages: a green, square-cornered bubble with "You" above it. -->
+            <DataTemplate x:Key="ChatUserMessageTemplate" x:DataType="lm:ChatMessageItem">
+                <VerticalStackLayout Spacing="2" HorizontalOptions="End">
+                    <Label Text="You" FontSize="12" TextColor="#1E9E6A" HorizontalOptions="End" />
+                    <Border MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0" BackgroundColor="#1E9E6A">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="4" />
+                        </Border.StrokeShape>
+                        <Label Text="{Binding Text}" TextColor="White" FontSize="15" />
+                    </Border>
+                </VerticalStackLayout>
+            </DataTemplate>
+
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

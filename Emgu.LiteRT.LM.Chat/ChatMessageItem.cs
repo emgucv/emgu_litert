@@ -87,15 +87,26 @@ namespace Emgu.LiteRT.LM.Chat
         public string Description
         {
             get => _description;
-            set => Set(ref _description, value);
+            set
+            {
+                if (Set(ref _description, value))
+                    Raise(nameof(Text));
+            }
         }
 
         /// <summary>True until the tool's result has arrived.</summary>
         public bool IsRunning
         {
             get => _isRunning;
-            internal set => Set(ref _isRunning, value);
+            internal set
+            {
+                if (Set(ref _isRunning, value))
+                    Raise(nameof(Text));
+            }
         }
+
+        /// <summary>The step line to show: the description, with "..." while the tool runs, or why it failed.</summary>
+        public string Text => _description + (_isRunning ? "..." : _error != null ? " - failed: " + _error : string.Empty);
 
         /// <summary>The tool's result, once it has arrived.</summary>
         public FunctionResultContent Result { get; internal set; }
@@ -104,7 +115,11 @@ namespace Emgu.LiteRT.LM.Chat
         public string Error
         {
             get => _error;
-            internal set => Set(ref _error, value);
+            internal set
+            {
+                if (Set(ref _error, value))
+                    Raise(nameof(Text));
+            }
         }
     }
 
@@ -121,6 +136,7 @@ namespace Emgu.LiteRT.LM.Chat
         private ChatMessageState _state;
         private string _error;
         private object _tag;
+        private bool _startsContext;
 
         /// <summary>
         /// Create a message, e.g. to restore a saved conversation with <see cref="ChatConversation.Load"/>.
@@ -148,8 +164,16 @@ namespace Emgu.LiteRT.LM.Chat
             internal set
             {
                 bool wasThinking = IsThinking;
+                bool hadAnswer = HasAnswer;
                 if (Set(ref _text, value ?? string.Empty))
+                {
                     RaiseIsThinking(wasThinking);
+                    if (HasAnswer != hadAnswer)
+                    {
+                        Raise(nameof(HasAnswer));
+                        Raise(nameof(IsFinishedWithoutAnswer));
+                    }
+                }
             }
         }
 
@@ -174,6 +198,29 @@ namespace Emgu.LiteRT.LM.Chat
 
         /// <summary>True while the model is thinking: the reply streams, has thinking and no answer yet.</summary>
         public bool IsThinking => _state == ChatMessageState.Streaming && _thinking.Length > 0 && _text.Length == 0;
+
+        /// <summary>True if the reply has answer text (not only thinking).</summary>
+        public bool HasAnswer => _text.Length > 0;
+
+        /// <summary>True while the reply is being written.</summary>
+        public bool IsStreaming => _state == ChatMessageState.Streaming;
+
+        /// <summary>True if the reply was cancelled while being written.</summary>
+        public bool IsInterrupted => _state == ChatMessageState.Interrupted;
+
+        /// <summary>True if the reply failed (see <see cref="Error"/>).</summary>
+        public bool IsFailed => _state == ChatMessageState.Failed;
+
+        /// <summary>True if the reply ended without answer text, e.g. cut off while thinking (a UI then shows its thinking).</summary>
+        public bool IsFinishedWithoutAnswer => _state != ChatMessageState.Streaming && _text.Length == 0;
+
+        /// <summary>True for the first message the model still sees after the conversation was compacted (a UI may show a
+        /// divider above it: the messages before are summarized or dropped).</summary>
+        public bool StartsContext
+        {
+            get => _startsContext;
+            internal set => Set(ref _startsContext, value);
+        }
 
         private void RaiseIsThinking(bool wasThinking)
         {
@@ -201,7 +248,13 @@ namespace Emgu.LiteRT.LM.Chat
             {
                 bool wasThinking = IsThinking;
                 if (Set(ref _state, value))
+                {
                     RaiseIsThinking(wasThinking);
+                    Raise(nameof(IsStreaming));
+                    Raise(nameof(IsInterrupted));
+                    Raise(nameof(IsFailed));
+                    Raise(nameof(IsFinishedWithoutAnswer));
+                }
             }
         }
 
