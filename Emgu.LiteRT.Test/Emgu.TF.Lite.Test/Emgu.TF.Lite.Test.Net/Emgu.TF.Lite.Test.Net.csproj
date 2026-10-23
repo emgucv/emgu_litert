@@ -8,6 +8,7 @@
     <!-- Opt in to the model-downloading tests (UnitTestLiteRtLm) with
          dotnet test -p:TestModels=true -->
     <DefineConstants Condition="'$(TestModels)'=='true'">$(DefineConstants);TEST_MODELS</DefineConstants>
+    <DefineConstants Condition="$([MSBuild]::IsOSPlatform('linux'))">$(DefineConstants);SYSTEM_SQLITE</DefineConstants>
 
     <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
@@ -65,6 +66,7 @@
     <Compile Include="..\UnitTestVisualAgents.cs" Link="UnitTestVisualAgents.cs" />
     <Compile Include="..\UnitTestChatSearch.cs" Link="UnitTestChatSearch.cs" />
     <Compile Include="..\UnitTestChatExport.cs" Link="UnitTestChatExport.cs" />
+    <Compile Include="..\SystemSqlite.cs" Link="SystemSqlite.cs" />
     <Compile Include="..\UnitTestStorage.cs" Link="UnitTestStorage.cs" />
     <Compile Include="..\UnitTestPrivateChat.cs" Link="UnitTestPrivateChat.cs" />
   </ItemGroup>
@@ -116,8 +118,10 @@
   <ItemGroup>
     <PackageReference Include="Emgu.CV.runtime.mini.windows" Version="4.12.0.5764" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
     <PackageReference Include="Emgu.CV.runtime.mini.macos" Version="4.12.0.5764" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
+    <PackageReference Include="Emgu.CV.runtime.mini.ubuntu-26.04-x64" Version="4.13.0.5924" Condition="$([MSBuild]::IsOSPlatform('linux'))" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
     <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
+    <PackageReference Include="SQLitePCLRaw.provider.sqlite3" Version="3.0.3" Condition="$([MSBuild]::IsOSPlatform('linux'))" />
     <PackageReference Include="NUnit" Version="4.3.2" />
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4">
@@ -147,6 +151,7 @@
 
   <Import Project="..\..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
   <Import Project="..\..\..\Emgu.LiteRT.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
+  <Import Project="..\..\..\Emgu.LiteRT.Runtime\Ubuntu\Emgu.TF.Lite.Runtime.Ubuntu.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('linux'))" />
 
   <!-- Microsoft Agent Framework (brings Microsoft.Extensions.AI), for the IChatClient / agent tests of
        Emgu.LiteRT.LM.Extensions.AI in UnitTestLiteRtLm.cs. -->

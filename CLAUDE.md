@@ -77,6 +77,8 @@ The LiteRT-LM tests (`UnitTestLiteRtLm.cs`) download large models on the first r
 
 Like Emgu CV, the app and test projects target the .NET version of the `dotnet` CMake runs: `cmake/modules/FindCSharp.cmake` sets `DOTNET_VERSION_MAJOR` from `dotnet --version`, and per-project `Directory.Build.props` generated from `cmake/*.Directory.Build.props.in` set `<TargetFramework>net${DOTNET_VERSION_MAJOR}.0</TargetFramework>` (`-windows` for `CVInterop.Lite`, `-android`/`-ios`/`-maccatalyst` for the MAUI projects); the csproj files name no version (a `TargetFramework` in a csproj would override the generated props, which are imported first). Re-run CMake (`build_emgutf`, or `cmake .` in `build/`) after switching .NET SDKs. So `Emgu.TF.Lite.Test.Net` needs the CMake-generated `Directory.Build.props` files (run the platform's `build_emgutf` once), and on macOS it copies `libtfliteextern.dylib`/`libLiteRt.dylib` from `lib/runtimes/osx/native/` via `Emgu.LiteRT.Runtime/Mac`'s `.projitems`.
 
+On Linux the tests use the Ubuntu natives in `lib/runtimes/ubuntu-x64/native/` and Emgu CV's Ubuntu 26.04 runtime, and switch sqlite-net to the system SQLite (`SystemSqlite.cs`) - see `docs/native-builds.md`, "Running the .NET tests on Linux".
+
 ## Key Conventions
 
 - **Extern library name**: `tfliteextern`. On iOS it is `@rpath/tfliteextern.framework/tfliteextern`; on Mac Catalyst and Unity iOS (static libraries) `__Internal`.
