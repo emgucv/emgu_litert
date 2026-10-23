@@ -19,7 +19,9 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>The user</summary>
         User,
         /// <summary>The model</summary>
-        Assistant
+        Assistant,
+        /// <summary>The app: a notice in the transcript (e.g. an alert card), never given to the model (<see cref="ChatConversation.AddNotice"/>)</summary>
+        Notice
     }
 
     /// <summary>
@@ -77,11 +79,23 @@ namespace Emgu.LiteRT.LM.Chat
             _description = description;
         }
 
-        /// <summary>The call, with the tool's name and arguments.</summary>
+        /// <summary>
+        /// Create a step line of the app's own, not a tool call (e.g. "Looked in report.pdf: page 2"), to add to a reply's
+        /// <see cref="ChatMessageItem.Steps"/>. It isn't counted as a tool call in the context window.
+        /// </summary>
+        /// <param name="description">The line</param>
+        /// <param name="isRunning">True to show it as still running ("..."); set <see cref="IsRunning"/> false when done</param>
+        public ChatToolStep(string description, bool isRunning = false)
+        {
+            _description = description;
+            _isRunning = isRunning;
+        }
+
+        /// <summary>The call, with the tool's name and arguments; null for the app's own step lines.</summary>
         public FunctionCallContent Call { get; }
 
-        /// <summary>The tool's name.</summary>
-        public string Name => Call.Name;
+        /// <summary>The tool's name; null for the app's own step lines.</summary>
+        public string Name => Call?.Name;
 
         /// <summary>What the step does, in words (from <see cref="ChatConversation.DescribeToolCall"/>); an app may change it, e.g. once it has the result.</summary>
         public string Description
@@ -94,11 +108,11 @@ namespace Emgu.LiteRT.LM.Chat
             }
         }
 
-        /// <summary>True until the tool's result has arrived.</summary>
+        /// <summary>True until the tool's result has arrived (or, for the app's own step, until it says so).</summary>
         public bool IsRunning
         {
             get => _isRunning;
-            internal set
+            set
             {
                 if (Set(ref _isRunning, value))
                     Raise(nameof(Text));
@@ -115,7 +129,7 @@ namespace Emgu.LiteRT.LM.Chat
         public string Error
         {
             get => _error;
-            internal set
+            set
             {
                 if (Set(ref _error, value))
                     Raise(nameof(Text));
@@ -137,6 +151,7 @@ namespace Emgu.LiteRT.LM.Chat
         private string _error;
         private object _tag;
         private bool _startsContext;
+        private string _context;
 
         /// <summary>
         /// Create a message, e.g. to restore a saved conversation with <see cref="ChatConversation.Load"/>.
@@ -149,7 +164,7 @@ namespace Emgu.LiteRT.LM.Chat
         {
             Role = role;
             _text = text ?? string.Empty;
-            Context = context;
+            _context = context;
             Attachments = new List<DataContent>(attachments ?? Array.Empty<DataContent>()).AsReadOnly();
             _state = ChatMessageState.Done;
         }
@@ -242,7 +257,23 @@ namespace Emgu.LiteRT.LM.Chat
         public IReadOnlyList<DataContent> Attachments { get; }
 
         /// <summary>Text given to the model before a user message's text (e.g. document excerpts), not shown in the transcript; or null.</summary>
-        public string Context { get; }
+        public string Context
+        {
+            get => _context;
+            set
+            {
+                // Its size changes: counted again before it is sent.
+                if (Set(ref _context, value))
+                    Tokens = -1;
+            }
+        }
+
+        /// <summary>
+        /// The app's own views or objects shown with the message - for a reply above its bubble (e.g. a generated picture,
+        /// a device action's card), for a notice as its content. A <c>ChatView</c> shows a View as it is (a View can only
+        /// be shown in one place) and anything else as text. Not given to the model.
+        /// </summary>
+        public ObservableCollection<object> Decorations { get; } = new ObservableCollection<object>();
 
         /// <summary>What the model is given: <see cref="Context"/> followed by <see cref="Text"/>.</summary>
         public string ModelText => string.IsNullOrEmpty(Context) ? Text : Context + Text;

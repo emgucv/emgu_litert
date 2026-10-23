@@ -53,11 +53,15 @@ namespace Emgu.LiteRT.LM.Chat
     /// </summary>
     public sealed class ChatExchangeEventArgs : EventArgs
     {
-        internal ChatExchangeEventArgs(ChatMessageItem message, ChatMessageItem reply)
+        internal ChatExchangeEventArgs(ChatMessageItem message, ChatMessageItem reply, bool regenerated)
         {
             Message = message;
             Reply = reply;
+            Regenerated = regenerated;
         }
+
+        /// <summary>True if the reply was written again (<see cref="ChatConversation.RegenerateAsync"/>): it replaces the one reported before.</summary>
+        public bool Regenerated { get; }
 
         /// <summary>The user's message.</summary>
         public ChatMessageItem Message { get; }
@@ -241,58 +245,153 @@ namespace Emgu.LiteRT.LM.Chat
             try
             {
                 Messages.Add(message);
-                try
-                {
-                    await PrepareContextAsync(message, cancellationToken);
-                }
-                catch (Exception) when (!cancellationToken.IsCancellationRequested)
-                {
-                    // Sent anyway; if it's too long, the context-full retry below drops the earlier messages.
-                }
+                await PrepareAsync(message, cancellationToken);
                 Messages.Add(reply);
-                ChatOptions requestOptions = WithInstructions(options);
-                for (int attempt = 0; ; attempt++)
-                {
-                    try
-                    {
-                        await StreamReplyAsync(message, reply, requestOptions, cancellationToken);
-                        reply.State = ChatMessageState.Done;
-                        break;
-                    }
-                    catch (Exception) when (cancellationToken.IsCancellationRequested)
-                    {
-                        // Interrupted: the reply keeps what was written so far; the client is given it as text from now on
-                        // (LiteRT-LM can't continue a cancelled conversation, and the client rebuilds it).
-                        reply.ModelMessages = null;
-                        reply.State = ChatMessageState.Interrupted;
-                        break;
-                    }
-                    catch (Exception ex) when (attempt == 0 && IsContextFullError(ex))
-                    {
-                        // The estimate was short, so don't rely on it: drop the earlier messages (a summary made before
-                        // stays) and try once more.
-                        reply.Text = string.Empty;
-                        reply.Thinking = string.Empty;
-                        reply.ThinkingDuration = null;
-                        reply.Steps.Clear();
-                        await CompactAsync(ChatCompaction.Drop, 0, message, cancellationToken);
-                    }
-                }
-                await CountReplyAsync(reply);
-                ExchangeCompleted?.Invoke(this, new ChatExchangeEventArgs(message, reply));
+                await StreamWithRetryAsync(message, reply, options, cancellationToken);
+                ExchangeCompleted?.Invoke(this, new ChatExchangeEventArgs(message, reply, false));
                 return reply;
             }
             catch (Exception ex)
             {
-                reply.Error = ex.Message;
-                reply.State = ChatMessageState.Failed;
-                message.Excluded = reply.Excluded = true;
+                Fail(message, reply, ex);
                 throw;
             }
             finally
             {
                 _busy = false;
             }
+        }
+
+        /// <summary>
+        /// Send the message of a reply again and stream a new reply into the same item: its text, thinking and steps
+        /// start again (its <see cref="ChatMessageItem.Decorations"/> stay). E.g. to retry with other options, or to answer
+        /// again once more tools are available. It must be the latest reply.
+        /// </summary>
+        /// <param name="reply">The latest reply</param>
+        /// <param name="options">Options for the new reply, as for <see cref="SendAsync"/></param>
+        /// <param name="cancellationToken">Stops the reply (<see cref="ChatMessageState.Interrupted"/>)</param>
+        /// <returns>The reply. If sending fails, the reply is marked <see cref="ChatMessageState.Failed"/> and the exception thrown.</returns>
+        public async Task<ChatMessageItem> RegenerateAsync(ChatMessageItem reply, ChatOptions options = null, CancellationToken cancellationToken = default)
+        {
+            if (_busy)
+                throw new InvalidOperationException("A message is already being sent.");
+            int index = Messages.IndexOf(reply);
+            if (reply == null || reply.Role != ChatMessageRole.Assistant || index < 0
+                || Messages.Skip(index + 1).Any(m => m.Role != ChatMessageRole.Notice))
+                throw new ArgumentException("Only the latest reply can be regenerated.", nameof(reply));
+            ChatMessageItem message = Messages.Take(index).LastOrDefault(m => m.Role == ChatMessageRole.User);
+            if (message == null)
+                throw new ArgumentException("The reply has no message to answer.", nameof(reply));
+            _busy = true;
+            try
+            {
+                message.Excluded = reply.Excluded = false;
+                ResetReply(reply);
+                reply.Error = null;
+                reply.State = ChatMessageState.Streaming;
+                await PrepareAsync(message, cancellationToken);
+                await StreamWithRetryAsync(message, reply, options, cancellationToken);
+                ExchangeCompleted?.Invoke(this, new ChatExchangeEventArgs(message, reply, true));
+                return reply;
+            }
+            catch (Exception ex)
+            {
+                Fail(message, reply, ex);
+                throw;
+            }
+            finally
+            {
+                _busy = false;
+            }
+        }
+
+        /// <summary>
+        /// Add a notice to the transcript: the app's own item - e.g. an alert card - which is never given to the model.
+        /// </summary>
+        /// <param name="content">What to show (in <see cref="ChatMessageItem.Decorations"/>), e.g. a View; or null</param>
+        /// <param name="text">A text for it, or null</param>
+        /// <returns>The notice</returns>
+        public ChatMessageItem AddNotice(object content, string text = null)
+        {
+            ChatMessageItem notice = new ChatMessageItem(ChatMessageRole.Notice, text);
+            if (content != null)
+                notice.Decorations.Add(content);
+            Messages.Add(notice);
+            return notice;
+        }
+
+        /// <summary>
+        /// Called after the conversation was made to fit (compacted if needed) and before the request is sent, with the
+        /// message being sent; it may change the message's <see cref="ChatMessageItem.Context"/> (e.g. search a document
+        /// again when <see cref="CompactionCount"/> changed, as excerpts given before may have been summarized away).
+        /// Null for none.
+        /// </summary>
+        public Func<ChatMessageItem, CancellationToken, Task> BeforeStreaming { get; set; }
+
+        /// <summary>How many times the conversation has been compacted.</summary>
+        public int CompactionCount { get; private set; }
+
+        private async Task PrepareAsync(ChatMessageItem message, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await PrepareContextAsync(message, cancellationToken);
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Sent anyway; if it's too long, the context-full retry drops the earlier messages.
+            }
+            if (BeforeStreaming != null)
+                await BeforeStreaming(message, cancellationToken);
+        }
+
+        private async Task StreamWithRetryAsync(ChatMessageItem message, ChatMessageItem reply, ChatOptions options,
+            CancellationToken cancellationToken)
+        {
+            ChatOptions requestOptions = WithInstructions(options);
+            for (int attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    await StreamReplyAsync(message, reply, requestOptions, cancellationToken);
+                    reply.State = ChatMessageState.Done;
+                    break;
+                }
+                catch (Exception) when (cancellationToken.IsCancellationRequested)
+                {
+                    // Interrupted: the reply keeps what was written so far; the client is given it as text from now on
+                    // (LiteRT-LM can't continue a cancelled conversation, and the client rebuilds it).
+                    reply.ModelMessages = null;
+                    reply.State = ChatMessageState.Interrupted;
+                    break;
+                }
+                catch (Exception ex) when (attempt == 0 && IsContextFullError(ex))
+                {
+                    // The estimate was short, so don't rely on it: drop the earlier messages (a summary made before
+                    // stays) and try once more.
+                    ResetReply(reply);
+                    await CompactAsync(ChatCompaction.Drop, 0, message, cancellationToken);
+                }
+            }
+            await CountReplyAsync(reply);
+        }
+
+        private static void ResetReply(ChatMessageItem reply)
+        {
+            reply.Text = string.Empty;
+            reply.Thinking = string.Empty;
+            reply.ThinkingDuration = null;
+            reply.Steps.Clear();
+            reply.ModelMessages = null;
+            reply.Tokens = -1;
+            reply.ExtraTokens = 0;
+        }
+
+        private static void Fail(ChatMessageItem message, ChatMessageItem reply, Exception ex)
+        {
+            reply.Error = ex.Message;
+            reply.State = ChatMessageState.Failed;
+            message.Excluded = reply.Excluded = true;
         }
 
         /// <summary>
@@ -521,7 +620,8 @@ namespace Emgu.LiteRT.LM.Chat
         // The messages the model sees: from ContextStart, without failed exchanges.
         private List<ChatMessageItem> ContextItems()
         {
-            return Messages.Skip(ContextStart).Where(m => !m.Excluded && m.State != ChatMessageState.Streaming).ToList();
+            return Messages.Skip(ContextStart)
+                .Where(m => !m.Excluded && m.State != ChatMessageState.Streaming && m.Role != ChatMessageRole.Notice).ToList();
         }
 
         private static int Cost(ChatMessageItem item) => Math.Max(0, item.Tokens) + item.ExtraTokens;
@@ -562,7 +662,8 @@ namespace Emgu.LiteRT.LM.Chat
         private async Task CountReplyAsync(ChatMessageItem reply)
         {
             Func<string, int> countTokens = CountTokens;
-            int steps = reply.Steps.Count;
+            // Tool calls only: the app's own step lines aren't in the model's conversation.
+            int steps = reply.Steps.Count(step => step.Call != null);
             string thinking = reply.Thinking;
             try
             {
@@ -676,6 +777,7 @@ namespace Emgu.LiteRT.LM.Chat
             }
             _summary = summary;
             _summaryTokens = 0;
+            CompactionCount++;
             ChatMessageItem firstKept = keepStart < items.Count ? items[keepStart] : next;
             ContextStart = firstKept != null ? Messages.IndexOf(firstKept) : Messages.Count;
             MarkContextStart();

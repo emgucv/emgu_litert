@@ -331,4 +331,82 @@ public class UnitTestChatConversation
         Assert.That(conversation.Summary, Is.Null);
         Assert.That(conversation.ContextStart, Is.EqualTo(4));
     }
+
+    [Test]
+    public async Task NoticesAreShownButNeverGivenToTheModel()
+    {
+        FakeChatClient client = new FakeChatClient();
+        ChatConversation conversation = Conversation(client);
+        client.Reply(new TextContent("Hi there."));
+        await conversation.SendAsync("Hello");
+        ChatMessageItem notice = conversation.AddNotice("A person was seen at the door", "Camera alert");
+        Assert.That(notice.Role, Is.EqualTo(ChatMessageRole.Notice));
+        Assert.That(notice.Decorations.Single(), Is.EqualTo("A person was seen at the door"));
+        client.Reply(new TextContent("Noted."));
+        await conversation.SendAsync("Anything new?");
+        Assert.That(Texts(client.Requests[1].Messages), Is.EqualTo("user:Hello | assistant:Hi there. | user:Anything new?"));
+        Assert.That(conversation.Messages.Select(m => m.Role), Is.EqualTo(new[]
+        {
+            ChatMessageRole.User, ChatMessageRole.Assistant, ChatMessageRole.Notice, ChatMessageRole.User, ChatMessageRole.Assistant
+        }));
+        // A notice after the latest reply doesn't stop it being regenerated.
+        conversation.AddNotice(null, "Later");
+        client.Reply(new TextContent("Nothing new."));
+        await conversation.RegenerateAsync(conversation.Messages[4]);
+        Assert.That(conversation.Messages[4].Text, Is.EqualTo("Nothing new."));
+    }
+
+    [Test]
+    public async Task TheAppCanChangeTheContextAfterCompaction()
+    {
+        FakeChatClient client = new FakeChatClient();
+        ChatConversation conversation = Conversation(client, 80);
+        conversation.Compaction = ChatCompaction.Drop;
+        List<int> compactionsSeen = new();
+        conversation.BeforeStreaming = (message, token) =>
+        {
+            compactionsSeen.Add(conversation.CompactionCount);
+            // e.g. document excerpts searched again once earlier ones may have been dropped.
+            if (conversation.CompactionCount > 0)
+                message.Context = "Excerpt: page 3. ";
+            return Task.CompletedTask;
+        };
+        string ten = string.Join(" ", Enumerable.Repeat("word", 8));
+        for (int i = 0; i < 4; i++)
+        {
+            client.Reply(new TextContent("answer " + i + " " + ten));
+            await conversation.SendAsync("question " + i + " " + ten);
+        }
+        Assert.That(compactionsSeen, Is.EqualTo(new[] { 0, 0, 0, 1 }));
+        Assert.That(client.Requests.Last().Messages.Last().Text, Does.StartWith("Excerpt: page 3. question 3"));
+    }
+
+    [Test]
+    public async Task RegeneratesTheLatestReply()
+    {
+        FakeChatClient client = new FakeChatClient();
+        ChatConversation conversation = Conversation(client);
+        List<bool> regenerated = new();
+        conversation.ExchangeCompleted += (s, e) => regenerated.Add(e.Regenerated);
+        client.Reply(new FunctionCallContent("c1", "use_clock"), new FunctionResultContent("c1", "Clock tools added"), new TextContent("Which time?"));
+        ChatMessageItem reply = await conversation.SendAsync("Set a timer for 5 minutes");
+        reply.Decorations.Add("card");
+        reply.Steps.Add(new ChatToolStep("Looked in the calendar"));
+        Assert.That(reply.Steps.Count, Is.EqualTo(2));
+
+        client.Reply(new FunctionCallContent("c2", "set_timer"), new FunctionResultContent("c2", "Timer set"), new TextContent("Timer set for 5 minutes."));
+        ChatMessageItem again = await conversation.RegenerateAsync(reply, new ChatOptions { ToolMode = ChatToolMode.Auto });
+        Assert.That(again, Is.SameAs(reply));
+        Assert.That(reply.Text, Is.EqualTo("Timer set for 5 minutes."));
+        Assert.That(reply.Steps.Select(st => st.Name), Is.EqualTo(new[] { "set_timer" }));
+        Assert.That(reply.Decorations.Single(), Is.EqualTo("card"));
+        Assert.That(regenerated, Is.EqualTo(new[] { false, true }));
+        // The same message, without the first reply.
+        Assert.That(Texts(client.Requests[1].Messages), Is.EqualTo("user:Set a timer for 5 minutes"));
+        Assert.That(conversation.Messages.Count, Is.EqualTo(2));
+
+        client.Reply(new TextContent("Done."));
+        await conversation.SendAsync("Thanks");
+        Assert.ThrowsAsync<ArgumentException>(() => conversation.RegenerateAsync(reply));
+    }
 }

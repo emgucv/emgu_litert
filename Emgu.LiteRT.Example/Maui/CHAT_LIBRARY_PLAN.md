@@ -201,6 +201,35 @@ Each step builds the demo and is checked before the next. Device checks: Mac Cat
    voice, server, task mode...), keeping each verified behaviour: compaction after reopening a saved chat, the
    "Provided less images than expected" workaround (`FilterChannelContentFromKvCache`), voice interruption, model
    switching while loading, the Android scroll clamp. Device checks after each feature group.
+   Split (2026-10-23, after surveying the page: 33 files, 11,100 lines, ~70 places adding views to the transcript):
+   - **6a - extension points in the libraries** (no demo change): `ChatMessageItem.Decorations` (the app's own views or
+     objects shown with a message - the cards the page puts above a reply), public `ChatToolStep`s for step lines that
+     aren't tool calls ("Looked in report.pdf..."), notices (`ChatMessageRole.Notice`, `ChatConversation.AddNotice`:
+     transcript items never given to the model, e.g. the monitors' alert cards), a hook after compaction and before
+     streaming that may change the message's context (the page re-searches document excerpts after compacting), and
+     `RegenerateAsync(reply)` (send the same message again into the same reply: `ToolRouter`'s re-run after a stub, a
+     server rejecting `reasoning_effort`).
+     **Done 2026-10-23:** `ChatMessageItem.Decorations` (objects; `ChatDecorationView` shows a View as it is - moving it
+     from where it was shown before, since a View has one parent - and anything else as text, `ChatDecorationTextStyle`;
+     above a reply's bubble, below a user message), public `ChatToolStep(description, isRunning)` with settable
+     `IsRunning`/`Error` (not counted as tool calls in the context), `ChatMessageRole.Notice` +
+     `ChatConversation.AddNotice(content, text)` (`ChatNoticeTemplate`; skipped by the request, compaction and the
+     alternation of exchanges), `ChatMessageItem.Context` settable (recounted), `ChatConversation.BeforeStreaming` and
+     `CompactionCount`, `RegenerateAsync(reply, options)` (the latest reply, notices after it allowed; steps start again,
+     decorations stay; `ChatExchangeEventArgs.Regenerated`), and `ChatView.ShowSummaryCommand` - the default user
+     template's "Earlier messages were summarized" divider, found through `RelativeSource AncestorType=ChatView` from
+     inside the `BindableLayout` item. Fixed: after summarizing, `ChatView` put "Generating..." back even when no
+     message was being sent ("compact now"). Tests: three more in `UnitTestChatConversation` (15 in all); on the Galaxy
+     S10 a temporary self-test with a scripted `IChatClient` (no model) showed an app step line, a decoration card, a
+     notice with its text and card, the divider after "compact now", and tapping it showed the summary.
+   - **6b - the core**: the page's send path (`ChatClientAgent` for Gemma 4 and the server, `Chat` for Qwen) becomes one
+     `ChatConversation` over a function-invoking `IChatClient` - the agent only added instructions and a session, which
+     the conversation now holds, and `ToolRouter` reads `FunctionInvokingChatClient.CurrentContext` either way - and
+     its transcript, thinking, steps, compaction divider, saved chats (`ExchangeCompleted`, `Load`), translation
+     (the `ThinkingView` accessory) and read-aloud move to `ChatView`. Checks on Mac Catalyst and the Galaxy S10.
+   - **6c - the feature cards**: generated images, photo search, documents, device actions, written documents, the
+     camera and sound monitors, task mode and the voice chat, as decorations and notices; device checks per group.
+   - **6d - remove the page's old code; docs.**
 7. **Docs**: package README with the sample, `CLAUDE.md`, the demo `README.md`.
 
 ## Risks and open questions

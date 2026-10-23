@@ -200,6 +200,21 @@ namespace Emgu.LiteRT.LM.Maui
             set => SetValue(PlaceholderProperty, value);
         }
 
+        /// <summary>
+        /// Shows the conversation's summary (<see cref="ChatConversation.Summary"/>) in an alert; the default message
+        /// template's "Earlier messages were summarized" divider runs it when tapped.
+        /// </summary>
+        public System.Windows.Input.ICommand ShowSummaryCommand => _showSummaryCommand ??= new Command(async () =>
+        {
+            string summary = Conversation?.Summary;
+            Page page = Window?.Page;
+            if (page != null)
+                await page.DisplayAlertAsync("Summary of the earlier messages",
+                    summary ?? "The earlier messages were dropped to make room; the model no longer sees them.", "Close");
+        });
+
+        private System.Windows.Input.ICommand _showSummaryCommand;
+
         /// <summary>Loading the <see cref="Model"/>, or null without one.</summary>
         public ModelLoadState LoadState { get; private set; }
 
@@ -380,7 +395,8 @@ namespace Emgu.LiteRT.LM.Maui
 
         private void OnSummarizing(object sender, bool summarizing)
         {
-            SetStatus(summarizing ? "Summarizing the earlier conversation..." : "Generating...");
+            // Afterwards "Generating..." only while a message is being sent (not after "compact now").
+            SetStatus(summarizing ? "Summarizing the earlier conversation..." : _replyCancel != null ? "Generating..." : null);
         }
 
         private async Task<bool> LoadModelAsync()
