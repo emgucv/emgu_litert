@@ -167,7 +167,7 @@ namespace Maui.Demo.Lite
         {
             _cameraSuspended = false;
             if (_pageVisible)
-                StartChatIndexing();
+                PastChats.StartIndexing();
             if (_pageVisible)
                 RefreshPhotoIndex();
         }

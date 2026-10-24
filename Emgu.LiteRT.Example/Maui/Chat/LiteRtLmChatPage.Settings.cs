@@ -243,7 +243,7 @@ namespace Maui.Demo.Lite
                     Theme.Divider(),
                     BuildPhotoSection(),
                     Theme.Divider(),
-                    BuildChatSearchSection(),
+                    PastChats.BuildSection(CreateSearchModelNotice()),
                     Theme.Divider(),
                     Images.BuildSection(BuildImageModelSelector()),
                     Theme.Divider(),

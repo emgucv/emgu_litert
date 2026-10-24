@@ -83,9 +83,9 @@ namespace Maui.Demo.Lite
                 // Cancel every producer before awaiting the shared embedding load.
                 DocumentState document = _document;
                 RemoveDocument();
-                _chatIndexing?.Cancel();
+                PastChats.CancelIndexing();
                 _photoIndexing?.Cancel();
-                await StopChatIndexingAsync();
+                await PastChats.StopIndexingAsync();
                 try { await (_photoIndexTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
                 if (document?.Ready != null) { try { await document.Ready; } catch (OperationCanceledException) { } }
                 await FinishPrivateDocumentsAsync();
@@ -111,7 +111,7 @@ namespace Maui.Demo.Lite
             {
                 _reloadingCpuThreads = false;
                 UpdatePrivateChatState();
-                if (!IsPrivateChat && _pageVisible) { StartPhotoIndexing(); StartChatIndexing(); }
+                if (!IsPrivateChat && _pageVisible) { StartPhotoIndexing(); PastChats.StartIndexing(); }
             }
         }
 

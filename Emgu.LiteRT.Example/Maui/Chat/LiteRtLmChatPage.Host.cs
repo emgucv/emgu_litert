@@ -35,6 +35,10 @@ public partial class LiteRtLmChatPage : IChatHost
 
     private GoalsFeature Goals => _goalsFeature ??= new GoalsFeature(this);
 
+    private PastChatsFeature _pastChatsFeature;
+
+    private PastChatsFeature PastChats => _pastChatsFeature ??= new PastChatsFeature(this);
+
     private DeviceActionsFeature _deviceActionsFeature;
 
     // Timers, alarms, calendar events, reminders and directions, each confirmed on a card (the static DeviceActions does them).
@@ -124,6 +128,27 @@ public partial class LiteRtLmChatPage : IChatHost
     void IChatHost.SetBusy(bool busy) => SetBusy(busy);
 
     ChatStore IChatHost.Store => _store;
+
+    SearchEmbedder IChatHost.Embedder => Embedder;
+
+    string IChatHost.SearchModelFile => SelectedEmbeddingFile;
+
+    bool IChatHost.SearchDownloadRequired => SearchDownloadRequired;
+
+    Task<T> IChatHost.RunIndexEmbeddingAsync<T>(Func<T> embed, Action<string> paused, CancellationToken cancel, bool photos) =>
+        RunIndexEmbeddingAsync(embed, paused, cancel, photos);
+
+    bool IChatHost.CanIndexNow => _pageVisible && !_reloadingCpuThreads;
+
+    bool IChatHost.IsReplying => _busy;
+
+    int? IChatHost.ConversationId => _conversationId;
+
+    async Task IChatHost.OpenChatAsync(int id)
+    {
+        if (!CanChangeModel) { SetStatus("Wait for the reply to finish before opening a saved chat."); return; }
+        await OpenConversationAsync(id);
+    }
 
     bool IChatHost.IsPrivateChat => IsPrivateChat;
 

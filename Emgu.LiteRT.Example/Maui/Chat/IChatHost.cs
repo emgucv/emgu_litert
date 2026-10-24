@@ -94,5 +94,22 @@ internal interface IChatHost
 
     // A text prompt: the text entered, or null when cancelled.
     Task<string> PromptAsync(string title, string message, string accept, string cancel, string initialValue, int maxLength);
+
+    // The search model the searches share, and the file it is (indexes record it, so a new model rebuilds them); whether the user
+    // deleted it in Settings > Storage.
+    SearchEmbedder Embedder { get; }
+    string SearchModelFile { get; }
+    bool SearchDownloadRequired { get; }
+
+    // One embedding for a background index: waits while the device is too busy (WorkloadPolicy), then embeds holding the model's Gate.
+    Task<T> RunIndexEmbeddingAsync<T>(Func<T> embed, Action<string> paused, CancellationToken cancel, bool photos = false);
+
+    // Whether background indexing may run now (the page is shown and no model is being reloaded), and whether a reply is being written.
+    bool CanIndexNow { get; }
+    bool IsReplying { get; }
+
+    // The saved chat being shown (null until its first exchange is saved), and opening another (when nothing is being answered).
+    int? ConversationId { get; }
+    Task OpenChatAsync(int id);
 }
 #endif

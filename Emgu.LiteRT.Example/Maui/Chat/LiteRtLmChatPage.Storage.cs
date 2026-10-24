@@ -58,9 +58,9 @@ namespace Maui.Demo.Lite
             if (_restoreSearchButton != null) _restoreSearchButton.IsVisible = blocked;
             foreach (View notice in _searchNotices) notice.IsVisible = blocked;
             if (blocked && _photoSwitch?.IsToggled == true) { SetPhotoSearchOff(); _photoIndexing?.Cancel(); }
-            if (blocked && _chatSearchSwitch?.IsToggled == true) { SetChatSearchOff(); _chatIndexing?.Cancel(); }
+            if (blocked && PastChats.On) { PastChats.TurnOff(); PastChats.CancelIndexing(); }
             if (_photoSwitch != null) _photoSwitch.IsEnabled = !blocked && EmbeddingSupportsImages;
-            if (_chatSearchSwitch != null) _chatSearchSwitch.IsEnabled = !IsPrivateChat && !blocked;
+            PastChats.SetSwitchEnabled(!IsPrivateChat && !blocked);
         }
 
         private StorageCatalog CreateStorageCatalog()
@@ -102,8 +102,8 @@ namespace Maui.Demo.Lite
                 // These tasks may share the same embedder load: cancel all producers before awaiting any of them.
                 if (documentPending) RemoveDocument();
                 _photoIndexing?.Cancel();
-                _chatIndexing?.Cancel();
-                await StopChatIndexingAsync();
+                PastChats.CancelIndexing();
+                await PastChats.StopIndexingAsync();
                 try { await (_photoIndexTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
                 if (documentPending)
                 {
@@ -126,7 +126,7 @@ namespace Maui.Demo.Lite
                     if (SelectedEmbeddingFile == entry.Key)
                     {
                         SetPhotoSearchOff();
-                        SetChatSearchOff();
+                        PastChats.TurnOff();
                         RemoveDocument();
                         await Embedder.ReleaseWithGateAsync();
                     }
@@ -136,7 +136,7 @@ namespace Maui.Demo.Lite
                     SetPhotoSearchOff();
                     await _photoIndex.ClearAsync();
                 }
-                if (entry.Kind == StorageKind.ChatIndex) SetChatSearchOff();
+                if (entry.Kind == StorageKind.ChatIndex) PastChats.TurnOff();
                 if (entry.Kind == StorageKind.Document && _document?.Id == entry.Key) RemoveDocument();
                 if (entry.Kind == StorageKind.ImageModel)
                 {
@@ -164,7 +164,7 @@ namespace Maui.Demo.Lite
                 _chipSpinner.IsVisible = _chipSpinner.IsRunning = _loadTask != null;
                 UpdateExportChatButton();
                 if (!ModelReady && !IsDownloaded(SelectedOption)) ShowDownloadPrompt(SelectedOption);
-                if (_pageVisible) { StartChatIndexing(); StartPhotoIndexing(); }
+                if (_pageVisible) { PastChats.StartIndexing(); StartPhotoIndexing(); }
             }
         }
 
@@ -174,15 +174,6 @@ namespace Maui.Demo.Lite
             _photoSwitch.IsToggled = false;
             _photoSwitch.Toggled += OnPhotoSearchToggled;
             Preferences.Default.Set(PhotoSearchPreference, false);
-        }
-
-        private void SetChatSearchOff()
-        {
-            _chatSearchSwitch.Toggled -= OnChatSearchToggled;
-            _chatSearchSwitch.IsToggled = false;
-            _chatSearchSwitch.Toggled += OnChatSearchToggled;
-            Preferences.Default.Set(ChatSearchPreference, false);
-            _chatSearchStatus.IsVisible = false;
         }
 
         private async Task RestoreSearchModelDownloadAsync()

@@ -55,8 +55,8 @@ public partial class LiteRtLmChatPage
                 () => IsPrivateChat ? Array.Empty<AITool>() : new AITool[] { AgentTools.SearchDocuments(SearchDocumentsAsync) },
                 () => ChatPlannerInstructions.Documents),
             new ToolGroup(ChatToolGroups.PastChats, ChatToolGroups.PastChatsSummary, ChatToolGroups.PastChatsKeywords,
-                () => IsPrivateChat ? Array.Empty<AITool>() : new AITool[] { AgentTools.SearchChats(SearchChatsAsync) },
-                () => ChatSearchInstructions),
+                () => IsPrivateChat ? Array.Empty<AITool>() : new AITool[] { AgentTools.SearchChats(PastChats.SearchAsync) },
+                () => PastChatsFeature.Instructions),
         };
         groups.Add(new ToolGroup(ChatToolGroups.WriteDocument, ChatToolGroups.WriteDocumentSummary, ChatToolGroups.WriteDocumentKeywords,
             () => new AITool[] { AgentTools.CreateDocument(WrittenDocuments.SaveAsync, () => _routePrompt) }.Concat(Meetings.Tools(_voiceMode)),

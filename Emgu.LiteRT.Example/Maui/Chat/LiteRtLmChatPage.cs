@@ -401,7 +401,7 @@ namespace Maui.Demo.Lite
         {
             base.OnAppearing();
             _pageVisible = true;
-            StartChatIndexing();
+            PastChats.StartIndexing();
             if (_pageStarted)
             {
                 RefreshPhotoIndex();
@@ -486,7 +486,7 @@ namespace Maui.Demo.Lite
                 if (!IsPrivateChat) _ = CancelRecordingAsync();
                 RemoveDocument();
                 _photoIndexing?.Cancel();
-                _chatIndexing?.Cancel();
+                PastChats.CancelIndexing();
                 _chatExportCancel?.Cancel();
                 _searchRestoreCancel?.Cancel();
                 if (IsPrivateChat) _ = CleanupPrivateChatAsync();
