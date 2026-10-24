@@ -79,10 +79,6 @@ namespace Maui.Demo.Lite
 
         private HorizontalStackLayout _documentBar;
         private DocumentState _document;
-        private EmbeddingModel _embedder;
-        // One embedding at a time: document search and photo search (PhotoIndex) share the model.
-        private readonly SemaphoreSlim _embedderGate = new SemaphoreSlim(1, 1);
-        private Task<EmbeddingModel> _embedderLoad;
         // What the model's conversation already holds: passages and images given with earlier messages since the
         // conversation was last compacted.
         private readonly HashSet<int> _givenPassages = new HashSet<int>();
@@ -240,7 +236,7 @@ namespace Maui.Demo.Lite
                     if (index.Passages.Count == 0 && index.Images.Count == 0)
                         throw new InvalidOperationException("this document needs an embedding model that supports images");
                     // The model embeds the questions.
-                    EmbeddingModel savedEmbedder = await EnsureEmbedderAsync(stage, cancel);
+                    EmbeddingModel savedEmbedder = await Embedder.EnsureAsync(stage, cancel);
                     if (rebuild)
                     {
                         ((IProgress<string>)stage).Report("Rebuilding the document embeddings...");
@@ -272,7 +268,7 @@ namespace Maui.Demo.Lite
                     UiStallWatchdog.Mark(string.Format("Document read in {0:F1}s: {1} passages, {2} images, {3} pages ({4} skipped), {5} images skipped",
                         watch.Elapsed.TotalSeconds, index.Passages.Count, index.Images.Count, content.PageCount, content.PagesSkipped, content.ImagesSkipped));
 
-                    EmbeddingModel embedder = await EnsureEmbedderAsync(stage, cancel);
+                    EmbeddingModel embedder = await Embedder.EnsureAsync(stage, cancel);
                     watch.Restart();
                     Progress<DocumentIndexProgress> indexed = new Progress<DocumentIndexProgress>(p =>
                     {
@@ -424,78 +420,6 @@ namespace Maui.Demo.Lite
             return string.Join(" · ", parts);
         }
 
-        // The embedding model is loaded once (downloaded the first time) and kept while the page is open.
-        private Task<EmbeddingModel> EnsureEmbedderAsync(IProgress<string> stage, CancellationToken cancel)
-        {
-            if (SearchDownloadRequired)
-                return Task.FromException<EmbeddingModel>(new InvalidOperationException("The search model was deleted. Download it again in Settings > Storage."));
-            if (_embedderLoad == null || _embedderLoad.IsFaulted || _embedderLoad.IsCanceled)
-                _embedderLoad = LoadEmbedderAsync(stage, cancel);
-            return _embedderLoad;
-        }
-
-        private async Task<EmbeddingModel> LoadEmbedderAsync(IProgress<string> stage, CancellationToken cancel)
-        {
-            EmbeddingModel embedder = CreateEmbeddingModel();
-            embedder.OnDownloadProgressChanged += (total, received, percent) =>
-                stage?.Report(string.Format("Downloading {0}: {1:F0}%", SelectedEmbeddingName, percent));
-            stage?.Report(embedder.DefaultModelFile.IsLocalFileVerified ? "Loading the search model..." : "Downloading " + SelectedEmbeddingName + "...");
-            try
-            {
-                await BackgroundDownloads.DownloadFileAsync(embedder.DefaultModelFile, SelectedEmbeddingName,
-                    (total, received, percent) => stage?.Report($"Downloading {SelectedEmbeddingName}: {percent:0}%"), cancel);
-                Action<Emgu.LiteRT.LM.EmbeddingEngineSettings> configure = settings =>
-                {
-                    int count = CpuThreadSettings.Count;
-                    settings.NumThreads = count;
-                    settings.AudioNumThreads = count;
-                };
-                try
-                {
-                    await embedder.Init(backend: SelectedEmbeddingBackend, configureSettings: configure, cancellationToken: cancel);
-                }
-                catch (Exception ex) when (_selectedEmbeddingGpu && !cancel.IsCancellationRequested)
-                {
-                    bool useCpu = await MainThread.InvokeOnMainThreadAsync(() => DisplayAlertAsync(
-                        "GPU embedding model could not load", ex.Message + "\n\nRun this model on CPU instead?", "Run on CPU", "Cancel"));
-                    if (!useCpu) throw;
-                    await MainThread.InvokeOnMainThreadAsync(() =>
-                    {
-                        _selectedEmbeddingGpu = false;
-                        try { Preferences.Default.Set(EmbeddingGpuPreference, false); } catch (Exception) { }
-                        UpdateEmbeddingModelDetail();
-                    });
-                    embedder.Dispose();
-                    embedder = CreateEmbeddingModel();
-                    await embedder.Init(configureSettings: configure, cancellationToken: cancel);
-                }
-            }
-            catch (Exception)
-            {
-                embedder.Dispose();
-                throw;
-            }
-            _embedder = embedder;
-            return embedder;
-        }
-
-        private async Task ReleaseEmbedderAsync()
-        {
-            Task<EmbeddingModel> load = _embedderLoad;
-            _embedderLoad = null;
-            if (load == null)
-                return;
-            try
-            {
-                EmbeddingModel embedder = await load;
-                _embedder = null;
-                await Task.Run(() => embedder.Dispose());
-            }
-            catch (Exception)
-            {
-            }
-        }
-
         private void RemoveDocument()
         {
             DocumentState state = _document;
@@ -528,10 +452,10 @@ namespace Maui.Demo.Lite
             var found = await new DocumentLibrarySearch(_store).SearchAsync(SelectedEmbeddingFile, request, documentName,
                 async (text, token) =>
                 {
-                    var embedder = await EnsureEmbedderAsync(null, token);
-                    await _embedderGate.WaitAsync(token);
+                    var embedder = await Embedder.EnsureAsync(null, token);
+                    await Embedder.Gate.WaitAsync(token);
                     try { return await Task.Run(() => embedder.EmbedQuery(text), token); }
-                    finally { _embedderGate.Release(); }
+                    finally { Embedder.Gate.Release(); }
                 }, ContextWindow >= 8192 ? 3200 : 1600, cancel);
             if (found.Count == 0)
                 return "No relevant passages were found in the user's saved documents" +
@@ -549,20 +473,20 @@ namespace Maui.Demo.Lite
                 return null;
             if (!state.Ready.IsCompleted)
                 SetStatus("Waiting for the document to be indexed...");
-            if (!await state.Ready || state.Index == null || _embedder == null)
+            if (!await state.Ready || state.Index == null || Embedder.Model == null)
                 return null;
             SetStatus("Searching the document...");
             DocumentIndex index = state.Index;
-            EmbeddingModel embedder = _embedder;
+            EmbeddingModel embedder = Embedder.Model;
             DocumentSearchResult result;
-            await _embedderGate.WaitAsync();
+            await Embedder.Gate.WaitAsync();
             try
             {
                 result = await Task.Run(() => index.Search(embedder, prompt));
             }
             finally
             {
-                _embedderGate.Release();
+                Embedder.Gate.Release();
             }
 
             DocumentContext context = new DocumentContext();

@@ -25,7 +25,7 @@ public partial class LiteRtLmChatPage
     private async Task ReloadCpuModelsCoreAsync()
     {
         bool reloadChat = _model != null || _loadTask != null;
-        bool reloadEmbedder = _embedderLoad != null;
+        bool reloadEmbedder = Embedder.IsLoaded;
         bool reloadImage = Images.ModelLoaded;
         try
         {
@@ -41,13 +41,13 @@ public partial class LiteRtLmChatPage
                 await _document.Ready;
             // A send can load a tool model while we wait, so check again after it finishes.
             reloadChat |= _model != null || _loadTask != null;
-            reloadEmbedder |= _embedderLoad != null;
+            reloadEmbedder |= Embedder.IsLoaded;
             reloadImage |= Images.ModelLoaded;
             _loadCancel?.Cancel();
             if (_loadTask != null)
                 await _loadTask;
             await CleanupModelAsync();
-            await ReleaseEmbedderAsync();
+            await Embedder.ReleaseAsync();
             await Images.ResetModelAsync();
             CpuThreadSettings.RequestReload();
             if (!_pageVisible)
@@ -60,7 +60,7 @@ public partial class LiteRtLmChatPage
                     throw new InvalidOperationException("The chat model could not be reloaded.");
             }
             if (reloadEmbedder)
-                await EnsureEmbedderAsync(null, CancellationToken.None);
+                await Embedder.EnsureAsync(null, CancellationToken.None);
             if (reloadImage)
                 await Images.EnsureModelAsync();
             SetStatus($"Models ready with {CpuThreadSettings.Count} CPU threads.");
@@ -82,7 +82,7 @@ public partial class LiteRtLmChatPage
         try { await (_cpuReloadTask ?? Task.CompletedTask); } catch (Exception) { }
         await StopChatIndexingAsync();
         await CleanupModelAsync();
-        await ReleaseEmbedderAsync();
+        await Embedder.ReleaseAsync();
         await Images.ReleaseModelAsync();
     }
 }

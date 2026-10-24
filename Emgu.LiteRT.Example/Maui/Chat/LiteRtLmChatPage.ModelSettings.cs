@@ -7,8 +7,37 @@ using Emgu.LiteRT.LM.Models;
 
 namespace Maui.Demo.Lite;
 
-public partial class LiteRtLmChatPage
+public partial class LiteRtLmChatPage : ISearchModelChoice
 {
+    private SearchEmbedder _searchEmbedder;
+
+    // The search model document, photo and past-chat search share.
+    private SearchEmbedder Embedder => _searchEmbedder ??= new SearchEmbedder(this);
+
+    EmbeddingModel ISearchModelChoice.CreateModel() => CreateEmbeddingModel();
+
+    string ISearchModelChoice.ModelName => SelectedEmbeddingName;
+
+    string ISearchModelChoice.Backend => SelectedEmbeddingBackend;
+
+    bool ISearchModelChoice.UsesGpu => _selectedEmbeddingGpu;
+
+    bool ISearchModelChoice.DownloadRequired => SearchDownloadRequired;
+
+    async Task<bool> ISearchModelChoice.SwitchToCpuAsync(string error)
+    {
+        bool useCpu = await MainThread.InvokeOnMainThreadAsync(() => DisplayAlertAsync(
+            "GPU embedding model could not load", error + "\n\nRun this model on CPU instead?", "Run on CPU", "Cancel"));
+        if (!useCpu) return false;
+        await MainThread.InvokeOnMainThreadAsync(() =>
+        {
+            _selectedEmbeddingGpu = false;
+            try { Preferences.Default.Set(EmbeddingGpuPreference, false); } catch (Exception) { }
+            UpdateEmbeddingModelDetail();
+        });
+        return true;
+    }
+
     private const string EmbeddingModelPreference = "litert_lm_chat_embedding_model";
     private readonly string[] _embeddingNames = {
         "EmbeddingGemma 2 Text Vision 440M · CPU", "EmbeddingGemma 2 Multimodal 740M · CPU",
@@ -107,10 +136,8 @@ public partial class LiteRtLmChatPage
             try { await (_photoIndexTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
             if (_document?.Ready != null) await _document.Ready;
             SetBusy(true);
-            bool reload = _embedderLoad != null;
-            await _embedderGate.WaitAsync();
-            try { await ReleaseEmbedderAsync(); }
-            finally { _embedderGate.Release(); }
+            bool reload = Embedder.IsLoaded;
+            await Embedder.ReleaseWithGateAsync();
             bool modelChanged = _selectedEmbedding != index;
             _selectedEmbedding = index;
             _selectedEmbeddingGpu = gpu;
@@ -124,8 +151,8 @@ public partial class LiteRtLmChatPage
             string documentId = _document?.Id;
             RemoveDocument();
             if (documentId != null) await RestoreDocumentAsync(documentId);
-            else if (reload) await EnsureEmbedderAsync(null, CancellationToken.None);
-            SetStatus(_embedder != null ? "Embedding model ready: " + SelectedEmbeddingName : "Embedding model selected. It will load when search needs it.");
+            else if (reload) await Embedder.EnsureAsync(null, CancellationToken.None);
+            SetStatus(Embedder.Model != null ? "Embedding model ready: " + SelectedEmbeddingName : "Embedding model selected. It will load when search needs it.");
         }
         catch (Exception ex) { SetStatus("Could not switch embedding model: " + ex.Message); }
         finally

@@ -95,9 +95,7 @@ namespace Maui.Demo.Lite
                 // Drop generated-image prompt/caption caches as well as transcript references.
                 if (IsPrivateChat)
                 {
-                    await _embedderGate.WaitAsync();
-                    try { await ReleaseEmbedderAsync(); }
-                    finally { _embedderGate.Release(); }
+                    await Embedder.ReleaseWithGateAsync();
                     await Images.ResetModelAsync();
                 }
                 _store.IsPrivate = value;

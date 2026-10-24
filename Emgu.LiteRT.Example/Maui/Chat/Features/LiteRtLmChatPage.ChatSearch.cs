@@ -99,7 +99,7 @@ namespace Maui.Demo.Lite
                             Action<string> paused = reason => MainThread.BeginInvokeOnMainThread(() =>
                                 ChatIndexStatus(reason == null ? "Indexing chats..." : "Chat indexing paused: " + reason));
                             await WaitForWorkAsync(false, paused, token);
-                            var embedder = await EnsureEmbedderAsync(new Progress<string>(ChatIndexStatus), token);
+                            var embedder = await Embedder.EnsureAsync(new Progress<string>(ChatIndexStatus), token);
                             return await RunIndexEmbeddingAsync(() => embedder.EmbedDocuments(new[] { text })[0], paused, token);
                         }, (done, total) => ChatIndexStatus(done == total ? $"{done} messages indexed."
                             : $"Indexing chats: {done} of {total} messages."), cancel);
@@ -120,10 +120,10 @@ namespace Maui.Demo.Lite
             var found = await new ChatSearchIndex(_store).SearchAsync(ChatIndexModel, query, _conversationId,
                 async (text, token) =>
                 {
-                    var embedder = await EnsureEmbedderAsync(null, token);
-                    await _embedderGate.WaitAsync(token);
+                    var embedder = await Embedder.EnsureAsync(null, token);
+                    await Embedder.Gate.WaitAsync(token);
                     try { return await Task.Run(() => embedder.EmbedQuery(text), token); }
-                    finally { _embedderGate.Release(); }
+                    finally { Embedder.Gate.Release(); }
                 }, cancel);
             if (!ChatSearchOn) return "Past-chat search was turned off. Discard the search results.";
             if (found.Count == 0) return "No relevant excerpts were found in the indexed past chats for this request and dates. " +

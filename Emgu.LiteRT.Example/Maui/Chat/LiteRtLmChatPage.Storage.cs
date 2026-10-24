@@ -128,9 +128,7 @@ namespace Maui.Demo.Lite
                         SetPhotoSearchOff();
                         SetChatSearchOff();
                         RemoveDocument();
-                        await _embedderGate.WaitAsync();
-                        try { await ReleaseEmbedderAsync(); }
-                        finally { _embedderGate.Release(); }
+                        await Embedder.ReleaseWithGateAsync();
                     }
                 }
                 if (entry.Kind == StorageKind.PhotoIndex)

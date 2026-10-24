@@ -193,7 +193,7 @@ namespace Maui.Demo.Lite
                     _photoStatus.Text = text;
                 });
                 await WaitForPhotoWorkAsync(cancel);
-                var embedder = await EnsureEmbedderAsync(stage, cancel);
+                var embedder = await Embedder.EnsureAsync(stage, cancel);
                 // Waits while the chat answers, so indexing doesn't slow the reply down.
                 await _photoIndex.IndexAsync(embedder, (image, token) => RunIndexEmbeddingAsync(
                     () => embedder.EmbedImage(image, visionTokensPerImage: PhotoIndex.VisionTokens),
@@ -240,13 +240,13 @@ namespace Maui.Demo.Lite
                 return string.Format(CultureInfo.InvariantCulture,
                     "Photo search is turned off, so the user's photos can't be searched. Tell the user they can turn on \"Search my photos\" in {0}: their recent photos are then indexed on this device (the first time takes a while), and nothing leaves it.",
                     _settingsButton.IsVisible ? "this chat's settings (the gear button at the top)" : "the settings panel beside the chat");
-            if (_embedder == null || _photoIndex.Count == 0)
+            if (Embedder.Model == null || _photoIndex.Count == 0)
                 return _photoIndex.IsIndexing
                     ? "The photos are still being indexed - try again in a few minutes."
                     : "No photos are indexed yet.";
             // What, where, when, kind and camera, from the request; places and cameras as the indexed photos name them.
             PhotoQuery query = PhotoRequest.Parse(request, DateTime.Now, _photoIndex.KnownPlaces(), _photoIndex.KnownCameras());
-            (List<(IndexedPhoto Photo, float Score)> found, int matching) = await _photoIndex.SearchAsync(_embedder, _embedderGate, query, cancel);
+            (List<(IndexedPhoto Photo, float Score)> found, int matching) = await _photoIndex.SearchAsync(Embedder.Model, Embedder.Gate, query, cancel);
             // Photos deleted since the last indexing pass: forgotten, and the search run again, since the scores of the
             // rest count relative to the best one.
             for (int attempt = 0; attempt < 3 && found.Count > 0; attempt++)
@@ -259,7 +259,7 @@ namespace Maui.Demo.Lite
                     break;
                 UiStallWatchdog.Mark(string.Format("find_photos: {0} found photos no longer in the library", gone.Count));
                 await _photoIndex.RemoveAsync(gone);
-                (found, matching) = await _photoIndex.SearchAsync(_embedder, _embedderGate, query, cancel);
+                (found, matching) = await _photoIndex.SearchAsync(Embedder.Model, Embedder.Gate, query, cancel);
             }
             UiStallWatchdog.Mark(string.Format("find_photos {0}: {1} found of {2} matching{3}", query, found.Count, matching,
                 found.Count > 0 && query.Description != null ? string.Format(CultureInfo.InvariantCulture, ", best {0:F3}", found[0].Score) : ""));

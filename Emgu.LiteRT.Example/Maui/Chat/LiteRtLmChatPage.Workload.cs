@@ -34,13 +34,13 @@ public partial class LiteRtLmChatPage
         while (true)
         {
             await WaitForWorkAsync(photos, paused, cancel);
-            await _embedderGate.WaitAsync(cancel);
+            await Embedder.Gate.WaitAsync(cancel);
             try
             {
                 if (_workloadPolicy.PauseReason(await DeviceWorkload.ReadAsync(), photos && _photosOnlyWhileCharging) != null) continue;
                 return await Task.Run(embed, cancel);
             }
-            finally { _embedderGate.Release(); }
+            finally { Embedder.Gate.Release(); }
         }
     }
 
