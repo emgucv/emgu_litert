@@ -166,7 +166,7 @@ internal static class VisualHostCatalog
         string normalized = string.Join(" ", new string((label ?? "").ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
             .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
         bool mistaken = normalized.Length == 0 || normalized is "person" or "people" or "human" or "body pose" or "hand gesture" or "hand gestures" or "pose" or "body" ||
-            !(Classes.Contains(normalized) || Gestures.Contains(normalized));
+            !(Classes.Contains(normalized) || Gestures.Contains(normalized) || FaceClasses.Contains(normalized));
         return mistaken ? PoseFromRequest(request) : null;
     }
 
@@ -188,6 +188,97 @@ internal static class VisualHostCatalog
         if (landmarks == null) return observations;
         float[] box = PoseGestures.BoxOf(landmarks);
         foreach (PoseReading reading in readings)
+            observations.Add(new VisualObservation("object", reading.Name, Math.Clamp(reading.Score, 0f, 1f),
+                new VisualBox(box[0], box[1], Math.Max(0, box[2] - box[0]), Math.Max(0, box[3] - box[1]))));
+        return observations;
+    }
+
+    // The face-expression agent (FaceVisualAgent): expressions read from MediaPipe's face blendshapes as the object classes a monitor can watch for. Their
+    // scores are scaled so the expression's threshold is 0.5, the confidence the planner passes by default.
+    internal static readonly string[] FaceClasses = FaceExpressions.Names;
+
+    internal static VisualAgentDescriptor FaceDescriptor(bool requiresPreparation = true, string backend = null) => new(
+        "face-expression", "Face expressions · MediaPipe" + (backend == null ? "" : " · LiteRT " + backend),
+        new[] { "object_detection", "face_expression" }, FaceClasses, requiresPreparation: requiresPreparation);
+
+    // The words people use for each expression. Nothing maps to tiredness, attention or who someone is: the model cards rule that out. A blink is too brief
+    // for a monitor's hold time, so it isn't "eyes closed".
+    private static readonly Dictionary<string, string> ExpressionWords = BuildExpressionWords();
+
+    private static Dictionary<string, string> BuildExpressionWords()
+    {
+        var words = new Dictionary<string, string>();
+        void Add(string expression, params string[] names) { foreach (string name in names) words[name] = expression; }
+        Add("smiling", "smiling", "smile", "smiles", "a smile", "smiling face", "big smile", "grin", "grins", "grinning", "😀", "😃", "😄", "😁", "😊", "🙂");
+        Add("eyes closed", "eyes closed", "closed eyes", "close eyes", "closes eyes", "closing eyes", "eyes shut", "shut eyes", "both eyes closed");
+        Add("winking", "winking", "wink", "winks", "a wink", "😉");
+        Add("mouth open", "mouth open", "open mouth", "opens mouth", "opening mouth", "mouth wide open", "wide open mouth", "jaw dropped", "😮", "😲", "😯");
+        Add("eyebrows raised", "eyebrows raised", "raised eyebrows", "raise eyebrows", "raises eyebrows", "raising eyebrows", "eyebrows up", "brows raised",
+            "raised brows", "raise brows");
+        return words;
+    }
+
+    /// <summary>The expression class for the words a person used (case and punctuation ignored, an agent prefix tolerated), or null if it isn't one.</summary>
+    internal static string CanonicalExpression(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        string trimmed = text.Trim();
+        if (ExpressionWords.TryGetValue(trimmed, out string emoji)) return emoji;
+        string normalized = string.Join(" ", new string(trimmed.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
+            .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+        foreach (string prefix in new[] { "face expressions ", "face expression ", "face " })
+            if (normalized.StartsWith(prefix, StringComparison.Ordinal)) { normalized = normalized.Substring(prefix.Length); break; }
+        return ExpressionWords.TryGetValue(normalized, out string expression) ? expression : null;
+    }
+
+    private const string Whose = "(my |their |his |her |your |the |both )?";
+
+    // What the request itself says, for when the model gives the person class, "face" or an agent's name as the label. The first in the text wins.
+    private static readonly (string Expression, System.Text.RegularExpressions.Regex Pattern)[] ExpressionRequestPatterns =
+    {
+        ("smiling", new(@"\bsmil(e|es|ed|ing)\b|\bgrin(s|ned|ning)?\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("eyes closed", new(@"\b(close[sd]?|closing|shut(s|ting)?) " + Whose + @"eyes\b|\beyes (are |is )?(closed|shut)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("winking", new(@"\bwink(s|ed|ing)?\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("mouth open", new(@"\bopen(s|ed|ing)? " + Whose + @"mouth\b|\bmouth (is )?(wide )?open\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("eyebrows raised", new(@"\brais(e|es|ed|ing) " + Whose + @"(eye)?brows\b|\b(eye)?brows (are |go )?(raised|up)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+    };
+
+    /// <summary>The expression a request names in so many words ("take a picture when I smile"), or null.</summary>
+    internal static string ExpressionFromRequest(string request)
+    {
+        if (string.IsNullOrWhiteSpace(request)) return null;
+        string best = null;
+        int position = int.MaxValue;
+        foreach (var (expression, pattern) in ExpressionRequestPatterns)
+        {
+            var match = pattern.Match(request);
+            if (match.Success && match.Index < position) { best = expression; position = match.Index; }
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// The expression class for a monitor's label: the words it holds if they are one, else - when the label is one the model puts there by mistake
+    /// (the person class, "face", an agent's name, anything that isn't a class or posture word of another agent) - what the user's request says.
+    /// </summary>
+    internal static string ExpressionForMonitor(string label, string request)
+    {
+        string expression = CanonicalExpression(label);
+        if (expression != null) return expression;
+        string normalized = string.Join(" ", new string((label ?? "").ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
+            .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+        bool mistaken = normalized.Length == 0 || normalized is "person" or "people" or "human" or "face" or "faces" or "face expression" or "face expressions" or "expression" ||
+            !(Classes.Contains(normalized) || Gestures.Contains(normalized) || CanonicalGesture(normalized) != null || CanonicalPose(normalized) != null);
+        return mistaken ? ExpressionFromRequest(request) : null;
+    }
+
+    /// <summary>The expressions of a face as observations of their classes, each with the box of the face's landmarks; none without a face.</summary>
+    internal static IReadOnlyList<VisualObservation> FaceObservations(Face face)
+    {
+        var observations = new List<VisualObservation>();
+        if (face == null) return observations;
+        float[] box = FaceExpressions.BoxOf(face);
+        foreach (FaceExpressionReading reading in FaceExpressions.Classify(face))
             observations.Add(new VisualObservation("object", reading.Name, Math.Clamp(reading.Score, 0f, 1f),
                 new VisualBox(box[0], box[1], Math.Max(0, box[2] - box[0]), Math.Max(0, box[3] - box[1]))));
         return observations;

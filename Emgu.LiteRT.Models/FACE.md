@@ -2,8 +2,8 @@
 
 `Emgu.LiteRT.Models/FaceTracker.cs` runs MediaPipe's face detector, face landmark model and blendshape model through LiteRT's `CompiledModel`, in
 C#, with no MediaPipe library. `Emgu.LiteRT.Models.CV`'s `FaceDetector` (with `FaceImageInput`) does it for Emgu CV images, and the demo has a
-"Face" page (CPU or GPU) with a live camera. Ported 2026-10-23 and checked against MediaPipe's Python results on an Apple M1. Nothing here is a
-visual-agent condition yet.
+"Face" page (CPU or GPU) with a live camera. Ported 2026-10-23 and checked against MediaPipe's Python results on an Apple M1. `FaceExpressions`
+reads five expressions from the blendshapes, and the demo's `face-expression` visual agent makes them classes of the camera monitors (below).
 
 ## What it does
 
@@ -88,8 +88,37 @@ shuttle; the GPU case is explicit).
 blendshapes 1.0 ms CPU (the Metal GPU can't compile it: a half/float mismatch in one of LiteRT's generated shaders, so it always runs on the CPU).
 A whole frame on a Galaxy S10's CPU (the demo's live camera, 480 x 640): 8 ms, 30 fps; an 820 x 1024 photo 30 ms.
 
+## Expressions and the visual agent
+
+`FaceExpressions.Classify` turns the 52 scores into readings of smiling (the mean of the two smile scores, threshold 0.5), eyes closed (the smaller
+blink score, 0.6), winking (the difference of the blink scores, 0.25, with the closed eye at least 0.45), mouth open (`jawOpen`, 0.4) and eyebrows
+raised (`browInnerUp` or the mean of the outer brows, whichever is higher, 0.45). Each score is scaled so the threshold is 0.5 - linear below and
+above - which is the confidence the planner gives a monitor by default.
+
+The thresholds come from synthetic faces drawn by `ZImageTurbo` (prompts for a neutral face, a broad smile, both eyes closed, a surprised open mouth
+and a wink; seeds 1-3; 2026-10-23), read by the C# pipeline:
+
+| Faces | Smile | Blink (each eye) | Jaw | Brows |
+|---|---:|---:|---:|---:|
+| neutral | 0.00 | 0.09-0.16 | 0.01 | 0.00 |
+| broad smile | 0.95-0.97 | 0.25-0.35 | 0.08-0.20 | 0.00 |
+| eyes closed | 0.00-0.01 | 0.76-0.86 | 0.00-0.01 | 0.30-0.41 |
+| surprised, mouth open | 0.00 | 0.00-0.01 | 0.71-0.80 | 0.47-0.80 |
+| wink | 0.31-0.70 | closed 0.52-0.54, open 0.15-0.23 | 0.00-0.01 | 0.00 |
+
+A wink scores the closed eye only about half way (the squint takes part of it), hence its own rule. Prompts for raised eyebrows alone gave
+pictures cut off at the nose, where no face is found, so the brows' threshold rests on the surprised faces and the closed-eye ones (whose brows
+rise a little). A blink is too brief for a monitor's hold time and isn't mapped to "eyes closed".
+
+The demo's `FaceVisualAgent` (`face-expression`, CPU, 2 threads) reports the largest face's readings as observations with the face's box;
+`VisualHostCatalog.CanonicalExpression` maps the words people use ("smile", "wink", "open mouth", emoji), and `ExpressionForMonitor` reads the
+expression from the user's request when the model gives "person", "face" or the agent's name as the label. The agent's instructions name the five
+labels and say it can't recognise anyone and isn't for tiredness or attention. Tests: `UnitTestFaceVisualAgent` (model-free: rules, scaling,
+words, routing) and `UnitTestFaceVisualAgentNative` (four of the synthetic faces in `TestData/face_*.jpg`, 256 px JPEGs, and the sample: each shows
+exactly its expressions at confidence 0.5 - the wink also smiles). Not yet tried with Gemma 4 or a real camera.
+
 ## Not done yet
 
-- A `face` visual agent for the camera monitors (smiling, eyes closed, mouth open as object classes, like `PoseVisualAgent`'s postures).
+- Trying the agent with Gemma 4 E2B and a real face in front of a camera.
 - Tracking between frames (MediaPipe's video mode skips the detector using the previous frame's landmarks).
 - The head-pose matrix (the geometry pipeline file).
