@@ -34,6 +34,7 @@ public partial class MainPage : ContentPage
             (Theme.GlyphDetect, "Hand gestures", "Find hands and name the gesture, with MediaPipe's models", () => new HandGesturePage()),
             (Theme.GlyphDetect, "Body pose", "Find a person and draw their skeleton, with MediaPipe's models", () => new PosePage()),
             (Theme.GlyphDetect, "Face", "Find faces and read their expressions, with MediaPipe's models", () => new FacePage()),
+            (Theme.GlyphDetect, "Holistic", "Find a person's body, hands and face at once, with MediaPipe's models", () => new HolisticPage()),
             (Theme.GlyphSparkle, "Sound events", "Name the sounds the microphone hears, with YAMNet", () => new SoundEventsPage()),
             (Theme.GlyphImage, "Mobilenet", "Recognize what is in an image", () => new MobilenetPage()),
             (Theme.GlyphSparkle, "Inception", "Recognize flower species", () => new InceptionPage()),

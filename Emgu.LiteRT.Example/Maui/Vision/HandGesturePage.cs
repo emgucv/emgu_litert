@@ -18,7 +18,7 @@ public class HandGesturePage : DemoPage
     private readonly Picker _backend;
 
     // The bones: the thumb, the four fingers (each from the palm), and the palm's edge.
-    private static readonly int[][] Bones =
+    internal static readonly int[][] Bones =
     {
         new[] { 0, 1 }, new[] { 1, 2 }, new[] { 2, 3 }, new[] { 3, 4 },
         new[] { 0, 5 }, new[] { 5, 6 }, new[] { 6, 7 }, new[] { 7, 8 },

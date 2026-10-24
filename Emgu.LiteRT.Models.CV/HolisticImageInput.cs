@@ -38,8 +38,13 @@ internal static class HolisticImageInput
     }
 
     /// <summary>The person in a BGR image with their hands and face, or null if no body is found.</summary>
-    internal static HolisticResult Track(HolisticTracker tracker, Mat bgr)
+    internal static HolisticResult Track(HolisticTracker tracker, Mat bgr) => Track(tracker, bgr, out _);
+
+    /// <summary>The same, with how long each part took.</summary>
+    internal static HolisticResult Track(HolisticTracker tracker, Mat bgr, out HolisticTimings timings)
     {
+        timings = new HolisticTimings();
+        var watch = System.Diagnostics.Stopwatch.StartNew();
         if (bgr.IsEmpty || bgr.Depth != DepthType.Cv8U || bgr.NumberOfChannels != 3)
             throw new ArgumentException("Expected a nonempty 8-bit BGR frame.", nameof(bgr));
         int width = bgr.Width, height = bgr.Height;
@@ -49,7 +54,9 @@ internal static class HolisticImageInput
         HandRect bodyRect = PoseTracker.RectOf(detection, width, height);
         PoseImageInput.FillLandmarks(tracker.Pose, bgr, bodyRect);
         Pose pose = tracker.ReadPose(detection, bodyRect);
+        timings.Pose = watch.Elapsed.TotalMilliseconds;
         if (pose == null) return null;
+        watch.Restart();
         Hand leftHand = null, rightHand = null;
         foreach (bool left in new[] { true, false })
         {
@@ -61,6 +68,8 @@ internal static class HolisticImageInput
             Hand hand = tracker.ReadHand(handRect, left, pose);
             if (left) leftHand = hand; else rightHand = hand;
         }
+        timings.Hands = watch.Elapsed.TotalMilliseconds;
+        watch.Restart();
         HandRect faceCrop = HolisticTracker.FaceRectFromPose(pose.Landmarks, width, height);
         WarpInto(bgr, faceCrop, HolisticTracker.FaceDetectorSize, BorderType.Constant, tracker.FaceDetectorInput, 2.0 / 255, -1);
         FaceDetection faceDetection = tracker.DetectFace(faceCrop);
@@ -71,6 +80,18 @@ internal static class HolisticImageInput
             WarpInto(bgr, faceRect, HolisticTracker.FaceLandmarkSize, BorderType.Replicate, tracker.FaceLandmarkInput, 1.0 / 255, 0);
             face = tracker.ReadFace(faceDetection, faceRect, width, height);
         }
+        timings.Face = watch.Elapsed.TotalMilliseconds;
         return new HolisticResult(pose, leftHand, rightHand, face);
     }
+}
+
+/// <summary>How long each part of a holistic frame took, in milliseconds (the image warps included).</summary>
+public sealed class HolisticTimings
+{
+    /// <summary>The pose detector and landmark model</summary>
+    public double Pose { get; internal set; }
+    /// <summary>Both hands: the re-crop and landmark models</summary>
+    public double Hands { get; internal set; }
+    /// <summary>The face detector, landmark model and blendshapes</summary>
+    public double Face { get; internal set; }
 }

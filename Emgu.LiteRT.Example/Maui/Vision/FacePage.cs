@@ -87,7 +87,7 @@ public class FacePage : DemoPage
     }
 
     // "mouthSmileLeft" -> "mouth smile left".
-    private static string Readable(string name)
+    internal static string Readable(string name)
     {
         var text = new System.Text.StringBuilder();
         foreach (char c in name)

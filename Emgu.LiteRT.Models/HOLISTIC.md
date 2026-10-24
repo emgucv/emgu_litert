@@ -2,8 +2,8 @@
 
 `Emgu.LiteRT.Models/HolisticTracker.cs` runs the seven models of MediaPipe's holistic landmarker through LiteRT's `CompiledModel`, in C#, with
 no MediaPipe library: one person's body, both hands and face in a single call. `Emgu.LiteRT.Models.CV`'s `HolisticDetector` (with
-`HolisticImageInput`) does it for Emgu CV images. Ported 2026-10-24 and checked against MediaPipe's Python results on an Apple M1. Not in the demo
-yet (stage 2: a "Holistic" photo / live-camera page; stage 3: perhaps a visual agent).
+`HolisticImageInput`) does it for Emgu CV images, and the demo has a "Holistic" page (photo or live camera; CPU, or the GPU for the hands and
+face). Ported 2026-10-24, checked against MediaPipe's Python results on an Apple M1 and measured on two phones.
 
 ## What it does
 
@@ -110,20 +110,41 @@ change of the crop:
 World landmarks: the pose's shape within 1-6 mm on average and its position within 1-9 mm; the hands' shape within 0.5-6 mm, their position within
 2-15 mm (they carry the pose wrist's own error). Handedness as MediaPipe's everywhere.
 
-**Speed**: the whole frame (the pose, both hands with their re-crops, the face and its expressions) 31 ms on an M1's CPU with 2 threads (the
-sample, mean of 10 after a first run).
+**Speed**, the whole frame (the warps, the pose, both hands with their re-crops, the face and its expressions), the sample picture, median of 20
+after a first run (the demo's first photo takes 2-3 times as long). The hands cost the most: two re-crops and two landmark models.
 
-**The GPU** isn't supported: the pose models don't compile for the Metal GPU (`UnitTestPoseTrackerNative`'s GPU case fails with
-`ErrorCompilation`; POSE.md found the same on the S10's OpenCL), and with the CPU as fallback the pose detector found no one. `HolisticDetector`
-uses the CPU; the hand and face models could run on the GPU on their own, which is worth trying for the live camera.
+| Device | Backend, threads | Frame | Body / hands / face |
+|---|---|---:|---|
+| M1 (Mac Catalyst) | CPU, 2 | 30.5 ms | 12 / 15 / 3.5 ms |
+| M1 (Mac Catalyst) | GPU for hands and face (Metal), 2 | 24 ms | 12 / 9 / 3 ms |
+| Galaxy S10 | CPU, 2 | 72 ms | 30 / 33 / 9 ms |
+| Galaxy S10 | CPU, 4 | 50-59 ms | 21-25 / 22-25 / 6-8 ms |
+| Pixel Fold | CPU, 2 | 53-62 ms | 20-25 / 24-28 / 6-9 ms |
+| Pixel Fold | CPU, 4 | 67-90 ms | 38-45 / 18-39 / 9-10 ms |
+
+On the Pixel Fold 4 threads are slower than 2 (the pose model most of all). A 480 x 480 frame costs about the same as the 256 px sample (the
+models' inputs are fixed; only the warps grow).
+
+**The GPU**: the pose models don't compile for it (`UnitTestPoseTrackerNative`'s GPU case fails with `ErrorCompilation` on the Metal GPU, and
+POSE.md found the same on the S10's OpenCL), so `HolisticTracker` always runs them on the CPU, and the blendshape model too; `accelerators` applies
+to the hand and face models. These compile fully for the M1's Metal GPU and give the CPU's landmarks (the parity test's GPU case: the same
+figures to 0.01 px), and the frame drops from 30.5 to 23-24 ms. On the phones the GPU (OpenCL) is slower: Galaxy S10 78 vs 77 ms (2 threads), 64
+vs 55 ms (4); Pixel Fold 126 vs 61 ms, 149 vs 95 ms. So `HolisticDetector` with `preferGpu` uses the GPU only if it compiles fully, matches the
+CPU's hand and face landmarks within 1% of the picture and is faster on the bundled sample (the median of five frames each); otherwise it
+says why in `GpuFailure` and uses the CPU - verified: the Mac Catalyst app chose the GPU, both phones the CPU.
+
+**The demo page** (`Vision/HolisticPage.cs`): the body (without its head and finger points where the face and hand models found them), the hand
+skeletons, the face's outline, a row with each part's time, which hands were found and the face's three strongest expressions. Checked on the
+Pixel Fold with the sample; the live camera wasn't tried with a person in front of it.
 
 **Tests**: `UnitTestHolisticTracker` (model-free: the region transform, the hand regions from the pose and from the re-crop points, the face
 region, the heatmap refinement) and `UnitTestHolisticTrackerNative` (the parity above with limits of 1.5 / 3 px for the pose, 0.75 / 2 px for the
-hands, 0.5 / 1.5 px for the face, 0.1 for the expressions, 10 mm for world shapes; no one on the space shuttle; the seven models unpacked).
+hands, 0.5 / 1.5 px for the face, 0.1 for the expressions, 10 mm for world shapes - on the CPU, and explicitly with the hands and face on the GPU;
+no one on the space shuttle; the seven models unpacked; `HolisticDetector` downloading and running them).
 
 ## Not done yet
 
-- The demo page and its measurements on phones (stage 2); a visual agent (stage 3).
+- A visual agent for the camera monitors (stage 3).
 - Tracking between frames (MediaPipe's video mode), and smoothing.
-- Real people in front of a camera: this was checked on one synthetic picture and its copies.
-- The GPU for the hand and face models.
+- Real people: this was checked on one synthetic picture and its copies.
+- A real person in front of the live camera.

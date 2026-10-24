@@ -19,4 +19,5 @@ internal static class DetectorFactory
     public static HandGestureDetector Hand() => new(FileSystem.CacheDirectory, ValidationImage);
     public static PoseDetector Pose() => new(FileSystem.CacheDirectory, ValidationImage);
     public static FaceDetector Face() => new(FileSystem.CacheDirectory, ValidationImage);
+    public static HolisticDetector Holistic() => new(FileSystem.CacheDirectory, ValidationImage);
 }

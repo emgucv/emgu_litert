@@ -163,16 +163,19 @@ public class UnitTestHolisticTrackerNative
         return sum / t.Length;
     }
 
-    // The CPU only: the pose models don't compile for the GPU (see UnitTestPoseTrackerNative), and with the CPU as fallback the pose detector
-    // found no one on the Metal GPU (HOLISTIC.md).
-    [Test]
-    public async Task LandmarksMatchMediaPipeOnTheSamplePersonAndCopiesOfIt()
+    // The GPU case runs the hand and face models on the GPU (the pose models always run on the CPU: they don't compile for it).
+    [TestCase(Emgu.LiteRT.HwAccelerators.Cpu)]
+    [TestCase(Emgu.LiteRT.HwAccelerators.Gpu, Explicit = true)]
+    public async Task LandmarksMatchMediaPipeOnTheSamplePersonAndCopiesOfIt(Emgu.LiteRT.HwAccelerators accelerators)
     {
-        const Emgu.LiteRT.HwAccelerators accelerators = Emgu.LiteRT.HwAccelerators.Cpu;
         string root = AppContext.BaseDirectory;
         string[] models = await ModelsAsync();
         using var reference = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "holistic_reference.json")));
-        using var tracker = new HolisticTracker(models, 2, accelerators);
+        using var tracker = new HolisticTracker(models, 2,
+            accelerators == Emgu.LiteRT.HwAccelerators.Gpu ? Emgu.LiteRT.HwAccelerators.Gpu | Emgu.LiteRT.HwAccelerators.Cpu : accelerators,
+            Emgu.LiteRT.GpuPrecision.Fp32);
+        if (accelerators == Emgu.LiteRT.HwAccelerators.Gpu)
+            TestContext.Out.WriteLine($"Hand and face models fully on the GPU: {tracker.IsFullyAccelerated}");
         using var source = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "holistic_person.png"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
         var failures = new List<string>();
         foreach (var image in reference.RootElement.GetProperty("images").EnumerateObject())
@@ -235,6 +238,27 @@ public class UnitTestHolisticTrackerNative
         // An image without a person has none.
         using var shuttle = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "space_shuttle.jpg"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
         Assert.That(Emgu.LiteRT.Models.HolisticImageInput.Track(tracker, shuttle), Is.Null);
+    }
+
+    // The detector downloads, unpacks and runs the models. It only tries the GPU where CocoDetector.CanTryGpu (Android, Mac Catalyst), so this
+    // build checks the CPU path; on the phones the GPU wasn't faster and the CPU was chosen (HOLISTIC.md).
+    [Test]
+    public async Task TheDetectorFindsTheBodyHandsAndFace()
+    {
+        string root = AppContext.BaseDirectory;
+        string cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Emgu.LiteRT.Tests", "HolisticDetector");
+        using var detector = new HolisticDetector(cache,
+            name => Task.FromResult(Emgu.CV.CvInvoke.Imread(Path.Combine(root, name), Emgu.CV.CvEnum.ImreadModes.ColorBgr)));
+        await detector.PrepareAsync(true, 2, text => TestContext.Out.WriteLine(text), CancellationToken.None);
+        TestContext.Out.WriteLine($"Backend {detector.Backend}; {detector.GpuFailure}");
+        if (CocoDetector.CanTryGpu)
+            Assert.That(detector.Backend == "GPU" || detector.GpuFailure != null, Is.True, "The GPU is used or the reason it isn't is given.");
+        else
+            Assert.That((detector.Backend, detector.GpuFailure), Is.EqualTo(("CPU", (string)null)));
+        using var source = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "holistic_person.png"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
+        HolisticResult result = detector.Detect(source);
+        Assert.That(result?.LeftHand != null && result.RightHand != null && result.Face != null, Is.True);
+        Assert.That(detector.LastTimings.Pose + detector.LastTimings.Hands + detector.LastTimings.Face, Is.GreaterThan(0));
     }
 
     [Test]

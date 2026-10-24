@@ -72,7 +72,8 @@ namespace Emgu.LiteRT.Models
         /// <summary>Compile the seven models. Compilation should run off the UI thread.</summary>
         /// <param name="paths">The model files in <see cref="HolisticModelFiles.ModelNames"/>' order (<see cref="HolisticModelFiles.Extract"/>)</param>
         /// <param name="numThreads">CPU threads</param>
-        /// <param name="accelerators">What the models may use (the blendshape model runs on the CPU)</param>
+        /// <param name="accelerators">What the hand and face models may use (the pose models and the blendshape model always run on the CPU:
+        /// they don't compile for the GPU)</param>
         /// <param name="gpuPrecision">The GPU's precision (FP32 is the safe choice)</param>
         public HolisticTracker(string[] paths, int numThreads = 2, HwAccelerators accelerators = HwAccelerators.Cpu, GpuPrecision? gpuPrecision = null)
         {
@@ -81,7 +82,7 @@ namespace Emgu.LiteRT.Models
             if (numThreads < 1) throw new ArgumentOutOfRangeException(nameof(numThreads));
             try
             {
-                _pose = new PoseTracker(paths[0], paths[1], numThreads, accelerators, gpuPrecision);
+                _pose = new PoseTracker(paths[0], paths[1], numThreads, HwAccelerators.Cpu, null);
                 _environment = new Environment();
                 _refinementModel = new Model(_environment, paths[2]);
                 _handModel = new Model(_environment, paths[3]);
@@ -162,13 +163,13 @@ namespace Emgu.LiteRT.Models
             get { CheckActive(); return _pose; }
         }
 
-        /// <summary>Whether LiteRT reports every model but the blendshape model fully on the requested accelerator.</summary>
+        /// <summary>Whether LiteRT reports the hand and face models fully on the requested accelerator.</summary>
         public bool IsFullyAccelerated
         {
             get
             {
                 CheckActive();
-                return _pose.IsFullyAccelerated && _refinement.IsFullyAccelerated && _hand.IsFullyAccelerated && _faceDetector.IsFullyAccelerated &&
+                return _refinement.IsFullyAccelerated && _hand.IsFullyAccelerated && _faceDetector.IsFullyAccelerated &&
                     _face.IsFullyAccelerated;
             }
         }
