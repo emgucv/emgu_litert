@@ -59,8 +59,8 @@ public partial class LiteRtLmChatPage
                 () => ChatSearchInstructions),
         };
         groups.Add(new ToolGroup(ChatToolGroups.WriteDocument, ChatToolGroups.WriteDocumentSummary, ChatToolGroups.WriteDocumentKeywords,
-            () => new AITool[] { AgentTools.CreateDocument(SaveWrittenDocumentAsync, () => _routePrompt) },
-            () => DocumentWritingInstructions));
+            () => new AITool[] { AgentTools.CreateDocument(SaveWrittenDocumentAsync, () => _routePrompt) }.Concat(MeetingTools()),
+            () => JoinInstructions(DocumentWritingInstructions, MeetingTools().Any() ? MeetingInstructions : null)));
         if (ImageGenerationSupported)
             groups.Add(new ToolGroup(ChatToolGroups.ImageGeneration, ChatToolGroups.ImageGenerationSummary, ChatToolGroups.ImageGenerationKeywords,
                 () => new AITool[] { AgentTools.GenerateImage(GenerateImageAsync) },

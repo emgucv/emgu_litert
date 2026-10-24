@@ -2992,6 +2992,7 @@ namespace Maui.Demo.Lite
             {
                 _ = DisposeVisualMonitoringAsync();
                 DisposeExerciseCounting();
+                _meeting?.Ended.TrySetResult("the chat was closed");
                 ReleaseAlertSounds();
                 _ = DisposeSoundMonitoringAsync();
                 _sessionVersion++;

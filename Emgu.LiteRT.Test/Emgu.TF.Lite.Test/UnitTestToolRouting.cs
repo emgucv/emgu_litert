@@ -106,7 +106,7 @@ public class UnitTestToolRouting
                 {
                     done?.Invoke("document:" + document.Format + ":" + (document.Data.Length > 200 ? "content" : "short"));
                     return Task.FromResult(AgentTools.DocumentCreatedResult(document));
-                }, request) },
+                }, request), AgentTools.RecordMeeting((title, token) => Task.FromResult("none")) },
                 () => "When the user asks for a document or a file (Word, PDF, Markdown), write the whole content into create_document's content in Markdown - not into your reply - then say in one short sentence that it is ready."),
             new ToolGroup(ChatToolGroups.ImageGeneration, ChatToolGroups.ImageGenerationSummary, ChatToolGroups.ImageGenerationKeywords,
                 () => new AITool[] { AgentTools.GenerateImage(Unused) }, () => ChatPlannerInstructions.Images),
@@ -159,7 +159,12 @@ public class UnitTestToolRouting
             ("Make me a packing list as a Word document", new[] { ChatToolGroups.WriteDocument }),
             ("Write that up as a PDF", new[] { ChatToolGroups.WriteDocument }),
             ("Can you export this as Markdown?", new[] { ChatToolGroups.WriteDocument }),
+            ("Take notes of my meeting", new[] { ChatToolGroups.WriteDocument }),
+            ("Record this lecture and transcribe it", new[] { ChatToolGroups.WriteDocument }),
+            ("Can you write the minutes of our team call?", new[] { ChatToolGroups.WriteDocument }),
             // Everyday messages need no group.
+            ("Boil the eggs for 7 minutes", new string[0]),
+            ("Who holds the world record for the marathon?", new string[0]),
             ("What's the weather in Paris?", new string[0]),
             ("Look up the capital of France", new string[0]),
             ("How many people live in Tokyo?", new string[0]),

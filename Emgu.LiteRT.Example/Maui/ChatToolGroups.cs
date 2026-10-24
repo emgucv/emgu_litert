@@ -38,12 +38,17 @@ internal static class ChatToolGroups
     };
 
     internal const string WriteDocument = "write_document";
-    internal const string WriteDocumentSummary = "write a document file (Word, PDF or Markdown) for the user to open or share";
+    // Recording a meeting and writing its notes (record_meeting) comes with the documents: its notes are one, and a group of its own
+    // would add a stub to every message.
+    internal const string WriteDocumentSummary = "write a document file (Word, PDF or Markdown) for the user to open or share, or record a meeting and write its notes";
     internal static readonly string[] WriteDocumentKeywords =
     {
         "document", "word file", "word doc", "a doc", "docx", "pdf", "markdown", "write up", "write it up", "write that up",
         "write this up", "as a file", "into a file", "in a file", "save it as", "save that as", "save this as", "export",
-        "printable", "print out", "handout", "report", "letter", "essay", "cv", "resume", "itinerary"
+        "printable", "print out", "handout", "report", "letter", "essay", "cv", "resume", "itinerary",
+        "meeting", "the minutes", "transcri", "take notes", "taking notes", "note taking", "notes of", "notes for", "notes from",
+        "record my", "record the", "record this", "record our", "record a", "recording", "lecture", "class notes", "interview",
+        "dictat", "write down what"
     };
 
     internal const string Goals = "goals";

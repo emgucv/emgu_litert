@@ -19,6 +19,7 @@ public partial class LiteRtLmChatPage
 
     private void StartMonitoringStopButton() => MonitoringForegroundService.StopRequested = () => MainThread.BeginInvokeOnMainThread(async () =>
     {
+        _meeting?.Ended.TrySetResult("the user pressed Stop in the notification");
         if (_soundRuntime == null) return;
         foreach (var monitor in _soundRuntime.Snapshot()) _soundRuntime.SetEnabled(monitor.Id, false);
         await UpdateSoundListeningAsync();
@@ -26,21 +27,24 @@ public partial class LiteRtLmChatPage
 
     private void EndMonitoringStopButton() => MonitoringForegroundService.StopRequested = null;
 
-    // Starts, updates or stops the service to match the enabled sound monitors.
+    // Starts, updates or stops the service to match the enabled sound monitors and a meeting being recorded (which has the microphone:
+    // the monitors are paused meanwhile).
     private async Task SyncMonitoringServiceAsync()
     {
         var monitors = _soundRuntime?.Snapshot().Where(m => m.Enabled).ToList() ?? new List<SoundMonitorInfo>();
-        if (_soundDisposed || monitors.Count == 0)
+        MeetingSession meeting = _meeting;
+        if (meeting == null && (_soundDisposed || monitors.Count == 0))
         {
             if (_monitoringKey == null) return;
             _monitoringKey = null;
             await MainThread.InvokeOnMainThreadAsync(MonitoringForegroundService.Stop);
             return;
         }
-        bool camera = monitors.Any(m => m.ClipSeconds > 0 || m.TakePhoto);
+        bool camera = meeting == null && monitors.Any(m => m.ClipSeconds > 0 || m.TakePhoto);
         int heard = monitors.Sum(m => m.Heard);
-        string title = monitors.Count == 1 ? "Listening for a sound" : "Listening for " + monitors.Count + " sounds";
-        string text = string.Join(", ", monitors.Select(m => m.Sound.Replace('_', ' '))) + (heard > 0 ? " · heard " + heard + (heard == 1 ? " time" : " times") : "");
+        string title = meeting != null ? "Recording a meeting" : monitors.Count == 1 ? "Listening for a sound" : "Listening for " + monitors.Count + " sounds";
+        string text = meeting != null ? (meeting.Title.Length > 0 ? meeting.Title + " · " : "") + "writing down what is said"
+            : string.Join(", ", monitors.Select(m => m.Sound.Replace('_', ' '))) + (heard > 0 ? " · heard " + heard + (heard == 1 ? " time" : " times") : "");
         string key = title + "|" + text + "|" + camera;
         if (key == _monitoringKey && (!camera || MonitoringForegroundService.CameraActive)) return;
         string error = await MonitoringForegroundService.StartAsync(title, text, camera);
