@@ -2989,6 +2989,7 @@ namespace Maui.Demo.Lite
             if (!Navigation.NavigationStack.Contains(this) && !Navigation.ModalStack.Contains(this))
             {
                 _ = DisposeVisualMonitoringAsync();
+                DisposeExerciseCounting();
                 ReleaseAlertSounds();
                 _ = DisposeSoundMonitoringAsync();
                 _sessionVersion++;

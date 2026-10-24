@@ -179,7 +179,7 @@ public partial class LiteRtLmChatPage
             _cameraPanel.IsVisible = true;
             _cameraLabel.Text = "Opening camera…";
             var camera = _camera = new LiveCamera { RotationDegrees = () => Volatile.Read(ref _cameraRotation), Front = _cameraFront };
-            camera.FrameReady = frame => { QueueCameraPreview(camera, frame); QueueVisualFrame(camera, frame); };
+            camera.FrameReady = frame => { QueueCameraPreview(camera, frame); QueueVisualFrame(camera, frame); QueueExerciseFrame(camera, frame); };
             camera.Failed = _ =>
             {
                 PauseVisualFeed();

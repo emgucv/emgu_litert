@@ -47,11 +47,12 @@ internal static class ChatToolGroups
     };
 
     internal const string Goals = "goals";
-    internal const string GoalsSummary = "save the user's goals (habits, targets) and log or check their progress";
+    internal const string GoalsSummary = "save the user's goals (habits, targets), log or check their progress, and count jumping jacks with the camera";
     internal static readonly string[] GoalsKeywords =
     {
         "goal", "habit", "target", "streak", "progress", "i want to", "i'd like to", "every day", "a day$", "a week$",
-        "per week$", "per day$", "each week$", "times a week", "how am i doing", "on track", "keep track", "track my"
+        "per week$", "per day$", "each week$", "times a week", "how am i doing", "on track", "keep track", "track my",
+        "jumping jack", "jumping-jack", "star jump", "exercise", "workout", "work out", "reps", "count my"
     };
 
     internal const string Photos = "photo_search";

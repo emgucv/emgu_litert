@@ -31,6 +31,10 @@ public class UnitTestAgentGoals
             ("Practise piano 30 minutes every evening", 30, "minutes", GoalPeriod.Day),
             ("Play tennis once a week", 1, "times", GoalPeriod.Week),
             ("Learn Spanish", null, "times", GoalPeriod.None),
+            // Exercises of two words, or hyphenated, are the unit as a whole.
+            ("30 jumping jacks per day", 30, "jumping jacks", GoalPeriod.Day),
+            ("Do 20 push ups every morning", 20, "push ups", GoalPeriod.Day),
+            ("50 sit-ups a day", 50, "sit-ups", GoalPeriod.Day),
         };
         foreach (var c in cases)
         {
@@ -39,6 +43,7 @@ public class UnitTestAgentGoals
         }
         Assert.That(AgentGoal.FromText("Read 20 pages a day.", Now).TargetText, Is.EqualTo("20 pages a day"));
         Assert.That(AgentGoal.FromText("Run once a week", Now).TargetText, Is.EqualTo("1 time a week"));
+        Assert.That(AgentGoal.FromText("30 jumping jacks per day", Now).TargetText, Is.EqualTo("30 jumping jacks a day"));
     }
 
     [Test]

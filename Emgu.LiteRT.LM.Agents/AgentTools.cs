@@ -824,6 +824,7 @@ namespace Emgu.LiteRT.LM.Agents
                 case "add_goal": return "Saving your goal: " + Argument("goal");
                 case "log_progress": return "Logging progress: " + Argument("goal");
                 case "get_goals": return "Checking your goals";
+                case "count_exercise": return "Counting your " + (Argument("exercise").Length > 0 ? Argument("exercise") : "jumping jacks");
                 case "create_document": return "Writing “" + Argument("title") + "”";
                 case string stub when stub.StartsWith("use_", StringComparison.Ordinal): return "Getting more tools";
                 case "remove_goal": return "Removing the goal: " + Argument("goal");

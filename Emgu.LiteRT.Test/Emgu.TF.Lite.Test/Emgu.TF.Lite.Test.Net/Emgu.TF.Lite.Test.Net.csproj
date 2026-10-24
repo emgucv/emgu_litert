@@ -36,6 +36,7 @@
     <Compile Include="..\UnitTestPoseTracker.cs" Link="UnitTestPoseTracker.cs" />
     <Compile Include="..\UnitTestFaceTracker.cs" Link="UnitTestFaceTracker.cs" />
     <Compile Include="..\UnitTestPoseVisualAgent.cs" Link="UnitTestPoseVisualAgent.cs" />
+    <Compile Include="..\UnitTestJumpingJacks.cs" Link="UnitTestJumpingJacks.cs" />
     <Compile Include="..\UnitTestFaceVisualAgent.cs" Link="UnitTestFaceVisualAgent.cs" />
     <Compile Include="..\UnitTestAlertSounds.cs" Link="UnitTestAlertSounds.cs" />
     <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\PlayFileAction.cs" Link="PlayFileAction.cs" />

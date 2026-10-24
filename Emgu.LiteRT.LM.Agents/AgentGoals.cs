@@ -260,7 +260,8 @@ namespace Emgu.LiteRT.LM.Agents
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         private static readonly Regex AmountPattern = new Regex(
-            @"(?<![\w.])(\d+(?:[.,]\d+)*|once|twice|thrice|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|hundred)(?:x\b|(?!\w)(?:\s+(?:more\s+)?(\p{L}+))?)",
+            // The unit is one word, hyphenated words ("sit-ups"), or an exercise of two words ("jumping jacks", "push ups").
+            @"(?<![\w.])(\d+(?:[.,]\d+)*|once|twice|thrice|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|hundred)(?:x\b|(?!\w)(?:\s+(?:more\s+)?((?:jumping|star)\s+(?:jacks?|jumps?)\b|(?:push|sit|pull|chin)\s+ups?\b|\p{L}+(?:-\p{L}+)*))?)",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         private static readonly Dictionary<string, double> Words = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)

@@ -108,6 +108,25 @@ snapshot. Not run: a real person on a live camera - so nothing says how well the
 person far away, a hand raised only to the shoulder) - and the wave detector has seen only made-up swings. The frames reach the agent at about 5 a second, so a
 wave faster than about 2 Hz is sampled thinly; a faster feed for this agent would help.
 
+## Counting jumping jacks
+
+`JumpingJackCounter` counts jumping jacks frame by frame: closed (both wrists below their shoulders, feet at most 1.0 shoulder widths apart), open
+(both wrists more than 0.4 shoulder widths above their shoulders - `PoseGestures`' arms raised - and feet at least 1.2 apart), closed again - it
+counts when it closes. The feet are only checked when both ankles are visible, so a camera that sees the person from the waist up counts the arms;
+frames in between change nothing, and losing the person drops the jumping jack under way but keeps the count. Checked on synthetic Z-Image pictures
+(2026-10-24): a jumping jack read open (wrists 1.45 shoulder widths up, feet 5.5 apart), a man standing - cropped and enlarged, as the wide shot
+left him too small to find - closed (wrists 1.4-1.5 down, feet 0.41), and the warrior pose (arms level) neither; Z-Image's "full body" prompts were
+cut off at the chest. `UnitTestJumpingJacks` covers the rules on made-up landmarks.
+
+In the demo's chat, Gemma 4 calls `count_exercise` (`Emgu.LiteRT.LM.Agents`' `ExerciseTools.cs`, in the goals tool group - a group of its own
+added a stub to every message and went over the budget `UnitTestToolRouting` checks): the call lasts as long as the exercise, since the model is
+far too slow to judge each movement. `LiteRtLmChatPage.Exercise.cs` opens the camera, runs its own pose detector (lite) on every frame it keeps up
+with and shows a card with the count, the time and Done; it ends at the target or the time asked for, Done, 10 s without a jumping jack after the
+first, 30 s without any, or 5 minutes. The count is then logged toward a goal that names jumping jacks or star jumps (`AgentTools.LogExerciseAsync`:
+the count for "30 jumping jacks a day", 1 for "do jumping jacks every day", the minutes for "10 minutes of jumping jacks a day") and returned to
+the model, told not to log it again. `GoalParser` reads "jumping jacks", "push ups" and hyphenated words such as "sit-ups" as one unit. Not yet
+tried with a real person or with Gemma 4.
+
 ## What is left
 
 - More conditions (hands on the head, leaning, crouching, a person turned away) and thresholds tuned on real people.
