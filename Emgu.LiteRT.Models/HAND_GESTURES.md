@@ -43,7 +43,8 @@ Python Tasks API):
    sigmoid scores >= 0.5; boxes and keypoints = regressor / 192 + anchor centre; weighted NMS (IoU 0.3); the letterbox padding removed.
 2. **Hand rect:** rotation = 90 degrees - atan2(-(dy), dx) of the wrist (keypoint 0) to the middle finger base (keypoint 2); the box centre shifted
    -0.5 box heights along the hand's axis; made square in pixels (the longer side) and scaled by 2.6.
-3. **Landmarks:** the rotated rect warped to 224 x 224 (an affine warp; OpenCV needs its half-pixel offsets), the 63 values / 224, projected back
+3. **Landmarks:** the rotated rect warped to 224 x 224 (an affine warp, the rect's corners to the input's corners and its edges repeated, as
+   MediaPipe does - [HOLISTIC.md](HOLISTIC.md)), the 63 values / 224, projected back
    through the rotation, x and y by the rect's width and height, z by the width; presence >= 0.5.
 4. **Gesture:** the landmarks with the image's aspect ratio taken out (x and y scaled by size / the larger side around 0.5), moved so the wrist is
    the origin and divided by max(x extent, y extent) + 1e-5; the same for the world landmarks without the aspect step; handedness = P(right).
@@ -64,7 +65,7 @@ Pitfalls found on the way:
 **Parity** with MediaPipe's own Python Gesture Recognizer (1.1.1) on its five test images (`hand_reference.json`): the gesture and the handedness
 are the same on all five - `Closed_Fist`, `Pointing_Up`, `None` (the sideways hand), `Thumb_Up`, `Victory` - scores within 0.06, and every landmark within
 14 pixels of MediaPipe's (the mean offset is 0-2 pixels, scale 1.00, rotation 0 degrees; the largest single errors were 6-10 pixels on the wrist
-and thumb: the crop is resampled slightly differently). An image without a hand (`space_shuttle.jpg`) has no hands. `UnitTestHandTracker` runs this
+and thumb). An image without a hand (`space_shuttle.jpg`) has no hands. `UnitTestHandTracker` runs this
 on the CPU, and (explicitly) on the Metal GPU, where both vision models compile fully and give the same results.
 
 **Speed**, the vision models alone through `CompiledModel` (inference, float16 weights, median of 15, random input) on the M1:

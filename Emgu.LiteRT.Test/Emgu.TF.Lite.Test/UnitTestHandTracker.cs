@@ -291,14 +291,18 @@ public class UnitTestHandTrackerNative
             Assert.That(hand.Handedness, Is.EqualTo(expected.GetProperty("handedness").GetString()), image.Name);
             Assert.That(hand.GestureScore, Is.EqualTo(expected.GetProperty("gesture_score").GetSingle()).Within(0.1), image.Name);
             int index = 0;
+            double sum = 0, max = 0;
             foreach (var point in expected.GetProperty("landmarks").EnumerateArray())
             {
                 float x = point[0].GetSingle() * bgr.Width, y = point[1].GetSingle() * bgr.Height;
+                double distance = Math.Sqrt(Math.Pow(hand.Landmarks[index][0] * bgr.Width - x, 2) + Math.Pow(hand.Landmarks[index][1] * bgr.Height - y, 2));
+                sum += distance; max = Math.Max(max, distance);
                 // A few pixels: the crop is resampled slightly differently from MediaPipe's.
                 Assert.That(Math.Abs(hand.Landmarks[index][0] * bgr.Width - x), Is.LessThan(14), image.Name + " landmark " + index + " x");
                 Assert.That(Math.Abs(hand.Landmarks[index][1] * bgr.Height - y), Is.LessThan(14), image.Name + " landmark " + index + " y");
                 index++;
             }
+            TestContext.Out.WriteLine($"{accelerators} {image.Name}: landmarks within {sum / index:0.00} px on average, {max:0.00} at most");
         }
         // An image without a hand has none.
         using var shuttle = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "space_shuttle.jpg"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);

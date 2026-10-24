@@ -77,6 +77,9 @@ the CPU and the Metal GPU the same to 0.01 px:
 | cropped | 0.13 / 0.43 | 0.020 |
 | tilted 20 degrees | 0.26 / 0.51 | 0.028 |
 
+Since 2026-10-24 the region's corners are mapped as MediaPipe's OpenCV converter maps them, without a half-pixel shift ([HOLISTIC.md](HOLISTIC.md)):
+the copies above are now within 0.13-0.19 px on average (turned 90 degrees: 0.42 / 0.95), expressions within 0.018-0.050.
+
 With MediaPipe's own 820 x 1024 test portrait the upright copies were within 0.5-1 px on average and 1.3-3.9 px at most, expressions within
 0.04-0.13, and the face shrunk to half was found by neither.
 

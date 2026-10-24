@@ -308,7 +308,12 @@ namespace Emgu.LiteRT.Models
         /// Run the landmark model on the filled <see cref="LandmarkInput"/> (the region <paramref name="rect"/> warped to 256 x 256).
         /// Null if the model sees no body there (presence under <paramref name="minPresence"/>).
         /// </summary>
-        public Pose Read(PoseDetection detection, HandRect rect, float minPresence = 0.5f)
+        /// <param name="detection">The detection the region came from (kept in the result)</param>
+        /// <param name="rect">The region</param>
+        /// <param name="minPresence">The least presence</param>
+        /// <param name="refineWithHeatmap">Move each landmark to the weighted centre of the model's heatmap around it, as MediaPipe's pose
+        /// landmarker does (<see cref="RefineWithHeatmap"/>); off by default, which keeps this tracker's earlier results</param>
+        public Pose Read(PoseDetection detection, HandRect rect, float minPresence = 0.5f, bool refineWithHeatmap = false)
         {
             CheckActive();
             _landmarks.Run(_landmarkIn, _landmarkOut);
@@ -316,6 +321,8 @@ namespace Emgu.LiteRT.Models
             float presence = _landmarkOut[_landmarkOrder[1]].Read<float>()[0];   // already a probability: the model applies the sigmoid
             float[] world = _landmarkOut[_landmarkOrder[4]].Read<float>();
             if (!(presence >= minPresence)) return null;
+            if (refineWithHeatmap)
+                raw = RefineWithHeatmap(raw, _landmarkOut[_landmarkOrder[3]].Read<float>());
             return new Pose
             {
                 Detection = detection,
@@ -353,6 +360,47 @@ namespace Emgu.LiteRT.Models
         }
 
         private static float Sigmoid(float v) => (float)(1 / (1 + Math.Exp(-Math.Max(-100f, Math.Min(100f, v)))));
+
+        /// <summary>
+        /// MediaPipe's RefineLandmarksFromHeatmapCalculator with the pose landmarker's settings (kernel 7, least confidence 0.5): each of the
+        /// 39 landmarks (x, y in the 256-pixel crop) moves to the confidence-weighted mean position of the heatmap's 7 x 7 window around it
+        /// (64 x 64 cells, the sigmoid of the model's values, the window cut at the edges), if the window's highest confidence is at least
+        /// 0.5. A landmark outside the heatmap is kept. Returns a new array; z, visibility and presence are unchanged.
+        /// </summary>
+        /// <param name="raw">The landmark model's 39 x 5 values</param>
+        /// <param name="heatmap">Its heatmap, [1, 64, 64, 39] in HWC order</param>
+        /// <param name="kernelSize">The window's size</param>
+        /// <param name="minConfidence">The least highest confidence in the window for the landmark to move</param>
+        public static float[] RefineWithHeatmap(float[] raw, float[] heatmap, int kernelSize = 7, float minConfidence = 0.5f)
+        {
+            const int cells = 64;
+            if (raw == null || raw.Length != OutputLandmarks * 5) throw new ArgumentException("Expected 195 landmark values.");
+            if (heatmap == null || heatmap.Length != cells * cells * OutputLandmarks) throw new ArgumentException("Expected a 64 x 64 x 39 heatmap.");
+            float[] result = (float[])raw.Clone();
+            int offset = (kernelSize - 1) / 2;
+            for (int i = 0; i < OutputLandmarks; i++)
+            {
+                // C++'s int conversion truncates toward zero, as here: a point just left of or above the crop still counts as cell 0.
+                int col = (int)(raw[5 * i] / LandmarkSize * cells), row = (int)(raw[5 * i + 1] / LandmarkSize * cells);
+                if (col < 0 || col >= cells || row < 0 || row >= cells) continue;
+                float sum = 0, weightedCol = 0, weightedRow = 0, max = 0;
+                for (int r = Math.Max(0, row - offset); r < Math.Min(cells, row + offset + 1); r++)
+                    for (int c = Math.Max(0, col - offset); c < Math.Min(cells, col + offset + 1); c++)
+                    {
+                        float confidence = Sigmoid(heatmap[(r * cells + c) * OutputLandmarks + i]);
+                        sum += confidence;
+                        max = Math.Max(max, confidence);
+                        weightedCol += c * confidence;
+                        weightedRow += r * confidence;
+                    }
+                if (max >= minConfidence && sum > 0)
+                {
+                    result[5 * i] = weightedCol / cells / sum * LandmarkSize;
+                    result[5 * i + 1] = weightedRow / cells / sum * LandmarkSize;
+                }
+            }
+            return result;
+        }
 
         private static float[][] RotateWorld(float[] world, float rotation)
         {

@@ -10,7 +10,8 @@ using Emgu.LiteRT.Models;
 namespace Emgu.LiteRT.Models;
 
 // Cuts and scales images for PoseTracker (shared with the native regression test): the image letterboxed into the detector's 224 x 224
-// input as float32 RGB scaled to -1..1, and the rotated region of a body warped into the landmark model's 256 x 256 input, 0..1.
+// input as float32 RGB scaled to -1..1, and the rotated region of a body warped into the landmark model's 256 x 256 input, 0..1, its edges
+// repeated (MediaPipe's default BORDER_REPLICATE); the landmarks are refined with the model's heatmap, as MediaPipe's pose landmarker does.
 internal static class PoseImageInput
 {
     internal static void FillDetector(PoseTracker tracker, Mat bgr)
@@ -29,12 +30,12 @@ internal static class PoseImageInput
     {
         const int size = PoseTracker.LandmarkSize;
         float[] c = rect.SourceCorners(bgr.Width, bgr.Height);
-        // OpenCV's pixel centres are at integer coordinates, while the corners are pixel edges: half a pixel on each side.
-        System.Drawing.PointF[] source = { new System.Drawing.PointF(c[0] - 0.5f, c[1] - 0.5f), new System.Drawing.PointF(c[2] - 0.5f, c[3] - 0.5f), new System.Drawing.PointF(c[4] - 0.5f, c[5] - 0.5f) };
-        System.Drawing.PointF[] target = { new System.Drawing.PointF(-0.5f, -0.5f), new System.Drawing.PointF(size - 0.5f, -0.5f), new System.Drawing.PointF(size - 0.5f, size - 0.5f) };
+        // As MediaPipe's OpenCV converter does: the region's corners go to the input's corners (0 and size), with no half-pixel adjustment.
+        System.Drawing.PointF[] source = { new System.Drawing.PointF(c[0], c[1]), new System.Drawing.PointF(c[2], c[3]), new System.Drawing.PointF(c[4], c[5]) };
+        System.Drawing.PointF[] target = { new System.Drawing.PointF(0, 0), new System.Drawing.PointF(size, 0), new System.Drawing.PointF(size, size) };
         using var transform = CvInvoke.GetAffineTransform(source, target);
         using var warped = new Mat();
-        CvInvoke.WarpAffine(bgr, warped, transform, new System.Drawing.Size(size, size), Inter.Linear, Warp.Default, BorderType.Constant);
+        CvInvoke.WarpAffine(bgr, warped, transform, new System.Drawing.Size(size, size), Inter.Linear, Warp.Default, BorderType.Replicate);
         Write(tracker.LandmarkInput, warped, size, 1.0 / 255, 0);
     }
 
@@ -63,7 +64,7 @@ internal static class PoseImageInput
         {
             HandRect rect = PoseTracker.RectOf(detection, bgr.Width, bgr.Height);
             FillLandmarks(tracker, bgr, rect);
-            Pose pose = tracker.Read(detection, rect);
+            Pose pose = tracker.Read(detection, rect, refineWithHeatmap: true);
             if (pose != null)
                 poses.Add(pose);
         }

@@ -246,6 +246,7 @@ public class UnitTestPoseTrackerNative
                     Assert.That(poses[0].Landmarks[index][3], Is.GreaterThan(0.7f), image.Name + " visibility of " + PoseTracker.LandmarkNames[index]);
                 index++;
             }
+            TestContext.Out.WriteLine($"{variantName} {accelerators} {image.Name}: landmarks within {sum / 33:0.00} px on average");
             Assert.That(sum / 33, Is.LessThan(12), image.Name + " mean error in pixels");
             int w = 0;
             foreach (var point in expected.GetProperty("world").EnumerateArray())

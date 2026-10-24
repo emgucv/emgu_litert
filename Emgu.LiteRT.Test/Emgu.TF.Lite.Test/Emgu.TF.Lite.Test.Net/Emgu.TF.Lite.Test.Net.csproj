@@ -39,6 +39,7 @@
     <Compile Include="..\UnitTestHandTracker.cs" Link="UnitTestHandTracker.cs" />
     <Compile Include="..\UnitTestPoseTracker.cs" Link="UnitTestPoseTracker.cs" />
     <Compile Include="..\UnitTestFaceTracker.cs" Link="UnitTestFaceTracker.cs" />
+    <Compile Include="..\UnitTestHolisticTracker.cs" Link="UnitTestHolisticTracker.cs" />
     <Compile Include="..\UnitTestPoseVisualAgent.cs" Link="UnitTestPoseVisualAgent.cs" />
     <Compile Include="..\UnitTestJumpingJacks.cs" Link="UnitTestJumpingJacks.cs" />
     <Compile Include="..\UnitTestFaceVisualAgent.cs" Link="UnitTestFaceVisualAgent.cs" />
@@ -80,8 +81,10 @@
     <Content Include="..\TestData\hand_reference.json" Link="hand_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\pose_reference.json" Link="pose_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\face_reference.json" Link="face_reference.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\TestData\holistic_reference.json" Link="holistic_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\face_*.jpg" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui\Resources\Raw\face_portrait.png" Link="face_portrait.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\Emgu.LiteRT.Example\Maui\Resources\Raw\holistic_person.png" Link="holistic_person.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui\Resources\Raw\pose_standing.jpg" Link="pose_standing.jpg" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\yamnet_reference.json" Link="yamnet_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\picodet_reference.json" Link="picodet_reference.json" CopyToOutputDirectory="PreserveNewest" />

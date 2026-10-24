@@ -10,7 +10,8 @@ using Emgu.LiteRT.Models;
 namespace Emgu.LiteRT.Models;
 
 // Cuts and scales images for HandTracker (shared with the native regression test): the image letterboxed into the palm detector's
-// 192 x 192 input, and the rotated region of a hand warped into the landmark model's 224 x 224 input - float32 RGB, 0..1.
+// 192 x 192 input, and the rotated region of a hand warped into the landmark model's 224 x 224 input (its edges repeated: MediaPipe's
+// default BORDER_REPLICATE) - float32 RGB, 0..1.
 internal static class HandImageInput
 {
     internal static void FillDetector(HandTracker tracker, Mat bgr)
@@ -29,12 +30,12 @@ internal static class HandImageInput
     {
         const int size = HandTracker.LandmarkSize;
         float[] c = rect.SourceCorners(bgr.Width, bgr.Height);
-        // OpenCV's pixel centres are at integer coordinates, while the corners are pixel edges: half a pixel on each side.
-        System.Drawing.PointF[] source = { new System.Drawing.PointF(c[0] - 0.5f, c[1] - 0.5f), new System.Drawing.PointF(c[2] - 0.5f, c[3] - 0.5f), new System.Drawing.PointF(c[4] - 0.5f, c[5] - 0.5f) };
-        System.Drawing.PointF[] target = { new System.Drawing.PointF(-0.5f, -0.5f), new System.Drawing.PointF(size - 0.5f, -0.5f), new System.Drawing.PointF(size - 0.5f, size - 0.5f) };
+        // As MediaPipe's OpenCV converter does: the region's corners go to the input's corners (0 and size), with no half-pixel adjustment.
+        System.Drawing.PointF[] source = { new System.Drawing.PointF(c[0], c[1]), new System.Drawing.PointF(c[2], c[3]), new System.Drawing.PointF(c[4], c[5]) };
+        System.Drawing.PointF[] target = { new System.Drawing.PointF(0, 0), new System.Drawing.PointF(size, 0), new System.Drawing.PointF(size, size) };
         using var transform = CvInvoke.GetAffineTransform(source, target);
         using var warped = new Mat();
-        CvInvoke.WarpAffine(bgr, warped, transform, new System.Drawing.Size(size, size), Inter.Linear, Warp.Default, BorderType.Constant);
+        CvInvoke.WarpAffine(bgr, warped, transform, new System.Drawing.Size(size, size), Inter.Linear, Warp.Default, BorderType.Replicate);
         Write(tracker.LandmarkInput, warped, size);
     }
 

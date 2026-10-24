@@ -64,9 +64,13 @@ What a first look found: the presence output is **not** a logit - run through a 
 
 **Parity with MediaPipe** (Python `PoseLandmarker`, mediapipe 1.1.1, image mode) on its `pose.jpg` (1000 x 667) and five copies - mirrored, turned 90
 degrees, the person small (padded to double size and shrunk back), cropped, and tilted 20 degrees: the same person found every time, landmarks
-within 3.6-7.6 px on average and 10-20 px at most (a 1000 px image; the crop is resampled slightly differently), visibility within 0.03 for lite
+within 3.6-7.6 px on average and 10-20 px at most (a 1000 px image), visibility within 0.03 for lite
 and full (heavy: up to 0.15), world landmarks within 0.07 m (z included), scale and centre the same (no offset); heavy was checked in Python too.
 The tests (`UnitTestPoseTrackerNative`) cover lite and full, 6 images each, with a 30 px per-landmark and 12 px mean limit.
+
+Since 2026-10-24 (found by the holistic tracker, [HOLISTIC.md](HOLISTIC.md)) the region is cut as MediaPipe cuts it - its edges repeated rather
+than black, its corners mapped to the input's corners without a half-pixel shift - and the landmarks are refined with the model's heatmap, as
+MediaPipe's pose landmarker does: now within 1.4-3.0 px on average (lite) and 1.0-2.1 px (full).
 
 **Speed** (the whole frame: letterbox, detector, warp, landmark model, decode), CPU with 2 threads, median of 20 after warmup, the test photo:
 
