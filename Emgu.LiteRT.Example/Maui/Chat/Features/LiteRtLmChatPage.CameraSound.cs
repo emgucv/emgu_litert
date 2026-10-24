@@ -8,18 +8,17 @@ namespace Maui.Demo.Lite;
 // listen while it plays (the alert mute), so the click can't be heard as a sound.
 public partial class LiteRtLmChatPage
 {
-    private const string CameraSoundPreference = "litert_lm_chat_camera_sound";
     private readonly CameraChimeAction _cameraClick = new CameraChimeAction("camera_click.wav");
 
     private static bool CameraSoundOn
     {
-        get { try { return Preferences.Default.Get(CameraSoundPreference, true); } catch (Exception) { return true; } }
+        get => AppSettings.Chat.CameraSound;
     }
 
     private View BuildCameraSoundSection()
     {
         var toggle = new Switch { IsToggled = CameraSoundOn, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
-        toggle.Toggled += (_, e) => { try { Preferences.Default.Set(CameraSoundPreference, e.Value); } catch (Exception) { } };
+        toggle.Toggled += (_, e) => AppSettings.Chat.CameraSound = e.Value;
         SemanticProperties.SetDescription(toggle, "Camera sounds");
         var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
         row.Add(new Label { Text = "Camera sounds", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, VerticalOptions = LayoutOptions.Center }, 0, 0);

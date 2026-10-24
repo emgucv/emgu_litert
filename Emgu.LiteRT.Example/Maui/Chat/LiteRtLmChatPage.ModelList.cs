@@ -28,9 +28,6 @@ public partial class LiteRtLmChatPage
     private bool? _cpuModelsExpanded;
     private bool? _gpuModelsExpanded;
 
-    private static bool? ReadModelGroupPreference(string key) =>
-        Preferences.Default.ContainsKey(key) ? Preferences.Default.Get(key, false) : null;
-
     private void UpdateModelSectionHeader()
     {
         string selected = SelectedOption.Name + (_selectedGpu ? " · GPU" : " · CPU");
@@ -76,7 +73,8 @@ public partial class LiteRtLmChatPage
                 models.IsVisible = !models.IsVisible;
                 if (gpu) _gpuModelsExpanded = models.IsVisible;
                 else _cpuModelsExpanded = models.IsVisible;
-                try { Preferences.Default.Set(gpu ? GpuModelsExpandedPreference : CpuModelsExpandedPreference, models.IsVisible); } catch (Exception) { }
+                if (gpu) AppSettings.Chat.GpuModelsExpanded = models.IsVisible;
+                else AppSettings.Chat.CpuModelsExpanded = models.IsVisible;
                 UpdateHeader();
                 if (inSheet) RefreshModelList();
             };
@@ -207,8 +205,8 @@ public partial class LiteRtLmChatPage
             // Constructor UI setup must not overwrite the saved backend before OnAppearing restores it.
             // (The server has no backend: the local models keep theirs.)
             if (option.Choice != ModelChoice.Server)
-                try { Preferences.Default.Set(BackendPreference, _selectedGpu); } catch (Exception) { }
-            try { Preferences.Default.Set(LastModelPreference, option.Choice.ToString()); } catch (Exception) { }
+                AppSettings.Chat.UseGpu = _selectedGpu;
+            AppSettings.Chat.LastModel = option.Choice.ToString();
             _ = PrepareModelAsync(false);
         }
     }

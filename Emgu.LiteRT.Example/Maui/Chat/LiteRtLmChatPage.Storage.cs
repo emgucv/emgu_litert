@@ -12,7 +12,6 @@ namespace Maui.Demo.Lite;
 
 public partial class LiteRtLmChatPage
 {
-    private const string SearchDeletedPreference = "litert_lm_chat_search_deleted_";
     private Button _restoreSearchButton;
     // Notices with their own download button under the photo and past-chat search switches, shown while the search
     // model is deleted - otherwise the switches are just disabled, with the way back only in the Storage section.
@@ -34,7 +33,7 @@ public partial class LiteRtLmChatPage
     private CancellationTokenSource _searchRestoreCancel;
     private bool SearchDownloadRequired
     {
-        get { try { return Preferences.Default.Get(SearchDeletedPreference + SelectedEmbeddingFile, false); } catch (Exception) { return false; } }
+        get => AppSettings.Chat.SearchModelDeleted(SelectedEmbeddingFile);
     }
 
     private View BuildStorageSection()
@@ -121,7 +120,7 @@ public partial class LiteRtLmChatPage
             }
             if (entry.Kind == StorageKind.SearchModel)
             {
-                Preferences.Default.Set(SearchDeletedPreference + entry.Key, true);
+                AppSettings.Chat.SetSearchModelDeleted(entry.Key, true);
                 if (SelectedEmbeddingFile == entry.Key)
                 {
                     PhotoSearch.TurnOff();
@@ -199,7 +198,7 @@ public partial class LiteRtLmChatPage
             await BackgroundDownloads.DownloadFileAsync(file, name,
                 (total, received, percent) => SetStatus($"Downloading search model: {percent:0}%"), cancel);
             if (!await Task.Run(() => file.IsLocalFileValid, cancel)) throw new IOException("The search model failed verification.");
-            Preferences.Default.Set(SearchDeletedPreference + Path.GetFileName(file.LocalFile), false);
+            AppSettings.Chat.SetSearchModelDeleted(Path.GetFileName(file.LocalFile), false);
             SetStatus("Search model downloaded. You can enable photo/chat search or attach a document again.");
         }
         catch (OperationCanceledException) { SetStatus("Search-model download paused."); throw; }

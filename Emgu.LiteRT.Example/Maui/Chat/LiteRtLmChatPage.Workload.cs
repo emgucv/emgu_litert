@@ -2,7 +2,6 @@ namespace Maui.Demo.Lite;
 
 public partial class LiteRtLmChatPage
 {
-    private const string PhotosChargingPreference = "litert_lm_photos_only_charging";
     private readonly WorkloadPolicy _workloadPolicy = new();
     private volatile bool _photosOnlyWhileCharging;
 
@@ -11,12 +10,12 @@ public partial class LiteRtLmChatPage
 
     private View BuildPhotoChargingSetting()
     {
-        try { _photosOnlyWhileCharging = Preferences.Default.Get(PhotosChargingPreference, false); } catch (Exception) { }
+        _photosOnlyWhileCharging = AppSettings.Chat.PhotosOnlyWhileCharging;
         var toggle = new Switch { IsToggled = _photosOnlyWhileCharging, OnColor = Theme.Accent };
         toggle.Toggled += (_, e) =>
         {
             _photosOnlyWhileCharging = e.Value;
-            try { Preferences.Default.Set(PhotosChargingPreference, e.Value); } catch (Exception) { }
+            AppSettings.Chat.PhotosOnlyWhileCharging = e.Value;
         };
         var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
         row.Add(new Label { Text = "Index photos only while charging", FontSize = 13, TextColor = Theme.PrimaryText,

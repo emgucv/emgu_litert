@@ -132,14 +132,10 @@ public partial class LiteRtLmChatPage
     {
         _thinkingSwitch = new ToggleChip("\u2728 Think");
         // On by default (thinking first gives better answers, at the cost of time and context), then as last set.
-        bool think = true;
-        try { think = Preferences.Default.Get(ThinkPreference, true); } catch (Exception) { }
-        _thinkingSwitch.IsToggled = think;
+        _thinkingSwitch.IsToggled = AppSettings.Chat.Think;
         _thinkingSwitch.Toggled += OnThinkingToggled;
         _webSearchSwitch = new ToggleChip("\U0001F50E Web search");
-        bool webSearch = false;
-        try { webSearch = Preferences.Default.Get(WebSearchPreference, false); } catch (Exception) { }
-        _webSearchSwitch.IsToggled = webSearch;
+        _webSearchSwitch.IsToggled = AppSettings.Chat.WebSearch;
         _webSearchSwitch.Toggled += OnWebSearchToggled;
         _taskChip = new ToggleChip("\U0001F4CB Plan");
         SemanticProperties.SetDescription(_taskChip, "Plan the next message as a task and run it step by step");
@@ -360,13 +356,9 @@ public partial class LiteRtLmChatPage
     {
         _sideChatList = new VerticalStackLayout { Spacing = 2 };
         _sideModelList = new VerticalStackLayout { Spacing = 4 };
-        try
-        {
-            _modelsExpanded = Preferences.Default.Get(ModelsExpandedPreference, true);
-            _cpuModelsExpanded = ReadModelGroupPreference(CpuModelsExpandedPreference);
-            _gpuModelsExpanded = ReadModelGroupPreference(GpuModelsExpandedPreference);
-        }
-        catch (Exception) { }
+        _modelsExpanded = AppSettings.Chat.ModelsExpanded;
+        _cpuModelsExpanded = AppSettings.Chat.CpuModelsExpanded;
+        _gpuModelsExpanded = AppSettings.Chat.GpuModelsExpanded;
         _sideModelHeader = new Button
         {
             FontFamily = Theme.TitleFont,
@@ -380,7 +372,7 @@ public partial class LiteRtLmChatPage
         _sideModelHeader.Clicked += (_, _) =>
         {
             _modelsExpanded = !_modelsExpanded;
-            try { Preferences.Default.Set(ModelsExpandedPreference, _modelsExpanded); } catch (Exception) { }
+            AppSettings.Chat.ModelsExpanded = _modelsExpanded;
             UpdateModelSectionHeader();
         };
         _sideSettingsHost = new VerticalStackLayout();

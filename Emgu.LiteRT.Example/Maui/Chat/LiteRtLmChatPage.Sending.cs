@@ -27,7 +27,7 @@ public partial class LiteRtLmChatPage
 {
     private void OnThinkingToggled(object sender, ToggledEventArgs e)
     {
-        try { Preferences.Default.Set(ThinkPreference, e.Value); } catch (Exception) { }
+        AppSettings.Chat.Think = e.Value;
     }
 
     // ---------- Sending a message ----------

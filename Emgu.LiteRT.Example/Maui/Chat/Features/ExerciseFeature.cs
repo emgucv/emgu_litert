@@ -51,12 +51,10 @@ internal sealed class ExerciseFeature : IDisposable
     }
 
     // Counting aloud: on by default, the card's speaker button turns it off (and on), remembered for the next time.
-    private const string CountAloudPreference = "litert_lm_chat_count_aloud";
-
     private static bool CountAloud
     {
-        get { try { return Preferences.Default.Get(CountAloudPreference, true); } catch (Exception) { return true; } }
-        set { try { Preferences.Default.Set(CountAloudPreference, value); } catch (Exception) { } }
+        get => AppSettings.Chat.CountAloud;
+        set => AppSettings.Chat.CountAloud = value;
     }
 
     public IEnumerable<Microsoft.Extensions.AI.AITool> Tools(bool voiceMode) =>

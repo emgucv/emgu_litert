@@ -19,7 +19,6 @@ namespace Maui.Demo.Lite;
 // doesn't see them. The tool is offered with the setting off too, and then tells the model where to turn it on. Everything stays on the device; turning it off deletes the index.
 internal sealed class PhotoSearchFeature
 {
-    private const string PhotoSearchPreference = "litert_lm_chat_photo_search";
     private readonly IChatHost _host;
     private string _photoPauseReason;
 
@@ -43,7 +42,7 @@ internal sealed class PhotoSearchFeature
         _photoIndex = new PhotoIndex(_host.Store);
         _photoIndex.Changed += () => MainThread.BeginInvokeOnMainThread(UpdateStatus);
         bool on = false;
-        try { on = Preferences.Default.Get(PhotoSearchPreference, false); } catch (Exception) { }
+        on = AppSettings.Chat.PhotoSearch;
         _photoSwitch = new Switch { IsToggled = on && _host.SearchModelTakesImages, IsEnabled = _host.SearchModelTakesImages, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
         _photoSwitch.Toggled += OnPhotoSearchToggled;
         var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
@@ -82,7 +81,7 @@ internal sealed class PhotoSearchFeature
 
     private async void OnPhotoSearchToggled(object sender, ToggledEventArgs e)
     {
-        try { Preferences.Default.Set(PhotoSearchPreference, e.Value); } catch (Exception) { }
+        AppSettings.Chat.PhotoSearch = e.Value;
         if (e.Value)
         {
             bool allowed = false;
@@ -340,7 +339,7 @@ internal sealed class PhotoSearchFeature
         _photoSwitch.Toggled -= OnPhotoSearchToggled;
         _photoSwitch.IsToggled = false;
         _photoSwitch.Toggled += OnPhotoSearchToggled;
-        Preferences.Default.Set(PhotoSearchPreference, false);
+        AppSettings.Chat.PhotoSearch = false;
     }
 
     // Turns photo search off as the user would, deleting the index.

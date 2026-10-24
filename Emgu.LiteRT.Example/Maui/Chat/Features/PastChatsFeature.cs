@@ -14,7 +14,6 @@ namespace Maui.Demo.Lite;
 // searched by the model's request; links to the matching chats are shown above the reply.
 internal sealed class PastChatsFeature
 {
-    private const string ChatSearchPreference = "litert_lm_chat_search_chats";
     public const string Instructions = ChatPlannerInstructions.ChatSearch;
     private readonly IChatHost _host;
 
@@ -33,7 +32,7 @@ internal sealed class PastChatsFeature
     public View BuildSection(View searchModelNotice)
     {
         bool enabled = false;
-        try { enabled = Preferences.Default.Get(ChatSearchPreference, false); } catch (Exception) { }
+        enabled = AppSettings.Chat.PastChatSearch;
         _chatSearchSwitch = new Switch { IsToggled = enabled, OnColor = Theme.Accent };
         _chatSearchSwitch.Toggled += OnChatSearchToggled;
         _store.ChatsChanged += (_, _) => MainThread.BeginInvokeOnMainThread(StartIndexing);
@@ -49,7 +48,7 @@ internal sealed class PastChatsFeature
 
     private async void OnChatSearchToggled(object sender, ToggledEventArgs e)
     {
-        try { Preferences.Default.Set(ChatSearchPreference, e.Value); } catch (Exception) { }
+        AppSettings.Chat.PastChatSearch = e.Value;
         if (e.Value)
         {
             StartIndexing();
@@ -176,7 +175,7 @@ internal sealed class PastChatsFeature
         _chatSearchSwitch.Toggled -= OnChatSearchToggled;
         _chatSearchSwitch.IsToggled = false;
         _chatSearchSwitch.Toggled += OnChatSearchToggled;
-        Preferences.Default.Set(ChatSearchPreference, false);
+        AppSettings.Chat.PastChatSearch = false;
         _chatSearchStatus.IsVisible = false;
     }
 

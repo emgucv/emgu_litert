@@ -27,6 +27,7 @@
     <Compile Include="..\UnitTestVoiceLanguages.cs" Link="UnitTestVoiceLanguages.cs" />
     <Compile Include="..\UnitTestTaskPlan.cs" Link="UnitTestTaskPlan.cs" />
     <Compile Include="..\UnitTestMeetingNotes.cs" Link="UnitTestMeetingNotes.cs" />
+    <Compile Include="..\UnitTestChatSettings.cs" Link="UnitTestChatSettings.cs" />
     <Compile Include="..\UnitTestMathText.cs" Link="UnitTestMathText.cs" />
     <Compile Include="..\UnitTestReplyMarkdown.cs" Link="UnitTestReplyMarkdown.cs" />
     <Compile Include="..\UnitTestChatConversation.cs" Link="UnitTestChatConversation.cs" />

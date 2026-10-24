@@ -31,13 +31,12 @@ public partial class LiteRtLmChatPage : ISearchModelChoice
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
             _selectedEmbeddingGpu = false;
-            try { Preferences.Default.Set(EmbeddingGpuPreference, false); } catch (Exception) { }
+            AppSettings.Chat.EmbeddingGpu = false;
             UpdateEmbeddingModelDetail();
         });
         return true;
     }
 
-    private const string EmbeddingModelPreference = "litert_lm_chat_embedding_model";
     private readonly string[] _embeddingNames = {
         "EmbeddingGemma 2 Text Vision 440M · CPU", "EmbeddingGemma 2 Multimodal 740M · CPU",
 #if WINDOWS_WEBGPU
@@ -46,7 +45,6 @@ public partial class LiteRtLmChatPage : ISearchModelChoice
     };
     private int _selectedEmbedding = ReadEmbeddingSelection();
     private bool _selectedEmbeddingGpu = ReadEmbeddingGpuSelection();
-    private const string EmbeddingGpuPreference = "litert_lm_chat_embedding_windows_gpu";
     private Button _embeddingModelButton;
     private Label _embeddingModelDetail;
     private bool EmbeddingSupportsImages => true;
@@ -57,15 +55,14 @@ public partial class LiteRtLmChatPage : ISearchModelChoice
     private static bool ReadEmbeddingGpuSelection()
     {
 #if WINDOWS_WEBGPU
-        try { return Preferences.Default.Get(EmbeddingGpuPreference, false); } catch (Exception) { }
+        return AppSettings.Chat.EmbeddingGpu;
 #endif
         return false;
     }
 
     private static int ReadEmbeddingSelection()
     {
-        try { return Preferences.Default.Get(EmbeddingModelPreference, 1) == 2 ? 2 : 1; }
-        catch (Exception) { return 1; }
+        return AppSettings.Chat.EmbeddingModel;
     }
 
     private EmbeddingModel CreateEmbeddingModel()
@@ -140,8 +137,8 @@ public partial class LiteRtLmChatPage : ISearchModelChoice
             bool modelChanged = _selectedEmbedding != index;
             _selectedEmbedding = index;
             _selectedEmbeddingGpu = gpu;
-            Preferences.Default.Set(EmbeddingModelPreference, index);
-            Preferences.Default.Set(EmbeddingGpuPreference, gpu);
+            AppSettings.Chat.EmbeddingModel = index;
+            AppSettings.Chat.EmbeddingGpu = gpu;
             UpdateEmbeddingModelDetail();
             if (modelChanged) await PhotoSearch.ClearIndexAsync();
             if (!EmbeddingSupportsImages && PhotoSearch.On)

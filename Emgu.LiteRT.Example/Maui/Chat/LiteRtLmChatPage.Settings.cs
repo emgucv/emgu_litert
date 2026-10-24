@@ -49,8 +49,7 @@ public partial class LiteRtLmChatPage
         readAloudRow.Add(_readAloudSwitch, 1, 0);
         // The language voice messages are recognized in (Emgu.LiteRT.LM.Maui's SpeechRecognizer): the device's
         // language unless chosen.
-        string voiceLanguage = string.Empty;
-        try { voiceLanguage = Preferences.Default.Get(VoiceLanguagePreference, string.Empty); } catch (Exception) { }
+        string voiceLanguage = AppSettings.Chat.VoiceLanguage;
         SpeechRecognizer.Language = voiceLanguage;
         SpeechRecognizer.ChooseLanguageHint = "Choose the language in Settings > Voice language.";
         var voiceLanguagePicker = new Picker
@@ -68,7 +67,7 @@ public partial class LiteRtLmChatPage
         voiceLanguagePicker.SelectedIndexChanged += (s, e) =>
         {
             string tag = voiceLanguagePicker.SelectedIndex <= 0 ? string.Empty : VoiceLanguages.All[voiceLanguagePicker.SelectedIndex - 1].Tag;
-            try { Preferences.Default.Set(VoiceLanguagePreference, tag); } catch (Exception) { }
+            AppSettings.Chat.VoiceLanguage = tag;
             SpeechRecognizer.Language = tag;
         };
         SemanticProperties.SetDescription(voiceLanguagePicker, "The language you speak in voice messages");
@@ -106,13 +105,8 @@ public partial class LiteRtLmChatPage
         };
         _saveTavilyKeyButton = new Button { Text = "Save API key", IsEnabled = false };
         _saveTavilyKeyButton.Clicked += (s, e) => OnTavilyKeyChanged();
-        bool shareLocation = false;
-        try { shareLocation = Preferences.Default.Get(ShareLocationPreference, false); } catch (Exception) { }
-        _shareLocationSwitch = new Switch { IsToggled = shareLocation, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
-        _shareLocationSwitch.Toggled += (s, e) =>
-        {
-            try { Preferences.Default.Set(ShareLocationPreference, e.Value); } catch (Exception) { }
-        };
+        _shareLocationSwitch = new Switch { IsToggled = AppSettings.Chat.ShareLocation, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+        _shareLocationSwitch.Toggled += (s, e) => AppSettings.Chat.ShareLocation = e.Value;
         var locationRow = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
@@ -126,13 +120,8 @@ public partial class LiteRtLmChatPage
             VerticalOptions = LayoutOptions.Center
         }, 0, 0);
         locationRow.Add(_shareLocationSwitch, 1, 0);
-        bool memoryOn = true;
-        try { memoryOn = Preferences.Default.Get(MemoryPreference, true); } catch (Exception) { }
-        _memorySwitch = new Switch { IsToggled = memoryOn, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
-        _memorySwitch.Toggled += (s, e) =>
-        {
-            try { Preferences.Default.Set(MemoryPreference, e.Value); } catch (Exception) { }
-        };
+        _memorySwitch = new Switch { IsToggled = AppSettings.Chat.Memory, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+        _memorySwitch.Toggled += (s, e) => AppSettings.Chat.Memory = e.Value;
         var memoryRow = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
@@ -173,7 +162,7 @@ public partial class LiteRtLmChatPage
         SemanticProperties.SetDescription(_compactButton, "Summarize the earlier messages now");
         _compactButton.OnTap(OnCompactTapped);
         UpdateMemoryLabel();
-        try { _contextSetting = Preferences.Default.Get(ContextWindowPreference, 0); } catch (Exception) { }
+        _contextSetting = AppSettings.Chat.ContextTokens;
         if (Array.IndexOf(ContextWindowChoices, _contextSetting) < 0)
             _contextSetting = 0;
         var contextChips = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };

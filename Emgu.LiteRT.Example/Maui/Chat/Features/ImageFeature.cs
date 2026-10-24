@@ -23,7 +23,6 @@ namespace Maui.Demo.Lite;
 // folder is kept out of iCloud backups. With the setting off the tool is offered anyway and tells the model where to turn it on.
 internal sealed class ImageFeature
 {
-    private const string ImageGenerationPreference = "litert_lm_chat_image_generation";
     public const string GeneratedKind = "generated";
     public const string Instructions = ChatPlannerInstructions.Images;
 
@@ -72,7 +71,7 @@ internal sealed class ImageFeature
         _zimage = new ZImageTurbo();
         ExcludeFromBackup(_zimage.Folder);
         bool on = false;
-        try { on = Preferences.Default.Get(ImageGenerationPreference, false); } catch (Exception) { }
+        on = AppSettings.Chat.ImageGeneration;
         _imageSwitch = new Switch { IsToggled = on, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
         _imageSwitch.Toggled += OnImageGenerationToggled;
         var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
@@ -126,7 +125,7 @@ internal sealed class ImageFeature
 
     private async void OnImageGenerationToggled(object sender, ToggledEventArgs e)
     {
-        try { Preferences.Default.Set(ImageGenerationPreference, e.Value); } catch (Exception) { }
+        AppSettings.Chat.ImageGeneration = e.Value;
         if (e.Value && !_zimage.IsDownloaded)
         {
             long remaining = Math.Max(0, ZImageTurbo.DownloadSize - _zimage.DownloadedBytes);
@@ -555,7 +554,7 @@ internal sealed class ImageFeature
             _imageSwitch.IsToggled = false;
             _imageSwitch.Toggled += OnImageGenerationToggled;
         }
-        Preferences.Default.Set(ImageGenerationPreference, false);
+        AppSettings.Chat.ImageGeneration = false;
         await ResetModelAsync();
     }
 

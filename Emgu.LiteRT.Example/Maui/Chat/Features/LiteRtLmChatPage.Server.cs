@@ -19,8 +19,6 @@ namespace Maui.Demo.Lite;
 // saved chats and compaction - with the token counts estimated, since there is no tokenizer on the device.
 public partial class LiteRtLmChatPage
 {
-    private const string ServerUrlPreference = "litert_lm_chat_server_url";
-    private const string ServerModelPreference = "litert_lm_chat_server_model";
     private const string ServerKeyStorageName = "litert_lm_chat_server_key";
 
     // Without a context length from the server, the conversation is kept within this (LM Studio's default).
@@ -90,12 +88,8 @@ public partial class LiteRtLmChatPage
 
     private View BuildServerSection()
     {
-        try
-        {
-            _serverUrl = Preferences.Default.Get(ServerUrlPreference, string.Empty);
-            _serverModel = Preferences.Default.Get(ServerModelPreference, string.Empty);
-        }
-        catch (Exception) { }
+        _serverUrl = AppSettings.Chat.ServerUrl;
+        _serverModel = AppSettings.Chat.ServerModel;
         _serverUrlEntry = new Entry
         {
             Text = _serverUrl,
@@ -164,7 +158,7 @@ public partial class LiteRtLmChatPage
             return;
         _serverUrlEntry.Text = url;
         _serverUrl = url;
-        try { Preferences.Default.Set(ServerUrlPreference, url); } catch (Exception) { }
+        AppSettings.Chat.ServerUrl = url;
         if (key != _serverKey)
         {
             _serverKey = key;
@@ -244,7 +238,7 @@ public partial class LiteRtLmChatPage
     private void SetServerModel(string id)
     {
         _serverModel = id ?? string.Empty;
-        try { Preferences.Default.Set(ServerModelPreference, _serverModel); } catch (Exception) { }
+        AppSettings.Chat.ServerModel = _serverModel;
         if (_serverModelButton != null)
             _serverModelButton.Text = "Model: " + (string.IsNullOrEmpty(_serverModel) ? "choose after connecting" : _serverModel);
     }

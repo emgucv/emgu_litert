@@ -66,7 +66,7 @@ public partial class LiteRtLmChatPage
         if (!on)
             return;
         _contextSetting = value;
-        try { Preferences.Default.Set(ContextWindowPreference, value); } catch (Exception) { }
+        AppSettings.Chat.ContextTokens = value;
         SetContextChips();
         UpdateContextSection();
         UiStallWatchdog.Mark("Context window: " + ContextWindowName(value));

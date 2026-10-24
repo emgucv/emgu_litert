@@ -11,3 +11,7 @@ How the MAUI demo's code is organised. Moved here from CLAUDE.md, which keeps th
 ## The home page
 
 - The MAUI demo's home page (`MainPage.xaml.cs`) has two tabs, pills like the Emgu CV demo's category pills: "LiteRT-LM" (the chat; on the platforms with LiteRT-LM) and "TF Lite" (Coco SSD MobileNet, MobileNet, Inception, Model Checker); the last one used is kept in Preferences (`main_page_tab`).
+
+## Settings
+
+- The chat page's settings are `ChatSettings` (`Maui.Demo.Lite.Core/Chat/ChatSettings.cs`): typed properties with their Preferences keys and defaults in one place, never throwing (a failing store gives the default). The app's instance is `AppSettings.Chat` (`Services/AppSettings.cs`, over MAUI's Preferences); tests use `InMemorySettingsStore` (`UnitTestChatSettings`). Add a new setting there rather than calling `Preferences` directly.

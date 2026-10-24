@@ -22,7 +22,6 @@ namespace Maui.Demo.Lite;
 // authorization headers in SecureStorage.
 public partial class LiteRtLmChatPage
 {
-    private const string McpServersPreference = "litert_lm_chat_mcp_servers";
     private const string McpKeyStoragePrefix = "litert_lm_chat_mcp_key_";
     private const string McpGroupPrefix = "mcp_";
     private static readonly string[] McpGenericWords =
@@ -54,7 +53,7 @@ public partial class LiteRtLmChatPage
         {
             if (_mcpConfigs != null)
                 return _mcpConfigs;
-            try { _mcpConfigs = JsonSerializer.Deserialize<List<McpServerConfig>>(Preferences.Default.Get(McpServersPreference, "[]")); }
+            try { _mcpConfigs = JsonSerializer.Deserialize<List<McpServerConfig>>(AppSettings.Chat.McpServersJson); }
             catch (Exception) { }
             return _mcpConfigs ??= new List<McpServerConfig>();
         }
@@ -62,7 +61,7 @@ public partial class LiteRtLmChatPage
 
     private void SaveMcpConfigs()
     {
-        try { Preferences.Default.Set(McpServersPreference, JsonSerializer.Serialize(McpConfigs)); } catch (Exception) { }
+        AppSettings.Chat.McpServersJson = JsonSerializer.Serialize(McpConfigs);
     }
 
     private static async Task<string> McpAuthorizationAsync(McpServerConfig config)

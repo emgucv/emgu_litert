@@ -149,9 +149,6 @@ public partial class LiteRtLmChatPage : ContentPage
     private VerticalStackLayout _sideModelList;
     private Button _sideModelHeader;
     private bool _modelsExpanded = true;
-    private const string ModelsExpandedPreference = "litert_lm_chat_models_expanded";
-    private const string CpuModelsExpandedPreference = "litert_lm_chat_cpu_models_expanded";
-    private const string GpuModelsExpandedPreference = "litert_lm_chat_gpu_models_expanded";
     private VerticalStackLayout _sideSettingsHost;
     private VerticalStackLayout _settingsView;
     private Border _modelChip;
@@ -192,11 +189,9 @@ public partial class LiteRtLmChatPage : ContentPage
     private string _savedTavilyKey;
     // Whether the agent gets the location tool (Settings, off by default): the user's town and approximate
     // coordinates, which leave the device in web searches that use them.
-    private const string ShareLocationPreference = "litert_lm_chat_share_location";
     private Switch _shareLocationSwitch;
     // Memories about the user (ChatStore): with "Remember things about me" on (the default; they stay on the device),
     // the agent can save and delete them, and the latest are given to it with every message.
-    private const string MemoryPreference = "litert_lm_chat_memory";
     private const int MaxMemoryLength = 1200;
     private Switch _memorySwitch;
     private Label _memoryCountLabel;
@@ -209,16 +204,12 @@ public partial class LiteRtLmChatPage : ContentPage
     private ModelChoice? _loaded;
     // GPU (Android): whether the loaded model runs on it, whether the one loading will, and whether it failed to
     // load there (then the CPU is used for the rest of the session).
-    private const string UseGpuPreference = "litert_lm_chat_use_gpu";
     // Settings > "Voice language": a BCP-47 tag, or "" for the device's language.
-    private const string VoiceLanguagePreference = "litert_lm_chat_voice_language";
     private bool _selectedGpu;
-    private static string BackendPreference => UseGpuPreference + "_" + DeviceInfo.Platform;
     private bool _loadedOnGpu;
     private bool _loadingOnGpu;
     // Context window (Settings, Gemma 4): Automatic (0: the model's DesktopContextTokens, 8k) or a size; the loaded model's
     // and the loading one's, to reload the model when it changes.
-    private const string ContextWindowPreference = "litert_lm_chat_context_tokens";
     private static readonly int[] ContextWindowChoices = { 0, 4096, 8192, 16384, 32000 };
     private int _contextSetting;
     private int _loadedContextTokens;
@@ -333,9 +324,6 @@ public partial class LiteRtLmChatPage : ContentPage
 
     // Loading: models load in the background as soon as they are selected (when already downloaded), shown in a
     // card at the top of the conversation; a message sent meanwhile waits for it.
-    private const string LastModelPreference = "litert_lm_chat_model";
-    private const string ThinkPreference = "litert_lm_chat_think";
-    private const string WebSearchPreference = "litert_lm_chat_web_search";
     private Task<bool> _loadTask;
     private ModelChoice? _loadingChoice;
     private CancellationTokenSource _loadCancel;
@@ -408,18 +396,10 @@ public partial class LiteRtLmChatPage : ContentPage
         _pageStarted = true;
         _ = ConnectMcpServersAsync();
         int index = 0;
-        try
-        {
-            string last = Preferences.Default.Get(LastModelPreference, null as string);
-            int found = ModelIndexOf(last);
-            if (found >= 0)
-                index = found;
-        }
-        catch (Exception)
-        {
-        }
-        try { _selectedGpu = Preferences.Default.Get(BackendPreference,
-            Preferences.Default.Get(UseGpuPreference, DeviceInfo.Platform != DevicePlatform.WinUI)); } catch (Exception) { }
+        int found = ModelIndexOf(AppSettings.Chat.LastModel);
+        if (found >= 0)
+            index = found;
+        _selectedGpu = AppSettings.Chat.UseGpu;
         SelectModel(index);
         // Photo search: index photos added since the app last ran.
         PhotoSearch.StartIndexing();

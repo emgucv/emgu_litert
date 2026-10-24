@@ -97,7 +97,7 @@ public partial class LiteRtLmChatPage
 
     private void OnWebSearchToggled(object sender, ToggledEventArgs e)
     {
-        try { Preferences.Default.Set(WebSearchPreference, e.Value); } catch (Exception) { }
+        AppSettings.Chat.WebSearch = e.Value;
         UpdateWebSearchNotice();
         // Applies from the next message; the conversation continues.
         if (e.Value && !_busy)

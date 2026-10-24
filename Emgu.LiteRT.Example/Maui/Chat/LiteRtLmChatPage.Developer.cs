@@ -5,7 +5,6 @@ namespace Maui.Demo.Lite;
 // while an exercise is counted, the camera preview draws the body pose as the "Body pose" page does, and the card says which position was read.
 public partial class LiteRtLmChatPage
 {
-    private const string DeveloperModePreference = "litert_lm_chat_developer_mode";
     private static bool? _developerMode;
 
     private static bool DeveloperMode
@@ -14,14 +13,14 @@ public partial class LiteRtLmChatPage
         {
             if (_developerMode == null)
             {
-                try { _developerMode = Preferences.Default.Get(DeveloperModePreference, false); } catch (Exception) { _developerMode = false; }
+                _developerMode = AppSettings.Chat.DeveloperMode;
             }
             return _developerMode.Value;
         }
         set
         {
             _developerMode = value;
-            try { Preferences.Default.Set(DeveloperModePreference, value); } catch (Exception) { }
+            AppSettings.Chat.DeveloperMode = value;
         }
     }
 

@@ -148,7 +148,7 @@ public partial class LiteRtLmChatPage
                     await MainThread.InvokeOnMainThreadAsync(() =>
                     {
                         _selectedGpu = false;
-                        try { Preferences.Default.Set(BackendPreference, false); } catch (Exception) { }
+                        AppSettings.Chat.UseGpu = false;
                         _modelChipLabel.Text = option.Name + " · CPU";
                         RefreshModelList();
                     });
