@@ -36,6 +36,18 @@ public partial class LiteRtLmChatPage
         public int Target;
         public string Time = "0:00";
         public bool Finished;
+        public string SpeakText;               // the latest thing to say; one not yet said when a newer one comes is dropped
+        public readonly SemaphoreSlim SpeakSignal = new(0, 1);
+        public volatile bool Stopping;         // the speaker finishes what it is saying and ends
+    }
+
+    // Counting aloud: on by default, the card's speaker button turns it off (and on), remembered for the next time.
+    private const string CountAloudPreference = "litert_lm_chat_count_aloud";
+
+    private static bool CountAloud
+    {
+        get { try { return Preferences.Default.Get(CountAloudPreference, true); } catch (Exception) { return true; } }
+        set { try { Preferences.Default.Set(CountAloudPreference, value); } catch (Exception) { } }
     }
 
     private IEnumerable<Microsoft.Extensions.AI.AITool> ExerciseTools() =>
@@ -54,7 +66,7 @@ public partial class LiteRtLmChatPage
             return opened + " Nothing could be counted without the camera. Tell the user.";
 
         var session = new ExerciseSession { Target = target };
-        Button done = null;
+        Button done = null, aloud = null;
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
             session.Count = new Label { Text = "0", FontFamily = Theme.TitleFont, FontSize = 44, TextColor = Theme.PrimaryText, HorizontalOptions = LayoutOptions.Start };
@@ -63,6 +75,14 @@ public partial class LiteRtLmChatPage
                 CornerRadius = 12, Padding = new Thickness(16, 6), MinimumHeightRequest = 40, HorizontalOptions = LayoutOptions.Start };
             done.Clicked += (_, _) => session.Ended.TrySetResult("the user pressed Done");
             SemanticProperties.SetDescription(done, "Stop counting jumping jacks");
+            aloud = new Button { FontFamily = Theme.TitleFont, FontSize = 14, CornerRadius = 12, Padding = new Thickness(12, 6), MinimumHeightRequest = 40 };
+            void ShowAloud()
+            {
+                aloud.Text = CountAloud ? "\U0001F50A Counting aloud" : "\U0001F507 Silent";
+                SemanticProperties.SetDescription(aloud, CountAloud ? "Counting aloud. Tap to count silently" : "Counting silently. Tap to count aloud");
+            }
+            aloud.Clicked += (_, _) => { CountAloud = !CountAloud; ShowAloud(); };
+            ShowAloud();
             var title = "\U0001F3C3  Jumping jacks" + (target > 0 ? " · target " + target : "");
             AddCard(_agentBubble, new Border
             {
@@ -72,7 +92,8 @@ public partial class LiteRtLmChatPage
                 Content = new VerticalStackLayout
                 {
                     Spacing = 4,
-                    Children = { new Label { Text = title, FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText }, session.Count, session.Status, done }
+                    Children = { new Label { Text = title, FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText }, session.Count, session.Status,
+                        new HorizontalStackLayout { Spacing = 8, Children = { done, aloud } } }
                 }
             });
             SetStatus("Counting jumping jacks…");
@@ -80,6 +101,8 @@ public partial class LiteRtLmChatPage
 
         var watch = Stopwatch.StartNew();
         string ending;
+        using var speaking = new CancellationTokenSource();
+        Task speaker = Task.CompletedTask;
         try
         {
             _exercisePose ??= DetectorFactory.Pose();
@@ -89,6 +112,7 @@ public partial class LiteRtLmChatPage
             session.Camera = _camera;
             watch.Restart();
             _exercise = session;
+            speaker = SpeakExerciseAsync(session, speaking.Token);
             ending = await WatchExerciseAsync(session, watch, target, seconds, token);
         }
         catch (OperationCanceledException)
@@ -98,7 +122,8 @@ public partial class LiteRtLmChatPage
         catch (Exception ex)
         {
             _exercise = null;
-            await MainThread.InvokeOnMainThreadAsync(() => { session.Status.Text = "Couldn't count: " + ex.Message; done.IsVisible = false; if (_overlaySession == session) _overlaySession = null; UpdateExerciseOverlay(); });
+            speaking.Cancel();
+            await MainThread.InvokeOnMainThreadAsync(() => { session.Status.Text = "Couldn't count: " + ex.Message; done.IsVisible = false; aloud.IsVisible = false; if (_overlaySession == session) _overlaySession = null; UpdateExerciseOverlay(); });
             return "Couldn't count jumping jacks: " + ex.Message + ". Tell the user.";
         }
         _exercise = null;
@@ -106,12 +131,21 @@ public partial class LiteRtLmChatPage
             await Task.Delay(20);
 
         var result = new ExerciseResult(name, session.Counter.Count, watch.Elapsed, ending);
+        // The user may be a few metres from the screen: say that it ended, before the reply (which may be read aloud too).
+        session.Stopping = true;
+        QueueExerciseSpeech(session, null);
+        if (token.IsCancellationRequested || await Task.WhenAny(speaker, Task.Delay(3000)) != speaker)
+            speaking.Cancel();
+        try { await speaker; } catch (Exception) { }
+        if (!token.IsCancellationRequested && CountAloud)
+            await SayAsync("Done. " + (result.Count == 1 ? "1 jumping jack." : result.Count + " jumping jacks."), TimeSpan.FromSeconds(6));
         string logged = null;
         try { logged = await AgentTools.LogExerciseAsync(GoalsOn ? _store : null, result, DateTime.Now); }
         catch (Exception ex) { logged = null; Debug.WriteLine("Logging the exercise failed: " + ex.Message); }
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
             done.IsVisible = false;
+            aloud.IsVisible = false;
             session.Count.Text = result.Count.ToString();
             session.Time = FormatExerciseTime(watch.Elapsed);
             session.Finished = true;
@@ -156,6 +190,38 @@ public partial class LiteRtLmChatPage
                 ShowExerciseOverlay(session);
             });
         }
+    }
+
+    // The speaker says the latest number: a jumping jack done while the one before is still being said skips that number rather than falling behind.
+    private static void QueueExerciseSpeech(ExerciseSession session, string text)
+    {
+        if (text != null) Volatile.Write(ref session.SpeakText, text);
+        try { if (session.SpeakSignal.CurrentCount == 0) session.SpeakSignal.Release(); }
+        catch (SemaphoreFullException) { }
+    }
+
+    private async Task SpeakExerciseAsync(ExerciseSession session, CancellationToken token)
+    {
+        while (true)
+        {
+            await session.SpeakSignal.WaitAsync(token);
+            string text = Interlocked.Exchange(ref session.SpeakText, null);
+            if (text != null && CountAloud)
+                await SayAsync(text, TimeSpan.FromSeconds(4), token);
+            if (session.Stopping && Volatile.Read(ref session.SpeakText) == null)
+                return;
+        }
+    }
+
+    // The device's voice, with the sound monitors not listening (they would hear it).
+    private async Task SayAsync(string text, TimeSpan limit, CancellationToken token = default)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        cts.CancelAfter(limit);
+        BeginSoundMute();
+        try { await MainThread.InvokeOnMainThreadAsync(() => TextToSpeech.Default.SpeakAsync(text, cancelToken: cts.Token)); }
+        catch (Exception) when (!token.IsCancellationRequested) { }
+        finally { EndSoundMute(); }
     }
 
     // The count over the maximized camera preview, where the card in the conversation is hidden; a finished count stays for 5 s.
@@ -211,14 +277,18 @@ public partial class LiteRtLmChatPage
                 var poses = pose.Detect(copy);
                 float[][] landmarks = poses.Count > 0 ? poses[0].Landmarks : null;
                 var position = landmarks != null ? JumpingJackCounter.Read(landmarks, copy.Width, copy.Height) : JumpingJackCounter.Position.Unknown;
-                if (position != JumpingJackCounter.Position.Unknown)
+                if (position != JumpingJackCounter.Position.Unknown && !session.PersonSeen)
+                {
                     session.PersonSeen = true;
+                    QueueExerciseSpeech(session, "Go!");
+                }
                 session.Position = position;
                 Volatile.Write(ref session.Landmarks, landmarks);
                 if (session.Counter.Update(landmarks, copy.Width, copy.Height))
                 {
                     Volatile.Write(ref session.LastRepTicks, Stopwatch.GetTimestamp());
                     int count = session.Counter.Count;
+                    QueueExerciseSpeech(session, count.ToString());
                     MainThread.BeginInvokeOnMainThread(() => { session.Count.Text = count.ToString(); ShowExerciseOverlay(session); });
                 }
             }
