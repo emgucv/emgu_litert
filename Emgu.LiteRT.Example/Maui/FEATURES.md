@@ -1,156 +1,669 @@
 # MAUI demo features
 
-How the demo's features work, with what was measured or verified on which device. Several entries still name the file a feature had before it moved to `Chat/` or became a class (see ARCHITECTURE.md). Moved here from CLAUDE.md, which keeps the short version.
+How the demo's chat features work, and what was measured or verified on which device. File names are the demo's
+(`Chat/`, `Chat/Features/`, `Services/`... - see [ARCHITECTURE.md](ARCHITECTURE.md)) unless a library is named. Open work
+is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/packaging.md](../../docs/packaging.md).
 
-## The chat page
+## Saved chats
 
-- The MAUI demo's `LiteRtLmChatPage` (saved chats: `ChatStore.cs` keeps them in SQLite (`sqlite-net-pcl`; `chats/chats.db3` in the app data folder - a subfolder, since an unsandboxed Mac Catalyst app's data folder is `~/Library` itself) with photos/audio as files in `chats/attachments/<id>/`;
-- each completed exchange is saved (user message with attachments, tool step lines, answer with thinking);
-- a history button (narrow) or a Chats section in the side panel (wide) lists them with delete;
-- opening one switches to its model, redraws the transcript and gives the model the conversation with the next message (`ChatConversation.Load(messages, summary, contextStart)`, each reply's saved steps and cards restored with it);
-- new chat / another model starts a new saved chat;
-- deleting one asks first;
-- verified across an app restart on Mac Catalyst for Gemma 4 E2B (agent) and Qwen3 (Chat). Compaction: the models run with a 4,096-token context window (`LanguageModel.MaxNumTokens`, set on the engine; LiteRT-LM picked 4096 anyway) - except Gemma 4 E2B/E4B on Mac Catalyst and Windows, which the demo gives 8,192 (`ModelOption.DesktopContextTokens`). The Qwen files are fixed at 4096, while both Gemma 4 files allow up to ~32k (E2B's model info says dynamic 32003; E4B's says 0, but its model has the same 32003 magic number and accepted 8k/16k). Measured by filling the window with a fact at the start (recalled at every size): reading the whole conversation - what opening a saved chat or compacting costs - took E2B 12 s / 27 s / 82 s / 262 s at 4k / 8k / 16k / 32k on an Apple Silicon Mac's CPU (peak RSS 2.9 / 4.1 / 4.6 / 5.2 GB; E4B 28 s / 61 s / 168 s at 4k-16k), and on a Pixel Fold 123 s at 4k and 342 s at 8k (RSS 4.9 GB, 1.5 GB of the phone's RAM left), while a short follow-up in the open conversation took 6-8 s either way - so phones kept 4k by default, until the agent's instructions and tool definitions alone grew to ~4k tokens (~14.5k characters, 7 of the 21 tools being the live camera's; adding the goal tools made every Gemma 4 E2B message on a Galaxy S10 fail with "This request and its tools do not fit in the current context window"): now Automatic gives models with tools (`CanUseTools`: Gemma 4) their `DesktopContextTokens`, 8k, on phones too;
-- the other models stay at 4k. Settings > Context window (Gemma 4 only: `ModelOption.MaxContextTokens` 32000, under the files' 32003 limit; Qwen hides it) chooses Automatic - 8k for Gemma 4, else 4k - or 4k / 8k / 16k / 32k, saved in Preferences (`litert_lm_chat_context_tokens`) for all models;
-- `ContextTokensFor(option)` is what `LoadModelAsync` sets `MaxNumTokens` to, and `ModelReady`/`PrepareModelAsync` compare it with the loaded/loading window, so a change reloads the model and the chat continues (compacted on the next message if it no longer fits). Verified with memories off (a code word recalled after each reload): Mac Catalyst Metal GPU 8k → 16k → 32k → 8k, reloads 1-8 s;
-- Galaxy Z Fold3 OpenCL GPU 4k → 16k → 32k → 4k, reloads 8-17 s;
-- the GPU cache grows with the window (Z Fold3 program cache 15 → 64 MB). On phones the settings open in `BottomSheet` (`Theme.cs`), which had no scroll view or height limit, so a long settings view ran off the top of the screen and its end (the context window) couldn't be reached;
-- the sheet's content now scrolls in a `ScrollView` limited to the window height less 40 + 170 (title and closing button stay fixed) - verified on the Z Fold3 and a Pixel 8 emulator. On Android, Gemma 4 E2B runs on the GPU (`ModelOption.GpuOnAndroid`, Settings "Use the GPU", default on; `_gpuUnavailable` falls back to the CPU for the session when the engine fails at the LoadingEngine stage): `Init(backend: "gpu")` with `ActivationDataType.Float32`, through LiteRT's OpenCL accelerator `libLiteRtOpenClAccelerator.so` - a LiteRT-LM prebuilt (`prebuilt/android_{arm64,x86_64}`, self-contained, only Android system libraries) that `bazel_build_tflite_android` copies to `lib/android/<abi>/` and the optional `Emgu.LiteRT.OpenCL.runtime.maui.android` package (`Emgu.LiteRT.Runtime/Maui/OpenCL/Android/`, props/README from `cmake/Emgu.LiteRT.OpenCL.runtime.maui.android.*.in`, `EMGU_LITERT_OPENCL_MAUI_ANDROID_NUGET_ID`; arm64-v8a and x86_64 only, depends on `Emgu.LiteRT.runtime.maui.android`, nothing depends on it - it is a LiteRT plugin, usable by `CompiledModel` with `HwAccelerators.Gpu` too, though only LiteRT-LM was tested) embeds and the demo references;
-- when an add-on is packed, .NET for Android unpacks the referenced base project's `.aar` (`obj/.../lp/<n>/jl/jni/`) and adds its `libLiteRt.so`/`libtfliteextern.so` to the add-on's `EmbeddedNativeLibrary` items (with `%(OriginalFile)` set), which put another copy of them for every ABI into the add-on's `.aar` - so both add-ons (this one and `Emgu.LiteRT.LM.runtime.maui.android`) have an `EmguExcludeReferencedNativeLibraries` target (before `_CreateAarCache`) that removes the items with `%(OriginalFile)`;
-- the base package they depend on provides them (verified: OpenCL package 16 -> 4.1 MB, LM 37 -> 26 MB, and an Android app referencing only the two add-on packages gets one copy of each library);
-- our `libLiteRt.so` (`gpu_registry.cc`) dlopens it by name, and the app must declare `<uses-native-library android:name="libOpenCL.so" android:required="false" />` (Android 12+). fp32 because with the default fp16 Gemma 4 E2B doubled digits after a long conversation ("73342" for 7342) at every window size, while short chats were fine;
-- fp32 fixed it at ~1.5x the time - on the Pixel Fold a full 4k chat re-reads in 8 s (CPU 123 s), follow-ups take ~1 s (CPU ~6 s). LiteRT-LM's GPU top-k sampler prebuilt is not shipped: it added ~25 s to every load and fixed nothing (sampling falls back to the CPU). The GPU keeps `<model>_..._mldrift_{program,weight}_cache.bin` (~0.8 GB for E2B; it grows when the window size changes) next to the model: first load ~30 s, later ~2.6 s;
-- turning the switch off reloads on the CPU, continues the chat (a new client, given the conversation) and deletes the cache. Details and the fp16/fp32 table in `Emgu.LiteRT.Example/Maui/Performance.md`. On Mac Catalyst the Gemma 4 models (`ModelOption.GpuOnMac`: E2B, E4B, 12B) run on the GPU too, through LiteRT's Metal accelerator `libLiteRtMetalAccelerator.dylib` - a LiteRT-LM prebuilt (`prebuilt/macos_arm64`, arm64, macOS 14+, only system frameworks) that `bazel_build_tflite_macos darwin_arm64` copies to `lib/runtimes/osx/native/` and the optional `Emgu.LiteRT.Metal.runtime.maui.macos` package (`Emgu.LiteRT.Runtime/Maui/Metal/Mac/`, `EMGU_LITERT_METAL_MAUI_MACOS_NUGET_ID`, props/README from `cmake/Emgu.LiteRT.Metal.runtime.maui.macos.*.in`) puts in `Contents/MonoBundle`;
-- it depends on `Emgu.LiteRT.LM.runtime.maui.macos`, the only package with a Catalyst `libLiteRt.dylib` (which loads the plugin by name from its own folder - verified in the test runner and in the Catalyst app). fp16 was wrong on the M1 GPU as well (Gemma 4 E2B "732" for 7342, 12B "7341"), so `Gemma4.CreateEngineSettings` itself sets `ActivationDataType.Float32` for the "gpu" backend (an Init `configureSettings` can override it) and the demo no longer sets it. `Gemma4_12B` (`litert-community/gemma-4-12B-it-litert-lm`'s `gemma-4-12B-it.litertlm`, 6.9 GB, with vision/audio encoders; the repo's 6.0 GB `-gpu`/`-web` files lack them) is offered in the demo on Mac Catalyst only (`#if MACCATALYST` in the model list; ~8 GB of memory). On an M1 16 GB: ~8.6 tokens/s, a full 4k chat re-read in 38 s, warm load 3.3 s, GPU cache 6.0 GB. The Catalyst demo keeps its models in `~/Documents/LiteRT-LM` (the test runner in `~/Library/Application Support/LiteRT-LM`). For plain macOS .NET apps the same plugin ships in the optional `Emgu.LiteRT.Metal.runtime.macos` package (`cmake/Emgu.LiteRT.Metal.runtime.macos.Package.{nuspec,README.md}.in`, generated into `platforms/nuget/Emgu.LiteRT.Metal.runtime.macos/` and packed by its `CMakeLists.txt` like `Emgu.LiteRT.runtime.macos`, only when `lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib` exists - `HAVE_MACOS_LITERT_METAL`; `runtimes/osx/native`, depends on `Emgu.LiteRT.runtime.macos`). libLiteRt dlopens its plugins by bare file name, which on macOS only finds them on the library search path or in the current folder: a console app using these packages couldn't load the plugin unless started from `runtimes/osx/native`. So `Emgu.LiteRT.Util.AcceleratorPlugins.Load()` (`Emgu.LiteRT.Util/AcceleratorPlugins.cs`, once per process) dlopens `libLiteRtMetalAccelerator.dylib` by full path from the app folder or `runtimes/{osx,osx-arm64,maccatalyst-arm64}/native` on macOS/Mac Catalyst, and LiteRT's later dlopen then returns the loaded library;
-- `Emgu.LiteRT`'s `Environment` calls it before `LiteRtCreateEnvironment` (LiteRT registers its accelerators when the environment is created) and `Emgu.LiteRT.LM`'s `Engine` before creating an engine with a "gpu" backend - verified with a console app started from `/`, both a portable build (`runtimes/osx/native`) and an `-r osx-arm64` build. `Emgu.LiteRT.Runtime/Mac`'s `.projitems` copies the plugin to in-repo projects' output when it exists, and `UnitTest1.TestLiteRtMobilenetGpu` (skipped without it) runs MobileNet through `CompiledModel` with `HwAccelerators.Gpu`: same top class as the Interpreter, max abs diff 0.0015 on an M1. While the model re-reads the conversation the status says "Reading the conversation so far...". A conversation that outgrows the window fails with "Input token ids are too long..." (new conversation) or "Prefill input length exceeds available state entries" (continued one);
-- a reply that hits it just ends. Before each send the page estimates the conversation - text via `LanguageModel.CountTokens` (the tokenizer; within ~1% of LiteRT-LM's count), +8 per message, 270 per image and 25 per second of audio (measured with a 128-token window, whose error reports the exact count: Gemma 4 and Qwen3.5 VL images ~260, `audio_sample.wav` 5.8 s ~146), thinking and 450 per tool step until the conversation is rebuilt - and if it plus the message exceeds the window less 1024 for the reply and 50 (chat template) / 600 (agent instructions and tools), the earlier messages are summarized by the model in a conversation of its own (`CanSummarize`: Gemma 4, Qwen3.5 4B; keeps the latest exchanges up to a quarter of the window) or dropped (Qwen3 0.6B, Qwen3.5 0.8B - Qwen3 0.6B's summaries copied the instructions' example and repeated themselves);
-- the model is then given the summary as a user/assistant message pair plus the kept messages (`ChatConversation` sends the summary pair and the messages since with every request). If LiteRT-LM still reports the context full, all earlier messages are dropped and the send retried once. The transcript keeps everything, with a divider above the first message the model still sees (tap: the summary);
-- the summary and the last message it covers are saved with the chat (`ConversationRecord.Summary`/`SummaryUpTo`) and restored on reopening;
-- Settings shows the estimated usage and "Compact now". Verified on Mac Catalyst: Gemma 4 E2B summarized and then answered from the summary, also after reopening the chat;
-- Qwen3 dropped;
-- the retry and "Compact now". `Chat.SendAsync` and `LiteRtLmChatClient` create their LiteRT-LM conversation on a background thread - doing it on the caller's (UI) thread stalled the demo for ~2.5 s after Send on a Pixel Fold, found by the stall watchdog;
-- replies: LaTeX maths - `$...$`/`\(...\)` within a line, `$$...$$`/`\[...\]` as centered blocks (also across lines, shown while streaming), also inside bold/italic/link text and for read-aloud - is converted to Unicode text by `Emgu.LiteRT.LM.Models`' `MathText` (superscripts/subscripts where Unicode has them, else `^(...)`; `\frac` as a/b with parentheses around multi-term parts; `\sqrt`, Greek, operators, arrows, sets, `\mathbb`, `\text`, accents; `lim_{x \to 0}` as "lim x→0"; unknown commands lose their backslash) - no typesetting (no stacked fractions or matrices: that would need a WebView with KaTeX per reply);
-- a `$` only starts maths when followed by a non-space and closed by a `$` after a non-space and not before a digit, so "$5 and $10" stays;
-- verified on Mac Catalyst with Gemma 4 E2B explaining the quadratic formula;
-- `Emgu.LiteRT.LM.Maui`'s `ReplyView` (formerly the demo's `ReplyBody.cs`; parsing in `Emgu.LiteRT.LM.Chat`'s `ReplyMarkdown`) renders basic Markdown - headings, **bold**, *italic*, `inline code`, bullet / numbered lists, quotes, rules and links (tap opens http/https only) - as `FormattedString` spans (underscores inside words such as snake_case are not italics; unclosed markup shows as typed while streaming), and code blocks as dark monospace panels with the language and a Copy button (`Clipboard`);
-- a reply with code uses the full width instead of the 420-point bubble limit;
-- it updates in place while streaming - code lines wrap, since a horizontal `ScrollView` around the code label was measured once and showed only the first line of streamed code;
-- loading: the last-used model (Preferences) is selected when the page opens, and a selected model starts loading in the background straight away if its file is on the device, otherwise a card offers the download with its size and a not-on-Wi-Fi note;
-- the card at the top of the conversation shows the stage, a download progress bar, Cancel, and errors with Retry;
-- a message sent while loading waits for it;
-- switching models cancels the load, waits for a cancelled load to finish before loading another, and releases the old model on a background thread;
-- verified on the Pixel Fold: first load 11 s (9 s one-time hash) with no UI stall, later loads under 3 s;
-- layout: a one-line header - back, a model chip that opens a bottom sheet with the model list, new chat, settings - the conversation, and the message box with per-message `ToggleChip`s "Think" (on by default, last setting kept in Preferences `litert_lm_chat_think`, only applied to `CanThink` models; in a reply, the thinking shows as a "Thinking..." header with a spinner and its last ~180 characters while the model thinks, collapses to a tappable "Thought for N s" header - expanded, the thinking is rendered like the answer (`Emgu.LiteRT.LM.Maui`'s `ThinkingView`, its body a `ReplyView` in the thinking colour at 13 pt: Markdown, code blocks with Copy, maths), while the streaming preview stays plain text with maths converted and code fences/`**`/backticks/heading marks removed, since a tail cut out of formatted text can't be laid out - - time from the first thinking text to the first answer text; "Thoughts" for reopened chats - once the answer starts, and stays expanded if a reply ends without an answer; verified on Mac Catalyst with Gemma 4 E2B) and "Web search";
-- read-aloud and the Tavily key are in a settings sheet;
-- windows at least 820 wide - desktop, a foldable's inner screen - show the model list and settings in a side panel instead (`UpdateLayout`, the settings view is moved between sheet and panel);
-- Gemma 4 always gets the agent's tools and instructions, the Web search chip setting `ChatToolMode.Auto`/`None` per message so it can change mid-conversation;
-- verified on Mac Catalyst (wide) and a Pixel Fold's cover screen (narrow);
-- model picker Qwen3 / Qwen3.5 0.8B VL / Qwen3.5 4B / Gemma 4 E2B / E4B, with per-model `AcceptsImages`/`AcceptsAudio`/`CanThink` flags deciding which of the attach, talk and thinking controls show;
-- for the Gemma models a "+" button attaches a photo (photo library, or "Take Photo" via `MediaPicker.CapturePhotoAsync` when `IsCaptureSupported` - camera access is declared for every platform: Android `CAMERA` plus an `IMAGE_CAPTURE` intent query, `NSCameraUsageDescription` for iOS/Mac Catalyst, the Windows `webcam` capability; the image demos' existing "Take Photo" lacked them), a sample image, a WAV/MP3/FLAC file or LiteRT-LM's `audio_sample.wav` - linked from the submodule as a `MauiAsset` - to the next message;
-- images are decoded with Emgu CV, downscaled to 1024 px and re-encoded as JPEG, since stb can't read e.g. HEIC;
-- verified on Mac Catalyst that Gemma 4 E2B describes an image and transcribes audio, though given both in one message it ignored the audio;
-- a microphone button records a voice message - `Emgu.LiteRT.LM.Maui`'s `VoiceRecorder` (moved from the demo, with `SpeechRecognizer`, `MicrophoneGate` and, in `Emgu.LiteRT.LM.Chat`, `VoiceLanguages`; `CHAT_VOICE_AND_HISTORY_PLAN.md` step 1; step 3 added the saved-chats package `Emgu.LiteRT.LM.Chat.Sqlite` - `ChatHistoryStore` over the demo's `Conversation`/`Message` tables, `ChatHistory`, `UnitTestChatHistoryStore` incl. reading the demo's saved chats - and step 4 `Attach(conversation, chatId)` (`ChatHistoryBinding`: saves exchanges, regenerated replies, compaction and late transcripts in order; the `MauiChat` sample reopens its last chat, kept in `MauiChat/chats` of the app data folder since on Mac Catalyst that is `~/Library`, where the demo keeps `chats/`) - and in step 5 the demo's `ChatStore` became a `ChatHistoryStore` with its own tables and columns (`ConversationRecord`/`MessageRecord` derive from the library's records; its `AddMessageAsync` takes a language as its last parameter and hides the library's), verified with the existing saved chats on Mac Catalyst and a Galaxy S10; step 2 gave `ChatView` a microphone - `ChatView.Voice.cs`, `PART_Talk`, `VoiceMessages` Auto/Audio/Text/Off - and `ChatMessageItem.Transcript`, verified on the Galaxy S10 and Mac Catalyst by playing a spoken question through the device's speaker while recording; an app that replaces `ChatViewTemplate` in its resources replaces it for every `ChatView`, so a test page in the demo sets the library's `ChatStyles` templates itself), 16 kHz mono WAV via AVAudioRecorder / Android AudioRecord / Windows MediaCapture, max 30 s, microphone permission in each platform's manifest - sent with empty text, which Gemma 4 answers directly (checked with `say`-generated WAVs), and "Read replies aloud" uses MAUI's TextToSpeech via `ReplySpeech.cs`, which picks a voice for the reply's language - detected from the writing system most of its letters use (Han -> zh, kana -> ja, Hangul -> ko, Cyrillic, Arabic, ...), preferring the device's own region - since the default voice read e.g. Chinese with an English voice, and strips Markdown, links and emoji first (verified on a Pixel Fold: zh-CN / ja-JP voices chosen);
-- replies are read while they stream, sentence by sentence (`ReplyReader` over `SpeechSegmenter`, in `Emgu.LiteRT.LM.Agents/VoiceConversation.cs`, namespace `Emgu.LiteRT.LM.Agents.Audio`, with `VoiceActivityDetector` and `IVoiceInput`: no thinking, code blocks or table rows);
-- the "Voice chat" chip (Gemma 4, not Windows - its recorder reports no level) is a hands-free conversation (`LiteRtLmChatPage.Voice.cs`): a full-screen view listens, `VoiceActivityDetector` ends the message after 0.9 s of quiet (levels from AVAudioRecorder metering / Android's samples), sends the audio without thinking, reads the reply and listens again;
-- a tap interrupts (the reply is cancelled, kept with "…" - `ChatMessageState.Interrupted` - and given to the model as text from then on), and with headphones speaking does too;
-- verified on Mac Catalyst with `say` recordings in place of the microphone (`IVoiceInput`) and with real microphones and loudspeakers on Mac Catalyst (a Mac mini, USB microphone) and a Pixel Fold - where Android's recorder, reading 200 ms at a time, left most 50 ms level readings empty, which as digital silence dragged the background down so a noisy room's peaks kept speech from ending;
-- it now reads 20 ms at a time, and the detector ignores digital silence;
-- not yet with headphones) (and its `Emgu.LiteRT.LM`/`.LM.Models` references) is enabled for Windows, iOS, Android and Mac Catalyst (on Android, iOS and Mac Catalyst the demo also references the `Emgu.LiteRT.Runtime/Maui/LM/{Android,iOS,Mac}` add-on projects, which carry `liblitert-lm.so`/`libGemmaModelConstraintProvider.so`, the two xcframeworks, and the macOS dylibs;
-- verified on the arm64 API 35 emulator with Qwen3, including the fix that the transcript scrolls to `Math.Max(0, content - viewport)` rather than `double.MaxValue`, which Android doesn't clamp and so scrolled the transcript out of view); like Mac Catalyst, the iOS app needs the UIScene life cycle (`Platforms/iOS/Info.plist` `UIApplicationSceneManifest` + `SceneDelegate.cs`) or UIKit kills it at launch when built with the iOS 27 SDK, and building it with Xcode 27 needs `-p:ValidateXcodeVersion=false`.
+- `ChatStore` keeps the chats in SQLite (`sqlite-net-pcl`), in `chats/chats.db3` in the app data folder - a subfolder,
+  because an unsandboxed Mac Catalyst app's data folder is `~/Library` itself. Photos and audio are files in
+  `chats/attachments/<id>/`.
+- Each completed exchange is saved: the user's message with its attachments, the tool step lines, and the answer with its
+  thinking.
+- A history button (narrow windows) or a Chats section in the side panel (wide ones) lists the chats, with delete, which
+  asks first. A new chat, or switching to another model, starts a new saved chat.
+- Opening a chat switches to its model, redraws the transcript and gives the model the conversation with the next message
+  (`ChatConversation.Load(messages, summary, contextStart)`); each reply's saved steps and cards are restored with it.
+- Verified across an app restart on Mac Catalyst with Gemma 4 E2B (agent) and Qwen3 (plain chat).
+
+## Loading models
+
+- When the page opens, the last-used model (Preferences) is selected. A selected model starts loading in the background
+  straight away if its file is on the device; otherwise a card offers the download, with its size and a note when not on
+  Wi-Fi.
+- The card at the top of the conversation shows the stage, a download progress bar, Cancel, and errors with Retry. A message
+  sent while the model loads waits for it.
+- Switching models cancels the load, waits for a cancelled load to finish before loading another, and releases the old
+  model on a background thread.
+- Verified on the Pixel Fold: the first load took 11 s (9 s of it a one-time hash) with no UI stall; later loads take under
+  3 s.
+- `Chat.SendAsync` and `LiteRtLmChatClient` create their LiteRT-LM conversation on a background thread: on the caller's (UI)
+  thread it stalled the demo for ~2.5 s after Send on a Pixel Fold, which the stall watchdog found.
+
+## Layout and controls
+
+- A one-line header - back, a model chip that opens a bottom sheet with the model list, new chat, settings - then the
+  conversation, then the message box with per-message `ToggleChip`s: "Think" and "Web search" (plus "Plan" and "Voice chat",
+  below).
+- Read-aloud and the Tavily key are in the settings sheet.
+- Windows at least 820 points wide - desktops, a foldable's inner screen - show the model list and the settings in a side
+  panel instead (`UpdateLayout` moves the settings view between the sheet and the panel). Verified on Mac Catalyst (wide) and
+  a Pixel Fold's cover screen (narrow).
+- On phones the settings open in `BottomSheet` (`Theme.cs`). It had no scroll view or height limit, so a long settings view
+  ran off the top of the screen and its end (the context window) couldn't be reached; its content now scrolls in a
+  `ScrollView` limited to the window height less 40 + 170 points, with the title and closing button fixed. Verified on a
+  Galaxy Z Fold3 and a Pixel 8 emulator.
+- The model picker offers Qwen3, Qwen3.5 0.8B VL, Qwen3.5 4B, Gemma 4 E2B and E4B (and Gemma 4 12B on Mac Catalyst and
+  Windows, from `ChatModelCatalog`). Each model's `AcceptsImages`, `AcceptsAudio` and `CanThink` flags decide which of the
+  attach, talk and thinking controls show.
+- Gemma 4 always gets the agent's tools and instructions. The Web search chip sets `ChatToolMode.Auto` or `None` per
+  message, so it can change in the middle of a conversation.
+
+## Replies: Markdown, code, maths and thinking
+
+- `Emgu.LiteRT.LM.Maui`'s `ReplyView` (it was the demo's `ReplyBody.cs`; the parsing is `Emgu.LiteRT.LM.Chat`'s
+  `ReplyMarkdown`) renders basic Markdown as `FormattedString` spans: headings, **bold**, *italic*, `inline code`, bullet and
+  numbered lists, quotes, rules and links (a tap opens http/https links only). Underscores inside words, as in snake_case,
+  aren't italics, and unclosed markup shows as typed while it streams.
+- Code blocks are dark monospace panels with the language and a Copy button (`Clipboard`). A reply with code uses the full
+  width instead of the 420-point bubble limit. The reply updates in place while streaming; code lines wrap, because a
+  horizontal `ScrollView` around the code label was measured once and showed only the first line of streamed code.
+- LaTeX maths is converted to Unicode text by `Emgu.LiteRT.LM.Models`' `MathText`: `$...$` and `\(...\)` within a line,
+  `$$...$$` and `\[...\]` as centred blocks (also across lines, and shown while streaming), also inside bold, italic and link
+  text, and for read-aloud.
+  - It uses superscripts and subscripts where Unicode has them, else `^(...)`; `\frac` becomes a/b with parentheses around
+    multi-term parts; it handles `\sqrt`, Greek letters, operators, arrows, sets, `\mathbb`, `\text` and accents;
+    `lim_{x \to 0}` becomes "lim x→0"; unknown commands lose their backslash.
+  - There is no typesetting - no stacked fractions or matrices, which would need a WebView with KaTeX per reply.
+  - A `$` only starts maths when followed by a non-space and closed by a `$` after a non-space and not before a digit, so
+    "$5 and $10" stays as it is.
+  - Verified on Mac Catalyst with Gemma 4 E2B explaining the quadratic formula.
+- Thinking: the Think chip is on by default and remembers its last setting (Preferences `litert_lm_chat_think`); it only
+  applies to `CanThink` models.
+  - While the model thinks, the reply shows a "Thinking..." header with a spinner and the thinking's last ~180 characters.
+    That preview stays plain text - maths converted; code fences, `**`, backticks and heading marks removed - since a tail
+    cut out of formatted text can't be laid out.
+  - Once the answer starts, it collapses to a tappable "Thought for N s" header (the time from the first thinking text to
+    the first answer text; "Thoughts" in reopened chats). It stays expanded if a reply ends without an answer.
+  - Expanded, the thinking is rendered like the answer: `Emgu.LiteRT.LM.Maui`'s `ThinkingView`, whose body is a `ReplyView`
+    in the thinking colour at 13 pt, with Markdown, code blocks with Copy, and maths. Verified on Mac Catalyst with Gemma 4
+    E2B.
+
+## Attachments and voice messages
+
+- For the Gemma models a "+" button attaches, to the next message: a photo (from the library, or "Take Photo" through
+  `MediaPicker.CapturePhotoAsync` when `IsCaptureSupported`), a sample image, a WAV, MP3 or FLAC file, or LiteRT-LM's
+  `audio_sample.wav` (linked from the submodule as a `MauiAsset`).
+  - Camera access is declared for every platform: Android's `CAMERA` plus an `IMAGE_CAPTURE` intent query,
+    `NSCameraUsageDescription` on iOS and Mac Catalyst, and the Windows `webcam` capability. (The image demos' existing
+    "Take Photo" lacked them.)
+  - Images are decoded with Emgu CV, downscaled to 1024 px and re-encoded as JPEG, since LiteRT-LM's stb can't read e.g.
+    HEIC.
+  - Verified on Mac Catalyst: Gemma 4 E2B describes an image and transcribes audio, though given both in one message it
+    ignored the audio.
+- A microphone button records a voice message with `Emgu.LiteRT.LM.Maui`'s `VoiceRecorder`: 16 kHz mono WAV through
+  AVAudioRecorder, Android's AudioRecord or Windows' MediaCapture, at most 30 s, with the microphone permission in each
+  platform's manifest. It is sent with empty text, which Gemma 4 answers directly (checked with WAVs generated by `say`).
+- The voice classes moved from the demo into the libraries step by step (history/CHAT_VOICE_AND_HISTORY_PLAN.md):
+  - Step 1: `VoiceRecorder`, `SpeechRecognizer` and `MicrophoneGate` into `Emgu.LiteRT.LM.Maui`, and `VoiceLanguages` into
+    `Emgu.LiteRT.LM.Chat`.
+  - Step 2 gave `ChatView` a microphone (`ChatView.Voice.cs`, `PART_Talk`, `VoiceMessages` Auto/Audio/Text/Off) and
+    `ChatMessageItem.Transcript`; verified on a Galaxy S10 and Mac Catalyst by playing a spoken question through the device's
+    speaker while recording. An app that replaces `ChatViewTemplate` in its resources replaces it for every `ChatView`, so a
+    test page in the demo sets the library's `ChatStyles` templates itself.
+  - Step 3 added the saved-chats package `Emgu.LiteRT.LM.Chat.Sqlite`: `ChatHistoryStore` over the demo's
+    `Conversation`/`Message` tables, `ChatHistory`, and `UnitTestChatHistoryStore`, which also reads the demo's saved chats.
+  - Step 4 added `Attach(conversation, chatId)` (`ChatHistoryBinding`), which saves exchanges, regenerated replies,
+    compaction and late transcripts in order. The `MauiChat` sample reopens its last chat, kept in `MauiChat/chats` in the
+    app data folder - on Mac Catalyst that is `~/Library`, where the demo keeps `chats/`.
+  - Step 5 made the demo's `ChatStore` a `ChatHistoryStore` with its own tables and columns: `ConversationRecord` and
+    `MessageRecord` derive from the library's records, and its `AddMessageAsync` takes a language as its last parameter and
+    hides the library's. Verified with the existing saved chats on Mac Catalyst and a Galaxy S10.
+
+## Reading replies aloud
+
+- "Read replies aloud" uses MAUI's TextToSpeech through `ReplySpeech.cs`. It picks a voice for the reply's language -
+  detected from the writing system most of its letters use (Han → zh, kana → ja, Hangul → ko, Cyrillic, Arabic...),
+  preferring the device's own region - because the default voice read e.g. Chinese with an English voice. It strips
+  Markdown, links and emoji first. Verified on a Pixel Fold: zh-CN and ja-JP voices were chosen.
+- Replies are read while they stream, sentence by sentence: `ReplyReader` over `SpeechSegmenter`
+  (`Emgu.LiteRT.LM.Agents/VoiceConversation.cs`, namespace `Emgu.LiteRT.LM.Agents.Audio`, with `VoiceActivityDetector` and
+  `IVoiceInput`). Thinking, code blocks and table rows aren't read.
+
+## Voice chat (hands-free)
+
+- The "Voice chat" chip (Gemma 4; not on Windows, whose recorder reports no level) is a hands-free conversation
+  (`LiteRtLmChatPage.Voice.cs`). A full-screen view listens; `VoiceActivityDetector` ends the message after 0.9 s of quiet
+  (levels from AVAudioRecorder's metering, or Android's samples); the audio is sent without thinking, the reply is read, and
+  it listens again.
+- A tap interrupts: the reply is cancelled, kept with "…" (`ChatMessageState.Interrupted`), and given to the model as text
+  from then on. With headphones, speaking interrupts too.
+- Verified on Mac Catalyst with `say` recordings in place of the microphone (`IVoiceInput`), and with real microphones and
+  loudspeakers on Mac Catalyst (a Mac mini with a USB microphone) and a Pixel Fold. On the Pixel Fold, Android's recorder
+  read 200 ms at a time and left most 50 ms level readings empty; as digital silence they dragged the background level down,
+  so a noisy room's peaks kept speech from ending. It now reads 20 ms at a time, and the detector ignores digital silence.
+  Not yet tried with headphones.
+
+## Context window and compaction
+
+- Sizes: the models run with a 4,096-token context window (`LanguageModel.MaxNumTokens`, set on the engine; LiteRT-LM picked
+  4096 anyway), except that Gemma 4 E2B and E4B get 8,192 on Mac Catalyst and Windows (`ModelOption.DesktopContextTokens`).
+  The Qwen files are fixed at 4096; both Gemma 4 files allow up to ~32k (E2B's model info says dynamic 32003; E4B's says 0,
+  but its model has the same 32003 magic number and accepted 8k and 16k).
+- What a bigger window costs, measured by filling the window with a fact at its start (recalled at every size). Reading the
+  whole conversation - what opening a saved chat or compacting costs:
+
+  | | 4k | 8k | 16k | 32k |
+  |---|---|---|---|---|
+  | Gemma 4 E2B, Apple Silicon Mac CPU | 12 s (2.9 GB) | 27 s (4.1 GB) | 82 s (4.6 GB) | 262 s (5.2 GB) |
+  | Gemma 4 E4B, Apple Silicon Mac CPU | 28 s | 61 s | 168 s | |
+  | Gemma 4 E2B, Pixel Fold CPU | 123 s | 342 s (4.9 GB; 1.5 GB of the phone's RAM left) | | |
+
+  (Peak RSS in brackets.) A short follow-up in the open conversation took 6-8 s either way.
+- So phones kept 4k by default - until the agent's instructions and tool definitions alone grew to ~4k tokens (~14.5k
+  characters; 7 of the 21 tools were the live camera's). Adding the goal tools made every Gemma 4 E2B message on a Galaxy
+  S10 fail with "This request and its tools do not fit in the current context window". Now Automatic gives models with
+  tools (`CanUseTools`: Gemma 4) their `DesktopContextTokens`, 8k, on phones too; the other models stay at 4k.
+- Settings > Context window (Gemma 4 only, up to `ModelOption.MaxContextTokens` 32000, under the files' 32003 limit; Qwen
+  hides it) chooses Automatic - 8k for Gemma 4, else 4k - or 4k, 8k, 16k or 32k, saved for all models
+  (`ChatSettings.ContextTokens`). `ContextTokensFor(option)` is what `LoadModelAsync` sets `MaxNumTokens` to, and
+  `ModelReady`/`PrepareModelAsync` compare it with the loaded or loading window, so a change reloads the model and the chat
+  continues (compacted with the next message if it no longer fits).
+  - Verified with memories off, a code word recalled after each reload: Mac Catalyst's Metal GPU 8k → 16k → 32k → 8k,
+    reloads 1-8 s; a Galaxy Z Fold3's OpenCL GPU 4k → 16k → 32k → 4k, reloads 8-17 s. The GPU cache grows with the window
+    (Z Fold3 program cache 15 → 64 MB).
+- A conversation that outgrows the window fails with "Input token ids are too long..." (a new conversation) or "Prefill
+  input length exceeds available state entries" (a continued one); a reply that hits the limit just ends. While the model
+  re-reads the conversation, the status says "Reading the conversation so far...".
+- Before each send the page estimates the conversation: text by `LanguageModel.CountTokens` (the tokenizer, within ~1% of
+  LiteRT-LM's count), plus 8 per message, 270 per image and 25 per second of audio, plus thinking and 450 per tool step until
+  the conversation is rebuilt. The image and audio costs were measured with a 128-token window, whose error message reports
+  the exact count: Gemma 4 and Qwen3.5 VL images ~260 tokens, `audio_sample.wav` (5.8 s) ~146.
+- If the estimate plus the message exceeds the window less 1024 for the reply and 50 (chat template) or 600 (agent
+  instructions and tools):
+  - Models that summarize well (`CanSummarize`: Gemma 4, Qwen3.5 4B) summarize the earlier messages in a conversation of
+    their own, keeping the latest exchanges up to a quarter of the window.
+  - The others (Qwen3 0.6B, Qwen3.5 0.8B) drop them - Qwen3 0.6B's summaries copied the instructions' example and repeated
+    themselves.
+  - The model is then given the summary as a user/assistant message pair plus the kept messages (`ChatConversation` sends
+    the summary pair and the messages since with every request).
+  - If LiteRT-LM still reports the context full, all earlier messages are dropped and the send is retried once.
+- The transcript keeps everything, with a divider above the first message the model still sees (tap it for the summary).
+  The summary and the last message it covers are saved with the chat (`ConversationRecord.Summary`/`SummaryUpTo`) and
+  restored on reopening. Settings shows the estimated usage and "Compact now".
+- Verified on Mac Catalyst: Gemma 4 E2B summarized and then answered from the summary, also after reopening the chat; Qwen3
+  dropped messages; the retry and "Compact now" worked.
+
+## The GPU
+
+- Android: Gemma 4 E2B runs on the GPU (`ModelOption.GpuOnAndroid`; Settings "Use the GPU", on by default) through LiteRT's
+  OpenCL accelerator `libLiteRtOpenClAccelerator.so`, with `Init(backend: "gpu")` and `ActivationDataType.Float32`. If the
+  engine fails at the LoadingEngine stage, `_gpuUnavailable` falls back to the CPU for the rest of the session. The app must
+  declare `<uses-native-library android:name="libOpenCL.so" android:required="false" />` (Android 12+); our `libLiteRt.so`
+  (`gpu_registry.cc`) dlopens the accelerator by name.
+- fp32, because with the default fp16 Gemma 4 E2B doubled digits after a long conversation ("73342" for 7342) at every
+  window size, while short chats were fine. fp32 fixed it at ~1.5 times the time. On the Pixel Fold a full 4k chat re-reads
+  in 8 s (CPU 123 s), and follow-ups take ~1 s (CPU ~6 s). Details and the fp16/fp32 table are in
+  [Performance.md](Performance.md).
+- LiteRT-LM's GPU top-k sampler prebuilt isn't shipped: it added ~25 s to every load and fixed nothing (sampling falls back
+  to the CPU).
+- The GPU keeps `<model>_..._mldrift_{program,weight}_cache.bin` next to the model (~0.8 GB for E2B; it grows when the
+  window size changes): the first load takes ~30 s, later ones ~2.6 s. Turning the switch off reloads on the CPU, continues
+  the chat (a new client, given the conversation) and deletes the cache.
+- Mac Catalyst: the Gemma 4 models (`ModelOption.GpuOnMac`: E2B, E4B, 12B) run on the GPU through LiteRT's Metal accelerator
+  `libLiteRtMetalAccelerator.dylib`. fp16 was wrong on the M1's GPU as well (Gemma 4 E2B "732" for 7342, 12B "7341"), so
+  `Gemma4.CreateEngineSettings` itself sets `ActivationDataType.Float32` for the "gpu" backend (an Init `configureSettings`
+  can override it), and the demo no longer sets it.
+- `Gemma4_12B` (`litert-community/gemma-4-12B-it-litert-lm`'s `gemma-4-12B-it.litertlm`, 6.9 GB, with the vision and audio
+  encoders - the repo's 6.0 GB `-gpu`/`-web` files lack them) is offered on Mac Catalyst and Windows (`ChatModelCatalog`;
+  ~8 GB of memory). On an M1 with 16 GB: ~8.6 tokens/s, a full 4k chat re-read in 38 s, warm load 3.3 s, GPU cache 6.0 GB.
+- The Catalyst demo keeps its models in `~/Documents/LiteRT-LM` (the test runner in `~/Library/Application Support/LiteRT-LM`).
+- `UnitTest1.TestLiteRtMobilenetGpu` (skipped without the Metal plugin) runs MobileNet through `CompiledModel` with
+  `HwAccelerators.Gpu`: the same top class as the Interpreter, max abs diff 0.0015 on an M1.
 
 ## The chat agent and its tools
 
-- The MAUI demo's chat page sends every message through `Emgu.LiteRT.LM.Chat`'s `ChatConversation` (see `Emgu.LiteRT.LM.Chat/` above) over `ChatClientBuilder(...).UseFunctionInvocation()` on the model's `LiteRtLmChatClient` or the server's client (`EnsureClient`, behind the page's `PageChatClient` so a reloaded model keeps the conversation; it replaced a `ChatClientAgent` and, for Qwen, `Models.Chat`); for Gemma 4 each message passes its tools in `ChatOptions.Tools` (`MessageOptionsAsync`) (`ChatAgentTools.Create(tavilyKey, webSearch, location, memories)` - `ChatAgentTools.cs` picks them from `Emgu.LiteRT.LM.Agents`' `AgentTools` and holds the MAUI location lookup; `ChatStore` implements `IAgentMemoryStore` - `ChatToolMode.Auto`), so settings can change them mid-conversation: `get_current_date_time`, `convert_units` and `calculate` (`Emgu.LiteRT.LM.Agents.Calculator`: a recursive-descent evaluator - + - * / ^ %, parentheses, pi/e, sqrt/ln/log/sin/.../round/min/max/pow, × ÷ − ·, a trailing % as percent; -2 ^ 2 is -4 - since small models get arithmetic wrong; Gemma 4 E2B called it for "1234.5 times 678.9" and answered 838,102.05) always, `remember`/`forget` with Settings "Memories about you" → "Remember things about me" on (Preferences `litert_lm_chat_memory`, default on: `ChatStore`'s `Memory` table, local only; the latest memories up to 1,200 characters go into each message's `ChatOptions.Instructions`, after the agent's own instructions; `remember` skips a fact whose words - minus stop words - are all in one already saved, since the model re-saves known facts in other words, and the step line then says "Already remembered"; Settings lists the memories with delete; verified: saved "The user is vegetarian and their daughter's name is Mia." and, in a new chat, answered "Your daughter's name is Mia" and suggested a vegetarian dinner), `get_current_location` with Settings "Share my location" on (Preferences `litert_lm_chat_share_location`, off by default: `Permissions.LocationWhenInUse` asked on first use, `Geolocation` last known position if under 30 min old else a low-accuracy fix, `Geocoding.GetPlacemarksAsync` for "sub-locality, locality, region, country" - online via Apple/Google, coordinates only where it fails, e.g. Windows without a map key - coordinates rounded to 2 decimals; all on the UI thread; Android `ACCESS_COARSE/FINE_LOCATION`, `NSLocationWhenInUseUsageDescription` for iOS/Mac Catalyst, the Windows `location` capability; verified on the arm64 API 35 emulator with a `geo fix`: "The user is in Shibuya, Tokyo, Japan (latitude 35.66, longitude 139.70)", and "Location services are turned off" when they are), and with the Web search chip on `get_weather` (Open-Meteo, no key: its geocoding API for a place name - the whole name, then its first comma-separated part - or coordinates, then current conditions and a 3-day forecast with WMO weather codes in words; verified for Paris) `convert_currency`, `read_web_page` (the built-in reader, or Tavily's with a key), and the search tools ( `search_wikipedia` - MediaWiki search plus intro extracts, most of the ~1,500-character budget to the best match - and, with a Tavily API key kept in `SecureStorage`, `search_web`/`read_web_page` via Tavily's `/search` and `/extract`), showing each tool call as a step line; verified on Mac Catalyst and the iOS simulator (Wikipedia; Tavily not verified - no key).
+- Every message goes through `Emgu.LiteRT.LM.Chat`'s `ChatConversation`, over `ChatClientBuilder(...).UseFunctionInvocation()`
+  on the model's `LiteRtLmChatClient` or the server's client (`EnsureClient`, behind the page's `PageChatClient`, so a
+  reloaded model keeps the conversation). It replaced a `ChatClientAgent` and, for Qwen, `Models.Chat`.
+- For Gemma 4 each message passes its tools in `ChatOptions.Tools` (`MessageOptionsAsync`, `ChatToolMode.Auto`), so settings
+  can change them in the middle of a conversation. `ChatAgentTools.Create(tavilyKey, webSearch, location, memories)` picks
+  them from `Emgu.LiteRT.LM.Agents`' `AgentTools` and holds the MAUI location lookup; `ChatStore` implements
+  `IAgentMemoryStore`. Each tool call shows as a step line.
+- Always: `get_current_date_time`, `convert_units` and `calculate` (`Emgu.LiteRT.LM.Agents.Calculator`, a recursive-descent
+  evaluator: + - * / ^ %, parentheses, pi and e, sqrt/ln/log/sin/.../round/min/max/pow, × ÷ − ·, a trailing % as percent;
+  -2 ^ 2 is -4). Small models get arithmetic wrong: Gemma 4 E2B called it for "1234.5 times 678.9" and answered 838,102.05.
+- Memories - `remember` and `forget`, with Settings > "Memories about you" > "Remember things about me" on (on by default):
+  - Kept in `ChatStore`'s `Memory` table, on the device only. The latest memories, up to 1,200 characters, go into each
+    message's `ChatOptions.Instructions`, after the agent's own instructions.
+  - `remember` skips a fact whose words (less stop words) are all in one already saved, since the model re-saves known facts
+    in other words; the step line then says "Already remembered". Settings lists the memories, with delete.
+  - Verified: it saved "The user is vegetarian and their daughter's name is Mia." and, in a new chat, answered "Your
+    daughter's name is Mia" and suggested a vegetarian dinner.
+- `get_current_location`, with Settings > "Share my location" on (off by default):
+  - `Permissions.LocationWhenInUse` is asked on first use; then `Geolocation`'s last known position if under 30 minutes
+    old, else a low-accuracy fix; then `Geocoding.GetPlacemarksAsync` for "sub-locality, locality, region, country" (online,
+    through Apple or Google; coordinates only where it fails, e.g. Windows without a map key). Coordinates are rounded to
+    2 decimals, and it all runs on the UI thread.
+  - Declared: Android's `ACCESS_COARSE/FINE_LOCATION`, `NSLocationWhenInUseUsageDescription` on iOS and Mac Catalyst, the
+    Windows `location` capability.
+  - Verified on the arm64 API 35 emulator with a `geo fix`: "The user is in Shibuya, Tokyo, Japan (latitude 35.66, longitude
+    139.70)", and "Location services are turned off" when they are.
+- With the Web search chip on:
+  - `get_weather` (Open-Meteo, no key): its geocoding API for a place name - the whole name, then its first comma-separated
+    part - or coordinates, then the current conditions and a 3-day forecast with the WMO weather codes in words. Verified
+    for Paris.
+  - `convert_currency`, and `read_web_page` (the built-in reader, or Tavily's with a key).
+  - `search_wikipedia`: MediaWiki search plus intro extracts, with most of the ~1,500-character budget for the best match.
+  - With a Tavily API key (kept in `SecureStorage`): `search_web` and `read_web_page` through Tavily's `/search` and
+    `/extract`.
+  - Verified on Mac Catalyst and the iOS simulator (Wikipedia; Tavily wasn't verified - no key).
 
 ## Document questions
 
-- Document questions (`LiteRtLmChatPage.Documents.cs` - the page class is partial - `DocumentReader.cs`, `PdfPageRenderer.cs`): "+" > Document attaches a PDF, Word (.docx) or text file to the chat, shown as a chip above the message box (indexing progress, then e.g. "5 pages · 2 pictures · 1 page as image"; the cross removes it, as do New chat and opening a saved chat).
-- `DocumentReader` extracts each PDF page's text with PdfPig 0.1.16 (`ContentOrderTextExtractor`), its pictures (`page.GetImages()`: `TryGetPng`, else the raw JPEG; skipped below 100 px or 4% of the page, image masks too) and renders pages with under 80 letters/digits of text - scans, vector charts - with the platform's renderer (`PdfPageRenderer`: Android `PdfRenderer` from a temporary file, PDFKit `PdfPage.GetThumbnail` on iOS/Mac Catalyst, `Windows.Data.Pdf` on Windows - the Windows one is unbuilt and untested); .docx paragraphs from `word/document.xml` and pictures from `word/media`; all images re-encoded as JPEG of at most 1024 px with Emgu CV.
-- Pictures and page images (at most 24 on desktops, 10 on phones, page images first) only when the selected model takes images; first 150 pages.
-- The index uses `EmbeddingGemma2TextVision` (downloaded on first use, kept while the page is open, released with it).
-- Indexes are saved in the chat database (`ChatStore`'s `Document` - id = the file's SHA-256 in hex, name, pages, chip summary, `Settings` - and `DocumentItem` - each passage's text/location or image's bytes/media type/location/page flag, with its embedding as floats - plus `Conversation.DocumentId`): attaching a file whose saved index has the current settings (`IndexSettings`: embedding model file, passage size/overlap, image and page limits) loads it instead of indexing (0.02 s vs 6.2 s for the test report on an M1); each saved exchange records the chat's document, and opening a saved chat restores it from the database without the file (`RestoreDocumentAsync`; passages its visible messages' contexts already contain are marked as given); deleting a chat deletes documents no other chat uses, as does opening the page for ones attached to chats never saved.
-- `DocumentIndex.AddPassage(text, location, embedding)` and `AddImage(..., embedding)` rebuild a saved index without `Build`.
-- Each message gets a context (`ChatMessageItem.Context`, saved as `MessageRecord.Context` - a new column - and given to the model before the message text, `ModelText`; the transcript shows only the message): excerpts in document order with their pages, up to 1,600 characters (4k window) / 3,200 (8k) - the whole text if it fits, the beginning for summary-type questions, else the best passages and any within 0.1 of the best, passages of a page the message names first - leaving out passages already given since the last compaction (`_givenPassages`, reset by compaction and new chats) - except for summary-type questions, which always get the text - and if sending the message compacts the conversation, the excerpts are searched again afterwards (`RefreshDocumentContextAsync`, `_compactions`): they were chosen before it, so a passage given earlier and then summarized away was left out (on a Galaxy Z Fold3, "How many people does the bakery employ?" after compaction got no excerpt and the summary lacked the number), plus for image models one picture or page image as an attachment: the one on a page the message names, or on the page whose text has a figure caption it names ("Figure 1"), or for a picture question the one on the best passage's page, else the best image if it scores at least 0.6 and no more than 0.02 below the best passage (0.52/0.08 for picture questions), always for an all-scan document, and never for a summary-type question about a document with text (given one page's image with "Summarize this document", Gemma 4 E2B summarized only that page) - an absolute threshold alone failed, since a paper's diagrams full of text scored 0.62-0.76 against every question about it.
-- A grey step line says what was used ("Looked in report.pdf: pages 2 and 5 and the image of page 3"; not counted as a tool step).
-- Verified on Mac Catalyst with Gemma 4 E2B: a generated 5-page report (text, two photos with captions, a scanned page) - 5/5 answers right, including the departure time read from the scanned page and "What does Figure 1 show?"; "Attention Is All You Need" (15 pages) - 5/5 (heads and d_k, BLEU 28.4, 3.5 days on 8 P100s, Figure 1, the attention formula); a .docx - 3/3; indexing 4.5-14 s on the M1 once the search model is loaded.
-- On a Pixel Fold (Gemma 4 E2B on the GPU, 4k window) the report's first four questions were right - the scanned page rendered by Android's `PdfRenderer` - with indexing 318 s including the first 388 MB download and 60-140 s per answer (each turn's images are encoded on the CPU, the previous message's again too - see below); the fifth failed with LiteRT-LM's "Provided less images than expected in the prompt", which led to the fix below; with it, all six questions (the five plus a sixth) were right on the phone, the chat compacting twice on the way (questions 4 and 6), indexing 21 s with the model downloaded, 60-140 s per answer.
-- On a Galaxy Z Fold3 (SM-F926W, Snapdragon 888, Android 15, 11.6 GB; Gemma 4 E2B on its GPU through the OpenCL plugin) the same six were right after the two fixes above: model load 4-11 s, indexing 28-42 s, 51-136 s per answer.
+- "+" > Document attaches a PDF, Word (.docx) or text file to the chat (`LiteRtLmChatPage.Documents.cs`, `DocumentReader.cs`,
+  `PdfPageRenderer.cs`). It shows as a chip above the message box - indexing progress, then e.g. "5 pages · 2 pictures ·
+  1 page as image". Its cross removes it, as do New chat and opening a saved chat.
+- Reading:
+  - `DocumentReader` extracts each PDF page's text with PdfPig 0.1.16 (`ContentOrderTextExtractor`) and its pictures
+    (`page.GetImages()`: `TryGetPng`, else the raw JPEG; skipped below 100 px or 4% of the page, and image masks).
+  - Pages with fewer than 80 letters or digits of text - scans, vector charts - are rendered with the platform's renderer
+    (`PdfPageRenderer`: Android's `PdfRenderer` from a temporary file, PDFKit's `PdfPage.GetThumbnail` on iOS and Mac
+    Catalyst, `Windows.Data.Pdf` on Windows - the Windows one is unbuilt and untested).
+  - .docx: the paragraphs from `word/document.xml` and the pictures from `word/media`.
+  - All images are re-encoded as JPEG of at most 1024 px with Emgu CV. Pictures and page images (at most 24 on desktops, 10
+    on phones, page images first) are only indexed when the selected model takes images; only the first 150 pages are read.
+- The index uses the shared search model (`SearchEmbedder`, EmbeddingGemma 2 Text Vision by default; downloaded on first use,
+  kept while the page is open, released with it).
+- Indexes are saved in the chat database: `ChatStore`'s `Document` (id = the file's SHA-256 in hex, name, pages, chip
+  summary, `Settings`) and `DocumentItem` (each passage's text and location, or each image's bytes, media type, location and
+  page flag, with its embedding as floats), plus `Conversation.DocumentId`.
+  - Attaching a file whose saved index has the current settings (`IndexSettings`: embedding model file, passage size and
+    overlap, image and page limits) loads it instead of indexing: 0.02 s instead of 6.2 s for the test report on an M1.
+    `DocumentIndex.AddPassage(text, location, embedding)` and `AddImage(..., embedding)` rebuild a saved index without
+    `Build`.
+  - Each saved exchange records the chat's document, and opening a saved chat restores it from the database without the
+    file (`RestoreDocumentAsync`); passages that its visible messages' contexts already contain are marked as given.
+  - Deleting a chat deletes the documents no other chat uses, as does opening the page for documents attached to chats that
+    were never saved.
+- Each message gets a context: `ChatMessageItem.Context`, saved as `MessageRecord.Context` and given to the model before the
+  message text (`ModelText`); the transcript shows only the message.
+  - It is excerpts in document order with their pages, up to 1,600 characters with a 4k window or 3,200 with 8k: the whole
+    text if it fits; the beginning for summary-type questions; else the best passages and any within 0.1 of the best, with
+    the passages of a page the message names first.
+  - Passages already given since the last compaction are left out (`_givenPassages`, reset by compaction and new chats),
+    except for summary-type questions, which always get the text.
+  - If sending the message compacts the conversation, the excerpts are searched again afterwards
+    (`RefreshDocumentContextAsync`, `_compactions`). They were chosen before it, so a passage given earlier and then
+    summarized away was left out: on a Galaxy Z Fold3, "How many people does the bakery employ?" after compaction got no
+    excerpt, and the summary lacked the number.
+- For image models, one picture or page image also goes with the message as an attachment:
+  - the one on a page the message names; or on the page whose text has a figure caption the message names ("Figure 1"); or,
+    for a question about a picture, the one on the best passage's page;
+  - else the best image, if it scores at least 0.6 and no more than 0.02 below the best passage (0.52 and 0.08 for questions
+    about a picture). An absolute threshold alone failed: a paper's diagrams, full of text, scored 0.62-0.76 against every
+    question about it;
+  - always for a document of scans only, and never for a summary-type question about a document with text (given one page's
+    image with "Summarize this document", Gemma 4 E2B summarized only that page).
+- A grey step line says what was used, e.g. "Looked in report.pdf: pages 2 and 5 and the image of page 3" (not counted as a
+  tool step).
+- Verified:
+  - Mac Catalyst, Gemma 4 E2B: a generated 5-page report (text, two photos with captions, a scanned page) - 5/5 answers
+    right, including the departure time read from the scanned page, and "What does Figure 1 show?"; "Attention Is All You
+    Need" (15 pages) - 5/5 (the heads and d_k, BLEU 28.4, 3.5 days on 8 P100s, Figure 1, the attention formula); a .docx -
+    3/3. Indexing took 4.5-14 s on the M1 once the search model was loaded.
+  - Pixel Fold, Gemma 4 E2B on the GPU, 4k window: the report's first four questions were right (the scanned page rendered by
+    Android's `PdfRenderer`), with indexing 318 s including the first 388 MB download, and 60-140 s per answer (each turn's
+    images are encoded on the CPU, the previous message's again too). The fifth failed with LiteRT-LM's "Provided less images
+    than expected in the prompt", which led to the thinking fix in [docs/litert-lm.md](../../docs/litert-lm.md). With it,
+    all six questions (the five plus a sixth) were right on the phone, the chat compacting twice on the way (questions 4 and
+    6): indexing 21 s with the model already downloaded, 60-140 s per answer.
+  - Galaxy Z Fold3 (SM-F926W, Snapdragon 888, Android 15, 11.6 GB; Gemma 4 E2B on its GPU through the OpenCL plugin): the
+    same six were right after both fixes; model load 4-11 s, indexing 28-42 s, 51-136 s per answer.
 
 ## Photo search
 
-- Photo search (`PhotoSearchFeature.cs`, `PhotoIndex.cs`, `PhotoLibrary.cs`): Settings > "Search my photos" (off by default; Preferences `litert_lm_chat_photo_search`) asks for photo access (Android `READ_MEDIA_IMAGES` - a custom permission class, since MAUI's `Permissions.Photos` also asks for videos - plus `READ_MEDIA_VISUAL_USER_SELECTED` and `READ_EXTERNAL_STORAGE` up to API 32; `NSPhotoLibraryUsageDescription` and PhotoKit on iOS/Mac Catalyst, local images only; the Windows `picturesLibrary` capability and the Pictures folder - unbuilt and untested) and indexes the most recent photos (1000 on desktops, 200 on phones; newest first; MediaStore `LoadThumbnail` / `PHImageManager` / Emgu CV at 512 px) in the background with the document search's `EmbeddingGemma2TextVision`, at 140 vision tokens per image - the higher-quality encoder, EmbeddingGemma 2's default (`EmbeddingModel.EmbedImage(..., visionTokensPerImage)` chooses; 70 was 2.3 times faster on an M1's CPU, 461 vs 1041 ms per photo, with the same 6/6 text matches, but sees less detail); `PhotoEmbedding.VisionTokens` records it, so a change re-embeds the photos - pausing while the chat answers and sharing the model with document search through `_embedderGate`; embeddings are kept in `ChatStore`'s `PhotoEmbedding` table (photo id, version, date, floats), so later runs only embed new or edited photos (the library's modification date: MediaStore `date_modified`, PhotoKit `ModificationDate`) and drop ones no longer among the most recent; a pass runs when the page opens, when it is shown again and when the app returns to the foreground (`Window.Resumed`, subscribed when the page's `Window` is set - it is still null in `OnAppearing` when the page is pushed in the Shell), at most once a minute; `find_photos` checks its results against the library (`PhotoLibrary.GetExistingAsync`, nothing if photo access was taken away) and forgets photos deleted since the last pass, searching again; verified on the Pixel 8 emulator: a duplicate deleted in between dropped out of the results (index 26 -> 25), and a photo added while the app was in the background was indexed on its return; turning it off deletes them.
-- Each photo's details are kept with it (`PhotoEmbedding`: latitude/longitude, `Place` from `PlaceLookup`, camera, size, kinds; `DetailsVersion` re-reads them without re-embedding): Android - MediaStore size, `relative_path` (Screenshots) and `is_favorite`, then the EXIF via AndroidX's `ExifInterface` (Android's own `android.media.ExifInterface` returned an empty LensModel) for GPS (needs `ACCESS_MEDIA_LOCATION`, asked for separately and optional; `MediaStore.SetRequireOriginal`), camera, the capture date (MediaStore's `datetaken` was the file's date for copied photos) and selfies (LensModel naming the front camera); iOS/Mac Catalyst - PhotoKit's location, size, favourite and subtypes (`Screenshot`, `PhotoPanorama`, `PhotoDepthEffect`), the Selfies smart album, and the camera from the image data's `{TIFF}` properties; Windows - `StorageFile` image properties (untested); very wide or tall photos count as panoramas.
-- Gemma 4 always gets `find_photos` (and an instruction to pass the request in the user's words) - with the setting off it returns that photo search is off and where to turn it on (the settings button or the side panel), so the model tells the user (verified on Mac Catalyst with Gemma 4 E2B: "You can turn on \"Search my photos\" in the settings panel beside the chat"); the page parses it with the indexed photos' places and cameras, filters by the details, then ranks by the description - or, without one, lists the 12 most recent matches - showing thumbnails with date and town captions and telling the model when, where and with what each was taken; a search returns photos scoring at least 0.6 and within 0.04 of the best (0.06 let three screenshots of shapes through for "a piece of fruit" at 0.63 vs the apple's 0.687), up to 8, shown as a row of thumbnails above the reply (tap: larger, in a sheet), and tells the model how many were found and when they were taken.
-- Verified on the Pixel 8 emulator with 6 test photos among 25: each of six descriptions found its photo first (0.69-0.78, at 70 tokens), indexing 65 s including the model download, searches 0.4-1 s; `TestAgentTools` checks that Gemma 4 E2B calls `find_photos` for "Show me my photos of the beach".
-- With EXIF-tagged test photos on the emulator (Paris, Arlington, Amsterdam, Santa Cruz, Cape Canaveral, Valencia; iPhone/Canon/Pixel; one front-camera selfie): "photos from Paris", "people surfing in California", "photos from Spain in summer 2025", "selfies", "photos taken with my Pixel in 2025", "pictures from the USA", "flowers in the Netherlands" and "a rocket" each found exactly the right photos, and "photos from Japan"/"screenshots" none; detail-only searches take < 60 ms.
-- `TestPlaceLookup`, `TestPhotoRequest` (14 requests against a fixed date) and `TestAgentTools` (Gemma passes "beach photos from Spain last summer") cover the parts.
-- Not tried on a real phone's library yet.
+- Settings > "Search my photos" (off by default; `PhotoSearchFeature.cs`, `PhotoIndex.cs`, `PhotoLibrary.cs`) asks for photo
+  access:
+  - Android: `READ_MEDIA_IMAGES` - a custom permission class, since MAUI's `Permissions.Photos` also asks for videos - plus
+    `READ_MEDIA_VISUAL_USER_SELECTED`, and `READ_EXTERNAL_STORAGE` up to API 32.
+  - iOS and Mac Catalyst: `NSPhotoLibraryUsageDescription` and PhotoKit, local images only.
+  - Windows: the `picturesLibrary` capability and the Pictures folder (unbuilt and untested).
+- Indexing, in the background, of the most recent photos (1000 on desktops, 200 on phones; newest first; thumbnails at
+  512 px from MediaStore's `LoadThumbnail`, `PHImageManager` or Emgu CV), with the shared search model:
+  - At 140 vision tokens per image - EmbeddingGemma 2's default and higher-quality setting (`EmbeddingModel.EmbedImage(...,
+    visionTokensPerImage)` chooses). 70 was 2.3 times faster on an M1's CPU (461 vs 1041 ms per photo) with the same 6/6
+    text matches, but sees less detail. `PhotoEmbedding.VisionTokens` records it, so a change re-embeds the photos.
+  - It pauses while the chat answers, and shares the model with document search through `SearchEmbedder.Gate`.
+  - Embeddings are kept in `ChatStore`'s `PhotoEmbedding` table (photo id, version, date, floats), so later runs only embed
+    new or edited photos (by the library's modification date: MediaStore's `date_modified`, PhotoKit's `ModificationDate`)
+    and drop those no longer among the most recent. Turning the setting off deletes them.
+  - A pass runs when the page opens, when it is shown again, and when the app returns to the foreground (`Window.Resumed`,
+    subscribed when the page's `Window` is set - it is still null in `OnAppearing` when the page is pushed in the Shell), at
+    most once a minute.
+  - `find_photos` checks its results against the library (`PhotoLibrary.GetExistingAsync`; nothing if photo access was taken
+    away), forgets photos deleted since the last pass, and searches again. Verified on the Pixel 8 emulator: a duplicate
+    deleted in between dropped out of the results (index 26 → 25), and a photo added while the app was in the background was
+    indexed on its return.
+- Each photo's details are kept with it (`PhotoEmbedding`: latitude and longitude, `Place` from `PlaceLookup`, camera, size,
+  kinds; `DetailsVersion` re-reads them without re-embedding):
+  - Android: MediaStore's size, `relative_path` (Screenshots) and `is_favorite`; then the EXIF through AndroidX's
+    `ExifInterface` (Android's own `android.media.ExifInterface` returned an empty LensModel) for GPS (which needs
+    `ACCESS_MEDIA_LOCATION`, asked for separately and optional, and `MediaStore.SetRequireOriginal`), the camera, the capture
+    date (MediaStore's `datetaken` was the file's date for copied photos) and selfies (a LensModel naming the front camera).
+  - iOS and Mac Catalyst: PhotoKit's location, size, favourite flag and subtypes (`Screenshot`, `PhotoPanorama`,
+    `PhotoDepthEffect`), the Selfies smart album, and the camera from the image data's `{TIFF}` properties.
+  - Windows: `StorageFile`'s image properties (untested).
+  - Very wide or tall photos count as panoramas.
+- Searching: Gemma 4 always gets `find_photos`, with an instruction to pass the request in the user's words.
+  - With the setting off, it returns that photo search is off and where to turn it on (the settings button, or the side
+    panel), so the model tells the user. Verified on Mac Catalyst with Gemma 4 E2B: "You can turn on "Search my photos" in the
+    settings panel beside the chat".
+  - The page parses the request with the indexed photos' places and cameras, filters by the details, then ranks by the
+    description - or, without one, lists the 12 most recent matches.
+  - It returns photos scoring at least 0.6 and within 0.04 of the best, up to 8 (0.06 let three screenshots of shapes through
+    for "a piece of fruit", at 0.63 against the apple's 0.687). They show as a row of thumbnails above the reply, with date
+    and town captions (tap one to see it larger, in a sheet), and the model is told how many were found and when, where and
+    with what each was taken.
+- Verified:
+  - Pixel 8 emulator, 6 test photos among 25: each of six descriptions found its photo first (0.69-0.78, at 70 tokens);
+    indexing 65 s including the model download; searches 0.4-1 s. `TestAgentTools` checks that Gemma 4 E2B calls
+    `find_photos` for "Show me my photos of the beach".
+  - With EXIF-tagged test photos on the emulator (Paris, Arlington, Amsterdam, Santa Cruz, Cape Canaveral, Valencia;
+    iPhone, Canon and Pixel; one front-camera selfie): "photos from Paris", "people surfing in California", "photos from
+    Spain in summer 2025", "selfies", "photos taken with my Pixel in 2025", "pictures from the USA", "flowers in the
+    Netherlands" and "a rocket" each found exactly the right photos, and "photos from Japan" and "screenshots" none.
+    Searches by details only take under 60 ms.
+  - `TestPlaceLookup`, `TestPhotoRequest` (14 requests against a fixed date) and `TestAgentTools` (Gemma passes "beach
+    photos from Spain last summer") cover the parts.
+  - Not tried on a real phone's library yet.
 
 ## Image generation
 
-- Image generation (`LiteRtLmChatPage.Images.cs`): Settings > "Image generation" (off by default, Preferences `litert_lm_chat_image_generation`; also on iOS, where `Emgu.LiteRT` uses `LiteRt.framework` (above) and the model folder - the app's Documents, `LocalApplicationData` on iOS - is excluded from iCloud backups (`NSUrl.IsExcludedFromBackupKey`); verified in an iPhone 18 Pro simulator (iOS 27) with the models linked in from the Mac: two 8-step pictures and Gemma 4 E2B drawing through the chat, ~205-225 s per picture there - about 10x slower than the Mac's CPU with the weight caches in use, probably XNNPACK picking slower kernels in the simulator; not tried on an iPhone (memory: the text encoder maps 3.5 GB). In Mono's interpreter, which iOS Debug builds use for hot reload, the second picture crashed (an `ArrayTypeMismatchException` - `RunGraph`'s returned `float[]` came back as the `finally` block's `TensorBuffer` - and, with that worked around, a SIGSEGV in `mono_interp_exec_method`; not tiering - `--interp=-tiering` changed nothing), while ahead-of-time compiled code drew picture after picture, so the demo sets `UseInterpreter=false` for iOS (Debug builds compile ahead of time too; no hot reload). That needed the demo's `System.Drawing.Common` exclusion (Emgu.CV.Models' netstandard2.0 dependency; its `System.Private.Windows.Core.dll` crashes Mono's AOT compiler, exit code 139) on iOS as well as Android - before, iOS Release builds failed that way) - turning it on asks before downloading `Emgu.LiteRT.Models`' `ZImageTurbo` (10.6 GB, to its default folder: `LocalApplicationData/Z-Image-Turbo`, which is `~/Documents/Z-Image-Turbo` for the Catalyst app - on this Mac a link to the data volume), with progress in the settings; it resumes on the next start if interrupted; "Delete the image model" removes the folder.
-- Gemma 4 then gets `generate_image` (`ImageInstructions` too); the page checks the description's length (`CountPromptTokens`, at most 24 tokens - too long, it asks the model for a shorter one), draws 8 steps with a random seed on the CPU, shows a 220-point tile above the reply (a spinner with the stage and seconds while drawing; tap: larger in a sheet) and keeps the PNG in `_sendImages`, saved with the reply as attachments of kind `generated` - restored above the reply when the chat is reopened, but never put in the message's `Attachments`, so the model, the token estimate and summaries don't see them.
-- Like `find_photos`, the tool is offered with the setting off and then tells the model where to turn it on (or that the model is still downloading).
-- The tool's first result text ("...shown to the user above your reply. You can't see it: say briefly what you drew...") made Gemma 4 E2B end its turn without any answer, twice in a row; asking for "one short sentence that says what you drew, e.g. \"Here is ...\"" fixed it.
-- Verified on Mac Catalyst with Gemma 4 E2B (temporary self-test): "Draw a red fox sitting in fresh snow, in watercolor style." and "Can you paint a lighthouse at sunset?" were drawn, answered ("Here is a lighthouse at sunset, dramatic lighting, painterly style."), saved and shown again on reopening.
-- Not yet tried on Android or Windows.
-- The enlarged generated picture (`ShowGeneratedImageLarge`, TODO item 17) shows its description and seed - kept in the PNG as iTXt chunks (`Emgu.LiteRT.Models`' `PngMetadata`), so saved chats and files have them - with "Draw it again" (sends "Draw this again, using exactly this description: ..."), "Add to Photos" (`PictureGallery.cs`: MediaStore on Android, add-only PhotoKit - `NSPhotoLibraryAddUsageDescription` - on iOS/Mac Catalyst, the Pictures folder on Windows), "Share..." and "Save image...".
+- Settings > "Image generation" (off by default; `ImageFeature.cs`) asks before downloading `Emgu.LiteRT.Models`'
+  `ZImageTurbo` (10.6 GB) to its default folder, `LocalApplicationData/Z-Image-Turbo` (`~/Documents/Z-Image-Turbo` for the
+  Catalyst app - on this Mac a link to the data volume), with progress in the settings. An interrupted download resumes on
+  the next start; Storage deletes the model.
+- Gemma 4 then gets `generate_image` (with `ChatPlannerInstructions.Images`). The page checks the description's length
+  (`CountPromptTokens`, at most 24 tokens - if it's too long, it asks the model for a shorter one), draws 8 steps with a random
+  seed on the CPU, and shows a 220-point tile above the reply (a spinner with the stage and the seconds while drawing; tap it
+  to see it larger, in a sheet).
+- The PNG is saved with the reply as an attachment of kind `generated` and restored above the reply when the chat is
+  reopened, but never put in the message's `Attachments`, so the model, the token estimate and summaries don't see it.
+- Like `find_photos`, the tool is offered with the setting off, and then tells the model where to turn it on (or that the
+  model is still downloading).
+- The tool's first result text ("...shown to the user above your reply. You can't see it: say briefly what you drew...") made
+  Gemma 4 E2B end its turn without any answer, twice in a row. Asking for "one short sentence that says what you drew, e.g.
+  "Here is ..."" fixed it.
+- The enlarged picture (`ShowGeneratedImageLarge`, TODO item 17) shows its description and seed - kept in the PNG as iTXt
+  chunks (`Emgu.LiteRT.Models`' `PngMetadata`), so saved chats and files have them - with "Draw it again" (which sends "Draw
+  this again, using exactly this description: ..."), "Add to Photos" (`PictureGallery.cs`: MediaStore on Android, add-only
+  PhotoKit with `NSPhotoLibraryAddUsageDescription` on iOS and Mac Catalyst, the Pictures folder on Windows), "Share..." and
+  "Save image...".
+- iOS: `Emgu.LiteRT` uses `LiteRt.framework` there, and the model folder (the app's Documents; `LocalApplicationData` on
+  iOS) is excluded from iCloud backups (`NSUrl.IsExcludedFromBackupKey`).
+  - Verified in an iPhone 18 Pro simulator (iOS 27) with the models linked in from the Mac: two 8-step pictures, and Gemma 4
+    E2B drawing through the chat, at ~205-225 s per picture there - about 10 times slower than the Mac's CPU with the weight
+    caches in use, probably XNNPACK picking slower kernels in the simulator. Not tried on an iPhone (memory: the text encoder
+    maps 3.5 GB).
+  - In Mono's interpreter, which iOS Debug builds use for hot reload, the second picture crashed: an
+    `ArrayTypeMismatchException` (`RunGraph`'s returned `float[]` came back as the `finally` block's `TensorBuffer`) and,
+    with that worked around, a SIGSEGV in `mono_interp_exec_method`. Tiering wasn't the cause (`--interp=-tiering` changed
+    nothing). Ahead-of-time compiled code drew picture after picture, so the demo sets `UseInterpreter=false` for iOS (Debug
+    builds compile ahead of time too; no hot reload).
+  - That needed the demo's `System.Drawing.Common` exclusion (Emgu.CV.Models' netstandard2.0 dependency, whose
+    `System.Private.Windows.Core.dll` crashes Mono's AOT compiler with exit code 139) on iOS as well as Android; iOS Release
+    builds had been failing that way.
+- Verified on Mac Catalyst with Gemma 4 E2B (temporary self-test): "Draw a red fox sitting in fresh snow, in watercolor
+  style." and "Can you paint a lighthouse at sunset?" were drawn and answered ("Here is a lighthouse at sunset, dramatic
+  lighting, painterly style."), saved, and shown again on reopening. Not yet tried on Android or Windows.
 
 ## Your own server
 
-- Your own server (`LiteRtLmChatPage.Server.cs`): Settings > "Your own server" takes an OpenAI-compatible server's address ("host:port" gets `http://` and `/v1`), an optional API key (`SecureStorage`) and one of its models (`GET /models`; LM Studio's `/api/v0/models` adds the type - embeddings are left out, `vlm` takes images - and a loaded model's context length, else 4096 until the first reply loads it); "Your server" in the model list (not one of `Models`: selected as index `Models.Length`, saved chats record `Server`) chats through the same conversation, tools and compaction as Gemma 4, over `Microsoft.Extensions.AI.OpenAI`'s `IChatClient`, whose 10.10.1 turns the servers' `reasoning_content` into `TextReasoningContent`, so thinking shows as for local models; the Think chip is sent as `reasoning_effort` (medium/none - LM Studio honours both, `none` giving 0 reasoning tokens); a server whose 400 names it gets the message again without it, and no more for that address (`ServerRejectedReasoning`; the message is sent again into the same reply - `ChatConversation.RegenerateAsync` - so nothing is duplicated), with token counts estimated (`ApproximateTokens`: ~3.5 ASCII characters a token) and summaries by the server's model, without thinking (and allowed `SummaryMaxTokens` + 1600 tokens in case it thinks anyway: LM Studio runs Gemma 4 with thinking on by default, which used up 400 before any summary came out); voice messages and the voice chat are sent as text, written down by the platform's speech recognizer (`SpeechRecognizer`, formerly the demo's `SpeechToText.cs`; also for the Qwen models, which don't take audio): Android 13+'s `SpeechRecognizer` reading the recording from a pipe (`EXTRA_AUDIO_SOURCE`) - fed at recording speed, then 0.6 s of silence and `StopListening`, falling back to the last partial results, one recognizer per recording, since Google's on-device recognizer dropped words given the audio at once, didn't end at the pipe's end and passed a reused recognizer's late results on; verified on a Pixel Fold with a voice message to LM Studio - and Apple's Speech framework on iOS/Mac Catalyst (built, not yet run; asks for permission on first use); not on Windows.
-- Verified on Mac Catalyst (temporary self-test) against a mock server and LM Studio on a Windows PC (`google/gemma-4-26b-a4b-qat`, 16k context read from `/api/v0/models`): a tool call (`get_current_date_time`), the conversation carried on, an image (the tulips described), compaction and the summary used afterwards, thinking shown with Think on and none with it off, and (mock) a wrong address and a server rejecting `reasoning_effort`; 5-60 s per answer.
-- Also works on a Pixel Fold, which needed `android:usesCleartextTraffic="true"` in the Android manifest: such servers are plain `http://` at an address the user types, which Android blocks by default (iOS/Mac Catalyst's ATS exempts IP addresses and unqualified host names).
-- Requests to the server go through `ServerRetryHandler`, which sends a request that failed without a response once more after the app is back in front (`Window.Stopped`/`Resumed`): on a Galaxy S10 the connection ended ("unexpected end of stream") when Google Maps, opened by `open_directions`, came to the front, losing the reply (the retry itself hasn't been seen to run).
+- Settings > "Your own server" (`LiteRtLmChatPage.Server.cs`) takes an OpenAI-compatible server's address ("host:port" gets
+  `http://` and `/v1`), an optional API key (kept in `SecureStorage`) and one of its models (`GET /models`). LM Studio's
+  `/api/v0/models` adds the model type - embeddings are left out, `vlm` takes images - and a loaded model's context length;
+  otherwise 4096 is assumed until the first reply loads it.
+- "Your server" in the model list (not one of the catalogue's models: it's index `Models.Length`, and saved chats record
+  `Server`) chats through the same conversation, tools and compaction as Gemma 4, over `Microsoft.Extensions.AI.OpenAI`'s
+  `IChatClient`. Its version 10.10.1 turns the servers' `reasoning_content` into `TextReasoningContent`, so thinking shows as
+  it does for local models.
+- The Think chip is sent as `reasoning_effort` (medium or none; LM Studio honours both, `none` giving 0 reasoning tokens). A
+  server whose 400 response names it gets the message again without it, and no more for that address
+  (`ServerRejectedReasoning`); the message is sent again into the same reply (`ChatConversation.RegenerateAsync`), so nothing
+  is duplicated.
+- Token counts are estimated (`ApproximateTokens`: ~3.5 ASCII characters a token). Summaries are written by the server's
+  model without thinking, and allowed `SummaryMaxTokens` + 1600 tokens in case it thinks anyway: LM Studio runs Gemma 4 with
+  thinking on by default, which used up 400 tokens before any summary came out.
+- Voice messages and the voice chat are sent as text, written down by the platform's speech recognizer (`SpeechRecognizer`,
+  which was the demo's `SpeechToText.cs`; also used for the Qwen models, which don't take audio):
+  - Android 13+: `SpeechRecognizer` reads the recording from a pipe (`EXTRA_AUDIO_SOURCE`), fed at recording speed, then
+    0.6 s of silence and `StopListening`, falling back to the last partial results, with one recognizer per recording -
+    Google's on-device recognizer dropped words when given the audio at once, didn't end at the pipe's end, and passed a
+    reused recognizer's late results on. Verified on a Pixel Fold with a voice message to LM Studio.
+  - iOS and Mac Catalyst: Apple's Speech framework (built, not yet run; it asks for permission on first use). Not on Windows.
+- Verified on Mac Catalyst (temporary self-test) against a mock server and LM Studio on a Windows PC
+  (`google/gemma-4-26b-a4b-qat`, 16k context read from `/api/v0/models`): a tool call (`get_current_date_time`), the
+  conversation carried on, an image (the tulips described), compaction and the summary used afterwards, thinking shown with
+  Think on and none with it off, and (mock) a wrong address and a server rejecting `reasoning_effort`; 5-60 s per answer.
+- Also works on a Pixel Fold, which needed `android:usesCleartextTraffic="true"` in the Android manifest: such servers are
+  plain `http://` at an address the user types, which Android blocks by default (on iOS and Mac Catalyst, ATS exempts IP
+  addresses and unqualified host names).
+- Requests to the server go through `ServerRetryHandler`, which sends a request that failed without a response once more
+  after the app is back in front (`Window.Stopped`/`Resumed`). On a Galaxy S10 the connection ended ("unexpected end of
+  stream") when Google Maps, opened by `open_directions`, came to the front, and the reply was lost. (The retry itself hasn't
+  been seen to run.)
 
-## Device actions and the clipboard
+## Device actions
 
-- Device actions (`DeviceActions.cs`, `DeviceActionsFeature.cs`, TODO item 24): the agent gets `AgentTools.DeviceActions` (not in the voice chat) and each call shows a card above the reply with Confirm / Cancel; a cancelled one returns `DeviceActionCancelled`, which starts "CANCELLED - NOT done" since with a gentler text Gemma 4 E2B told the user the alarm was set; Android does timers/alarms through `AlarmClock` intents (`EXTRA_SKIP_UI`; alarms within 24 hours), events through the calendar's insert intent (the user saves there) and directions through a Google Maps URL; iOS/Mac Catalyst save events and reminders with EventKit and open Apple Maps (built, not run); Windows only directions.
-- Verified on a Galaxy S10 (Android 12) with Gemma 4 E2B (timer) and LM Studio's Gemma 4 26B-A4B with thinking on (alarm cancelled, calendar, directions by foot/car/transit).
-- `read_clipboard` (`AgentTools.ReadClipboard`, TODO item 26: the text the user last copied, wrapped as their data and cut to 3,000 characters, ending with an instruction to act on it - without it Gemma 4 E2B repeated the text for "Summarize") is no router group, so there is no stub the model could call by itself: `ChatAgentTools.Create` adds it only to a message for which `AgentTools.MentionsClipboard` is true ("clipboard", "what I just copied", "the text I copied"; not plain "paste"/"copy"), with the step line "Reading the clipboard"; verified on Mac Catalyst with Gemma 4 E2B, `UnitTestClipboardTool`.
+- The agent gets `AgentTools.DeviceActions` - timers, alarms, calendar events, reminders and directions (`DeviceActions.cs`,
+  `DeviceActionsFeature.cs`, TODO item 24) - except in the voice chat. Each call shows a card above the reply with Confirm
+  and Cancel.
+- A cancelled action returns `DeviceActionCancelled`, which starts "CANCELLED - NOT done": with a gentler text, Gemma 4 E2B
+  told the user the alarm was set.
+- Android does timers and alarms through `AlarmClock` intents (`EXTRA_SKIP_UI`; alarms within 24 hours), events through the
+  calendar's insert intent (the user saves there), and directions through a Google Maps URL. iOS and Mac Catalyst save
+  events and reminders with EventKit and open Apple Maps (built, not run). Windows only does directions.
+- Verified on a Galaxy S10 (Android 12) with Gemma 4 E2B (a timer) and LM Studio's Gemma 4 26B-A4B with thinking on (an
+  alarm cancelled, a calendar event, directions on foot, by car and by transit).
+
+## The clipboard
+
+- `read_clipboard` (`AgentTools.ReadClipboard`, TODO item 26) gives the model the text the user last copied, wrapped as their
+  data, cut to 3,000 characters, and ending with an instruction to act on it - without that, Gemma 4 E2B repeated the text
+  for "Summarize".
+- It isn't a tool group, so there is no stub the model could call by itself: `ChatAgentTools.Create` adds it only to a
+  message for which `AgentTools.MentionsClipboard` is true ("clipboard", "what I just copied", "the text I copied"; not a
+  plain "paste" or "copy"), with the step line "Reading the clipboard". Verified on Mac Catalyst with Gemma 4 E2B;
+  `UnitTestClipboardTool`.
 
 ## Languages, translation and voice transcripts
 
-- `TextLanguage.cs` (TODO item 39) gives the language of a text: the script check first (`ReplySpeech.DetectLanguage`), then for Latin script ML Kit's language identification on Android (`Xamarin.Google.MLKit.Language.Id`, bundled model; 26 of 26 test phrases right on a Galaxy S10, 2-3 ms each, short ones included; its Common library needs `Xamarin.AndroidX.Fragment.Ktx` 1.9.0 pinned in the demo for Android, otherwise D8: `FragmentKt` defined twice) and Apple's `NLLanguageRecognizer` on iOS/Mac Catalyst; `ReplySpeech` uses it to pick the reading voice, and each saved user message keeps it (`MessageRecord.Language`).
-- Gemma 4 thinks in English whatever the language, so the opened thinking of a reply to a non-English message offers "Translate to <language>" (`TranslationFeature.cs`): the model translates it on request in conversations of its own, like a summary (the agent's conversation is released and re-read with the next message), and the translation is saved with the reply (`MessageRecord.ThinkingTranslation`) and shown again after reopening; verified on Mac Catalyst with Spanish, German and Chinese.
-- A voice message that a model hears as audio (Gemma 4) also gets its words written down by the platform's speech recognizer (`SpeechRecognizer`; `LiteRtLmChatPage.Transcript.cs`) in the background: shown under the chip, kept in `MessageRecord.Transcript` (not given to the model), the title of a chat still called "Voice message", in exports; the recording is kept too (`chats/attachments/...`); verified on a Pixel Fold.
-- Settings > "Voice language" (`VoiceLanguages`, set as `SpeechRecognizer.Language`; the errors end with `SpeechRecognizer.ChooseLanguageHint`) is the language the speech recognizer listens in - the device's by default, which gave nothing for Chinese speech on an English phone; on Android 13+ it asks the recognizer what it supports (`CheckRecognitionSupport`; the on-device one lists only installed languages, Mandarin as `cmn-Hans-CN`), requests the language pack and falls back to the normal recognizer meanwhile; verified on a Pixel Fold with Chinese and Japanese recordings.
+- `TextLanguage.cs` (TODO item 39) gives the language of a text: the script check first (`ReplySpeech.DetectLanguage`), then
+  for Latin script ML Kit's language identification on Android (`Xamarin.Google.MLKit.Language.Id`, with its bundled model:
+  26 of 26 test phrases right on a Galaxy S10, 2-3 ms each, short ones included) and Apple's `NLLanguageRecognizer` on iOS and
+  Mac Catalyst. ML Kit's Common library needs `Xamarin.AndroidX.Fragment.Ktx` 1.9.0 pinned in the demo for Android; otherwise
+  D8 fails with `FragmentKt` defined twice.
+- `ReplySpeech` uses it to pick the reading voice, and each saved user message keeps it (`MessageRecord.Language`).
+- Gemma 4 thinks in English whatever the language, so the opened thinking of a reply to a non-English message offers
+  "Translate to <language>" (`TranslationFeature.cs`). The model translates it on request, in conversations of its own like a
+  summary (the agent's conversation is released and re-read with the next message). The translation is saved with the reply
+  (`MessageRecord.ThinkingTranslation`) and shown again after reopening. Verified on Mac Catalyst with Spanish, German and
+  Chinese.
+- A voice message that a model hears as audio (Gemma 4) also gets its words written down by the platform's speech recognizer
+  in the background (`SpeechRecognizer`; `LiteRtLmChatPage.Transcript.cs`). The words show under the chip, are kept in
+  `MessageRecord.Transcript` (not given to the model), become the title of a chat still called "Voice message", and go into
+  exports; the recording is kept too (`chats/attachments/...`). Verified on a Pixel Fold.
+- Settings > "Voice language" (`VoiceLanguages`, set as `SpeechRecognizer.Language`; the errors end with
+  `SpeechRecognizer.ChooseLanguageHint`) is the language the speech recognizer listens in. It's the device's by default, which
+  gave nothing for Chinese speech on an English phone. On Android 13+ it asks the recognizer what it supports
+  (`CheckRecognitionSupport`; the on-device recognizer lists only installed languages, Mandarin as `cmn-Hans-CN`), requests the
+  language pack, and falls back to the normal recognizer meanwhile. Verified on a Pixel Fold with Chinese and Japanese
+  recordings.
 
-## Task mode and goals
+## Task mode
 
-- Task mode (TODO item 23; `LiteRtLmChatPage.Task.cs`, `Emgu.LiteRT.LM.Agents`' `TaskPlan`): the Plan chip has the model write a short numbered plan (`TaskPlan.PlanPrompt`/`Parse`), shown as a checklist card the user can edit, skip steps of and stop; each step then runs as a request of its own (`TaskModeClient`, the `IChatClient` of that one message) given only the task, the plan and the earlier steps' short results (`StepPrompt`), its tool calls shown as step lines (its bubble stays hidden), and the final answer is written from the results into the reply (`FinalPrompt`); the saved chat holds the request, the step lines and the answer, and the reply is given to the model as text afterwards (a reply written by a per-message client, `TaskModeClient`); verified on Mac Catalyst with Gemma 4 E2B (a Paris weekend: weather, Wikipedia, a page, a packing-list document in ~2.5 minutes), including skip, stop and a follow-up.
-- Goals have streaks and a history (`GoalHistory.cs` in `Emgu.LiteRT.LM.Agents`, TODO item 25): per period (day, week from Monday, month) what was logged and whether the target was reached, the streak of periods in a row (the current one never breaks it), the best streak; Settings > Your goals shows a strip of the latest 12 periods and the streak, and `GoalStatusAsync` (so `get_goals` and the message instructions) adds "2-week-streak" from two periods in a row.
+- The Plan chip (TODO item 23; `TaskFeature.cs`, `Emgu.LiteRT.LM.Agents`' `TaskPlan`) has the model write a short numbered
+  plan (`TaskPlan.PlanPrompt`/`Parse`), shown as a checklist card the user can edit, skip steps of, and stop.
+- Each step then runs as a request of its own (`TaskModeClient`, the `IChatClient` of that one message), given only the task,
+  the plan and the earlier steps' short results (`StepPrompt`). Its tool calls show as step lines (its own bubble stays
+  hidden), and the final answer is written from the results into the reply (`FinalPrompt`).
+- The saved chat holds the request, the step lines and the answer; the reply is given to the model as text afterwards (a
+  reply written by a per-message client).
+- Verified on Mac Catalyst with Gemma 4 E2B: a Paris weekend (weather, Wikipedia, a web page and a packing-list document in
+  ~2.5 minutes), including skip, stop and a follow-up.
+
+## Goals
+
+- Goals have streaks and a history (`GoalsFeature.cs`; `GoalHistory.cs` in `Emgu.LiteRT.LM.Agents`, TODO item 25): per
+  period (day, week from Monday, month) what was logged and whether the target was reached, the streak of periods in a row
+  (the current period never breaks it), and the best streak.
+- Settings > Your goals shows a strip of the latest 12 periods and the streak, and `GoalStatusAsync` (so `get_goals` and the
+  message instructions) adds "2-week-streak" from two periods in a row.
 
 ## Tool servers (MCP)
 
-- Tool servers (MCP, TODO item 28): Settings > "Tool servers (MCP)" (`LiteRtLmChatPage.Mcp.cs`) adds Model Context Protocol servers - an address (Streamable HTTP / SSE) with an optional authorization header kept in `SecureStorage`, or on Mac Catalyst and Windows a program started with stdio - through the official `ModelContextProtocol.Core` 2.2.0 client (referenced by the demo and the test project, not by `Emgu.LiteRT.LM.Agents`).
-- `McpServers.cs` (no MAUI types, in `Maui.Demo.Lite.Core`) turns a server's tools into functions named `<server>_<tool>`, each connected server is a `ToolGroup` (`mcp_<server>`: its tools come when a message mentions the server or its tools' subject, else through the `use_mcp_<server>` stub), tools the user switched off cost nothing, a tool without the `readOnlyHint` annotation asks with the device actions' Confirm / Cancel card unless the user trusts the server (DeepWiki annotates none), results are wrapped as the server's data - not instructions - and cut to 2,500 characters, step lines read "Calling <tool> on <server> (...)".
-- `UnitTestMcp` runs a server in the test process over pipes (`ConnectsToAPublicServerOverHttp`, `TEST_MODELS`, uses DeepWiki); verified on a Galaxy S10 with Gemma 4 E2B on the GPU calling DeepWiki's `read_wiki_contents`; stdio untested.
-- Apple Intelligence (Microsoft.Maui.Essentials.AI, an `IChatClient` too) only ships for .NET 11, so it is left for when the repo moves to .NET 11.
+- Settings > "Tool servers (MCP)" (`LiteRtLmChatPage.Mcp.cs`, TODO item 28) adds Model Context Protocol servers: an address
+  (Streamable HTTP or SSE) with an optional authorization header kept in `SecureStorage`, or, on Mac Catalyst and Windows, a
+  program started with stdio. It uses the official `ModelContextProtocol.Core` 2.2.0 client (referenced by the demo and the
+  test project, not by `Emgu.LiteRT.LM.Agents`).
+- `McpServers.cs` (in `Maui.Demo.Lite.Core`) turns a server's tools into functions named `<server>_<tool>`:
+  - Each connected server is a `ToolGroup` (`mcp_<server>`): its tools come when a message mentions the server or its tools'
+    subject, else through the `use_mcp_<server>` stub. Tools the user switched off cost nothing.
+  - A tool without the `readOnlyHint` annotation asks with the device actions' Confirm / Cancel card, unless the user trusts
+    the server (DeepWiki annotates none).
+  - Results are wrapped as the server's data - not instructions - and cut to 2,500 characters. Step lines read "Calling
+    <tool> on <server> (...)".
+- `UnitTestMcp` runs a server in the test process over pipes (`ConnectsToAPublicServerOverHttp` is `TEST_MODELS`-gated and
+  uses DeepWiki). Verified on a Galaxy S10 with Gemma 4 E2B on the GPU calling DeepWiki's `read_wiki_contents`; stdio is
+  untested.
+- Apple Intelligence (Microsoft.Maui.Essentials.AI, an `IChatClient` too) only ships for .NET 11, so it's left for when the
+  repo moves to .NET 11.
 
 ## Camera and sound monitors
 
-- Sound monitors (TODO item 42): `Emgu.LiteRT.LM.Agents`' `Audio/SoundMonitors.cs` (`SoundGroups`: 30 sounds as groups of YAMNet classes with the words people use, `SoundPresenceMonitor`, `SoundMonitorRuntime`, `SoundMonitorTools` - `create_sound_monitor` etc.) and the chat page's `LiteRtLmChatPage.Sound.cs` (a `sound_monitor` tool group, the microphone on while a monitor is enabled, a monitor card, chime/spoken alerts that the page doesn't listen to, `MicrophoneGate` so `VoiceRecorder` gets the microphone first; not Windows); verified with Gemma 4 E2B on Mac Catalyst and with a Galaxy S10's microphone (`Emgu.LiteRT.Models/YAMNET.md`).
-- On Android a sound monitor can also take a full-resolution photo and record a clip (`SoundAlert.ClipSeconds`/`TakePhoto`, `create_sound_monitor`'s `clipSeconds`/`takePhoto` when `SoundMonitorTools.Create` gets `cameraActions`; TODO item 49): the live camera opens when the monitor is created, the photo comes first, one capture per 30 s plus the clip, the same `TakePhotoAsync`/`RecordClipAsync` as the camera monitors.
-- `take_photo` also plays a short shutter click (`camera_click.wav`, `CameraChimeAction("camera_click.wav")`, inside the sound mute) unless Settings > "Camera sounds" is off (`litert_lm_chat_camera_sound`; TODO item 50); clips are silent.
-- On Android the live camera runs through Camera2 (`LiveCamera.Camera2.cs`, OpenCV's camera is the fallback; a 640x480 YUV reader feeds the preview and detectors, and the `record_clip` visual-alert action adds a `MediaRecorder` surface by configuring the session again for the length of a clip - 720p H.264 MP4 with sound when the microphone is already allowed, 3-30 s, a transcript card in `LiteRtLmChatPage.VisualClips.cs` that plays the clip in place (Play/Pause with a progress bar - Android's `VideoView` in `InlineVideoView.cs`, no extra packages; one clip at a time; the sound monitors don't listen while it plays) with Full screen (the system player), Share and Save to gallery; frames keep coming at 30 fps during a clip and pause ~0.3 s at each end; TODO item 43).
-- The `take_photo` action (TODO item 44) takes a full-resolution still (the camera's largest JPEG, 12 MP on a Galaxy S10 and a Pixel Fold) with the same session-reconfiguring approach - `LiveCamera.TakePhotoAsync`, a card in `LiteRtLmChatPage.VisualPhotos.cs` with Open/Share/Save to gallery - while `take_snapshot` stays a small analysis frame; a photo asked for with a clip is taken first.
-- The `hand-gesture` visual agent (`HandVisualAgent.cs`, TODO item 47) makes MediaPipe's seven gestures object classes of the camera monitors ("thumb up", "victory"...; `VisualHostCatalog.CanonicalGesture` maps the words people use, the visual instructions say which label fits which words), so "take a picture when you see a thumb up" is an ordinary monitor with every action; verified on a Galaxy S10 with Gemma 4 E2B and with MediaPipe's photos as frames.
-- With a real hand on a Pixel Fold's selfie camera the gestures were found in 94-100% of frames except the closed fist and "I love you" (pose-sensitive "none"), after the palm threshold went from 0.5 to 0.35, `HandTracker.TiltAngles` (the classifier is asked again on landmarks turned by +-30 and +-60 degrees when the upright reading is weak - a tilted thumb up 5% -> 92%; not MediaPipe's behaviour, the parity tests turn it off) and a 0.4 default confidence for gesture monitors were added.
-- Alert sounds (TODO item 53): `AlertSoundLibrary` (`Emgu.LiteRT.LM.Agents.Audio`, with `AlertAudioCoordinator`, which keeps alert sounds and spoken replies from talking over each other) holds two synthesized built-in sounds (white noise, a music-box lullaby: `tools/make_alert_sounds.py`) and the user's own (added from a file or recorded, Settings > "Alert sounds"); the `play_file` visual action and `create_sound_monitor`'s `playFile`/`playSeconds` play one, once or repeated for up to 300 s, by `AlertFilePlayer`, inside the sound mute; names are matched loosely (`Find`) and a wrong one is refused with the list; with Gemma 4 E2B the sound group's keywords and its stub summary had to say it is for sounds heard, or "play white noise when you see a person" went to the sound tool.
-- Background monitoring (TODO item 54): on Android `MonitoringForegroundService` (microphone, plus camera when a sound monitor photographs or records) keeps sound monitors listening with the app in the background or the screen off - an ongoing notification with Stop, a partial wake lock, and a notification per alert - started from the foreground by `LiteRtLmChatPage.Background.cs` (Android 14 refuses to start these from the background); the camera may then be opened for an alert (`CameraUsable`) and is closed again afterwards; camera monitors don't run in the background yet; verified on a Galaxy S10 (Home, and screen off).
-- The selfie camera (TODO item 48): `LiveCamera.Front`/`FindCameraId`, a request that names a camera ("use the selfie camera", `VisualHostCatalog.CameraFacingRequest`) or the preview's camera button (labelled with the camera it switches to, "Selfie camera" / "Back camera"; it was "Flip", which read as mirroring) switches camera with the monitors going on, a front camera's rotation is (sensor + display) % 360, its preview is mirrored and its photos, clips and detector frames are not; New chat goes back to the back camera.
-- Each camera and sound monitor's card shows the user's request that created it (`LiteRtLmChatPage.MonitorInfo.cs`, TODO item 45: in memory, not in private chats, tap to expand), and the camera preview's label says what the camera is doing ("Watching · 2 monitors", "● Recording clip · 7 s left").
+- Sound monitors (TODO item 42): `Emgu.LiteRT.LM.Agents`' `Audio/SoundMonitors.cs` (`SoundGroups`: 30 sounds as groups of
+  YAMNet classes with the words people use; `SoundPresenceMonitor`, `SoundMonitorRuntime`, `SoundMonitorTools` -
+  `create_sound_monitor` and the rest) and the page's `LiteRtLmChatPage.Sound.cs`: a `sound_monitor` tool group, the
+  microphone on while a monitor is enabled, a monitor card, and chime or spoken alerts that the page doesn't listen to;
+  `MicrophoneGate` gives `VoiceRecorder` the microphone first. Not on Windows. Verified with Gemma 4 E2B on Mac Catalyst and
+  with a Galaxy S10's microphone (`Emgu.LiteRT.Models/YAMNET.md`).
+- On Android a sound monitor can also take a full-resolution photo and record a clip (TODO item 49; `SoundAlert.ClipSeconds`
+  and `TakePhoto`, `create_sound_monitor`'s `clipSeconds` and `takePhoto` when `SoundMonitorTools.Create` gets
+  `cameraActions`): the live camera opens when the monitor is created, the photo comes first, one capture per 30 s plus the
+  clip, through the same `TakePhotoAsync`/`RecordClipAsync` as the camera monitors.
+- `take_photo` also plays a short shutter click (`camera_click.wav`, `CameraChimeAction("camera_click.wav")`, inside the sound
+  mute) unless Settings > "Camera sounds" is off (TODO item 50); clips are silent.
+- On Android the live camera runs through Camera2 (`LiveCamera.Camera2.cs`; OpenCV's camera is the fallback). A 640x480 YUV
+  reader feeds the preview and the detectors.
+  - The `record_clip` visual-alert action (TODO item 43) adds a `MediaRecorder` surface by configuring the session again for
+    the length of a clip: 720p H.264 MP4, with sound when the microphone is already allowed, 3-30 s. Frames keep coming at 30
+    fps during a clip and pause ~0.3 s at each end.
+  - The clip's card in the transcript (`LiteRtLmChatPage.VisualClips.cs`) plays it in place - Play/Pause with a progress bar,
+    through Android's `VideoView` in `InlineVideoView.cs` (no extra packages), one clip at a time, the sound monitors not
+    listening meanwhile - with Full screen (the system player), Share and Save to gallery.
+  - The `take_photo` action (TODO item 44) takes a full-resolution still - the camera's largest JPEG, 12 MP on a Galaxy S10
+    and a Pixel Fold - in the same session-reconfiguring way (`LiveCamera.TakePhotoAsync`; a card in
+    `LiteRtLmChatPage.VisualPhotos.cs` with Open, Share and Save to gallery), while `take_snapshot` stays a small analysis
+    frame. A photo asked for together with a clip is taken first.
+- The `hand-gesture` visual agent (`HandVisualAgent.cs`, TODO item 47) makes MediaPipe's seven gestures object classes of the
+  camera monitors ("thumb up", "victory"...; `VisualHostCatalog.CanonicalGesture` maps the words people use, and the visual
+  instructions say which label fits which words), so "take a picture when you see a thumb up" is an ordinary monitor with
+  every action. Verified on a Galaxy S10 with Gemma 4 E2B, with MediaPipe's photos as frames.
+  - With a real hand on a Pixel Fold's selfie camera, the gestures were found in 94-100% of frames - except the closed fist
+    and "I love you" (pose-sensitive "none") - after three changes: the palm threshold went from 0.5 to 0.35; `HandTracker.TiltAngles`
+    asks the classifier again on landmarks turned by ±30 and ±60 degrees when the upright reading is weak (a tilted thumb up
+    went from 5% to 92%; not MediaPipe's behaviour, so the parity tests turn it off); and gesture monitors default to a 0.4
+    confidence.
+- Alert sounds (TODO item 53): `AlertSoundLibrary` (`Emgu.LiteRT.LM.Agents.Audio`, with `AlertAudioCoordinator`, which keeps
+  alert sounds and spoken replies from talking over each other) holds two synthesized built-in sounds - white noise and a
+  music-box lullaby (`tools/make_alert_sounds.py`) - and the user's own, added from a file or recorded in Settings > "Alert
+  sounds".
+  - The `play_file` visual action and `create_sound_monitor`'s `playFile`/`playSeconds` play one, once or repeated for up to
+    300 s, through `AlertFilePlayer`, inside the sound mute. Names are matched loosely (`Find`), and a wrong one is refused
+    with the list.
+  - With Gemma 4 E2B, the sound group's keywords and its stub summary had to say it's for sounds heard; otherwise "play white
+    noise when you see a person" went to the sound tool.
+- Background monitoring (TODO item 54): on Android, `MonitoringForegroundService` (microphone, plus the camera when a sound
+  monitor photographs or records) keeps sound monitors listening with the app in the background or the screen off - an
+  ongoing notification with Stop, a partial wake lock, and a notification per alert. `LiteRtLmChatPage.Background.cs` starts
+  it from the foreground (Android 14 refuses to start such services from the background). The camera may then be opened for
+  an alert (`CameraUsable`) and is closed again afterwards. Camera monitors don't run in the background yet. Verified on a
+  Galaxy S10 (Home, and screen off). Meeting recordings use the same service.
+- The selfie camera (TODO item 48; `LiveCamera.Front`, `FindCameraId`): a request that names a camera ("use the selfie
+  camera", `VisualHostCatalog.CameraFacingRequest`) or the preview's camera button switches camera while the monitors go on.
+  The button is labelled with the camera it switches to, "Selfie camera" or "Back camera" (it was "Flip", which read as
+  mirroring). A front camera's rotation is (sensor + display) % 360; its preview is mirrored, but its photos, clips and
+  detector frames aren't. New chat goes back to the back camera.
+- Each camera and sound monitor's card shows the user's request that created it (`LiteRtLmChatPage.MonitorInfo.cs`, TODO item
+  45: kept in memory, not in private chats; tap to expand), and the camera preview's label says what the camera is doing
+  ("Watching · 2 monitors", "● Recording clip · 7 s left").
 
-## Exercise counting and meeting notes
+## Exercise counting
 
-- `JumpingJackCounter` counts jumping jacks from the landmarks (closed - wrists below the shoulders, feet together - to open - wrists 0.4 shoulder widths above, feet 1.2 apart - and back; feet only when both ankles are visible), and the chat's `count_exercise` (`Emgu.LiteRT.LM.Agents`' `ExerciseTools.cs`, part of the goals tool group; `ExerciseFeature.cs`: the call lasts as long as the exercise, a card with the count, time and Done, its own pose detector on every frame it keeps up with) logs the count toward a goal that names jumping jacks (`AgentTools.LogExerciseAsync`) and tells the model; `SquatCounter` and `HighKneesCounter` (`ExerciseCounters.cs`, `IExerciseCounter`) count squats (hip height above the ankle over the knee's) and high knees (each knee near its hip's height, in front of it) the same way, for `count_exercise`'s "squats" / "high knees" and goals naming them; `GoalParser` reads two-word exercises ("30 jumping jacks a day") as the unit; `UnitTestJumpingJacks`, `POSE.md`; checked on synthetic pictures, not yet with a real person or Gemma 4. Settings > "Developer mode" (`LiteRtLmChatPage.Developer.cs`, Preferences `litert_lm_chat_developer_mode`, off by default) draws the counted body on the camera preview with the "Body pose" page's skeleton (`PoseDrawing.cs`) and shows the position read on the card; the preview's Maximize button fills the conversation's area with it (Restore, or closing the camera, makes it small again), and while counting a maximized preview shows the count over the picture.
-- The count is also said aloud with the device's text-to-speech ("Go!" when the body is first in view, each number - skipping to the latest when behind - and "Done. N jumping jacks."; the sound monitors' mute is held meanwhile); the card's speaker button turns it off (Preferences `litert_lm_chat_count_aloud`, on by default).
-- Meeting notes (`record_meeting`, in the `write_document` tool group so it adds no stub; `Emgu.LiteRT.LM.Agents`' `MeetingNotes.cs`, the demo's `MeetingFeature.cs`; Android 13+, iOS, Mac Catalyst - wherever `SpeechRecognizer` works): the call lasts as long as the recording; `MicrophoneSoundSource` (through `MicrophoneGate`, so sound monitors pause) feeds `MeetingAudioChunker`, which cuts 30-50 s pieces at the quietest 200 ms, each written down by the platform's speech recognizer while recording goes on (the card shows the transcript's end, Pause, Stop and write notes; on Android the monitoring foreground service keeps it going with the screen off, on iOS the screen is kept on); after Stop the model writes the notes with `AskModelOnceAsync` (`MeetingNotes.WriteAsync`: the whole transcript if it fits, else section summaries - combined again if still too long - then notes with Summary / Key points / Decisions / Action items / Open questions), shown in the card; notes plus the timed transcript are saved as a Word document with the reply, the transcript is attached as the chat's document for later questions, and the notes go back to the model; no speaker labels; `UnitTestMeetingNotes`; not yet tried with a real meeting.
+- `count_exercise` (`Emgu.LiteRT.LM.Agents`' `ExerciseTools.cs`, part of the goals tool group; the demo's `ExerciseFeature.cs`)
+  counts jumping jacks, squats or high knees in front of the camera. The call lasts as long as the exercise; a card shows the
+  count, the time and Done, and the feature runs its own pose detector on every frame it keeps up with. The count is logged
+  toward a goal that names the exercise (`AgentTools.LogExerciseAsync`) and returned to the model.
+- The counters (`Emgu.LiteRT.Models`, `IExerciseCounter`):
+  - `JumpingJackCounter`: from closed (wrists below the shoulders, feet together) to open (wrists 0.4 shoulder widths above
+    them, feet 1.2 shoulder widths apart) and back. Feet only count when both ankles are visible.
+  - `SquatCounter` (`ExerciseCounters.cs`): the hip's height above the ankle compared with the knee's.
+  - `HighKneesCounter` (`ExerciseCounters.cs`): each knee near its hip's height, in front of it.
+- `GoalParser` reads two-word exercises ("30 jumping jacks a day") as the unit.
+- The count is also said aloud with the device's text-to-speech: "Go!" when the body is first in view, each number (skipping
+  to the latest when behind), and "Done. N jumping jacks." The sound monitors' mute is held meanwhile. The card's speaker
+  button turns it off (on by default).
+- Settings > "Developer mode" (`LiteRtLmChatPage.Developer.cs`, off by default) draws the counted body on the camera preview
+  with the "Body pose" page's skeleton (`PoseDrawing.cs`) and shows the position read on the card. The preview's Maximize
+  button makes it fill the conversation's area (Restore, or closing the camera, makes it small again), and while counting a
+  maximized preview shows the count over the picture.
+- Tested by `UnitTestJumpingJacks` on synthetic pictures (see `POSE.md`); not yet with a real person or Gemma 4.
 
-## The TF Lite pages and the About page
+## Meeting notes
 
-- The TF Lite tab's photo demos (`DemoPage` subclasses: Coco SSD MobileNet, YOLOX, PicoDet, hand gestures, body pose, Mobilenet, Inception; not D-FINE) have a Live Camera button where `LiveCamera.Supported` (Android, Mac Catalyst, Windows): `LiveDemoPage` runs the page's `PrepareAsync` once and its `Analyze(input, render)` on every frame (the page's default `RunAsync` uses the same two, so photo and camera share one model; classifiers set `DrawsOnPhoto` false and draw labels on live frames only), skipping frames while one is analyzed - on a Galaxy S10 30 fps at 12-23 ms, on an M1 with a Logitech StreamCam 30 fps at 6-9 ms.
-- `LiveCamera` no longer sets a frame size on Mac Catalyst (OpenCV's AVFoundation backend turned 640x480, larger than the StreamCam's active format, into an Objective-C exception that ended the app), scales frames over 960 px down, and retries empty first reads for 3 s (AVFoundation starts asynchronously); `LiveCamera.FrameRotation(front)` is the Android rotation the chat used.
-- The demo's About page lists the TensorFlow Lite, LiteRT and LiteRT-LM versions (not XNNPACK, though Mac Catalyst's static tfliteextern is built without it) - LiteRT's and LiteRT-LM's from the `Emgu.LiteRT` / `Emgu.LiteRT.LM` assembly versions, since neither C API has a version function; LiteRT-LM's is shown once `liblitert-lm` loads (in the background), "older than 0.18.0" for an older library and "Not included" without one - and links "Open-source licences" (`LicensesPage.cs`: grouped, searchable, each entry with its licence text) built from `Resources/Raw/licenses.json.gz`, which `Emgu.LiteRT.Example/Maui/tools/make_licenses.py` generates - rerun it after changing packages, native dependencies, models or assets: the .NET packages `dotnet list package --include-transitive` reports for Android, iOS and Mac Catalyst (licences from the NuGet cache; Microsoft's and the AndroidX bindings grouped), the Bazel repositories `deps(//c:litert-lm)` and our runtime targets depend on (licence files from `bazel_output/*/external`, Rust crates with their Cargo licence, build-only and other-platform crates left out), OpenCV and the libraries its build information lists in Emgu CV's runtime, and a hand-kept list of models (all Apache-2.0 per their Hugging Face cards), fonts (Inter OFL-1.1, Open Sans and Material Symbols Apache-2.0), data and services (GeoNames and Open-Meteo CC BY 4.0, Wikipedia CC BY-SA 4.0, Frankfurter, Tavily); texts not on the machine are fetched at pinned versions with curl into `tools/.license_cache` (gitignored).
-- On Mac Catalyst a long label in a `Theme.CenteredScroll` column widened its card and was cut off instead of wrapping, so the pages limit such labels to the column's width (`LicensesPage.LimitWidth`).
+- `record_meeting` (in the `write_document` tool group, so it adds no stub; `Emgu.LiteRT.LM.Agents`' `MeetingNotes.cs`, the
+  demo's `MeetingFeature.cs`) works on Android 13+, iOS and Mac Catalyst - wherever `SpeechRecognizer` works. The call lasts
+  as long as the recording.
+- Recording: `MicrophoneSoundSource` (through `MicrophoneGate`, so the sound monitors pause) feeds `MeetingAudioChunker`, which
+  cuts 30-50 s pieces at the quietest 200 ms. Each piece is written down by the platform's speech recognizer while the
+  recording goes on. The card shows the end of the transcript, Pause, and Stop and write notes. On Android the monitoring
+  foreground service keeps it going with the screen off; on iOS the screen is kept on.
+- After Stop, the model writes the notes with `AskModelOnceAsync` (`MeetingNotes.WriteAsync`): from the whole transcript if it
+  fits, else from section summaries - combined again if still too long - with Summary, Key points, Decisions, Action items and
+  Open questions. They show in the card.
+- The notes and the timed transcript are saved as a Word document with the reply, the transcript is attached as the chat's
+  document for later questions, and the notes go back to the model. There are no speaker labels.
+- Tested by `UnitTestMeetingNotes`; not yet tried with a real meeting.
+
+## The TF Lite pages, the live camera and the About page
+
+- The TF Lite tab's photo demos (`DemoPage` subclasses: COCO SSD MobileNet, YOLOX, PicoDet, hand gestures, body pose,
+  MobileNet, Inception; not D-FINE) have a Live Camera button where `LiveCamera.Supported` (Android, Mac Catalyst, Windows).
+  `LiveDemoPage` runs the page's `PrepareAsync` once and its `Analyze(input, render)` on every frame, skipping frames while
+  one is analyzed. The page's default `RunAsync` uses the same two, so photo and camera share one model; classifiers set
+  `DrawsOnPhoto` false and draw labels on live frames only. On a Galaxy S10: 30 fps at 12-23 ms; on an M1 with a Logitech
+  StreamCam: 30 fps at 6-9 ms.
+- `LiveCamera` doesn't set a frame size on Mac Catalyst any more (OpenCV's AVFoundation backend turned 640x480, larger than the
+  StreamCam's active format, into an Objective-C exception that ended the app). It scales frames over 960 px down, and retries
+  empty first reads for 3 s (AVFoundation starts asynchronously). `LiveCamera.FrameRotation(front)` is the Android rotation
+  the chat used.
+- The About page lists the TensorFlow Lite, LiteRT and LiteRT-LM versions (not XNNPACK, though Mac Catalyst's static
+  tfliteextern is built without it). LiteRT's and LiteRT-LM's come from the `Emgu.LiteRT` and `Emgu.LiteRT.LM` assembly
+  versions, since neither C API has a version function. LiteRT-LM's is shown once `liblitert-lm` loads (in the background):
+  "older than 0.18.0" for an older library, and "Not included" without one.
+- It links "Open-source licences" (`LicensesPage.cs`: grouped, searchable, each entry with its licence text), built from
+  `Resources/Raw/licenses.json.gz`, which `tools/make_licenses.py` generates. Rerun it after changing packages, native
+  dependencies, models or assets. It collects:
+  - the .NET packages `dotnet list package --include-transitive` reports for Android, iOS and Mac Catalyst (licences from the
+    NuGet cache; Microsoft's and the AndroidX bindings grouped);
+  - the Bazel repositories that `deps(//c:litert-lm)` and our runtime targets depend on (licence files from
+    `bazel_output/*/external`; Rust crates with their Cargo licence; build-only and other-platform crates left out);
+  - OpenCV and the libraries its build information lists in Emgu CV's runtime;
+  - a hand-kept list of models (all Apache-2.0 per their Hugging Face cards), fonts (Inter OFL-1.1, Open Sans and Material
+    Symbols Apache-2.0), data and services (GeoNames and Open-Meteo CC BY 4.0, Wikipedia CC BY-SA 4.0, Frankfurter, Tavily).
+  - Texts not on the machine are fetched at pinned versions with curl into `tools/.license_cache` (gitignored).
+- On Mac Catalyst a long label in a `Theme.CenteredScroll` column widened its card and was cut off instead of wrapping, so the
+  pages limit such labels to the column's width (`LicensesPage.LimitWidth`).
+
+## Platform notes
+
+- The chat (and its `Emgu.LiteRT.LM` and `.LM.Models` references) is enabled for Windows, iOS, Android and Mac Catalyst. On
+  Android, iOS and Mac Catalyst the demo also references the `Emgu.LiteRT.Runtime/Maui/LM/{Android,iOS,Mac}` add-on projects,
+  which carry `liblitert-lm.so` and `libGemmaModelConstraintProvider.so`, the two xcframeworks, and the macOS dylibs.
+- Verified on the arm64 API 35 emulator with Qwen3, including a fix: the transcript scrolls to `Math.Max(0, content -
+  viewport)` rather than `double.MaxValue`, which Android doesn't clamp, so it scrolled the transcript out of view.
+- Like the Mac Catalyst app, the iOS app needs the UIScene life cycle (`Platforms/iOS/Info.plist`'s
+  `UIApplicationSceneManifest` and `SceneDelegate.cs`), or UIKit kills it at launch when it's built with the iOS 27 SDK.
+  Building it with Xcode 27 needs `-p:ValidateXcodeVersion=false`.

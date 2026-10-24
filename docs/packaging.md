@@ -26,3 +26,41 @@ The NuGet packages, the native runtime packages and their add-ons, and versionin
 ## Versioning
 
 - There is no `tensorflow/` submodule — it was removed once the Windows CMake path was proven to work without it (LiteRT downloads the TF source it needs itself). The overall package version (`CPACK_PACKAGE_VERSION_*` in the top-level `CMakeLists.txt`, and `litertextern/tfliteextern/CMakeLists.txt`'s own version) is read from `litert/litert/version.bzl` (`LITERT_EXPERIMENTAL_VERSION`) via `cmake/modules/LitertVersion.cmake`, plus the git commit count. Exception: the TFLite-versioned packages (`Emgu.TF.Lite`, `Emgu.LiteRT.Tflite.Models`, `Emgu.TF.Lite.runtime.windows`) use the TFLite version, i.e. TensorFlow's `TF_VERSION` (`EMGU_TFLITE_PACKAGE_VERSION` = `<TF_VERSION>.<commit count>`, e.g. 2.22.0.N). Every native build writes a `tflite_version.txt` next to its libraries (the Bazel scripts from `$(bazel info output_base)/external/org_tensorflow/tensorflow/tf_version.bzl`, the CMake build from the TensorFlow it downloads), the same way as `tflite_with_xnnpack.txt`; the top-level `CMakeLists.txt` reads all of them under `lib/` (highest wins, with a warning if they differ - e.g. a CMake-built 2.21.0 next to Bazel-built 2.22.0) and falls back to the LiteRT version when there are none. The root `Directory.Build.props` (from `cmake/Directory.Build.props.in`, imported at the end of each project's own props) only sets `Version` when the project hasn't, so the Tflite projects' version isn't overridden. The MAUI runtime's `PackageReference` to `Emgu.TF.Lite.runtime.windows` uses that version too; `ProjectReference`s to the Tflite projects pick it up automatically.
+
+## GPU accelerator packages (OpenCL, Metal)
+
+- **Android, OpenCL.** LiteRT's OpenCL accelerator `libLiteRtOpenClAccelerator.so` is a LiteRT-LM prebuilt
+  (`prebuilt/android_{arm64,x86_64}`; self-contained, using only Android system libraries). `bazel_build_tflite_android`
+  copies it to `lib/android/<abi>/`, and the optional `Emgu.LiteRT.OpenCL.runtime.maui.android` package embeds it
+  (`Emgu.LiteRT.Runtime/Maui/OpenCL/Android/`; props and README from `cmake/Emgu.LiteRT.OpenCL.runtime.maui.android.*.in`;
+  `EMGU_LITERT_OPENCL_MAUI_ANDROID_NUGET_ID`). It has arm64-v8a and x86_64 only and depends on
+  `Emgu.LiteRT.runtime.maui.android`; nothing depends on it. It is a LiteRT plugin, so `CompiledModel` can use it with
+  `HwAccelerators.Gpu` too, though only LiteRT-LM was tested. The demo references it.
+- **Duplicate native libraries in the Android add-ons.** When an add-on is packed, .NET for Android unpacks the referenced
+  base project's `.aar` (`obj/.../lp/<n>/jl/jni/`) and adds its `libLiteRt.so` and `libtfliteextern.so` to the add-on's
+  `EmbeddedNativeLibrary` items (with `%(OriginalFile)` set), which put another copy of them for every ABI into the add-on's
+  `.aar`. So both add-ons - this one and `Emgu.LiteRT.LM.runtime.maui.android` - have an
+  `EmguExcludeReferencedNativeLibraries` target (before `_CreateAarCache`) that removes the items with `%(OriginalFile)`; the
+  base package they depend on provides them. Verified: the OpenCL package went from 16 to 4.1 MB, the LM package from 37 to
+  26 MB, and an Android app referencing only the two add-on packages gets one copy of each library.
+- **Mac Catalyst, Metal.** LiteRT's Metal accelerator `libLiteRtMetalAccelerator.dylib` is a LiteRT-LM prebuilt
+  (`prebuilt/macos_arm64`; arm64, macOS 14+, using only system frameworks). `bazel_build_tflite_macos darwin_arm64` copies it
+  to `lib/runtimes/osx/native/`, and the optional `Emgu.LiteRT.Metal.runtime.maui.macos` package puts it in
+  `Contents/MonoBundle` (`Emgu.LiteRT.Runtime/Maui/Metal/Mac/`; `EMGU_LITERT_METAL_MAUI_MACOS_NUGET_ID`; props and README from
+  `cmake/Emgu.LiteRT.Metal.runtime.maui.macos.*.in`). It depends on `Emgu.LiteRT.LM.runtime.maui.macos`, the only package with
+  a Catalyst `libLiteRt.dylib`, which loads the plugin by name from its own folder - verified in the test runner and in the
+  Catalyst app.
+- **Plain macOS .NET apps, Metal.** The same plugin ships in the optional `Emgu.LiteRT.Metal.runtime.macos` package
+  (`cmake/Emgu.LiteRT.Metal.runtime.macos.Package.{nuspec,README.md}.in`, generated into
+  `platforms/nuget/Emgu.LiteRT.Metal.runtime.macos/` and packed by its `CMakeLists.txt` like `Emgu.LiteRT.runtime.macos`, only
+  when `lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib` exists - `HAVE_MACOS_LITERT_METAL`; it goes in
+  `runtimes/osx/native` and depends on `Emgu.LiteRT.runtime.macos`). `Emgu.LiteRT.Runtime/Mac`'s `.projitems` copies the
+  plugin to in-repo projects' output when it exists.
+- **Finding the plugin on macOS.** libLiteRt dlopens its plugins by bare file name, which on macOS only finds them on the
+  library search path or in the current folder: a console app using these packages couldn't load the plugin unless it was
+  started from `runtimes/osx/native`. So `Emgu.LiteRT.Util.AcceleratorPlugins.Load()` (`Emgu.LiteRT.Util/AcceleratorPlugins.cs`,
+  once per process) dlopens `libLiteRtMetalAccelerator.dylib` by full path from the app folder or
+  `runtimes/{osx,osx-arm64,maccatalyst-arm64}/native` on macOS and Mac Catalyst, and LiteRT's later dlopen then returns the
+  loaded library. `Emgu.LiteRT`'s `Environment` calls it before `LiteRtCreateEnvironment` (LiteRT registers its accelerators
+  when the environment is created), and `Emgu.LiteRT.LM`'s `Engine` before creating an engine with a "gpu" backend. Verified
+  with a console app started from `/`, both a portable build (`runtimes/osx/native`) and an `-r osx-arm64` build.
