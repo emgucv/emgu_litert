@@ -176,7 +176,7 @@ tool selection, arguments and final replies with offline fake tools. Run it afte
 
 Saved chats open at once and their messages appear about a frame's worth at a time, newest first (`ChatView`);
 streamed replies share a coalesced scroll request.
-The [Pixel Fold investigation](PixelFoldFreeze.md) records the measured stalls, device checks and remaining limits.
+The [Pixel Fold investigation](history/PixelFoldFreeze.md) records the measured stalls, device checks and remaining limits.
 Debug builds retain `UiStallWatchdog` logs in the app data folder as `ui_stalls.log`.
 
 ## The home page
@@ -200,7 +200,7 @@ The chat page is built on the reusable chat libraries:
   `SpeechRecognizer` for voice messages.
 - `Emgu.LiteRT.LM.Chat.Sqlite`'s `ChatHistoryStore`, the base of the page's `ChatStore`, for saved chats.
 
-See [CHAT_LIBRARY_PLAN.md](CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HISTORY_PLAN.md](CHAT_VOICE_AND_HISTORY_PLAN.md);
+See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HISTORY_PLAN.md](history/CHAT_VOICE_AND_HISTORY_PLAN.md);
 [`Emgu.LiteRT.Example/MauiChat`](../MauiChat/README.md) is a minimal app using them.
 
 - Choosing a model you haven't downloaded yet shows its download size (Qwen3 0.6B ~350 MB, Qwen3.5 0.8B ~1.3 GB,

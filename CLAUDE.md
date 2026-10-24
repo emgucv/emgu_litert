@@ -103,3 +103,4 @@ On Linux the tests use the Ubuntu natives in `lib/runtimes/ubuntu-x64/native/` a
 | `Emgu.LiteRT.Example/Maui/ARCHITECTURE.md` | changing the MAUI demo's structure: folders, the chat page's partials, `IChatHost` and the feature classes, `SearchEmbedder`, `Maui.Demo.Lite.Core` |
 | `Emgu.LiteRT.Example/Maui/FEATURES.md` | working on a chat feature: how each works and what was measured or verified on which device (compaction, GPU, documents, photos, images, server, voice, device actions, MCP, camera and sound monitors, exercise, meeting notes) |
 | `Emgu.LiteRT.Example/Maui/README.md` | building, running, deploying and debugging the demo |
+| `Emgu.LiteRT.Example/Maui/TODO.md` | looking for open work on the demo (finished items, and the completed plans, are in `Emgu.LiteRT.Example/Maui/history/`, under the same item numbers) |
