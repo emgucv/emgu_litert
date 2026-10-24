@@ -15,3 +15,7 @@ How the MAUI demo's code is organised. Moved here from CLAUDE.md, which keeps th
 ## Settings
 
 - The chat page's settings are `ChatSettings` (`Maui.Demo.Lite.Core/Chat/ChatSettings.cs`): typed properties with their Preferences keys and defaults in one place, never throwing (a failing store gives the default). The app's instance is `AppSettings.Chat` (`Services/AppSettings.cs`, over MAUI's Preferences); tests use `InMemorySettingsStore` (`UnitTestChatSettings`). Add a new setting there rather than calling `Preferences` directly.
+
+## The model list
+
+- The chat page's models are `ChatModelCatalog` (`Maui.Demo.Lite.Core/Chat/ChatModelCatalog.cs`): `ModelChoice`, `ModelOption` (name, file, size, what each model can do, its GPUs and context window), the list per `ChatPlatform` (Gemma 4 12B on Mac Catalyst and Windows only) and `Create(choice)`. The page takes its own platform's list; `UnitTestChatModelCatalog` checks it. Add a model there.

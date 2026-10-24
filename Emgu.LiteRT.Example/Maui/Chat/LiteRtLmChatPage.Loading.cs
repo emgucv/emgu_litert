@@ -231,18 +231,7 @@ public partial class LiteRtLmChatPage
 #endif
     }
 
-    private static LanguageModel CreateModel(ModelChoice choice)
-    {
-        switch (choice)
-        {
-            case ModelChoice.Qwen3: return new Qwen3();
-            case ModelChoice.Qwen35_0_8B_VL: return new Qwen35_0_8B_VL();
-            case ModelChoice.Qwen35_4B: return new Qwen35_4B();
-            case ModelChoice.Gemma4E4B: return new Gemma4E4B();
-            case ModelChoice.Gemma4_12B: return new Gemma4_12B();
-            default: return new Gemma4E2B();
-        }
-    }
+    private static LanguageModel CreateModel(ModelChoice choice) => ChatModelCatalog.Create(choice);
 
     private void ClearLoading(ModelChoice choice)
     {

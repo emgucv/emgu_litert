@@ -33,54 +33,6 @@ namespace Maui.Demo.Lite;
 /// </summary>
 public partial class LiteRtLmChatPage : ContentPage
 {
-    private enum ModelChoice
-    {
-        Qwen3,
-        Qwen35_0_8B_VL,
-        Qwen35_4B,
-        Gemma4E2B,
-        Gemma4E4B,
-        Gemma4_12B,
-        // A model on the user's own server (LiteRtLmChatPage.Server.cs).
-        Server
-    }
-
-    private sealed class ModelOption
-    {
-        public string Name;
-        public string Detail;
-        public ModelChoice Choice;
-        // Whether the model accepts images / audio (LanguageModel.SupportsImages / SupportsAudio) and can
-        // think, known before the model is loaded so the controls can be shown right away.
-        public bool AcceptsImages;
-        public bool AcceptsAudio;
-        public bool CanThink = true;
-        // Whether the model can call tools (LanguageModel.SupportsToolCalling), for web search.
-        public bool CanUseTools;
-        // Whether the model writes useful summaries: when a chat outgrows its context window, earlier messages
-        // are summarized; otherwise (the small models) they are dropped.
-        public bool CanSummarize;
-        // The context window Automatic picks, or 0 for LanguageModel's default (4096). Gemma 4's files allow up to
-        // ~32k, but the model re-reads the whole conversation when a saved chat is opened or after compacting, which
-        // grows with the window: a full 4k chat took 2 minutes on a Pixel Fold's CPU (8k: almost 6, with 1.5 GB of
-        // its RAM left; on its GPU 8 s at 4k), 8k 27 s (E2B) / 61 s (E4B) on an Apple Silicon Mac. Phones use it too
-        // for models with tools: the agent's instructions and tool definitions alone grew to ~4k tokens (goals
-        // pushed them past a 4k window, so every message failed).
-        public int DesktopContextTokens;
-        // The largest context window the model's file allows, which Settings > Context window can choose up to; 0 for
-        // a model with a fixed window (the Qwen files: 4096).
-        public int MaxContextTokens;
-        // Whether the model runs on the GPU (when "Use the GPU" is on): on Android with LiteRT's OpenCL accelerator
-        // (if the device has OpenCL; only Gemma 4 E2B has been tested there), on Mac Catalyst with its Metal one.
-        // Gemma4 uses 32-bit activations on the GPU - see Performance.md.
-        public bool GpuOnAndroid;
-        public bool GpuOnMac;
-        public bool GpuOnWindows;
-        // The model file (to tell whether it is downloaded) and its download size, for the download prompt.
-        public DownloadableFile File;
-        public string Size;
-    }
-
     // An image or audio file attached to the message being written.
     private sealed class PendingAttachment
     {
@@ -118,24 +70,17 @@ public partial class LiteRtLmChatPage : ContentPage
     // Material Symbols "mic" (Apache 2.0); the bundled icon font is a subset without it.
     private const string MicPathData = "M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z";
 
-    private static readonly ModelOption[] Models = new[]
-    {
-        new ModelOption { Name = "Qwen3 0.6B", File = Qwen3.ModelFile, Size = "350 MB", Detail = "~350 MB download. Fast, and can think before answering.", Choice = ModelChoice.Qwen3, GpuOnWindows = true },
-        new ModelOption { Name = "Qwen3.5 0.8B", File = Qwen35_0_8B_VL.ModelFile, Size = "1.3 GB", Detail = "~1.3 GB download. Newer and still fast; understands images.", Choice = ModelChoice.Qwen35_0_8B_VL, AcceptsImages = true, CanThink = false, GpuOnWindows = true },
-        new ModelOption { Name = "Qwen3.5 4B", File = Qwen35_4B.ModelFile, Size = "2.8 GB", Detail = "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", Choice = ModelChoice.Qwen35_4B, CanSummarize = true, GpuOnWindows = true },
-        new ModelOption { Name = "Gemma 4 E2B", File = Gemma4E2B.ModelFile, Size = "2.6 GB", Detail = "~2.6 GB download. Understands images and speech, and can think before answering.", Choice = ModelChoice.Gemma4E2B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnAndroid = true, GpuOnMac = true, GpuOnWindows = true },
-        new ModelOption { Name = "Gemma 4 E4B", File = Gemma4E4B.ModelFile, Size = "3.7 GB", Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory.", Choice = ModelChoice.Gemma4E4B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnMac = true, GpuOnWindows = true },
-#if MACCATALYST || WINDOWS
-        // Large desktop model; GPU entries are enabled only for verified platform runtimes.
-        new ModelOption { Name = "Gemma 4 12B", File = Gemma4_12B.ModelFile, Size = "6.9 GB",
-#if WINDOWS
-            Detail = "~6.9 GB download. Large desktop model for code and harder questions. CPU only on Windows: GPU image inference failed compatibility testing. Needs substantial system memory.",
+    // The models this platform offers (Maui.Demo.Lite.Core's ChatModelCatalog).
+    private static readonly ModelOption[] Models = ChatModelCatalog.ModelsFor(
+#if ANDROID
+        ChatPlatform.Android);
+#elif MACCATALYST
+        ChatPlatform.MacCatalyst);
+#elif IOS
+        ChatPlatform.iOS);
 #else
-            Detail = "~6.9 GB download. The most capable - best for code and harder questions. Needs a Mac with 16 GB of memory.",
+        ChatPlatform.Windows);
 #endif
-            Choice = ModelChoice.Gemma4_12B, AcceptsImages = true, AcceptsAudio = true, CanUseTools = true, CanSummarize = true, DesktopContextTokens = 8192, MaxContextTokens = 32000, GpuOnMac = true },
-#endif
-    };
 
     // Layout: a one-line header, the conversation, and the message box with per-message toggle chips. The model
     // list and the settings open in bottom sheets on narrow screens, and sit in a side panel on wide ones.
