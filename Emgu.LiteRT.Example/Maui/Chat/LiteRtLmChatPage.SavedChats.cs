@@ -303,7 +303,7 @@ namespace Maui.Demo.Lite
                     }
                     StreamingBubble bubble = BubbleFor(item);
                     bubble.MessageId = record.Id;
-                    bubble.TargetLanguage = TranslationTarget(record.Language ?? lastUserLanguage);
+                    bubble.TargetLanguage = TranslationFeature.Target(record.Language ?? lastUserLanguage);
                     bubble.Translation = record.ThinkingTranslation;
                     bubble.ShowTranslation = !string.IsNullOrEmpty(record.ThinkingTranslation);
                     foreach (ChatSavedAttachment attachment in history.AttachmentsOf(item))
@@ -314,7 +314,7 @@ namespace Maui.Demo.Lite
                         else if (attachment.Kind == ImageFeature.GeneratedKind)
                             AddCard(bubble, Images.SavedImageView(await System.IO.File.ReadAllBytesAsync(attachment.Path)));
                     }
-                    _ = CheckThinkingLanguageAsync(bubble);
+                    _ = Translations.CheckThinkingLanguageAsync(bubble);
                 }
                 SetStatus($"Opening conversation: {history.Messages.Count} messages...");
                 await Task.Yield();

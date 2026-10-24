@@ -27,6 +27,10 @@ public partial class LiteRtLmChatPage : IChatHost
 
     private TaskFeature Tasks => _taskFeature ??= new TaskFeature(this);
 
+    private TranslationFeature _translationFeature;
+
+    private TranslationFeature Translations => _translationFeature ??= new TranslationFeature(this);
+
     void IChatHost.AddCardToReply(View card) => AddCard(_agentBubble, card);
 
     void IChatHost.SetStatus(string message) => SetStatus(message);
@@ -98,12 +102,22 @@ public partial class LiteRtLmChatPage : IChatHost
 
     Size IChatHost.PageSize => new Size(Width, Height);
 
-    bool IChatHost.IsBusy => _busy;
+    bool IChatHost.IsBusy => _busy || _reloadingCpuThreads;
 
     Task IChatHost.SendMessageAsync(string text) => SendAsync(text, new List<PendingAttachment>());
 
     Microsoft.Extensions.AI.IChatClient IChatHost.ChatClient => _clientProxy;
 
     string IChatHost.ToolSummary => TaskToolSummary();
+
+    bool IChatHost.ModelReady => ModelReady;
+
+    void IChatHost.SetBusy(bool busy) => SetBusy(busy);
+
+    async Task IChatHost.SaveThinkingTranslationAsync(int messageId, string language, string translation)
+    {
+        if (!IsPrivateChat)
+            await _store.SetThinkingTranslationAsync(messageId, language, translation);
+    }
 }
 #endif

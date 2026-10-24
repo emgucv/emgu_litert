@@ -169,9 +169,9 @@ namespace Maui.Demo.Lite
                 StreamingBubble bubble = reply.Tag as StreamingBubble;
                 if (bubble != null)
                 {
-                    bubble.TargetLanguage = TranslationTarget(info.Language);
+                    bubble.TargetLanguage = TranslationFeature.Target(info.Language);
                     bubble.Refresh();
-                    _ = CheckThinkingLanguageAsync(bubble);
+                    _ = Translations.CheckThinkingLanguageAsync(bubble);
                 }
                 MarkDocumentContextGiven(document);
                 UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));

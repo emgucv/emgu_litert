@@ -18,10 +18,14 @@ namespace Maui.Demo.Lite;
 // opened thinking offers "Translate to <language>": the model translates it in a conversation of its own (like the
 // summaries) - on request, so unread thinking costs nothing - and the translation is kept with the reply, with a way back to
 // the English. The language of a message is detected when it is sent (TextLanguage) and kept with it (MessageRecord.Language).
-public partial class LiteRtLmChatPage
+internal sealed class TranslationFeature
 {
+    private readonly IChatHost _host;
+
+    public TranslationFeature(IChatHost host) { _host = host; }
+
     // The language to translate into: that of the message a reply answers, unless it is English or not known.
-    private static string TranslationTarget(string language) =>
+    public static string Target(string language) =>
         string.IsNullOrEmpty(language) || language == "en" ? null : language;
 
     private static string LanguageName(string code, bool english)
@@ -39,7 +43,7 @@ public partial class LiteRtLmChatPage
 
     // A reply whose thinking is already in the language of the message (some models think in it) needs no translation:
     // only after this check does the row appear.
-    private async Task CheckThinkingLanguageAsync(StreamingBubble bubble)
+    public async Task CheckThinkingLanguageAsync(StreamingBubble bubble)
     {
         string thinking = bubble.Thinking;
         if (bubble.TargetLanguage == null || string.IsNullOrEmpty(thinking))
@@ -77,7 +81,7 @@ public partial class LiteRtLmChatPage
         SemanticProperties.SetDescription(bubble.TranslateRow, bubble.TranslateRow.Text);
     }
 
-    private async void OnTranslateTapped(StreamingBubble bubble)
+    public async void OnTranslateTapped(StreamingBubble bubble)
     {
         if (bubble.Translating || bubble.TargetLanguage == null)
             return;
@@ -87,39 +91,38 @@ public partial class LiteRtLmChatPage
             ShowTranslation(bubble);
             return;
         }
-        if (_busy || _reloadingCpuThreads)
+        if (_host.IsBusy)
         {
-            SetStatus("Hang on - still answering.");
+            _host.SetStatus("Hang on - still answering.");
             return;
         }
-        if (!ModelReady)
+        if (!_host.ModelReady)
         {
-            SetStatus("Load the model first.");
+            _host.SetStatus("Load the model first.");
             return;
         }
         string thinking = bubble.Thinking;
         string language = bubble.TargetLanguage;
         bubble.Translating = true;
         ShowTranslation(bubble);
-        SetBusy(true);
-        SetStatus("Translating the thinking...");
+        _host.SetBusy(true);
+        _host.SetStatus("Translating the thinking...");
         try
         {
             string translation = await TranslateTextAsync(thinking, language);
             bubble.Translation = translation;
             bubble.ShowTranslation = true;
-            if (!IsPrivateChat)
-                await _store.SetThinkingTranslationAsync(bubble.MessageId, language, translation);
-            SetStatus(null);
+            await _host.SaveThinkingTranslationAsync(bubble.MessageId, language, translation);
+            _host.SetStatus(null);
         }
         catch (Exception ex)
         {
-            SetStatus("Couldn't translate: " + ex.Message);
+            _host.SetStatus("Couldn't translate: " + ex.Message);
         }
         finally
         {
             bubble.Translating = false;
-            SetBusy(false);
+            _host.SetBusy(false);
             ShowTranslation(bubble);
         }
     }
@@ -130,24 +133,20 @@ public partial class LiteRtLmChatPage
     private async Task<string> TranslateTextAsync(string text, string language)
     {
         string name = LanguageName(language, true);
-        Func<string, int> countTokens = TokenCounter;
-        int pieceTokens = Math.Max(200, Math.Min(1200, (ContextWindow - 500) / 3));
+        Func<string, int> countTokens = _host.TokenCounter;
+        int contextWindow = _host.ContextWindow;
+        int pieceTokens = Math.Max(200, Math.Min(1200, (contextWindow - 500) / 3));
         List<string> pieces = await Task.Run(() => LanguageText.SplitForTranslation(text, pieceTokens, countTokens));
         string Prompt(string piece) =>
             "Translate the text below into " + name + ". It is an AI assistant's private reasoning notes. Keep code, file names, " +
             "tool or function names (words with underscores), numbers and the Markdown formatting unchanged. " +
             "Write only the translation, nothing else.\n\nText:\n" + piece;
         var result = new StringBuilder();
-        if (SelectedChoice == ModelChoice.Server)
-        {
-            foreach (string piece in pieces)
-                result.Append(result.Length > 0 ? "\n\n" : "").Append(await SummarizeOnServerAsync(Prompt(piece)));
-            return result.ToString();
-        }
         foreach (string piece in pieces)
         {
             // A language can need more tokens than the English (Hindi, Thai: about three times).
-            string translated = await AskModelOnceAsync(Prompt(piece), Math.Max(256, Math.Min(ContextWindow - pieceTokens - 200, pieceTokens * 3)));
+            // (A server's model is asked with its own limits: AskModelOnceAsync summarizes on the server.)
+            string translated = await _host.AskModelOnceAsync(Prompt(piece), Math.Max(256, Math.Min(contextWindow - pieceTokens - 200, pieceTokens * 3)));
             if (translated.Length == 0)
                 throw new Exception("The translation is empty");
             result.Append(result.Length > 0 ? "\n\n" : "").Append(translated);

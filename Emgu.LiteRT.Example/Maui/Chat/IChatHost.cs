@@ -78,5 +78,12 @@ internal interface IChatHost
 
     // The tools the model can use, in words (for a planner).
     string ToolSummary { get; }
+
+    // Whether the model is loaded and ready; marking the page busy (the message box waits).
+    bool ModelReady { get; }
+    void SetBusy(bool busy);
+
+    // Keeps a reply's translated thinking with the saved chat (nothing in a private chat).
+    Task SaveThinkingTranslationAsync(int messageId, string language, string translation);
 }
 #endif
