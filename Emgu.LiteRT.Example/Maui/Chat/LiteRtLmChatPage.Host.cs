@@ -19,6 +19,10 @@ public partial class LiteRtLmChatPage : IChatHost
 
     private ImageFeature Images => _imageFeature ??= new ImageFeature(this);
 
+    private WrittenDocumentsFeature _writtenDocuments;
+
+    private WrittenDocumentsFeature WrittenDocuments => _writtenDocuments ??= new WrittenDocumentsFeature(this);
+
     void IChatHost.AddCardToReply(View card) => AddCard(_agentBubble, card);
 
     void IChatHost.SetStatus(string message) => SetStatus(message);
@@ -29,7 +33,7 @@ public partial class LiteRtLmChatPage : IChatHost
 
     Func<string, int> IChatHost.TokenCounter => TokenCounter;
 
-    Task IChatHost.SaveDocumentAsync(GeneratedDocument document) => SaveWrittenDocumentAsync(document, CancellationToken.None);
+    Task IChatHost.SaveDocumentAsync(GeneratedDocument document) => WrittenDocuments.SaveAsync(document, CancellationToken.None);
 
     void IChatHost.AttachDocument(byte[] bytes, string fileName)
     {

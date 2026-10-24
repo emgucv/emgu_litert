@@ -87,7 +87,7 @@ namespace Maui.Demo.Lite
                 List<(string Kind, string MediaType, byte[] Data)> drawn;
                 drawn = Images.Drawn();
                 // And the documents it wrote.
-                drawn.AddRange(TakeWrittenDocuments());
+                drawn.AddRange(WrittenDocuments.Take());
                 ChatSavedExchange saved = await _store.SaveExchangeAsync(id, userItem, reply, drawn, steps);
                 info.MessageId = saved.MessageId;
                 await _store.SetLanguageAsync(saved.MessageId, info.Language);
@@ -309,8 +309,8 @@ namespace Maui.Demo.Lite
                     foreach (ChatSavedAttachment attachment in history.AttachmentsOf(item))
                     {
                         // A document the reply wrote, or a picture it drew: cards above it, not given to the model.
-                        if (attachment.Kind == DocumentKind)
-                            AddSavedDocumentCard(bubble, attachment.MediaType, await System.IO.File.ReadAllBytesAsync(attachment.Path));
+                        if (attachment.Kind == WrittenDocumentsFeature.Kind)
+                            AddCard(bubble, WrittenDocuments.SavedCard(attachment.MediaType, await System.IO.File.ReadAllBytesAsync(attachment.Path)));
                         else if (attachment.Kind == ImageFeature.GeneratedKind)
                             AddCard(bubble, Images.SavedImageView(await System.IO.File.ReadAllBytesAsync(attachment.Path)));
                     }

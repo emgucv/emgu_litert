@@ -20,42 +20,45 @@ namespace Maui.Demo.Lite;
 // model's Markdown): a card above the reply with Open and Share, saved with the reply as an attachment of kind
 // "document" (its file name in the media type, "...; name=Packing list.docx"), shown again when the chat is reopened and,
 // like the generated pictures, never given back to the model.
-public partial class LiteRtLmChatPage
+internal sealed class WrittenDocumentsFeature
 {
-    private const string DocumentKind = "document";
+    public const string Kind = "document";
+    private readonly IChatHost _host;
     private readonly List<GeneratedDocument> _sendDocuments = new List<GeneratedDocument>();
 
-    private const string DocumentWritingInstructions = "When the user asks for a document or a file (Word, PDF, Markdown), write the whole " +
+    public WrittenDocumentsFeature(IChatHost host) { _host = host; }
+
+    public const string Instructions = "When the user asks for a document or a file (Word, PDF, Markdown), write the whole " +
         "content into create_document's content in Markdown - not into your reply - then say in one short sentence that it is ready.";
 
-    private Task<string> SaveWrittenDocumentAsync(GeneratedDocument document, CancellationToken cancellationToken)
+    // create_document's save: kept for the reply being written, with a card above it.
+    public Task<string> SaveAsync(GeneratedDocument document, CancellationToken cancellationToken)
     {
         lock (_sendDocuments)
             _sendDocuments.Add(document);
-        StreamingBubble bubble = _agentBubble;
         return MainThread.InvokeOnMainThreadAsync(() =>
         {
-            AddDocumentCard(bubble, document.FileName, document.MediaType, document.Format, document.Data);
+            _host.AddCardToReply(CreateCard(document.FileName, document.MediaType, document.Format, document.Data));
             UiStallWatchdog.Mark("create_document: " + document.FileName + ", " + document.Data.Length + " bytes");
             return AgentTools.DocumentCreatedResult(document);
         });
     }
 
-    private List<(string Kind, string MediaType, byte[] Data)> TakeWrittenDocuments()
+    // The documents written for the reply, to save with it.
+    public List<(string Kind, string MediaType, byte[] Data)> Take()
     {
         lock (_sendDocuments)
-            return _sendDocuments.Select(d => (DocumentKind, d.MediaType + "; name=" + d.FileName, d.Data)).ToList();
+            return _sendDocuments.Select(d => (Kind, d.MediaType + "; name=" + d.FileName, d.Data)).ToList();
     }
 
-    private void ClearWrittenDocuments()
+    public void Clear()
     {
         lock (_sendDocuments)
             _sendDocuments.Clear();
     }
 
-    // A saved chat's document: its name and type from the media type.
-    // A document a saved reply wrote, above it again when the chat is reopened.
-    private void AddSavedDocumentCard(StreamingBubble bubble, string mediaType, byte[] data)
+    // A document a saved reply wrote, for above it again when the chat is reopened: its name and type from the media type.
+    public View SavedCard(string mediaType, byte[] data)
     {
         string type = mediaType, name = "Document";
         int parameter = mediaType.IndexOf(';');
@@ -67,7 +70,7 @@ public partial class LiteRtLmChatPage
                 name = rest.Substring(5);
         }
         string format = type == DocumentWriter.PdfMediaType ? "PDF" : type == DocumentWriter.MarkdownMediaType ? "Markdown" : "Word";
-        AddDocumentCard(bubble, name, type, format, data);
+        return CreateCard(name, type, format, data);
     }
 
     private static string SizeText(long bytes) =>
@@ -75,7 +78,7 @@ public partial class LiteRtLmChatPage
             : (bytes / 1048576.0).ToString("0.0", CultureInfo.InvariantCulture) + " MB";
 
     // The card above the reply bubble (or at the end of a restored transcript).
-    private void AddDocumentCard(StreamingBubble bubble, string fileName, string mediaType, string format, byte[] data)
+    private View CreateCard(string fileName, string mediaType, string format, byte[] data)
     {
         Button Action(string text, string description)
         {
@@ -149,7 +152,7 @@ public partial class LiteRtLmChatPage
             Content = content
         };
         SemanticProperties.SetDescription(card, "Document " + fileName + ", " + format);
-        AddCard(bubble, card);
+        return card;
     }
 
     // Open and Share need a file: written to the cache, in a folder of its own so the name stays as it is.

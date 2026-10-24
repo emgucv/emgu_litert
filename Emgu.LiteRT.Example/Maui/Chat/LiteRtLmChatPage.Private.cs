@@ -133,7 +133,7 @@ namespace Maui.Demo.Lite
             ClearPendingAttachments();
             _promptEditor.Text = string.Empty;
             Images.ClearDrawn();
-            ClearWrittenDocuments();
+            WrittenDocuments.Clear();
             _agentBubble = null;
             _statusLabel.Text = string.Empty;
             _statusLabel.IsVisible = false;

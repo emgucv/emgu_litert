@@ -63,7 +63,7 @@ namespace Maui.Demo.Lite
         {
             ClearCameraTurn();
             Images.ClearDrawn();
-            ClearWrittenDocuments();
+            WrittenDocuments.Clear();
             UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, agent {3}, think {4}, web {5}",
                 prompt.Length, attachments.Count, SelectedOption.Name, UseAgent, _thinkingSwitch.IsToggled, _webSearchSwitch.IsToggled));
             // With read-aloud on (or in a voice chat) the reply is read while it is written.
