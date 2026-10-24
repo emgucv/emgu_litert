@@ -212,6 +212,27 @@ namespace Maui.Demo.Lite
             SetStatus(null);
             return ready && ModelReady;
         }
+
+        // The tools the plan may use, by name, for the planner.
+        private string TaskToolSummary()
+        {
+            var tools = new List<string> { "date and time", "calculator", "unit and currency conversion", "weather", "Wikipedia" };
+            if (_webSearchSwitch.IsToggled)
+                tools.Add("web search and page reading");
+            tools.AddRange(ToolRouter.Groups.Select(g => g.Name.Replace('_', ' ')));
+            return string.Join(", ", tools);
+        }
+
+        // One question to the model in a request of its own (like a summary): its reply. The conversation's client takes it as
+        // a new conversation and is given the chat again with the next message.
+        private async Task<string> AskModelOnceAsync(string prompt, int maxTokens)
+        {
+            if (SelectedChoice == ModelChoice.Server)
+                return await SummarizeOnServerAsync(prompt);
+            ChatResponse response = await _clientProxy.GetResponseAsync(new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, prompt) },
+                new ChatOptions { MaxOutputTokens = maxTokens, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } });
+            return new ChatReply(response.Text ?? string.Empty).Text.Trim();
+        }
     }
 }
 

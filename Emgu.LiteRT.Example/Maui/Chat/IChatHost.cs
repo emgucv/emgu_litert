@@ -72,5 +72,11 @@ internal interface IChatHost
     // Whether a message is being answered; and sending one as if the user had typed it.
     bool IsBusy { get; }
     Task SendMessageAsync(string text);
+
+    // The conversation's chat client (the model's or the server's, with the tools), for requests of a feature's own.
+    Microsoft.Extensions.AI.IChatClient ChatClient { get; }
+
+    // The tools the model can use, in words (for a planner).
+    string ToolSummary { get; }
 }
 #endif

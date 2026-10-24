@@ -23,34 +23,20 @@ namespace Maui.Demo.Lite;
 // and last the final answer is written from the results into the reply. Tools that change something outside the app still ask
 // with their own Confirm / Cancel cards. The saved chat holds the request and the final answer (the plan card isn't saved);
 // the model is given the conversation again with the next message.
-public partial class LiteRtLmChatPage
+internal sealed class TaskFeature
 {
+    private readonly IChatHost _host;
+
+    public TaskFeature(IChatHost host) { _host = host; }
+
+    // The chat client of a message the Plan chip is on for.
+    public IChatClient CreateClient(string request, IList<DataContent> attachments) => new TaskModeClient(this, request, attachments);
+
     // Completed by the card's buttons: true to run the plan, false to just answer. (A test completes it.)
     private TaskCompletionSource<bool> _taskDecision;
     // The plan being run (for the card's sake and for tests).
     private TaskPlan _taskPlan;
     private TaskCard _taskCard;
-
-    // The tools the plan may use, by name, for the planner.
-    private string TaskToolSummary()
-    {
-        var tools = new List<string> { "date and time", "calculator", "unit and currency conversion", "weather", "Wikipedia" };
-        if (_webSearchSwitch.IsToggled)
-            tools.Add("web search and page reading");
-        tools.AddRange(ToolRouter.Groups.Select(g => g.Name.Replace('_', ' ')));
-        return string.Join(", ", tools);
-    }
-
-    // One question to the model in a request of its own (like a summary): its reply. The conversation's client takes it as
-    // a new conversation and is given the chat again with the next message.
-    private async Task<string> AskModelOnceAsync(string prompt, int maxTokens)
-    {
-        if (SelectedChoice == ModelChoice.Server)
-            return await SummarizeOnServerAsync(prompt);
-        ChatResponse response = await _clientProxy.GetResponseAsync(new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, prompt) },
-            new ChatOptions { MaxOutputTokens = maxTokens, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } });
-        return new ChatReply(response.Text ?? string.Empty).Text.Trim();
-    }
 
     // A task, as the chat client of the message that asks for it (ChatConversation.SendAsync with this client): it plans
     // the task, shows the plan above the reply and waits for Run (or "Just answer"); then each step runs as a request of its
@@ -59,13 +45,15 @@ public partial class LiteRtLmChatPage
     // break up, or answered without the plan: the message goes to the model as usual.
     private sealed class TaskModeClient : IChatClient
     {
-        private readonly LiteRtLmChatPage _page;
+        private readonly TaskFeature _feature;
+        private readonly IChatHost _host;
         private readonly string _request;
         private readonly IList<DataContent> _attachments;
 
-        public TaskModeClient(LiteRtLmChatPage page, string request, IList<DataContent> attachments)
+        public TaskModeClient(TaskFeature feature, string request, IList<DataContent> attachments)
         {
-            _page = page;
+            _feature = feature;
+            _host = feature._host;
             _request = request;
             _attachments = attachments;
         }
@@ -82,26 +70,30 @@ public partial class LiteRtLmChatPage
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages,
             ChatOptions options = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken token = default)
         {
-            LiteRtLmChatPage page = _page;
-            IChatClient client = page._clientProxy;
-            page.SetStatus("Planning...");
+            IChatClient client = _host.ChatClient;
+            _host.SetStatus("Planning...");
             UiStallWatchdog.Mark("Task mode: planning");
-            List<string> steps = TaskPlan.Parse(await page.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, page.TaskToolSummary()), 400));
+            List<string> steps = TaskPlan.Parse(await _host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _host.ToolSummary), 400));
             bool run = false;
             TaskPlan plan = null;
             TaskCard card = null;
             if (steps.Count >= 2)
             {
                 plan = new TaskPlan(steps);
-                page._taskPlan = plan;
+                _feature._taskPlan = plan;
                 var decision = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                page._taskDecision = decision;
-                card = await MainThread.InvokeOnMainThreadAsync(() => page.AddTaskCard(page._agentBubble, plan, decision));
-                page._taskCard = card;
-                page.SetStatus("Review the plan, then run it.");
+                _feature._taskDecision = decision;
+                card = await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    TaskCard created = _feature.CreateTaskCard(plan, decision);
+                    _host.AddCardToReply(created.View);
+                    return created;
+                });
+                _feature._taskCard = card;
+                _host.SetStatus("Review the plan, then run it.");
                 using (token.Register(() => decision.TrySetCanceled(token)))
                     run = await decision.Task;
-                page._taskDecision = null;
+                _feature._taskDecision = null;
                 if (!run)
                     await MainThread.InvokeOnMainThreadAsync(() => card.Close("Answering without a plan"));
             }
@@ -110,7 +102,7 @@ public partial class LiteRtLmChatPage
             if (!run)
             {
                 // Not a task to break up: answered as usual.
-                page.SetStatus("Generating...");
+                _host.SetStatus("Generating...");
                 await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(messages, options, token))
                     yield return update;
                 yield break;
@@ -126,7 +118,7 @@ public partial class LiteRtLmChatPage
                     continue;
                 step.State = TaskPlan.State.Running;
                 await MainThread.InvokeOnMainThreadAsync(card.Refresh);
-                page.SetStatus(string.Format("Step {0} of {1}: {2}", i + 1, plan.Steps.Count, step.Text));
+                _host.SetStatus(string.Format("Step {0} of {1}: {2}", i + 1, plan.Steps.Count, step.Text));
                 UiStallWatchdog.Mark("Task mode: step " + (i + 1));
                 // A request of its own: the task, the plan and the results so far are in the message.
                 var contents = new List<AIContent>();
@@ -189,7 +181,7 @@ public partial class LiteRtLmChatPage
             }
             await MainThread.InvokeOnMainThreadAsync(() => card.Close("Done"));
             // The final answer, from the results, in the reply.
-            page.SetStatus("Writing the answer...");
+            _host.SetStatus("Writing the answer...");
             var final = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, plan.FinalPrompt(_request)) };
             await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(final, options, token))
                 yield return update;
@@ -224,7 +216,7 @@ public partial class LiteRtLmChatPage
 
     // The plan above the reply: its steps with their state and result, and the buttons - Run, Edit and "Just answer" until it
     // runs, then Stop.
-    private TaskCard AddTaskCard(StreamingBubble before, TaskPlan plan, TaskCompletionSource<bool> decision)
+    private TaskCard CreateTaskCard(TaskPlan plan, TaskCompletionSource<bool> decision)
     {
         var card = new TaskCard();
         bool running = false, finished = false;
@@ -391,7 +383,6 @@ public partial class LiteRtLmChatPage
             Refresh();
         };
         Refresh();
-        AddCard(before, card.View);
         return card;
     }
 }

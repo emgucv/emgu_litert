@@ -130,7 +130,7 @@ namespace Maui.Demo.Lite
                 _pendingReader = reader;
 
                 List<DataContent> contents = attachments.Select(a => new DataContent(a.Data, a.MediaType) { Name = a.Name }).ToList();
-                IChatClient client = planTask ? new TaskModeClient(this, prompt, contents) : null;
+                IChatClient client = planTask ? Tasks.CreateClient(prompt, contents) : null;
                 ChatMessageItem reply = null;
                 for (int attempt = 0; ; attempt++)
                 {

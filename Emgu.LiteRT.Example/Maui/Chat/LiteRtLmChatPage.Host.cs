@@ -23,6 +23,10 @@ public partial class LiteRtLmChatPage : IChatHost
 
     private WrittenDocumentsFeature WrittenDocuments => _writtenDocuments ??= new WrittenDocumentsFeature(this);
 
+    private TaskFeature _taskFeature;
+
+    private TaskFeature Tasks => _taskFeature ??= new TaskFeature(this);
+
     void IChatHost.AddCardToReply(View card) => AddCard(_agentBubble, card);
 
     void IChatHost.SetStatus(string message) => SetStatus(message);
@@ -97,5 +101,9 @@ public partial class LiteRtLmChatPage : IChatHost
     bool IChatHost.IsBusy => _busy;
 
     Task IChatHost.SendMessageAsync(string text) => SendAsync(text, new List<PendingAttachment>());
+
+    Microsoft.Extensions.AI.IChatClient IChatHost.ChatClient => _clientProxy;
+
+    string IChatHost.ToolSummary => TaskToolSummary();
 }
 #endif
