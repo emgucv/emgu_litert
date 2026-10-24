@@ -2489,6 +2489,9 @@ namespace Maui.Demo.Lite
         {
             _ = CloseCameraAsync();
             _cameraFront = false;
+#if ANDROID
+            UpdateCameraSwitch();
+#endif
             _visualRuntime?.Clear();
             ClearSoundMonitors();
             ForgetMonitorRequests();

@@ -21,6 +21,7 @@ public partial class LiteRtLmChatPage
     private VisualActionRegistry _visualActions;
     private AlertAudioCoordinator _alertAudio;
     private Border _visualMonitorPanel;
+    private Label _visualMonitorTitle;
     private VerticalStackLayout _visualMonitorRows;
     private int _visualUiQueued;
     private long _visualFrameId, _lastVisualFrame;
@@ -75,7 +76,11 @@ public partial class LiteRtLmChatPage
 #endif
         _visualRuntime = new VisualMonitorRuntime(_visualAgents, _visualActions, actionCoordinator: _alertAudio);
         _visualRuntime.Changed += QueueVisualMonitorUi;
-        _visualMonitorRows = new VerticalStackLayout { Spacing = 6 };
+        // The title stays (UpdateVisualMonitorUi rebuilds the rows after it), so it can be the handle to drag the card by.
+        _visualMonitorTitle = new Label { Text = "Camera monitors · session only", FontSize = 13, FontFamily = Theme.TitleFont,
+            TextColor = Theme.PrimaryText, MinimumHeightRequest = 32, VerticalTextAlignment = TextAlignment.Center };
+        SemanticProperties.SetHint(_visualMonitorTitle, "Drag to move the camera monitors card.");
+        _visualMonitorRows = new VerticalStackLayout { Spacing = 6, Children = { _visualMonitorTitle } };
         _visualMonitorPanel = Theme.Card(new ScrollView { Content = _visualMonitorRows }, 8);
         _visualMonitorPanel.WidthRequest = 310;
         _visualMonitorPanel.MaximumHeightRequest = 220;
@@ -85,6 +90,7 @@ public partial class LiteRtLmChatPage
         _visualMonitorPanel.IsVisible = false;
         _visualMonitorPanel.ZIndex = 6;
         _mainColumn.Add(_visualMonitorPanel, 0, 1);
+        AttachPanelDrag(_visualMonitorTitle, _visualMonitorPanel, MoveVisualMonitorPanel);
         _cameraPanel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == IsVisibleProperty.PropertyName && !_cameraPanel.IsVisible) PauseVisualFeed();
@@ -93,7 +99,16 @@ public partial class LiteRtLmChatPage
         {
             _visualMonitorPanel.WidthRequest = Math.Min(310, Math.Max(180, _mainColumn.Width - 16));
             _visualMonitorPanel.MaximumHeightRequest = Math.Max(90, Math.Min(220, _chatView.Height - 16));
+            MoveVisualMonitorPanel(_visualMonitorPanel.TranslationX, _visualMonitorPanel.TranslationY);
         };
+        _visualMonitorPanel.SizeChanged += (_, _) => MoveVisualMonitorPanel(_visualMonitorPanel.TranslationX, _visualMonitorPanel.TranslationY);
+    }
+
+    // The card sits at the bottom left, so it moves right (positive X) and up (negative Y) from there.
+    private void MoveVisualMonitorPanel(double x, double y)
+    {
+        _visualMonitorPanel.TranslationX = Math.Clamp(x, 0, Math.Max(0, _mainColumn.Width - _visualMonitorPanel.Width - 16));
+        _visualMonitorPanel.TranslationY = Math.Clamp(y, -Math.Max(0, _chatView.Height - _visualMonitorPanel.Height - 16), 0);
     }
 
     private Task DisposeVisualMonitoringAsync()
@@ -119,10 +134,8 @@ public partial class LiteRtLmChatPage
         UpdateCameraLabel();
         var monitors = _visualRuntime.Snapshot();
         _visualMonitorPanel.IsVisible = monitors.Count > 0;
-        _visualMonitorRows.Children.Clear();
+        while (_visualMonitorRows.Children.Count > 1) _visualMonitorRows.Children.RemoveAt(_visualMonitorRows.Children.Count - 1);
         if (monitors.Count == 0) return;
-        _visualMonitorRows.Children.Add(new Label { Text = "Camera monitors · session only", FontSize = 13,
-            FontFamily = Theme.TitleFont, TextColor = Theme.PrimaryText });
         if (_camera?.IsRunning != true || !_cameraPanel.IsVisible)
         {
             var open = MonitorButton("Open live feed");

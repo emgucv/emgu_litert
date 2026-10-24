@@ -26,6 +26,7 @@ namespace Maui.Demo.Lite
         private readonly Label _statusLabel;
         private readonly LoadingOverlay _loading;
         private readonly Border _flip;
+        private readonly Label _flipLabel;   // names the camera it switches to ("Flip" read as mirroring the picture)
         private readonly object _gate = new object();
         private LiveCamera _camera;
         private bool _front;
@@ -88,11 +89,11 @@ namespace Maui.Demo.Lite
                     Children =
                     {
                         Theme.MakeIcon(Theme.GlyphCamera, Colors.White, 20),
-                        new Label { Text = "Flip", FontFamily = Theme.TitleFont, FontSize = 17, TextColor = Colors.White, VerticalOptions = LayoutOptions.Center }
+                        (_flipLabel = new Label { FontFamily = Theme.TitleFont, FontSize = 17, TextColor = Colors.White, VerticalOptions = LayoutOptions.Center })
                     }
                 }
             };
-            SemanticProperties.SetDescription(_flip, "Switch between the back and the selfie camera");
+            UpdateFlipLabel();
             _flip.OnTap(async () => await FlipAsync());
 #if ANDROID
             _flip.IsVisible = LiveCamera.FindCameraId(true) != null;
@@ -171,9 +172,16 @@ namespace Maui.Demo.Lite
                 await StartCameraAsync();
         }
 
+        private void UpdateFlipLabel()
+        {
+            _flipLabel.Text = _front ? "Back camera" : "Selfie camera";
+            SemanticProperties.SetDescription(_flip, _front ? "Switch to the back camera" : "Switch to the selfie camera");
+        }
+
         private async Task FlipAsync()
         {
             _front = !_front;
+            UpdateFlipLabel();
             await StopCameraAsync();
             await StartCameraAsync();
         }

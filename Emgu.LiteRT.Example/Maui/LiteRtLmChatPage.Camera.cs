@@ -38,9 +38,9 @@ public partial class LiteRtLmChatPage
 #if ANDROID
         if (LiveCamera.FindCameraId(true) != null)
         {
-            var flip = new Button { Text = "Flip", FontSize = 12, Padding = new Thickness(8, 0), MinimumHeightRequest = 40 };
+            var flip = _cameraSwitch = new Button { FontSize = 12, Padding = new Thickness(8, 0), MinimumHeightRequest = 40 };
             flip.Clicked += async (_, _) => await SwitchCameraAsync(!_cameraFront);
-            SemanticProperties.SetDescription(flip, "Switch between the back camera and the selfie camera");
+            UpdateCameraSwitch();
             header.ColumnDefinitions.Insert(1, new ColumnDefinition(GridLength.Auto));
             header.SetColumn(close, 2);
             header.Add(flip, 1);
@@ -76,7 +76,10 @@ public partial class LiteRtLmChatPage
         _cameraPanel.TranslationY = Math.Clamp(y, 0, Math.Max(0, _chatView.Height - _cameraPanel.Height - 16));
     }
 
-    private void AttachCameraDrag(View handle)
+    private void AttachCameraDrag(View handle) => AttachPanelDrag(handle, _cameraPanel, MoveCameraPanel);
+
+    // Drag-to-move for a floating panel: dragging the handle moves the panel through move(translationX, translationY), which clamps it.
+    private static void AttachPanelDrag(View handle, View panel, Action<double, double> move)
     {
         double startX = 0, startY = 0;
 #if ANDROID
@@ -91,8 +94,8 @@ public partial class LiteRtLmChatPage
             switch (motion.ActionMasked)
             {
                 case Android.Views.MotionEventActions.Down:
-                    startX = _cameraPanel.TranslationX;
-                    startY = _cameraPanel.TranslationY;
+                    startX = panel.TranslationX;
+                    startY = panel.TranslationY;
                     downX = motion.RawX;
                     downY = motion.RawY;
                     dragging = true;
@@ -100,7 +103,7 @@ public partial class LiteRtLmChatPage
                     break;
                 case Android.Views.MotionEventActions.Move when dragging:
                     double density = native.Resources.DisplayMetrics.Density;
-                    MoveCameraPanel(startX + (motion.RawX - downX) / density, startY + (motion.RawY - downY) / density);
+                    move(startX + (motion.RawX - downX) / density, startY + (motion.RawY - downY) / density);
                     break;
                 case Android.Views.MotionEventActions.Up:
                 case Android.Views.MotionEventActions.Cancel:
@@ -130,11 +133,11 @@ public partial class LiteRtLmChatPage
         {
             if (e.StatusType == GestureStatus.Started)
             {
-                startX = _cameraPanel.TranslationX; startY = _cameraPanel.TranslationY;
+                startX = panel.TranslationX; startY = panel.TranslationY;
             }
             else if (e.StatusType == GestureStatus.Running)
             {
-                MoveCameraPanel(startX + e.TotalX, startY + e.TotalY);
+                move(startX + e.TotalX, startY + e.TotalY);
             }
         };
         handle.GestureRecognizers.Add(pan);
@@ -157,6 +160,7 @@ public partial class LiteRtLmChatPage
             {
                 if (facing == "front" && LiveCamera.FindCameraId(true) == null) return "This phone has no selfie camera. Tell the user.";
                 _cameraFront = facing == "front";
+                UpdateCameraSwitch();
                 if (_camera != null) await CloseCameraCoreAsync();
             }
 #endif
@@ -209,12 +213,23 @@ public partial class LiteRtLmChatPage
 #endif
 
 #if ANDROID
-    // The Flip button: the other camera, with the monitors going on.
+    // The camera switch button names the camera it switches to ("Flip" read as mirroring the picture).
+    private Button _cameraSwitch;
+
+    private void UpdateCameraSwitch()
+    {
+        if (_cameraSwitch == null) return;
+        _cameraSwitch.Text = _cameraFront ? "Back camera" : "Selfie camera";
+        SemanticProperties.SetDescription(_cameraSwitch, _cameraFront ? "Switch to the back camera" : "Switch to the selfie camera");
+    }
+
+    // The camera switch button: the other camera, with the monitors going on.
     private async Task SwitchCameraAsync(bool front)
     {
         if (front == _cameraFront) return;
         if (front && LiveCamera.FindCameraId(true) == null) { SetStatus("This phone has no selfie camera."); return; }
         _cameraFront = front;
+        UpdateCameraSwitch();
         await CloseCameraAsync();
         string result = await OpenCameraCoreAsync(CancellationToken.None, false);
         if (_camera?.IsRunning != true) SetStatus(result);

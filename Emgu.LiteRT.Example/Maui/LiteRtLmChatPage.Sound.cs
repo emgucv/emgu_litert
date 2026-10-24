@@ -39,11 +39,16 @@ public partial class LiteRtLmChatPage
     private string _soundStatus;
     private Border _soundPanel;
     private VerticalStackLayout _soundRows;
+    private Label _soundTitle;
     private int _soundUiQueued;
 
     private void BuildSoundMonitoring()
     {
-        _soundRows = new VerticalStackLayout { Spacing = 6 };
+        // The title stays (UpdateSoundMonitorUi rebuilds the rows after it), so it can be the handle to drag the card by.
+        _soundTitle = new Label { Text = "Sound monitors · session only", FontSize = 13, FontFamily = Theme.TitleFont,
+            TextColor = Theme.PrimaryText, MinimumHeightRequest = 32, VerticalTextAlignment = TextAlignment.Center };
+        SemanticProperties.SetHint(_soundTitle, "Drag to move the sound monitors card.");
+        _soundRows = new VerticalStackLayout { Spacing = 6, Children = { _soundTitle } };
         _soundPanel = Theme.Card(new ScrollView { Content = _soundRows }, 8);
         _soundPanel.WidthRequest = 310;
         _soundPanel.MaximumHeightRequest = 220;
@@ -53,14 +58,24 @@ public partial class LiteRtLmChatPage
         _soundPanel.IsVisible = false;
         _soundPanel.ZIndex = 6;
         _mainColumn.Add(_soundPanel, 0, 1);
+        AttachPanelDrag(_soundTitle, _soundPanel, MoveSoundPanel);
         _chatView.SizeChanged += (_, _) =>
         {
             _soundPanel.WidthRequest = Math.Min(310, Math.Max(180, _mainColumn.Width - 16));
             _soundPanel.MaximumHeightRequest = Math.Max(90, Math.Min(220, _chatView.Height - 16));
+            MoveSoundPanel(_soundPanel.TranslationX, _soundPanel.TranslationY);
         };
+        _soundPanel.SizeChanged += (_, _) => MoveSoundPanel(_soundPanel.TranslationX, _soundPanel.TranslationY);
         StartMonitoringStopButton();
         MicrophoneGate.Pausing = PauseSoundListeningAsync;
         MicrophoneGate.Released = () => { _soundPaused = false; _ = UpdateSoundListeningAsync(); };
+    }
+
+    // The card sits at the bottom right, so it moves left (negative X) and up (negative Y) from there.
+    private void MoveSoundPanel(double x, double y)
+    {
+        _soundPanel.TranslationX = Math.Clamp(x, -Math.Max(0, _mainColumn.Width - _soundPanel.Width - 16), 0);
+        _soundPanel.TranslationY = Math.Clamp(y, -Math.Max(0, _chatView.Height - _soundPanel.Height - 16), 0);
     }
 
     private async Task DisposeSoundMonitoringAsync()
@@ -313,9 +328,8 @@ public partial class LiteRtLmChatPage
         var monitors = _soundRuntime?.Snapshot() ?? (IReadOnlyList<SoundMonitorInfo>)Array.Empty<SoundMonitorInfo>();
         _soundPanel.IsVisible = monitors.Count > 0;
         _ = SyncMonitoringServiceAsync();
-        _soundRows.Children.Clear();
+        while (_soundRows.Children.Count > 1) _soundRows.Children.RemoveAt(_soundRows.Children.Count - 1);
         if (monitors.Count == 0) return;
-        _soundRows.Children.Add(new Label { Text = "Sound monitors · session only", FontSize = 13, FontFamily = Theme.TitleFont, TextColor = Theme.PrimaryText });
         foreach (var monitor in monitors)
         {
             _soundRows.Children.Add(new Label { Text = monitor.Description, FontSize = 12, TextColor = Theme.PrimaryText });
