@@ -1,0 +1,6 @@
+# Commits that only reformat code; `git blame` skips them with
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (GitHub reads this file by itself.)
+
+# Use file-scoped namespaces throughout the MAUI demo
+daf9a8996602644201d35345eee3ce698727b20a
