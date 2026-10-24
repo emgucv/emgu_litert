@@ -19,7 +19,7 @@ public partial class LiteRtLmChatPage
 
     private void StartMonitoringStopButton() => MonitoringForegroundService.StopRequested = () => MainThread.BeginInvokeOnMainThread(async () =>
     {
-        _meeting?.Ended.TrySetResult("the user pressed Stop in the notification");
+        Meetings.Stop("the user pressed Stop in the notification");
         if (_soundRuntime == null) return;
         foreach (var monitor in _soundRuntime.Snapshot()) _soundRuntime.SetEnabled(monitor.Id, false);
         await UpdateSoundListeningAsync();
@@ -32,7 +32,7 @@ public partial class LiteRtLmChatPage
     private async Task SyncMonitoringServiceAsync()
     {
         var monitors = _soundRuntime?.Snapshot().Where(m => m.Enabled).ToList() ?? new List<SoundMonitorInfo>();
-        MeetingSession meeting = _meeting;
+        string meeting = Meetings.ActiveTitle;
         if (meeting == null && (_soundDisposed || monitors.Count == 0))
         {
             if (_monitoringKey == null) return;
@@ -43,7 +43,7 @@ public partial class LiteRtLmChatPage
         bool camera = meeting == null && monitors.Any(m => m.ClipSeconds > 0 || m.TakePhoto);
         int heard = monitors.Sum(m => m.Heard);
         string title = meeting != null ? "Recording a meeting" : monitors.Count == 1 ? "Listening for a sound" : "Listening for " + monitors.Count + " sounds";
-        string text = meeting != null ? (meeting.Title.Length > 0 ? meeting.Title + " · " : "") + "writing down what is said"
+        string text = meeting != null ? (meeting.Length > 0 ? meeting + " · " : "") + "writing down what is said"
             : string.Join(", ", monitors.Select(m => m.Sound.Replace('_', ' '))) + (heard > 0 ? " · heard " + heard + (heard == 1 ? " time" : " times") : "");
         string key = title + "|" + text + "|" + camera;
         if (key == _monitoringKey && (!camera || MonitoringForegroundService.CameraActive)) return;

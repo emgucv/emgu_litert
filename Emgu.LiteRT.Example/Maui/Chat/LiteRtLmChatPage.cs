@@ -467,8 +467,8 @@ namespace Maui.Demo.Lite
             if (!Navigation.NavigationStack.Contains(this) && !Navigation.ModalStack.Contains(this))
             {
                 _ = DisposeVisualMonitoringAsync();
-                DisposeExerciseCounting();
-                _meeting?.Ended.TrySetResult("the chat was closed");
+                _exerciseFeature?.Dispose();
+                _meetingFeature?.Stop("the chat was closed");
                 ReleaseAlertSounds();
                 _ = DisposeSoundMonitoringAsync();
                 _sessionVersion++;

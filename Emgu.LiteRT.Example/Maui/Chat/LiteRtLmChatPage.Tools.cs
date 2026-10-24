@@ -45,8 +45,8 @@ public partial class LiteRtLmChatPage
                 rerunAfterStub: true),
             new ToolGroup(ChatToolGroups.Goals, ChatToolGroups.GoalsSummary, ChatToolGroups.GoalsKeywords,
                 // Counting jumping jacks comes with the goals: it logs toward them, and a group of its own would add a stub to every message.
-                () => GoalToolsForMessage().Cast<AITool>().Concat(ExerciseTools()),
-                () => JoinInstructions(_routeGoalInstructions, ExerciseTools().Any() ? ExerciseInstructions : null),
+                () => GoalToolsForMessage().Cast<AITool>().Concat(Exercises.Tools(_voiceMode)),
+                () => JoinInstructions(_routeGoalInstructions, Exercises.Tools(_voiceMode).Any() ? ExerciseFeature.Instructions : null),
                 text => AgentTools.MentionsGoal(_routeGoals, text)),
             new ToolGroup(ChatToolGroups.Photos,ChatToolGroups.PhotosSummary, ChatToolGroups.PhotosKeywords,
                 () => new AITool[] { AgentTools.FindPhotos(FindPhotosAsync) },
@@ -59,8 +59,8 @@ public partial class LiteRtLmChatPage
                 () => ChatSearchInstructions),
         };
         groups.Add(new ToolGroup(ChatToolGroups.WriteDocument, ChatToolGroups.WriteDocumentSummary, ChatToolGroups.WriteDocumentKeywords,
-            () => new AITool[] { AgentTools.CreateDocument(SaveWrittenDocumentAsync, () => _routePrompt) }.Concat(MeetingTools()),
-            () => JoinInstructions(DocumentWritingInstructions, MeetingTools().Any() ? MeetingInstructions : null)));
+            () => new AITool[] { AgentTools.CreateDocument(SaveWrittenDocumentAsync, () => _routePrompt) }.Concat(Meetings.Tools(_voiceMode)),
+            () => JoinInstructions(DocumentWritingInstructions, Meetings.Tools(_voiceMode).Any() ? MeetingFeature.Instructions : null)));
         if (ImageGenerationSupported)
             groups.Add(new ToolGroup(ChatToolGroups.ImageGeneration, ChatToolGroups.ImageGenerationSummary, ChatToolGroups.ImageGenerationKeywords,
                 () => new AITool[] { AgentTools.GenerateImage(GenerateImageAsync) },

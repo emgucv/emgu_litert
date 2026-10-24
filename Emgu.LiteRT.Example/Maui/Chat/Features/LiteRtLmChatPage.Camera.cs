@@ -122,7 +122,7 @@ public partial class LiteRtLmChatPage
             Dispatcher.Dispatch(() => MoveCameraPanel(x, y));
         }
         UpdateCameraMaximizeButton();
-        UpdateExerciseOverlay();
+        _exerciseFeature?.UpdateOverlay();
     }
 
     private void UpdateCameraMaximizeButton()
@@ -240,7 +240,7 @@ public partial class LiteRtLmChatPage
             _cameraPanel.IsVisible = true;
             _cameraLabel.Text = "Opening camera…";
             var camera = _camera = new LiveCamera { RotationDegrees = () => Volatile.Read(ref _cameraRotation), Front = _cameraFront };
-            camera.FrameReady = frame => { QueueCameraPreview(camera, frame); QueueVisualFrame(camera, frame); QueueExerciseFrame(camera, frame); };
+            camera.FrameReady = frame => { QueueCameraPreview(camera, frame); QueueVisualFrame(camera, frame); _exerciseFeature?.QueueFrame(camera, frame); };
             camera.Failed = _ =>
             {
                 PauseVisualFeed();
@@ -342,7 +342,7 @@ public partial class LiteRtLmChatPage
             if (_camera != camera) return;
             _previewFrame ??= new Mat();
             frame.CopyTo(_previewFrame);
-            DrawExercisePose(camera, _previewFrame);
+            _exerciseFeature?.DrawPose(camera, _previewFrame);
             // A selfie preview is a mirror; the frames the detectors, photos and clips get are not mirrored.
             if (_cameraFront) CvInvoke.Flip(_previewFrame, _previewFrame, Emgu.CV.CvEnum.FlipType.Horizontal);
             if (_previewQueued) return;

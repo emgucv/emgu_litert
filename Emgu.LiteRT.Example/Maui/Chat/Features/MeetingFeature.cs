@@ -16,15 +16,24 @@ namespace Maui.Demo.Lite;
 // the transcript is longer than the window), shown in the card; the notes and the transcript are saved as a Word document with the reply,
 // the transcript is attached to the chat as its document - so later questions get the passages they need - and the notes go back to the
 // model. Gemma 4 could listen to the audio itself, but at ~25 tokens a second an hour is ~90k tokens, far over its window.
-public partial class LiteRtLmChatPage
+internal sealed class MeetingFeature
 {
-    private const string MeetingInstructions =
+    public const string Instructions =
         "To record a meeting, lecture or conversation and take notes of it, call record_meeting: it records until the user presses Stop, " +
         "then returns the notes.";
 
     private static readonly TimeSpan MeetingLimit = TimeSpan.FromHours(3);
 
+    private readonly IChatHost _host;
     private MeetingSession _meeting;
+
+    public MeetingFeature(IChatHost host) { _host = host; }
+
+    // The meeting being recorded: its title ("" without one), or null.
+    public string ActiveTitle => _meeting?.Title;
+
+    // Ends the recording (the notes are then written, unless the chat is closing).
+    public void Stop(string reason) => _meeting?.Ended.TrySetResult(reason);
 
     private sealed class MeetingSession
     {
@@ -42,20 +51,20 @@ public partial class LiteRtLmChatPage
         public VerticalStackLayout Content;
     }
 
-    private static bool MeetingSupported =>
+    public static bool Supported =>
 #if ANDROID || IOS || MACCATALYST
         SpeechRecognizer.IsSupported;
 #else
         false;
 #endif
 
-    private IEnumerable<Microsoft.Extensions.AI.AITool> MeetingTools() =>
-        MeetingSupported && !_voiceMode ? new[] { AgentTools.RecordMeeting(RecordMeetingAsync) } : Array.Empty<Microsoft.Extensions.AI.AITool>();
+    public IEnumerable<Microsoft.Extensions.AI.AITool> Tools(bool voiceMode) =>
+        Supported && !voiceMode ? new[] { AgentTools.RecordMeeting(RecordMeetingAsync) } : Array.Empty<Microsoft.Extensions.AI.AITool>();
 
     private async Task<string> RecordMeetingAsync(string title, CancellationToken token)
     {
 #if ANDROID || IOS || MACCATALYST
-        if (!MeetingSupported)
+        if (!Supported)
             return "Writing down speech needs Android 13 or later with a speech recognizer, an iPhone, iPad or a Mac. Tell the user.";
         if (_meeting != null)
             return "A meeting is already being recorded. Tell the user.";
@@ -91,7 +100,7 @@ public partial class LiteRtLmChatPage
         // Without a background audio mode, iOS stops the microphone when the screen locks.
         MainThread.BeginInvokeOnMainThread(() => DeviceDisplay.Current.KeepScreenOn = true);
 #endif
-        await SyncMonitoringServiceAsync();
+        await _host.SyncBackgroundServiceAsync();
         Task transcribing = TranscribeMeetingAsync(session);
 
         string ending;
@@ -113,7 +122,7 @@ public partial class LiteRtLmChatPage
         if (last != null) QueueMeetingChunk(session, last);
         session.PendingSignal.Release();
         _meeting = null;
-        _ = SyncMonitoringServiceAsync();
+        _ = _host.SyncBackgroundServiceAsync();
 #if IOS
         MainThread.BeginInvokeOnMainThread(() => DeviceDisplay.Current.KeepScreenOn = false);
 #endif
@@ -124,7 +133,7 @@ public partial class LiteRtLmChatPage
             session.Time.Text = MeetingNotes.FormatTime(duration);
             session.Status.Text = "Writing down the last part…";
         });
-        SetStatus("Writing down the last part of the meeting...");
+        _host.SetStatus("Writing down the last part of the meeting...");
         await transcribing;
 
         string heading = string.IsNullOrWhiteSpace(session.Title) ? "Meeting notes " + session.Started.ToString("yyyy-MM-dd HH.mm") : session.Title;
@@ -142,11 +151,11 @@ public partial class LiteRtLmChatPage
         {
             try
             {
-                SetStatus("Writing the meeting notes...");
-                int maxPrompt = ContextWindow - MeetingNotes.NotesTokens - 300;
+                _host.SetStatus("Writing the meeting notes...");
+                int maxPrompt = _host.ContextWindow - MeetingNotes.NotesTokens - 300;
                 var progress = new Progress<string>(text => MainThread.BeginInvokeOnMainThread(() => session.Status.Text = text));
                 notes = await MeetingNotes.WriteAsync(session.Transcript, session.Title, duration,
-                    (prompt, maxTokens, _) => AskModelOnceAsync(prompt, maxTokens), TokenCounter, maxPrompt, progress, token);
+                    (prompt, maxTokens, _) => _host.AskModelOnceAsync(prompt, maxTokens), _host.TokenCounter, maxPrompt, progress, token);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -158,7 +167,7 @@ public partial class LiteRtLmChatPage
 
         GeneratedDocument document = DocumentWriter.Create(heading,
             MeetingNotes.DocumentMarkdown(heading, session.Started, duration, notes, session.Transcript), "word");
-        await SaveWrittenDocumentAsync(document, CancellationToken.None);
+        await _host.SaveDocumentAsync(document);
         string transcriptName = DocumentWriter.FileName(heading + " transcript", ".txt");
         string transcriptText = "Transcript of " + heading + ", " + session.Started.ToString("f") + "\n\n" + session.Transcript.Text();
         await MainThread.InvokeOnMainThreadAsync(() =>
@@ -169,9 +178,8 @@ public partial class LiteRtLmChatPage
             if (notes != null)
                 session.Content.Children.Add(new ReplyView { Text = notes, FontSize = 14, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) });
             // Questions about the meeting later get the transcript's passages they need, as for an attached document.
-            if (!SearchDownloadRequired)
-                AttachDocument(Encoding.UTF8.GetBytes(transcriptText), transcriptName);
-            SetStatus("Generating...");
+            _host.AttachDocument(Encoding.UTF8.GetBytes(transcriptText), transcriptName);
+            _host.SetStatus("Generating...");
         });
         return AgentTools.MeetingResultText(duration, words, notes, document.FileName, problem);
 #else
@@ -288,14 +296,14 @@ public partial class LiteRtLmChatPage
                 new HorizontalStackLayout { Spacing = 8, Margin = new Thickness(0, 4, 0, 0), Children = { session.Stop, session.Pause } }
             }
         };
-        AddCard(_agentBubble, new Border
+        _host.AddCardToReply(new Border
         {
             BackgroundColor = Theme.CardBackground, Stroke = Theme.RowBorder, StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) },
             Padding = new Thickness(14, 12), Margin = new Thickness(6, 2), MaximumWidthRequest = 520, HorizontalOptions = LayoutOptions.Start,
             Content = session.Content
         });
-        SetStatus("Recording the meeting…");
+        _host.SetStatus("Recording the meeting…");
     }
 
     private static void EndMeetingCard(MeetingSession session, string text)
