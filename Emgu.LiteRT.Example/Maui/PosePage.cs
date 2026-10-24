@@ -78,16 +78,9 @@ namespace Maui.Demo.Lite
             {
                 Summary = $"LiteRT {_detector.Backend} · {_preparedVariant} · {watch.ElapsedMilliseconds} ms" + (_detector.GpuFailure != null ? " · GPU unavailable, using CPU" : "")
             };
-            MCvScalar bone = new MCvScalar(247, 123, 61), joint = new MCvScalar(255, 255, 255), faint = new MCvScalar(160, 160, 160);
             foreach (Pose pose in poses)
             {
-                float[] L(int i) => pose.Landmarks[i];
-                System.Drawing.Point P(int i) => new System.Drawing.Point((int)(L(i)[0] * render.Width), (int)(L(i)[1] * render.Height));
-                // A landmark the model thinks is hidden is drawn grey.
-                foreach (int[] b in PoseTracker.Bones)
-                    CvInvoke.Line(render, P(b[0]), P(b[1]), L(b[0])[3] < 0.5f || L(b[1])[3] < 0.5f ? faint : bone, 2);
-                for (int i = 0; i < PoseTracker.LandmarkCount; i++)
-                    CvInvoke.Circle(render, P(i), 3, L(i)[3] < 0.5f ? faint : joint, -1);
+                PoseDrawing.Draw(render, pose.Landmarks);
                 int visible = pose.Landmarks.Count(p => p[3] >= 0.5f);
                 demo.Rows.Add(new ResultRow("Person", $"{visible} of 33 landmarks visible", pose.Presence));
             }

@@ -720,7 +720,9 @@ namespace Maui.Demo.Lite
                     new Label { Text = "Conversation memory", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) },
                     _memoryLabel,
                     _compactButton,
-                    _contextSection
+                    _contextSection,
+                    Theme.Divider(),
+                    BuildDeveloperSection()
                 }
             };
 

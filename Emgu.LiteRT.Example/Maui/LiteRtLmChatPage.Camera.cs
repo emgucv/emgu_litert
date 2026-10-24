@@ -23,6 +23,11 @@ public partial class LiteRtLmChatPage
     private int _previewVersion;
     private int _cameraRotation = 0;
     private bool _cameraFront;     // the selfie camera (Android); New chat goes back to the back camera
+    private bool _cameraMaximized; // the preview fills the conversation's area; closing the camera restores it
+    private Button _cameraMaximize;
+    private Border _cameraOverlay;          // the jumping jack count over the maximized preview (LiteRtLmChatPage.Exercise.cs)
+    private Label _cameraOverlayCount, _cameraOverlayDetail;
+    private double _cameraRestoreX, _cameraRestoreY;
     private const string CameraInstructions = ChatPlannerInstructions.Camera;
 
     private void BuildCameraPanel()
@@ -46,8 +51,22 @@ public partial class LiteRtLmChatPage
             header.Add(flip, 1);
         }
 #endif
-        var hint = new Label { Text = "Drag to move · Ask what you see", FontSize = 11, TextColor = Theme.SecondaryText };
-        _cameraPanel = Theme.Card(new VerticalStackLayout { Spacing = 4, Children = { header, _cameraPreview, hint } }, 8);
+        var hint = new Label { Text = "Drag to move · Ask what you see", FontSize = 11, TextColor = Theme.SecondaryText, VerticalTextAlignment = TextAlignment.Center };
+        _cameraMaximize = new Button { FontSize = 12, Padding = new Thickness(8, 0), MinimumHeightRequest = 36 };
+        _cameraMaximize.Clicked += (_, _) => SetCameraMaximized(!_cameraMaximized);
+        var footer = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
+        footer.Add(hint, 0); footer.Add(_cameraMaximize, 1);
+        _cameraOverlayCount = new Label { FontFamily = Theme.TitleFont, FontSize = 64, TextColor = Colors.White, LineHeight = 1 };
+        _cameraOverlayDetail = new Label { FontFamily = Theme.BodyFont, FontSize = 14, TextColor = Colors.White };
+        _cameraOverlay = new Border
+        {
+            BackgroundColor = Color.FromRgba(0, 0, 0, 0.55), StrokeThickness = 0, StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
+            Padding = new Thickness(14, 6, 14, 10), Margin = new Thickness(10), HorizontalOptions = LayoutOptions.Start, VerticalOptions = LayoutOptions.Start,
+            InputTransparent = true, IsVisible = false,
+            Content = new VerticalStackLayout { Children = { _cameraOverlayCount, _cameraOverlayDetail } }
+        };
+        var previewArea = new Grid { Children = { _cameraPreview, _cameraOverlay } };
+        _cameraPanel = Theme.Card(new VerticalStackLayout { Spacing = 4, Children = { header, previewArea, footer } }, 8);
         _cameraPanel.WidthRequest = 270;
         _cameraPanel.HorizontalOptions = LayoutOptions.End;
         _cameraPanel.VerticalOptions = LayoutOptions.Start;
@@ -60,14 +79,56 @@ public partial class LiteRtLmChatPage
         AttachCameraDrag(_cameraPreview);
         AttachCameraDrag(_cameraLabel);
         AttachCameraDrag(hint);
-        _chatView.SizeChanged += (_, _) =>
+        UpdateCameraMaximizeButton();
+        _chatView.SizeChanged += (_, _) => UpdateCameraPanelSize();
+        BuildVisualMonitoring();
+        BuildSoundMonitoring();
+    }
+
+    // Small: 270 wide with a 170-high preview, where it was dragged. Maximized: the conversation's whole area, less the header and footer.
+    private void UpdateCameraPanelSize()
+    {
+        if (_cameraMaximized)
+        {
+            _cameraPanel.WidthRequest = Math.Max(180, _mainColumn.Width - 16);
+            _cameraPreview.HeightRequest = Math.Max(70, _chatView.Height - 16 - 110);
+        }
+        else
         {
             _cameraPanel.WidthRequest = Math.Min(270, Math.Max(180, _mainColumn.Width - 16));
             _cameraPreview.HeightRequest = Math.Min(170, Math.Max(70, _chatView.Height - 100));
-            MoveCameraPanel(_cameraPanel.TranslationX, _cameraPanel.TranslationY);
-        };
-        BuildVisualMonitoring();
-        BuildSoundMonitoring();
+        }
+        MoveCameraPanel(_cameraPanel.TranslationX, _cameraPanel.TranslationY);
+    }
+
+    private void SetCameraMaximized(bool maximized)
+    {
+        if (_cameraMaximized == maximized) return;
+        _cameraMaximized = maximized;
+        if (maximized)
+        {
+            _cameraRestoreX = _cameraPanel.TranslationX;
+            _cameraRestoreY = _cameraPanel.TranslationY;
+            _cameraPanel.TranslationX = 0;
+            _cameraPanel.TranslationY = 0;
+        }
+        UpdateCameraPanelSize();
+        if (!maximized)
+        {
+            // Back where it was once the smaller size has been laid out (MoveCameraPanel clamps with the panel's measured size).
+            double x = _cameraRestoreX, y = _cameraRestoreY;
+            _cameraPanel.TranslationX = x;
+            _cameraPanel.TranslationY = y;
+            Dispatcher.Dispatch(() => MoveCameraPanel(x, y));
+        }
+        UpdateCameraMaximizeButton();
+        UpdateExerciseOverlay();
+    }
+
+    private void UpdateCameraMaximizeButton()
+    {
+        _cameraMaximize.Text = _cameraMaximized ? "Restore" : "Maximize";
+        SemanticProperties.SetDescription(_cameraMaximize, _cameraMaximized ? "Make the camera preview small again" : "Make the camera preview fill the conversation");
     }
 
     private void MoveCameraPanel(double x, double y)
@@ -281,6 +342,7 @@ public partial class LiteRtLmChatPage
             if (_camera != camera) return;
             _previewFrame ??= new Mat();
             frame.CopyTo(_previewFrame);
+            DrawExercisePose(camera, _previewFrame);
             // A selfie preview is a mirror; the frames the detectors, photos and clips get are not mirrored.
             if (_cameraFront) CvInvoke.Flip(_previewFrame, _previewFrame, Emgu.CV.CvEnum.FlipType.Horizontal);
             if (_previewQueued) return;
@@ -333,7 +395,7 @@ public partial class LiteRtLmChatPage
         DeviceDisplay.Current.MainDisplayInfoChanged -= CameraDisplayChanged;
         var camera = _camera;
         _camera = null;
-        if (_cameraPanel != null) _cameraPanel.IsVisible = false;
+        if (_cameraPanel != null) { SetCameraMaximized(false); _cameraPanel.IsVisible = false; }
         QueueVisualMonitorUi();
         _cameraPreview?.ClearFrame();
         lock (_previewGate)

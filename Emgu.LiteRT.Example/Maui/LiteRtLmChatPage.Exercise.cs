@@ -30,7 +30,12 @@ public partial class LiteRtLmChatPage
         public int Busy;                       // a frame is being read
         public long LastRepTicks;              // Stopwatch time of the last jumping jack, 0 before the first
         public bool PersonSeen;
+        public float[][] Landmarks;            // the latest frame's body, null without one (drawn on the preview in developer mode)
+        public JumpingJackCounter.Position Position;
         public Label Count, Status;
+        public int Target;
+        public string Time = "0:00";
+        public bool Finished;
     }
 
     private IEnumerable<Microsoft.Extensions.AI.AITool> ExerciseTools() =>
@@ -48,7 +53,7 @@ public partial class LiteRtLmChatPage
         if (_camera?.IsRunning != true)
             return opened + " Nothing could be counted without the camera. Tell the user.";
 
-        var session = new ExerciseSession();
+        var session = new ExerciseSession { Target = target };
         Button done = null;
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
@@ -93,7 +98,7 @@ public partial class LiteRtLmChatPage
         catch (Exception ex)
         {
             _exercise = null;
-            await MainThread.InvokeOnMainThreadAsync(() => { session.Status.Text = "Couldn't count: " + ex.Message; done.IsVisible = false; });
+            await MainThread.InvokeOnMainThreadAsync(() => { session.Status.Text = "Couldn't count: " + ex.Message; done.IsVisible = false; if (_overlaySession == session) _overlaySession = null; UpdateExerciseOverlay(); });
             return "Couldn't count jumping jacks: " + ex.Message + ". Tell the user.";
         }
         _exercise = null;
@@ -108,6 +113,9 @@ public partial class LiteRtLmChatPage
         {
             done.IsVisible = false;
             session.Count.Text = result.Count.ToString();
+            session.Time = FormatExerciseTime(watch.Elapsed);
+            session.Finished = true;
+            ShowExerciseOverlay(session);
             session.Status.Text = (result.Count == 1 ? "1 jumping jack" : result.Count + " jumping jacks") + " in " + FormatExerciseTime(watch.Elapsed)
                 + (logged != null ? "\n✓ " + logged.Substring(logged.IndexOf("Now: ", StringComparison.Ordinal) + 5) : "");
             session.Status.TextColor = logged != null ? Theme.Success : Theme.SecondaryText;
@@ -138,15 +146,56 @@ public partial class LiteRtLmChatPage
             if (_camera != session.Camera || _camera?.IsRunning != true) return "the camera was closed";
             string time = FormatExerciseTime(elapsed) + (seconds > 0 ? " of " + FormatExerciseTime(TimeSpan.FromSeconds(seconds)) : "");
             string hint = !session.PersonSeen ? "Stand back so the camera sees you from head to toe" : count == 0 ? "Go!" : "Keep going";
+            if (DeveloperMode)
+                hint += "\nPose: " + (Volatile.Read(ref session.Landmarks) == null ? "nobody" : session.Position.ToString().ToLowerInvariant());
+            session.Time = time;
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
                 session.Count.Text = count.ToString();
                 session.Status.Text = time + " · " + hint;
+                ShowExerciseOverlay(session);
             });
         }
     }
 
+    // The count over the maximized camera preview, where the card in the conversation is hidden; a finished count stays for 5 s.
+    private ExerciseSession _overlaySession;
+
+    private void ShowExerciseOverlay(ExerciseSession session)
+    {
+        _overlaySession = session;
+        UpdateExerciseOverlay();
+        if (session.Finished)
+            Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(5), () =>
+            {
+                if (_overlaySession != session) return;
+                _overlaySession = null;
+                UpdateExerciseOverlay();
+            });
+    }
+
+    private void UpdateExerciseOverlay()
+    {
+        if (_cameraOverlay == null) return;
+        ExerciseSession session = _overlaySession;
+        bool show = _cameraMaximized && session != null && _camera != null && session.Camera == _camera;
+        _cameraOverlay.IsVisible = show;
+        if (!show) return;
+        _cameraOverlayCount.Text = session.Counter.Count.ToString();
+        _cameraOverlayDetail.Text = (session.Finished ? "✓ " : "") + (session.Target > 0 ? "of " + session.Target + " " : "")
+            + (session.Counter.Count == 1 && session.Target <= 0 ? "jumping jack" : "jumping jacks") + " · " + session.Time;
+    }
+
     private static string FormatExerciseTime(TimeSpan time) => ((int)time.TotalMinutes) + ":" + time.Seconds.ToString("00");
+
+    // Developer mode: the latest body read while counting, drawn on a preview frame (before a selfie preview is mirrored, so it mirrors with it).
+    private void DrawExercisePose(LiveCamera camera, Mat preview)
+    {
+        ExerciseSession session = _exercise;
+        if (!DeveloperMode || session == null || session.Camera != camera) return;
+        float[][] landmarks = Volatile.Read(ref session.Landmarks);
+        if (landmarks != null) PoseDrawing.Draw(preview, landmarks);
+    }
 
     // Each camera frame while counting, unless one is still being read: the pose model and the counter, off the camera's thread.
     private void QueueExerciseFrame(LiveCamera camera, Mat frame)
@@ -161,13 +210,16 @@ public partial class LiteRtLmChatPage
             {
                 var poses = pose.Detect(copy);
                 float[][] landmarks = poses.Count > 0 ? poses[0].Landmarks : null;
-                if (landmarks != null && JumpingJackCounter.Read(landmarks, copy.Width, copy.Height) != JumpingJackCounter.Position.Unknown)
+                var position = landmarks != null ? JumpingJackCounter.Read(landmarks, copy.Width, copy.Height) : JumpingJackCounter.Position.Unknown;
+                if (position != JumpingJackCounter.Position.Unknown)
                     session.PersonSeen = true;
+                session.Position = position;
+                Volatile.Write(ref session.Landmarks, landmarks);
                 if (session.Counter.Update(landmarks, copy.Width, copy.Height))
                 {
                     Volatile.Write(ref session.LastRepTicks, Stopwatch.GetTimestamp());
                     int count = session.Counter.Count;
-                    MainThread.BeginInvokeOnMainThread(() => session.Count.Text = count.ToString());
+                    MainThread.BeginInvokeOnMainThread(() => { session.Count.Text = count.ToString(); ShowExerciseOverlay(session); });
                 }
             }
             catch (Exception ex) { Debug.WriteLine("Exercise frame failed: " + ex.Message); }
