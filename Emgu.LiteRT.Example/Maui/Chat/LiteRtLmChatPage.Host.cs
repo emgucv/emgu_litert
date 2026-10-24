@@ -31,6 +31,10 @@ public partial class LiteRtLmChatPage : IChatHost
 
     private TranslationFeature Translations => _translationFeature ??= new TranslationFeature(this);
 
+    private GoalsFeature _goalsFeature;
+
+    private GoalsFeature Goals => _goalsFeature ??= new GoalsFeature(this);
+
     void IChatHost.AddCardToReply(View card) => AddCard(_agentBubble, card);
 
     void IChatHost.SetStatus(string message) => SetStatus(message);
@@ -76,7 +80,7 @@ public partial class LiteRtLmChatPage : IChatHost
 
     void IChatHost.EndSoundMute() => EndSoundMute();
 
-    IAgentGoalStore IChatHost.Goals => GoalsOn ? _store : null;
+    IAgentGoalStore IChatHost.Goals => Goals.On ? _store : null;
 
     bool IChatHost.DeveloperMode => DeveloperMode;
 
@@ -113,6 +117,15 @@ public partial class LiteRtLmChatPage : IChatHost
     bool IChatHost.ModelReady => ModelReady;
 
     void IChatHost.SetBusy(bool busy) => SetBusy(busy);
+
+    ChatStore IChatHost.Store => _store;
+
+    bool IChatHost.IsPrivateChat => IsPrivateChat;
+
+    bool IChatHost.MemoryOn => _memorySwitch.IsToggled;
+
+    Task<string> IChatHost.PromptAsync(string title, string message, string accept, string cancel, string initialValue, int maxLength) =>
+        DisplayPromptAsync(title, message, accept, cancel, initialValue: initialValue, maxLength: maxLength);
 
     async Task IChatHost.SaveThinkingTranslationAsync(int messageId, string language, string translation)
     {

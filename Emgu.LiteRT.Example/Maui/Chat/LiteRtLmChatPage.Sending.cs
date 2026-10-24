@@ -207,7 +207,7 @@ namespace Maui.Demo.Lite
                 UpdateMemoryLabel();
                 // The agent may have saved or deleted a memory or a goal.
                 _ = RefreshMemoryCountAsync();
-                _ = RefreshGoalCountAsync();
+                _ = Goals.RefreshCountAsync();
                 _ = RefreshServerContextAsync();
             }
         }

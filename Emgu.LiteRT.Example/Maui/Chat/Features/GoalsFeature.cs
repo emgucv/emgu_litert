@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 
@@ -16,19 +17,25 @@ namespace Maui.Demo.Lite;
 // in a private chat. Each message's instructions list the goals with this period's progress, so "I ran today" is
 // logged without asking. Settings lists them with their progress, streak and history by period (GoalHistory), to edit, undo
 // the last entry or delete.
-public partial class LiteRtLmChatPage
+internal sealed class GoalsFeature
 {
     private const int MaxGoalLength = 800;
+    private readonly IChatHost _host;
     private Label _goalsLabel;
 
-    private bool GoalsOn => !IsPrivateChat && _memorySwitch.IsToggled;
+    public GoalsFeature(IChatHost host) { _host = host; }
 
-    private IEnumerable<Microsoft.Extensions.AI.AIFunction> GoalToolsForMessage() =>
-        GoalsOn ? AgentTools.Goals(_store) : Array.Empty<Microsoft.Extensions.AI.AIFunction>();
+    private ChatStore _store => _host.Store;
 
-    private async Task<string> GoalInstructionsAsync()
+    // Whether goals are kept: with "Remember things about me" on, never in a private chat.
+    public bool On => !_host.IsPrivateChat && _host.MemoryOn;
+
+    public IEnumerable<Microsoft.Extensions.AI.AIFunction> ToolsForMessage() =>
+        On ? AgentTools.Goals(_store) : Array.Empty<Microsoft.Extensions.AI.AIFunction>();
+
+    public async Task<string> InstructionsAsync()
     {
-        if (!GoalsOn)
+        if (!On)
             return null;
         try
         {
@@ -40,7 +47,7 @@ public partial class LiteRtLmChatPage
         }
     }
 
-    private View BuildGoalsSection()
+    public View BuildSection()
     {
         _goalsLabel = new Label
         {
@@ -51,7 +58,7 @@ public partial class LiteRtLmChatPage
             HorizontalOptions = LayoutOptions.Start
         };
         _goalsLabel.OnTap(OnGoalsTapped);
-        _ = RefreshGoalCountAsync();
+        _ = RefreshCountAsync();
         return new VerticalStackLayout
         {
             Spacing = 4,
@@ -70,9 +77,9 @@ public partial class LiteRtLmChatPage
         };
     }
 
-    private async Task RefreshGoalCountAsync()
+    public async Task RefreshCountAsync()
     {
-        if (_goalsLabel == null || IsPrivateChat) return;
+        if (_goalsLabel == null || _host.IsPrivateChat) return;
         int count = 0;
         try
         {
@@ -87,15 +94,15 @@ public partial class LiteRtLmChatPage
     // The goals in a sheet, each with its progress and Edit / Undo last / Delete.
     private async void OnGoalsTapped()
     {
-        if (IsPrivateChat) return;
+        if (_host.IsPrivateChat) return;
         IList<AgentGoal> goals = await _store.GetGoalsAsync();
         if (goals.Count == 0)
             return;
         var list = new VerticalStackLayout { Spacing = 2 };
         foreach (AgentGoal goal in goals)
             list.Children.Add(await BuildGoalRowAsync(goal, list));
-        await _sheet.ShowViewAsync("Your goals", list, "Close");
-        await RefreshGoalCountAsync();
+        await _host.ShowSheetAsync("Your goals", list, "Close");
+        await RefreshCountAsync();
     }
 
     private async Task<View> BuildGoalRowAsync(AgentGoal goal, VerticalStackLayout list)
@@ -148,8 +155,8 @@ public partial class LiteRtLmChatPage
         };
         edit.OnTap(async () =>
         {
-            string text = await DisplayPromptAsync("Edit goal", "The goal, with how much and how often, e.g. \"Read 20 pages a day\".",
-                "Save", "Cancel", initialValue: goal.Text, maxLength: 200);
+            string text = await _host.PromptAsync("Edit goal", "The goal, with how much and how often, e.g. \"Read 20 pages a day\".",
+                "Save", "Cancel", goal.Text, 200);
             if (string.IsNullOrWhiteSpace(text) || text.Trim() == goal.Text)
                 return;
             AgentGoal parsed = AgentGoal.FromText(text, goal.Created);
@@ -164,11 +171,11 @@ public partial class LiteRtLmChatPage
         });
         delete.OnTap(async () =>
         {
-            if (!await DisplayAlertAsync("Delete goal", "Delete \"" + goal.Text + "\" and its progress?", "Delete", "Cancel"))
+            if (!await _host.AskAsync("Delete goal", "Delete \"" + goal.Text + "\" and its progress?", "Delete", "Cancel"))
                 return;
             await _store.DeleteGoalAsync(goal.Id);
             list.Children.Remove(row);
-            await RefreshGoalCountAsync();
+            await RefreshCountAsync();
         });
         return row;
     }

@@ -45,7 +45,7 @@ public partial class LiteRtLmChatPage
                 rerunAfterStub: true),
             new ToolGroup(ChatToolGroups.Goals, ChatToolGroups.GoalsSummary, ChatToolGroups.GoalsKeywords,
                 // Counting jumping jacks comes with the goals: it logs toward them, and a group of its own would add a stub to every message.
-                () => GoalToolsForMessage().Cast<AITool>().Concat(Exercises.Tools(_voiceMode)),
+                () => Goals.ToolsForMessage().Cast<AITool>().Concat(Exercises.Tools(_voiceMode)),
                 () => JoinInstructions(_routeGoalInstructions, Exercises.Tools(_voiceMode).Any() ? ExerciseFeature.Instructions : null),
                 text => AgentTools.MentionsGoal(_routeGoals, text)),
             new ToolGroup(ChatToolGroups.Photos,ChatToolGroups.PhotosSummary, ChatToolGroups.PhotosKeywords,
@@ -95,9 +95,9 @@ public partial class LiteRtLmChatPage
     {
         _routeAttachments = attachments;
         _routePrompt = prompt;
-        try { _routeGoals = GoalsOn ? await _store.GetGoalsAsync() : new List<AgentGoal>(); }
+        try { _routeGoals = Goals.On ? await _store.GetGoalsAsync() : new List<AgentGoal>(); }
         catch (Exception) { _routeGoals = new List<AgentGoal>(); }
-        _routeGoalInstructions = await GoalInstructionsAsync();
+        _routeGoalInstructions = await Goals.InstructionsAsync();
         ToolRouter router = ToolRouter;
         if (_camera?.IsRunning == true || _visualRuntime.Snapshot().Any())
             router.Activate(ChatToolGroups.Camera);

@@ -85,5 +85,14 @@ internal interface IChatHost
 
     // Keeps a reply's translated thinking with the saved chat (nothing in a private chat).
     Task SaveThinkingTranslationAsync(int messageId, string language, string translation);
+
+    // The saved chats, memories and goals (SQLite); whether this is a private chat (nothing saved), and whether "Remember things about
+    // me" is on.
+    ChatStore Store { get; }
+    bool IsPrivateChat { get; }
+    bool MemoryOn { get; }
+
+    // A text prompt: the text entered, or null when cancelled.
+    Task<string> PromptAsync(string title, string message, string accept, string cancel, string initialValue, int maxLength);
 }
 #endif
