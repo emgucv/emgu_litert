@@ -77,7 +77,7 @@ namespace Maui.Demo.Lite
         private static readonly Regex FigureReference = new Regex(
             @"\b(fig(?:ure)?|chart|diagram|graph|photo|picture|image|illustration|map|plate)\.?\s*(\d+)\b", RegexOptions.IgnoreCase);
 
-        private readonly HorizontalStackLayout _documentBar;
+        private HorizontalStackLayout _documentBar;
         private DocumentState _document;
         private EmbeddingModel _embedder;
         // One embedding at a time: document search and photo search (PhotoIndex) share the model.

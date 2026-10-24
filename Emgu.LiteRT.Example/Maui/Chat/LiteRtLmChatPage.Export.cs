@@ -12,7 +12,7 @@ namespace Maui.Demo.Lite
 {
     public partial class LiteRtLmChatPage
     {
-        private readonly Border _exportChatButton;
+        private Border _exportChatButton;
         private bool _exportingChat;
         private CancellationTokenSource _chatExportCancel;
 
