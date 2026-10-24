@@ -216,6 +216,16 @@ $env:PYTHON_BIN_PATH = $PythonBinPath
 $env:PYTHON_LIB_PATH = $PythonLibPath
 if ($HermeticPythonVersion) { $env:HERMETIC_PYTHON_VERSION = $HermeticPythonVersion }
 
+# LiteRT-LM's WORKSPACE configures the Android NDK (rules_android_ndk's @androidndk) whenever ANDROID_NDK_HOME is
+# set - GitHub's Windows runners set it, as does an Android SDK install - and on Windows rules_android_ndk can't
+# create its symlink tree: it strips the NDK path (backslashes) from the files' paths (forward slashes), so the
+# links stay absolute and Bazel fails with "Cannot write outside of the repository directory". This build doesn't
+# target Android, so it runs without it (LiteRT-LM then registers its placeholder NDK toolchain).
+if ($env:ANDROID_NDK_HOME) {
+    Write-Host "Ignoring ANDROID_NDK_HOME ($env:ANDROID_NDK_HOME) for the Windows build."
+    Remove-Item Env:ANDROID_NDK_HOME
+}
+
 # SET_BAZEL_VS_VC
 $BazelVs = $null
 if ($Devenv -eq $VS2017) { $BazelVs = $VS2017 -replace '\\Common7\\IDE\\devenv\.com$', '' }
