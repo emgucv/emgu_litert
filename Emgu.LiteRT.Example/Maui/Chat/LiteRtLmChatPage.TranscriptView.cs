@@ -116,9 +116,9 @@ namespace Maui.Demo.Lite
                         // A fact the model tried to save again isn't a new memory: say so instead of "Remembering".
                         if (resultText.StartsWith("Already remembered", StringComparison.Ordinal))
                             step.Description = "Already remembered";
-                        else if (step.Error == null && (DeviceActionTools.Contains(step.Name) || IsMcpFunction(step.Name)))
+                        else if (step.Error == null && (DeviceActionsFeature.ToolNames.Contains(step.Name) || IsMcpFunction(step.Name)))
                             // A device action or a tool server's tool: what the user chose, also in the saved chat.
-                            step.Description = described + (IsMcpFunction(step.Name) ? McpStepOutcome(resultText) : DeviceActionStepOutcome(resultText));
+                            step.Description = described + (IsMcpFunction(step.Name) ? McpStepOutcome(resultText) : DeviceActionsFeature.StepOutcome(resultText));
                         SetStatus("Generating...");
                     };
                 }

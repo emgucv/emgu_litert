@@ -40,8 +40,8 @@ public partial class LiteRtLmChatPage
                 SoundTools,
                 () => SoundInstructions),
             new ToolGroup(ChatToolGroups.DeviceActions, ChatToolGroups.DeviceActionsSummary, ChatToolGroups.DeviceActionsKeywords,
-                DeviceActionToolsForMessage,
-                DeviceActionInstructionsForMessage,
+                () => ActionTools.ToolsForMessage(_voiceMode),
+                () => DeviceActionsFeature.InstructionsForMessage(_voiceMode),
                 rerunAfterStub: true),
             new ToolGroup(ChatToolGroups.Goals, ChatToolGroups.GoalsSummary, ChatToolGroups.GoalsKeywords,
                 // Counting jumping jacks comes with the goals: it logs toward them, and a group of its own would add a stub to every message.

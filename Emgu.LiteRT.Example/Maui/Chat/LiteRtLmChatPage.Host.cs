@@ -35,6 +35,11 @@ public partial class LiteRtLmChatPage : IChatHost
 
     private GoalsFeature Goals => _goalsFeature ??= new GoalsFeature(this);
 
+    private DeviceActionsFeature _deviceActionsFeature;
+
+    // Timers, alarms, calendar events, reminders and directions, each confirmed on a card (the static DeviceActions does them).
+    private DeviceActionsFeature ActionTools => _deviceActionsFeature ??= new DeviceActionsFeature(this);
+
     void IChatHost.AddCardToReply(View card) => AddCard(_agentBubble, card);
 
     void IChatHost.SetStatus(string message) => SetStatus(message);

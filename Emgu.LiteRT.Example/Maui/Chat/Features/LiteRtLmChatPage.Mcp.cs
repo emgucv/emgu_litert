@@ -145,7 +145,8 @@ public partial class LiteRtLmChatPage
         return MainThread.InvokeOnMainThreadAsync(async () =>
         {
             var choice = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            DeviceActionCard card = AddDeviceActionCard(_agentBubble, request, confirmed => choice.TrySetResult(confirmed));
+            DeviceActionsFeature.Card card = DeviceActionsFeature.Card.Create(request, confirmed => choice.TrySetResult(confirmed));
+            AddCard(_agentBubble, card.View);
             UiStallWatchdog.Mark("Tool server: waiting for confirmation of " + request.ToolName);
             SetStatus("Waiting for you to confirm...");
             bool confirmed;
