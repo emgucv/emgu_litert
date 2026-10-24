@@ -119,10 +119,10 @@ namespace Emgu.TF.Lite.Test
         public void PrivateAgentHasNoMemoryOrPastChatToolsEvenWhenCallbacksAreProvided()
         {
             Task<string> Tool(string text, CancellationToken token) => Task.FromResult(text);
-            var privateTools = ChatAgentTools.SessionTools(true, _store, Tool, Tool, Tool).Select(t => t.Name).ToList();
+            var privateTools = ChatSessionTools.Create(true, _store, Tool, Tool, Tool).Select(t => t.Name).ToList();
             Assert.That(privateTools, Does.Not.Contain("remember").And.Not.Contain("forget").And.Not.Contain("search_chats"));
             Assert.That(privateTools, Does.Contain("calculate").And.Contain("find_photos").And.Contain("generate_image"));
-            var regularTools = ChatAgentTools.SessionTools(false, _store, Tool, Tool, Tool).Select(t => t.Name).ToList();
+            var regularTools = ChatSessionTools.Create(false, _store, Tool, Tool, Tool).Select(t => t.Name).ToList();
             Assert.That(regularTools, Does.Contain("remember").And.Contain("forget").And.Contain("search_chats"));
         }
 

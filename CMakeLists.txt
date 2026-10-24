@@ -847,6 +847,8 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Maui.Demo.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/Maui/Directory.Build.props)
+# The demo's code without UI (saved chats, tool groups, MCP...), referenced by the demo and the test project.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Maui.Demo.Lite.Core.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/Maui.Demo.Lite.Core/Directory.Build.props)
 # The minimal chat sample (Emgu.LiteRT.Example/MauiChat): one page with Emgu.LiteRT.LM.Maui's ChatView.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.MauiChat.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Example/MauiChat/Directory.Build.props)
 IF (HAVE_WINDESKTOP_LITE)

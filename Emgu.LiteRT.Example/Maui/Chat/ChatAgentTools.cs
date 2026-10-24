@@ -19,7 +19,7 @@ namespace Maui.Demo.Lite
     /// location (this file's MAUI lookup) when they allow it, and with web search on the weather, Wikipedia, currency
     /// conversion and a web page reader (Tavily's, with a Tavily API key, which also adds a web search).
     /// </summary>
-    internal static partial class ChatAgentTools
+    internal static class ChatAgentTools
     {
         public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location, ChatStore memories,
             Func<string, CancellationToken, Task<string>> findPhotos = null,
@@ -28,7 +28,7 @@ namespace Maui.Demo.Lite
             Func<string, string, CancellationToken, Task<string>> searchDocuments = null,
             bool readClipboard = false)
         {
-            var tools = new List<AITool>(SessionTools(privateChat, memories, findPhotos, generateImage, searchChats, searchDocuments));
+            var tools = new List<AITool>(ChatSessionTools.Create(privateChat, memories, findPhotos, generateImage, searchChats, searchDocuments));
             if (location)
                 tools.Add(AgentTools.Location(GetCurrentLocationAsync));
             // Only for a message that asks about what the user copied: a clipboard can hold passwords.

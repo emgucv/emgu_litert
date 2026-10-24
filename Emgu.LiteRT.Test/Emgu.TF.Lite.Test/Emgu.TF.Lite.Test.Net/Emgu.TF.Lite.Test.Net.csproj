@@ -40,11 +40,8 @@
     <Compile Include="..\UnitTestJumpingJacks.cs" Link="UnitTestJumpingJacks.cs" />
     <Compile Include="..\UnitTestFaceVisualAgent.cs" Link="UnitTestFaceVisualAgent.cs" />
     <Compile Include="..\UnitTestAlertSounds.cs" Link="UnitTestAlertSounds.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\PlayFileAction.cs" Link="PlayFileAction.cs" />
     <Compile Include="..\UnitTestYamNet.cs" Link="UnitTestYamNet.cs" />
     <Compile Include="..\UnitTestSoundMonitors.cs" Link="UnitTestSoundMonitors.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\LanguageText.cs" Link="LanguageText.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\McpServers.cs" Link="McpServers.cs" />
     <Compile Include="..\UnitTestCocoBackendBenchmark.cs" Link="UnitTestCocoBackendBenchmark.cs" />
     <Compile Include="..\UnitTestZImageTurbo.cs" Link="UnitTestZImageTurbo.cs" />
     <Compile Include="..\UnitTestDownloads.cs" Link="UnitTestDownloads.cs" />
@@ -59,30 +56,15 @@
     <Compile Include="..\UnitTestCameraTools.cs" Link="UnitTestCameraTools.cs" />
     <Compile Include="..\UnitTestCameraHardware.cs" Link="UnitTestCameraHardware.cs" />
     <Compile Include="..\UnitTestLongChatBenchmark.cs" Link="UnitTestLongChatBenchmark.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\CameraSnapshotAction.cs" Link="CameraSnapshotAction.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\ChatPlannerInstructions.cs" Link="ChatPlannerInstructions.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\ChatToolGroups.cs" Link="ChatToolGroups.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\VisualHostCatalog.cs" Link="VisualHostCatalog.cs" />
     <Compile Include="..\UnitTestContextManagement.cs" Link="UnitTestContextManagement.cs" />
     <Compile Include="..\UnitTestVisualActions.cs" Link="UnitTestVisualActions.cs" />
     <Compile Include="..\UnitTestClipAction.cs" Link="UnitTestClipAction.cs" />
     <Compile Include="..\UnitTestHandVisualAgent.cs" Link="UnitTestHandVisualAgent.cs" />
     <Compile Include="..\UnitTestVisualAgents.cs" Link="UnitTestVisualAgents.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\WorkloadPolicy.cs" Link="WorkloadPolicy.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\DownloadActivity.cs" Link="DownloadActivity.cs" />
     <Compile Include="..\UnitTestChatSearch.cs" Link="UnitTestChatSearch.cs" />
     <Compile Include="..\UnitTestChatExport.cs" Link="UnitTestChatExport.cs" />
     <Compile Include="..\UnitTestStorage.cs" Link="UnitTestStorage.cs" />
     <Compile Include="..\UnitTestPrivateChat.cs" Link="UnitTestPrivateChat.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\ChatExporter.cs" Link="ChatExporter.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\ChatStore.cs" Link="ChatStore.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\ChatAgentTools.Session.cs" Link="ChatAgentTools.Session.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\ChatStore.Storage.cs" Link="ChatStore.Storage.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\ChatStore.Goals.cs" Link="ChatStore.Goals.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\StorageFiles.cs" Link="StorageFiles.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\StorageCatalog.cs" Link="StorageCatalog.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\ChatSearchIndex.cs" Link="ChatSearchIndex.cs" />
-    <Compile Include="..\..\..\Emgu.LiteRT.Example\Maui\DocumentLibrarySearch.cs" Link="DocumentLibrarySearch.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -154,6 +136,8 @@
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Agents\NetStandard\Emgu.LiteRT.LM.Agents.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Chat\NetStandard\Emgu.LiteRT.LM.Chat.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Chat.Sqlite\NetStandard\Emgu.LiteRT.LM.Chat.Sqlite.csproj" />
+    <!-- The MAUI demo's code without UI (saved chats, tool groups, MCP, storage, the camera monitors' catalogue). -->
+    <ProjectReference Include="..\..\..\Emgu.LiteRT.Example\Maui.Demo.Lite.Core\Maui.Demo.Lite.Core.csproj" />
     <!-- Annotation/DownloadableFile/FileDownloadManager moved from Emgu.Models into
          Emgu.LiteRT.Util - needs a direct reference now for UnitTest1.cs to compile. -->
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />

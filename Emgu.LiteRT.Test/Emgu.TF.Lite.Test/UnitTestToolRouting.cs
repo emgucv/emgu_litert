@@ -255,7 +255,7 @@ public class UnitTestToolRouting
         ChatResponse response = null;
         for (int run = 0; run < 2; run++)
         {
-            IList<AITool> tools = ChatAgentTools.SessionTools(false, null, null, null, null);
+            IList<AITool> tools = ChatSessionTools.Create(false, null, null, null, null);
             foreach (AITool tool in router.Tools())
                 tools.Add(tool);
             response = await client.GetResponseAsync(prompt, new ChatOptions
@@ -286,7 +286,7 @@ public class UnitTestToolRouting
         await model.Init(configureSettings: s => { s.NumThreads = 4; s.MaxNumTokens = 4096; }, cancellationToken: stop.Token);
         int asked = 0;
         var kinds = DeviceActionKinds.Timer | DeviceActionKinds.Alarm | DeviceActionKinds.CalendarEvent | DeviceActionKinds.Directions;
-        IList<AITool> tools = ChatAgentTools.SessionTools(false, null, null, null, null);
+        IList<AITool> tools = ChatSessionTools.Create(false, null, null, null, null);
         foreach (AITool tool in AgentTools.DeviceActions(kinds, (request, token) => { asked++; return Task.FromResult(AgentTools.DeviceActionCancelled); }))
             tools.Add(tool);
         using var native = new Emgu.LiteRT.LM.Extensions.AI.LiteRtLmChatClient(model) { EnableContextManagement = true };
@@ -324,7 +324,7 @@ public class UnitTestToolRouting
     [Test]
     public void EveryMessageCarriesLittle()
     {
-        IList<AITool> core = ChatAgentTools.SessionTools(false, null, null, null, null);
+        IList<AITool> core = ChatSessionTools.Create(false, null, null, null, null);
         core.Add(AgentTools.Memory(new InMemoryAgentMemoryStore())[0]);
         core.Add(AgentTools.Memory(new InMemoryAgentMemoryStore())[1]);
         ToolRouter router = new ToolRouter(DemoGroups(), null);

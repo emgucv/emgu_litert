@@ -147,7 +147,7 @@ public class UnitTestContextManagement
         var catalog = new VisualActionRegistry(); foreach (var action in actions) catalog.Register(action);
         var runtime = new VisualMonitorRuntime(agents, catalog); int creations = 0, unrelatedCalls = 0;
         Task<string> Unexpected(string request, CancellationToken token) { unrelatedCalls++; throw new InvalidOperationException("Unrelated tool: " + request); }
-        var tools = ChatAgentTools.SessionTools(false, null, Unexpected, Unexpected, Unexpected);
+        var tools = ChatSessionTools.Create(false, null, Unexpected, Unexpected, Unexpected);
         tools.Add(AgentTools.OpenCamera(_ => Task.FromResult("Live feed is visible.")));
         tools.Add(AgentTools.CaptureCameraFrame(_ => throw new InvalidOperationException("No direct camera capture requested.")));
         foreach (var tool in VisualAgentTools.Create(() => JsonSerializer.Serialize(new[] { detector.Descriptor }),

@@ -79,6 +79,8 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\Emgu.LiteRT.Runtime\Maui\UI\Emgu.LiteRT.runtime.maui.csproj" />
+		<!-- The demo's code without UI or device (saved chats, tool groups, MCP, storage, the camera monitors' catalogue), also tested by the test project. -->
+		<ProjectReference Include="..\Maui.Demo.Lite.Core\Maui.Demo.Lite.Core.csproj" />
 	    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
 	  
 	    <!-- <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.IOS\Emgu.TF.Lite.Models.IOS.csproj" /> -->

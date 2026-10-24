@@ -8,9 +8,10 @@ using Microsoft.Extensions.AI;
 
 namespace Maui.Demo.Lite
 {
-    internal static partial class ChatAgentTools
+    // The chat agent's tools that need no device (the demo's ChatAgentTools adds the location, clipboard and web tools).
+    internal static class ChatSessionTools
     {
-        internal static IList<AITool> SessionTools(bool isPrivate, ChatStore memories,
+        internal static IList<AITool> Create(bool isPrivate, ChatStore memories,
             Func<string, CancellationToken, Task<string>> findPhotos,
             Func<string, CancellationToken, Task<string>> generateImage,
             Func<string, CancellationToken, Task<string>> searchChats,
