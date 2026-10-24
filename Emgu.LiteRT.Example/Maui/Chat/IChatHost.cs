@@ -50,5 +50,27 @@ internal interface IChatHost
 
     // Settings > Developer mode: show what the models see.
     bool DeveloperMode { get; }
+
+    // Waits while the device is too hot or its battery too low for heavy work (WorkloadPolicy), telling status why (null when it goes on).
+    Task WaitForWorkAsync(bool photos, Action<string> status, CancellationToken cancel);
+
+    // Settings > Storage.
+    Task OpenStorageAsync();
+
+    // An alert: true for accept; with cancel null it has one button.
+    Task<bool> AskAsync(string title, string message, string accept, string cancel);
+
+    // Where the settings are, in words for the model ("this chat's settings (the gear button at the top)").
+    string SettingsLocation { get; }
+
+    // The page's bottom sheet: shows a view (the result is the closing button's text or what DismissSheet passed), and closes it.
+    Task<string> ShowSheetAsync(string title, View content, string closeText);
+    void DismissSheet(string result);
+
+    Size PageSize { get; }
+
+    // Whether a message is being answered; and sending one as if the user had typed it.
+    bool IsBusy { get; }
+    Task SendMessageAsync(string text);
 }
 #endif

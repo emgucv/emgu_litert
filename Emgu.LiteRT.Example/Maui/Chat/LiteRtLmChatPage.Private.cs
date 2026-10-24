@@ -98,9 +98,7 @@ namespace Maui.Demo.Lite
                     await _embedderGate.WaitAsync();
                     try { await ReleaseEmbedderAsync(); }
                     finally { _embedderGate.Release(); }
-                    await ReleaseImageModelAsync();
-                    _zimageInit = null;
-                    if (ImageGenerationSupported) _zimage = new ZImageTurbo();
+                    await Images.ResetModelAsync();
                 }
                 _store.IsPrivate = value;
                 if (value) { _privateDiagnostics ??= UiStallWatchdog.SuppressPrivateDetails(); }
@@ -134,12 +132,12 @@ namespace Maui.Demo.Lite
             RemoveDocument();
             ClearPendingAttachments();
             _promptEditor.Text = string.Empty;
-            lock (_sendImages) _sendImages.Clear();
+            Images.ClearDrawn();
             ClearWrittenDocuments();
             _agentBubble = null;
             _statusLabel.Text = string.Empty;
             _statusLabel.IsVisible = false;
-            _zimage?.ClearPromptCache();
+            Images.ClearPromptCache();
             _privateDocumentTasks.RemoveAll(t => t.IsCompleted);
         }
 

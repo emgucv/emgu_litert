@@ -142,16 +142,7 @@ namespace Maui.Demo.Lite
                 if (entry.Kind == StorageKind.Document && _document?.Id == entry.Key) RemoveDocument();
                 if (entry.Kind == StorageKind.ImageModel)
                 {
-                    if (_imageSwitch != null)
-                    {
-                        _imageSwitch.Toggled -= OnImageGenerationToggled;
-                        _imageSwitch.IsToggled = false;
-                        _imageSwitch.Toggled += OnImageGenerationToggled;
-                    }
-                    Preferences.Default.Set(ImageGenerationPreference, false);
-                    await ReleaseImageModelAsync();
-                    _zimageInit = null;
-                    _zimage = new ZImageTurbo();
+                    await Images.TurnOffAndResetAsync();
                 }
                 await Task.Run(() => catalog.DeleteAsync(entry));
                 if (entry.Kind == StorageKind.Attachments && _conversationId.HasValue)
@@ -169,7 +160,7 @@ namespace Maui.Demo.Lite
                 _reloadingCpuThreads = false;
                 UpdateSearchStorageState();
                 UpdatePhotoStatus();
-                UpdateImageStatus();
+                Images.UpdateStatus();
                 RefreshModelList();
                 UpdateModelDownloadRows();
                 _chipSpinner.IsVisible = _chipSpinner.IsRunning = _loadTask != null;

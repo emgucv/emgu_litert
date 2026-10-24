@@ -7,7 +7,6 @@ public partial class LiteRtLmChatPage
     private readonly WorkloadPolicy _workloadPolicy = new();
     private volatile bool _photosOnlyWhileCharging;
     private string _photoPauseReason;
-    private string _imagePauseReason;
 
     private Task WaitForWorkAsync(bool photos, Action<string> status, CancellationToken cancel) =>
         _workloadPolicy.WaitAsync(DeviceWorkload.ReadAsync, () => photos && _photosOnlyWhileCharging, status, cancel);

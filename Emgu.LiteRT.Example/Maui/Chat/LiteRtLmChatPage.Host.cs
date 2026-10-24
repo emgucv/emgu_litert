@@ -15,6 +15,10 @@ public partial class LiteRtLmChatPage : IChatHost
 
     private ExerciseFeature Exercises => _exerciseFeature ??= new ExerciseFeature(this);
 
+    private ImageFeature _imageFeature;
+
+    private ImageFeature Images => _imageFeature ??= new ImageFeature(this);
+
     void IChatHost.AddCardToReply(View card) => AddCard(_agentBubble, card);
 
     void IChatHost.SetStatus(string message) => SetStatus(message);
@@ -63,5 +67,31 @@ public partial class LiteRtLmChatPage : IChatHost
     IAgentGoalStore IChatHost.Goals => GoalsOn ? _store : null;
 
     bool IChatHost.DeveloperMode => DeveloperMode;
+
+    Task IChatHost.WaitForWorkAsync(bool photos, Action<string> status, CancellationToken cancel) => WaitForWorkAsync(photos, status, cancel);
+
+    Task IChatHost.OpenStorageAsync() => OpenStorageAsync();
+
+    async Task<bool> IChatHost.AskAsync(string title, string message, string accept, string cancel)
+    {
+        if (cancel == null)
+        {
+            await DisplayAlertAsync(title, message, accept);
+            return true;
+        }
+        return await DisplayAlertAsync(title, message, accept, cancel);
+    }
+
+    string IChatHost.SettingsLocation => _settingsButton.IsVisible ? "this chat's settings (the gear button at the top)" : "the settings panel beside the chat";
+
+    Task<string> IChatHost.ShowSheetAsync(string title, View content, string closeText) => _sheet.ShowViewAsync(title, content, closeText);
+
+    void IChatHost.DismissSheet(string result) => _sheet.Dismiss(result);
+
+    Size IChatHost.PageSize => new Size(Width, Height);
+
+    bool IChatHost.IsBusy => _busy;
+
+    Task IChatHost.SendMessageAsync(string text) => SendAsync(text, new List<PendingAttachment>());
 }
 #endif

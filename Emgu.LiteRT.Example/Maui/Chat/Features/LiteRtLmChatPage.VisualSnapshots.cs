@@ -63,7 +63,7 @@ public partial class LiteRtLmChatPage
                 var result = await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(
                     "camera-snapshot-" + capturedAt.ToString("yyyyMMdd-HHmmss-fff") + ".jpg", stream);
                 if (result.IsSuccessful) { status.Text = "Saved to " + result.FilePath; status.IsVisible = true; }
-                else if (!SaveWasCancelled(result.Exception))
+                else if (!ImageFeature.SaveWasCancelled(result.Exception))
                     throw result.Exception ?? new IOException("The snapshot could not be saved.");
             }
             catch (OperationCanceledException) { }

@@ -62,8 +62,7 @@ namespace Maui.Demo.Lite
         private async Task SendAsync(string prompt, List<PendingAttachment> attachments)
         {
             ClearCameraTurn();
-            lock (_sendImages)
-                _sendImages.Clear();
+            Images.ClearDrawn();
             ClearWrittenDocuments();
             UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, agent {3}, think {4}, web {5}",
                 prompt.Length, attachments.Count, SelectedOption.Name, UseAgent, _thinkingSwitch.IsToggled, _webSearchSwitch.IsToggled));

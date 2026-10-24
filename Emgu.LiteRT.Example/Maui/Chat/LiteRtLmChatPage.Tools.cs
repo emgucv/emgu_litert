@@ -61,10 +61,10 @@ public partial class LiteRtLmChatPage
         groups.Add(new ToolGroup(ChatToolGroups.WriteDocument, ChatToolGroups.WriteDocumentSummary, ChatToolGroups.WriteDocumentKeywords,
             () => new AITool[] { AgentTools.CreateDocument(SaveWrittenDocumentAsync, () => _routePrompt) }.Concat(Meetings.Tools(_voiceMode)),
             () => JoinInstructions(DocumentWritingInstructions, Meetings.Tools(_voiceMode).Any() ? MeetingFeature.Instructions : null)));
-        if (ImageGenerationSupported)
+        if (ImageFeature.Supported)
             groups.Add(new ToolGroup(ChatToolGroups.ImageGeneration, ChatToolGroups.ImageGenerationSummary, ChatToolGroups.ImageGenerationKeywords,
-                () => new AITool[] { AgentTools.GenerateImage(GenerateImageAsync) },
-                () => ImageInstructions));
+                () => new AITool[] { AgentTools.GenerateImage(Images.GenerateAsync) },
+                () => ImageFeature.Instructions));
         groups.AddRange(McpGroups());
         // The clock/calendar/maps stub ends the request and SendAsync sends the message again into the same reply (rerunAfterStub, RegenerateAsync).
         var router = new ToolRouter(groups, () => FunctionInvokingChatClient.CurrentContext?.Options,

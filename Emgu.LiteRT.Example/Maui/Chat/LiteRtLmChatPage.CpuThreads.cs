@@ -26,7 +26,7 @@ public partial class LiteRtLmChatPage
     {
         bool reloadChat = _model != null || _loadTask != null;
         bool reloadEmbedder = _embedderLoad != null;
-        bool reloadImage = _zimageInit != null;
+        bool reloadImage = Images.ModelLoaded;
         try
         {
             // Prevent new work while allowing the current send (including its tools) to finish.
@@ -42,16 +42,13 @@ public partial class LiteRtLmChatPage
             // A send can load a tool model while we wait, so check again after it finishes.
             reloadChat |= _model != null || _loadTask != null;
             reloadEmbedder |= _embedderLoad != null;
-            reloadImage |= _zimageInit != null;
+            reloadImage |= Images.ModelLoaded;
             _loadCancel?.Cancel();
             if (_loadTask != null)
                 await _loadTask;
             await CleanupModelAsync();
             await ReleaseEmbedderAsync();
-            await ReleaseImageModelAsync();
-            _zimageInit = null;
-            if (_zimage != null)
-                _zimage = new ZImageTurbo();
+            await Images.ResetModelAsync();
             CpuThreadSettings.RequestReload();
             if (!_pageVisible)
                 return;
@@ -65,7 +62,7 @@ public partial class LiteRtLmChatPage
             if (reloadEmbedder)
                 await EnsureEmbedderAsync(null, CancellationToken.None);
             if (reloadImage)
-                await EnsureImageModelAsync();
+                await Images.EnsureModelAsync();
             SetStatus($"Models ready with {CpuThreadSettings.Count} CPU threads.");
         }
         finally
@@ -86,7 +83,7 @@ public partial class LiteRtLmChatPage
         await StopChatIndexingAsync();
         await CleanupModelAsync();
         await ReleaseEmbedderAsync();
-        await ReleaseImageModelAsync();
+        await Images.ReleaseModelAsync();
     }
 }
 #endif

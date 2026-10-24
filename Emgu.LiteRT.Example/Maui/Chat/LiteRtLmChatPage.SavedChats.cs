@@ -85,8 +85,7 @@ namespace Maui.Demo.Lite
                 steps.AddRange(reply.Steps.Select(step => step.Description));
                 // Pictures the reply drew are kept with it (shown again when the chat is reopened, not given to the model).
                 List<(string Kind, string MediaType, byte[] Data)> drawn;
-                lock (_sendImages)
-                    drawn = _sendImages.Select(png => (GeneratedKind, "image/png", png)).ToList();
+                drawn = Images.Drawn();
                 // And the documents it wrote.
                 drawn.AddRange(TakeWrittenDocuments());
                 ChatSavedExchange saved = await _store.SaveExchangeAsync(id, userItem, reply, drawn, steps);
@@ -312,8 +311,8 @@ namespace Maui.Demo.Lite
                         // A document the reply wrote, or a picture it drew: cards above it, not given to the model.
                         if (attachment.Kind == DocumentKind)
                             AddSavedDocumentCard(bubble, attachment.MediaType, await System.IO.File.ReadAllBytesAsync(attachment.Path));
-                        else if (attachment.Kind == GeneratedKind)
-                            AddSavedGeneratedImage(bubble, await System.IO.File.ReadAllBytesAsync(attachment.Path));
+                        else if (attachment.Kind == ImageFeature.GeneratedKind)
+                            AddCard(bubble, Images.SavedImageView(await System.IO.File.ReadAllBytesAsync(attachment.Path)));
                     }
                     _ = CheckThinkingLanguageAsync(bubble);
                 }

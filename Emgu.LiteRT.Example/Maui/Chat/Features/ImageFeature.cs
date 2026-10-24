@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using Stopwatch = System.Diagnostics.Stopwatch;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.CV;
@@ -22,11 +23,16 @@ namespace Maui.Demo.Lite
     // model is 10.6 GB, downloaded when the setting is turned on, and its first image writes ~9 GB of weight caches. The
     // pictures are saved with the reply (attachments of kind "generated", never given back to the model). On iOS the model
     // folder is kept out of iCloud backups. With the setting off the tool is offered anyway and tells the model where to turn it on.
-    public partial class LiteRtLmChatPage
+    internal sealed class ImageFeature
     {
         private const string ImageGenerationPreference = "litert_lm_chat_image_generation";
-        private const string GeneratedKind = "generated";
-        private const string ImageInstructions = ChatPlannerInstructions.Images;
+        public const string GeneratedKind = "generated";
+        public const string Instructions = ChatPlannerInstructions.Images;
+
+        private readonly IChatHost _host;
+        private string _imagePauseReason;
+
+        public ImageFeature(IChatHost host) { _host = host; }
 
         private Switch _imageSwitch;
         private Label _imageStatus;
@@ -40,7 +46,7 @@ namespace Maui.Demo.Lite
         private readonly List<byte[]> _sendImages = new List<byte[]>();
 
         // Everywhere the chat runs.
-        private static bool ImageGenerationSupported => true;
+        public static bool Supported => true;
 
         // iOS backs up the app's Library/Application Support (where ZImageTurbo keeps its ~21 GB) to iCloud unless told
         // not to; the model can be downloaded again.
@@ -61,9 +67,9 @@ namespace Maui.Demo.Lite
 
         private bool ImageGenerationOn => _imageSwitch != null && _imageSwitch.IsToggled;
 
-        private View BuildImageSection()
+        public View BuildSection(View modelSelector)
         {
-            if (!ImageGenerationSupported)
+            if (!Supported)
                 return new ContentView { IsVisible = false };
             _zimage = new ZImageTurbo();
             ExcludeFromBackup(_zimage.Folder);
@@ -94,7 +100,7 @@ namespace Maui.Demo.Lite
                 IsVisible = false
             };
             _imageDeleteButton.Clicked += OnDeleteImageModelClicked;
-            UpdateImageStatus();
+            UpdateStatus();
             // Turned on before and the model isn't complete: go on downloading.
             if (on && !_zimage.IsDownloaded)
                 StartImageModelDownload();
@@ -103,7 +109,7 @@ namespace Maui.Demo.Lite
                 Spacing = 6,
                 Children =
                 {
-                    BuildImageModelSelector(),
+                    modelSelector,
                     row,
                     new Label
                     {
@@ -129,7 +135,7 @@ namespace Maui.Demo.Lite
                 string remainingSize = remaining >= 1e9
                     ? string.Format(CultureInfo.InvariantCulture, "{0:F1} GB", remaining / 1e9)
                     : string.Format(CultureInfo.InvariantCulture, "{0:F0} MB", Math.Ceiling(remaining / 1e6));
-                bool download = await DisplayAlertAsync("Image generation",
+                bool download = await _host.AskAsync("Image generation",
                     string.Format(CultureInfo.InvariantCulture,
                         "Download the image model ({0} remaining)? Model files and prepared caches use about {1:F0} GB in total.",
                         remainingSize, (ZImageTurbo.DownloadSize + 9e9) / 1e9),
@@ -145,7 +151,7 @@ namespace Maui.Demo.Lite
             {
                 _zimageDownload?.Cancel();
             }
-            UpdateImageStatus();
+            UpdateStatus();
         }
 
         private void StartImageModelDownload()
@@ -155,7 +161,7 @@ namespace Maui.Demo.Lite
             CancellationTokenSource cancel = new CancellationTokenSource();
             _zimageDownload = cancel;
             _zimageDownloadFraction = (double)_zimage.DownloadedBytes / ZImageTurbo.DownloadSize;
-            UpdateImageStatus();
+            UpdateStatus();
             _zimageDownloadTask = Task.Run(async () =>
             {
                 string error = null;
@@ -169,7 +175,7 @@ namespace Maui.Demo.Lite
                     {
                         lease.Report(p.TotalBytes, p.BytesDone);
                         _zimageDownloadFraction = (double)p.BytesDone / p.TotalBytes;
-                        UpdateImageStatus();
+                        UpdateStatus();
                     }), lease.Token);
                 }
                 catch (Exception) when (cancel.IsCancellationRequested || downloadLease?.Token.IsCancellationRequested == true)
@@ -184,7 +190,7 @@ namespace Maui.Demo.Lite
                 {
                     _zimageDownload = null;
                     _zimageDownloadFraction = -1;
-                    UpdateImageStatus();
+                    UpdateStatus();
                     if (error != null)
                         _imageStatus.Text = "Download stopped: " + error + " (turn the switch off and on to retry)";
                     else if (paused && _imageSwitch.IsToggled)
@@ -193,13 +199,13 @@ namespace Maui.Demo.Lite
             });
         }
 
-        private void UpdateImageStatus()
+        public void UpdateStatus()
         {
             if (_imageStatus == null)
                 return;
             if (!MainThread.IsMainThread)
             {
-                MainThread.BeginInvokeOnMainThread(UpdateImageStatus);
+                MainThread.BeginInvokeOnMainThread(UpdateStatus);
                 return;
             }
             bool downloaded = _zimage.IsDownloaded;
@@ -229,10 +235,10 @@ namespace Maui.Demo.Lite
 
         private async void OnDeleteImageModelClicked(object sender, EventArgs e)
         {
-            await OpenStorageAsync();
+            await _host.OpenStorageAsync();
         }
 
-        private Task EnsureImageModelAsync()
+        public Task EnsureModelAsync()
         {
             if (_zimageInit == null || _zimageInit.IsFaulted)
             {
@@ -243,14 +249,14 @@ namespace Maui.Demo.Lite
         }
 
         // The generate_image tool: draw the picture, show it above the reply, and tell the model what happened.
-        private async Task<string> GenerateImageAsync(string prompt, CancellationToken cancel)
+        public async Task<string> GenerateAsync(string prompt, CancellationToken cancel)
         {
-            if (!ImageGenerationSupported)
+            if (!Supported)
                 return "Image generation isn't available on this device.";
             if (!ImageGenerationOn)
                 return string.Format(CultureInfo.InvariantCulture,
                     "Image generation is turned off, so no picture can be drawn. Tell the user they can turn on \"Image generation\" in {0}; the image model is a {1:F1} GB download and runs on this device.",
-                    _settingsButton.IsVisible ? "this chat's settings (the gear button at the top)" : "the settings panel beside the chat",
+                    _host.SettingsLocation,
                     ZImageTurbo.DownloadSize / 1e9);
             if (_zimageDownload != null)
                 return string.Format(CultureInfo.InvariantCulture,
@@ -265,10 +271,10 @@ namespace Maui.Demo.Lite
             Action<string> modelPaused = reason => MainThread.BeginInvokeOnMainThread(() =>
             {
                 _imagePauseReason = reason;
-                UpdateImageStatus();
+                UpdateStatus();
             });
-            await WaitForWorkAsync(false, modelPaused, cancel);
-            await EnsureImageModelAsync();
+            await _host.WaitForWorkAsync(false, modelPaused, cancel);
+            await EnsureModelAsync();
             int tokens = _zimage.CountPromptTokens(prompt);
             if (tokens > ZImageTurbo.MaxPromptTokens)
                 return string.Format(CultureInfo.InvariantCulture,
@@ -276,8 +282,12 @@ namespace Maui.Demo.Lite
                     tokens, ZImageTurbo.MaxPromptTokens);
 
             long seed = Random.Shared.NextInt64(1, 1L << 40);
-            StreamingBubble bubble = _agentBubble;
-            ImageTile tile = await MainThread.InvokeOnMainThreadAsync(() => AddImageTile(bubble, prompt));
+            ImageTile tile = await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                ImageTile created = CreateImageTile(prompt);
+                _host.AddCardToReply(created.View);
+                return created;
+            });
             Stopwatch watch = Stopwatch.StartNew();
             UiStallWatchdog.Mark("generate_image: " + prompt);
             try
@@ -288,10 +298,10 @@ namespace Maui.Demo.Lite
                     // Generate reports each stage synchronously on its worker thread, before the native graph runs.
                     // Keep the current latent state while waiting; cancellation still stops the pending generation.
                     if (p.Stage != "Done")
-                        WaitForWorkAsync(false, reason => MainThread.BeginInvokeOnMainThread(() =>
+                        _host.WaitForWorkAsync(false, reason => MainThread.BeginInvokeOnMainThread(() =>
                         {
                             _imagePauseReason = reason;
-                            UpdateImageStatus();
+                            UpdateStatus();
                             tile.Stage.Text = reason == null ? p.Stage : "Image generation paused: " + reason;
                         }), cancel).GetAwaiter().GetResult();
                     string text = p.Stage + string.Format(CultureInfo.InvariantCulture, " ({0:F0} s)", watch.Elapsed.TotalSeconds);
@@ -362,7 +372,7 @@ namespace Maui.Demo.Lite
         private const double GeneratedImageSize = 220;
 
         // A picture being drawn, above the reply: a placeholder with a spinner and the stage, then the picture.
-        private ImageTile AddImageTile(StreamingBubble bubble, string prompt)
+        private ImageTile CreateImageTile(string prompt)
         {
             ImageTile tile = new ImageTile();
             tile.Frame = new Border
@@ -383,13 +393,12 @@ namespace Maui.Demo.Lite
                 Children = { tile.Frame, tile.Stage }
             };
             SemanticProperties.SetDescription(tile.View, "Picture of " + prompt);
-            AddCard(bubble, tile.View);
             return tile;
         }
 
         // The Windows file picker reports cancelling as a plain exception, "Operation cancelled or Path doesn't exist.",
         // not an OperationCanceledException (Apple and Android do use that).
-        private static bool SaveWasCancelled(Exception exception)
+        internal static bool SaveWasCancelled(Exception exception)
         {
             return exception is OperationCanceledException
                 || (exception != null && exception.Message.StartsWith("Operation cancelled", StringComparison.OrdinalIgnoreCase));
@@ -402,13 +411,13 @@ namespace Maui.Demo.Lite
             tile.View.OnTap(() => ShowGeneratedImageLarge(png));
         }
 
-        // A saved chat's picture, above the saved reply.
-        // A picture a saved reply drew, above it again when the chat is reopened.
-        private void AddSavedGeneratedImage(StreamingBubble bubble, byte[] png)
+        // A picture a saved reply drew, for above it again when the chat is reopened.
+        public View SavedImageView(byte[] png)
         {
-            ImageTile tile = AddImageTile(bubble, string.Empty);
+            ImageTile tile = CreateImageTile(string.Empty);
             ShowGeneratedImage(tile, png, string.Empty);
             tile.Stage.IsVisible = false;
+            return tile.View;
         }
 
         private async void ShowGeneratedImageLarge(byte[] png)
@@ -417,7 +426,7 @@ namespace Maui.Demo.Lite
             {
                 Source = ImageUtil.ToImageSource(png),
                 Aspect = Aspect.AspectFit,
-                HeightRequest = Math.Max(200, Math.Min(Width, Height) * 0.45)
+                HeightRequest = Math.Max(200, Math.Min(_host.PageSize.Width, _host.PageSize.Height) * 0.45)
             };
             var details = PngMetadata.ReadText(png);
             details.TryGetValue("Description", out string description);
@@ -463,14 +472,14 @@ namespace Maui.Demo.Lite
                 catch (OperationCanceledException) { }
                 catch (Exception ex)
                 {
-                    await DisplayAlertAsync("Couldn't " + button.Text.TrimEnd('…').ToLowerInvariant(), ex.Message, "OK");
+                    await _host.AskAsync("Couldn't " + button.Text.TrimEnd('…').ToLowerInvariant(), ex.Message, "OK", null);
                 }
                 finally { button.IsEnabled = true; }
             }
 
             var again = Action("Draw it again", "Draw the same description again with a new seed");
             again.IsVisible = !string.IsNullOrEmpty(description);
-            again.Clicked += (_, _) => _sheet.Dismiss("again");
+            again.Clicked += (_, _) => _host.DismissSheet("again");
             var gallery = Action("Add to " + PictureGallery.DestinationName, "Add the picture to the device's " + PictureGallery.DestinationName);
             gallery.Clicked += async (_, _) => await Run(gallery, async () => await PictureGallery.SaveAsync(png, fileName));
             var share = Action("Share…", "Share the picture with another app");
@@ -506,12 +515,53 @@ namespace Maui.Demo.Lite
             buttons.Add(save, 1, 1);
             content.Children.Add(buttons);
             content.Children.Add(status);
-            string choice = await _sheet.ShowViewAsync("Picture", content, "Close");
-            if (choice == "again" && !string.IsNullOrEmpty(description) && !_busy)
-                await SendAsync("Draw this again, using exactly this description: " + description, new List<PendingAttachment>());
+            string choice = await _host.ShowSheetAsync("Picture", content, "Close");
+            if (choice == "again" && !string.IsNullOrEmpty(description) && !_host.IsBusy)
+                await _host.SendMessageAsync("Draw this again, using exactly this description: " + description);
         }
 
-        private async Task ReleaseImageModelAsync()
+        // Whether the model has been loaded (or is loading).
+        public bool ModelLoaded => _zimageInit != null;
+
+        // The pictures drawn for the reply being written, to save with it; and forgetting them for the next reply.
+        public List<(string Kind, string MediaType, byte[] Data)> Drawn()
+        {
+            lock (_sendImages)
+                return _sendImages.Select(png => (GeneratedKind, "image/png", png)).ToList();
+        }
+
+        public void ClearDrawn()
+        {
+            lock (_sendImages)
+                _sendImages.Clear();
+        }
+
+        public void ClearPromptCache() => _zimage?.ClearPromptCache();
+
+        // Releases the model and starts again with a new instance, loaded on the next picture (the CPU thread count changed, a private
+        // chat began or ended).
+        public async Task ResetModelAsync()
+        {
+            await ReleaseModelAsync();
+            _zimageInit = null;
+            if (_zimage != null)
+                _zimage = new ZImageTurbo();
+        }
+
+        // Storage deleted the model: image generation is turned off.
+        public async Task TurnOffAndResetAsync()
+        {
+            if (_imageSwitch != null)
+            {
+                _imageSwitch.Toggled -= OnImageGenerationToggled;
+                _imageSwitch.IsToggled = false;
+                _imageSwitch.Toggled += OnImageGenerationToggled;
+            }
+            Preferences.Default.Set(ImageGenerationPreference, false);
+            await ResetModelAsync();
+        }
+
+        public async Task ReleaseModelAsync()
         {
             _zimageDownload?.Cancel();
             try { await (_zimageDownloadTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
