@@ -31,12 +31,12 @@ public partial class LiteRtLmChatPage
         {
             // Prevent new work while allowing the current send (including its tools) to finish.
             _settingsView.IsEnabled = false;
-            _photoIndexing?.Cancel();
+            PhotoSearch.CancelIndexing();
             await PastChats.StopIndexingAsync();
             while (_busy)
                 await Task.Delay(100);
             SetBusy(true);
-            try { await (_photoIndexTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
+            await PhotoSearch.WaitForIndexingAsync();
             if (_document?.Ready != null)
                 await _document.Ready;
             // A send can load a tool model while we wait, so check again after it finishes.
@@ -73,7 +73,7 @@ public partial class LiteRtLmChatPage
             if (_pageVisible)
                 PastChats.StartIndexing();
             if (_pageVisible)
-                StartPhotoIndexing();
+                PhotoSearch.StartIndexing();
         }
     }
 

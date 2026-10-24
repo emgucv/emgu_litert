@@ -19,31 +19,34 @@ namespace Maui.Demo.Lite
     // background with the document search's embedding model (PhotoIndex), and Gemma 4's find_photos tool
     // (Emgu.LiteRT.LM.Agents' AgentTools.FindPhotos) shows the matches as thumbnails above the reply - the model
     // doesn't see them. The tool is offered with the setting off too, and then tells the model where to turn it on. Everything stays on the device; turning it off deletes the index.
-    public partial class LiteRtLmChatPage
+    internal sealed class PhotoSearchFeature
     {
         private const string PhotoSearchPreference = "litert_lm_chat_photo_search";
+        private readonly IChatHost _host;
+        private string _photoPauseReason;
+
+        public PhotoSearchFeature(IChatHost host) { _host = host; }
         // How many of the most recent photos are indexed: each takes about 1 s on a Mac's CPU and several seconds on a
         // phone's, in the background.
         private static int MaxIndexedPhotos => DeviceInfo.Idiom == DeviceIdiom.Desktop ? 1000 : 200;
-        private const string PhotoInstructions = ChatPlannerInstructions.Photos;
+        public const string Instructions = ChatPlannerInstructions.Photos;
 
         private PhotoIndex _photoIndex;
         private Switch _photoSwitch;
         private Label _photoStatus;
         private CancellationTokenSource _photoIndexing;
         private Task _photoIndexTask;
-        // The reply being written, so photos a tool call finds are shown above it.
-        private StreamingBubble _agentBubble;
 
-        private bool PhotoSearchOn => _photoSwitch != null && _photoSwitch.IsToggled;
+        public bool On => _photoSwitch != null && _photoSwitch.IsToggled;
+        private bool PhotoSearchOn => On;
 
-        private View BuildPhotoSection()
+        public View BuildSection(View searchModelNotice, View chargingSetting)
         {
-            _photoIndex = new PhotoIndex(_store);
-            _photoIndex.Changed += () => MainThread.BeginInvokeOnMainThread(UpdatePhotoStatus);
+            _photoIndex = new PhotoIndex(_host.Store);
+            _photoIndex.Changed += () => MainThread.BeginInvokeOnMainThread(UpdateStatus);
             bool on = false;
             try { on = Preferences.Default.Get(PhotoSearchPreference, false); } catch (Exception) { }
-            _photoSwitch = new Switch { IsToggled = on && EmbeddingSupportsImages, IsEnabled = EmbeddingSupportsImages, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+            _photoSwitch = new Switch { IsToggled = on && _host.SearchModelTakesImages, IsEnabled = _host.SearchModelTakesImages, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
             _photoSwitch.Toggled += OnPhotoSearchToggled;
             var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
             row.Add(new Label
@@ -71,8 +74,8 @@ namespace Maui.Demo.Lite
                         FontSize = 12,
                         TextColor = Theme.SecondaryText
                     },
-                    CreateSearchModelNotice(),
-                    BuildPhotoChargingSetting(),
+                    searchModelNotice,
+                    chargingSetting,
                     new Label { Text = "On phones and tablets, indexing pauses at 20% battery or lower without power. It also pauses if the device reports excessive heat, and resumes automatically when conditions improve.", FontSize = 12, TextColor = Theme.SecondaryText },
                     _photoStatus
                 }
@@ -88,13 +91,13 @@ namespace Maui.Demo.Lite
                 try { allowed = await PhotoLibrary.RequestAccessAsync(); }
                 catch (Exception ex)
                 {
-                    SetPhotoSearchOff();
+                    TurnOff();
                     ShowPhotoAccessError("Could not request photo access: " + ex.Message);
                     return;
                 }
                 if (!allowed)
                 {
-                    SetPhotoSearchOff();
+                    TurnOff();
 #if MACCATALYST
                     ShowPhotoAccessError("Allow Emgu LiteRT in System Settings > Privacy & Security > Photos, then turn on Search my photos again.");
 #else
@@ -102,14 +105,14 @@ namespace Maui.Demo.Lite
 #endif
                     return;
                 }
-                StartPhotoIndexing();
+                StartIndexing();
             }
             else
             {
                 _photoIndexing?.Cancel();
                 try { await (_photoIndexTask ?? Task.CompletedTask); } catch (Exception) { }
                 await _photoIndex.ClearAsync();
-                UpdatePhotoStatus();
+                UpdateStatus();
             }
         }
 
@@ -117,65 +120,24 @@ namespace Maui.Demo.Lite
         {
             _photoStatus.Text = message;
             _photoStatus.IsVisible = true;
-            SetStatus(message);
+            _host.SetStatus(message);
         }
 
         // When an indexing pass last started; returning to the page or the app starts another at most this often.
         private DateTime _photoIndexStarted = DateTime.MinValue;
         private static readonly TimeSpan PhotoReindexInterval = TimeSpan.FromMinutes(1);
-        private Window _resumeWindow;
-
         // The page is shown again, or the app came back to the foreground: photos taken, edited or deleted in the meantime
         // are indexed or forgotten (a pass over unchanged photos only reads the library's list).
-        private void RefreshPhotoIndex()
+        public void RefreshIndex()
         {
             if (DateTime.UtcNow - _photoIndexStarted >= PhotoReindexInterval)
-                StartPhotoIndexing();
-        }
-
-        // Window.Resumed: the app returns to the foreground (on desktops also when its window is activated). The page's
-        // Window is set after OnAppearing when it is pushed in the Shell, so this follows the property.
-        protected override void OnPropertyChanged(string propertyName = null)
-        {
-            base.OnPropertyChanged(propertyName);
-            if (propertyName == nameof(Window))
-                WatchAppResume();
-        }
-
-        private void WatchAppResume()
-        {
-            if (Window == _resumeWindow)
-                return;
-            if (_resumeWindow != null)
-            {
-                _resumeWindow.Resumed -= OnAppResumed;
-                _resumeWindow.Stopped -= CameraWindowStopped;
-                _resumeWindow.Resumed -= ServerAppResumed;
-                _resumeWindow.Stopped -= ServerAppStopped;
-            }
-            _resumeWindow = Window;
-            if (_resumeWindow != null)
-            {
-                _resumeWindow.Resumed += OnAppResumed;
-                _resumeWindow.Stopped += CameraWindowStopped;
-                _resumeWindow.Resumed += ServerAppResumed;
-                _resumeWindow.Stopped += ServerAppStopped;
-            }
-        }
-
-        private void OnAppResumed(object sender, EventArgs e)
-        {
-            _cameraSuspended = false;
-            if (_pageVisible)
-                PastChats.StartIndexing();
-            if (_pageVisible)
-                RefreshPhotoIndex();
+                StartIndexing();
         }
 
         // Index the new photos in the background (incremental: only photos not yet indexed, or edited since).
-        private void StartPhotoIndexing()
+        public void StartIndexing()
         {
-            if (IsPrivateChat || _reloadingCpuThreads || !EmbeddingSupportsImages || !PhotoSearchOn || (_photoIndexTask != null && !_photoIndexTask.IsCompleted))
+            if (_host.IsPrivateChat || _host.ReloadingModels || !_host.SearchModelTakesImages || !PhotoSearchOn || (_photoIndexTask != null && !_photoIndexTask.IsCompleted))
                 return;
             _photoIndexStarted = DateTime.UtcNow;
             _photoIndexing = new CancellationTokenSource();
@@ -193,12 +155,12 @@ namespace Maui.Demo.Lite
                     _photoStatus.Text = text;
                 });
                 await WaitForPhotoWorkAsync(cancel);
-                var embedder = await Embedder.EnsureAsync(stage, cancel);
+                var embedder = await _host.Embedder.EnsureAsync(stage, cancel);
                 // Waits while the chat answers, so indexing doesn't slow the reply down.
-                await _photoIndex.IndexAsync(embedder, (image, token) => RunIndexEmbeddingAsync(
+                await _photoIndex.IndexAsync(embedder, (image, token) => _host.RunIndexEmbeddingAsync(
                     () => embedder.EmbedImage(image, visionTokensPerImage: PhotoIndex.VisionTokens),
-                    reason => MainThread.BeginInvokeOnMainThread(() => { _photoPauseReason = reason; UpdatePhotoStatus(); }),
-                    token, photos: true), MaxIndexedPhotos, () => _busy, cancel, WaitForPhotoWorkAsync);
+                    reason => MainThread.BeginInvokeOnMainThread(() => { _photoPauseReason = reason; UpdateStatus(); }),
+                    token, photos: true), MaxIndexedPhotos, () => _host.IsReplying, cancel, WaitForPhotoWorkAsync);
                 UiStallWatchdog.Mark(string.Format("Photos indexed: {0}", _photoIndex.Count));
             }
             catch (OperationCanceledException)
@@ -210,10 +172,13 @@ namespace Maui.Demo.Lite
                 _photoStatus.IsVisible = true;
                 _photoStatus.Text = "Indexing stopped: " + ex.Message;
             }
-            UpdatePhotoStatus();
+            UpdateStatus();
         }
 
-        private void UpdatePhotoStatus()
+        private Task WaitForPhotoWorkAsync(CancellationToken cancel) => _host.WaitForWorkAsync(true, reason =>
+            MainThread.BeginInvokeOnMainThread(() => { _photoPauseReason = reason; UpdateStatus(); }), cancel);
+
+        public void UpdateStatus()
         {
             if (_photoStatus == null)
                 return;
@@ -234,19 +199,19 @@ namespace Maui.Demo.Lite
         }
 
         // The find_photos tool: search the index, show the matches above the reply, and tell the model what was found.
-        private async Task<string> FindPhotosAsync(string request, CancellationToken cancel)
+        public async Task<string> FindAsync(string request, CancellationToken cancel)
         {
             if (!PhotoSearchOn)
                 return string.Format(CultureInfo.InvariantCulture,
                     "Photo search is turned off, so the user's photos can't be searched. Tell the user they can turn on \"Search my photos\" in {0}: their recent photos are then indexed on this device (the first time takes a while), and nothing leaves it.",
-                    _settingsButton.IsVisible ? "this chat's settings (the gear button at the top)" : "the settings panel beside the chat");
-            if (Embedder.Model == null || _photoIndex.Count == 0)
+                    _host.SettingsLocation);
+            if (_host.Embedder.Model == null || _photoIndex.Count == 0)
                 return _photoIndex.IsIndexing
                     ? "The photos are still being indexed - try again in a few minutes."
                     : "No photos are indexed yet.";
             // What, where, when, kind and camera, from the request; places and cameras as the indexed photos name them.
             PhotoQuery query = PhotoRequest.Parse(request, DateTime.Now, _photoIndex.KnownPlaces(), _photoIndex.KnownCameras());
-            (List<(IndexedPhoto Photo, float Score)> found, int matching) = await _photoIndex.SearchAsync(Embedder.Model, Embedder.Gate, query, cancel);
+            (List<(IndexedPhoto Photo, float Score)> found, int matching) = await _photoIndex.SearchAsync(_host.Embedder.Model, _host.Embedder.Gate, query, cancel);
             // Photos deleted since the last indexing pass: forgotten, and the search run again, since the scores of the
             // rest count relative to the best one.
             for (int attempt = 0; attempt < 3 && found.Count > 0; attempt++)
@@ -259,7 +224,7 @@ namespace Maui.Demo.Lite
                     break;
                 UiStallWatchdog.Mark(string.Format("find_photos: {0} found photos no longer in the library", gone.Count));
                 await _photoIndex.RemoveAsync(gone);
-                (found, matching) = await _photoIndex.SearchAsync(Embedder.Model, Embedder.Gate, query, cancel);
+                (found, matching) = await _photoIndex.SearchAsync(_host.Embedder.Model, _host.Embedder.Gate, query, cancel);
             }
             UiStallWatchdog.Mark(string.Format("find_photos {0}: {1} found of {2} matching{3}", query, found.Count, matching,
                 found.Count > 0 && query.Description != null ? string.Format(CultureInfo.InvariantCulture, ", best {0:F3}", found[0].Score) : ""));
@@ -271,8 +236,7 @@ namespace Maui.Demo.Lite
                 return string.Format(CultureInfo.InvariantCulture, "No photos {0} were found among the {1} most recent photos.{2}",
                     query, _photoIndex.Count, why);
             }
-            StreamingBubble bubble = _agentBubble;
-            await MainThread.InvokeOnMainThreadAsync(() => AddPhotoStrip(bubble, found.Select(f => f.Photo).ToList()));
+            await MainThread.InvokeOnMainThreadAsync(() => _host.AddCardToReply(CreatePhotoStrip(found.Select(f => f.Photo).ToList())));
             // When and where, for the model to say (it can't see the photos).
             string details = string.Join("; ", found.Take(5).Select(f => PhotoCaption(f.Photo, true)));
             return string.Format(CultureInfo.InvariantCulture,
@@ -299,7 +263,7 @@ namespace Maui.Demo.Lite
         }
 
         // A row of thumbnails above the reply; tapping one shows it larger.
-        private void AddPhotoStrip(StreamingBubble bubble, List<IndexedPhoto> photos)
+        private View CreatePhotoStrip(List<IndexedPhoto> photos)
         {
             HorizontalStackLayout row = new HorizontalStackLayout { Spacing = 8 };
             foreach (IndexedPhoto photo in photos)
@@ -337,7 +301,7 @@ namespace Maui.Demo.Lite
                 Margin = new Thickness(6, 0),
                 Content = row
             };
-            AddCard(bubble, strip);
+            return strip;
         }
 
         private static async Task LoadThumbnailAsync(Image image, string photoId)
@@ -356,9 +320,37 @@ namespace Maui.Demo.Lite
             {
                 Source = ImageSource.FromStream(() => new System.IO.MemoryStream(jpeg)),
                 Aspect = Aspect.AspectFit,
-                HeightRequest = Math.Max(240, Height * 0.6)
+                HeightRequest = Math.Max(240, _host.PageSize.Height * 0.6)
             };
-            await _sheet.ShowViewAsync("Photo", image, "Close");
+            await _host.ShowSheetAsync("Photo", image, "Close");
+        }
+
+        // Stops indexing without waiting; waiting for it to stop.
+        public void CancelIndexing() => _photoIndexing?.Cancel();
+
+        public async Task WaitForIndexingAsync()
+        {
+            try { await (_photoIndexTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
+        }
+
+        // Forgets every indexed photo (the search model changed, or Storage deleted the index).
+        public Task ClearIndexAsync() => _photoIndex.ClearAsync();
+
+        // Settings > Storage deleted the index or the search model: the switch goes off without clearing the index again.
+        public void TurnOff()
+        {
+            _photoSwitch.Toggled -= OnPhotoSearchToggled;
+            _photoSwitch.IsToggled = false;
+            _photoSwitch.Toggled += OnPhotoSearchToggled;
+            Preferences.Default.Set(PhotoSearchPreference, false);
+        }
+
+        // Turns photo search off as the user would, deleting the index.
+        public void SwitchOff() => _photoSwitch.IsToggled = false;
+
+        public void SetSwitchEnabled(bool enabled)
+        {
+            if (_photoSwitch != null) _photoSwitch.IsEnabled = enabled;
         }
     }
 }

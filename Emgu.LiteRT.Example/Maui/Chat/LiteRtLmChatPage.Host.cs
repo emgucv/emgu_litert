@@ -39,6 +39,10 @@ public partial class LiteRtLmChatPage : IChatHost
 
     private PastChatsFeature PastChats => _pastChatsFeature ??= new PastChatsFeature(this);
 
+    private PhotoSearchFeature _photoSearchFeature;
+
+    private PhotoSearchFeature PhotoSearch => _photoSearchFeature ??= new PhotoSearchFeature(this);
+
     private DeviceActionsFeature _deviceActionsFeature;
 
     // Timers, alarms, calendar events, reminders and directions, each confirmed on a card (the static DeviceActions does them).
@@ -141,6 +145,10 @@ public partial class LiteRtLmChatPage : IChatHost
     bool IChatHost.CanIndexNow => _pageVisible && !_reloadingCpuThreads;
 
     bool IChatHost.IsReplying => _busy;
+
+    bool IChatHost.ReloadingModels => _reloadingCpuThreads;
+
+    bool IChatHost.SearchModelTakesImages => EmbeddingSupportsImages;
 
     int? IChatHost.ConversationId => _conversationId;
 

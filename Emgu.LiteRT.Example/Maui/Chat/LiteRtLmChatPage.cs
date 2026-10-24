@@ -404,7 +404,7 @@ namespace Maui.Demo.Lite
             PastChats.StartIndexing();
             if (_pageStarted)
             {
-                RefreshPhotoIndex();
+                PhotoSearch.RefreshIndex();
                 return;
             }
             _pageStarted = true;
@@ -424,7 +424,7 @@ namespace Maui.Demo.Lite
                 Preferences.Default.Get(UseGpuPreference, DeviceInfo.Platform != DevicePlatform.WinUI)); } catch (Exception) { }
             SelectModel(index);
             // Photo search: index photos added since the app last ran.
-            StartPhotoIndexing();
+            PhotoSearch.StartIndexing();
             // Saved document indexes no chat uses (attached, then the chat was never saved).
             _ = _store.DeleteUnusedDocumentsAsync();
         }
@@ -461,6 +461,50 @@ namespace Maui.Demo.Lite
             await Task.Run(() => model?.Dispose());
         }
 
+        // The reply being written, so cards features add (found photos, documents, step lines...) are shown above it.
+        private StreamingBubble _agentBubble;
+
+        private Window _resumeWindow;
+
+        // Window.Resumed: the app returns to the foreground (on desktops also when its window is activated). The page's
+        // Window is set after OnAppearing when it is pushed in the Shell, so this follows the property.
+        protected override void OnPropertyChanged(string propertyName = null)
+        {
+            base.OnPropertyChanged(propertyName);
+            if (propertyName == nameof(Window))
+                WatchAppResume();
+        }
+
+        private void WatchAppResume()
+        {
+            if (Window == _resumeWindow)
+                return;
+            if (_resumeWindow != null)
+            {
+                _resumeWindow.Resumed -= OnAppResumed;
+                _resumeWindow.Stopped -= CameraWindowStopped;
+                _resumeWindow.Resumed -= ServerAppResumed;
+                _resumeWindow.Stopped -= ServerAppStopped;
+            }
+            _resumeWindow = Window;
+            if (_resumeWindow != null)
+            {
+                _resumeWindow.Resumed += OnAppResumed;
+                _resumeWindow.Stopped += CameraWindowStopped;
+                _resumeWindow.Resumed += ServerAppResumed;
+                _resumeWindow.Stopped += ServerAppStopped;
+            }
+        }
+
+        private void OnAppResumed(object sender, EventArgs e)
+        {
+            _cameraSuspended = false;
+            if (_pageVisible)
+                PastChats.StartIndexing();
+            if (_pageVisible)
+                PhotoSearch.RefreshIndex();
+        }
+
         protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
         {
             base.OnNavigatedFrom(args);
@@ -485,7 +529,7 @@ namespace Maui.Demo.Lite
                 _loadCancel?.Cancel();
                 if (!IsPrivateChat) _ = CancelRecordingAsync();
                 RemoveDocument();
-                _photoIndexing?.Cancel();
+                PhotoSearch.CancelIndexing();
                 PastChats.CancelIndexing();
                 _chatExportCancel?.Cancel();
                 _searchRestoreCancel?.Cancel();

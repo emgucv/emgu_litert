@@ -131,9 +131,9 @@ public partial class LiteRtLmChatPage : ISearchModelChoice
         _settingsView.IsEnabled = false;
         try
         {
-            _photoIndexing?.Cancel();
+            PhotoSearch.CancelIndexing();
             await PastChats.StopIndexingAsync();
-            try { await (_photoIndexTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
+            await PhotoSearch.WaitForIndexingAsync();
             if (_document?.Ready != null) await _document.Ready;
             SetBusy(true);
             bool reload = Embedder.IsLoaded;
@@ -144,10 +144,10 @@ public partial class LiteRtLmChatPage : ISearchModelChoice
             Preferences.Default.Set(EmbeddingModelPreference, index);
             Preferences.Default.Set(EmbeddingGpuPreference, gpu);
             UpdateEmbeddingModelDetail();
-            if (modelChanged) await _photoIndex.ClearAsync();
-            if (!EmbeddingSupportsImages && _photoSwitch.IsToggled)
-                _photoSwitch.IsToggled = false;
-            _photoSwitch.IsEnabled = EmbeddingSupportsImages && !SearchDownloadRequired;
+            if (modelChanged) await PhotoSearch.ClearIndexAsync();
+            if (!EmbeddingSupportsImages && PhotoSearch.On)
+                PhotoSearch.SwitchOff();
+            PhotoSearch.SetSwitchEnabled(EmbeddingSupportsImages && !SearchDownloadRequired);
             string documentId = _document?.Id;
             RemoveDocument();
             if (documentId != null) await RestoreDocumentAsync(documentId);
@@ -160,7 +160,7 @@ public partial class LiteRtLmChatPage : ISearchModelChoice
             _reloadingCpuThreads = false;
             _settingsView.IsEnabled = true;
             SetBusy(false);
-            if (_pageVisible) StartPhotoIndexing();
+            if (_pageVisible) PhotoSearch.StartIndexing();
             if (_pageVisible) PastChats.StartIndexing();
         }
     }

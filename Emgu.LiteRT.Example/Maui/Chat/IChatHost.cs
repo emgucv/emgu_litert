@@ -108,6 +108,12 @@ internal interface IChatHost
     bool CanIndexNow { get; }
     bool IsReplying { get; }
 
+    // Whether models are being reloaded (CPU threads, private chat, Storage, another search model): nothing new starts meanwhile.
+    bool ReloadingModels { get; }
+
+    // Whether the search model embeds images too (photo search needs it).
+    bool SearchModelTakesImages { get; }
+
     // The saved chat being shown (null until its first exchange is saved), and opening another (when nothing is being answered).
     int? ConversationId { get; }
     Task OpenChatAsync(int id);

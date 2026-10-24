@@ -6,7 +6,6 @@ public partial class LiteRtLmChatPage
     private const string PhotosChargingPreference = "litert_lm_photos_only_charging";
     private readonly WorkloadPolicy _workloadPolicy = new();
     private volatile bool _photosOnlyWhileCharging;
-    private string _photoPauseReason;
 
     private Task WaitForWorkAsync(bool photos, Action<string> status, CancellationToken cancel) =>
         _workloadPolicy.WaitAsync(DeviceWorkload.ReadAsync, () => photos && _photosOnlyWhileCharging, status, cancel);
@@ -43,8 +42,5 @@ public partial class LiteRtLmChatPage
             finally { Embedder.Gate.Release(); }
         }
     }
-
-    private Task WaitForPhotoWorkAsync(CancellationToken cancel) => WaitForWorkAsync(true, reason =>
-        MainThread.BeginInvokeOnMainThread(() => { _photoPauseReason = reason; UpdatePhotoStatus(); }), cancel);
 }
 #endif

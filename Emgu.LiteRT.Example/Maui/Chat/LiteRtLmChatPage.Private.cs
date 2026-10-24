@@ -84,9 +84,9 @@ namespace Maui.Demo.Lite
                 DocumentState document = _document;
                 RemoveDocument();
                 PastChats.CancelIndexing();
-                _photoIndexing?.Cancel();
+                PhotoSearch.CancelIndexing();
                 await PastChats.StopIndexingAsync();
-                try { await (_photoIndexTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
+                await PhotoSearch.WaitForIndexingAsync();
                 if (document?.Ready != null) { try { await document.Ready; } catch (OperationCanceledException) { } }
                 await FinishPrivateDocumentsAsync();
                 StopSpeaking();
@@ -111,7 +111,7 @@ namespace Maui.Demo.Lite
             {
                 _reloadingCpuThreads = false;
                 UpdatePrivateChatState();
-                if (!IsPrivateChat && _pageVisible) { StartPhotoIndexing(); PastChats.StartIndexing(); }
+                if (!IsPrivateChat && _pageVisible) { PhotoSearch.StartIndexing(); PastChats.StartIndexing(); }
             }
         }
 
