@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Diagnostics;
 using System.Text;
 using Emgu.LiteRT.LM.Agents;
@@ -314,4 +313,3 @@ internal sealed class MeetingFeature
         session.Time.IsVisible = false;
     }
 }
-#endif

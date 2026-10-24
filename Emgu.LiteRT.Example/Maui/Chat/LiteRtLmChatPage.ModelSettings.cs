@@ -1,4 +1,3 @@
-#if WINDOWS || IOS || ANDROID || MACCATALYST
 using System;
 using System.Linq;
 using System.Threading;
@@ -177,4 +176,3 @@ public partial class LiteRtLmChatPage : ISearchModelChoice
             new Label { Text = "Z-Image-Turbo is the only available image model. 10.6 GB download, 256 × 256 images. GPU execution is not supported by this selector.", FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText } } };
     }
 }
-#endif

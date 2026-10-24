@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Text.Json;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Audio;
@@ -41,7 +40,6 @@ internal sealed class CameraSpeechAction(AlertAudioCoordinator audio, string tex
         { throw new TimeoutException("Spoken alert exceeded 30 seconds."); }
     }
 }
-#endif
 
 #if ANDROID
 internal sealed class CameraClipFactory(Func<VisualEvent, int, CancellationToken, Task> record) : IVisualActionFactory

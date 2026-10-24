@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if WINDOWS || IOS || ANDROID || MACCATALYST
 using System;
 using System.IO;
 using Path = System.IO.Path;
@@ -123,4 +122,3 @@ namespace Maui.Demo.Lite
         }
     }
 }
-#endif

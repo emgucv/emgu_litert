@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using Emgu.CV;
 #if ANDROID
 using PreviewBase = Emgu.CV.Platform.Maui.UI.CvImageView;
@@ -67,4 +66,3 @@ internal sealed class LiveCameraPreview : PreviewBase
 #endif
     }
 }
-#endif

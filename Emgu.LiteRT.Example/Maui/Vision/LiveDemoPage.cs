@@ -2,7 +2,6 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Diagnostics;
 using Emgu.CV;
 using Microsoft.Maui.Controls.Shapes;
@@ -344,4 +343,3 @@ namespace Maui.Demo.Lite
         }
     }
 }
-#endif

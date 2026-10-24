@@ -1,4 +1,3 @@
-#if WINDOWS || IOS || ANDROID || MACCATALYST
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -75,4 +74,3 @@ public partial class LiteRtLmChatPage
         row.Continue.IsEnabled = CanChangeModel;
     }
 }
-#endif

@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 namespace Maui.Demo.Lite;
 
 // What the camera and sound monitors show about themselves: the user's own request behind each monitor (kept in memory with the monitor, not in
@@ -91,4 +90,3 @@ public partial class LiteRtLmChatPage
         if (_cameraFront) _cameraLabel.Text += " · selfie";
     }
 }
-#endif

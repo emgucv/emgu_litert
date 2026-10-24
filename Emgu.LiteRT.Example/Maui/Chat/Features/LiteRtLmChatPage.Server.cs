@@ -1,4 +1,3 @@
-#if WINDOWS || IOS || ANDROID || MACCATALYST
 using System;
 using System.ClientModel;
 using System.ClientModel.Primitives;
@@ -592,4 +591,3 @@ public partial class LiteRtLmChatPage
         };
     }
 }
-#endif

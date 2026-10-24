@@ -2,8 +2,6 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if WINDOWS || IOS || ANDROID || MACCATALYST
-
 using System.Diagnostics;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Maui.Controls.Shapes;
@@ -509,5 +507,3 @@ public partial class LiteRtLmChatPage
         }
     }
 }
-
-#endif

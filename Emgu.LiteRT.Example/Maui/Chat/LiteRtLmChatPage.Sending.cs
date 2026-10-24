@@ -2,8 +2,6 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-#if WINDOWS || IOS || ANDROID || MACCATALYST
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -245,5 +243,3 @@ namespace Maui.Demo.Lite
         private ReplyReader _pendingReader;
     }
 }
-
-#endif

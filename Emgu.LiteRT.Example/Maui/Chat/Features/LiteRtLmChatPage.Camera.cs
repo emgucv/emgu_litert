@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.IO;
 using Emgu.CV;
 using Microsoft.Extensions.AI;
@@ -408,4 +407,3 @@ public partial class LiteRtLmChatPage
         if (camera != null) { camera.FrameReady = null; camera.Failed = null; await camera.StopAsync(); }
     }
 }
-#endif

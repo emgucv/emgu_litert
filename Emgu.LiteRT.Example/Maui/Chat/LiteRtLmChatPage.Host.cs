@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using Emgu.LiteRT.LM.Agents;
 
 namespace Maui.Demo.Lite;
@@ -171,4 +170,3 @@ public partial class LiteRtLmChatPage : IChatHost
             await _store.SetThinkingTranslationAsync(messageId, language, translation);
     }
 }
-#endif

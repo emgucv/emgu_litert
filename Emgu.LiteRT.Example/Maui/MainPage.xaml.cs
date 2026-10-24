@@ -19,12 +19,10 @@ public partial class MainPage : ContentPage
 
         // Two tabs, like the Emgu CV demo's category pills: the LiteRT-LM chat, and the TF Lite (Interpreter API) demos.
         var tabs = new List<(string Name, string Glyph, string Title, List<(string Glyph, string Title, string Subtitle, Func<Page> Create)> Rows)>();
-#if WINDOWS || IOS || ANDROID || MACCATALYST
         tabs.Add(("LiteRT-LM", Theme.GlyphText, "LiteRT-LM Demos", new List<(string, string, string, Func<Page>)>
         {
             (Theme.GlyphText, "Chat", "Chat with Gemma 4 or Qwen on this device - images, voice and web search too", () => new LiteRtLmChatPage()),
         }));
-#endif
         tabs.Add(("TF Lite", Theme.GlyphImage, "TF Lite Demos", new List<(string, string, string, Func<Page>)>
         {
             (Theme.GlyphDetect, "Coco SSD Mobilenet", "Detect and label objects in a photo", () => new CocoSsdMobilenetPage()),

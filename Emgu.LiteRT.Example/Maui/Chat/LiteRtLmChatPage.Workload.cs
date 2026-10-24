@@ -1,4 +1,3 @@
-#if WINDOWS || IOS || ANDROID || MACCATALYST
 namespace Maui.Demo.Lite;
 
 public partial class LiteRtLmChatPage
@@ -43,4 +42,3 @@ public partial class LiteRtLmChatPage
         }
     }
 }
-#endif

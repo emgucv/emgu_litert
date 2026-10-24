@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Runtime.InteropServices;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
@@ -38,4 +37,3 @@ internal sealed class FaceVisualAgent : IVisualAgent
 
     public void Dispose() => _detector.Dispose();
 }
-#endif

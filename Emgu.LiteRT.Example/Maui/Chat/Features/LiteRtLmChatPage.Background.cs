@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using Emgu.LiteRT.LM.Agents.Audio;
 
 namespace Maui.Demo.Lite;
@@ -68,4 +67,3 @@ public partial class LiteRtLmChatPage
     private void NotifySoundAlert(SoundEvent occurrence, SoundMonitorInfo monitor) { }
 #endif
 }
-#endif

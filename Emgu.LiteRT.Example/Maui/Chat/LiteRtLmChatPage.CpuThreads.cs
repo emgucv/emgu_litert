@@ -1,4 +1,3 @@
-#if WINDOWS || IOS || ANDROID || MACCATALYST
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -86,4 +85,3 @@ public partial class LiteRtLmChatPage
         await Images.ReleaseModelAsync();
     }
 }
-#endif

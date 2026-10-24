@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Runtime.InteropServices;
 using Emgu.CV;
 using Emgu.LiteRT.Models;
@@ -40,4 +39,3 @@ internal sealed class HandVisualAgent : IVisualAgent
 
     public void Dispose() => _detector.Dispose();
 }
-#endif

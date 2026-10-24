@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Diagnostics;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Microsoft.Extensions.AI;
@@ -351,4 +350,3 @@ public partial class LiteRtLmChatPage
         }
     }
 }
-#endif

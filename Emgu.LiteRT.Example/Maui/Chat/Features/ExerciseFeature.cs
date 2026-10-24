@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Diagnostics;
 using Emgu.CV;
 using Emgu.LiteRT.LM.Agents;
@@ -323,4 +322,3 @@ internal sealed class ExerciseFeature : IDisposable
         if (pose != null) _ = Task.Run(async () => { await Task.Delay(500); pose.Dispose(); });
     }
 }
-#endif

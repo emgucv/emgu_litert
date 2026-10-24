@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Globalization;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Maui;
@@ -190,4 +189,3 @@ public partial class LiteRtLmChatPage
         if (_alertRecorder.IsRecording) _ = _alertRecorder.StopAsync();
     }
 }
-#endif

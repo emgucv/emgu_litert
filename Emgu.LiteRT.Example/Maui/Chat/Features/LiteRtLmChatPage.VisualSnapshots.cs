@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using Emgu.LiteRT.LM.Agents.Events;
 
 namespace Maui.Demo.Lite;
@@ -73,4 +72,3 @@ public partial class LiteRtLmChatPage
         await _sheet.ShowViewAsync("Camera snapshot", new VerticalStackLayout { Spacing = 10, Children = { image, save, status } }, "Close");
     }
 }
-#endif

@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -293,4 +292,3 @@ public partial class LiteRtLmChatPage
         catch { ArrayPool<byte>.Shared.Return(pixels); throw; }
     }
 }
-#endif

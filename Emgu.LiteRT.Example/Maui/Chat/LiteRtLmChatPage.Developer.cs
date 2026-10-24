@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 namespace Maui.Demo.Lite;
 
 // Settings > "Developer mode" (off by default, Preferences litert_lm_chat_developer_mode): shows what the models see, for checking and tuning them -
@@ -49,4 +48,3 @@ public partial class LiteRtLmChatPage
         };
     }
 }
-#endif

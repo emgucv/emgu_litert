@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using Emgu.LiteRT.LM.Models;
 
 namespace Maui.Demo.Lite;
@@ -112,4 +111,3 @@ internal sealed class SearchEmbedder
         finally { Gate.Release(); }
     }
 }
-#endif

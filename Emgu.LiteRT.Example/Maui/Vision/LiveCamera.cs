@@ -1,5 +1,4 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || MACCATALYST || WINDOWS || IOS
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 using System.Diagnostics;
@@ -185,4 +184,3 @@ internal sealed partial class LiveCamera
         }
     }
 }
-#endif
