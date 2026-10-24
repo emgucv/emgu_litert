@@ -11,7 +11,7 @@ namespace Emgu.LiteRT.Models
     /// twice. Feed it the frames of one camera in order, from one thread; at least ~8 frames a second, since a quick jumping jack is open for
     /// about a quarter of a second.
     /// </summary>
-    public sealed class JumpingJackCounter
+    public sealed class JumpingJackCounter : IExerciseCounter
     {
         private const int LeftShoulder = 11, RightShoulder = 12, LeftWrist = 15, RightWrist = 16, LeftAnkle = 27, RightAnkle = 28;
 
@@ -37,11 +37,15 @@ namespace Emgu.LiteRT.Models
         /// <summary>The position the person was last seen in</summary>
         public Position Current { get; private set; }
 
+        /// <inheritdoc/>
+        public string Phase { get; private set; }
+
         /// <summary>Start again from 0.</summary>
         public void Reset()
         {
             Count = 0;
             Current = Position.Unknown;
+            Phase = null;
         }
 
         /// <summary>
@@ -57,11 +61,13 @@ namespace Emgu.LiteRT.Models
             if (landmarks == null)
             {
                 Current = Position.Unknown;
+                Phase = null;
                 return false;
             }
             if (landmarks.Length != PoseTracker.LandmarkCount) throw new ArgumentException("Expected 33 landmarks.", nameof(landmarks));
             if (imageWidth < 1 || imageHeight < 1) throw new ArgumentOutOfRangeException(nameof(imageWidth));
             Position position = Read(landmarks, imageWidth, imageHeight, minVisibility);
+            Phase = position == Position.Open ? "open" : position == Position.Closed ? "closed" : "between";
             if (position == Position.Unknown || position == Current)
                 return false;
             bool completed = Current == Position.Open && position == Position.Closed;

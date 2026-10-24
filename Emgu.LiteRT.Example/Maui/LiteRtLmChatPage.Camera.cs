@@ -25,7 +25,7 @@ public partial class LiteRtLmChatPage
     private bool _cameraFront;     // the selfie camera (Android); New chat goes back to the back camera
     private bool _cameraMaximized; // the preview fills the conversation's area; closing the camera restores it
     private Button _cameraMaximize;
-    private Border _cameraOverlay;          // the jumping jack count over the maximized preview (LiteRtLmChatPage.Exercise.cs)
+    private Border _cameraOverlay;          // the exercise count over the maximized preview (LiteRtLmChatPage.Exercise.cs)
     private Label _cameraOverlayCount, _cameraOverlayDetail;
     private double _cameraRestoreX, _cameraRestoreY;
     private const string CameraInstructions = ChatPlannerInstructions.Camera;

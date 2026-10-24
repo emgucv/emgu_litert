@@ -118,6 +118,16 @@ frames in between change nothing, and losing the person drops the jumping jack u
 left him too small to find - closed (wrists 1.4-1.5 down, feet 0.41), and the warrior pose (arms level) neither; Z-Image's "full body" prompts were
 cut off at the chest. `UnitTestJumpingJacks` covers the rules on made-up landmarks.
 
+`SquatCounter` and `HighKneesCounter` (`ExerciseCounters.cs`, with the `IExerciseCounter` all three implement) count the same way:
+- Squats: the hip's height above the ankle over the knee's - about 2 standing, 1 with the thighs level, only heights, so the front and the side
+  alike; standing at 1.75 or more, down at 1.45 or less (thighs ~30 degrees from level), counted on standing up; legs with hip, knee and ankle
+  visible, averaged.
+- High knees: each knee's drop below its hip in torso lengths (shoulders' middle to hips' middle) - about 0.8 standing; up at 0.2 or less and no more
+  than 0.35 to the side of the hip, down at 0.5 or more; each leg counts on coming down. The sideways limit is needed: a jumping jack's spread legs
+  bring the knees to 0.25-0.32 below the hips (0.62 to the side), the warrior pose's bent knee 0.14 (0.65 to the side), standing 0.77 (0.02).
+- Checked only on those synthetic pictures (standing read 2.14 for squats, the jumping jack 2.15, the warrior pose 1.59 - in between) and on
+  made-up landmarks in `UnitTestJumpingJacks`; no squat or high-knee picture, real person or Gemma 4 run yet.
+
 In the demo's chat, Gemma 4 calls `count_exercise` (`Emgu.LiteRT.LM.Agents`' `ExerciseTools.cs`, in the goals tool group - a group of its own
 added a stub to every message and went over the budget `UnitTestToolRouting` checks): the call lasts as long as the exercise, since the model is
 far too slow to judge each movement. `LiteRtLmChatPage.Exercise.cs` opens the camera, runs its own pose detector (lite) on every frame it keeps up

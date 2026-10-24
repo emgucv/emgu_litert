@@ -147,6 +147,8 @@ public class UnitTestToolRouting
             ("Count my jumping jacks", new[] { ChatToolGroups.Goals }),
             ("Let's do 30 seconds of star jumps", new[] { ChatToolGroups.Goals }),
             ("I want to do 30 jumping jacks every day", new[] { ChatToolGroups.Goals }),
+            ("Count my squats", new[] { ChatToolGroups.Goals }),
+            ("Let's do high knees for a minute", new[] { ChatToolGroups.Goals }),
             ("Show me my photos from Paris", new[] { ChatToolGroups.Photos }),
             ("Find my selfies from last summer", new[] { ChatToolGroups.Photos }),
             ("What does my rental contract say about pets?", new[] { ChatToolGroups.Documents }),

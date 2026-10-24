@@ -3,7 +3,7 @@
 namespace Maui.Demo.Lite;
 
 // Settings > "Developer mode" (off by default, Preferences litert_lm_chat_developer_mode): shows what the models see, for checking and tuning them -
-// while jumping jacks are counted, the camera preview draws the body pose as the "Body pose" page does, and the card says which position was read.
+// while an exercise is counted, the camera preview draws the body pose as the "Body pose" page does, and the card says which position was read.
 public partial class LiteRtLmChatPage
 {
     private const string DeveloperModePreference = "litert_lm_chat_developer_mode";
@@ -42,7 +42,7 @@ public partial class LiteRtLmChatPage
                 row,
                 new Label
                 {
-                    Text = "Shows what the models see. While jumping jacks are counted, the camera preview draws the body tracking and the card shows the position read.",
+                    Text = "Shows what the models see. While an exercise is counted, the camera preview draws the body tracking and the card shows the position read.",
                     FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText
                 }
             }

@@ -48,13 +48,18 @@ namespace Emgu.LiteRT.LM.Agents
     public static partial class AgentTools
     {
         /// <summary>The exercises count_exercise can count</summary>
-        public static readonly string[] CountableExercises = { "jumping jacks" };
+        public static readonly string[] CountableExercises = { "jumping jacks", "squats", "high knees" };
 
-        private static readonly Regex JumpingJackWords = new Regex(@"\b(?:jumping[\s-]*jacks?|star[\s-]*jumps?)\b",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        // Each countable exercise by the words people use for it.
+        private static readonly (string Name, Regex Words)[] ExerciseWords =
+        {
+            ("jumping jacks", new Regex(@"\b(?:jumping[\s-]*jacks?|star[\s-]*jumps?)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)),
+            ("squats", new Regex(@"\bsquat(?:s|ting)?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)),
+            ("high knees", new Regex(@"\b(?:high[\s-]*knees?|knee[\s-]*(?:raises?|lifts?|ups?)|marching\s+(?:on\s+the\s+spot|in\s+place))\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)),
+        };
 
         /// <summary>
-        /// count_exercise: the app counts an exercise the user does in front of the camera (jumping jacks) until a target, a time limit, the
+        /// count_exercise: the app counts an exercise the user does in front of the camera (jumping jacks, squats, high knees) until a target, a time limit, the
         /// user stopping it or a pause, and returns the count - with what LogExerciseAsync logged toward a goal, so the model doesn't log it
         /// again. The model is too slow to judge each movement itself, so the app's count function does the counting (e.g. the body pose model
         /// on each frame) and the call lasts as long as the exercise.
@@ -67,24 +72,31 @@ namespace Emgu.LiteRT.LM.Agents
             if (count == null)
                 throw new ArgumentNullException(nameof(count));
             return AIFunctionFactory.Create(
-                ([Description("The exercise: \"jumping jacks\"")] string exercise = "jumping jacks",
+                ([Description("The exercise: \"jumping jacks\", \"squats\" or \"high knees\"")] string exercise = "jumping jacks",
                  [Description("How many to stop at, if the user said (e.g. 30); 0 if not")] int target = 0,
                  [Description("How many seconds to count for, if the user said (e.g. 60 for \"one minute\"); 0 if not")] int seconds = 0,
                  CancellationToken cancellationToken = default) =>
                     count(String.IsNullOrWhiteSpace(exercise) ? "jumping jacks" : exercise.Trim(), Math.Max(0, target), Math.Max(0, seconds), cancellationToken),
                 "count_exercise",
-                "Counts jumping jacks the user does in front of the camera, showing the count as they go, and returns how many they did. " +
-                "Use it when the user wants to do jumping jacks, wants them counted or wants a jumping jack challenge. The count is logged " +
-                "to a matching goal automatically: never call log_progress for it.");
+                "Counts jumping jacks, squats or high knees the user does in front of the camera, showing the count as they go, and returns " +
+                "how many they did. Use it when the user wants to do one of them, wants them counted or wants a challenge. The count is " +
+                "logged to a matching goal automatically: never call log_progress for it.");
         }
 
         /// <summary>
-        /// Whether an exercise can be counted (count_exercise), by its name in the user's words: "jumping jacks", "star jumps".
+        /// Whether an exercise can be counted (count_exercise), by its name in the user's words: "jumping jacks", "star jumps", "squats",
+        /// "high knees", "knee raises".
         /// </summary>
         /// <param name="exercise">The exercise</param>
-        /// <returns>The name it is counted as ("jumping jacks"), or null</returns>
-        public static string CountableExercise(string exercise) =>
-            exercise != null && JumpingJackWords.IsMatch(exercise) ? "jumping jacks" : null;
+        /// <returns>The name it is counted as (one of <see cref="CountableExercises"/>), or null</returns>
+        public static string CountableExercise(string exercise)
+        {
+            if (exercise == null) return null;
+            foreach (var (name, words) in ExerciseWords)
+                if (words.IsMatch(exercise))
+                    return name;
+            return null;
+        }
 
         /// <summary>
         /// Log a counted exercise toward the goal that names it ("30 jumping jacks a day"): its count if the goal counts the exercise, 1 if it

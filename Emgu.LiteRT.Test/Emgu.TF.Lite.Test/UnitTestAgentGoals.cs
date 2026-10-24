@@ -35,6 +35,8 @@ public class UnitTestAgentGoals
             ("30 jumping jacks per day", 30, "jumping jacks", GoalPeriod.Day),
             ("Do 20 push ups every morning", 20, "push ups", GoalPeriod.Day),
             ("50 sit-ups a day", 50, "sit-ups", GoalPeriod.Day),
+            ("Do 40 squats a day", 40, "squats", GoalPeriod.Day),
+            ("100 high knees every day", 100, "high knees", GoalPeriod.Day),
         };
         foreach (var c in cases)
         {

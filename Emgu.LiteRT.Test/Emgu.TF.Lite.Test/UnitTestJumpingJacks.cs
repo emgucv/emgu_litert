@@ -9,8 +9,8 @@ using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
 
-// Counting jumping jacks (JumpingJackCounter) from made-up landmarks, and logging a count toward a goal (AgentTools.LogExerciseAsync);
-// no model or native library.
+// Counting jumping jacks (JumpingJackCounter), squats (SquatCounter) and high knees (HighKneesCounter) from made-up landmarks, and logging
+// a count toward a goal (AgentTools.LogExerciseAsync); no model or native library.
 [TestFixture]
 public class UnitTestJumpingJacks
 {
@@ -157,9 +157,82 @@ public class UnitTestJumpingJacks
         Assert.That(text, Does.Contain("add_goal"));
     }
 
+    // A body for squats and high knees, seen from the front: shoulders at y 0.25, hips at 0.5 (torso 100 px), standing knees at 0.7 and
+    // ankles at 0.9. Squatting moves the hips down by `drop` (as a fraction of the image); a raised knee is lifted to `knee` (left leg).
+    private static float[][] Body(float drop = 0, float? leftKnee = null, float? rightKnee = null)
+    {
+        var p = Enumerable.Range(0, 33).Select(_ => new[] { 0.5f, 0.5f, 0f, 1f, 1f }).ToArray();
+        void Set(int i, float x, float y) { p[i][0] = x; p[i][1] = y; }
+        Set(11, 0.4f, 0.25f + drop); Set(12, 0.6f, 0.25f + drop);
+        Set(23, 0.44f, 0.5f + drop); Set(24, 0.56f, 0.5f + drop);
+        Set(25, 0.44f, leftKnee ?? 0.7f); Set(26, 0.56f, rightKnee ?? 0.7f);
+        Set(27, 0.44f, 0.9f); Set(28, 0.56f, 0.9f);
+        return p;
+    }
+
+    private static int Count(IExerciseCounter counter, IEnumerable<float[][]> frames)
+    {
+        foreach (var frame in frames) counter.Update(frame, W, H);
+        return counter.Count;
+    }
+
+    [Test]
+    public void CountsSquatsWhenThePersonStandsUp()
+    {
+        // Standing: hip 0.4 above the ankle, knee 0.2: 2.0. Thighs level (hips at the knees' height, 0.7): 1.0. Half way (0.6): 1.5.
+        Assert.That(SquatCounter.HipHeight(Body(), W, H), Is.EqualTo(2.0).Within(1e-6));
+        Assert.That(SquatCounter.HipHeight(Body(0.2f), W, H), Is.EqualTo(1.0).Within(1e-6));
+        var squats = new[] { Body(), Body(0.1f), Body(0.2f), Body(0.1f), Body(), Body(0.2f), Body(), Body(0.2f) };
+        var counter = new SquatCounter();
+        Assert.That(Count(counter, squats), Is.EqualTo(2));   // the third is still down
+        Assert.That(counter.Phase, Is.EqualTo("down"));
+        // Bobbing half way - never below 1.45 - isn't a squat.
+        Assert.That(Count(new SquatCounter(), new[] { Body(), Body(0.1f), Body(), Body(0.1f), Body() }), Is.EqualTo(0));
+        // Without the ankles nothing is read.
+        var noAnkles = Body(0.2f);
+        noAnkles[27][3] = noAnkles[28][3] = 0.1f;
+        Assert.That(SquatCounter.HipHeight(noAnkles, W, H), Is.Null);
+    }
+
+    [Test]
+    public void CountsEachKneeRaisedForHighKnees()
+    {
+        // Standing, a knee is 0.8 torso lengths below its hip; raised to the hip's height, 0.
+        Assert.That(HighKneesCounter.KneeDrops(Body(), W, H)[0], Is.EqualTo(0.8).Within(1e-6));
+        Assert.That(HighKneesCounter.KneeDrops(Body(leftKnee: 0.5f), W, H)[0], Is.EqualTo(0).Within(1e-6));
+        var frames = new[]
+        {
+            Body(), Body(leftKnee: 0.5f), Body(), Body(rightKnee: 0.52f), Body(), Body(leftKnee: 0.54f), Body(leftKnee: 0.6f), Body(),
+            Body(rightKnee: 0.62f), Body()     // 0.24 below the hip: not high enough
+        };
+        var counter = new HighKneesCounter();
+        Assert.That(Count(counter, frames), Is.EqualTo(3));
+        Assert.That(counter.Phase, Is.EqualTo("knees down"));
+        // Legs spread wide - knees well to the side of the hips, as in a jumping jack - bring the knees up too, but aren't high knees.
+        var wide = Body(leftKnee: 0.52f, rightKnee: 0.52f);
+        wide[25][0] = 0.2f; wide[26][0] = 0.8f;   // 0.48 torso lengths to the side
+        Assert.That(Count(new HighKneesCounter(), new[] { Body(), wide, Body(), wide, Body() }), Is.EqualTo(0));
+    }
+
+    [Test]
+    public async Task LogsSquatsTowardASquatGoal()
+    {
+        var store = new InMemoryAgentGoalStore();
+        await store.AddGoalAsync(AgentGoal.FromText("30 jumping jacks a day", Now));
+        await store.AddGoalAsync(AgentGoal.FromText("Do 40 squats a day", Now));
+        string logged = await AgentTools.LogExerciseAsync(store, new ExerciseResult("squats", 12, TimeSpan.FromSeconds(40), "x"), Now);
+        Assert.That(logged, Does.StartWith("Logged 12 squats for \"Do 40 squats a day\""));
+        Assert.That(AgentTools.ExerciseResultText(new ExerciseResult("high knees", 1, TimeSpan.FromSeconds(3), "x"), null, false),
+            Does.Contain("The user did 1 high knee in 3 s"));
+    }
+
     [Test]
     public void KnowsWhichExercisesItCounts()
     {
+        Assert.That(AgentTools.CountableExercise("Squats"), Is.EqualTo("squats"));
+        Assert.That(AgentTools.CountableExercise("a squat challenge"), Is.EqualTo("squats"));
+        Assert.That(AgentTools.CountableExercise("high-knees"), Is.EqualTo("high knees"));
+        Assert.That(AgentTools.CountableExercise("knee raises"), Is.EqualTo("high knees"));
         Assert.That(AgentTools.CountableExercise("Jumping Jacks"), Is.EqualTo("jumping jacks"));
         Assert.That(AgentTools.CountableExercise("star jumps"), Is.EqualTo("jumping jacks"));
         Assert.That(AgentTools.CountableExercise("jumping-jack"), Is.EqualTo("jumping jacks"));
