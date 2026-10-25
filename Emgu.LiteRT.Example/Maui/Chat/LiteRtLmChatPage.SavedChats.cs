@@ -76,11 +76,13 @@ public partial class LiteRtLmChatPage
             // saved by Emgu.LiteRT.LM.Chat.Sqlite's ChatHistoryStore; the language, the chat's document and the cards are the page's.
             _conversationId ??= await _store.CreateConversationAsync(ChatHistoryStore.TitleOf(userItem), SelectedChoice.ToString());
             int id = _conversationId.Value;
-            // The step lines: the document's (a card above the reply), then the tool calls.
+            // The step lines: the document's (a card above the reply), then the tool calls, then the memories it used.
             List<string> steps = new List<string>();
             if (bubble?.DocumentStep != null)
                 steps.Add(bubble.DocumentStep);
             steps.AddRange(reply.Steps.Select(step => step.Description));
+            if (bubble?.MemoryStep != null)
+                steps.Add(bubble.MemoryStep);
             // Pictures the reply drew are kept with it (shown again when the chat is reopened, not given to the model).
             List<(string Kind, string MediaType, byte[] Data)> drawn;
             drawn = Images.Drawn();

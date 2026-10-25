@@ -61,6 +61,7 @@ public partial class LiteRtLmChatPage
     {
         ClearCameraTurn();
         Images.ClearDrawn();
+        _memoriesGiven = null;
         WrittenDocuments.Clear();
         UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, agent {3}, think {4}, web {5}",
             prompt.Length, attachments.Count, SelectedOption.Name, UseAgent, _thinkingSwitch.IsToggled, _webSearchSwitch.IsToggled));
@@ -172,6 +173,7 @@ public partial class LiteRtLmChatPage
                 _ = Translations.CheckThinkingLanguageAsync(bubble);
             }
             MarkDocumentContextGiven(document);
+            await ShowMemoriesUsedAsync(prompt, reply, bubble);
             UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
             // The camera frames the tools took are given to the model with the conversation from now on.
             foreach (byte[] jpeg in _cameraTurnFrames)

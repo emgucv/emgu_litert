@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -254,21 +255,81 @@ namespace Emgu.LiteRT.LM.Agents
         {
             if (store == null)
                 return null;
-            IList<AgentMemory> memories = await store.GetMemoriesAsync().ConfigureAwait(false);
-            List<string> lines = new List<string>();
+            return MemoryInstructions(MemoriesForInstructions(await store.GetMemoriesAsync().ConfigureAwait(false), maxLength));
+        }
+
+        /// <summary>
+        /// The memories MemoryInstructionsAsync gives the agent: the latest that fit maxLength (each as a "- " line), oldest first.
+        /// </summary>
+        /// <param name="memories">All memories, oldest first</param>
+        /// <param name="maxLength">The most characters of facts to include</param>
+        public static IList<AgentMemory> MemoriesForInstructions(IList<AgentMemory> memories, int maxLength = 1200)
+        {
+            List<AgentMemory> included = new List<AgentMemory>();
+            if (memories == null)
+                return included;
             int length = 0;
             for (int i = memories.Count - 1; i >= 0; i--)
             {
-                string line = "- " + memories[i].Text;
-                if (length + line.Length > maxLength)
+                int lineLength = 2 + memories[i].Text.Length;
+                if (length + lineLength > maxLength)
                     break;
-                lines.Insert(0, line);
-                length += line.Length + 1;
+                included.Insert(0, memories[i]);
+                length += lineLength + 1;
             }
-            return lines.Count == 0 ? null
-                : "What you know about the user from earlier chats - already saved, so don't save these again; use them when they " +
-                  "help, without repeating them back unasked:\n" + string.Join("\n", lines);
+            return included;
         }
+
+        /// <summary>The instructions that give the agent these memories, or null if there are none.</summary>
+        /// <param name="memories">The memories (MemoriesForInstructions)</param>
+        public static string MemoryInstructions(IList<AgentMemory> memories)
+        {
+            return memories == null || memories.Count == 0 ? null
+                : "What you know about the user from earlier chats - already saved, so don't save these again; use them when they " +
+                  "help, without repeating them back unasked:\n" + string.Join("\n", memories.Select(m => "- " + m.Text));
+        }
+
+        /// <summary>
+        /// Which of the memories the agent was given a reply drew on, judged by their words (the model doesn't say): a memory whose
+        /// distinctive words - not stop words, not "likes", "works"... - include one in the reply that the user's message didn't have
+        /// (the memory supplied it), or two in the reply. An estimate: a word the reply shares by chance counts too, and a memory used
+        /// in other words (or in another language) doesn't.
+        /// </summary>
+        /// <param name="given">The memories in the agent's instructions</param>
+        /// <param name="message">The user's message</param>
+        /// <param name="reply">The reply</param>
+        public static IList<AgentMemory> MemoriesUsed(IEnumerable<AgentMemory> given, string message, string reply)
+        {
+            List<AgentMemory> used = new List<AgentMemory>();
+            if (given == null || string.IsNullOrWhiteSpace(reply))
+                return used;
+            HashSet<string> replyWords = ContentWords(reply), messageWords = ContentWords(message);
+            foreach (AgentMemory memory in given)
+            {
+                HashSet<string> words = ContentWords(memory.Text);
+                words.ExceptWith(MemoryGenericWords);
+                int inReply = 0, supplied = 0;
+                foreach (string word in words)
+                {
+                    if (!replyWords.Contains(word))
+                        continue;
+                    inReply++;
+                    if (!messageWords.Contains(word))
+                        supplied++;
+                }
+                if (supplied >= 1 || inReply >= 2)
+                    used.Add(memory);
+            }
+            return used;
+        }
+
+        // Words of a memory that say little about which one it is ("The user likes...", "...works as...", "...years old").
+        private static readonly HashSet<string> MemoryGenericWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "like", "love", "enjoy", "prefer", "want", "wish", "work", "live", "lived", "favorite", "favourite", "year", "old", "about",
+            "also", "always", "usually", "often", "very", "really", "from", "into", "been", "being", "does", "doesn't", "not", "don't",
+            "currently", "now", "lot", "much", "some", "would", "should", "can", "could", "get", "got", "going", "plan", "planning"
+        };
 
         private static async Task<string> RememberAsync(IAgentMemoryStore store, string fact)
         {

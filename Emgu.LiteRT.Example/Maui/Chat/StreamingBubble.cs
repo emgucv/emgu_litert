@@ -34,6 +34,8 @@ internal sealed class StreamingBubble : System.ComponentModel.INotifyPropertyCha
     public int MessageId;
     // The document's step line ("Looked in report.pdf..."), a card above the reply.
     public string DocumentStep;
+    // The memories the reply drew on (LiteRtLmChatPage.ShowMemoriesUsedAsync), saved as a step line.
+    public string MemoryStep;
 
     // What the thinking shows when opened: the translation, when chosen; null for the thinking itself.
     public string ThinkingDisplayText => ShowTranslation && Translation != null ? Translation.Trim() : null;

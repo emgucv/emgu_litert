@@ -27,20 +27,55 @@ public partial class LiteRtLmChatPage
 {
     // ---------- Memories about the user ----------
 
-    // The memories, for the agent's instructions: the latest that fit MaxMemoryLength, oldest first.
+    // The memories, for the agent's instructions: the latest that fit MaxMemoryLength, oldest first. Kept in _memoriesGiven,
+    // to show which ones the reply drew on.
     private async Task<string> MemoryInstructionsAsync()
     {
+        _memoriesGiven = null;
         if (IsPrivateChat || !_memorySwitch.IsToggled)
             return null;
         try
         {
-            return await AgentTools.MemoryInstructionsAsync(_store, MaxMemoryLength);
+            _memoriesGiven = AgentTools.MemoriesForInstructions(await ((IAgentMemoryStore)_store).GetMemoriesAsync(), MaxMemoryLength);
+            return AgentTools.MemoryInstructions(_memoriesGiven);
         }
         catch (Exception)
         {
             return null;
         }
     }
+
+    // The memories in the instructions of the message being sent, or null.
+    private IList<AgentMemory> _memoriesGiven;
+
+    // Under a finished reply: the memories it drew on (AgentTools.MemoriesUsed: by their words - the model doesn't say), as a line
+    // that opens them, and saved with the chat as a step line. Not for memories deleted in the same turn ("forget that...").
+    private async Task ShowMemoriesUsedAsync(string prompt, ChatMessageItem reply, StreamingBubble bubble)
+    {
+        IList<AgentMemory> given = _memoriesGiven;
+        if (bubble == null || given == null || given.Count == 0 || reply.State != ChatMessageState.Done || !reply.HasText)
+            return;
+        try
+        {
+            HashSet<string> kept = (await ((IAgentMemoryStore)_store).GetMemoriesAsync()).Select(m => m.Id).ToHashSet();
+            List<AgentMemory> used = AgentTools.MemoriesUsed(given, prompt, reply.Text).Where(m => kept.Contains(m.Id)).ToList();
+            if (used.Count == 0)
+                return;
+            bubble.MemoryStep = MemoryStepText(used);
+            var line = StepLine(bubble.MemoryStep);
+            line.Text = "\U0001F9E0 " + bubble.MemoryStep;
+            SemanticProperties.SetHint(line, "Shows these memories, to delete one");
+            line.OnTap(() => OnMemoriesTapped(used.Select(m => m.Id).ToHashSet()));
+            AddCard(bubble, line);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    // "Used a memory: The user is vegetarian." / "Used 2 memories: ... · ..."
+    internal static string MemoryStepText(IList<AgentMemory> used) =>
+        (used.Count == 1 ? "Used a memory: " : "Used " + used.Count + " memories: ") + string.Join(" · ", used.Select(m => m.Text));
 
     private async Task RefreshMemoryCountAsync()
     {
@@ -56,11 +91,15 @@ public partial class LiteRtLmChatPage
         _memoryCountLabel.Text = count == 0 ? "No memories yet" : count == 1 ? "1 memory - show" : count + " memories - show";
     }
 
-    // The memories in a sheet, each with a button to delete it.
-    private async void OnMemoriesTapped()
+    // The memories in a sheet, each with a button to delete it; only these ids when given (a reply's memories).
+    private void OnMemoriesTapped() => OnMemoriesTapped(null);
+
+    private async void OnMemoriesTapped(HashSet<string> only)
     {
         if (IsPrivateChat) return;
         List<MemoryRecord> memories = await _store.GetMemoriesAsync();
+        if (only != null)
+            memories = memories.Where(m => only.Contains(m.Id.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToList();
         if (memories.Count == 0)
             return;
         var list = new VerticalStackLayout { Spacing = 2 };
@@ -93,7 +132,7 @@ public partial class LiteRtLmChatPage
             row.Add(delete, 1, 0);
             list.Children.Add(row);
         }
-        await _sheet.ShowViewAsync("Memories about you", list, "Close");
+        await _sheet.ShowViewAsync(only != null ? "Memories this reply used" : "Memories about you", list, "Close");
         await RefreshMemoryCountAsync();
     }
 }
