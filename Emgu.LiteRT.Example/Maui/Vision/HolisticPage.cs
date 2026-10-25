@@ -11,13 +11,15 @@ using Emgu.LiteRT.Models;
 namespace Maui.Demo.Lite;
 
 // MediaPipe's holistic landmarker (HolisticTracker, Emgu.LiteRT.Models/HOLISTIC.md): one person's body, both hands and face in one pass,
-// drawn over the photo or the live camera, with the face's strongest expressions. The GPU backend runs the hand and face models on the GPU when it
+// drawn over the photo or the live camera, with the face's strongest expressions. The live camera tracks from one frame to the next as MediaPipe's video
+// mode does (the pose detector skipped, the body smoothed); a photo is read on its own. The GPU backend runs the hand and face models on the GPU when it
 // matches the CPU and is faster; the pose models always run on the CPU (they don't compile for the GPU).
 public class HolisticPage : DemoPage
 {
     private static readonly MCvScalar HandBone = new MCvScalar(80, 200, 120), FaceLine = new MCvScalar(230, 180, 90), Joint = new MCvScalar(255, 255, 255);
     private HolisticDetector _detector;
     private readonly Picker _backend;
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
 
     public HolisticPage()
         : base(
@@ -56,16 +58,21 @@ public class HolisticPage : DemoPage
         await _detector.PrepareAsync(_backend.SelectedIndex == 1, CpuThreadSettings.Count, ShowProgress, CancellationToken.None);
     }
 
-    protected override DemoResult Analyze(Mat input, Mat render)
+    protected override DemoResult Analyze(Mat input, Mat render) => Show(input, render, false);
+
+    // Live frames go through the video mode, timed by the page's clock (a pause of more than a second starts tracking again).
+    protected override DemoResult AnalyzeFrame(Mat input, Mat render) => Show(input, render, true);
+
+    private DemoResult Show(Mat input, Mat render, bool live)
     {
         Stopwatch watch = Stopwatch.StartNew();
-        HolisticResult result = _detector.Detect(input);
+        HolisticResult result = live ? _detector.Detect(input, _clock.Elapsed) : _detector.Detect(input);
         watch.Stop();
         HolisticTimings t = _detector.LastTimings;
         DemoResult demo = new DemoResult
         {
             Summary = $"LiteRT {(_detector.Backend == "GPU" ? "CPU + GPU" : "CPU")} · {watch.ElapsedMilliseconds} ms" +
-                (_detector.GpuFailure != null ? " · GPU not used" : "")
+                (live && !t.PoseDetected ? " · tracking" : "") + (_detector.GpuFailure != null ? " · GPU not used" : "")
         };
         if (result == null)
         {

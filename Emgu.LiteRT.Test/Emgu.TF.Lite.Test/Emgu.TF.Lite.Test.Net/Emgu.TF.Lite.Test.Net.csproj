@@ -83,6 +83,7 @@
     <Content Include="..\TestData\pose_reference.json" Link="pose_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\face_reference.json" Link="face_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\holistic_reference.json" Link="holistic_reference.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\TestData\holistic_video_reference.json" Link="holistic_video_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\holistic_*.jpg" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\face_*.jpg" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui\Resources\Raw\face_portrait.png" Link="face_portrait.png" CopyToOutputDirectory="PreserveNewest" />

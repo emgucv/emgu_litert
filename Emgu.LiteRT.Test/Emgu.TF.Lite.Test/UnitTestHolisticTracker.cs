@@ -109,6 +109,136 @@ public class UnitTestHolisticTracker
         Assert.That(refined[6], Is.EqualTo(60));
     }
 
+    [Test]
+    public void TheOneEuroFilterHoldsAStillValueAndFollowsAMovingOne()
+    {
+        var filter = new OneEuroFilter(0.05, 80, 1);
+        TimeSpan T(int frame) => TimeSpan.FromSeconds(frame / 30.0);
+        // The first value passes through; a timestamp that doesn't move on returns the value as it is.
+        Assert.That(filter.Apply(T(0), 10), Is.EqualTo(10));
+        Assert.That(filter.Apply(T(0), 99), Is.EqualTo(99));
+        // A 1 px step of a 100 px object (speed 0.3 a second at 30 Hz) through the speed's own filter (cutoff 1 Hz), then the value's, whose
+        // cutoff is 0.05 + 80 x the filtered speed: it moves only part of the way.
+        double speed = 0.3 / (1 + 30 / (2 * Math.PI));
+        double alpha = 1 / (1 + 30 / (2 * Math.PI * (0.05 + 80 * speed)));
+        Assert.That(filter.Apply(T(1), 11, 0.01), Is.EqualTo(10 + alpha).Within(1e-9));
+        Assert.That(alpha, Is.LessThan(0.5));
+        // A big, steady move is followed closely after a few frames.
+        double value = 0;
+        for (int i = 2; i < 12; i++) value = filter.Apply(T(i), 11 + (i - 1) * 20, 0.01);
+        Assert.That(value, Is.EqualTo(11 + 10 * 20).Within(20));
+    }
+
+    [Test]
+    public void TheSmootherSmoothsPixelsAndTheVisibility()
+    {
+        var smoother = new LandmarkSmoother(0.05, 80, 1, visibilityAlpha: 0.1f);
+        float[][] first = { new[] { 0.5f, 0.5f, 0f, 1f } }, second = { new[] { 0.51f, 0.5f, 0f, 0f } };
+        Assert.That(smoother.Apply(first, TimeSpan.Zero, 200, 100, 100)[0], Is.EqualTo(first[0]));
+        float[] p = smoother.Apply(second, TimeSpan.FromSeconds(1 / 30.0), 200, 100, 100)[0];
+        // 2 px of a 100 px object in a frame: part of the way (MediaPipe's beta of 80 follows a quick move closely); the visibility 0.1 of the way.
+        Assert.That(p[0], Is.GreaterThan(0.5f).And.LessThan(0.51f));
+        Assert.That(p[1], Is.EqualTo(0.5f).Within(1e-6));
+        Assert.That(p[3], Is.EqualTo(0.9f).Within(1e-6));
+        // The input isn't changed, and a different number of landmarks starts again.
+        Assert.That(second[0][0], Is.EqualTo(0.51f));
+        float[][] two = { new[] { 0.1f, 0.2f, 0f }, new[] { 0.3f, 0.4f, 0f } };
+        Assert.That(smoother.Apply(two, TimeSpan.FromSeconds(2 / 30.0), 200, 100, 100), Is.EqualTo(two));
+    }
+
+    // An upright open hand in a 400 px image: the wrist at (100, 200) px, the fingers 12 px apart with their knuckles 40 px above the wrist and
+    // their joints 10 px apart; the thumb's joints start 15 px above the wrist.
+    private static float[][] UprightHand(float dx = 0)
+    {
+        var hand = new float[21][];
+        hand[0] = new[] { (100 + dx) / 400, 200f / 400, 0f };
+        for (int i = 1; i < 21; i++)
+        {
+            int finger = (i - 1) / 4, joint = (i - 1) % 4;
+            float x = 100 + dx + (finger - 2) * 12, y = 200 - (finger == 0 ? 15 : 40) - joint * 10;
+            hand[i] = new[] { x / 400, y / 400, 0f };
+        }
+        return hand;
+    }
+
+    [Test]
+    public void FindsAHandsRegionFromItsPalm()
+    {
+        float[][] hand = UprightHand();
+        HandRect r = HolisticTracker.HandRectFromLandmarks(hand, 400, 400);
+        // Only the palm's 12 landmarks count, not the fingertips: upright (the wrist below the knuckles), the box of x 76..124 and y 150..200 px,
+        // made square on its 50 px, x 2, and shifted up by 0.1 of its height.
+        Assert.That(r.Rotation, Is.EqualTo(0).Within(1e-6));
+        Assert.That(r.Width * 400, Is.EqualTo(100).Within(1e-3));
+        Assert.That(r.Height * 400, Is.EqualTo(100).Within(1e-3));
+        Assert.That(r.CenterX * 400, Is.EqualTo(100).Within(1e-3));
+        Assert.That(r.CenterY * 400, Is.EqualTo(175 - 5).Within(1e-3));
+        // Tilted 90 degrees to the right (fingers pointing right): the region turns with it.
+        float[][] right = hand.Select(p => new[] { (100 + (200 - p[1] * 400)) / 400, (200 + (p[0] * 400 - 100)) / 400, 0f }).ToArray();
+        Assert.That(HolisticTracker.HandRectFromLandmarks(right, 400, 400).Rotation, Is.EqualTo((float)(Math.PI / 2)).Within(1e-5));
+    }
+
+    [Test]
+    public void FindsTheFacesRegionFromItsLandmarks()
+    {
+        // A level face: the box of its landmarks x 1.5, not made square.
+        var face = Enumerable.Range(0, FaceTracker.LandmarkCount).Select(i => new[] { 0.4f + 0.2f * (i % 2), 0.3f + 0.3f * (i % 3) / 2, 0f }).ToArray();
+        face[33] = new[] { 0.45f, 0.4f, 0f };
+        face[263] = new[] { 0.55f, 0.4f, 0f };
+        HandRect r = HolisticTracker.FaceRectFromLandmarks(face, 200, 100);
+        Assert.That(r.Rotation, Is.EqualTo(0).Within(1e-6));
+        Assert.That(r.Width, Is.EqualTo(0.3f).Within(1e-6));
+        Assert.That(r.Height, Is.EqualTo(0.45f).Within(1e-6));
+        Assert.That(r.CenterX, Is.EqualTo(0.5f).Within(1e-6));
+        Assert.That(r.CenterY, Is.EqualTo(0.45f).Within(1e-6));
+    }
+
+    [Test]
+    public void KeepsAHandsRegionWhileItMovesLittle()
+    {
+        float[][] hand = UprightHand();
+        HandRect last = HolisticTracker.HandRectFromLandmarks(hand, 400, 400);
+        bool Keep(HandRect recrop, float[][] landmarks = null) => HolisticTracker.KeepTracking(last, landmarks ?? hand, recrop, 400, 400,
+            HolisticTracker.HandTrackingRotation, HolisticTracker.HandTrackingTranslation, HolisticTracker.HandTrackingScale, HolisticTracker.HandTrackingMargin);
+        HandRect Moved(float dx = 0, float scale = 1, float degrees = 0) => new HandRect
+        {
+            CenterX = last.CenterX + dx / 400, CenterY = last.CenterY, Width = last.Width * scale, Height = last.Height * scale,
+            Rotation = (float)(degrees * Math.PI / 180)
+        };
+        Assert.That(Keep(Moved()), Is.True);
+        Assert.That(Keep(Moved(dx: 15)), Is.True);
+        // Moved more than 0.2 of the region (100 px), grown or shrunk by more than 0.4, or turned by more than 40 degrees: this frame's region is used.
+        Assert.That(Keep(Moved(dx: 25)), Is.False);
+        Assert.That(Keep(Moved(scale: 0.55f)), Is.False);
+        Assert.That(Keep(Moved(degrees: 45)), Is.False);
+        // Its last landmarks (all 21, fingertips too) outside this frame's region shrunk by 0.1.
+        Assert.That(Keep(Moved(), UprightHand(dx: 60)), Is.False);
+        Assert.That(HolisticTracker.KeepTracking(null, hand, last, 400, 400, 40, 0.2f, 0.4f, -0.1f), Is.False);
+    }
+
+    // A frame of the video test (the same as make_holistic_video_reference.py): the picture moved by whole pixels, edges repeated, and a fixed
+    // integer pattern of noise added.
+    internal static Emgu.CV.Mat HolisticVideoFrame(Emgu.CV.Mat image, int t)
+    {
+        int dx = (int)Math.Round(8 * Math.Sin(2 * Math.PI * t / 20)), dy = (int)Math.Round(3 * Math.Sin(2 * Math.PI * t / 15));
+        using var moved = new Emgu.CV.Mat();
+        using (var shift = new Emgu.CV.Matrix<float>(new float[,] { { 1, 0, dx }, { 0, 1, dy } }))
+            Emgu.CV.CvInvoke.WarpAffine(image, moved, shift, image.Size, Emgu.CV.CvEnum.Inter.Nearest, Emgu.CV.CvEnum.Warp.Default,
+                Emgu.CV.CvEnum.BorderType.Replicate);
+        byte[] pixels = moved.GetRawData();
+        int width = moved.Width, height = moved.Height;
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                for (int c = 0; c < 3; c++)
+                {
+                    int i = (y * width + x) * 3 + c;
+                    pixels[i] = (byte)Math.Clamp(pixels[i] + (x * 73 + y * 151 + c * 31 + t * 197) % 9 - 4, 0, 255);
+                }
+        var frame = new Emgu.CV.Mat(height, width, Emgu.CV.CvEnum.DepthType.Cv8U, 3);
+        frame.SetTo(pixels);
+        return frame;
+    }
+
     // The test image's copies (the same OpenCV calls as make_holistic_reference.py).
     internal static Emgu.CV.Mat HolisticVariant(Emgu.CV.Mat image, string name)
     {
@@ -240,6 +370,57 @@ public class UnitTestHolisticTrackerNative
         Assert.That(Emgu.LiteRT.Models.HolisticImageInput.Track(tracker, shuttle), Is.Null);
     }
 
+    // MediaPipe's video mode on 20 frames of the sample person moving (TestData/holistic_video_reference.json, made by
+    // Emgu.LiteRT.Models/tools/make_holistic_video_reference.py): the body is tracked from the first frame's detection (the detector runs once),
+    // smoothed, and each hand and the face keep their last region. Once tracked, our hands are MediaPipe's to a few hundredths of a pixel (the same
+    // regions, read by the same model); the body and face differ as in a single picture.
+    [Test]
+    public async Task TheVideoModeMatchesMediaPipesOnAMovingPerson()
+    {
+        string root = AppContext.BaseDirectory;
+        string[] models = await ModelsAsync();
+        using var reference = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "holistic_video_reference.json")));
+        using var tracker = new HolisticTracker(models);
+        using var source = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "holistic_person.png"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
+        var tracking = new HolisticTracking();
+        var failures = new List<string>();
+        var worst = new Dictionary<string, double>();
+        int t = 0;
+        foreach (JsonElement expected in reference.RootElement.GetProperty("frames").EnumerateArray())
+        {
+            using var frame = UnitTestHolisticTracker.HolisticVideoFrame(source, t);
+            HolisticResult result = HolisticImageInput.Track(tracker, frame, tracking, TimeSpan.FromMilliseconds(t * 1000 / 30), out HolisticTimings timings);
+            Assert.That(result, Is.Not.Null, $"frame {t}");
+            Assert.That((timings.PoseDetected, timings.HandsTracked, timings.FaceTracked), Is.EqualTo(t == 0 ? (true, 0, false) : (false, 2, true)), $"frame {t}");
+            void Check(string part, float[][] ours, string key, int step, double meanLimit, double maxLimit)
+            {
+                JsonElement[] theirs = expected.GetProperty(key).EnumerateArray().ToArray();
+                if (ours == null) { failures.Add($"frame {t} {part}: not found"); return; }
+                double sum = 0, max = 0;
+                for (int i = 0; i < theirs.Length; i++)
+                {
+                    float[] p = ours[i * step];
+                    double d = Math.Sqrt(Math.Pow((p[0] - theirs[i][0].GetDouble()) * 256, 2) + Math.Pow((p[1] - theirs[i][1].GetDouble()) * 256, 2));
+                    sum += d;
+                    // Only the body landmarks MediaPipe sees count for the largest error (not the feet below the picture).
+                    if (theirs[i].GetArrayLength() < 3 || theirs[i][2].GetDouble() >= 0.5) max = Math.Max(max, d);
+                }
+                double mean = sum / theirs.Length;
+                if (t > 0) worst[part] = Math.Max(worst.TryGetValue(part, out double w) ? w : 0, mean);
+                if (mean >= meanLimit || max >= maxLimit) failures.Add($"frame {t} {part}: {mean:0.00} / {max:0.00} px");
+            }
+            // The first frame has nothing to track from: a single picture's limits (LandmarksMatchMediaPipe...).
+            Check("pose", result.Pose.Landmarks, "pose", 1, 1.5, 3.5);
+            Check("left hand", result.LeftHand?.Landmarks, "leftHand", 1, t == 0 ? 0.75 : 0.1, t == 0 ? 2 : 1);
+            Check("right hand", result.RightHand?.Landmarks, "rightHand", 1, t == 0 ? 0.75 : 0.1, t == 0 ? 2 : 1);
+            Check("face", result.Face?.Landmarks, "face", 8, 0.5, 1.5);
+            t++;
+        }
+        TestContext.Out.WriteLine("Worst mean error of a tracked frame: " + string.Join(", ", worst.Select(w => $"{w.Key} {w.Value:0.00} px")));
+        Assert.That(t, Is.EqualTo(20));
+        Assert.That(failures, Is.Empty);
+    }
+
     // The detector downloads, unpacks and runs the models. It only tries the GPU where CocoDetector.CanTryGpu (Android, Mac Catalyst), so this
     // build checks the CPU path; on the phones the GPU wasn't faster and the CPU was chosen (HOLISTIC.md).
     [Test]
@@ -259,6 +440,14 @@ public class UnitTestHolisticTrackerNative
         HolisticResult result = detector.Detect(source);
         Assert.That(result?.LeftHand != null && result.RightHand != null && result.Face != null, Is.True);
         Assert.That(detector.LastTimings.Pose + detector.LastTimings.Hands + detector.LastTimings.Face, Is.GreaterThan(0));
+        // As a video: tracked from the second frame; a gap of more than a second, or a timestamp that goes back, starts again.
+        bool Detected(int milliseconds)
+        {
+            Assert.That(detector.Detect(source, TimeSpan.FromMilliseconds(milliseconds)), Is.Not.Null);
+            return detector.LastTimings.PoseDetected;
+        }
+        Assert.That(new[] { Detected(0), Detected(33), Detected(66), Detected(2000), Detected(2033), Detected(1000) },
+            Is.EqualTo(new[] { true, false, false, true, false, true }));
     }
 
     [Test]

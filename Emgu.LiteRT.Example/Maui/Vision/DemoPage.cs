@@ -276,7 +276,10 @@ public abstract class DemoPage : ContentPage
         finally { _progressTarget = null; }
     }
 
-    internal DemoResult AnalyzeLive(Mat input, Mat render) => Analyze(input, render);
+    internal DemoResult AnalyzeLive(Mat input, Mat render) => AnalyzeFrame(input, render);
+
+    /// <summary>Run the prepared model on a frame of the live camera: <see cref="Analyze"/> unless the page tracks from one frame to the next.</summary>
+    protected virtual DemoResult AnalyzeFrame(Mat input, Mat render) => Analyze(input, render);
 
     internal void SetOptionsEnabledForLive(bool enabled) => SetOptionsEnabled(enabled);
 

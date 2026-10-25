@@ -29,6 +29,9 @@ namespace Emgu.LiteRT.Models
         public float[][] Landmarks { get; internal set; }
         /// <summary>33 x (x, y, z) in metres from the middle of the hips, turned upright by the region's rotation; z is only up to scale</summary>
         public float[][] WorldLandmarks { get; internal set; }
+        /// <summary>The model's 6 auxiliary landmarks, as <see cref="Landmarks"/>: the first two (the hip centre and a point on the circle round the
+        /// body) give the next frame's region when tracking (<see cref="PoseTracker.RectOf(float[], float[], int, int)"/>)</summary>
+        public float[][] AuxiliaryLandmarks { get; internal set; }
     }
 
     /// <summary>
@@ -328,15 +331,17 @@ namespace Emgu.LiteRT.Models
                 Detection = detection,
                 Rect = rect,
                 Presence = presence,
-                Landmarks = ProjectLandmarks(raw, rect, out _),
-                WorldLandmarks = RotateWorld(world, rect.Rotation)
+                Landmarks = ProjectLandmarks(raw, rect, out float[][] auxiliary),
+                WorldLandmarks = RotateWorld(world, rect.Rotation),
+                AuxiliaryLandmarks = auxiliary
             };
         }
 
         /// <summary>
         /// The landmark model's 39 x (x, y, z in 256-pixel units, visibility and presence as logits) as 33 x (x, y, z, visibility,
         /// presence) with x and y as fractions of the image (through the region's rotation) and z scaled to the region, and the 6
-        /// auxiliary landmarks (the last two are the hip centre and the scale point, the alignment points of the next frame's region).
+        /// auxiliary landmarks (the first two are the hip centre and the scale point, the alignment points of the next frame's region: MediaPipe
+        /// splits off landmarks 33-34 for tracking, and the holistic video mode's results match with them).
         /// </summary>
         public static float[][] ProjectLandmarks(float[] raw, HandRect rect, out float[][] auxiliary)
         {

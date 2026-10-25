@@ -15,9 +15,10 @@ For an image it returns a `HolisticResult`, or null when no body is found:
   world landmarks are moved so its wrist is the pose's world wrist, so the hands and the body share one coordinate frame. There is no gesture.
 - `Face` (may be null): 478 landmarks and 52 expression scores, as `FaceTracker` gives them.
 
-It reads every frame on its own: no tracking or smoothing between frames. MediaPipe carries state between calls even in image mode (the
-reference script therefore makes a new landmarker for each picture), and its video mode skips the detectors using the previous frame's landmarks;
-both are left for later. One person only, as in MediaPipe.
+`HolisticDetector.Detect(Mat)` reads a picture on its own, as MediaPipe does a first image (MediaPipe carries state between calls even in image
+mode, so the reference script makes a new landmarker for each picture). `Detect(Mat, TimeSpan)` reads frames of a video as MediaPipe's video mode
+does: the body tracked from the last frame instead of the detector, each hand and the face kept in their last region while they move little, the
+body smoothed ([Video mode](#video-mode-tracking-and-smoothing)). One person only, as in MediaPipe.
 
 ## Provenance and licence
 
@@ -142,6 +143,62 @@ region, the heatmap refinement) and `UnitTestHolisticTrackerNative` (the parity 
 hands, 0.5 / 1.5 px for the face, 0.1 for the expressions, 10 mm for world shapes - on the CPU, and explicitly with the hands and face on the GPU;
 no one on the space shuttle; the seven models unpacked; `HolisticDetector` downloading and running them).
 
+## Video mode: tracking and smoothing
+
+`HolisticDetector.Detect(Mat, TimeSpan)` (with `HolisticImageInput`'s `HolisticTracking`, the static helpers in `HolisticTracker` and
+`LandmarkSmoother`) ports `holistic_pose_tracking.cc`, `holistic_hand_tracking.cc` and `holistic_face_tracking.cc`:
+
+- **Body:** after the first detection the pose detector is skipped. The next frame's region comes from the first two of the landmark model's six
+  auxiliary landmarks (the hip centre and a point on the circle round the body), smoothed by a one-euro filter (min cutoff 0.01, beta 10), as
+  `PoseTracker.RectOf` makes it from a detection. Only a frame without a body (the landmark model's presence under 0.5) sends the next frame
+  back to the detector. The 33 landmarks are smoothed by one-euro filters in pixels (min cutoff 0.05, beta 80, derivative cutoff 1; speeds
+  divided by the body's size, twice the distance between those two auxiliary landmarks), their visibility by a low-pass filter (0.1 of each new
+  value), and the world landmarks by one-euro filters in metres (0.1, 40). The hands and face take their regions from the smoothed landmarks.
+- **Each hand:** the region from the pose and the re-crop model as for a picture (the re-crop model still runs), then MediaPipe's
+  `RoiTrackingCalculator`: the region of the hand's last landmarks is kept instead unless the two differ by more than 40 degrees, 0.2 of the size
+  in position or 0.4 in size, or a last landmark is outside the re-crop region shrunk by 10%. The region of the last landmarks is the box of the
+  12 palm landmarks (the wrist, the thumb's first three, each finger's first two) turned so the wrist is below the index, middle and ring
+  knuckles, x 2, shifted by -0.1, square. The holistic source passes `HandLandmarksToRectCalculator` all 21 landmarks; with all 21 our hands were
+  1.2-2 px from MediaPipe's on the test videos, with the palm's 12 they are its to 0.00 px (median) - MediaPipe 1.1.1 evidently uses the palm.
+- **Face:** the detector still runs in the region from the pose; its region is kept as the box of the last 478 landmarks, level with landmarks 33
+  and 263 (the outer eye corners), x 1.5 (not square), unless it differs by more than 15 degrees, 0.1 in position or 0.3 in size, or a last
+  landmark is outside the detector's region shrunk by 20%.
+- Nothing else carries over: a part not found in a frame starts again in the next, as MediaPipe's loopbacks hold only the previous frame. Ours
+  also starts again when a timestamp goes back or comes more than a second after the last (`HolisticDetector.TrackingGap`; MediaPipe carries any
+  gap), and the demo page's photos and the parity tests use the single-picture mode.
+
+**Parity with MediaPipe's video mode** (mediapipe 1.1.1, `detect_for_video` at 30 frames a second) on four 3 s synthetic videos made from the test
+pictures - the picture swaying side to side (2 s, 6% of its width), up and down, zooming 5% and turning 3 degrees, with noise (sigma 4). Median
+error per frame, and jitter: the mean size of each landmark's frame-to-frame second difference, |p(t+1) - 2 p(t) + p(t-1)|, which on slow,
+smooth motion is mostly noise. Pixels of the 256 px frames:
+
+| Video | Body: error, jitter ours / MediaPipe | Hands: error, jitter ours / MediaPipe | Face: error, jitter |
+|---|---|---|---|
+| sample person | 0.91, 1.16 / 1.11 | 0.01-0.02, 0.53 / 0.53 and 0.43 / 0.43 | 0.32, 0.26 / 0.27 |
+| covering the eyes | 0.92, 1.37 / 1.47 | 0.02-0.03, 0.67 / 0.66 and 0.64 / 0.58 | (no face, as MediaPipe) |
+| hand over the mouth | 0.77, 1.99 / 1.89 | 0.03, 0.76 / 0.75 | 0.29, 0.54 / 0.50 |
+| hand raised, smiling | 2.10, 9.22 / 9.00 | 0.01-0.10, 0.35 / 0.35 | 0.45, 0.34 / 0.34 |
+
+The same frames read one by one (image mode) jitter far more: the body 4.3-13 px, a hand 0.7-7 px. A raised hand that the single pictures found in
+39 of 90 frames (MediaPipe: 33) was found in 89 tracked (MediaPipe: 89). The body was detected once per video; the hands kept their region in 97-178
+of 180 hand-frames and the face in 89 of 90.
+
+**Speed** on the M1 (CPU, 2 threads, those videos): 22-23 ms a frame tracked against 27-29 ms one by one - the pose detector is skipped; the hands'
+re-crop model and the face detector still run, as in MediaPipe. The phones weren't measured.
+
+**One thing tracking makes worse, in MediaPipe too:** in the raised-hand video both MediaPipe's video mode and ours move the lowered arm's wrist up by
+the face after about two seconds (from 26 px below the shoulder to 140 px above), and keep it there, since the detector never runs again while the
+body is tracked; read one by one, the wrist stays below the shoulder. So "arms raised" was read in 29 of those 90 frames where one hand was up, and
+the sway's turning made the raised hand read as waving in 15 more. On the covered-eyes video tracking helped: a stray "hand over mouth" in 1 frame
+against 13. The agent and the live page use the video mode.
+
+**Tests**: `UnitTestHolisticTracker` (model-free: the one-euro filter against a hand calculation, the smoother, the palm region and its turn, the
+face region from landmarks, the keep rules) and `UnitTestHolisticTrackerNative.TheVideoModeMatchesMediaPipesOnAMovingPerson` (MediaPipe's video
+mode on 20 frames of the sample moved by whole pixels with fixed noise - `tools/make_holistic_video_reference.py` makes
+`TestData/holistic_video_reference.json`, and the test makes the same frames: the detector runs only on the first, both hands and the face keep
+their region from then on, and the hands are within 0.1 px of MediaPipe's on average once tracked - 0.04-0.07 measured; the body within 1.5 / 3.5
+px, the face 0.5 / 1.5). `TheDetectorFindsTheBodyHandsAndFace` checks a gap of more than a second, and a timestamp going back, start again.
+
 ## The visual agent: two things at once, hands on the face
 
 The demo's `holistic` visual agent (`Chat/Visual/HolisticVisualAgent.cs`, CPU, 2 threads) makes what the body, hands and face show together classes of
@@ -192,7 +249,7 @@ the words, the requests, the routing and agent selection, the observations) and 
 
 ## Not done yet
 
-- The agent with a real person in front of a camera, and on a phone (the chat's monitors were only checked through the model test above).
-- Tracking between frames (MediaPipe's video mode), and smoothing.
-- Real people: this was checked on one synthetic picture and its copies.
-- A real person in front of the live camera.
+- Real people: everything here was checked on synthetic pictures, their copies and videos made from them - the live camera and the agent haven't had
+  a person in front of them, on the Mac or a phone.
+- The video mode's speed on the phones, and a way out of a wrong guess it keeps (such as re-running the detector now and then, which MediaPipe
+  doesn't do).

@@ -36,9 +36,9 @@ namespace Emgu.LiteRT.Models
     /// heatmap refinement); each hand's region comes from the pose's wrist, pinky and index finger, is corrected by the hand re-crop model and
     /// read by the hand landmark model; the face's region comes from the pose's face points, BlazeFace finds the face in it, and Face Mesh V2
     /// (192 px) reads it, then the blendshape model. The host fills each input (images are cut and scaled with OpenCV or the platform, not here)
-    /// in the order of the steps and serializes calls; <c>Emgu.LiteRT.Models.CV</c>'s <c>HolisticDetector</c> does it for Emgu CV images. Every
-    /// call reads one image on its own, which is what MediaPipe's landmarker does for the first image: MediaPipe carries tracking and smoothing
-    /// from one call to the next, even for still images, and this doesn't (yet).
+    /// in the order of the steps and serializes calls; <c>Emgu.LiteRT.Models.CV</c>'s <c>HolisticDetector</c> does it for Emgu CV images, one image
+    /// on its own (what MediaPipe's landmarker does for its first image) or as frames of a video, where the static helpers under "Tracking between
+    /// frames" and <see cref="LandmarkSmoother"/> carry the regions and smooth the body from one frame to the next as MediaPipe's video mode does.
     /// </summary>
     public sealed class HolisticTracker : IDisposable
     {
@@ -438,6 +438,136 @@ namespace Emgu.LiteRT.Models
             _blendshapeIn[0].Write(input);
             _blendshapes.Run(_blendshapeIn, _blendshapeOut);
             return _blendshapeOut[0].Read<float>();
+        }
+
+        // ---- Tracking between frames (MediaPipe's video mode: holistic_*_tracking.cc) ----
+
+        /// <summary>How far a hand's region may turn (degrees), move (a fraction of its size) and grow or shrink (a fraction) from the region of its
+        /// last landmarks, and the margin of the re-crop region its last landmarks must be inside, for the last region to be kept</summary>
+        public const float HandTrackingRotation = 40, HandTrackingTranslation = 0.2f, HandTrackingScale = 0.4f, HandTrackingMargin = -0.1f;
+        /// <summary>The same for the face</summary>
+        public const float FaceTrackingRotation = 15, FaceTrackingTranslation = 0.1f, FaceTrackingScale = 0.3f, FaceTrackingMargin = -0.2f;
+
+        /// <summary>A copy of a body with other (smoothed) landmarks, world landmarks and auxiliary landmarks.</summary>
+        public static Pose WithLandmarks(Pose pose, float[][] landmarks, float[][] worldLandmarks, float[][] auxiliaryLandmarks)
+        {
+            if (pose == null) throw new ArgumentNullException(nameof(pose));
+            return new Pose
+            {
+                Detection = pose.Detection,
+                Rect = pose.Rect,
+                Presence = pose.Presence,
+                Landmarks = landmarks ?? pose.Landmarks,
+                WorldLandmarks = worldLandmarks ?? pose.WorldLandmarks,
+                AuxiliaryLandmarks = auxiliaryLandmarks ?? pose.AuxiliaryLandmarks
+            };
+        }
+
+        /// <summary>The body's size in pixels from its first two auxiliary landmarks (twice their distance), which the smoothing divides speeds by.</summary>
+        public static double PoseScale(float[][] auxiliary, int imageWidth, int imageHeight)
+        {
+            if (auxiliary == null || auxiliary.Length < 2) throw new ArgumentException("Expected the pose's auxiliary landmarks.", nameof(auxiliary));
+            double dx = (auxiliary[1][0] - auxiliary[0][0]) * imageWidth, dy = (auxiliary[1][1] - auxiliary[0][1]) * imageHeight;
+            return 2 * Math.Sqrt(dx * dx + dy * dy);
+        }
+
+        /// <summary>The 12 hand landmarks a hand's tracked region is the box of: the wrist, the thumb's first three and each finger's first two</summary>
+        public static readonly int[] PalmLandmarks = { 0, 1, 2, 3, 5, 6, 9, 10, 13, 14, 17, 18 };
+
+        /// <summary>
+        /// A hand's region from its last landmarks (MediaPipe's HandLandmarksToRectCalculator, then x 2 with a shift of -0.1, made square): the box
+        /// round the 12 <see cref="PalmLandmarks"/>, turned so the wrist is below the middle of the index, middle and ring fingers' knuckles (the
+        /// calculator's indices 4, 6 and 8 of that subset). The holistic source passes the calculator all 21 landmarks, but MediaPipe 1.1.1's
+        /// results are those of this region: its hand landmarks on the synthetic videos are what the landmark model gives in it to 0.00 px (median),
+        /// and 1.2-2 px off in the region of all 21 (HOLISTIC.md).
+        /// </summary>
+        public static HandRect HandRectFromLandmarks(float[][] landmarks, int imageWidth, int imageHeight)
+        {
+            if (landmarks == null || landmarks.Length != HandTracker.LandmarkCount) throw new ArgumentException("Expected 21 hand landmarks.", nameof(landmarks));
+            float[][] palm = PalmLandmarks.Select(i => landmarks[i]).ToArray();
+            double x0 = palm[0][0] * imageWidth, y0 = palm[0][1] * imageHeight;
+            double x1 = ((palm[4][0] + palm[8][0]) / 2 + palm[6][0]) / 2 * imageWidth;
+            double y1 = ((palm[4][1] + palm[8][1]) / 2 + palm[6][1]) / 2 * imageHeight;
+            double rotation = Normalize(Math.PI / 2 - Math.Atan2(-(y1 - y0), x1 - x0));
+            HandRect tight = RotatedBox(palm, rotation, imageWidth, imageHeight);
+            return Transform(tight, imageWidth, imageHeight, 2, 0, HandShiftY, true);
+        }
+
+        /// <summary>
+        /// The face's region from its last landmarks (MediaPipe's holistic face tracking): the box of the 478 landmarks, level with the line from
+        /// landmark 33 (the right eye's outer corner) to 263 (the left eye's), x 1.5 (not made square).
+        /// </summary>
+        public static HandRect FaceRectFromLandmarks(float[][] landmarks, int imageWidth, int imageHeight)
+        {
+            if (landmarks == null || landmarks.Length != FaceTracker.LandmarkCount) throw new ArgumentException("Expected 478 face landmarks.", nameof(landmarks));
+            float minX = landmarks.Min(p => p[0]), maxX = landmarks.Max(p => p[0]), minY = landmarks.Min(p => p[1]), maxY = landmarks.Max(p => p[1]);
+            var rect = new HandRect
+            {
+                CenterX = (minX + maxX) / 2,
+                CenterY = (minY + maxY) / 2,
+                Width = maxX - minX,
+                Height = maxY - minY,
+                Rotation = Angle(landmarks[33], landmarks[263], 0, imageWidth, imageHeight)
+            };
+            return Transform(rect, imageWidth, imageHeight, 1.5f, 0, 0, false);
+        }
+
+        /// <summary>
+        /// MediaPipe's RoiTrackingCalculator: whether to keep the region of the last landmarks (<paramref name="previous"/>) instead of this frame's
+        /// re-crop region - yes unless, measured along the re-crop region's axes, the two differ by more than <paramref name="rotationDegrees"/>,
+        /// <paramref name="translation"/> or <paramref name="scale"/> of its size, or a last landmark is outside the re-crop region grown by
+        /// <paramref name="margin"/> (negative: shrunk).
+        /// </summary>
+        public static bool KeepTracking(HandRect previous, float[][] previousLandmarks, HandRect recrop, int imageWidth, int imageHeight,
+            float rotationDegrees, float translation, float scale, float margin)
+        {
+            if (previous == null || previousLandmarks == null) return false;
+            if (recrop == null) throw new ArgumentNullException(nameof(recrop));
+            double c = Math.Cos(-recrop.Rotation), s = Math.Sin(-recrop.Rotation);
+            double X(double x, double y) => x * imageWidth * c - y * imageHeight * s;
+            double Y(double x, double y) => x * imageWidth * s + y * imageHeight * c;
+            double turn = (previous.Rotation - recrop.Rotation) * 180 / Math.PI;
+            if (turn > 180) turn -= 360;
+            if (turn < -180) turn += 360;
+            double width = recrop.Width * imageWidth, height = recrop.Height * imageHeight;
+            if (Math.Abs(turn) > rotationDegrees ||
+                Math.Abs(X(previous.CenterX, previous.CenterY) - X(recrop.CenterX, recrop.CenterY)) > width * translation ||
+                Math.Abs(Y(previous.CenterX, previous.CenterY) - Y(recrop.CenterX, recrop.CenterY)) > height * translation ||
+                Math.Abs(previous.Width * imageWidth - width) > width * scale ||
+                Math.Abs(previous.Height * imageHeight - height) > height * scale)
+                return false;
+            double cx = X(recrop.CenterX, recrop.CenterY), cy = Y(recrop.CenterX, recrop.CenterY);
+            double halfWidth = width * (1 + margin) / 2, halfHeight = height * (1 + margin) / 2;
+            foreach (float[] p in previousLandmarks)
+            {
+                double x = X(p[0], p[1]), y = Y(p[0], p[1]);
+                if (!(cx - halfWidth < x && x < cx + halfWidth && cy - halfHeight < y && y < cy + halfHeight)) return false;
+            }
+            return true;
+        }
+
+        // The smallest box round the points turned by the rotation (HandLandmarksToRectCalculator's NormalizedLandmarkListToRect).
+        private static HandRect RotatedBox(float[][] points, double rotation, int imageWidth, int imageHeight)
+        {
+            double ax = (points.Max(p => p[0]) + points.Min(p => p[0])) / 2.0, ay = (points.Max(p => p[1]) + points.Min(p => p[1])) / 2.0;
+            double c = Math.Cos(-rotation), s = Math.Sin(-rotation);
+            double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
+            foreach (float[] p in points)
+            {
+                double x = (p[0] - ax) * imageWidth, y = (p[1] - ay) * imageHeight;
+                double px = x * c - y * s, py = x * s + y * c;
+                minX = Math.Min(minX, px); maxX = Math.Max(maxX, px); minY = Math.Min(minY, py); maxY = Math.Max(maxY, py);
+            }
+            double mx = (minX + maxX) / 2, my = (minY + maxY) / 2;
+            double rc = Math.Cos(rotation), rs = Math.Sin(rotation);
+            return new HandRect
+            {
+                CenterX = (float)((mx * rc - my * rs + imageWidth * ax) / imageWidth),
+                CenterY = (float)((mx * rs + my * rc + imageHeight * ay) / imageHeight),
+                Width = (float)((maxX - minX) / imageWidth),
+                Height = (float)((maxY - minY) / imageHeight),
+                Rotation = (float)rotation
+            };
         }
 
         // ---- Geometry (MediaPipe's calculators; regions as fractions of the image, angles from pixels) ----

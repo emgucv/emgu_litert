@@ -17,6 +17,7 @@ public sealed class HolisticDetector : IDisposable
     private readonly string _cacheDirectory;
     private readonly Func<string, Task<Mat>> _validationImage;
     private HolisticTracker _tracker;
+    private readonly HolisticTracking _tracking = new HolisticTracking();
 
     /// <summary>Creates the detector.</summary>
     /// <param name="cacheDirectory">Where the models are downloaded to (default: a folder in the temp path).</param>
@@ -129,9 +130,31 @@ public sealed class HolisticDetector : IDisposable
         return result;
     }
 
-    /// <summary>How long each part of the last <see cref="Detect"/> took.</summary>
+    /// <summary>
+    /// The person in a frame of a video (an 8-bit BGR image) taken at <paramref name="timestamp"/>, as MediaPipe's video mode finds them: while the
+    /// body is tracked its region comes from the last frame (the pose detector is skipped), each hand and the face keep their last region while
+    /// they move little, and the body's landmarks are smoothed. A timestamp that isn't later than the last one, or more than
+    /// <see cref="TrackingGap"/> after it, starts again. Null if no body is found.
+    /// </summary>
+    public HolisticResult Detect(Mat bgr, TimeSpan timestamp)
+    {
+        if (!Imported) throw new InvalidOperationException("Prepare the holistic models first.");
+        if (_tracking.LastTime is TimeSpan last && (timestamp <= last || timestamp - last > TrackingGap)) _tracking.Reset();
+        _tracking.LastTime = timestamp;
+        HolisticResult result = HolisticImageInput.Track(_tracker, bgr, _tracking, timestamp, out HolisticTimings timings);
+        LastTimings = timings;
+        return result;
+    }
+
+    /// <summary>The longest time between two frames of a video that tracking carries over (MediaPipe's video mode carries any gap)</summary>
+    public static readonly TimeSpan TrackingGap = TimeSpan.FromSeconds(1);
+
+    /// <summary>Forget the last frame: the next <see cref="Detect(Mat, TimeSpan)"/> runs every detector, unsmoothed.</summary>
+    public void ResetTracking() => _tracking.Reset();
+
+    /// <summary>How long each part of the last <see cref="Detect(Mat)"/> took, and what tracking kept.</summary>
     public HolisticTimings LastTimings { get; private set; }
 
     /// <summary>Releases the compiled models.</summary>
-    public void Dispose() { _tracker?.Dispose(); _tracker = null; Backend = null; }
+    public void Dispose() { _tracker?.Dispose(); _tracker = null; Backend = null; _tracking.Reset(); }
 }
