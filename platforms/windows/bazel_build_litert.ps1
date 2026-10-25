@@ -262,11 +262,15 @@ $WorkspaceDir = "LiteRT-LM"
 # scripts, which depend on the equivalent per-platform prebuilt.
 $BuildLitertLm = $false
 $GemmaPrebuilt = Join-Path $WorkspaceDir "prebuilt\windows_x86_64\libGemmaModelConstraintProvider.dll"
+# Its import library is linked into liblitert-lm.dll, and is a Git LFS file too: a pointer file in its place
+# fails the link at the very end (LNK1107, "invalid or corrupt file").
+$GemmaImportLib = Join-Path $WorkspaceDir "prebuilt\windows_x86_64\libGemmaModelConstraintProvider.lib"
 if ($Arch -eq "64") {
-    if ((Test-Path $GemmaPrebuilt) -and ((Get-Item $GemmaPrebuilt).Length -gt 1024)) {
+    $GemmaMissing = @($GemmaPrebuilt, $GemmaImportLib) | Where-Object { -not ((Test-Path $_) -and ((Get-Item $_).Length -gt 1024)) }
+    if (-not $GemmaMissing) {
         $BuildLitertLm = $true
     } else {
-        Write-Warning "$GemmaPrebuilt is missing or too small (a Git LFS pointer?) - run 'git -C $WorkspaceDir lfs pull'. Skipping liblitert-lm.dll."
+        Write-Warning "$($GemmaMissing -join ', ') missing or too small (a Git LFS pointer?) - run 'git -C $WorkspaceDir lfs pull'. Skipping liblitert-lm.dll."
     }
 }
 

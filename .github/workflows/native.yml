@@ -239,8 +239,9 @@ jobs:
         & D:\bazelisk\bazel.exe --version
     - name: Fetch LiteRT-LM's prebuilt Gemma library
       # liblitert-lm.dll depends on prebuilt/windows_x86_64/libGemmaModelConstraintProvider.dll, which LiteRT-LM stores
-      # with Git LFS; without it the script skips liblitert-lm.dll.
-      run: git -C LiteRT-LM lfs pull --include=prebuilt/windows_x86_64/libGemmaModelConstraintProvider.dll
+      # with Git LFS; without it the script skips liblitert-lm.dll. Its import library (.lib) is an LFS file too, and the link
+      # needs it: with only its pointer file, link.exe failed with LNK1107 ("invalid or corrupt file").
+      run: git -C LiteRT-LM lfs pull --include="prebuilt/windows_x86_64/libGemmaModelConstraintProvider.dll,prebuilt/windows_x86_64/libGemmaModelConstraintProvider.lib"
     - name: Build tfliteextern.dll, libLiteRt.dll and liblitert-lm.dll
       # The LiteRT-LM build's Rust objects come within a few characters of link.exe's 260-character path limit even under
       # short "o"/"u" output folders: under the checkout (D:\a\emgu_litert\emgu_litert) one went to 261 (LNK1181), so they go
