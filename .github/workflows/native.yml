@@ -242,12 +242,12 @@ jobs:
       # with Git LFS; without it the script skips liblitert-lm.dll.
       run: git -C LiteRT-LM lfs pull --include=prebuilt/windows_x86_64/libGemmaModelConstraintProvider.dll
     - name: Build tfliteextern.dll, libLiteRt.dll and liblitert-lm.dll
-      # Run from a drive letter mapped to the workspace: the LiteRT-LM build's Rust objects come within a few characters
-      # of link.exe's 260-character path limit even under the repo root's short "o"/"u" output folders (see the script).
-      run: |
-        subst X: "$env:GITHUB_WORKSPACE"
-        X:
-        powershell -NoProfile -ExecutionPolicy Bypass -File X:\platforms\windows\bazel_build_litert.ps1 64
+      # The LiteRT-LM build's Rust objects come within a few characters of link.exe's 260-character path limit even under
+      # short "o"/"u" output folders: under the checkout (D:\a\emgu_litert\emgu_litert) one went to 261 (LNK1181), so they go
+      # directly under D:\. (A subst drive letter didn't help: Bazel resolves it to the real path.)
+      env:
+        LITERT_LM_BAZEL_ROOT: D:\
+      run: powershell -NoProfile -ExecutionPolicy Bypass -File platforms\windows\bazel_build_litert.ps1 64
     - name: Check the built libraries
       # The script doesn't stop at a failed Bazel build, so check that every library was written.
       run: |

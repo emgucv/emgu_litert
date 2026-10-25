@@ -152,8 +152,12 @@ if (-not (Test-Path $OutputBaseDir)) { New-Item -ItemType Directory -Path $Outpu
 # level further out (e.g. directly under a drive root). Kept as a second, separate output_base/root
 # (its own Bazel server/cache) rather than changing the one above, so the already-warm cache for
 # tfliteextern/libLiteRt isn't disturbed.
-$LitertLmOutputUserRootDir = Join-Path $RepoRoot "u"
-$LitertLmOutputBaseDir = Join-Path $RepoRoot "o"
+# LITERT_LM_BAZEL_ROOT puts "o"/"u" in a shorter folder than the repo root (CI: D:\, as the runner's checkout is
+# D:\a\emgu_litert\emgu_litert - 261 characters, one over). A subst drive letter doesn't help: Bazel resolves it to the
+# real path.
+$LitertLmRoot = if ($env:LITERT_LM_BAZEL_ROOT) { $env:LITERT_LM_BAZEL_ROOT } else { $RepoRoot }
+$LitertLmOutputUserRootDir = Join-Path $LitertLmRoot "u"
+$LitertLmOutputBaseDir = Join-Path $LitertLmRoot "o"
 if (-not (Test-Path $LitertLmOutputUserRootDir)) { New-Item -ItemType Directory -Path $LitertLmOutputUserRootDir | Out-Null }
 if (-not (Test-Path $LitertLmOutputBaseDir)) { New-Item -ItemType Directory -Path $LitertLmOutputBaseDir | Out-Null }
 
