@@ -24,27 +24,11 @@ public partial class LiteRtLmChatPage
     private VerticalStackLayout _visualMonitorRows;
     private int _visualUiQueued;
     private long _visualFrameId, _lastVisualFrame;
-    private static readonly string VisualInstructions = VisualAgentTools.Instructions +
-        " Prefer coco-ssd-mobilenet-v3 for ordinary object monitors. Use the experimental coco-yolox-nano when the user asks for YOLOX." +
-        " For a hand gesture use the hand-gesture agent and pick the label that matches the user's words: thumbs up = thumb up, thumbs down = thumb down, peace sign or V sign = victory, " +
-        "open hand or high five = open palm, fist = closed fist, pointing finger = pointing up, rock sign = i love you. The label is just the class, never prefixed by the agent id, and never person. Raising or waving a hand is not a gesture: that is the body-pose agent. " +
-        "It sees upright hands, a gesture held for about a second." +
-        " To play a recorded sound when an alert fires - a lullaby, white noise, one of the user's own sounds - select play_file with parameters {sound: its name from list_visual_actions, seconds: how long to keep repeating it (60 if the user wants it to go on without saying for how long; leave out to play it once)}. " +
-        " For what a person's body is doing - waving, raising a hand or both arms, standing, sitting, lying down - use the body-pose agent, not hand-gesture and not person: the label is exactly one of " +
-        "arms raised (both arms up, hands in the air), hand raised (raising a hand or arm), waving, standing, sitting, lying down. " +
-        "It sees one person with the head in view, within a few metres; waving takes about two seconds to show; standing and sitting need the legs in view. It can't detect falls or tell people apart." +
-        " For a facial expression - smiling, closing the eyes, winking, opening the mouth, raising the eyebrows - use the face-expression agent, not person: the label is exactly one of " +
-        "smiling, eyes closed, winking, mouth open, eyebrows raised. It reads one face looking at the camera, within about two metres. It can't recognise who someone is, " +
-        "and it is not for checking whether someone is tired, drowsy or paying attention: decline such requests." +
+    private static readonly string VisualInstructions = VisualHostCatalog.PlannerInstructions(
 #if ANDROID
-        " The app switches between the back camera and the selfie (front) camera by itself when the user's request says so: don't refuse such a request, use the camera tools as usual and say which camera is used." +
-#endif
-#if ANDROID
-        " For record a video or clip when an object appears, select record_clip with parameters {seconds: the requested length, default 10, from 3 to 30}. " +
-        "It records from the live camera with sound and shows the clip in this chat session; no automatic saving or model analysis. A request for both a picture and a clip uses take_snapshot and record_clip. " +
-        "For a full resolution, high resolution or high quality photo when an object appears, select take_photo (parameters {}), not take_snapshot; it is slower and shows the full-size photo in this chat session.";
+        android: true);
 #else
-        "";
+        android: false);
 #endif
 
     private void BuildVisualMonitoring()
@@ -55,6 +39,7 @@ public partial class LiteRtLmChatPage
         _visualAgents.Register(new HandVisualAgent());
         _visualAgents.Register(new PoseVisualAgent());
         _visualAgents.Register(new FaceVisualAgent());
+        _visualAgents.Register(new HolisticVisualAgent());
         _visualChime = new CameraChimeAction();
         _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(text, token)),
             occurrence => _visualRuntime.Snapshot().Any(m => m.Id == occurrence.MonitorId &&
@@ -193,10 +178,14 @@ public partial class LiteRtLmChatPage
         try
         {
             token.ThrowIfCancellationRequested();
-            // "thumbs up" and the like are the hand-gesture agent's classes ("thumb up"), "smile" the face agent's, "raises a hand" the pose agent's;
+            // "thumbs up" and the like are the hand-gesture agent's classes ("thumb up"), "smile" the face agent's, "raises a hand" the pose agent's,
+            // "raises a hand and smiles" or "covers their eyes" the holistic agent's;
             // anything else goes as it came.
             string gesture = VisualHostCatalog.CanonicalGesture(label);
             if (gesture != null) { label = gesture; confidence = VisualHostCatalog.GestureConfidence(confidence); }
+            // A posture with an expression ("hand raised and smiling") or a hand on the face: the holistic agent's; before the other two, which would take
+            // only half of a combination.
+            else if (VisualHostCatalog.HolisticForMonitor(label, _routePrompt) is string holistic) label = holistic;
             else if (VisualHostCatalog.ExpressionForMonitor(label, _routePrompt) is string expression) label = expression;
             else if (VisualHostCatalog.PostureForMonitor(label, _routePrompt) is string posture) label = posture;
             var monitor = _visualRuntime.CreateObjectMonitor(label, actions, minimumCount, confidence);

@@ -142,9 +142,57 @@ region, the heatmap refinement) and `UnitTestHolisticTrackerNative` (the parity 
 hands, 0.5 / 1.5 px for the face, 0.1 for the expressions, 10 mm for world shapes - on the CPU, and explicitly with the hands and face on the GPU;
 no one on the space shuttle; the seven models unpacked; `HolisticDetector` downloading and running them).
 
+## The visual agent: two things at once, hands on the face
+
+The demo's `holistic` visual agent (`Chat/Visual/HolisticVisualAgent.cs`, CPU, 2 threads) makes what the body, hands and face show together classes of
+the camera monitors (`HolisticGestures`, in this library):
+
+- **Combinations**: every posture of the body-pose agent with every expression of the face-expression agent, posture first - "hand raised and smiling",
+  "waving and smiling", "arms raised and mouth open"... (30 classes; the score is the lower of the two). So "take a picture when I raise my hand and smile"
+  is an ordinary monitor. Gestures (thumb up...) aren't combined: the holistic bundle has no gesture classifier.
+- **Interactions**: `covering eyes` (peekaboo), `hand over mouth`, `hand on face`.
+
+The plain postures and expressions stay with the body-pose (26 ms a frame on a Galaxy S10) and face-expression (8 ms) agents, registered before this one
+(50-72 ms), so a monitor for "smiling" still uses the face agent.
+
+**The interactions** are geometry in eye distances (the pose's eyes, 2 and 5): both eyes within 0.25 of a bone of a hand (the segments between its
+landmarks), the middle of the mouth within 0.18, or a hand's deepest landmark at least 0.05 inside the outline of the pose's head landmarks (0-10);
+each score is 0.5 at its threshold. The pose's head landmarks are used, not the face's, because the face model found no face in any of the synthetic
+pictures of covered eyes or two of three of covered mouths - the pose keeps its head. Distances to the hand's bones, not to its outline: a hand
+cradling the chin has the mouth inside its outline, between thumb and fingers. Measured on synthetic Z-Image pictures (2026-10-24, three seeds each:
+"a person covering both eyes with their hands", "...covering their mouth with one hand", "...resting their cheek on one hand", "a smiling person
+raising one hand high above their head"), in MediaPipe's landmarks:
+
+| Pictures | Eyes to the nearest bone | Mouth to the nearest bone | Hand inside the head outline |
+|---|---|---|---|
+| covering the eyes | 0.01-0.13 (both eyes) | 0.10-0.37 | 0.16-0.41 |
+| covering the mouth | 0.55-1.07 | 0.02-0.13 | 0.43-0.50 |
+| the sample: hands raised beside the face | 0.58-1.51 | 0.83-1.33 | 0.20-0.96 outside |
+| cheek on a hand | one eye 0.03 (the other 0.42); 0.54; - | 0.26; 0.84; - | 0.35; 0.13 outside; no hand found |
+
+Through this tracker (`UnitTestHolisticVisualAgentNative`, on JPEG copies in `TestData/holistic_*.jpg` and the sample): covering the eyes reads
+`covering eyes` 1.00 and `hand on face` 0.84; the covered mouth `hand over mouth` 0.93 and `hand on face` 1.00; the raised hand with a smile `hand raised
+and smiling` 0.73; the sample none of them. Of all twelve pictures: two of three covered-eyes pictures read `covering eyes` - in the third only one hand
+was found -, all three covered mouths `hand over mouth` (0.60-0.99), all three raised hands with a smile their combination (0.69-0.87). What doesn't
+work: **a hand resting at the side of the jaw** is outside the head outline (`hand on face` 0.32; the face model's outline would separate it from the
+sample by only 0.20 against 0.12); **a hand cradling the chin**, its fingers by the mouth, can read as `hand over mouth` (0.68 on the JPEG copy) and was
+found or not depending on JPEG or PNG; **both hands under the chin** weren't found at all. Hands on the face are where hand finding is least stable.
+
+**Routing**: Gemma 4 E2B (Metal GPU, on an M1, with the demo's camera instructions) named the class for "Beep when I wave and smile at the camera"
+(`waving and smiling`), but gave `person` for "Take a picture when I raise my hand and smile", `baby` for "Play a chime when the baby plays peekaboo",
+`hand_gesture` for "Take a photo when I cover my mouth with my hand" and `face-expression` for "Say stop when I touch my face". So, as for the pose and
+face agents, the host reads the request when the label is half of a combination or a mistake (`VisualHostCatalog.HolisticForMonitor`: a combination or
+interaction the label names; else a posture and an expression the request names in so many words, when the label is one of them or a mistake; else an
+interaction the request names), checked before the face and pose fallbacks, which would take only half of a combination. With it all five became the
+right holistic class, and "Take a picture when I smile" / "Beep when I raise my hand" stayed `smiling` (face-expression) and `hand raised` (body-pose).
+The planner's instructions moved to `Maui.Demo.Lite.Core` (`VisualHostCatalog.PlannerInstructions`) so the model check uses the app's text.
+
+**Tests**: `UnitTestHolisticVisualAgent` (model-free: the hull and distances, the interactions and a combination on made-up landmarks, the classes,
+the words, the requests, the routing and agent selection, the observations) and `UnitTestHolisticVisualAgentNative` (the synthetic pictures above).
+
 ## Not done yet
 
-- A visual agent for the camera monitors (stage 3).
+- The agent with a real person in front of a camera, and on a phone (the chat's monitors were only checked through the model test above).
 - Tracking between frames (MediaPipe's video mode), and smoothing.
 - Real people: this was checked on one synthetic picture and its copies.
 - A real person in front of the live camera.

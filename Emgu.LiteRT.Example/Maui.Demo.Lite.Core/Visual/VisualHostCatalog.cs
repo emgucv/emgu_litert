@@ -284,6 +284,138 @@ internal static class VisualHostCatalog
         return observations;
     }
 
+    // The holistic agent (HolisticVisualAgent, Emgu.LiteRT.Models/HOLISTIC.md): what the body, hands and face show together - a posture combined with an
+    // expression ("hand raised and smiling") and the hand-and-face interactions. The plain postures and expressions stay with the body-pose and
+    // face-expression agents, which are cheaper and registered first.
+    internal static readonly string[] HolisticClasses = HolisticGestures.InteractionNames.Concat(HolisticGestures.CombinationNames).ToArray();
+
+    internal static VisualAgentDescriptor HolisticDescriptor(bool requiresPreparation = true, string backend = null) => new(
+        "holistic", "Body, hands and face · MediaPipe" + (backend == null ? "" : " · LiteRT " + backend),
+        new[] { "object_detection", "holistic" }, HolisticClasses, requiresPreparation: requiresPreparation);
+
+    private static readonly Dictionary<string, string> InteractionWords = BuildInteractionWords();
+
+    private static Dictionary<string, string> BuildInteractionWords()
+    {
+        var words = new Dictionary<string, string>();
+        void Add(string interaction, params string[] names) { foreach (string name in names) words[name] = interaction; }
+        Add("covering eyes", "covering eyes", "cover eyes", "covers eyes", "covered eyes", "eyes covered", "hands over eyes", "hand over eyes", "hiding eyes",
+            "peekaboo", "peek a boo", "🙈");
+        Add("hand over mouth", "hand over mouth", "hands over mouth", "covering mouth", "cover mouth", "covers mouth", "mouth covered", "🤭");
+        Add("hand on face", "hand on face", "hands on face", "touching face", "touch face", "touches face", "hand on cheek", "hand on chin", "chin on hand",
+            "cheek on hand", "facepalm", "face palm", "🤦");
+        return words;
+    }
+
+    private static string Normalize(string text) => string.Join(" ", new string((text ?? "").ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
+        .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+
+    /// <summary>The interaction class for the words a person used ("peekaboo", "touching face"), or null.</summary>
+    internal static string CanonicalInteraction(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (InteractionWords.TryGetValue(text.Trim(), out string emoji)) return emoji;
+        string normalized = Normalize(text);
+        if (normalized.StartsWith("holistic ", StringComparison.Ordinal)) normalized = normalized.Substring("holistic ".Length);
+        if (InteractionWords.TryGetValue(normalized, out string named)) return named;
+        // "my", "their"... between the verb and the body part.
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\b(my|their|his|her|your|the|both|one|a)\b ?", "").Trim();
+        return InteractionWords.TryGetValue(normalized, out string interaction) ? interaction : null;
+    }
+
+    /// <summary>The combination class ("hand raised and smiling") for a label naming one posture and one expression in either order, or null.</summary>
+    internal static string CanonicalCombination(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        string normalized = Normalize(text.Replace("&", " and ").Replace("+", " and "));
+        if (normalized.StartsWith("holistic ", StringComparison.Ordinal)) normalized = normalized.Substring("holistic ".Length);
+        string[] parts = System.Text.RegularExpressions.Regex.Split(normalized, @"\b(?:and|while|with|plus)\b")
+            .Select(p => p.Trim()).Where(p => p.Length > 0).ToArray();
+        if (parts.Length != 2) return null;
+        string posture = CanonicalPose(parts[0]) ?? CanonicalPose(parts[1]);
+        string expression = CanonicalExpression(parts[0]) ?? CanonicalExpression(parts[1]);
+        return posture != null && expression != null ? HolisticGestures.Combine(posture, expression) : null;
+    }
+
+    private static readonly (string Interaction, System.Text.RegularExpressions.Regex Pattern)[] InteractionRequestPatterns =
+    {
+        ("covering eyes", new(@"\b(cover(s|ed|ing)?|hid(e|es|ing)) " + Whose + @"eyes\b|\bhands? over " + Whose + @"eyes\b|\bpeek[ -]?a[ -]?boo\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("hand over mouth", new(@"\bcover(s|ed|ing)? " + Whose + @"mouth\b|\bhands? (is |are )?over " + Whose + @"mouth\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)),
+        ("hand on face", new(@"\btouch(es|ed|ing)? " + Whose + @"face\b|\bhands? (is |are )?on " + Whose + @"(face|cheek|chin)\b|\bface ?palm|\b(chin|cheek) on " + Whose + @"hand\b|\brest(s|ed|ing)? " + Whose + @"(chin|cheek|head) on\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+    };
+
+    /// <summary>The interaction a request names in so many words ("take a picture when I cover my eyes"), or null.</summary>
+    internal static string InteractionFromRequest(string request)
+    {
+        if (string.IsNullOrWhiteSpace(request)) return null;
+        string best = null;
+        int position = int.MaxValue;
+        foreach (var (interaction, pattern) in InteractionRequestPatterns)
+        {
+            var match = pattern.Match(request);
+            if (match.Success && match.Index < position) { best = interaction; position = match.Index; }
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// The holistic class for a monitor's label: a combination or interaction it names, else - when the request names both a posture and an expression
+    /// ("raise your hand and smile") and the label is one of them, or the label is one the model puts there by mistake - what the request says.
+    /// Checked before <see cref="ExpressionForMonitor"/> and <see cref="PostureForMonitor"/>, which would take only half of a combination.
+    /// </summary>
+    internal static string HolisticForMonitor(string label, string request)
+    {
+        string named = CanonicalCombination(label) ?? CanonicalInteraction(label);
+        if (named != null) return named;
+        string normalized = Normalize(label);
+        bool mistaken = normalized.Length == 0 || normalized is "person" or "people" or "human" or "face" or "body" or "hands" or "hand" or "holistic" ||
+            !(Classes.Contains(normalized) || Gestures.Contains(normalized) || CanonicalGesture(normalized) != null ||
+              CanonicalPose(normalized) != null || CanonicalExpression(normalized) != null);
+        string posture = PoseFromRequest(request), expression = ExpressionFromRequest(request);
+        if (posture != null && expression != null &&
+            (mistaken || CanonicalPose(normalized) == posture || CanonicalExpression(normalized) == expression))
+            return HolisticGestures.Combine(posture, expression);
+        return mistaken ? InteractionFromRequest(request) : null;
+    }
+
+    /// <summary>What the person in a frame shows (HolisticGestures) as observations of their classes, each with the box of the body's visible landmarks.</summary>
+    internal static IReadOnlyList<VisualObservation> HolisticObservations(HolisticResult result, int width, int height, PoseGestures.WaveDetector wave, TimeSpan time)
+    {
+        // Every frame goes through Classify, so the wave detector sees them all.
+        var readings = HolisticGestures.Classify(result, width, height, wave, time);
+        var observations = new List<VisualObservation>();
+        if (result?.Pose == null) return observations;
+        float[] box = PoseGestures.BoxOf(result.Pose.Landmarks);
+        foreach (HolisticReading reading in readings)
+            observations.Add(new VisualObservation("object", reading.Name, Math.Clamp(reading.Score, 0f, 1f),
+                new VisualBox(box[0], box[1], Math.Max(0, box[2] - box[0]), Math.Max(0, box[3] - box[1]))));
+        return observations;
+    }
+
+    // The camera planner's instructions for the demo's visual agents and actions (the chat page's), shared with the model tests. The camera switching,
+    // clip and full-resolution photo sentences are for Android, the only platform with them.
+    internal static string PlannerInstructions(bool android) => VisualAgentTools.Instructions +
+        " Prefer coco-ssd-mobilenet-v3 for ordinary object monitors. Use the experimental coco-yolox-nano when the user asks for YOLOX." +
+        " For a hand gesture use the hand-gesture agent and pick the label that matches the user's words: thumbs up = thumb up, thumbs down = thumb down, peace sign or V sign = victory, " +
+        "open hand or high five = open palm, fist = closed fist, pointing finger = pointing up, rock sign = i love you. The label is just the class, never prefixed by the agent id, and never person. Raising or waving a hand is not a gesture: that is the body-pose agent. " +
+        "It sees upright hands, a gesture held for about a second." +
+        " To play a recorded sound when an alert fires - a lullaby, white noise, one of the user's own sounds - select play_file with parameters {sound: its name from list_visual_actions, seconds: how long to keep repeating it (60 if the user wants it to go on without saying for how long; leave out to play it once)}. " +
+        " For what a person's body is doing - waving, raising a hand or both arms, standing, sitting, lying down - use the body-pose agent, not hand-gesture and not person: the label is exactly one of " +
+        "arms raised (both arms up, hands in the air), hand raised (raising a hand or arm), waving, standing, sitting, lying down. " +
+        "It sees one person with the head in view, within a few metres; waving takes about two seconds to show; standing and sitting need the legs in view. It can't detect falls or tell people apart." +
+        " For a facial expression - smiling, closing the eyes, winking, opening the mouth, raising the eyebrows - use the face-expression agent, not person: the label is exactly one of " +
+        "smiling, eyes closed, winking, mouth open, eyebrows raised. It reads one face looking at the camera, within about two metres. It can't recognise who someone is, " +
+        "and it is not for checking whether someone is tired, drowsy or paying attention: decline such requests." +
+        " For a posture and an expression at once (raise a hand and smile, wave while smiling) use the holistic agent: the label is the posture, \"and\", then the expression, " +
+        "e.g. hand raised and smiling, waving and smiling, arms raised and mouth open. For covering the eyes (peekaboo), a hand over the mouth or a hand on the face use the holistic agent " +
+        "with exactly covering eyes, hand over mouth or hand on face." +
+        (android
+            ? " The app switches between the back camera and the selfie (front) camera by itself when the user's request says so: don't refuse such a request, use the camera tools as usual and say which camera is used." +
+              " For record a video or clip when an object appears, select record_clip with parameters {seconds: the requested length, default 10, from 3 to 30}. " +
+              "It records from the live camera with sound and shows the clip in this chat session; no automatic saving or model analysis. A request for both a picture and a clip uses take_snapshot and record_clip. " +
+              "For a full resolution, high resolution or high quality photo when an object appears, select take_photo (parameters {}), not take_snapshot; it is slower and shows the full-size photo in this chat session."
+            : "");
+
     internal static readonly VisualActionDescriptor Chime = new("play_sound", "Chime", "Play the bundled alert chime once.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
 

@@ -17,7 +17,8 @@ internal static class ChatToolGroups
         "when a person", "when a dog", "when a cat", "when a car", "if someone", "if a person",
         "appears", "shows up", "walks in", "comes in", "intruder", "visitor", "front door", "the door", "yolox", "mobilenet", "detector",
         "thumb", "gesture", "peace sign", "open palm", "fist",
-        "wave", "waving", "raise", "raising", "raised", "arms up", "hands up", "stand up", "stands up", "sit down", "sits down", "lie down", "lies down", "lying down"
+        "wave", "waving", "raise", "raising", "raised", "arms up", "hands up", "stand up", "stands up", "sit down", "sits down", "lie down", "lies down", "lying down",
+        "smile", "smiling", "peekaboo", "peek-a-boo", "cover my eyes", "covers her eyes", "covers his eyes", "covers their eyes", "covering", "hand over", "facepalm"
     };
 
     internal const string Sound = "sound_monitor";

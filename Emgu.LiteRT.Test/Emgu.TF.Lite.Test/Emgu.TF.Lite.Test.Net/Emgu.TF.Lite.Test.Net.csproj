@@ -43,6 +43,7 @@
     <Compile Include="..\UnitTestPoseVisualAgent.cs" Link="UnitTestPoseVisualAgent.cs" />
     <Compile Include="..\UnitTestJumpingJacks.cs" Link="UnitTestJumpingJacks.cs" />
     <Compile Include="..\UnitTestFaceVisualAgent.cs" Link="UnitTestFaceVisualAgent.cs" />
+    <Compile Include="..\UnitTestHolisticVisualAgent.cs" Link="UnitTestHolisticVisualAgent.cs" />
     <Compile Include="..\UnitTestAlertSounds.cs" Link="UnitTestAlertSounds.cs" />
     <Compile Include="..\UnitTestYamNet.cs" Link="UnitTestYamNet.cs" />
     <Compile Include="..\UnitTestSoundMonitors.cs" Link="UnitTestSoundMonitors.cs" />
@@ -82,6 +83,7 @@
     <Content Include="..\TestData\pose_reference.json" Link="pose_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\face_reference.json" Link="face_reference.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\holistic_reference.json" Link="holistic_reference.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\TestData\holistic_*.jpg" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TestData\face_*.jpg" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui\Resources\Raw\face_portrait.png" Link="face_portrait.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\Emgu.LiteRT.Example\Maui\Resources\Raw\holistic_person.png" Link="holistic_person.png" CopyToOutputDirectory="PreserveNewest" />
