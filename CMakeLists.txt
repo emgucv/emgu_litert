@@ -550,6 +550,10 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # Emgu.LiteRT.LM.Agents/: ready-made tools for chat agents (Microsoft.Extensions.AI functions), for any IChatClient.
   SET(EMGU_LITERT_LM_AGENTS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Agents")
   SET(EMGU_LITERT_LM_AGENTS_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} Agents")
+  # Emgu.LiteRT.LM.Agents.CV/: ready-made visual agents on the Emgu.LiteRT.Models.CV detectors (kept out of Emgu.LiteRT.LM.Agents so that package
+  # needs neither Emgu CV nor LiteRT).
+  SET(EMGU_LITERT_LM_AGENTS_CV_NUGET_ID "${EMGU_LITERT_LM_AGENTS_NUGET_ID}.CV")
+  SET(EMGU_LITERT_LM_AGENTS_CV_NUGET_TITLE "${EMGU_LITERT_LM_AGENTS_NUGET_TITLE} CV")
   # Emgu.LiteRT.LM.Chat/: the conversation logic of a chat (no UI) over any IChatClient - messages, streaming,
   # context window management.
   SET(EMGU_LITERT_LM_CHAT_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Chat")
@@ -1267,6 +1271,17 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.CV.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models.CV/NetStandard/docs/README.md)
 
+# Emgu.LiteRT.LM.Agents.CV: visual agents for Emgu.LiteRT.LM.Agents' camera monitors on the Emgu.LiteRT.Models.CV detectors. Its own nuget package,
+# depending on Emgu.LiteRT.LM.Agents and Emgu.LiteRT.Models.CV, versioned with the LiteRT-LM packages.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Agents.CV.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents.CV/NetStandard/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents.CV/NetStandard/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents.CV/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Agents.CV.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents.CV/NetStandard/docs/README.md)
+
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.windows/README.md)
 
@@ -1332,6 +1347,8 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.TF.Lite.Models)
   ADD_SUBDIRECTORY(Emgu.LiteRT.Models)
   ADD_SUBDIRECTORY(Emgu.LiteRT.Models.CV)
+  # After Emgu.LiteRT.LM.Agents and Emgu.LiteRT.Models.CV, which it depends on.
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Agents.CV)
 ENDIF()
 
 IF (HAVE_LITE_BUILD)

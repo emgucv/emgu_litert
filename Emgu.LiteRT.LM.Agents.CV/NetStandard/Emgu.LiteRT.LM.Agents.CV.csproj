@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<AssemblyName>Emgu.LiteRT.LM.Agents.CV</AssemblyName>
+	<TargetName>$(AssemblyName)</TargetName>
+	<LangVersion>latest</LangVersion>
+	<ImplicitUsings>enable</ImplicitUsings>
+	<Configurations>Release;Debug</Configurations>
+    <TensorflowBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\lib))</TensorflowBinaryDir>
+	<OutputPath>$(TensorflowBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <Import Project="..\Emgu.LiteRT.LM.Agents.CV.Shared.projitems" Label="Shared" />
+
+  <!--
+  Emgu.LiteRT.LM.Agents.CV holds ready-made visual agents (Emgu.LiteRT.LM.Agents' IVisualAgent) on the Emgu.LiteRT.Models.CV detectors:
+  COCO objects, hand gestures, body postures, face expressions and the holistic combinations, with the words people use for their classes.
+  Kept out of Emgu.LiteRT.LM.Agents so that package needs neither Emgu CV nor LiteRT. Plain ProjectReferences, so the package depends on them.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Emgu.LiteRT.LM.Agents\NetStandard\Emgu.LiteRT.LM.Agents.csproj" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.Models.CV\NetStandard\Emgu.LiteRT.Models.CV.csproj" />
+  </ItemGroup>
+</Project>

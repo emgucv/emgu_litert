@@ -70,7 +70,7 @@ public class UnitTestToolRouting
                 AgentTools.OpenCamera(_ => { snapshot?.Invoke(); return Task.FromResult("open"); }),
                 AgentTools.CaptureCameraFrame(_ => Task.FromResult<IEnumerable<AIContent>>(Array.Empty<AIContent>()))
             };
-            tools.AddRange(VisualAgentTools.Create(() => JsonSerializer.Serialize(new[] { VisualHostCatalog.Detector() }),
+            tools.AddRange(VisualAgentTools.Create(() => JsonSerializer.Serialize(new[] { CocoVisualAgent.Describe() }),
                 () => JsonSerializer.Serialize(actions), actions,
                 (label, count, confidence, selected, token) =>
                 {

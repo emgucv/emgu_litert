@@ -7,6 +7,7 @@ using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Vision;
+using Emgu.LiteRT.Models;
 using Microsoft.Extensions.AI;
 using Emgu.LiteRT.LM.Agents.Audio;
 
@@ -34,12 +35,16 @@ public partial class LiteRtLmChatPage
     private void BuildVisualMonitoring()
     {
         _visualAgents = new VisualAgentRegistry();
-        _visualAgents.Register(new CocoVisualAgent());
-        _visualAgents.Register(new CocoVisualAgent(useYoloX: true));
-        _visualAgents.Register(new HandVisualAgent());
-        _visualAgents.Register(new PoseVisualAgent());
-        _visualAgents.Register(new FaceVisualAgent());
-        _visualAgents.Register(new HolisticVisualAgent());
+        // Emgu.LiteRT.LM.Agents.CV's agents on the detectors DetectorFactory makes (the app's cache folder, its bundled GPU check pictures), with at
+        // most 2 of the CPU threads Settings allows, read each time an agent is prepared. The holistic agent after the pose and face agents, which
+        // keep the plain postures and expressions.
+        Func<int> threads = () => Math.Min(2, CpuThreadSettings.Count);
+        _visualAgents.Register(new CocoVisualAgent(DetectorFactory.Coco(), threads, CocoDetector.CanTryGpu));
+        _visualAgents.Register(new CocoVisualAgent(DetectorFactory.YoloX(), threads, CocoDetector.CanTryGpu));
+        _visualAgents.Register(new HandVisualAgent(DetectorFactory.Hand(), threads));
+        _visualAgents.Register(new PoseVisualAgent(DetectorFactory.Pose(), numThreads: threads));
+        _visualAgents.Register(new FaceVisualAgent(DetectorFactory.Face(), threads));
+        _visualAgents.Register(new HolisticVisualAgent(DetectorFactory.Holistic(), threads));
         _visualChime = new CameraChimeAction();
         _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(text, token)),
             occurrence => _visualRuntime.Snapshot().Any(m => m.Id == occurrence.MonitorId &&
@@ -181,13 +186,13 @@ public partial class LiteRtLmChatPage
             // "thumbs up" and the like are the hand-gesture agent's classes ("thumb up"), "smile" the face agent's, "raises a hand" the pose agent's,
             // "raises a hand and smiles" or "covers their eyes" the holistic agent's;
             // anything else goes as it came.
-            string gesture = VisualHostCatalog.CanonicalGesture(label);
-            if (gesture != null) { label = gesture; confidence = VisualHostCatalog.GestureConfidence(confidence); }
+            string gesture = VisualClasses.CanonicalGesture(label);
+            if (gesture != null) { label = gesture; confidence = VisualClasses.GestureConfidence(confidence); }
             // A posture with an expression ("hand raised and smiling") or a hand on the face: the holistic agent's; before the other two, which would take
             // only half of a combination.
-            else if (VisualHostCatalog.HolisticForMonitor(label, _routePrompt) is string holistic) label = holistic;
-            else if (VisualHostCatalog.ExpressionForMonitor(label, _routePrompt) is string expression) label = expression;
-            else if (VisualHostCatalog.PostureForMonitor(label, _routePrompt) is string posture) label = posture;
+            else if (VisualClasses.HolisticForMonitor(label, _routePrompt) is string holistic) label = holistic;
+            else if (VisualClasses.ExpressionForMonitor(label, _routePrompt) is string expression) label = expression;
+            else if (VisualClasses.PostureForMonitor(label, _routePrompt) is string posture) label = posture;
             var monitor = _visualRuntime.CreateObjectMonitor(label, actions, minimumCount, confidence);
             RememberMonitorRequest(monitor.Id);
             // Repeated requests return the existing rule, including its user-paused status.

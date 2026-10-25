@@ -42,7 +42,7 @@ public class UnitTestHandVisualAgent
     [TestCase("I love you", "i love you")]
     public void TheWordsForAGestureFindItsClass(string said, string gesture)
     {
-        Assert.That(VisualHostCatalog.CanonicalGesture(said), Is.EqualTo(gesture));
+        Assert.That(VisualClasses.CanonicalGesture(said), Is.EqualTo(gesture));
     }
 
     [TestCase("person")]
@@ -53,16 +53,16 @@ public class UnitTestHandVisualAgent
     [TestCase("a wave")]
     public void OtherWordsAreNotGestures(string said)
     {
-        Assert.That(VisualHostCatalog.CanonicalGesture(said), Is.Null);
+        Assert.That(VisualClasses.CanonicalGesture(said), Is.Null);
     }
 
     [Test]
     public void EveryMediaPipeLabelHasAClass()
     {
         foreach (string label in HandTracker.GestureLabels.Where(l => l != "None"))
-            Assert.That(VisualHostCatalog.Gestures, Does.Contain(VisualHostCatalog.CanonicalGesture(label)), label);
-        Assert.That(VisualHostCatalog.Gestures, Is.Unique);
-        Assert.That(VisualHostCatalog.Gestures.Length, Is.EqualTo(7));
+            Assert.That(VisualClasses.Gestures, Does.Contain(VisualClasses.CanonicalGesture(label)), label);
+        Assert.That(VisualClasses.Gestures, Is.Unique);
+        Assert.That(VisualClasses.Gestures.Length, Is.EqualTo(7));
     }
 
     [TestCase("Use the selfie camera and take a picture when you see a thumb up", "front")]
@@ -87,10 +87,10 @@ public class UnitTestHandVisualAgent
     [Test]
     public void AGestureMonitorGetsALowerDefaultConfidenceAndKeepsAChosenOne()
     {
-        Assert.That(VisualHostCatalog.GestureConfidence(0.5), Is.EqualTo(0.4));
-        Assert.That(VisualHostCatalog.GestureConfidence(0.7), Is.EqualTo(0.7));
-        Assert.That(VisualHostCatalog.GestureConfidence(0.3), Is.EqualTo(0.3));
-        Assert.That(VisualHostCatalog.GestureConfidence(0.9), Is.EqualTo(0.9));
+        Assert.That(VisualClasses.GestureConfidence(0.5), Is.EqualTo(0.4));
+        Assert.That(VisualClasses.GestureConfidence(0.7), Is.EqualTo(0.7));
+        Assert.That(VisualClasses.GestureConfidence(0.3), Is.EqualTo(0.3));
+        Assert.That(VisualClasses.GestureConfidence(0.9), Is.EqualTo(0.9));
     }
 
     private sealed class FakeAgent(VisualAgentDescriptor descriptor) : IVisualAgent
@@ -105,17 +105,17 @@ public class UnitTestHandVisualAgent
     public void AMonitorForAGestureSelectsTheHandAgentAndAnObjectOneStillSelectsTheDetector()
     {
         var agents = new VisualAgentRegistry();
-        agents.Register(new FakeAgent(VisualHostCatalog.Detector()));
-        agents.Register(new FakeAgent(VisualHostCatalog.HandDetector()));
+        agents.Register(new FakeAgent(CocoVisualAgent.Describe()));
+        agents.Register(new FakeAgent(HandVisualAgent.Describe()));
         Assert.That(agents.SelectObjects("thumb up").Descriptor.Id, Is.EqualTo("hand-gesture"));
         Assert.That(agents.SelectObjects("victory").Descriptor.Id, Is.EqualTo("hand-gesture"));
         Assert.That(agents.SelectObjects("person").Descriptor.Id, Is.EqualTo("coco-ssd-mobilenet-v3"));
         Assert.Throws<ArgumentException>(() => agents.SelectObjects("thumbs up"));            // the host maps the words first
         var hand = agents.Describe().Single(d => d.Id == "hand-gesture");
         Assert.That(hand.Capabilities, Does.Contain("object_detection").And.Contain("hand_gestures"));
-        Assert.That(hand.ObjectClasses, Is.EquivalentTo(VisualHostCatalog.Gestures));
+        Assert.That(hand.ObjectClasses, Is.EquivalentTo(VisualClasses.Gestures));
         // The classes don't overlap COCO's, so no gesture is ever claimed by the object detector.
-        Assert.That(VisualHostCatalog.Classes.Intersect(VisualHostCatalog.Gestures), Is.Empty);
+        Assert.That(VisualClasses.ObjectClasses.Intersect(VisualClasses.Gestures), Is.Empty);
     }
 
     [Test]
@@ -155,7 +155,7 @@ public class UnitTestHandVisualAgentNative
         })
         {
             using var bgr = Emgu.CV.CvInvoke.Imread(Path.Combine(root, image), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
-            var observations = VisualHostCatalog.GestureObservations(HandImageInput.Track(tracker, bgr)).ToArray();
+            var observations = HandVisualAgent.Observations(HandImageInput.Track(tracker, bgr)).ToArray();
             Assert.That(observations.Length, Is.EqualTo(1), image);
             var o = observations[0];
             Assert.That(o.Kind, Is.EqualTo("object"));
@@ -168,11 +168,11 @@ public class UnitTestHandVisualAgentNative
         }
         // The sideways hand: MediaPipe's own reading is "none"; with the turned readings it is pointing up.
         using var sideways = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "hand_pointing_up_rotated.jpg"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
-        Assert.That(VisualHostCatalog.GestureObservations(HandImageInput.Track(tracker, sideways)).Select(o => o.Label), Is.EqualTo(new[] { "pointing up" }));
+        Assert.That(HandVisualAgent.Observations(HandImageInput.Track(tracker, sideways)).Select(o => o.Label), Is.EqualTo(new[] { "pointing up" }));
         tracker.TiltAngles = Array.Empty<double>();
-        Assert.That(VisualHostCatalog.GestureObservations(HandImageInput.Track(tracker, sideways)), Is.Empty);
+        Assert.That(HandVisualAgent.Observations(HandImageInput.Track(tracker, sideways)), Is.Empty);
         tracker.TiltAngles = new double[] { -30, 30, -60, 60 };
         using var shuttle = Emgu.CV.CvInvoke.Imread(Path.Combine(root, "space_shuttle.jpg"), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
-        Assert.That(VisualHostCatalog.GestureObservations(HandImageInput.Track(tracker, shuttle)), Is.Empty);
+        Assert.That(HandVisualAgent.Observations(HandImageInput.Track(tracker, shuttle)), Is.Empty);
     }
 }

@@ -105,7 +105,7 @@ input `TensorBuffer`, runs the compiled model, and returns `VisualAnalysis` with
 typed `VisualObservation` results. Object observations contain a canonical label, confidence and normalized box.
 Frame/source identifiers and capture timestamps travel with the analysis.
 
-An optional second registration, `coco-yolox-nano`, uses `CocoVisualAgent(useYoloX: true)` and `YoloXDetector`.
+An optional second registration, `coco-yolox-nano`, uses `CocoVisualAgent` over a `YoloXDetector`.
 Ask explicitly, for example: "Use YOLOX to watch for a person and play a sound." This path downloads the official
 YOLOX-Nano weights from Emgu public S3 on first use, verifies SHA-256 and caches them, then runs them on the LiteRT GPU when that passes an accuracy and speed check against the CPU (else on CPU). It uses BGR float pixels, top-left padding, grid decoding and NMS before returning
 the same observations to the monitor; the event/action pipeline is shared. It is experimental and was slower than V3
@@ -243,7 +243,7 @@ monitoring remain future additions.
 | Visual contracts and detector registry | [VisualAgents.cs](../../Emgu.LiteRT.LM.Agents/VisualAgents.cs) |
 | Conditions and presence state machine | [VisualEvents.cs](../../Emgu.LiteRT.LM.Agents/VisualEvents.cs) |
 | Rule binding, frame scheduling and action dispatch | [VisualMonitorRuntime.cs](../../Emgu.LiteRT.LM.Agents/VisualMonitorRuntime.cs) |
-| COCO model adapter | [CocoVisualAgent.cs](CocoVisualAgent.cs) |
+| COCO model adapter | [CocoVisualAgent.cs](../../Emgu.LiteRT.LM.Agents.CV/CocoVisualAgent.cs) (`Emgu.LiteRT.LM.Agents.CV`, with the hand, pose, face and holistic agents) |
 | Action contracts, factories and validation | [VisualActions.cs](../../Emgu.LiteRT.LM.Agents/VisualActions.cs) |
 | MAUI factories and fixed speech | [CameraActionFactories.cs](CameraActionFactories.cs) |
 | Snapshot action | [CameraSnapshotAction.cs](CameraSnapshotAction.cs), [LiteRtLmChatPage.VisualSnapshots.cs](LiteRtLmChatPage.VisualSnapshots.cs) |

@@ -1,0 +1,34 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Agents.CV.dll`: ready-made visual agents for the camera monitors of `${EMGU_LITERT_LM_AGENTS_NUGET_ID}` (`IVisualAgent`, in `Emgu.LiteRT.LM.Agents.Vision`), on the detectors of `${EMGU_LITERT_MODELS_CV_NUGET_ID}`:
+
+| Agent | Id | Detector | Classes |
+|---|---|---|---|
+| `CocoVisualAgent` | `coco-ssd-mobilenet-v3`, `coco-yolox-nano` | `CocoDetector`, `YoloXDetector` | the 80 COCO objects (`VisualClasses.ObjectClasses`) |
+| `HandVisualAgent` | `hand-gesture` | `HandGestureDetector` | thumb up, thumb down, victory, open palm, closed fist, pointing up, i love you |
+| `PoseVisualAgent` | `body-pose` | `PoseDetector` | arms raised, hand raised, waving, standing, sitting, lying down |
+| `FaceVisualAgent` | `face-expression` | `FaceDetector` | smiling, eyes closed, winking, mouth open, eyebrows raised |
+| `HolisticVisualAgent` | `holistic` | `HolisticDetector` | a posture and an expression together ("hand raised and smiling"), covering eyes, hand over mouth, hand on face |
+
+`VisualClasses` has the words people use for those classes ("thumbs up", "peace sign", "raise my hand", "peekaboo", emoji) and reads a monitor's label with them - and, when a language model put the agent's name or the person class there, the user's request (`PostureForMonitor`, `ExpressionForMonitor`, `HolisticForMonitor`; check the holistic one first, since the others would take half of a combination).
+
+```csharp
+using Emgu.LiteRT.LM.Agents.Vision;
+using Emgu.LiteRT.Models;
+
+string cache = "...";   // where the detectors download their models
+var registry = new VisualAgentRegistry();
+registry.Register(new CocoVisualAgent(new CocoDetector(cache), preferGpu: CocoDetector.CanTryGpu));
+registry.Register(new HandVisualAgent(new HandGestureDetector(cache)));
+registry.Register(new PoseVisualAgent(new PoseDetector(cache)));
+registry.Register(new FaceVisualAgent(new FaceDetector(cache)));
+registry.Register(new HolisticVisualAgent(new HolisticDetector(cache)));   // after the pose and face agents, which keep the plain classes
+var runtime = new VisualMonitorRuntime(registry, yourActions);
+```
+
+Each agent owns its detector (disposing the agent disposes it), prepares it on the CPU unless asked to try the GPU, and copies each frame into an Emgu CV image; the camera is the app's. The pose, face and holistic agents read postures and expressions for fun triggers: they don't identify anyone, detect falls, or judge tiredness or attention. Needs an Emgu CV runtime package for the platform.
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

@@ -563,8 +563,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     and a Pixel Fold - in the same session-reconfiguring way (`LiveCamera.TakePhotoAsync`; a card in
     `LiteRtLmChatPage.VisualPhotos.cs` with Open, Share and Save to gallery), while `take_snapshot` stays a small analysis
     frame. A photo asked for together with a clip is taken first.
-- The `hand-gesture` visual agent (`HandVisualAgent.cs`, TODO item 47) makes MediaPipe's seven gestures object classes of the
-  camera monitors ("thumb up", "victory"...; `VisualHostCatalog.CanonicalGesture` maps the words people use, and the visual
+- The `hand-gesture` visual agent (`HandVisualAgent`, in `Emgu.LiteRT.LM.Agents.CV`, TODO item 47) makes MediaPipe's seven gestures object classes of the
+  camera monitors ("thumb up", "victory"...; `VisualClasses.CanonicalGesture` maps the words people use, and the visual
   instructions say which label fits which words), so "take a picture when you see a thumb up" is an ordinary monitor with
   every action. Verified on a Galaxy S10 with Gemma 4 E2B, with MediaPipe's photos as frames.
   - With a real hand on a Pixel Fold's selfie camera, the gestures were found in 94-100% of frames - except the closed fist
@@ -572,9 +572,9 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     asks the classifier again on landmarks turned by ±30 and ±60 degrees when the upright reading is weak (a tilted thumb up
     went from 5% to 92%; not MediaPipe's behaviour, so the parity tests turn it off); and gesture monitors default to a 0.4
     confidence.
-- The `holistic` visual agent (`HolisticVisualAgent.cs`, MediaPipe's holistic landmarker) watches for two things at once - a posture with an
+- The `holistic` visual agent (`HolisticVisualAgent`, in `Emgu.LiteRT.LM.Agents.CV`, MediaPipe's holistic landmarker) watches for two things at once - a posture with an
   expression, "hand raised and smiling", "waving and smiling" - and for covering the eyes (peekaboo), a hand over the mouth or a hand on the face.
-  `VisualHostCatalog.HolisticForMonitor` reads the request when the label Gemma 4 E2B gives is half of a combination or a mistake (it gave `person`,
+  `VisualClasses.HolisticForMonitor` reads the request when the label Gemma 4 E2B gives is half of a combination or a mistake (it gave `person`,
   `baby`, `hand_gesture`, `face-expression` for four of five such requests); checked with Gemma on an M1 and on synthetic pictures, not yet with a
   real person or on a phone (`Emgu.LiteRT.Models/HOLISTIC.md`). Its frames, and the Holistic page's live camera, go through MediaPipe's video
   mode (tracked and smoothed from frame to frame by their timestamps): steadier hands and a covered-eyes video with 1 stray "hand over mouth"

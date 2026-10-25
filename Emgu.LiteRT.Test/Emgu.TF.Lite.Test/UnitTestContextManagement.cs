@@ -114,7 +114,7 @@ public class UnitTestContextManagement
 
     private sealed class CatalogDetector : IVisualAgent
     {
-        public VisualAgentDescriptor Descriptor => VisualHostCatalog.Detector();
+        public VisualAgentDescriptor Descriptor => CocoVisualAgent.Describe();
         public Task PrepareAsync(Action<string> progress, CancellationToken token) => Task.CompletedTask;
         public Task<VisualAnalysis> AnalyzeAsync(VisualFrame frame, CancellationToken token) => throw new NotSupportedException("Planner fixture has no camera feed.");
         public void Dispose() { }

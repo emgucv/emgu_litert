@@ -212,7 +212,7 @@ px, the face 0.5 / 1.5). `TheDetectorFindsTheBodyHandsAndFace` checks a gap of m
 
 ## The visual agent: two things at once, hands on the face
 
-The demo's `holistic` visual agent (`Chat/Visual/HolisticVisualAgent.cs`, CPU, 2 threads) makes what the body, hands and face show together classes of
+The demo's `holistic` visual agent (`HolisticVisualAgent` in `Emgu.LiteRT.LM.Agents.CV`, CPU, 2 threads) makes what the body, hands and face show together classes of
 the camera monitors (`HolisticGestures`, in this library):
 
 - **Combinations**: every posture of the body-pose agent with every expression of the face-expression agent, posture first - "hand raised and smiling",
@@ -249,7 +249,7 @@ found or not depending on JPEG or PNG; **both hands under the chin** weren't fou
 **Routing**: Gemma 4 E2B (Metal GPU, on an M1, with the demo's camera instructions) named the class for "Beep when I wave and smile at the camera"
 (`waving and smiling`), but gave `person` for "Take a picture when I raise my hand and smile", `baby` for "Play a chime when the baby plays peekaboo",
 `hand_gesture` for "Take a photo when I cover my mouth with my hand" and `face-expression` for "Say stop when I touch my face". So, as for the pose and
-face agents, the host reads the request when the label is half of a combination or a mistake (`VisualHostCatalog.HolisticForMonitor`: a combination or
+face agents, the host reads the request when the label is half of a combination or a mistake (`VisualClasses.HolisticForMonitor`: a combination or
 interaction the label names; else a posture and an expression the request names in so many words, when the label is one of them or a mistake; else an
 interaction the request names), checked before the face and pose fallbacks, which would take only half of a combination. With it all five became the
 right holistic class, and "Take a picture when I smile" / "Beep when I raise my hand" stayed `smiling` (face-expression) and `hand raised` (body-pose).

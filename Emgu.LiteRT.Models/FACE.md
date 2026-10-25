@@ -114,7 +114,7 @@ pictures cut off at the nose, where no face is found, so the brows' threshold re
 rise a little). A blink is too brief for a monitor's hold time and isn't mapped to "eyes closed".
 
 The demo's `FaceVisualAgent` (`face-expression`, CPU, 2 threads) reports the largest face's readings as observations with the face's box;
-`VisualHostCatalog.CanonicalExpression` maps the words people use ("smile", "wink", "open mouth", emoji), and `ExpressionForMonitor` reads the
+`VisualClasses.CanonicalExpression` maps the words people use ("smile", "wink", "open mouth", emoji), and `ExpressionForMonitor` reads the
 expression from the user's request when the model gives "person", "face" or the agent's name as the label. The agent's instructions name the five
 labels and say it can't recognise anyone and isn't for tiredness or attention. Tests: `UnitTestFaceVisualAgent` (model-free: rules, scaling,
 words, routing) and `UnitTestFaceVisualAgentNative` (four of the synthetic faces in `TestData/face_*.jpg`, 256 px JPEGs, and the sample: each shows

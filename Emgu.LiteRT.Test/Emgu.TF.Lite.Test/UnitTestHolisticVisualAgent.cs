@@ -135,12 +135,12 @@ public class UnitTestHolisticVisualAgent
     public void TheClassesAreCombinationsAndInteractionsOnly()
     {
         Assert.That(HolisticGestures.CombinationNames.Length, Is.EqualTo(PoseGestures.Names.Length * FaceExpressions.Names.Length));
-        Assert.That(VisualHostCatalog.HolisticClasses, Is.Unique);
-        Assert.That(VisualHostCatalog.HolisticClasses, Does.Contain("covering eyes").And.Contain("waving and smiling").And.Contain("hand raised and smiling"));
-        foreach (string other in VisualHostCatalog.Classes.Concat(VisualHostCatalog.Gestures).Concat(VisualHostCatalog.PoseClasses).Concat(VisualHostCatalog.FaceClasses))
-            Assert.That(VisualHostCatalog.HolisticClasses, Does.Not.Contain(other), other);
-        foreach (string name in VisualHostCatalog.HolisticClasses)
-            Assert.That(VisualHostCatalog.CanonicalCombination(name) ?? VisualHostCatalog.CanonicalInteraction(name), Is.EqualTo(name), name);
+        Assert.That(VisualClasses.HolisticClasses, Is.Unique);
+        Assert.That(VisualClasses.HolisticClasses, Does.Contain("covering eyes").And.Contain("waving and smiling").And.Contain("hand raised and smiling"));
+        foreach (string other in VisualClasses.ObjectClasses.Concat(VisualClasses.Gestures).Concat(VisualClasses.PoseClasses).Concat(VisualClasses.FaceClasses))
+            Assert.That(VisualClasses.HolisticClasses, Does.Not.Contain(other), other);
+        foreach (string name in VisualClasses.HolisticClasses)
+            Assert.That(VisualClasses.CanonicalCombination(name) ?? VisualClasses.CanonicalInteraction(name), Is.EqualTo(name), name);
     }
 
     [TestCase("hand raised and smiling", "hand raised and smiling")]
@@ -158,7 +158,7 @@ public class UnitTestHolisticVisualAgent
     [TestCase(null, null)]
     public void ALabelNamesACombination(string label, string expected)
     {
-        Assert.That(VisualHostCatalog.CanonicalCombination(label), Is.EqualTo(expected));
+        Assert.That(VisualClasses.CanonicalCombination(label), Is.EqualTo(expected));
     }
 
     [TestCase("covering eyes", "covering eyes")]
@@ -175,7 +175,7 @@ public class UnitTestHolisticVisualAgent
     [TestCase("face", null)]
     public void ALabelNamesAnInteraction(string label, string expected)
     {
-        Assert.That(VisualHostCatalog.CanonicalInteraction(label), Is.EqualTo(expected));
+        Assert.That(VisualClasses.CanonicalInteraction(label), Is.EqualTo(expected));
     }
 
     [TestCase("Take a picture when I cover my eyes", "covering eyes")]
@@ -188,27 +188,27 @@ public class UnitTestHolisticVisualAgent
     [TestCase("Close the door when I leave", null)]
     public void TheRequestNamesAnInteractionInSoManyWords(string request, string expected)
     {
-        Assert.That(VisualHostCatalog.InteractionFromRequest(request), Is.EqualTo(expected));
+        Assert.That(VisualClasses.InteractionFromRequest(request), Is.EqualTo(expected));
     }
 
     [Test]
     public void AMonitorsLabelIsRoutedToTheHolisticClass()
     {
         // The label names it.
-        Assert.That(VisualHostCatalog.HolisticForMonitor("smiling and waving", "Beep when I smile and wave"), Is.EqualTo("waving and smiling"));
-        Assert.That(VisualHostCatalog.HolisticForMonitor("peekaboo", "Play a chime for peekaboo"), Is.EqualTo("covering eyes"));
+        Assert.That(VisualClasses.HolisticForMonitor("smiling and waving", "Beep when I smile and wave"), Is.EqualTo("waving and smiling"));
+        Assert.That(VisualClasses.HolisticForMonitor("peekaboo", "Play a chime for peekaboo"), Is.EqualTo("covering eyes"));
         // Half of a combination, with the request naming both: the combination (Gemma gives one class, as for "raises their hand").
-        Assert.That(VisualHostCatalog.HolisticForMonitor("hand raised", "Take a picture when someone raises their hand and smiles"), Is.EqualTo("hand raised and smiling"));
-        Assert.That(VisualHostCatalog.HolisticForMonitor("smiling", "Take a picture when I raise my hand and smile"), Is.EqualTo("hand raised and smiling"));
-        Assert.That(VisualHostCatalog.HolisticForMonitor("person", "Beep when I stand up and smile"), Is.EqualTo("standing and smiling"));
-        Assert.That(VisualHostCatalog.HolisticForMonitor("holistic", "Take a picture when I cover my eyes"), Is.EqualTo("covering eyes"));
-        Assert.That(VisualHostCatalog.HolisticForMonitor("face", "Beep when I touch my face"), Is.EqualTo("hand on face"));
+        Assert.That(VisualClasses.HolisticForMonitor("hand raised", "Take a picture when someone raises their hand and smiles"), Is.EqualTo("hand raised and smiling"));
+        Assert.That(VisualClasses.HolisticForMonitor("smiling", "Take a picture when I raise my hand and smile"), Is.EqualTo("hand raised and smiling"));
+        Assert.That(VisualClasses.HolisticForMonitor("person", "Beep when I stand up and smile"), Is.EqualTo("standing and smiling"));
+        Assert.That(VisualClasses.HolisticForMonitor("holistic", "Take a picture when I cover my eyes"), Is.EqualTo("covering eyes"));
+        Assert.That(VisualClasses.HolisticForMonitor("face", "Beep when I touch my face"), Is.EqualTo("hand on face"));
         // A single posture or expression stays with its own agent; another agent's class stays theirs.
-        Assert.That(VisualHostCatalog.HolisticForMonitor("smiling", "Take a picture when I smile"), Is.Null);
-        Assert.That(VisualHostCatalog.HolisticForMonitor("waving", "Beep when I wave"), Is.Null);
-        Assert.That(VisualHostCatalog.HolisticForMonitor("thumb up", "Take a picture when I smile and give a thumbs up"), Is.Null);
-        Assert.That(VisualHostCatalog.HolisticForMonitor("dog", "Beep when the dog covers its eyes"), Is.Null);
-        Assert.That(VisualHostCatalog.HolisticForMonitor("person", "Take a picture when you see a person"), Is.Null);
+        Assert.That(VisualClasses.HolisticForMonitor("smiling", "Take a picture when I smile"), Is.Null);
+        Assert.That(VisualClasses.HolisticForMonitor("waving", "Beep when I wave"), Is.Null);
+        Assert.That(VisualClasses.HolisticForMonitor("thumb up", "Take a picture when I smile and give a thumbs up"), Is.Null);
+        Assert.That(VisualClasses.HolisticForMonitor("dog", "Beep when the dog covers its eyes"), Is.Null);
+        Assert.That(VisualClasses.HolisticForMonitor("person", "Take a picture when you see a person"), Is.Null);
     }
 
     private sealed class FakeAgent(VisualAgentDescriptor descriptor) : IVisualAgent
@@ -223,12 +223,12 @@ public class UnitTestHolisticVisualAgent
     public void AMonitorForAHolisticClassSelectsTheHolisticAgent()
     {
         var agents = new VisualAgentRegistry();
-        agents.Register(new FakeAgent(VisualHostCatalog.Detector()));
-        agents.Register(new FakeAgent(VisualHostCatalog.HandDetector()));
-        agents.Register(new FakeAgent(VisualHostCatalog.PoseDescriptor()));
-        agents.Register(new FakeAgent(VisualHostCatalog.FaceDescriptor()));
-        agents.Register(new FakeAgent(VisualHostCatalog.HolisticDescriptor()));
-        foreach (string name in VisualHostCatalog.HolisticClasses)
+        agents.Register(new FakeAgent(CocoVisualAgent.Describe()));
+        agents.Register(new FakeAgent(HandVisualAgent.Describe()));
+        agents.Register(new FakeAgent(PoseVisualAgent.Describe()));
+        agents.Register(new FakeAgent(FaceVisualAgent.Describe()));
+        agents.Register(new FakeAgent(HolisticVisualAgent.Describe()));
+        foreach (string name in VisualClasses.HolisticClasses)
             Assert.That(agents.SelectObjects(name).Descriptor.Id, Is.EqualTo("holistic"), name);
         // The plain postures and expressions stay with the cheaper agents registered before it.
         Assert.That(agents.SelectObjects("smiling").Descriptor.Id, Is.EqualTo("face-expression"));
@@ -239,13 +239,13 @@ public class UnitTestHolisticVisualAgent
     [Test]
     public void ReadingsBecomeObservationsWithTheBodysBox()
     {
-        var observations = VisualHostCatalog.HolisticObservations(
+        var observations = HolisticVisualAgent.Observations(
             new HolisticResult(new Pose { Landmarks = Body() }, HandAt(180, 100), HandAt(220, 100), null), 400, 400, null, TimeSpan.Zero);
         var eyes = observations.Single(o => o.Label == "covering eyes");
         Assert.That(eyes.Kind, Is.EqualTo("object"));
         Assert.That(eyes.Confidence, Is.GreaterThan(0.5));
         Assert.That(eyes.Box.Width, Is.GreaterThan(0.3));
-        Assert.That(VisualHostCatalog.HolisticObservations(null, 400, 400, new PoseGestures.WaveDetector(), TimeSpan.Zero), Is.Empty);
+        Assert.That(HolisticVisualAgent.Observations(null, 400, 400, new PoseGestures.WaveDetector(), TimeSpan.Zero), Is.Empty);
     }
 }
 
@@ -267,9 +267,9 @@ public class UnitTestHolisticVisualAgentNative
         using var bgr = Emgu.CV.CvInvoke.Imread(Path.Combine(AppContext.BaseDirectory, file), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
         HolisticResult result = HolisticImageInput.Track(tracker, bgr);
         Assert.That(result, Is.Not.Null, file);
-        var observations = VisualHostCatalog.HolisticObservations(result, bgr.Width, bgr.Height, null, TimeSpan.Zero);
+        var observations = HolisticVisualAgent.Observations(result, bgr.Width, bgr.Height, null, TimeSpan.Zero);
         TestContext.Out.WriteLine(file + ": " + string.Join(", ", observations.Select(o => $"{o.Label} {o.Confidence:0.00}")));
-        Assert.That(observations.Where(o => o.Confidence >= 0.5 && VisualHostCatalog.HolisticClasses.Contains(o.Label)).Select(o => o.Label),
+        Assert.That(observations.Where(o => o.Confidence >= 0.5 && VisualClasses.HolisticClasses.Contains(o.Label)).Select(o => o.Label),
             Is.EquivalentTo(expected), file);
     }
 }

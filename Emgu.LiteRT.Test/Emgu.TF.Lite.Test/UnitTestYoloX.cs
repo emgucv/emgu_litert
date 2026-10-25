@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Emgu.LiteRT.Util;
 using Emgu.LiteRT.Models;
 using NUnit.Framework;
+using Emgu.LiteRT.LM.Agents.Vision;
 
 namespace Emgu.TF.Lite.Test;
 
@@ -17,9 +18,9 @@ public class UnitTestYoloX
     [Test]
     public void ClassesMatchTheVisualHost()
     {
-        Assert.That(YoloX.Labels, Is.EqualTo(Maui.Demo.Lite.VisualHostCatalog.Classes));
-        Assert.That(Maui.Demo.Lite.VisualHostCatalog.YoloXDetector().Id,
-            Is.Not.EqualTo(Maui.Demo.Lite.VisualHostCatalog.Detector().Id));
+        Assert.That(YoloX.Labels, Is.EqualTo(VisualClasses.ObjectClasses));
+        Assert.That(CocoVisualAgent.Describe(yoloX: true).Id,
+            Is.Not.EqualTo(CocoVisualAgent.Describe().Id));
     }
     private static void Prediction(float[] data, int row, float x, float y, float w, float h, int label, float score)
     {

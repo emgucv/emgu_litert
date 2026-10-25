@@ -355,7 +355,7 @@ See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HIS
   Attach an image and ask to detect/count its objects to use the same visual agent once, without monitoring or sounds.
   YOLO, faces, OCR, plate recognition, individual tracking, saved rules and background monitoring are not included yet.
   The reusable `Emgu.LiteRT.LM.Agents.Vision` and `.Events` contracts have no MAUI/Emgu CV dependencies;
-  `CocoVisualAgent` and `CameraChimeAction` are host adapters. See [Visual agent workflow](VISUAL_AGENT_WORKFLOW.md)
+  the visual agents (`CocoVisualAgent`...) are `Emgu.LiteRT.LM.Agents.CV`'s, on Emgu CV; `CameraChimeAction` is a host adapter. See [Visual agent workflow](VISUAL_AGENT_WORKFLOW.md)
   for the chat-to-action walkthrough, and the Agents package README for extension points.
 - Settings → Context window (Gemma 4) sets how much of a chat the model keeps in mind: Automatic (8k tokens on a
   Mac or PC, 4k on a phone), 4k, 8k, 16k or 32k. A larger window summarizes the chat less often, but reading it again

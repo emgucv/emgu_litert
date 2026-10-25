@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<Project>
+ <PropertyGroup>
+ 
+    <!-- Managed code with no platform parts: netstandard2.0 only. On a phone it runs with Emgu.LiteRT.Models.CV's and Emgu CV's own
+         platform builds, which an app gets from those packages. -->
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+
+    <PackageId>${EMGU_LITERT_LM_AGENTS_CV_NUGET_ID}</PackageId>
+	<title>${EMGU_LITERT_LM_AGENTS_CV_NUGET_TITLE}</title>
+    <version>${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>Ready-made visual agents for Emgu.LiteRT.LM.Agents' camera monitors on the Emgu.LiteRT.Models.CV detectors: COCO objects, MediaPipe hand gestures, body postures, face expressions and the holistic combinations</summary>
+    <Description>Visual agents (IVisualAgent) that let a chat agent's camera monitors watch for COCO objects (COCO SSD MobileNet V3 or YOLOX-Nano), MediaPipe hand gestures (thumb up, victory...), body postures (hand raised, waving, sitting...), face expressions (smiling, winking...) and what the body, hands and face show together (hand raised and smiling, covering the eyes...), with the words people and language models use for those classes, for reading a monitor's label. Needs an Emgu CV runtime package.</Description>
+    <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM Agents CV, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html</PackageReleaseNotes>
+	
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\platforms\nuget))</PackageOutputPath>
+	<PackageTags>litert litert-lm agents visual-agents camera mediapipe gestures pose face emgu emgutf emgucv ai</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+    
+ </PropertyGroup>
+ 
+    <ItemGroup>
+      <None Include="..\..\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="..\..\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+	
+  <!-- https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022 -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />	
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />	
+</Project>

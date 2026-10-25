@@ -103,7 +103,7 @@ public class UnitTestFaceVisualAgent
     [TestCase("face: wink", "winking")]
     public void TheWordsForAnExpressionFindItsClass(string said, string expression)
     {
-        Assert.That(VisualHostCatalog.CanonicalExpression(said), Is.EqualTo(expression));
+        Assert.That(VisualClasses.CanonicalExpression(said), Is.EqualTo(expression));
     }
 
     [TestCase("person")]
@@ -117,7 +117,7 @@ public class UnitTestFaceVisualAgent
     [TestCase(null)]
     public void OtherWordsAreNotExpressions(string said)
     {
-        Assert.That(VisualHostCatalog.CanonicalExpression(said), Is.Null);
+        Assert.That(VisualClasses.CanonicalExpression(said), Is.Null);
     }
 
     [TestCase("Take a picture when I smile", "smiling")]
@@ -135,42 +135,42 @@ public class UnitTestFaceVisualAgent
     [TestCase(null, null)]
     public void TheRequestNamesAnExpressionInSoManyWords(string request, string expression)
     {
-        Assert.That(VisualHostCatalog.ExpressionFromRequest(request), Is.EqualTo(expression));
+        Assert.That(VisualClasses.ExpressionFromRequest(request), Is.EqualTo(expression));
     }
 
     [Test]
     public void ALabelThatIsNoClassFallsBackToWhatTheUserAsked()
     {
-        Assert.That(VisualHostCatalog.ExpressionForMonitor("smile", "Beep when I wink"), Is.EqualTo("smiling"));
-        Assert.That(VisualHostCatalog.ExpressionForMonitor("person", "Take a picture when I smile"), Is.EqualTo("smiling"));
-        Assert.That(VisualHostCatalog.ExpressionForMonitor("face-expression", "Beep when I close my eyes"), Is.EqualTo("eyes closed"));
-        Assert.That(VisualHostCatalog.ExpressionForMonitor("face", "Take a picture when she opens her mouth"), Is.EqualTo("mouth open"));
+        Assert.That(VisualClasses.ExpressionForMonitor("smile", "Beep when I wink"), Is.EqualTo("smiling"));
+        Assert.That(VisualClasses.ExpressionForMonitor("person", "Take a picture when I smile"), Is.EqualTo("smiling"));
+        Assert.That(VisualClasses.ExpressionForMonitor("face-expression", "Beep when I close my eyes"), Is.EqualTo("eyes closed"));
+        Assert.That(VisualClasses.ExpressionForMonitor("face", "Take a picture when she opens her mouth"), Is.EqualTo("mouth open"));
         // Another agent's class or posture words stay theirs.
-        Assert.That(VisualHostCatalog.ExpressionForMonitor("dog", "Beep when the dog opens its mouth"), Is.Null);
-        Assert.That(VisualHostCatalog.ExpressionForMonitor("thumbs up", "Take a picture when I smile and give a thumbs up"), Is.Null);
-        Assert.That(VisualHostCatalog.ExpressionForMonitor("waving", "Beep when I smile and wave"), Is.Null);
-        Assert.That(VisualHostCatalog.ExpressionForMonitor("person", "Take a picture when someone raises their hand"), Is.Null);
-        Assert.That(VisualHostCatalog.ExpressionForMonitor("person", "Take a picture when you see a person"), Is.Null);
+        Assert.That(VisualClasses.ExpressionForMonitor("dog", "Beep when the dog opens its mouth"), Is.Null);
+        Assert.That(VisualClasses.ExpressionForMonitor("thumbs up", "Take a picture when I smile and give a thumbs up"), Is.Null);
+        Assert.That(VisualClasses.ExpressionForMonitor("waving", "Beep when I smile and wave"), Is.Null);
+        Assert.That(VisualClasses.ExpressionForMonitor("person", "Take a picture when someone raises their hand"), Is.Null);
+        Assert.That(VisualClasses.ExpressionForMonitor("person", "Take a picture when you see a person"), Is.Null);
         // An expression label isn't taken for a posture by the pose agent's fallback.
-        Assert.That(VisualHostCatalog.PostureForMonitor("smiling", "Beep when I stand up and smile"), Is.Null);
+        Assert.That(VisualClasses.PostureForMonitor("smiling", "Beep when I stand up and smile"), Is.Null);
     }
 
     [Test]
     public void TheExpressionClassesAreTheAgentsAndDontOverlapOthers()
     {
-        Assert.That(VisualHostCatalog.FaceClasses, Is.EqualTo(new[] { "smiling", "eyes closed", "winking", "mouth open", "eyebrows raised" }));
-        Assert.That(VisualHostCatalog.FaceClasses, Is.Unique);
-        foreach (string expression in VisualHostCatalog.FaceClasses)
+        Assert.That(VisualClasses.FaceClasses, Is.EqualTo(new[] { "smiling", "eyes closed", "winking", "mouth open", "eyebrows raised" }));
+        Assert.That(VisualClasses.FaceClasses, Is.Unique);
+        foreach (string expression in VisualClasses.FaceClasses)
         {
-            Assert.That(VisualHostCatalog.CanonicalExpression(expression), Is.EqualTo(expression), expression);
-            Assert.That(VisualHostCatalog.CanonicalPose(expression), Is.Null, expression);
-            Assert.That(VisualHostCatalog.CanonicalGesture(expression), Is.Null, expression);
+            Assert.That(VisualClasses.CanonicalExpression(expression), Is.EqualTo(expression), expression);
+            Assert.That(VisualClasses.CanonicalPose(expression), Is.Null, expression);
+            Assert.That(VisualClasses.CanonicalGesture(expression), Is.Null, expression);
         }
-        Assert.That(VisualHostCatalog.Classes.Intersect(VisualHostCatalog.FaceClasses), Is.Empty);
-        Assert.That(VisualHostCatalog.Gestures.Intersect(VisualHostCatalog.FaceClasses), Is.Empty);
-        Assert.That(VisualHostCatalog.PoseClasses.Intersect(VisualHostCatalog.FaceClasses), Is.Empty);
-        foreach (string other in VisualHostCatalog.Gestures.Concat(VisualHostCatalog.PoseClasses))
-            Assert.That(VisualHostCatalog.CanonicalExpression(other), Is.Null, other);
+        Assert.That(VisualClasses.ObjectClasses.Intersect(VisualClasses.FaceClasses), Is.Empty);
+        Assert.That(VisualClasses.Gestures.Intersect(VisualClasses.FaceClasses), Is.Empty);
+        Assert.That(VisualClasses.PoseClasses.Intersect(VisualClasses.FaceClasses), Is.Empty);
+        foreach (string other in VisualClasses.Gestures.Concat(VisualClasses.PoseClasses))
+            Assert.That(VisualClasses.CanonicalExpression(other), Is.Null, other);
     }
 
     private sealed class FakeAgent(VisualAgentDescriptor descriptor) : IVisualAgent
@@ -185,17 +185,17 @@ public class UnitTestFaceVisualAgent
     public void AMonitorForAnExpressionSelectsTheFaceAgent()
     {
         var agents = new VisualAgentRegistry();
-        agents.Register(new FakeAgent(VisualHostCatalog.Detector()));
-        agents.Register(new FakeAgent(VisualHostCatalog.HandDetector()));
-        agents.Register(new FakeAgent(VisualHostCatalog.PoseDescriptor()));
-        agents.Register(new FakeAgent(VisualHostCatalog.FaceDescriptor()));
-        foreach (string expression in VisualHostCatalog.FaceClasses)
+        agents.Register(new FakeAgent(CocoVisualAgent.Describe()));
+        agents.Register(new FakeAgent(HandVisualAgent.Describe()));
+        agents.Register(new FakeAgent(PoseVisualAgent.Describe()));
+        agents.Register(new FakeAgent(FaceVisualAgent.Describe()));
+        foreach (string expression in VisualClasses.FaceClasses)
             Assert.That(agents.SelectObjects(expression).Descriptor.Id, Is.EqualTo("face-expression"), expression);
         Assert.That(agents.SelectObjects("waving").Descriptor.Id, Is.EqualTo("body-pose"));
         Assert.That(agents.SelectObjects("person").Descriptor.Id, Is.EqualTo("coco-ssd-mobilenet-v3"));
         var descriptor = agents.Describe().Single(d => d.Id == "face-expression");
         Assert.That(descriptor.Capabilities, Does.Contain("object_detection").And.Contain("face_expression"));
-        Assert.That(descriptor.ObjectClasses, Is.EquivalentTo(VisualHostCatalog.FaceClasses));
+        Assert.That(descriptor.ObjectClasses, Is.EquivalentTo(VisualClasses.FaceClasses));
     }
 
     [Test]
@@ -204,7 +204,7 @@ public class UnitTestFaceVisualAgent
         var landmarks = Enumerable.Range(0, FaceTracker.LandmarkCount)
             .Select(i => new[] { 0.3f + 0.4f * (i % 10) / 9, 0.2f + 0.5f * (i / 10 % 10) / 9, 0f }).ToArray();
         var face = new FaceForTest(landmarks, Scores(("mouthSmileLeft", 0.9f), ("mouthSmileRight", 0.9f))).Face;
-        var observation = VisualHostCatalog.FaceObservations(face).Single();
+        var observation = FaceVisualAgent.Observations(face).Single();
         Assert.That(observation.Kind, Is.EqualTo("object"));
         Assert.That(observation.Label, Is.EqualTo("smiling"));
         Assert.That(observation.Confidence, Is.EqualTo(0.9).Within(1e-6));
@@ -212,7 +212,7 @@ public class UnitTestFaceVisualAgent
         Assert.That(observation.Box.Y, Is.EqualTo(0.2).Within(1e-6));
         Assert.That(observation.Box.Width, Is.EqualTo(0.4).Within(1e-6));
         Assert.That(observation.Box.Height, Is.EqualTo(0.5).Within(1e-6));
-        Assert.That(VisualHostCatalog.FaceObservations(null), Is.Empty);
+        Assert.That(FaceVisualAgent.Observations(null), Is.Empty);
     }
 
     // Face's setters are internal to Emgu.LiteRT.Models; reflection builds one for the observation test.
@@ -244,7 +244,7 @@ public class UnitTestFaceVisualAgentNative
         using var bgr = Emgu.CV.CvInvoke.Imread(Path.Combine(AppContext.BaseDirectory, file), Emgu.CV.CvEnum.ImreadModes.ColorBgr);
         var faces = FaceImageInput.Track(tracker, bgr);
         Assert.That(faces.Count, Is.EqualTo(1), file);
-        var observations = VisualHostCatalog.FaceObservations(faces[0]);
+        var observations = FaceVisualAgent.Observations(faces[0]);
         TestContext.Out.WriteLine(file + ": " + string.Join(", ", observations.Select(o => $"{o.Label} {o.Confidence:0.00}")));
         Assert.That(observations.Where(o => o.Confidence >= 0.5).Select(o => o.Label), Is.EqualTo(expected), file);
         // The box is the face, inside the image.

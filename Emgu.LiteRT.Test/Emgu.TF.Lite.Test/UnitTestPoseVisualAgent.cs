@@ -181,7 +181,7 @@ public class UnitTestPoseVisualAgent
     [TestCase("body pose: standing", "standing")]
     public void TheWordsForAPostureFindItsClass(string said, string pose)
     {
-        Assert.That(VisualHostCatalog.CanonicalPose(said), Is.EqualTo(pose));
+        Assert.That(VisualClasses.CanonicalPose(said), Is.EqualTo(pose));
     }
 
     [TestCase("person")]
@@ -195,7 +195,7 @@ public class UnitTestPoseVisualAgent
     [TestCase(null)]
     public void OtherWordsAreNotPostures(string said)
     {
-        Assert.That(VisualHostCatalog.CanonicalPose(said), Is.Null);
+        Assert.That(VisualClasses.CanonicalPose(said), Is.Null);
     }
 
     [TestCase("Say hello when someone raises their hand.", "hand raised")]
@@ -216,38 +216,38 @@ public class UnitTestPoseVisualAgent
     [TestCase(null, null)]
     public void TheRequestNamesAPostureInSoManyWords(string request, string pose)
     {
-        Assert.That(VisualHostCatalog.PoseFromRequest(request), Is.EqualTo(pose));
+        Assert.That(VisualClasses.PoseFromRequest(request), Is.EqualTo(pose));
     }
 
     [Test]
     public void ALabelThatIsNoClassFallsBackToWhatTheUserAsked()
     {
         // The words are a posture: used as they are, whatever the request says.
-        Assert.That(VisualHostCatalog.PostureForMonitor("waving", "Beep when I sit down"), Is.EqualTo("waving"));
+        Assert.That(VisualClasses.PostureForMonitor("waving", "Beep when I sit down"), Is.EqualTo("waving"));
         // The agent's name or the person class, where the request names a posture (what Gemma 4 E2B did).
-        Assert.That(VisualHostCatalog.PostureForMonitor("body-pose", "Say hello when someone raises their hand."), Is.EqualTo("hand raised"));
-        Assert.That(VisualHostCatalog.PostureForMonitor("person", "Take a picture when the person is lying down."), Is.EqualTo("lying down"));
-        Assert.That(VisualHostCatalog.PostureForMonitor("", "Beep when I stand up"), Is.EqualTo("standing"));
-        Assert.That(VisualHostCatalog.PostureForMonitor("raising hand", "x"), Is.EqualTo("hand raised"));
+        Assert.That(VisualClasses.PostureForMonitor("body-pose", "Say hello when someone raises their hand."), Is.EqualTo("hand raised"));
+        Assert.That(VisualClasses.PostureForMonitor("person", "Take a picture when the person is lying down."), Is.EqualTo("lying down"));
+        Assert.That(VisualClasses.PostureForMonitor("", "Beep when I stand up"), Is.EqualTo("standing"));
+        Assert.That(VisualClasses.PostureForMonitor("raising hand", "x"), Is.EqualTo("hand raised"));
         // An ordinary label stays, whatever else the request says: a dog that sits down is still a dog.
-        Assert.That(VisualHostCatalog.PostureForMonitor("dog", "Beep when the dog sits down"), Is.Null);
-        Assert.That(VisualHostCatalog.PostureForMonitor("thumb up", "Take a picture when I wave and show a thumb up"), Is.Null);
-        Assert.That(VisualHostCatalog.PostureForMonitor("person", "Take a picture when you see a person"), Is.Null);
+        Assert.That(VisualClasses.PostureForMonitor("dog", "Beep when the dog sits down"), Is.Null);
+        Assert.That(VisualClasses.PostureForMonitor("thumb up", "Take a picture when I wave and show a thumb up"), Is.Null);
+        Assert.That(VisualClasses.PostureForMonitor("person", "Take a picture when you see a person"), Is.Null);
         // A label that is no class at all and a request with no posture: left for the registry to refuse.
-        Assert.That(VisualHostCatalog.PostureForMonitor("something odd", "Beep when it happens"), Is.Null);
+        Assert.That(VisualClasses.PostureForMonitor("something odd", "Beep when it happens"), Is.Null);
     }
 
     [Test]
     public void ThePostureClassesAreTheAgentsAndDontOverlapOthers()
     {
-        Assert.That(VisualHostCatalog.PoseClasses, Is.EqualTo(new[] { "arms raised", "hand raised", "waving", "standing", "sitting", "lying down" }));
-        Assert.That(VisualHostCatalog.PoseClasses, Is.Unique);
-        foreach (string pose in VisualHostCatalog.PoseClasses)
-            Assert.That(VisualHostCatalog.CanonicalPose(pose), Is.EqualTo(pose), pose);
-        Assert.That(VisualHostCatalog.Classes.Intersect(VisualHostCatalog.PoseClasses), Is.Empty);
-        Assert.That(VisualHostCatalog.Gestures.Intersect(VisualHostCatalog.PoseClasses), Is.Empty);
-        foreach (string gesture in VisualHostCatalog.Gestures)
-            Assert.That(VisualHostCatalog.CanonicalPose(gesture), Is.Null, gesture);
+        Assert.That(VisualClasses.PoseClasses, Is.EqualTo(new[] { "arms raised", "hand raised", "waving", "standing", "sitting", "lying down" }));
+        Assert.That(VisualClasses.PoseClasses, Is.Unique);
+        foreach (string pose in VisualClasses.PoseClasses)
+            Assert.That(VisualClasses.CanonicalPose(pose), Is.EqualTo(pose), pose);
+        Assert.That(VisualClasses.ObjectClasses.Intersect(VisualClasses.PoseClasses), Is.Empty);
+        Assert.That(VisualClasses.Gestures.Intersect(VisualClasses.PoseClasses), Is.Empty);
+        foreach (string gesture in VisualClasses.Gestures)
+            Assert.That(VisualClasses.CanonicalPose(gesture), Is.Null, gesture);
     }
 
     private sealed class FakeAgent(VisualAgentDescriptor descriptor) : IVisualAgent
@@ -262,23 +262,23 @@ public class UnitTestPoseVisualAgent
     public void AMonitorForAPostureSelectsThePoseAgent()
     {
         var agents = new VisualAgentRegistry();
-        agents.Register(new FakeAgent(VisualHostCatalog.Detector()));
-        agents.Register(new FakeAgent(VisualHostCatalog.HandDetector()));
-        agents.Register(new FakeAgent(VisualHostCatalog.PoseDescriptor()));
-        foreach (string pose in VisualHostCatalog.PoseClasses)
+        agents.Register(new FakeAgent(CocoVisualAgent.Describe()));
+        agents.Register(new FakeAgent(HandVisualAgent.Describe()));
+        agents.Register(new FakeAgent(PoseVisualAgent.Describe()));
+        foreach (string pose in VisualClasses.PoseClasses)
             Assert.That(agents.SelectObjects(pose).Descriptor.Id, Is.EqualTo("body-pose"), pose);
         Assert.That(agents.SelectObjects("thumb up").Descriptor.Id, Is.EqualTo("hand-gesture"));
         Assert.That(agents.SelectObjects("person").Descriptor.Id, Is.EqualTo("coco-ssd-mobilenet-v3"));
         var descriptor = agents.Describe().Single(d => d.Id == "body-pose");
         Assert.That(descriptor.Capabilities, Does.Contain("object_detection").And.Contain("body_pose"));
-        Assert.That(descriptor.ObjectClasses, Is.EquivalentTo(VisualHostCatalog.PoseClasses));
+        Assert.That(descriptor.ObjectClasses, Is.EquivalentTo(VisualClasses.PoseClasses));
     }
 
     [Test]
     public void PosturesBecomeObservationsOfTheirClassInsideTheImage()
     {
         var wave = new PoseGestures.WaveDetector();
-        var observations = VisualHostCatalog.PoseObservations(Person(p => { p[15][1] = 0.1f; }), W, H, wave, TimeSpan.Zero).ToArray();
+        var observations = PoseVisualAgent.Observations(Person(p => { p[15][1] = 0.1f; }), W, H, wave, TimeSpan.Zero).ToArray();
         Assert.That(observations.Select(o => o.Label), Is.EquivalentTo(new[] { "hand raised", "standing" }));
         foreach (var o in observations)
         {
@@ -288,12 +288,12 @@ public class UnitTestPoseVisualAgent
             Assert.That(o.Box.X + o.Box.Width, Is.LessThanOrEqualTo(1.0 + 1e-9));
             Assert.That(o.Box.Y + o.Box.Height, Is.LessThanOrEqualTo(1.0 + 1e-9));
         }
-        Assert.That(VisualHostCatalog.PoseObservations((float[][])null, W, H, wave, TimeSpan.Zero), Is.Empty);
+        Assert.That(PoseVisualAgent.Observations((float[][])null, W, H, wave, TimeSpan.Zero), Is.Empty);
         // Waving is reported through the same path, once the swings have been seen.
         var detector = new PoseGestures.WaveDetector();
         IEnumerable<VisualObservation> last = null;
         for (int i = 0; i < 5; i++)
-            last = VisualHostCatalog.PoseObservations(Person(p => { p[16][0] = i % 2 == 0 ? 0.6f : 0.7f; p[16][1] = 0.1f; }), W, H, detector, TimeSpan.FromSeconds(i * 0.2));
+            last = PoseVisualAgent.Observations(Person(p => { p[16][0] = i % 2 == 0 ? 0.6f : 0.7f; p[16][1] = 0.1f; }), W, H, detector, TimeSpan.FromSeconds(i * 0.2));
         Assert.That(last.Select(o => o.Label), Does.Contain("waving"));
         var condition = new ObjectCountCondition("waving", 1, 0.5);
         var frame = new VisualFrame(new byte[12], 2, 2, 6, "camera", 1, DateTimeOffset.Now, TimeSpan.FromSeconds(1));
@@ -315,7 +315,7 @@ public class UnitTestPoseVisualAgentNative
             using var bgr = UnitTestPoseTrackerNative.Variant(source, variant);
             var poses = PoseImageInput.Track(tracker, bgr);
             Assert.That(poses.Count, Is.EqualTo(1), variant);
-            return VisualHostCatalog.PoseObservations(poses[0], bgr.Width, bgr.Height, new PoseGestures.WaveDetector(), TimeSpan.Zero).Select(o => o.Label).ToArray();
+            return PoseVisualAgent.Observations(poses[0], bgr.Width, bgr.Height, new PoseGestures.WaveDetector(), TimeSpan.Zero).Select(o => o.Label).ToArray();
         }
         // Arms out sideways at shoulder height and a lunge: no raised hand, and the legs are neither standing nor sitting - in any copy of it.
         foreach (string variant in new[] { "original", "flip", "far", "crop" })

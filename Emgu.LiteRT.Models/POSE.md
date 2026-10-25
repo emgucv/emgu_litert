@@ -84,7 +84,7 @@ Not measured: the Pixel Fold, the M1 (the tests ran, without timing), the Metal 
 
 ## The visual agent (TODO item 52)
 
-`body-pose` (`PoseVisualAgent.cs`, `VisualHostCatalog.PoseDescriptor`; the geometry is `Emgu.LiteRT.Models/PoseGestures.cs`) makes six postures the
+`body-pose` (`PoseVisualAgent`, in `Emgu.LiteRT.LM.Agents.CV`, `PoseVisualAgent.Describe`; the geometry is `Emgu.LiteRT.Models/PoseGestures.cs`) makes six postures the
 object classes of the camera monitors, the way `hand-gesture` does for hands, so "take a picture when you see me waving" is an ordinary monitor with
 every action (chime, speech, snapshot, photo, clip). It runs the lite model on the CPU, analysing the camera's frames (about 5 a second) one person at a time.
 
@@ -105,7 +105,7 @@ Gemma 4 E2B on a Galaxy S10 (GPU), the prompt and what it made: "Beep when you s
 "beep"); "Beep when I stand up" - `standing`; "Say hello when someone raises their hand" - first the agent's own name as the label, then, with the
 instructions changed to say raising a hand is not a hand gesture and the camera keywords widened, still `body-pose`; "Take a picture when the person is lying down" -
 the `person` class. So the host now reads the request itself when the label is no posture and is a mistake - the person class, an agent's name, or
-nothing that is a class of any agent (`VisualHostCatalog.PostureForMonitor` / `PoseFromRequest`: unmistakable phrases only, so "stands at the door" stays a
+nothing that is a class of any agent (`VisualClasses.PostureForMonitor` / `PoseFromRequest`: unmistakable phrases only, so "stands at the door" stays a
 person and "the dog sits down" a dog); after that both gave `hand raised` and `lying down`. Frames fed from the test photo: the monitor for "lying
 down" stayed quiet on an empty image and on the upright warrior pose, started on the photo turned a quarter and ended when it went away, taking its
 snapshot. Not run: a real person on a live camera - so nothing says how well the rules hold up on real webcam views (legs cut off at the desk, a
