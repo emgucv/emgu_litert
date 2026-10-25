@@ -69,9 +69,10 @@ namespace Emgu.LiteRT.Models
         {
             if (imageWidth < 1 || imageHeight < 1) throw new ArgumentOutOfRangeException(nameof(imageWidth));
             var readings = new List<HolisticReading>();
-            PoseReading waving = wave?.Update(time, result?.Pose?.Landmarks, imageWidth, imageHeight);
-            if (result?.Pose == null) return readings;
-            var postures = PoseGestures.Classify(result.Pose.Landmarks, imageWidth, imageHeight).Select(p => (p.Name, p.Score)).ToList();
+            float[][] body = WithHandsFound(result, imageWidth, imageHeight);
+            PoseReading waving = wave?.Update(time, body, imageWidth, imageHeight);
+            if (body == null) return readings;
+            var postures = PoseGestures.Classify(body, imageWidth, imageHeight).Select(p => (p.Name, p.Score)).ToList();
             if (waving != null) postures.Add((waving.Name, waving.Score));
             var expressions = result.Face == null ? new List<(string Name, float Score)>()
                 : FaceExpressions.Classify(result.Face, 0).Select(e => (e.Name, e.Score)).ToList();
@@ -84,6 +85,33 @@ namespace Emgu.LiteRT.Models
                     readings.Add(new HolisticReading { Name = Combine(p.Name, e.Name), Score = Math.Min(p.Score, e.Score) });
             readings.RemoveAll(r => r.Score < minScore);
             return readings;
+        }
+
+        /// <summary>
+        /// The pose's landmarks with the visibility of each wrist whose hand wasn't found set to 0, so the postures and waving go by the hands the
+        /// hand model sees: a wrist out of the picture or hidden is a guess, and in video mode the pose model can move such a wrist up by the face or
+        /// onto the other hand and keep it there (HOLISTIC.md). When both hands are the same hand (their wrists within half a hand's length of each
+        /// other, as when the guessed wrist's region lands on the other hand), it belongs to the arm whose wrist is nearer. Null without a pose.
+        /// </summary>
+        public static float[][] WithHandsFound(HolisticResult result, int imageWidth, int imageHeight)
+        {
+            float[][] pose = result?.Pose?.Landmarks;
+            if (pose == null) return null;
+            float[][] left = result.LeftHand?.Landmarks, right = result.RightHand?.Landmarks;
+            double Distance(float[] a, float[] b) => Math.Sqrt(Math.Pow((a[0] - b[0]) * imageWidth, 2) + Math.Pow((a[1] - b[1]) * imageHeight, 2));
+            const int Wrist = 0, MiddleKnuckle = 9;
+            if (left != null && right != null && Distance(left[Wrist], right[Wrist]) < Distance(left[Wrist], left[MiddleKnuckle]) / 2)
+            {
+                if (Distance(pose[HolisticTracker.LeftHandPose[0]], left[Wrist]) <= Distance(pose[HolisticTracker.RightHandPose[0]], right[Wrist]))
+                    right = null;
+                else
+                    left = null;
+            }
+            if (left != null && right != null) return pose;
+            float[][] body = pose.Select(p => (float[])p.Clone()).ToArray();
+            if (left == null) body[HolisticTracker.LeftHandPose[0]][3] = 0;
+            if (right == null) body[HolisticTracker.RightHandPose[0]][3] = 0;
+            return body;
         }
 
         /// <summary>The scores of <see cref="InteractionNames"/> (0 when a part they need wasn't found).</summary>

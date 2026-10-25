@@ -189,9 +189,19 @@ tried on a Pixel Fold (2026-10-25) and worked.
 
 **One thing tracking makes worse, in MediaPipe too:** in the raised-hand video both MediaPipe's video mode and ours move the lowered arm's wrist up by
 the face after about two seconds (from 26 px below the shoulder to 140 px above), and keep it there, since the detector never runs again while the
-body is tracked; read one by one, the wrist stays below the shoulder. So "arms raised" was read in 29 of those 90 frames where one hand was up, and
-the sway's turning made the raised hand read as waving in 15 more. On the covered-eyes video tracking helped: a stray "hand over mouth" in 1 frame
-against 13. The agent and the live page use the video mode.
+body is tracked; read one by one, the wrist stays below the shoulder. So the postures read "arms raised" in 29 of those 90 frames where one hand was
+up, and waving in 15 more. That wrist is a guess: the picture ends at the chest, so it is outside it, and the pose model's presence for it is low
+in both modes (0.03-0.10 frame by frame, 0.07-0.51 tracked) - but its visibility, which the postures go by, climbs from 0.18-0.43 to 0.83 tracked.
+In the frames where the hand model found a hand for it (16 of 90, MediaPipe 17), that hand was the raised hand again (0 px apart). So the holistic
+postures go by the hands found (`HolisticGestures.WithHandsFound`): a wrist whose hand wasn't found doesn't count as raised or waving, and two
+"hands" whose wrists are within half a hand's length are one, the arm's with the nearer wrist. On that video: "arms raised" in 0 frames, "hand
+raised" in 89 of 90, waving in 0; the other three videos read the same as before. Presence didn't separate the arms (the raised wrist's was 0.08-0.49
+too). Re-running the detector didn't help either (measured 2026-10-25): the tracked region does grow on that video - to 1.46 times the
+detector's (overlap 0.47) after three seconds, against 0.89-1.09 (overlap 0.78 or more) on the other three -, but after taking the detector's region
+(and starting the filters again) the next tracked frame already put the wrist back up; every 5, 10 or 15 frames, it read "arms raised" in 0-16 frames
+and waving in 0-39, and the other videos never swapped. So the tracking stays MediaPipe's. Read one by one, a hand is found in fewer frames, so
+"hand raised" there drops from 67 to 33 of 90. On the covered-eyes video tracking helped: a stray "hand over mouth" in 1 frame against 13. The agent
+and the live page use the video mode.
 
 **Tests**: `UnitTestHolisticTracker` (model-free: the one-euro filter against a hand calculation, the smoother, the palm region and its turn, the
 face region from landmarks, the keep rules) and `UnitTestHolisticTrackerNative.TheVideoModeMatchesMediaPipesOnAMovingPerson` (MediaPipe's video
@@ -207,7 +217,7 @@ the camera monitors (`HolisticGestures`, in this library):
 
 - **Combinations**: every posture of the body-pose agent with every expression of the face-expression agent, posture first - "hand raised and smiling",
   "waving and smiling", "arms raised and mouth open"... (30 classes; the score is the lower of the two). So "take a picture when I raise my hand and smile"
-  is an ordinary monitor. Gestures (thumb up...) aren't combined: the holistic bundle has no gesture classifier.
+  is an ordinary monitor. A raised or waving wrist counts only with its hand found (`WithHandsFound`, above). Gestures (thumb up...) aren't combined: the holistic bundle has no gesture classifier.
 - **Interactions**: `covering eyes` (peekaboo), `hand over mouth`, `hand on face`.
 
 The plain postures and expressions stay with the body-pose (26 ms a frame on a Galaxy S10) and face-expression (8 ms) agents, registered before this one
@@ -245,7 +255,8 @@ interaction the request names), checked before the face and pose fallbacks, whic
 right holistic class, and "Take a picture when I smile" / "Beep when I raise my hand" stayed `smiling` (face-expression) and `hand raised` (body-pose).
 The planner's instructions moved to `Maui.Demo.Lite.Core` (`VisualHostCatalog.PlannerInstructions`) so the model check uses the app's text.
 
-**Tests**: `UnitTestHolisticVisualAgent` (model-free: the hull and distances, the interactions and a combination on made-up landmarks, the classes,
+**Tests**: `UnitTestHolisticVisualAgent` (model-free: the hull and distances, the interactions and a combination on made-up landmarks, a raised wrist
+without its hand or with the other's, the classes,
 the words, the requests, the routing and agent selection, the observations) and `UnitTestHolisticVisualAgentNative` (the synthetic pictures above).
 
 ## Not done yet
@@ -253,5 +264,5 @@ the words, the requests, the routing and agent selection, the observations) and 
 - Real people: everything here was checked on synthetic pictures, their copies and videos made from them - the live camera and the agent haven't had
   a person in front of them on the Mac, and the agent not on a phone either (the Holistic page's live camera worked on a Pixel Fold, with no
   figures taken).
-- The video mode's speed on the phones, and a way out of a wrong guess it keeps (such as re-running the detector now and then, which MediaPipe
-  doesn't do).
+- The video mode's speed on the phones. Its kept wrong guess of a hidden wrist is handled in the postures, not in the tracking (above); the body's
+  landmarks themselves still show it, as MediaPipe's do.

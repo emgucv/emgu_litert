@@ -578,7 +578,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   `baby`, `hand_gesture`, `face-expression` for four of five such requests); checked with Gemma on an M1 and on synthetic pictures, not yet with a
   real person or on a phone (`Emgu.LiteRT.Models/HOLISTIC.md`). Its frames, and the Holistic page's live camera, go through MediaPipe's video
   mode (tracked and smoothed from frame to frame by their timestamps): steadier hands and a covered-eyes video with 1 stray "hand over mouth"
-  instead of 13, but, as in MediaPipe, a wrong guess for an arm can stick while the body is tracked.
+  instead of 13. As in MediaPipe, a wrong guess for a hidden wrist can stick while the body is tracked, so a raised or waving wrist counts only
+  with its hand found: on a video with one hand up, "arms raised" in 0 of 90 frames instead of 29, waving in 0 instead of 15.
 - Alert sounds (TODO item 53): `AlertSoundLibrary` (`Emgu.LiteRT.LM.Agents.Audio`, with `AlertAudioCoordinator`, which keeps
   alert sounds and spoken replies from talking over each other) holds two synthesized built-in sounds - white noise and a
   music-box lullaby (`tools/make_alert_sounds.py`) - and the user's own, added from a file or recorded in Settings > "Alert

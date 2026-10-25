@@ -104,11 +104,31 @@ public class UnitTestHolisticVisualAgent
         var smile = new float[FaceTracker.BlendshapeCount];
         smile[FaceTracker.IndexOfBlendshape("mouthSmileLeft")] = smile[FaceTracker.IndexOfBlendshape("mouthSmileRight")] = 0.8f;
         var face = new Face { Landmarks = Enumerable.Range(0, FaceTracker.LandmarkCount).Select(i => new[] { (165 + 70 * (i % 10) / 9f) / 400, (80 + 80 * (i / 10 % 10) / 9f) / 400, 0f }).ToArray(), Blendshapes = smile };
-        var readings = HolisticGestures.Classify(new HolisticResult(new Pose { Landmarks = body }, null, null, face), 400, 400).ToDictionary(r => r.Name, r => r.Score);
+        // The raised hand found (its wrist, landmark 0, at (275, 30), by the pose's wrist); the lowered one not.
+        var readings = HolisticGestures.Classify(new HolisticResult(new Pose { Landmarks = body }, null, HandAt(300, 60), face), 400, 400).ToDictionary(r => r.Name, r => r.Score);
         Assert.That(readings.Keys, Does.Contain("hand raised").And.Contain("smiling").And.Contain("hand raised and smiling"));
         Assert.That(readings["hand raised and smiling"], Is.EqualTo(Math.Min(readings["hand raised"], readings["smiling"])));
         Assert.That(readings.Keys.Where(k => k.Contains(" and ")), Is.EqualTo(new[] { "hand raised and smiling" }));
         Assert.That(HolisticGestures.Classify(null, 400, 400), Is.Empty);
+    }
+
+    // A wrist goes by its hand: raised with no hand found (out of the picture, or a guess the video mode keeps), or with the other arm's hand, it isn't.
+    [Test]
+    public void ARaisedWristNeedsItsOwnHand()
+    {
+        var body = Body();
+        body[15] = new[] { 115f / 400, 60f / 400, 0f, 0.9f, 1f };   // both wrists above the head
+        body[16] = new[] { 285f / 400, 60f / 400, 0f, 0.9f, 1f };
+        string[] Postures(Hand left, Hand right) => HolisticGestures.Classify(new HolisticResult(new Pose { Landmarks = body }, left, right, null), 400, 400)
+            .Select(r => r.Name).Where(PoseGestures.Names.Contains).ToArray();
+        Assert.That(Postures(HandAt(140, 60), HandAt(300, 60)), Does.Contain("arms raised"));
+        Assert.That(Postures(null, HandAt(300, 60)), Does.Contain("hand raised").And.Not.Contain("arms raised"));
+        Assert.That(Postures(null, null), Does.Not.Contain("hand raised").And.Not.Contain("arms raised"));
+        // Both hands the same hand, by the right wrist: it is the right arm's.
+        float[][] only = HolisticGestures.WithHandsFound(new HolisticResult(new Pose { Landmarks = body }, HandAt(302, 61), HandAt(300, 60), null), 400, 400);
+        Assert.That((only[15][3], only[16][3]), Is.EqualTo((0f, 0.9f)));
+        Assert.That(Postures(HandAt(302, 61), HandAt(300, 60)), Does.Contain("hand raised").And.Not.Contain("arms raised"));
+        Assert.That(body[15][3], Is.EqualTo(0.9f), "the result's landmarks are left as they are");
     }
 
     [Test]
