@@ -7,6 +7,7 @@ using Emgu.LiteRT.LM.Models;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Chat;
 
 namespace Maui.Demo.Lite;
 
@@ -411,7 +412,7 @@ public partial class LiteRtLmChatPage
                 return;
             if (_voiceState != VoiceState.Speaking)
                 SetVoiceState(VoiceState.Speaking);
-            _voiceCaption.Text = ReplySpeech.CleanForSpeech(text);
+            _voiceCaption.Text = ReplySpeechText.CleanForSpeech(text);
         };
         _replyReader = reader;
         return reader;

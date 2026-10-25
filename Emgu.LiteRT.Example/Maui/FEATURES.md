@@ -113,7 +113,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Reading replies aloud
 
-- "Read replies aloud" uses MAUI's TextToSpeech through `ReplySpeech.cs`. It picks a voice for the reply's language -
+- "Read replies aloud" uses MAUI's TextToSpeech through `Emgu.LiteRT.LM.Maui`'s `TextToSpeechReplySpeaker` (the demo's
+  own `ReplySpeech.cs` was a copy of it, removed on 2026-10-25; the monitors' spoken alerts use one too). It picks a voice for the reply's language -
   detected from the writing system most of its letters use (Han → zh, kana → ja, Hangul → ko, Cyrillic, Arabic...),
   preferring the device's own region - because the default voice read e.g. Chinese with an English voice. It strips
   Markdown, links and emoji first. Verified on a Pixel Fold: zh-CN and ja-JP voices were chosen.
@@ -476,12 +477,13 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Languages, translation and voice transcripts
 
-- `TextLanguage.cs` (TODO item 39) gives the language of a text: the script check first (`ReplySpeech.DetectLanguage`), then
-  for Latin script ML Kit's language identification on Android (`Xamarin.Google.MLKit.Language.Id`, with its bundled model:
+- `Emgu.LiteRT.LM.Maui`'s `TextLanguage` (TODO item 39) gives the language of a text: the script check first
+  (`ReplySpeechText.DetectScriptLanguage`), then for Latin script `TextLanguage.IdentifyLatin` - the demo sets it on Android to ML
+  Kit's language identification (`Services/MlKitLanguage.cs`; ML Kit stays out of the library because of the pin below), with its bundled model:
   26 of 26 test phrases right on a Galaxy S10, 2-3 ms each, short ones included) and Apple's `NLLanguageRecognizer` on iOS and
   Mac Catalyst. ML Kit's Common library needs `Xamarin.AndroidX.Fragment.Ktx` 1.9.0 pinned in the demo for Android; otherwise
   D8 fails with `FragmentKt` defined twice.
-- `ReplySpeech` uses it to pick the reading voice, and each saved user message keeps it (`MessageRecord.Language`).
+- `TextToSpeechReplySpeaker` uses it to pick the reading voice, and each saved user message keeps it (`MessageRecord.Language`).
 - Gemma 4 thinks in English whatever the language, so the opened thinking of a reply to a non-English message offers
   "Translate to <language>" (`TranslationFeature.cs`). The model translates it on request, in conversations of its own like a
   summary (the agent's conversation is released and re-read with the next message). The translation is saved with the reply
@@ -557,7 +559,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     the length of a clip: 720p H.264 MP4, with sound when the microphone is already allowed, 3-30 s. Frames keep coming at 30
     fps during a clip and pause ~0.3 s at each end.
   - The clip's card in the transcript (`LiteRtLmChatPage.VisualClips.cs`) plays it in place - Play/Pause with a progress bar,
-    through Android's `VideoView` in `InlineVideoView.cs` (no extra packages), one clip at a time, the sound monitors not
+    through Android's `VideoView` in `Emgu.LiteRT.LM.Maui`'s `InlineVideoView` (no extra packages), one clip at a time, the sound monitors not
     listening meanwhile - with Full screen (the system player), Share and Save to gallery.
   - The `take_photo` action (TODO item 44) takes a full-resolution still - the camera's largest JPEG, 12 MP on a Galaxy S10
     and a Pixel Fold - in the same session-reconfiguring way (`LiveCamera.TakePhotoAsync`; a card in
@@ -585,7 +587,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   music-box lullaby (`tools/make_alert_sounds.py`) - and the user's own, added from a file or recorded in Settings > "Alert
   sounds".
   - The `play_file` visual action and `create_sound_monitor`'s `playFile`/`playSeconds` play one, once or repeated for up to
-    300 s, through `AlertFilePlayer`, inside the sound mute. Names are matched loosely (`Find`), and a wrong one is refused
+    300 s, through `Emgu.LiteRT.LM.Maui`'s `AudioFilePlayer`, inside the sound mute. Names are matched loosely (`Find`), and a wrong one is refused
     with the list.
   - With Gemma 4 E2B, the sound group's keywords and its stub summary had to say it's for sounds heard; otherwise "play white
     noise when you see a person" went to the sound tool.
@@ -630,7 +632,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 - `record_meeting` (in the `write_document` tool group, so it adds no stub; `Emgu.LiteRT.LM.Agents`' `MeetingNotes.cs`, the
   demo's `MeetingFeature.cs`) works on Android 13+, iOS and Mac Catalyst - wherever `SpeechRecognizer` works. The call lasts
   as long as the recording.
-- Recording: `MicrophoneSoundSource` (through `MicrophoneGate`, so the sound monitors pause) feeds `MeetingAudioChunker`, which
+- Recording: `Emgu.LiteRT.LM.Maui`'s `MicrophoneSoundSource` (through `MicrophoneGate`, so the sound monitors pause) feeds `MeetingAudioChunker`, which
   cuts 30-50 s pieces at the quietest 200 ms. Each piece is written down by the platform's speech recognizer while the
   recording goes on. The card shows the end of the transcript, Pause, and Stop and write notes. On Android the monitoring
   foreground service keeps it going with the screen off; on iOS the screen is kept on.

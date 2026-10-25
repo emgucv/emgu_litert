@@ -31,7 +31,7 @@ public partial class LiteRtLmChatPage
     private async Task PlayAlertSoundAsync(AlertSound sound, int seconds, CancellationToken token)
     {
         BeginSoundMute();
-        try { await AlertFilePlayer.PlayAsync(sound.Path, seconds, token); }
+        try { await AudioFilePlayer.PlayAsync(sound.Path, seconds, token); }
         finally { EndSoundMute(); }
     }
 

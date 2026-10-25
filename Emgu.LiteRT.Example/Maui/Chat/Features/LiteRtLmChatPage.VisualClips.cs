@@ -1,6 +1,7 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 #if ANDROID
 using Emgu.LiteRT.LM.Agents.Events;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 

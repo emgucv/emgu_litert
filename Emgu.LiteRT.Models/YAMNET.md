@@ -1,7 +1,7 @@
 # YAMNet sound events (a "Sound events" page in the demo)
 
 Prototype of audio event detection for the visual agents ("tell me when the doorbell rings"). The classes are `YamNet.cs`
-(the model, WAV reading, resampling) and `YamNetClassifier.cs` (download and load), both in this folder, and in the demo (`Emgu.LiteRT.Example/Maui/`) `SoundSource.cs` and `SoundEventsPage.cs`. Tests are
+(the model, WAV reading, resampling) and `YamNetClassifier.cs` (download and load), both in this folder, the microphone in `Emgu.LiteRT.LM.Maui`'s `MicrophoneSoundSource` (an `ISoundSource`, `Emgu.LiteRT.LM.Agents/SoundInput.cs`), and in the demo (`Emgu.LiteRT.Example/Maui/`) `Audio/SoundWindower.cs` and `SoundEventsPage.cs`. Tests are
 `UnitTestYamNet` (WAV and resampling, model-free) and `UnitTestYamNetNative` (the model against Python, `yamnet_reference.json`).
 
 ## Provenance and licence
@@ -22,7 +22,7 @@ Prototype of audio event detection for the visual agents ("tell me when the door
 - Labels: a `yamnet_label_list.txt` zip appended to the flatbuffer (`YamNet.ReadLabels` reads it).
 - The shapes are static, so `CompiledModel` runs it as it is (no patching, unlike the hand classifier).
 - Streaming: a window every 7,800 samples (half a window, as YAMNet's own demo) over the last 15,600. `YamNet.Resample` is a linear interpolation, the
-  one `UnitTestYamNet` checks; the demo's microphone source on Apple platforms averages (`BoxResampler`) because a microphone runs at 44.1 or 48 kHz and
+  one `UnitTestYamNet` checks; the microphone source on Apple platforms averages (`BoxResampler`, `Emgu.LiteRT.LM.Agents`; `UnitTestSoundInput`) because a microphone runs at 44.1 or 48 kHz and
   plain interpolation would fold frequencies above 8 kHz into the band.
 
 ## Parity

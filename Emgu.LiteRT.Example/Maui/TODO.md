@@ -495,7 +495,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] Tune thresholds per sound with real recordings (smoke alarm, baby, doorbell); try other phones' microphones and noisy rooms.
 - [ ] Combined camera + sound conditions, a camera snapshot as a sound alert, and sound monitors listed beside the camera monitors.
-- [ ] Windows microphone stream; listening in the background (Android foreground service, iOS background audio).
+- [ ] Windows microphone stream (`Emgu.LiteRT.LM.Maui`'s `MicrophoneSoundSource`, `IsSupported` false on Windows); listening in the background (Android foreground service, iOS background audio).
 - [ ] Run with the camera loop and Gemma together on a phone (heat, battery) - nothing was timed together.
 - [ ] Try on iOS (the `AVAudioEngine` tap and the microphone gate are built, not run).
 

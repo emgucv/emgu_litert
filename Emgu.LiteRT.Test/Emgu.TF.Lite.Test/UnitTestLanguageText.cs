@@ -1,5 +1,6 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using System.Linq;
+using Emgu.LiteRT.LM.Chat;
 using Maui.Demo.Lite;
 using NUnit.Framework;
 
@@ -12,13 +13,13 @@ public class UnitTestLanguageText
     [Test]
     public void TagsBecomeTwoLetterCodes()
     {
-        Assert.That(LanguageText.TwoLetter("es"), Is.EqualTo("es"));
-        Assert.That(LanguageText.TwoLetter("zh-Latn"), Is.EqualTo("zh"));
-        Assert.That(LanguageText.TwoLetter("zh-Hans"), Is.EqualTo("zh"));
-        Assert.That(LanguageText.TwoLetter("PT-br"), Is.EqualTo("pt"));
-        Assert.That(LanguageText.TwoLetter("und"), Is.Null);
-        Assert.That(LanguageText.TwoLetter(""), Is.Null);
-        Assert.That(LanguageText.TwoLetter(null), Is.Null);
+        Assert.That(ReplySpeechText.TwoLetterLanguage("es"), Is.EqualTo("es"));
+        Assert.That(ReplySpeechText.TwoLetterLanguage("zh-Latn"), Is.EqualTo("zh"));
+        Assert.That(ReplySpeechText.TwoLetterLanguage("zh-Hans"), Is.EqualTo("zh"));
+        Assert.That(ReplySpeechText.TwoLetterLanguage("PT-br"), Is.EqualTo("pt"));
+        Assert.That(ReplySpeechText.TwoLetterLanguage("und"), Is.Null);
+        Assert.That(ReplySpeechText.TwoLetterLanguage(""), Is.Null);
+        Assert.That(ReplySpeechText.TwoLetterLanguage(null), Is.Null);
     }
 
     // One token per word.

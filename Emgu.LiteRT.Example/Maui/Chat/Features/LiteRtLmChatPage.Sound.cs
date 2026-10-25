@@ -28,6 +28,8 @@ public partial class LiteRtLmChatPage
     private readonly SoundWindower _soundWindower = new SoundWindower();
     private readonly Stopwatch _soundClock = Stopwatch.StartNew();
     private readonly CameraChimeAction _soundChime = new CameraChimeAction();
+    // Speaks the monitors' alert texts (the sound and camera monitors' speak_text) with a voice for their language.
+    private static readonly TextToSpeechReplySpeaker AlertVoice = new TextToSpeechReplySpeaker();
     private ISoundSource _soundSource;
 #pragma warning disable CS0649     // assigned by the temporary self-tests that replace the microphone
     private Func<ISoundSource> _soundSourceFactory;
@@ -208,12 +210,7 @@ public partial class LiteRtLmChatPage
                 ISoundSource source = null;
                 try
                 {
-                    source = _soundSourceFactory != null ? _soundSourceFactory() :
-#if ANDROID || IOS || MACCATALYST
-                        new MicrophoneSoundSource();
-#else
-                        throw new NotSupportedException("Listening isn't supported on this platform yet.");
-#endif
+                    source = _soundSourceFactory != null ? _soundSourceFactory() : new MicrophoneSoundSource();
                     source.Samples += OnSoundSamples;
                     _soundWindower.Reset();
                     if (await source.StartAsync()) { _soundSource = source; _soundStatus = "Listening through the microphone."; }
@@ -272,7 +269,7 @@ public partial class LiteRtLmChatPage
                 actions.Add(PlayAlertSoundAsync(file, monitor.PlayFileSeconds, token));
             }
             if (monitor.Chime) actions.Add(_soundChime.ExecuteAsync(null, token));
-            if (monitor.SpeakText != null) actions.Add(MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(monitor.SpeakText, token)));
+            if (monitor.SpeakText != null) actions.Add(MainThread.InvokeOnMainThreadAsync(() => AlertVoice.SpeakAsync(monitor.SpeakText, token)));
             await Task.WhenAll(actions);
         }
         finally { EndSoundMute(); }

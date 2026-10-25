@@ -5,22 +5,9 @@ using System.Text;
 
 namespace Maui.Demo.Lite;
 
-// Small text helpers of the language features (TextLanguage.cs, LiteRtLmChatPage.Translation.cs). No MAUI types: linked
-// into the tests.
+// Small text helpers of the thinking translation (TranslationFeature.cs). No MAUI types: linked into the tests.
 internal static class LanguageText
 {
-    /// <summary>
-    /// A language tag as a two-letter code: ML Kit's "zh-Latn" (romanized Chinese) is "zh", Apple's "zh-Hans" is "zh";
-    /// null for "und" (undetermined) and for nothing.
-    /// </summary>
-    public static string TwoLetter(string tag)
-    {
-        if (string.IsNullOrWhiteSpace(tag) || tag == "und")
-            return null;
-        int dash = tag.IndexOf('-');
-        return (dash > 0 ? tag.Substring(0, dash) : tag).ToLowerInvariant();
-    }
-
     /// <summary>The text in pieces of at most this many tokens, cut at line ends (a longer line is a piece of its own).</summary>
     public static List<string> SplitForTranslation(string text, int maxTokens, Func<string, int> countTokens)
     {

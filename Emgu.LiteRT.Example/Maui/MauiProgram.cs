@@ -3,6 +3,7 @@
 //----------------------------------------------------------------------------
 
 
+using Emgu.LiteRT.LM.Maui;
 using Microsoft.Extensions.Logging;
 
 namespace Maui.Demo.Lite;
@@ -34,6 +35,8 @@ public static class MauiProgram
 
 #if ANDROID
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<InlineVideoView, InlineVideoHandler>());
+        // Latin-script languages for the reading voice and the translations: ML Kit (Emgu.LiteRT.LM.Maui uses Apple's recognizer on iOS and Mac Catalyst).
+        TextLanguage.IdentifyLatin = MlKitLanguage.IdentifyAsync;
 #endif
 
 		return builder.Build();

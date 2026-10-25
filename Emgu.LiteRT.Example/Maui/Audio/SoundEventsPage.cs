@@ -3,6 +3,8 @@
 //----------------------------------------------------------------------------
 
 using System.Diagnostics;
+using Emgu.LiteRT.LM.Agents.Audio;
+using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.Models;
 
 namespace Maui.Demo.Lite;
@@ -71,11 +73,9 @@ public class SoundEventsPage : ContentPage
 
     private static Task<ISoundSource> MicrophoneSource()
     {
-#if ANDROID || IOS || MACCATALYST
+        if (!MicrophoneSoundSource.IsSupported)
+            throw new NotSupportedException("Listening isn't supported on this platform yet; try a sample.");
         return Task.FromResult<ISoundSource>(new MicrophoneSoundSource());
-#else
-        throw new NotSupportedException("Listening isn't supported on this platform yet; try a sample.");
-#endif
     }
 
     private static async Task<float[]> SpeechClipAsync()

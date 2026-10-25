@@ -191,7 +191,7 @@ namespace Emgu.LiteRT.LM.Agents.Audio
     /// (list items, headings). Code blocks and table rows are skipped - read aloud they are noise. Give it the reply's
     /// text so far each time it grows (<see cref="Add"/>) and the whole reply at the end (<see cref="Finish"/>); each call
     /// returns the pieces completed since the last. The pieces keep their Markdown, which
-    /// <see cref="ReplySpeech.CleanForSpeech"/> removes. No MAUI types, so the unit tests use it too.
+    /// Emgu.LiteRT.LM.Chat's <c>ReplySpeechText.CleanForSpeech</c> removes. No MAUI types, so the unit tests use it too.
     /// </summary>
     public sealed class SpeechSegmenter
     {

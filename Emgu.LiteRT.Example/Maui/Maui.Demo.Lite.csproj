@@ -111,7 +111,7 @@
 		<PackageReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
 		<!-- The chat page's tool servers (LiteRtLmChatPage.Mcp.cs): Emgu.LiteRT.LM.Agents.Mcp, on the Model Context Protocol SDK. -->
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.LM.Agents.Mcp\NetStandard\Emgu.LiteRT.LM.Agents.Mcp.csproj" />
-		<!-- Android: ML Kit language identification (TextLanguage.cs), the Latin-script languages the script check can't tell apart. -->
+		<!-- Android: ML Kit language identification (Services/MlKitLanguage.cs), the Latin-script languages the script check can't tell apart. -->
 		<PackageReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="Xamarin.Google.MLKit.Language.Id" Version="117.0.6.9" />
 		<!-- ML Kit's Common library brings AndroidX Fragment 1.9.0, which contains FragmentKt itself, while Fragment.Ktx 1.8.8.1
 		     (a dependency of the MAUI packages) still defines it: D8 failed with "Type androidx.fragment.app.FragmentKt is defined multiple times". -->

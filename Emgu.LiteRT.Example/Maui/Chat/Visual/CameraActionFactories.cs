@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Audio;
+using Emgu.LiteRT.LM.Chat;
 
 namespace Maui.Demo.Lite;
 
@@ -23,7 +24,7 @@ internal sealed class CameraSpeechFactory(AlertAudioCoordinator audio) : IVisual
     {
         VisualActionParameters.AllowOnly(parameters, "text");
         string text = VisualActionParameters.RequiredText(parameters, "text", 200);
-        if (string.IsNullOrWhiteSpace(ReplySpeech.CleanForSpeech(text))) throw new ArgumentException("The spoken message needs pronounceable text.");
+        if (string.IsNullOrWhiteSpace(ReplySpeechText.CleanForSpeech(text))) throw new ArgumentException("The spoken message needs pronounceable text.");
         return new VisualActionBinding(new CameraSpeechAction(audio, text), VisualActionParameters.Text(text));
     }
 }

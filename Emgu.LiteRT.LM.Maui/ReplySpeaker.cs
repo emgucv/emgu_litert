@@ -29,9 +29,8 @@ namespace Emgu.LiteRT.LM.Maui
     /// <summary>
     /// The default <see cref="IReplySpeaker"/>: MAUI's TextToSpeech reads a reply sentence by sentence while it is written
     /// (<see cref="SpeechSegmenter"/>: the answer only - no thinking, code or tables), its Markdown, links and emoji removed
-    /// (<see cref="ReplySpeechText.CleanForSpeech"/>), with a voice for its language - the writing system's
-    /// (<see cref="ReplySpeechText.DetectScriptLanguage"/>), or <see cref="DetectLanguage"/>'s - preferring the device's
-    /// region. Use it from the UI thread.
+    /// (<see cref="ReplySpeechText.CleanForSpeech"/>), with a voice for its language (<see cref="DetectLanguage"/>, by default
+    /// <see cref="TextLanguage.DetectAsync"/>), preferring the device's region. Use it from the UI thread.
     /// </summary>
     public class TextToSpeechReplySpeaker : IReplySpeaker
     {
@@ -39,11 +38,11 @@ namespace Emgu.LiteRT.LM.Maui
         private Reader _reader;
 
         /// <summary>
-        /// Gives a text's language (two-letter code, or null for the device's default voice); by default the writing
-        /// system's (<see cref="ReplySpeechText.DetectScriptLanguage"/>), which can't tell Latin-script languages apart.
-        /// Set it to e.g. a platform language identifier.
+        /// Gives a text's language (two-letter code, or null for the device's default voice); by default
+        /// <see cref="TextLanguage.DetectAsync"/>: the writing system's, and for Latin script <see cref="TextLanguage.IdentifyLatin"/>'s or
+        /// Apple's recognizer.
         /// </summary>
-        public Func<string, Task<string>> DetectLanguage { get; set; } = text => Task.FromResult(ReplySpeechText.DetectScriptLanguage(text));
+        public Func<string, Task<string>> DetectLanguage { get; set; } = TextLanguage.DetectAsync;
 
         /// <summary>Raised with each piece of text as it is about to be spoken (e.g. to pause listening meanwhile).</summary>
         public event Action<string> Speaking;

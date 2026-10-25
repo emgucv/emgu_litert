@@ -59,6 +59,7 @@
     <Compile Include="..\UnitTestMemoriesUsed.cs" Link="UnitTestMemoriesUsed.cs" />
     <Compile Include="..\UnitTestVisualAgentsCV.cs" Link="UnitTestVisualAgentsCV.cs" />
     <Compile Include="..\UnitTestDocumentReader.cs" Link="UnitTestDocumentReader.cs" />
+    <Compile Include="..\UnitTestSoundInput.cs" Link="UnitTestSoundInput.cs" />
     <Compile Include="..\UnitTestDocumentWriter.cs" Link="UnitTestDocumentWriter.cs" />
     <Compile Include="..\UnitTestAgentRegression.cs" Link="UnitTestAgentRegression.cs" />
     <Compile Include="..\UnitTestCameraTools.cs" Link="UnitTestCameraTools.cs" />

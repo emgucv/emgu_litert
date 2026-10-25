@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.LM.Models;
 
 namespace Maui.Demo.Lite;

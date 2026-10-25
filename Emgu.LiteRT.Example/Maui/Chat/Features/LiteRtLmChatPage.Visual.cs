@@ -46,7 +46,7 @@ public partial class LiteRtLmChatPage
         _visualAgents.Register(new FaceVisualAgent(DetectorFactory.Face(), threads));
         _visualAgents.Register(new HolisticVisualAgent(DetectorFactory.Holistic(), threads));
         _visualChime = new CameraChimeAction();
-        _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => ReplySpeech.SpeakAsync(text, token)),
+        _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => AlertVoice.SpeakAsync(text, token)),
             occurrence => _visualRuntime.Snapshot().Any(m => m.Id == occurrence.MonitorId &&
                 m.Actions.Any(a => a.ActionId is "play_sound" or "speak_text")));
         _visualActions = new VisualActionRegistry();

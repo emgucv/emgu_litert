@@ -54,6 +54,19 @@ namespace Emgu.LiteRT.LM.Chat
         }
 
         /// <summary>
+        /// A language tag as a two-letter code: ML Kit's "zh-Latn" (romanized Chinese) is "zh", Apple's "zh-Hans" is "zh";
+        /// null for "und" (undetermined) and for nothing.
+        /// </summary>
+        /// <param name="tag">The language tag</param>
+        public static string TwoLetterLanguage(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag) || tag == "und")
+                return null;
+            int dash = tag.IndexOf('-');
+            return (dash > 0 ? tag.Substring(0, dash) : tag).ToLowerInvariant();
+        }
+
+        /// <summary>
         /// The language (two-letter code) of the writing system most of the text's letters use, or null for Latin script
         /// (and anything else this doesn't know), whose language this can't tell.
         /// </summary>
