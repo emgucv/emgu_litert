@@ -55,6 +55,8 @@ The app declares the permissions:
 
 The parts are public for an app's own UI: `VoiceRecorder` (16 kHz mono WAV, with microphone levels for a voice chat), `SpeechRecognizer` (`TranscribeAsync`; `Language` - one of `Emgu.LiteRT.LM.Chat`'s `VoiceLanguages`, or the device's) and `MicrophoneGate`, which an always-on listener such as a sound monitor uses to let go of the microphone while a recording needs it. On Android the on-device recognizer is used when it has the language; otherwise the normal one, which may send the audio to Google's service.
 
+`PdfPageRenderer` renders a PDF's pages to JPEG with each platform's own renderer (Android's PdfRenderer, PDFKit on iOS and Mac Catalyst, Windows.Data.Pdf), for pages that are images - scans, charts drawn as shapes. It is the `IPdfPageRenderer` that `${EMGU_LITERT_LM_AGENTS_DOCUMENTS_NUGET_ID}`' `DocumentReader` takes (`OpenPdf = pdf => new PdfPageRenderer(pdf)`).
+
 ## Changing the look
 
 The controls are templated. Each finds its template, and the styles of its buttons, by key - first in the app's resources, then in the package's own `ChatStyles` - so an app replaces one by defining a resource with its key in `App.xaml`; nothing needs to be merged:

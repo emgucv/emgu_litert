@@ -1,0 +1,30 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Agents.Documents.dll`: documents for a chat agent's questions about them, in namespace `Emgu.LiteRT.LM.Agents.Documents`.
+
+`DocumentReader.ReadAsync(bytes, fileName, options, progress, token)` reads a PDF (each page's text, in reading order, and its pictures, with [PdfPig](https://github.com/UglyToad/PdfPig)), a Word file (.docx: its paragraphs and pictures) or a text file into `DocumentContent`: text passages with where they are ("page 3"), and pictures as JPEG. `DocumentReadOptions` says how much (`MaxPages`, 150 by default; `MaxImages`, 0 by default - each picture takes seconds to index on a phone) and how to make images, two things the platform does:
+
+- `EncodeImage(image, maxSize)` decodes a picture, scales it down to `MaxImageSize` (1024 px) and encodes it as JPEG - Emgu CV, say. Without it, only JPEG pictures are kept, as they are.
+- `OpenPdf(pdf)` opens an `IPdfPageRenderer` (from `${EMGU_LITERT_LM_AGENTS_NUGET_ID}`) for pages with little text - scans, charts drawn as shapes -, which are then kept as images of the whole page. `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `PdfPageRenderer` is one, with each platform's own PDF renderer.
+
+The text then goes into `${EMGU_LITERT_LM_MODELS_NUGET_ID}`' `DocumentIndex` (passages embedded by an embedding model such as EmbeddingGemma 2), the images too for a model that reads them:
+
+```csharp
+using Emgu.LiteRT.LM.Agents.Documents;
+using Emgu.LiteRT.LM.Models;
+
+var options = new DocumentReadOptions { MaxImages = 10, EncodeImage = YourJpegEncoder, OpenPdf = pdf => new Emgu.LiteRT.LM.Maui.PdfPageRenderer(pdf) };
+DocumentContent content = await DocumentReader.ReadAsync(File.ReadAllBytes(path), Path.GetFileName(path), options, null, CancellationToken.None);
+var index = new DocumentIndex();
+foreach (DocumentText text in content.Texts)
+    index.AddText(text.Text, text.Location);
+foreach (DocumentPicture picture in content.Images)
+    index.AddImage(picture.Jpeg, "image/jpeg", picture.Location, picture.IsPage);
+```
+
+`DocumentLibrarySearch` searches every document a user saved, for `AgentTools.SearchDocuments`: read the saved passages with their embeddings from your store (`DocumentLibraryPassage`), narrow them to a document the model named (`Named`), embed the request as a query only if any are left, and `Rank` keeps the best (cosine similarity at least 0.5 and within 0.12 of the best, as much as a character budget holds); `Format` quotes them with their document and page, as data, not instructions.
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

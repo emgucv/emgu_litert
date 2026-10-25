@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Agents.Documents;
 using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.LM.Extensions.AI;
 using Maui.Demo.Lite;
@@ -111,20 +112,22 @@ namespace Emgu.TF.Lite.Test
                 ("The garden is shared.", "page 1", new[] { 0f, 1f }));
             await Save("b", "recipes.docx", "m1", ("Notice the pepper.", "page 1", new[] { 0.9f, 0.1f }));
             await Save("c", "old.pdf", "m2", ("Stale vector.", "page 1", new[] { 1f, 0f }));
-            Task<float[]> Embed(string text, CancellationToken token) => Task.FromResult(new[] { 1f, 0f });
-            var search = new DocumentLibrarySearch(store);
+            // As the chat page does: the store's passages for one embedding model, narrowed to a document, ranked against the request.
+            float[] query = { 1f, 0f };
+            var passages = await store.GetDocumentLibraryPassagesAsync("m1");
+            Assert.That(passages.Select(p => p.Embedding.Length), Is.All.EqualTo(2));
 
-            var all = await search.SearchAsync("m1", "notice", null, Embed, 3200, CancellationToken.None);
+            var all = DocumentLibrarySearch.Rank(passages, query, 3200);
             Assert.That(all.Select(m => m.DocumentName), Is.EqualTo(new[] { "lease.pdf", "recipes.docx" }));
             Assert.That(all[0].Location, Is.EqualTo("page 2"));
+            Assert.That(all[0].DocumentId, Is.EqualTo("a"));
 
-            var named = await search.SearchAsync("m1", "notice", "RECIPES", Embed, 3200, CancellationToken.None);
+            var named = DocumentLibrarySearch.Rank(DocumentLibrarySearch.Named(passages, "RECIPES"), query, 3200);
             Assert.That(named.Select(m => m.DocumentName), Is.EqualTo(new[] { "recipes.docx" }));
 
-            var small = await search.SearchAsync("m1", "notice", null, Embed, 10, CancellationToken.None);
-            Assert.That(small, Has.Count.EqualTo(1));
+            Assert.That(DocumentLibrarySearch.Rank(passages, query, 10), Has.Count.EqualTo(1));
 
-            Assert.That(await search.SearchAsync("m3", "notice", null, Embed, 3200, CancellationToken.None), Is.Empty);
+            Assert.That(await store.GetDocumentLibraryPassagesAsync("m3"), Is.Empty);
             Assert.That(DocumentLibrarySearch.Format(all), Does.Contain("[lease.pdf, page 2").And.Contain("three months"));
         }
 

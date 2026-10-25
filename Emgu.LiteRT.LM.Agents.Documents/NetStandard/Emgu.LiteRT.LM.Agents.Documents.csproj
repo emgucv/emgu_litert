@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<AssemblyName>Emgu.LiteRT.LM.Agents.Documents</AssemblyName>
+	<TargetName>$(AssemblyName)</TargetName>
+	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
+	<LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TensorflowBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\lib))</TensorflowBinaryDir>
+	<OutputPath>$(TensorflowBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <Import Project="..\Emgu.LiteRT.LM.Agents.Documents.Shared.projitems" Label="Shared" />
+
+  <!--
+  Emgu.LiteRT.LM.Agents.Documents reads PDF, Word and text files for a chat's document questions (text and pictures, with PdfPig), and ranks
+  passages saved from them for the search_documents tool. Kept out of Emgu.LiteRT.LM.Agents so that package doesn't depend on PdfPig.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Emgu.LiteRT.LM.Agents\NetStandard\Emgu.LiteRT.LM.Agents.csproj" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+  </ItemGroup>
+
+</Project>

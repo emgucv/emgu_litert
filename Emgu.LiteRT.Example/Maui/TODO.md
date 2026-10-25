@@ -36,7 +36,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       remain additional device checks.
 - [ ] Recording a voice message live (`VoiceRecorder.cs`: AVAudioRecorder, Android AudioRecord, Windows MediaCapture) -
       Android capture/model input passed; Mac Catalyst and Windows live capture remain pending.
-- [ ] Windows: the PDF page renderer (`PdfPageRenderer`, `Windows.Data.Pdf`) and the photo library (`StorageFile`
+- [ ] Windows: the PDF page renderer (`Emgu.LiteRT.LM.Maui`'s `PdfPageRenderer`, `Windows.Data.Pdf`) and the photo library (`StorageFile`
       details).
 - [ ] Photo search on a real phone's library (only the emulator's test photos so far), on a phone whose owner agrees
       to have their photos indexed for the test.

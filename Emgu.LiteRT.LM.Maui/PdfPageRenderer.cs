@@ -5,16 +5,18 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Agents.Documents;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui;
 
 /// <summary>
 /// Renders PDF pages to images with the platform's own PDF renderer (Android's PdfRenderer, PDFKit on iOS and Mac
-/// Catalyst, Windows.Data.Pdf on Windows), for pages whose content isn't text - scans, or charts drawn as shapes.
-/// Open one per document; RenderAsync returns an encoded image (JPEG or PNG) about maxSize pixels on its longer
-/// side, or null if the page can't be rendered.
+/// Catalyst, Windows.Data.Pdf on Windows), for pages whose content isn't text - scans, or charts drawn as shapes:
+/// Emgu.LiteRT.LM.Agents.Documents' <c>DocumentReader</c> takes it as <c>DocumentReadOptions.OpenPdf = pdf => new PdfPageRenderer(pdf)</c>.
+/// Open one per document; <see cref="RenderAsync"/> returns a JPEG about maxSize pixels on its longer side, or null if the
+/// page can't be rendered. On Android the document is written to the cache folder while it is open.
 /// </summary>
-internal sealed class PdfPageRenderer : IDisposable
+public sealed class PdfPageRenderer : IPdfPageRenderer
 {
 #if ANDROID
     private readonly string _path;
@@ -22,6 +24,8 @@ internal sealed class PdfPageRenderer : IDisposable
     private readonly Android.Graphics.Pdf.PdfRenderer _renderer;
 
     // PdfRenderer reads a file: the document is written to the cache folder while it is open.
+    /// <summary>Opens the document.</summary>
+    /// <param name="pdf">The PDF file</param>
     public PdfPageRenderer(byte[] pdf)
     {
         _path = Path.Combine(FileSystem.CacheDirectory, "render_" + Guid.NewGuid().ToString("N") + ".pdf");
@@ -39,6 +43,7 @@ internal sealed class PdfPageRenderer : IDisposable
         }
     }
 
+    /// <inheritdoc/>
     public Task<byte[]> RenderAsync(int pageIndex, int maxSize)
     {
         if (pageIndex < 0 || pageIndex >= _renderer.PageCount)
@@ -57,6 +62,7 @@ internal sealed class PdfPageRenderer : IDisposable
         return Task.FromResult(stream.ToArray());
     }
 
+    /// <summary>Closes the document.</summary>
     public void Dispose()
     {
         _renderer.Dispose();
@@ -66,11 +72,14 @@ internal sealed class PdfPageRenderer : IDisposable
 #elif IOS || MACCATALYST
     private readonly PdfKit.PdfDocument _document;
 
+    /// <summary>Opens the document.</summary>
+    /// <param name="pdf">The PDF file</param>
     public PdfPageRenderer(byte[] pdf)
     {
         _document = new PdfKit.PdfDocument(Foundation.NSData.FromArray(pdf));
     }
 
+    /// <inheritdoc/>
     public Task<byte[]> RenderAsync(int pageIndex, int maxSize)
     {
         if (pageIndex < 0 || pageIndex >= (int)_document.PageCount)
@@ -90,6 +99,7 @@ internal sealed class PdfPageRenderer : IDisposable
         return Task.FromResult(jpeg?.ToArray());
     }
 
+    /// <summary>Closes the document.</summary>
     public void Dispose()
     {
         _document.Dispose();
@@ -98,11 +108,14 @@ internal sealed class PdfPageRenderer : IDisposable
     private readonly byte[] _pdf;
     private Windows.Data.Pdf.PdfDocument _document;
 
+    /// <summary>Opens the document.</summary>
+    /// <param name="pdf">The PDF file</param>
     public PdfPageRenderer(byte[] pdf)
     {
         _pdf = pdf;
     }
 
+    /// <inheritdoc/>
     public async Task<byte[]> RenderAsync(int pageIndex, int maxSize)
     {
         if (_document == null)
@@ -139,6 +152,7 @@ internal sealed class PdfPageRenderer : IDisposable
         return bytes;
     }
 
+    /// <summary>Closes the document.</summary>
     public void Dispose()
     {
         _document = null;

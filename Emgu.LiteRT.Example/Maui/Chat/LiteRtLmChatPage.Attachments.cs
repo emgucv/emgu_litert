@@ -25,6 +25,15 @@ namespace Maui.Demo.Lite;
 
 public partial class LiteRtLmChatPage
 {
+    // The files "+" > Document offers: what Emgu.LiteRT.LM.Agents.Documents' DocumentReader reads (PDF, Word, text), by each platform's names.
+    private static readonly FilePickerFileType DocumentFileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+    {
+        { DevicePlatform.iOS, new[] { "com.adobe.pdf", "org.openxmlformats.wordprocessingml.document", "public.plain-text" } },
+        { DevicePlatform.MacCatalyst, new[] { "com.adobe.pdf", "org.openxmlformats.wordprocessingml.document", "public.plain-text" } },
+        { DevicePlatform.Android, new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", "text/markdown" } },
+        { DevicePlatform.WinUI, new[] { ".pdf", ".docx", ".txt", ".md" } },
+    });
+
     // ---------- Attachments ----------
 
     private async void OnAttachClicked()
@@ -58,7 +67,7 @@ public partial class LiteRtLmChatPage
         {
             if (action == "document")
             {
-                FileResult file = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Choose a document", FileTypes = DocumentReader.FileTypes });
+                FileResult file = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Choose a document", FileTypes = DocumentFileTypes });
                 if (file != null)
                     AttachDocument(await ReadAllBytesAsync(file, sessionVersion, privateRead), file.FileName);
             }

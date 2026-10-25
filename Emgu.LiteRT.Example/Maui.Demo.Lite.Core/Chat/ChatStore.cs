@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Agents.Documents;
 using Emgu.LiteRT.LM.Chat.Sqlite;
 using SQLite;
 
@@ -315,6 +316,24 @@ internal sealed partial class ChatStore : ChatHistoryStore, IAgentMemoryStore
                     result.Add((document, item));
         }
         return result;
+    }
+
+    /// <summary>The same passages as Emgu.LiteRT.LM.Agents.Documents' search takes them (DocumentLibrarySearch).</summary>
+    public async Task<List<DocumentLibraryPassage>> GetDocumentLibraryPassagesAsync(string embeddingFile) =>
+        (await GetDocumentPassagesAsync(embeddingFile)).Select(p => new DocumentLibraryPassage
+        {
+            DocumentId = p.Document.Id,
+            DocumentName = p.Document.Name,
+            Location = p.Item.Location,
+            Text = p.Item.Text,
+            Embedding = ToFloats(p.Item.Embedding)
+        }).ToList();
+
+    private static float[] ToFloats(byte[] bytes)
+    {
+        float[] values = new float[bytes.Length / sizeof(float)];
+        Buffer.BlockCopy(bytes, 0, values, 0, values.Length * sizeof(float));
+        return values;
     }
 
     /// <summary>Save a document's index, replacing an older one of the same file.</summary>

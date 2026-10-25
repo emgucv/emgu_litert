@@ -12,6 +12,8 @@ using System.Threading.Tasks;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Agents.Documents;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 
@@ -121,7 +123,7 @@ public partial class LiteRtLmChatPage
         DocumentIndex defaults = new DocumentIndex();
         return string.Format(System.Globalization.CultureInfo.InvariantCulture, "v1|{0}|passages {1}/{2}|images {3}|pages {4}",
             SelectedEmbeddingFile, defaults.MaxPassageLength, defaults.PassageOverlap,
-            images ? MaxDocumentImages : 0, DocumentReader.MaxPages);
+            images ? MaxDocumentImages : 0, DocumentReader.DefaultMaxPages);
     }
 
     private void BuildDocumentChip(DocumentState state)
@@ -252,7 +254,12 @@ public partial class LiteRtLmChatPage
                     throw new InvalidOperationException("its saved index is missing");
                 await WaitForWorkAsync(false, reason => ((IProgress<string>)stage).Report(reason == null
                     ? "Reading the document..." : "Document indexing paused: " + reason), cancel);
-                DocumentContent content = await DocumentReader.ReadAsync(bytes, state.Name, maxImages, stage, cancel);
+                DocumentContent content = await DocumentReader.ReadAsync(bytes, state.Name, new DocumentReadOptions
+                {
+                    MaxImages = maxImages,
+                    EncodeImage = EncodeDocumentImage,
+                    OpenPdf = pdf => new PdfPageRenderer(pdf)
+                }, stage, cancel);
                 state.PageCount = content.PageCount;
                 index = new DocumentIndex();
                 foreach (var text in content.Texts)
@@ -279,7 +286,7 @@ public partial class LiteRtLmChatPage
                 UiStallWatchdog.Mark(string.Format("Document indexed in {0:F1}s", watch.Elapsed.TotalSeconds));
                 summary = DocumentSummary(state, content, index);
                 if (content.PagesSkipped > 0)
-                    summary += string.Format(" (first {0} read)", DocumentReader.MaxPages);
+                    summary += string.Format(" (first {0} read)", DocumentReader.DefaultMaxPages);
                 await SaveDocumentIndexAsync(state, index, settings, summary);
             }
 
@@ -447,19 +454,37 @@ public partial class LiteRtLmChatPage
             return "Provide what to find in the documents.";
         if (SearchDownloadRequired)
             return "The search model was deleted, so saved documents can't be searched. The user can download it again in Settings > Storage.";
-        var found = await new DocumentLibrarySearch(_store).SearchAsync(SelectedEmbeddingFile, request, documentName,
-            async (text, token) =>
-            {
-                var embedder = await Embedder.EnsureAsync(null, token);
-                await Embedder.Gate.WaitAsync(token);
-                try { return await Task.Run(() => embedder.EmbedQuery(text), token); }
-                finally { Embedder.Gate.Release(); }
-            }, ContextWindow >= 8192 ? 3200 : 1600, cancel);
+        // The saved passages of documents indexed with the chosen embedding model; the request is embedded only if there are any.
+        var passages = DocumentLibrarySearch.Named(await _store.GetDocumentLibraryPassagesAsync(SelectedEmbeddingFile), documentName);
+        cancel.ThrowIfCancellationRequested();
+        var found = new List<DocumentLibraryMatch>();
+        if (passages.Count > 0)
+        {
+            var embedder = await Embedder.EnsureAsync(null, cancel);
+            float[] query;
+            await Embedder.Gate.WaitAsync(cancel);
+            try { query = await Task.Run(() => embedder.EmbedQuery(request), cancel); }
+            finally { Embedder.Gate.Release(); }
+            found = DocumentLibrarySearch.Rank(passages, query, ContextWindow >= 8192 ? 3200 : 1600);
+        }
         if (found.Count == 0)
             return "No relevant passages were found in the user's saved documents" +
                 (string.IsNullOrWhiteSpace(documentName) ? "" : " named \"" + documentName + "\"") +
                 ". Do not invent document content.";
         return DocumentLibrarySearch.Format(found);
+    }
+
+    // A document's picture or page image for the index (DocumentReadOptions.EncodeImage): decoded by OpenCV, scaled down and re-encoded as
+    // JPEG; null if it can't be decoded.
+    private static byte[] EncodeDocumentImage(byte[] image, int maxSize)
+    {
+        Emgu.CV.Mat mat = ImageUtil.Decode(image);
+        if (mat == null)
+            return null;
+        using Emgu.CV.Mat small = ImageUtil.Downscale(mat, maxSize);
+        using Emgu.CV.Util.VectorOfByte buffer = new Emgu.CV.Util.VectorOfByte();
+        Emgu.CV.CvInvoke.Imencode(".jpg", small, buffer);
+        return buffer.ToArray();
     }
 
     // The excerpts (and picture) to send with a message, or null without a document. Waits for the document to be

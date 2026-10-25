@@ -558,6 +558,10 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # depend on the MCP SDK).
   SET(EMGU_LITERT_LM_AGENTS_MCP_NUGET_ID "${EMGU_LITERT_LM_AGENTS_NUGET_ID}.Mcp")
   SET(EMGU_LITERT_LM_AGENTS_MCP_NUGET_TITLE "${EMGU_LITERT_LM_AGENTS_NUGET_TITLE} MCP")
+  # Emgu.LiteRT.LM.Agents.Documents/: reading documents and ranking their saved passages (kept out of Emgu.LiteRT.LM.Agents so that package
+  # doesn't depend on PdfPig).
+  SET(EMGU_LITERT_LM_AGENTS_DOCUMENTS_NUGET_ID "${EMGU_LITERT_LM_AGENTS_NUGET_ID}.Documents")
+  SET(EMGU_LITERT_LM_AGENTS_DOCUMENTS_NUGET_TITLE "${EMGU_LITERT_LM_AGENTS_NUGET_TITLE} Documents")
   # Emgu.LiteRT.LM.Chat/: the conversation logic of a chat (no UI) over any IChatClient - messages, streaming,
   # context window management.
   SET(EMGU_LITERT_LM_CHAT_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Chat")
@@ -1209,6 +1213,17 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Agents.Mcp.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents.Mcp/NetStandard/docs/README.md)
 
+# Emgu.LiteRT.LM.Agents.Documents: documents read for a chat agent, and the search over saved passages. Its own nuget package, depending on
+# Emgu.LiteRT.LM.Agents and PdfPig.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Agents.Documents.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents.Documents/NetStandard/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents.Documents/NetStandard/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents.Documents/NetStandard/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Agents.Documents.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents.Documents/NetStandard/docs/README.md)
+
 # Emgu.LiteRT.LM.Chat: the conversation logic of a chat, without UI. Its own nuget package, depending on
 # Emgu.LiteRT.LM.Extensions.AI, Emgu.LiteRT.LM.Models and Microsoft.Extensions.AI.Abstractions.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Chat.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Chat/NetStandard/Directory.Build.props)
@@ -1352,6 +1367,7 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Extensions.AI)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Agents)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Agents.Mcp)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Agents.Documents)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Chat)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Chat.Sqlite)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui)

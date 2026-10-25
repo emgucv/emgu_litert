@@ -58,6 +58,7 @@
     <Compile Include="..\UnitTestToolRouting.cs" Link="UnitTestToolRouting.cs" />
     <Compile Include="..\UnitTestMemoriesUsed.cs" Link="UnitTestMemoriesUsed.cs" />
     <Compile Include="..\UnitTestVisualAgentsCV.cs" Link="UnitTestVisualAgentsCV.cs" />
+    <Compile Include="..\UnitTestDocumentReader.cs" Link="UnitTestDocumentReader.cs" />
     <Compile Include="..\UnitTestDocumentWriter.cs" Link="UnitTestDocumentWriter.cs" />
     <Compile Include="..\UnitTestAgentRegression.cs" Link="UnitTestAgentRegression.cs" />
     <Compile Include="..\UnitTestCameraTools.cs" Link="UnitTestCameraTools.cs" />
@@ -150,6 +151,7 @@
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Agents\NetStandard\Emgu.LiteRT.LM.Agents.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Agents.CV\NetStandard\Emgu.LiteRT.LM.Agents.CV.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Agents.Mcp\NetStandard\Emgu.LiteRT.LM.Agents.Mcp.csproj" />
+    <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Agents.Documents\NetStandard\Emgu.LiteRT.LM.Agents.Documents.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Chat\NetStandard\Emgu.LiteRT.LM.Chat.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Chat.Sqlite\NetStandard\Emgu.LiteRT.LM.Chat.Sqlite.csproj" />
     <!-- The MAUI demo's code without UI (saved chats, tool groups, MCP, storage, the camera monitors' catalogue). -->
