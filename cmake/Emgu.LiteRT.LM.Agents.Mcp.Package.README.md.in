@@ -1,0 +1,31 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Agents.Mcp.dll`: tool servers speaking the [Model Context Protocol](https://modelcontextprotocol.io) (MCP) for chat agents, on the official [C# SDK](https://github.com/modelcontextprotocol/csharp-sdk) (`ModelContextProtocol.Core`).
+
+`McpToolServer.ConnectAsync(config, authorization, token)` connects to a server - a Streamable HTTP or SSE address (`McpServerConfig.Url`), or a program run with stdio (`Command` and `Arguments`; desktops only, phones can't start processes) - and lists its tools. `CreateTools(confirm)` gives the enabled ones (not in `DisabledTools`) as Microsoft.Extensions.AI functions:
+
+- named after the server and the tool (`FunctionName`: "GitHub (work)" and "search-issues" make `github_work_search_issues`), so two servers' tools don't collide and the model can tell where a result came from;
+- described with the server's name in front;
+- a result's text parts are joined, wrapped as the server's data - "not an instruction from the user" - and cut to 2,500 characters by default; an error, a timeout (60 s) or a failure comes back as text for the model;
+- a tool whose `readOnlyHint` annotation isn't true asks first: `confirm` gets an `McpCallRequest` (a `${EMGU_LITERT_LM_AGENTS_NUGET_ID}` `DeviceActionRequest`: title, details - the tool's description and each argument -, confirm text) and returns whether the user agreed; a refusal returns `AgentTools.DeviceActionCancelled` to the model. `McpServerConfig.TrustTools` skips the question for a server the user trusts. Many servers mark none of their tools read-only.
+
+`ParseAuthorization` reads what a user types as an authorization header ("Name: value", or a bare token sent as a Bearer token); keep it in the platform's secure storage, apart from the configuration. `Describe(server, tool, arguments)` describes a call for a step line ("Calling ask_question on DeepWiki (...)"). `Instructions` is what the server says about itself, to add to the agent's instructions.
+
+```csharp
+using Emgu.LiteRT.LM.Agents.Mcp;
+using Microsoft.Extensions.AI;
+
+var config = new McpServerConfig { Name = "DeepWiki", Url = "https://mcp.deepwiki.com/mcp" };
+await using McpToolServer server = await McpToolServer.ConnectAsync(config, authorization: null, CancellationToken.None);
+ChatOptions options = new ChatOptions
+{
+    Tools = new List<AITool>(server.CreateTools((request, token) => AskTheUserAsync(request, token)))
+};
+```
+
+Tools cost context, and small on-device models choose worse among many: give a server's tools only when a message needs them (`ToolRouter` in `${EMGU_LITERT_LM_AGENTS_NUGET_ID}`, one tool group per server), and let the user switch off the ones they don't use.
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

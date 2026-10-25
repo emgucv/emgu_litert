@@ -524,7 +524,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   (Streamable HTTP or SSE) with an optional authorization header kept in `SecureStorage`, or, on Mac Catalyst and Windows, a
   program started with stdio. It uses the official `ModelContextProtocol.Core` 2.2.0 client (referenced by the demo and the
   test project, not by `Emgu.LiteRT.LM.Agents`).
-- `McpServers.cs` (in `Maui.Demo.Lite.Core`) turns a server's tools into functions named `<server>_<tool>`:
+- `McpToolServer` (in the `Emgu.LiteRT.LM.Agents.Mcp` package, moved out of `Maui.Demo.Lite.Core` on 2026-10-25) turns a server's tools into functions named `<server>_<tool>`:
   - Each connected server is a `ToolGroup` (`mcp_<server>`): its tools come when a message mentions the server or its tools'
     subject, else through the `use_mcp_<server>` stub. Tools the user switched off cost nothing.
   - A tool without the `readOnlyHint` annotation asks with the device actions' Confirm / Cancel card, unless the user trusts

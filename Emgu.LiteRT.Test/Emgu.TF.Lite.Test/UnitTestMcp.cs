@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Agents.Mcp;
 using Maui.Demo.Lite;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
@@ -15,7 +16,7 @@ using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
 
-// The demo's MCP tool servers (McpServers.cs) against an MCP server in this process, over pipes: tool names and
+// Emgu.LiteRT.LM.Agents.Mcp's tool servers (McpToolServer) against an MCP server in this process, over pipes: tool names and
 // descriptions, the confirmation for tools that don't only read, the wrapping and cutting of results, and the parsing of
 // what a user types in Settings.
 [TestFixture]

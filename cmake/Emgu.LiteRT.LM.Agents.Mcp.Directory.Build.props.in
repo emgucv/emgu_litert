@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<Project>
+ <PropertyGroup>
+ 
+    <!-- Managed code: netstandard2.0 for any .NET, net8.0 for current runtimes, as Emgu.LiteRT.LM.Agents. -->
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+ 
+    <PackageId>${EMGU_LITERT_LM_AGENTS_MCP_NUGET_ID}</PackageId>
+	<title>${EMGU_LITERT_LM_AGENTS_MCP_NUGET_TITLE}</title>
+    <version>${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>Model Context Protocol (MCP) tool servers for chat agents: each server's tools as Microsoft.Extensions.AI functions, with the user asked before tools that change things.</summary>
+    <Description>Connects a chat agent to Model Context Protocol (MCP) servers - Streamable HTTP or SSE, or a program run with stdio on desktops - and gives it their tools as Microsoft.Extensions.AI functions, named after the server; each result is wrapped as the server's untrusted data and cut to a budget, and a tool the server doesn't mark read-only asks the user first through the app's confirmation. Made for the Emgu LiteRT LM language models on the device, it works with any IChatClient.</Description>
+    <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM Agents MCP, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
+	
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\platforms\nuget))</PackageOutputPath>
+	<PackageTags>litert litert-lm llm agent tools mcp model-context-protocol function-calling microsoft-extensions-ai emgu emgutflite ai</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+    
+ </PropertyGroup>
+ 
+    <ItemGroup>
+      <None Include="..\..\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="..\..\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+	
+  <!-- https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022 -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />	
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />	 
+</Project>

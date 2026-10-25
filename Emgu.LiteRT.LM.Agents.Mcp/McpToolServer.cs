@@ -14,25 +14,28 @@ using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Agents.Mcp;
 
-// Tool servers speaking the Model Context Protocol (MCP): the chat agent's tools next to the built-in ones (TODO item 28).
-// No MAUI types here, so the tests link this file. A server is a URL (Streamable HTTP, or SSE for older servers) or, where
-// the platform can start processes (Mac Catalyst, Windows), a command run with stdio. Its tools become Microsoft.Extensions.AI
-// functions - named after the server, so two servers' "search" don't collide and the model can tell where a result came from -
-// whose results are wrapped as untrusted text and cut to a budget, and which ask the user first unless the server says
+// Tool servers speaking the Model Context Protocol (MCP): a chat agent's tools next to its built-in ones. A server is a URL (Streamable
+// HTTP, or SSE for older servers) or, where the platform can start processes (desktops, not phones), a command run with stdio. Its tools
+// become Microsoft.Extensions.AI functions - named after the server, so two servers' "search" don't collide and the model can tell where a
+// result came from - whose results are wrapped as untrusted text and cut to a budget, and which ask the user first unless the server says
 // they only read (the tool's readOnlyHint annotation) or the user trusts the server.
 
-/// <summary>A configured server (what Settings saves; the authorization header is kept apart, in SecureStorage).</summary>
-internal sealed class McpServerConfig
+/// <summary>A configured server, as an app saves it (as JSON, say). Keep the authorization header apart, in the platform's secure storage.</summary>
+public sealed class McpServerConfig
 {
+    /// <summary>A stable id, for the app's own bookkeeping (where it keeps the authorization header, say)</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    /// <summary>The name the user gave it; its functions' names start with it</summary>
     public string Name { get; set; } = string.Empty;
     /// <summary>The endpoint of a Streamable HTTP / SSE server; empty for a stdio server.</summary>
     public string Url { get; set; } = string.Empty;
     /// <summary>A stdio server's program and its arguments (space separated, quotes group); empty for an HTTP server.</summary>
     public string Command { get; set; } = string.Empty;
+    /// <summary>The stdio server's arguments, space separated, "double quotes" grouping words</summary>
     public string Arguments { get; set; } = string.Empty;
+    /// <summary>Whether the app should connect to it</summary>
     public bool Enabled { get; set; } = true;
     /// <summary>
     /// Run the server's tools without asking. Off by default: only a tool whose readOnlyHint annotation is true runs without
@@ -42,18 +45,20 @@ internal sealed class McpServerConfig
     /// <summary>Tools the user switched off (their names on the server), so they cost no context.</summary>
     public List<string> DisabledTools { get; set; } = new List<string>();
 
+    /// <summary>True for a server started as a program (stdio), false for an HTTP server</summary>
     public bool IsStdio => !string.IsNullOrWhiteSpace(Command);
 }
 
-/// <summary>A tool of a connected server, for Settings.</summary>
-internal sealed record McpToolInfo(string Name, string Description, bool ReadOnly);
+/// <summary>A tool of a connected server, for an app's settings: its name on the server, its description, and whether the server says it only reads.</summary>
+public sealed record McpToolInfo(string Name, string Description, bool ReadOnly);
 
-/// <summary>What a tool call wants to do, for the Confirm / Cancel card.</summary>
-internal sealed class McpCallRequest : DeviceActionRequest
+/// <summary>What a tool call wants to do, for the app to ask the user (as for a device action: a title, details, the confirm button's text).</summary>
+public sealed class McpCallRequest : DeviceActionRequest
 {
     private readonly string _server, _tool;
     private readonly List<string> _details = new List<string>();
 
+    /// <summary>The request for a call of <paramref name="tool"/> on <paramref name="server"/>: the tool's description and each argument, shortened.</summary>
     public McpCallRequest(string server, string tool, string description, IDictionary<string, object> arguments)
     {
         _server = server;
@@ -64,23 +69,34 @@ internal sealed class McpCallRequest : DeviceActionRequest
             _details.Add(argument.Key + ": " + McpToolServer.Shorten(McpToolServer.ArgumentText(argument.Value), 200));
     }
 
+    /// <inheritdoc/>
     public override string ToolName => _tool;
+    /// <inheritdoc/>
     public override string Title => "Run \"" + _tool + "\" on " + _server + "?";
+    /// <inheritdoc/>
     public override string ConfirmText => "Run";
+    /// <inheritdoc/>
     public override IList<string> Details => _details;
+    /// <inheritdoc/>
     public override string Summary => "the tool " + _tool + " of the server " + _server;
 }
 
-/// <summary>One connected MCP server and its tools.</summary>
-internal sealed class McpToolServer : IAsyncDisposable
+/// <summary>
+/// One connected MCP server and its tools: <see cref="ConnectAsync"/>, then <see cref="CreateTools"/> for the agent's <c>ChatOptions.Tools</c>
+/// (or a tool group of <see cref="ToolRouter"/>). Dispose it to disconnect.
+/// </summary>
+public sealed class McpToolServer : IAsyncDisposable
 {
-    internal const int ConnectSeconds = 20, CallSeconds = 60;
+    /// <summary>How long connecting may take, and a tool call</summary>
+    public const int ConnectSeconds = 20, CallSeconds = 60;
     private readonly McpClient _client;
     private readonly List<McpClientTool> _tools;
 
+    /// <summary>The server's configuration</summary>
     public McpServerConfig Config { get; }
     /// <summary>What the server said about itself when connecting (its instructions), if anything.</summary>
     public string Instructions { get; }
+    /// <summary>All the server's tools, the disabled ones too</summary>
     public IReadOnlyList<McpToolInfo> Tools { get; }
 
     private McpToolServer(McpServerConfig config, McpClient client, List<McpClientTool> tools, string instructions)
@@ -95,6 +111,7 @@ internal sealed class McpToolServer : IAsyncDisposable
     /// <summary>Connect and list the tools.</summary>
     /// <param name="config">The server</param>
     /// <param name="authorization">An authorization header: "Name: value", or just a token (sent as a Bearer token); optional</param>
+    /// <param name="cancellationToken">Cancels connecting</param>
     /// <param name="transport">A ready transport, for tests; otherwise made from the configuration</param>
     public static async Task<McpToolServer> ConnectAsync(McpServerConfig config, string authorization, CancellationToken cancellationToken,
         IClientTransport transport = null)
@@ -165,13 +182,15 @@ internal sealed class McpToolServer : IAsyncDisposable
         return name.Length <= 64 ? name : name.Substring(0, 64);
     }
 
-    internal static string Slug(string text)
+    /// <summary>The server's or tool's name as a lower-case ASCII word with underscores (the start of its functions' names).</summary>
+    public static string Slug(string text)
     {
         string slug = Regex.Replace((text ?? string.Empty).ToLowerInvariant(), "[^a-z0-9]+", "_").Trim('_');
         return slug.Length == 0 ? "server" : slug;
     }
 
-    internal static string Shorten(string text, int length)
+    /// <summary>The text on one line, cut to <paramref name="length"/> characters with an ellipsis.</summary>
+    public static string Shorten(string text, int length)
     {
         text = Regex.Replace(text ?? string.Empty, "\\s+", " ").Trim();
         return text.Length <= length ? text : text.Substring(0, length - 1) + "…";
@@ -292,5 +311,6 @@ internal sealed class McpToolServer : IAsyncDisposable
         return Convert.ToString(result, CultureInfo.InvariantCulture) ?? "(no output)";
     }
 
+    /// <summary>Disconnect.</summary>
     public ValueTask DisposeAsync() => _client.DisposeAsync();
 }

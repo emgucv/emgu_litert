@@ -38,6 +38,7 @@ Directory.Build.props
 /Emgu.LiteRT.LM.Chat/NetStandard/docs/
 /Emgu.LiteRT.LM.Chat.Sqlite/NetStandard/docs/
 /Emgu.LiteRT.LM.Agents.CV/NetStandard/docs/
+/Emgu.LiteRT.LM.Agents.Mcp/NetStandard/docs/
 /Emgu.LiteRT.LM.Maui/Maui/docs/
 /Emgu.TF.Lite.Models/NetStandard/docs/
 /Emgu.LiteRT.Models/NetStandard/docs/

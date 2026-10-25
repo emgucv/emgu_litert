@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Agents.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
 

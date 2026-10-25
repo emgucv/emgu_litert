@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Agents.Mcp;
 using Microsoft.Extensions.AI;
 
 namespace Maui.Demo.Lite;
@@ -18,7 +19,7 @@ namespace Maui.Demo.Lite;
 // Catalyst and Windows also a program to start). Each connected server is a tool group of the router (Tools.cs), named
 // after the server: its tools come when a message mentions the server or its tools' subject, or the model calls the
 // server's stub (use_mcp_<name>). A tool that isn't marked read-only asks with the same Confirm / Cancel card as the device
-// actions. What a server says is untrusted text (McpServers.cs wraps it). The addresses are saved in Preferences, the
+// actions. What a server says is untrusted text (Emgu.LiteRT.LM.Agents.Mcp's McpToolServer wraps it). The addresses are saved in Preferences, the
 // authorization headers in SecureStorage.
 public partial class LiteRtLmChatPage
 {

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<AssemblyName>Emgu.LiteRT.LM.Agents.Mcp</AssemblyName>
+	<TargetName>$(AssemblyName)</TargetName>
+	<Platforms>AnyCPU;x64;x86;ARM</Platforms>
+	<LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TensorflowBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\lib))</TensorflowBinaryDir>
+	<OutputPath>$(TensorflowBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <Import Project="..\Emgu.LiteRT.LM.Agents.Mcp.Shared.projitems" Label="Shared" />
+
+  <!--
+  Emgu.LiteRT.LM.Agents.Mcp turns Model Context Protocol servers' tools into Microsoft.Extensions.AI functions for a chat agent. Kept out of
+  Emgu.LiteRT.LM.Agents so that package doesn't depend on the MCP SDK.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Emgu.LiteRT.LM.Agents\NetStandard\Emgu.LiteRT.LM.Agents.csproj" />
+    <PackageReference Include="ModelContextProtocol.Core" Version="2.2.0" />
+  </ItemGroup>
+
+  <!-- The tests check the result text and argument helpers directly. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Emgu.TF.Lite.Test.Net" />
+  </ItemGroup>
+</Project>
