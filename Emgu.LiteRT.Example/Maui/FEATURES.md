@@ -234,7 +234,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     in the reply that the message didn't have, or two in the reply. Not for a memory deleted in the same turn. Saved with the
     chat as a step line. Checked on Gemma 4 E2B's replies (Metal GPU, six memories, ten questions): "What should I cook
     tonight?" -> vegetarian, a birthday message -> Mia, a sleep tip -> night shifts, a weekend plan -> Paris and hiking, maths
-    and general questions -> none; missed: a Spanish phrase for "learning Spanish" (no shared word). Not yet tried in the app's UI.
+    and general questions -> none; missed: a Spanish phrase for "learning Spanish" (no shared word). The line and its sheet verified in the app on a Pixel Fold (2026-10-25).
   - Verified: it saved "The user is vegetarian and their daughter's name is Mia." and, in a new chat, answered "Your
     daughter's name is Mia" and suggested a vegetarian dinner.
 - `get_current_location`, with Settings > "Share my location" on (off by default):

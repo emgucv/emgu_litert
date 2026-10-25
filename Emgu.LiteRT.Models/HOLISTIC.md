@@ -184,7 +184,8 @@ The same frames read one by one (image mode) jitter far more: the body 4.3-13 px
 of 180 hand-frames and the face in 89 of 90.
 
 **Speed** on the M1 (CPU, 2 threads, those videos): 22-23 ms a frame tracked against 27-29 ms one by one - the pose detector is skipped; the hands'
-re-crop model and the face detector still run, as in MediaPipe. The phones weren't measured.
+re-crop model and the face detector still run, as in MediaPipe. The phones weren't measured; the Holistic page's live camera in video mode was
+tried on a Pixel Fold (2026-10-25) and worked.
 
 **One thing tracking makes worse, in MediaPipe too:** in the raised-hand video both MediaPipe's video mode and ours move the lowered arm's wrist up by
 the face after about two seconds (from 26 px below the shoulder to 140 px above), and keep it there, since the detector never runs again while the
@@ -250,6 +251,7 @@ the words, the requests, the routing and agent selection, the observations) and 
 ## Not done yet
 
 - Real people: everything here was checked on synthetic pictures, their copies and videos made from them - the live camera and the agent haven't had
-  a person in front of them, on the Mac or a phone.
+  a person in front of them on the Mac, and the agent not on a phone either (the Holistic page's live camera worked on a Pixel Fold, with no
+  figures taken).
 - The video mode's speed on the phones, and a way out of a wrong guess it keeps (such as re-running the detector now and then, which MediaPipe
   doesn't do).
