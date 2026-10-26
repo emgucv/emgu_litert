@@ -50,28 +50,66 @@ namespace Emgu.LiteRT.LM.Maui
 
         Size IChatOverlays.ChatSize => _chatView == null ? Size.Zero : new Size(_chatView.Width, _chatView.Height);
 
+        // Overlays and layers added before the template is applied (a feature's OnAttached runs in the constructor, before
+        // the page's views exist) wait for it.
+        private readonly List<View> _pendingOverlays = new List<View>();
+        private readonly List<View> _pendingLayers = new List<View>();
+
         void IChatOverlays.AddOverlay(View view)
         {
-            if (view != null && _overlay != null && !_overlay.Children.Contains(view))
+            if (view == null)
+                return;
+            if (_overlay == null)
+            {
+                if (!_pendingOverlays.Contains(view))
+                    _pendingOverlays.Add(view);
+            }
+            else if (!_overlay.Children.Contains(view))
                 _overlay.Children.Add(view);
         }
 
         void IChatOverlays.RemoveOverlay(View view)
         {
-            if (view != null)
-                _overlay?.Children.Remove(view);
+            if (view == null)
+                return;
+            _pendingOverlays.Remove(view);
+            _overlay?.Children.Remove(view);
         }
 
         void IChatOverlays.ShowLayer(View view)
         {
-            if (view != null && _layers != null && !_layers.Children.Contains(view))
+            if (view == null)
+                return;
+            if (_layers == null)
+            {
+                if (!_pendingLayers.Contains(view))
+                    _pendingLayers.Add(view);
+            }
+            else if (!_layers.Children.Contains(view))
                 _layers.Children.Add(view);
         }
 
         void IChatOverlays.HideLayer(View view)
         {
-            if (view != null)
-                _layers?.Children.Remove(view);
+            if (view == null)
+                return;
+            _pendingLayers.Remove(view);
+            _layers?.Children.Remove(view);
+        }
+
+        // The template is applied: the views the features added before go in.
+        private void FlushOverlays()
+        {
+            if (_overlay != null)
+                foreach (View view in _pendingOverlays)
+                    if (!_overlay.Children.Contains(view))
+                        _overlay.Children.Add(view);
+            _pendingOverlays.Clear();
+            if (_layers != null)
+                foreach (View view in _pendingLayers)
+                    if (!_layers.Children.Contains(view))
+                        _layers.Children.Add(view);
+            _pendingLayers.Clear();
         }
 
         ChatConversation IChatPageHost.Conversation => Conversation;

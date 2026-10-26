@@ -157,6 +157,7 @@ namespace Emgu.LiteRT.LM.Maui
                 _backButton.IsVisible = _options.ShowBackButton;
             SemanticProperties.SetDescription(_backButton, "Back");
             _chatView.SizeChanged += (s, e) => ChatSizeChanged?.Invoke(this, EventArgs.Empty);
+            FlushOverlays();
             if (_modelButton != null)
                 _modelButton.IsVisible = _options.ShowModelPicker;
             if (_chatsButton != null)
