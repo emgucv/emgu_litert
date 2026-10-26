@@ -92,6 +92,33 @@ namespace Emgu.LiteRT.LM.Maui
         {
         }
 
+        /// <summary>
+        /// What the feature adds to a message about to be sent: text for the model before the message (e.g. a document's
+        /// excerpts), attachments (a picture of it), and a step line shown above the reply; or null for nothing. The page
+        /// joins the features' additions (<see cref="ChatPage.PrepareRequestAsync"/>).
+        /// </summary>
+        /// <param name="request">The message as the user sent it</param>
+        /// <param name="cancellationToken">Stops the send</param>
+        public virtual Task<ChatMessageAddition> PrepareMessageAsync(ChatSendRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult<ChatMessageAddition>(null);
+
+        /// <summary>
+        /// Called just before the request goes out, after the conversation was made to fit the context window: a feature
+        /// whose addition no longer fits what the model holds (compacting dropped what it gave before) returns a new one
+        /// and the page joins the context again; null keeps the addition as it is. Only called for a feature that added
+        /// something to this message.
+        /// </summary>
+        /// <param name="message">The message being sent</param>
+        /// <param name="cancellationToken">Stops the send</param>
+        public virtual Task<ChatMessageAddition> RefreshMessageAsync(ChatMessageItem message, CancellationToken cancellationToken) =>
+            Task.FromResult<ChatMessageAddition>(null);
+
+        /// <summary>Called when the conversation became a saved chat, or another one (its id is <see cref="IChatPageHost.CurrentChatId"/>).</summary>
+        /// <param name="chatId">The chat</param>
+        public virtual void OnChatSaved(int chatId)
+        {
+        }
+
         /// <summary>Called when the app comes to the front (on desktops also when its window is activated).</summary>
         public virtual void OnAppResumed()
         {
@@ -147,6 +174,19 @@ namespace Emgu.LiteRT.LM.Maui
         /// the chat, with its progress), or null for none; the feature shows and hides it.
         /// </summary>
         public virtual View BuildComposerView() => null;
+    }
+
+    /// <summary>What a feature adds to a message about to be sent (<see cref="ChatFeature.PrepareMessageAsync"/>).</summary>
+    public sealed class ChatMessageAddition
+    {
+        /// <summary>Text given to the model before the message, or null.</summary>
+        public string Context { get; set; }
+
+        /// <summary>Attachments to send with the message, or null.</summary>
+        public IEnumerable<DataContent> Attachments { get; set; }
+
+        /// <summary>A step line shown above the reply ("Looked in report.pdf: pages 2 and 5"), or null.</summary>
+        public string StepLine { get; set; }
     }
 
     /// <summary>

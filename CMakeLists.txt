@@ -572,6 +572,10 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # Emgu.LiteRT.LM.Maui/: a MAUI chat control (XAML templates) on top of Emgu.LiteRT.LM.Chat.
   SET(EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.Maui")
   SET(EMGU_LITERT_LM_MAUI_CONTROL_NUGET_TITLE "${EMGU_LITERT_LM_NUGET_TITLE} MAUI")
+  # Emgu.LiteRT.LM.Maui.Documents/: ChatPage's document questions (kept out of Emgu.LiteRT.LM.Maui so that package doesn't
+  # depend on Emgu.LiteRT.LM.Agents.Documents and PdfPig).
+  SET(EMGU_LITERT_LM_MAUI_DOCUMENTS_NUGET_ID "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}.Documents")
+  SET(EMGU_LITERT_LM_MAUI_DOCUMENTS_NUGET_TITLE "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_TITLE} Documents")
 
   SET(EMGU_LITERT_UTIL_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Util")
   SET(EMGU_LITERT_UTIL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Util")
@@ -1260,6 +1264,17 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui/Maui/docs/README.md)
 
+# Emgu.LiteRT.LM.Maui.Documents: ChatPage's DocumentsFeature. Its own nuget package, depending on Emgu.LiteRT.LM.Maui and
+# Emgu.LiteRT.LM.Agents.Documents (PdfPig).
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Documents.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Documents/Maui/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Documents/Maui/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Documents/Maui/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Documents.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Documents/Maui/docs/README.md)
+
 # Emgu.TF.Lite.ImageIO: NativeImageIO/JpegData (renamed from Emgu.Models, then Emgu.LiteRT.ImageIO).
 # Its own nuget package, depending on Emgu.LiteRT.Util (Annotation) and Emgu.TF.Lite
 # (Emgu.TF.Lite.Toolbox's native pixel-conversion P/Invokes).
@@ -1385,6 +1400,7 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Chat)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Chat.Sqlite)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.Documents)
   # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and later to Emgu.TF.Lite.ImageIO/, and made
   # its own project+package (it used to be shared source imported directly into
   # Emgu.LiteRT.Tflite.Models.csproj and CVInterop.Lite.csproj). Depends on Emgu.TF.Lite

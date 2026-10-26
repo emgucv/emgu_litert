@@ -13,9 +13,6 @@ internal static class ChatPlannerInstructions
     internal const string Photos = "When the user asks you to find or show their photos or pictures, use the find_photos tool with the request in their " +
             "words; the photos it finds are shown to the user, not to you.";
 
-    internal const string Documents = "When asked about the user's saved documents or files shared in earlier chats, use search_documents with " +
-            "the request, and the document's name if given. Cite the document and page. If nothing is found, say so.";
-
     internal const string Images = "When the user asks you to draw, paint or create a picture, use the generate_image tool with a short English " +
             "description; the picture is shown to the user, not to you.";
 

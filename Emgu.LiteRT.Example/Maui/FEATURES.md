@@ -265,7 +265,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Document questions
 
-- "+" > Document attaches a PDF, Word (.docx) or text file to the chat (`DocumentsFeature`; `DocumentReader` and the saved-document search are in
+- "+" > Document attaches a PDF, Word (.docx) or text file to the chat (the library's `DocumentsFeature` in `Emgu.LiteRT.LM.Maui.Documents`
+  since 2026-10-26, over the demo's `ChatStore` and `SearchServices`; `DocumentReader` and the saved-document search are in
   the `Emgu.LiteRT.LM.Agents.Documents` package, `PdfPageRenderer` in `Emgu.LiteRT.LM.Maui`, since 2026-10-25). It shows as a chip above the message box - indexing progress, then e.g. "5 pages · 2 pictures ·
   1 page as image". Its cross removes it, as do New chat and opening a saved chat.
 - Reading:

@@ -20,65 +20,8 @@ namespace Maui.Demo.Lite;
 [Table("Conversation")]
 public class ConversationRecord : ChatRecord
 {
-    /// <summary>The attached document (DocumentRecord.Id), restored when the chat is opened; null if none</summary>
-    public string DocumentId { get; set; }
 }
 
-/// <summary>
-/// A document attached to a chat, indexed for its questions (LiteRtLmChatPage.Documents.cs): kept so attaching the
-/// same file again, or opening a chat that used it, doesn't index it again. Deleted with the last chat that uses it.
-/// </summary>
-[Table("Document")]
-public class DocumentRecord
-{
-    /// <summary>The SHA-256 of the file, in hex</summary>
-    [PrimaryKey]
-    public string Id { get; set; }
-
-    public string Name { get; set; }
-
-    public int PageCount { get; set; }
-
-    /// <summary>What the index was built with (passage size, embedding model, images...): another value rebuilds it</summary>
-    public string Settings { get; set; }
-
-    /// <summary>The chip's description, e.g. "5 pages · 2 pictures"</summary>
-    public string Summary { get; set; }
-
-    public DateTime Created { get; set; }
-}
-
-/// <summary>
-/// A passage or image of a saved document, with its embedding (floats).
-/// </summary>
-[Table("DocumentItem")]
-public class DocumentItemRecord
-{
-    [PrimaryKey, AutoIncrement]
-    public int Id { get; set; }
-
-    [Indexed]
-    public string DocumentId { get; set; }
-
-    /// <summary>Its position among the document's passages or images</summary>
-    public int Position { get; set; }
-
-    public bool IsImage { get; set; }
-
-    /// <summary>A passage's text</summary>
-    public string Text { get; set; }
-
-    public string Location { get; set; }
-
-    /// <summary>An image: whether it is a whole page, its media type and bytes</summary>
-    public bool IsPage { get; set; }
-
-    public string MediaType { get; set; }
-
-    public byte[] Data { get; set; }
-
-    public byte[] Embedding { get; set; }
-}
 
 /// <summary>
 /// A message of a saved chat.
@@ -165,8 +108,6 @@ internal sealed partial class ChatStore : ChatHistoryStore
         await connection.CreateTableAsync<ConversationRecord>();
         await connection.CreateTableAsync<MessageRecord>();
         await connection.CreateTableAsync<PhotoEmbeddingRecord>();
-        await connection.CreateTableAsync<DocumentRecord>();
-        await connection.CreateTableAsync<DocumentItemRecord>();
     }
 
     private Task<SQLiteAsyncConnection> Db => GetConnectionAsync();
@@ -211,50 +152,17 @@ internal sealed partial class ChatStore : ChatHistoryStore
         await (await Db).ExecuteAsync("UPDATE Message SET Language = ? WHERE Id = ?", language, messageId);
     }
 
-    // ---------- Documents ----------
-
-    public async Task<DocumentRecord> GetDocumentAsync(string id)
-    {
-        if (IsPrivate) return null;
-        return await (await Db).FindAsync<DocumentRecord>(id);
-    }
-
-    public async Task<List<DocumentItemRecord>> GetDocumentItemsAsync(string id)
-    {
-        if (IsPrivate) return new List<DocumentItemRecord>();
-        return await (await Db).Table<DocumentItemRecord>().Where(i => i.DocumentId == id).OrderBy(i => i.Position).ToListAsync();
-    }
-
-    /// <summary>
-    /// Every saved passage (not image) with its document, for searching all saved documents. Documents indexed with
-    /// another embedding model (the second part of DocumentRecord.Settings) are left out: their vectors can't be compared.
-    /// </summary>
-    public async Task<List<(DocumentRecord Document, DocumentItemRecord Item)>> GetDocumentPassagesAsync(string embeddingFile)
-    {
-        var result = new List<(DocumentRecord, DocumentItemRecord)>();
-        if (IsPrivate) return result;
-        SQLiteAsyncConnection db = await Db;
-        foreach (DocumentRecord document in await db.Table<DocumentRecord>().ToListAsync())
-        {
-            if (document.Settings?.Split('|').ElementAtOrDefault(1) != embeddingFile)
-                continue;
-            foreach (DocumentItemRecord item in await db.Table<DocumentItemRecord>()
-                .Where(i => i.DocumentId == document.Id && !i.IsImage).OrderBy(i => i.Position).ToListAsync())
-                if (item.Embedding != null && item.Embedding.Length > 0 && !string.IsNullOrEmpty(item.Text))
-                    result.Add((document, item));
-        }
-        return result;
-    }
+    // ---------- Documents (the index is the base store's; the demo's names and Emgu.LiteRT.LM.Agents.Documents' types) ----------
 
     /// <summary>The same passages as Emgu.LiteRT.LM.Agents.Documents' search takes them (DocumentLibrarySearch).</summary>
     public async Task<List<DocumentLibraryPassage>> GetDocumentLibraryPassagesAsync(string embeddingFile) =>
         (await GetDocumentPassagesAsync(embeddingFile)).Select(p => new DocumentLibraryPassage
         {
-            DocumentId = p.Document.Id,
-            DocumentName = p.Document.Name,
-            Location = p.Item.Location,
-            Text = p.Item.Text,
-            Embedding = ToFloats(p.Item.Embedding)
+            DocumentId = p.DocumentId,
+            DocumentName = p.DocumentName,
+            Location = p.Location,
+            Text = p.Text,
+            Embedding = ToFloats(p.Embedding)
         }).ToList();
 
     private static float[] ToFloats(byte[] bytes)
@@ -264,49 +172,8 @@ internal sealed partial class ChatStore : ChatHistoryStore
         return values;
     }
 
-    /// <summary>Save a document's index, replacing an older one of the same file.</summary>
-    public async Task SaveDocumentAsync(DocumentRecord document, IEnumerable<DocumentItemRecord> items)
-    {
-        if (IsPrivate) return;
-        SQLiteAsyncConnection db = await Db;
-        List<DocumentItemRecord> list = items.ToList();
-        await db.RunInTransactionAsync(connection =>
-        {
-            connection.Execute("DELETE FROM DocumentItem WHERE DocumentId = ?", document.Id);
-            connection.InsertOrReplace(document);
-            connection.InsertAll(list);
-        });
-    }
-
     /// <summary>Record the document a chat uses (null for none).</summary>
-    public async Task SetConversationDocumentAsync(int conversationId, string documentId)
-    {
-        if (IsPrivate) return;
-        SQLiteAsyncConnection db = await Db;
-        var conversation = await db.FindAsync<ConversationRecord>(conversationId);
-        if (conversation == null || conversation.DocumentId == documentId)
-            return;
-        conversation.DocumentId = documentId;
-        await db.UpdateAsync(conversation);
-    }
-
-    /// <summary>Delete the documents no saved chat uses, except keepId (e.g. the one attached now).</summary>
-    public async Task DeleteUnusedDocumentsAsync(string keepId = null)
-    {
-        if (IsPrivate) return;
-        SQLiteAsyncConnection db = await Db;
-        HashSet<string> used = new HashSet<string>((await db.Table<ConversationRecord>().ToListAsync())
-            .Where(c => c.DocumentId != null).Select(c => c.DocumentId));
-        if (keepId != null)
-            used.Add(keepId);
-        foreach (DocumentRecord document in await db.Table<DocumentRecord>().ToListAsync())
-        {
-            if (used.Contains(document.Id))
-                continue;
-            await db.ExecuteAsync("DELETE FROM DocumentItem WHERE DocumentId = ?", document.Id);
-            await db.DeleteAsync<DocumentRecord>(document.Id);
-        }
-    }
+    public Task SetConversationDocumentAsync(int conversationId, string documentId) => SetChatDocumentAsync(conversationId, documentId);
 
     /// <summary>Delete a saved chat, its messages and attachment files.</summary>
     public Task DeleteConversationAsync(int conversationId) => DeleteChatAsync(conversationId);

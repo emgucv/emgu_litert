@@ -100,6 +100,9 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>Makes the notice a search's settings section shows when the model was deleted (with a way to download it again); or null.</summary>
         public Func<View> CreateDownloadNotice { get; set; }
 
+        /// <summary>Whether the search model embeds images too (a document's pictures and photo search need it); true unless an app says otherwise.</summary>
+        public bool SupportsImages { get; set; } = true;
+
         /// <summary>Whether the model was deleted (<see cref="DownloadRequired"/>).</summary>
         public bool IsDownloadRequired => DownloadRequired?.Invoke() == true;
     }

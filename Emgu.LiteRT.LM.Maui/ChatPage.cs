@@ -332,6 +332,9 @@ namespace Emgu.LiteRT.LM.Maui
             if (DeveloperMode && _lastComposition != null)
                 Conversation?.AddNotice(null, "Tools: " + (_lastComposition.Tools.Count == 0 ? "none" : string.Join(", ", _lastComposition.Tools.Select(t => t.Name)))
                     + "\n\nInstructions:\n" + (_lastComposition.Instructions ?? "none"));
+            // Saved by the history binding (AutoSave): the page and the features learn the chat's id.
+            if (_binding != null && _binding.ChatId > 0 && _chatId != _binding.ChatId)
+                SetCurrentChat(_binding.ChatId);
             foreach (ChatFeature feature in _features)
             {
                 try { feature.OnReplyCompleted(e); }

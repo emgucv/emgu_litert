@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Chat.Sqlite;
 using Maui.Demo.Lite;
 using NUnit.Framework;
 

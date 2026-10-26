@@ -10,6 +10,7 @@ using Emgu.LiteRT.LM.Agents.Documents;
 using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Chat.Sqlite;
 using Maui.Demo.Lite;
 using Microsoft.Extensions.AI;
 using NUnit.Framework;

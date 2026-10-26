@@ -32,16 +32,6 @@ internal sealed partial class ChatStore
     public async Task<long> GetChatIndexBytesAsync() => await (await Db).ExecuteScalarAsync<long>(
         "SELECT COALESCE(SUM(COALESCE(length(Embedding),0) + COALESCE(length(CAST(Text AS BLOB)),0)),0) FROM ChatEmbedding");
 
-    public async Task DeleteDocumentAsync(string id)
-    {
-        await (await Db).RunInTransactionAsync(connection =>
-        {
-            connection.Execute("UPDATE Conversation SET DocumentId = NULL WHERE DocumentId = ?", id);
-            connection.Execute("DELETE FROM DocumentItem WHERE DocumentId = ?", id);
-            connection.Delete<DocumentRecord>(id);
-        });
-    }
-
     public async Task DeleteAllAttachmentsAsync()
     {
         StorageFiles.DeleteDirectory(StorageFolder, AttachmentFolder);

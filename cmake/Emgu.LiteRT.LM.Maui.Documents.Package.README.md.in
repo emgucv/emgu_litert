@@ -1,0 +1,25 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Maui.Documents.dll`: `DocumentsFeature`, a feature of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `ChatPage` for questions about a document. A PDF, Word (.docx) or text file attached to the chat (`AttachDocument(bytes, name)`, from your file picker) is read with `${EMGU_LITERT_LM_AGENTS_DOCUMENTS_NUGET_ID}` and indexed on the device with the shared search model (`SearchServices`): its text in passages, and its pictures and scanned pages for models that take images. Each message is then sent with the excerpts most related to it (and the best-matching picture), so the model's context needn't hold the whole document; after the conversation is compacted the excerpts are searched again. The `search_documents` tool looks in every document saved with earlier chats. A chip above the message box shows the document and its indexing.
+
+The index is kept in the chats' store (`IChatDocumentStore`, which `${EMGU_LITERT_LM_CHAT_SQLITE_NUGET_ID}`'s `ChatHistoryStore` implements), with the document each chat uses, restored when the chat is opened; a private chat's document is indexed in memory only. It is kept out of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}` so that package doesn't depend on PdfPig.
+
+## Adding it to a chat page
+
+```csharp
+using Emgu.LiteRT.LM.Chat.Sqlite;
+using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Documents;
+using Emgu.LiteRT.LM.Models;
+
+var store = new ChatHistoryStore(Path.Combine(FileSystem.AppDataDirectory, "MyApp", "chats"));
+var search = new SearchServices(new EmbeddingModelChoice(() => new EmbeddingGemma2TextVision(), "EmbeddingGemma 2"));
+var documents = new DocumentsFeature(store, search);
+options.Features.Add(documents);
+// From your file picker:
+documents.AttachDocument(await File.ReadAllBytesAsync(path), Path.GetFileName(path));
+```
+
+The same `SearchServices` serves `PastChatsFeature`, so the embedding model is loaded once.

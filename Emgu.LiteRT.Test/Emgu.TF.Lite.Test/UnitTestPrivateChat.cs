@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Chat.Sqlite;
 using Maui.Demo.Lite;
 using NUnit.Framework;
 

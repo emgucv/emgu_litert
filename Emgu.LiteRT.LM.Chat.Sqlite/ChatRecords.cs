@@ -39,6 +39,73 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
 
         /// <summary>The id of the last message the model no longer sees (summarized or dropped); 0 for none.</summary>
         public int SummaryUpTo { get; set; }
+
+        /// <summary>The document attached to the chat (<see cref="DocumentRecord.Id"/>), restored when it is opened; null if none.</summary>
+        public string DocumentId { get; set; }
+    }
+
+    /// <summary>
+    /// A document attached to a chat, indexed for its questions (the "Document" table; <see cref="IChatDocumentStore"/>): kept so
+    /// attaching the same file again, or opening a chat that used it, doesn't index it again. Deleted with the last chat that uses it.
+    /// </summary>
+    [Table("Document")]
+    public class DocumentRecord
+    {
+        /// <summary>The SHA-256 of the file, in hex</summary>
+        [PrimaryKey]
+        public string Id { get; set; }
+
+        /// <summary>The file's name</summary>
+        public string Name { get; set; }
+
+        /// <summary>Its pages (0 when unknown)</summary>
+        public int PageCount { get; set; }
+
+        /// <summary>What the index was built with (passage size, embedding model, images...): another value rebuilds it</summary>
+        public string Settings { get; set; }
+
+        /// <summary>The chip's description, e.g. "5 pages · 2 pictures"</summary>
+        public string Summary { get; set; }
+
+        /// <summary>When it was indexed (UTC)</summary>
+        public DateTime Created { get; set; }
+    }
+
+    /// <summary>A passage or image of a saved document, with its embedding (the floats' bytes); the "DocumentItem" table.</summary>
+    [Table("DocumentItem")]
+    public class DocumentItemRecord
+    {
+        /// <summary>The row's id</summary>
+        [PrimaryKey, AutoIncrement]
+        public int Id { get; set; }
+
+        /// <summary>The document</summary>
+        [Indexed]
+        public string DocumentId { get; set; }
+
+        /// <summary>Its position among the document's passages or images</summary>
+        public int Position { get; set; }
+
+        /// <summary>Whether it is an image (else a passage)</summary>
+        public bool IsImage { get; set; }
+
+        /// <summary>A passage's text</summary>
+        public string Text { get; set; }
+
+        /// <summary>Where it is ("page 3"), or null</summary>
+        public string Location { get; set; }
+
+        /// <summary>An image: whether it is a whole page</summary>
+        public bool IsPage { get; set; }
+
+        /// <summary>An image's media type</summary>
+        public string MediaType { get; set; }
+
+        /// <summary>An image's bytes</summary>
+        public byte[] Data { get; set; }
+
+        /// <summary>The embedding, as the floats' bytes; null if none</summary>
+        public byte[] Embedding { get; set; }
     }
 
     /// <summary>

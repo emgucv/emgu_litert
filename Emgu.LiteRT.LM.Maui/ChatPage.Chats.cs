@@ -86,14 +86,14 @@ namespace Emgu.LiteRT.LM.Maui
         /// </summary>
         /// <param name="message">The message being sent</param>
         /// <param name="cancellationToken">Stops the send</param>
-        protected virtual Task OnBeforeStreamingAsync(ChatMessageItem message, CancellationToken cancellationToken)
+        protected virtual async Task OnBeforeStreamingAsync(ChatMessageItem message, CancellationToken cancellationToken)
         {
+            await RefreshAdditionsAsync(message, cancellationToken);
             if (_rereadNext)
             {
                 _rereadNext = false;
                 _chatView.SetStatus("Reading the conversation so far...");
             }
-            return Task.CompletedTask;
         }
 
         private void AttachHistory(int chatId)
@@ -121,8 +121,16 @@ namespace Emgu.LiteRT.LM.Maui
         /// <param name="chatId">The chat, or null for one not saved yet</param>
         protected void SetCurrentChat(int? chatId)
         {
+            bool saved = chatId != null && chatId != _chatId;
             _chatId = chatId;
             RefreshChatList();
+            if (!saved)
+                return;
+            foreach (ChatFeature feature in _features)
+            {
+                try { feature.OnChatSaved(chatId.Value); }
+                catch (Exception) { }
+            }
         }
 
         /// <summary>

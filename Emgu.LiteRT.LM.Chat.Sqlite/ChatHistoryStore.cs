@@ -30,7 +30,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
     /// <see cref="GetMessageId"/> need nothing else. With <see cref="IsPrivate"/> on, nothing is saved.
     /// </para>
     /// </summary>
-    public class ChatHistoryStore : IChatHistoryStore, IChatSearchStore
+    public class ChatHistoryStore : IChatHistoryStore, IChatSearchStore, IChatDocumentStore
     {
         /// <summary>The version of the tables this store reads and writes (kept in the database, for migrations).</summary>
         public const int SchemaVersion = 1;
@@ -91,6 +91,8 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             await connection.CreateTableAsync<ChatRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<ChatMessageRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<ChatEmbeddingRecord>().ConfigureAwait(false);
+            await connection.CreateTableAsync<DocumentRecord>().ConfigureAwait(false);
+            await connection.CreateTableAsync<DocumentItemRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<SchemaVersionRecord>().ConfigureAwait(false);
             if (await connection.FindAsync<SchemaVersionRecord>(SchemaName).ConfigureAwait(false) == null)
                 await connection.InsertAsync(new SchemaVersionRecord { Name = SchemaName, Version = SchemaVersion }).ConfigureAwait(false);
@@ -620,6 +622,149 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 return new List<int>();
             SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
             return (await db.Table<ChatRecord>().ToListAsync().ConfigureAwait(false)).Select(c => c.Id).ToList();
+        }
+
+        // ---------- The documents attached to chats (IChatDocumentStore) ----------
+
+        /// <summary>A saved document, or null (none while <see cref="IsPrivate"/>).</summary>
+        /// <param name="id">Its id</param>
+        public async Task<DocumentRecord> GetDocumentAsync(string id)
+        {
+            if (IsPrivate)
+                return null;
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            return await db.FindAsync<DocumentRecord>(id).ConfigureAwait(false);
+        }
+
+        async Task<ChatDocument> IChatDocumentStore.GetDocumentAsync(string id)
+        {
+            DocumentRecord record = await GetDocumentAsync(id).ConfigureAwait(false);
+            return record == null ? null : new ChatDocument
+            {
+                Id = record.Id, Name = record.Name, PageCount = record.PageCount, Settings = record.Settings, Summary = record.Summary, Created = record.Created
+            };
+        }
+
+        /// <summary>A saved document's passages and images, in order (none while <see cref="IsPrivate"/>).</summary>
+        /// <param name="id">The document</param>
+        public async Task<List<DocumentItemRecord>> GetDocumentItemsAsync(string id)
+        {
+            if (IsPrivate)
+                return new List<DocumentItemRecord>();
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            return await db.Table<DocumentItemRecord>().Where(i => i.DocumentId == id).OrderBy(i => i.Position).ToListAsync().ConfigureAwait(false);
+        }
+
+        async Task<IReadOnlyList<ChatDocumentItem>> IChatDocumentStore.GetDocumentItemsAsync(string id) =>
+            (await GetDocumentItemsAsync(id).ConfigureAwait(false)).Select(ToItem).ToList();
+
+        private static ChatDocumentItem ToItem(DocumentItemRecord i) => new ChatDocumentItem
+        {
+            DocumentId = i.DocumentId, Position = i.Position, IsImage = i.IsImage, Text = i.Text, Location = i.Location,
+            IsPage = i.IsPage, MediaType = i.MediaType, Data = i.Data, Embedding = i.Embedding
+        };
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<ChatDocumentPassage>> GetDocumentPassagesAsync(string embeddingFile)
+        {
+            var result = new List<ChatDocumentPassage>();
+            if (IsPrivate)
+                return result;
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            foreach (DocumentRecord document in await db.Table<DocumentRecord>().ToListAsync().ConfigureAwait(false))
+            {
+                if (document.Settings?.Split('|').ElementAtOrDefault(1) != embeddingFile)
+                    continue;
+                foreach (DocumentItemRecord item in await db.Table<DocumentItemRecord>()
+                    .Where(i => i.DocumentId == document.Id && !i.IsImage).OrderBy(i => i.Position).ToListAsync().ConfigureAwait(false))
+                    if (item.Embedding != null && item.Embedding.Length > 0 && !string.IsNullOrEmpty(item.Text))
+                        result.Add(new ChatDocumentPassage
+                        {
+                            DocumentId = document.Id, DocumentName = document.Name, Location = item.Location, Text = item.Text, Embedding = item.Embedding
+                        });
+            }
+            return result;
+        }
+
+        /// <summary>Save a document's index, replacing an older one of the same file (nothing while <see cref="IsPrivate"/>).</summary>
+        /// <param name="document">The document</param>
+        /// <param name="items">Its passages and images</param>
+        public async Task SaveDocumentAsync(DocumentRecord document, IEnumerable<DocumentItemRecord> items)
+        {
+            if (IsPrivate)
+                return;
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            List<DocumentItemRecord> list = items.ToList();
+            await db.RunInTransactionAsync(connection =>
+            {
+                connection.Execute("DELETE FROM DocumentItem WHERE DocumentId = ?", document.Id);
+                connection.InsertOrReplace(document);
+                connection.InsertAll(list);
+            }).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public Task SaveDocumentAsync(ChatDocument document, IEnumerable<ChatDocumentItem> items) =>
+            SaveDocumentAsync(new DocumentRecord
+            {
+                Id = document.Id, Name = document.Name, PageCount = document.PageCount, Settings = document.Settings, Summary = document.Summary, Created = document.Created
+            }, items.Select(i => new DocumentItemRecord
+            {
+                DocumentId = i.DocumentId, Position = i.Position, IsImage = i.IsImage, Text = i.Text, Location = i.Location,
+                IsPage = i.IsPage, MediaType = i.MediaType, Data = i.Data, Embedding = i.Embedding
+            }));
+
+        /// <inheritdoc/>
+        public async Task<string> GetChatDocumentAsync(int chatId)
+        {
+            if (IsPrivate)
+                return null;
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            ChatRecord chat = await db.FindAsync<ChatRecord>(chatId).ConfigureAwait(false);
+            return chat?.DocumentId;
+        }
+
+        /// <inheritdoc/>
+        public async Task SetChatDocumentAsync(int chatId, string documentId)
+        {
+            if (IsPrivate)
+                return;
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            ChatRecord chat = await db.FindAsync<ChatRecord>(chatId).ConfigureAwait(false);
+            if (chat == null || chat.DocumentId == documentId)
+                return;
+            await db.ExecuteAsync("UPDATE Conversation SET DocumentId = ? WHERE Id = ?", documentId, chatId).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public async Task DeleteUnusedDocumentsAsync(string keepId = null)
+        {
+            if (IsPrivate)
+                return;
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            HashSet<string> used = new HashSet<string>((await db.Table<ChatRecord>().ToListAsync().ConfigureAwait(false))
+                .Where(c => c.DocumentId != null).Select(c => c.DocumentId));
+            if (keepId != null)
+                used.Add(keepId);
+            foreach (DocumentRecord document in await db.Table<DocumentRecord>().ToListAsync().ConfigureAwait(false))
+            {
+                if (used.Contains(document.Id))
+                    continue;
+                await db.ExecuteAsync("DELETE FROM DocumentItem WHERE DocumentId = ?", document.Id).ConfigureAwait(false);
+                await db.DeleteAsync<DocumentRecord>(document.Id).ConfigureAwait(false);
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task DeleteDocumentAsync(string id)
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            await db.RunInTransactionAsync(connection =>
+            {
+                connection.Execute("UPDATE Conversation SET DocumentId = NULL WHERE DocumentId = ?", id);
+                connection.Execute("DELETE FROM DocumentItem WHERE DocumentId = ?", id);
+                connection.Delete<DocumentRecord>(id);
+            }).ConfigureAwait(false);
         }
 
         // ---------- Helpers ----------

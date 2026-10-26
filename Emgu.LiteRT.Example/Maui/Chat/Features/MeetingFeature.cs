@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Documents;
 using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
 

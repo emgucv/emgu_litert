@@ -7,6 +7,7 @@ using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Chat.Sqlite;
 using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Documents;
 using Emgu.LiteRT.LM.Maui.Features;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Extensions.AI;
@@ -54,6 +55,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         public ExerciseFeature Exercises;
         public MemoryFeature Memory;
         public WorkloadService Workload;
+        public SearchServices Search;
     }
 
     private readonly Parts _parts;
@@ -100,7 +102,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         {
             ServerOption = models.First(m => m.Id == ChatModelOptions.ServerId),
             Camera = new CameraFeature(),
-            Documents = new DocumentsFeature(),
             Mcp = new McpFeature(),
             VoiceMode = new VoiceModeFeature(),
             Transcripts = new TranscriptFeature(),
@@ -120,15 +121,18 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         };
         parts.Server = new ServerFeature(parts.ServerOption);
         parts.Workload = new WorkloadService(() => parts.ModelSettings.Embedder);
-        // The library's past-chat search over the demo's store, search model, workload and storage.
-        parts.PastChats = new PastChatsFeature(SharedStore, new SearchServices
+        // What the library's searches share: the demo's search model, workload and storage.
+        parts.Search = new SearchServices
         {
             Embedder = parts.ModelSettings.Embedder,
             Workload = parts.Workload,
             IndexModel = () => parts.ModelSettings.SearchModelFile,
             DownloadRequired = () => parts.ModelSettings.SearchDownloadRequired,
+            SupportsImages = parts.ModelSettings.SupportsImages,
             CreateDownloadNotice = () => parts.Storage.CreateSearchModelNotice()
-        });
+        };
+        parts.PastChats = new PastChatsFeature(SharedStore, parts.Search);
+        parts.Documents = new DocumentsFeature(SharedStore, parts.Search);
         var options = new ChatPageOptions
         {
             Title = "LiteRT-LM Chat",
@@ -396,16 +400,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         };
     }
 
-    // A grey step line like the tool calls', for the page's own steps (the document's, the memories').
-    private static Label StepLine(string text) => new Label
-    {
-        Text = "\U0001F50E " + text,
-        FontFamily = Theme.BodyFont,
-        FontSize = 13,
-        TextColor = Theme.SecondaryText,
-        Margin = new Thickness(6, 0)
-    };
-
     // A card above a reply (one of its decorations); without a reply, a notice of its own in the transcript.
     private void AddCard(StreamingBubble bubble, View card)
     {
@@ -493,9 +487,9 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         return context.Length > 0 ? context : null;
     }
 
-    // A message: with a document attached, the excerpts (and maybe a picture or page) most related to it; in task mode,
-    // planned and run step by step; the reply streamed, sent again when a tool group's stub asks (or a server rejected
-    // the reasoning option); then the translation offer, the memories it drew on, and the exchange saved.
+    // A message: the features' additions (the document's excerpts as the message's context, and maybe a picture or page),
+    // in task mode planned and run step by step; the reply streamed, sent again when a tool group's stub asks (or a
+    // server rejected the reasoning option); then the translation offer, the memories it drew on, and the exchange saved.
     protected override async Task SendCoreAsync(ChatSendRequest request, CancellationToken cancellationToken)
     {
         _parts.Camera.ClearCameraTurn();
@@ -505,42 +499,30 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         if (conversation == null || !await EnsureRemoteAsync(cancellationToken))
             return;
         string prompt = request.Text ?? string.Empty;
-        List<DataContent> attachments = request.Attachments?.ToList() ?? new List<DataContent>();
-        UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, think {3}", prompt.Length, attachments.Count,
+        UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, think {3}", prompt.Length, request.Attachments.Count,
             SelectedModel?.DisplayName, Chat.ThinkingEnabled));
         bool canUseTools = SelectedModel?.CanUseTools == true;
         Chat.SetStatus("Generating...");
         try
         {
-            // With a document attached: the excerpts (and maybe a picture or page) most related to the message.
-            DocumentContext document = await _parts.Documents.GetDocumentContextAsync(prompt);
-            if (document?.Image != null)
-                attachments.Add(document.Image);
+            // The model is given references to the attached images for the camera tools, before the features' additions.
+            int attachedImages = request.Attachments.Count(a => a.MediaType != null && a.MediaType.StartsWith("image/", StringComparison.Ordinal));
+            string imageReferences = canUseTools && attachedImages > 0 && Emgu.LiteRT.Models.CV.Maui.LiveCamera.Supported
+                ? "Attached image references for analyze_visual_image: " + string.Join(", ", Enumerable.Range(1, attachedImages).Select(i => "image-" + i)) + "\n"
+                : null;
+            // The features' additions: the document's excerpts (and maybe a picture or page) most related to the message.
+            ChatSendRequest prepared = await PrepareRequestAsync(
+                new ChatSendRequest(prompt, request.Attachments, JoinContext(imageReferences, request.Context)) { IsVoiceMessage = request.IsVoiceMessage },
+                cancellationToken);
+            List<DataContent> attachments = prepared.Attachments.ToList();
             var info = new UserMessageInfo { Language = await TextLanguage.DetectAsync(prompt) };
 
             // Task mode: for this message only.
             bool planTask = _parts.Tasks.TakePlan() && canUseTools && !HandsFree;
             ChatOptions options = await ComposeOptionsAsync(request);
-            // The model is given references to the attached images for the camera tools.
-            int attachedImages = attachments.Count(a => a.MediaType != null && a.MediaType.StartsWith("image/", StringComparison.Ordinal));
-            string imageReferences = canUseTools && attachedImages > 0 && Emgu.LiteRT.Models.CV.Maui.LiveCamera.Supported
-                ? "Attached image references for analyze_visual_image: " + string.Join(", ", Enumerable.Range(1, attachedImages).Select(i => "image-" + i)) + "\n"
-                : null;
-            int searchedAt = conversation.CompactionCount;
-            ChatMessageItem userItem = null;
-            _documentRefresh = async (message, token) =>
-            {
-                userItem = message;
-                // Compacting may have summarized or dropped excerpts given before: they are searched again.
-                if (document != null && conversation.CompactionCount != searchedAt)
-                {
-                    searchedAt = conversation.CompactionCount;
-                    document = await _parts.Documents.RefreshDocumentContextAsync(prompt, document, message, attachments);
-                    message.Context = JoinContext(imageReferences, document?.Text);
-                }
-            };
+            _sendingUserItem = null;
             _pendingUserInfo = info;
-            _pendingDocumentStep = document?.Step;
+            _pendingDocumentStep = PendingStepLines.FirstOrDefault();
 
             IChatClient client = planTask ? _parts.Tasks.CreateClient(prompt, attachments) : null;
             ChatMessageItem reply = null;
@@ -549,7 +531,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                 try
                 {
                     reply = reply == null
-                        ? await conversation.SendAsync(prompt, attachments, options, JoinContext(imageReferences, document?.Text), cancellationToken, client)
+                        ? await conversation.SendAsync(prompt, attachments, options, prepared.Context, cancellationToken, client)
                         : await conversation.RegenerateAsync(reply, options, cancellationToken, client);
                 }
                 catch (System.ClientModel.ClientResultException ex) when (attempt == 0 && _parts.Server.ServerRejectedReasoning(ex))
@@ -581,31 +563,29 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                 bubble.Refresh();
                 _ = _parts.Translations.CheckThinkingLanguageAsync(bubble);
             }
-            _parts.Documents.MarkDocumentContextGiven(document);
             await ShowMemoriesUsedAsync(prompt, reply, bubble);
             UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
             // The features' progress during the reply ("Step 2 of 3", "Waiting for you to confirm...") is on the page's
             // status line; the save's error, if any, replaces it.
             SetStatus(null);
-            if (userItem != null)
-                await SaveExchangeAsync(userItem, reply, bubble);
+            if (_sendingUserItem != null)
+                await SaveExchangeAsync(_sendingUserItem, reply, bubble);
             Chat.SetStatus(null);
         }
         finally
         {
-            _documentRefresh = null;
+            _sendingUserItem = null;
             _pendingUserInfo = null;
             _pendingDocumentStep = null;
         }
     }
 
-    // The message about to be sent: the document's excerpts searched again after compacting, then the base's status.
-    private Func<ChatMessageItem, CancellationToken, Task> _documentRefresh;
+    // The message being sent, as the conversation holds it (for the save).
+    private ChatMessageItem _sendingUserItem;
 
     protected override async Task OnBeforeStreamingAsync(ChatMessageItem message, CancellationToken cancellationToken)
     {
-        if (_documentRefresh != null)
-            await _documentRefresh(message, cancellationToken);
+        _sendingUserItem = message;
         await base.OnBeforeStreamingAsync(message, cancellationToken);
     }
 

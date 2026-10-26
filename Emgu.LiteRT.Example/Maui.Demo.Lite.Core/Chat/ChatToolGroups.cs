@@ -64,13 +64,6 @@ internal static class ChatToolGroups
         "image of my", "my images"
     };
 
-    internal const string Documents = "documents";
-    internal const string DocumentsSummary = "search the documents (PDF, Word, text files) the user attached to earlier chats";
-    internal static readonly string[] DocumentsKeywords =
-    {
-        "document", "file", "pdf", "report", "contract", "paper", "manual", "my notes", "attached", "the doc"
-    };
-
     internal const string ImageGeneration = "image_generation";
     internal const string ImageGenerationSummary = "draw, paint or create a new picture from a description";
     internal static readonly string[] ImageGenerationKeywords =

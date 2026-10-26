@@ -64,7 +64,97 @@ namespace Emgu.LiteRT.LM.Maui
         {
             if (!await EnsureRemoteAsync(cancellationToken))
                 return;
-            await _chatView.DefaultSendAsync(request, cancellationToken);
+            ChatSendRequest prepared = await PrepareRequestAsync(request, cancellationToken);
+            foreach (string step in PendingStepLines)
+                AddCardToNextReply(StepLine(step));
+            await _chatView.DefaultSendAsync(prepared, cancellationToken);
+        }
+
+        // The features' additions to the message being sent, and the request they were made for.
+        private readonly Dictionary<ChatFeature, ChatMessageAddition> _additions = new Dictionary<ChatFeature, ChatMessageAddition>();
+        private ChatSendRequest _preparedRequest;
+
+        /// <summary>The step lines the features gave for the message being sent (<see cref="ChatMessageAddition.StepLine"/>).</summary>
+        protected IReadOnlyList<string> PendingStepLines =>
+            _additions.Values.Select(a => a.StepLine).Where(s => !string.IsNullOrEmpty(s)).ToList();
+
+        /// <summary>
+        /// Ask every feature what it adds to a message (<see cref="ChatFeature.PrepareMessageAsync"/>): the request with
+        /// their context joined after the request's own, and their attachments after its. A derived page with its own
+        /// send calls it first, then sends what it returns.
+        /// </summary>
+        /// <param name="request">The message as the user sent it</param>
+        /// <param name="cancellationToken">Stops the send</param>
+        protected async Task<ChatSendRequest> PrepareRequestAsync(ChatSendRequest request, CancellationToken cancellationToken)
+        {
+            _additions.Clear();
+            _preparedRequest = request;
+            var attachments = request.Attachments.ToList();
+            foreach (ChatFeature feature in _features)
+            {
+                ChatMessageAddition addition = await feature.PrepareMessageAsync(request, cancellationToken);
+                if (addition == null)
+                    continue;
+                _additions[feature] = addition;
+                if (addition.Attachments != null)
+                    attachments.AddRange(addition.Attachments);
+            }
+            return new ChatSendRequest(request.Text, attachments, JoinedContext(request.Context)) { IsVoiceMessage = request.IsVoiceMessage };
+        }
+
+        private string JoinedContext(string requestContext)
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(requestContext))
+                parts.Add(requestContext);
+            parts.AddRange(_additions.Values.Select(a => a.Context).Where(c => !string.IsNullOrEmpty(c)));
+            return parts.Count == 0 ? null : string.Join("\n\n", parts);
+        }
+
+        // Before the request goes out: the features whose additions no longer fit what the model holds give new ones.
+        private async Task RefreshAdditionsAsync(ChatMessageItem message, CancellationToken cancellationToken)
+        {
+            if (_additions.Count == 0)
+                return;
+            bool changed = false;
+            foreach (ChatFeature feature in _additions.Keys.ToList())
+            {
+                ChatMessageAddition again = await feature.RefreshMessageAsync(message, cancellationToken);
+                if (again == null)
+                    continue;
+                _additions[feature] = again;
+                changed = true;
+            }
+            if (changed)
+                message.Context = JoinedContext(_preparedRequest?.Context);
+        }
+
+        /// <summary>Put a card above the next reply, when it starts (for what is known before the reply exists).</summary>
+        /// <param name="card">The card</param>
+        protected void AddCardToNextReply(View card)
+        {
+            ChatConversation conversation = Conversation;
+            if (card == null || conversation == null)
+                return;
+            System.Collections.Specialized.NotifyCollectionChangedEventHandler handler = null;
+            handler = (s, e) =>
+            {
+                ChatMessageItem reply = e.NewItems?.OfType<ChatMessageItem>().FirstOrDefault(m => m.Role == ChatMessageRole.Assistant);
+                if (reply == null)
+                    return;
+                conversation.Messages.CollectionChanged -= handler;
+                reply.Decorations.Add(card);
+            };
+            conversation.Messages.CollectionChanged += handler;
+        }
+
+        /// <summary>A grey step line for above a reply, like the tool calls' ("Looked in report.pdf: pages 2 and 5").</summary>
+        /// <param name="text">The line</param>
+        public static Label StepLine(string text)
+        {
+            var label = new Label { Text = "\U0001F50E " + text, Margin = new Thickness(6, 0) };
+            ChatResources.ApplyStyle(label, "ChatDecorationTextStyle");
+            return label;
         }
 
         /// <summary>Connect a remote model if it isn't yet (<see cref="ConnectRemoteAsync"/>); true when the model is ready.</summary>
