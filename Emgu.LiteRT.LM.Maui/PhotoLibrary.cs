@@ -8,7 +8,16 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Maui.Demo.Lite;
+#if ANDROID
+// The photos (READ_MEDIA_IMAGES on Android 13+, READ_MEDIA_VISUAL_USER_SELECTED when the user allows only some on 14+,
+// READ_EXTERNAL_STORAGE before 13) and their GPS positions (ACCESS_MEDIA_LOCATION, Android 10+), for the app's manifest.
+[assembly: Android.App.UsesPermission("android.permission.READ_MEDIA_IMAGES")]
+[assembly: Android.App.UsesPermission("android.permission.READ_MEDIA_VISUAL_USER_SELECTED")]
+[assembly: Android.App.UsesPermission("android.permission.READ_EXTERNAL_STORAGE", MaxSdkVersion = 32)]
+[assembly: Android.App.UsesPermission("android.permission.ACCESS_MEDIA_LOCATION")]
+#endif
+
+namespace Emgu.LiteRT.LM.Maui;
 
 /// <summary>
 /// A photo in the device's photo library.

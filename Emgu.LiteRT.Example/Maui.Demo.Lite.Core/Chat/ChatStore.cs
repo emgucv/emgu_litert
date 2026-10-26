@@ -39,46 +39,6 @@ public class MessageRecord : ChatMessageRecord
     public string ThinkingTranslation { get; set; }
 }
 
-/// <summary>
-/// A photo's embedding, for the chat's photo search (PhotoIndex): its id in the photo library, the version it was
-/// computed from, when it was taken, and the embedding (floats).
-/// </summary>
-[Table("PhotoEmbedding")]
-public class PhotoEmbeddingRecord
-{
-    public string EmbeddingModel { get; set; }
-
-    [PrimaryKey]
-    public string PhotoId { get; set; }
-
-    public long Version { get; set; }
-
-    public DateTime Taken { get; set; }
-
-    /// <summary>The vision tokens the embedding was made with (EmbeddingGemma 2: 70 or 140)</summary>
-    public int VisionTokens { get; set; }
-
-    // The photo's details (PhotoItem), read when it was indexed; DetailsVersion changes when what is read changes.
-    public int DetailsVersion { get; set; }
-
-    public double? Latitude { get; set; }
-
-    public double? Longitude { get; set; }
-
-    /// <summary>The nearest town to where it was taken: "Town, Region, Country" (PlaceLookup), or null</summary>
-    public string Place { get; set; }
-
-    public string Camera { get; set; }
-
-    public int Width { get; set; }
-
-    public int Height { get; set; }
-
-    /// <summary>Comma-separated: screenshot, selfie, panorama, portrait, favorite</summary>
-    public string Kinds { get; set; }
-
-    public byte[] Embedding { get; set; }
-}
 
 /// <summary>
 /// The chat page's saved chats: a SQLite database (chats/chats.db3 in the app's data folder), with images and
@@ -107,7 +67,6 @@ internal sealed partial class ChatStore : ChatHistoryStore
     {
         await connection.CreateTableAsync<ConversationRecord>();
         await connection.CreateTableAsync<MessageRecord>();
-        await connection.CreateTableAsync<PhotoEmbeddingRecord>();
     }
 
     private Task<SQLiteAsyncConnection> Db => GetConnectionAsync();
@@ -178,27 +137,4 @@ internal sealed partial class ChatStore : ChatHistoryStore
     /// <summary>Delete a saved chat, its messages and attachment files.</summary>
     public Task DeleteConversationAsync(int conversationId) => DeleteChatAsync(conversationId);
 
-    // ---------- Photo search ----------
-
-    public async Task<List<PhotoEmbeddingRecord>> GetPhotoEmbeddingsAsync()
-    {
-        return await (await Db).Table<PhotoEmbeddingRecord>().ToListAsync();
-    }
-
-    public async Task SavePhotoEmbeddingAsync(PhotoEmbeddingRecord record)
-    {
-        await (await Db).InsertOrReplaceAsync(record);
-    }
-
-    public async Task DeletePhotoEmbeddingsAsync(IEnumerable<string> photoIds)
-    {
-        SQLiteAsyncConnection db = await Db;
-        foreach (string id in photoIds)
-            await db.DeleteAsync<PhotoEmbeddingRecord>(id);
-    }
-
-    public async Task ClearPhotoEmbeddingsAsync()
-    {
-        await (await Db).DeleteAllAsync<PhotoEmbeddingRecord>();
-    }
 }

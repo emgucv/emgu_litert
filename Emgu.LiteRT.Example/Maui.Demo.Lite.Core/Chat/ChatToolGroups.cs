@@ -56,14 +56,6 @@ internal static class ChatToolGroups
     // extras); the name is kept for the page's token estimate.
     internal const string Goals = Emgu.LiteRT.LM.Agents.Skills.GoalsSkill.GroupName;
 
-    internal const string Photos = "photo_search";
-    internal const string PhotosSummary = "find and show the user's own photos and pictures on this device";
-    internal static readonly string[] PhotosKeywords =
-    {
-        "photo", "picture", "pic", "selfie", "screenshot", "gallery", "album", "camera roll", "images of",
-        "image of my", "my images"
-    };
-
     internal const string ImageGeneration = "image_generation";
     internal const string ImageGenerationSummary = "draw, paint or create a new picture from a description";
     internal static readonly string[] ImageGenerationKeywords =

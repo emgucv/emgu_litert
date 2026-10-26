@@ -8,9 +8,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Models;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui;
 
 /// <summary>
 /// A photo the index knows: its embedding and details.
@@ -34,7 +35,7 @@ internal sealed class IndexedPhoto
 /// The chat's photo search: the most recent photos (PhotoLibrary), each turned into an embedding by an image embedding
 /// model (EmbeddingGemma 2 Text Vision) in the same space as text, with its details - when and where it was taken
 /// (the nearest town, from the offline place list, PlaceLookup), the camera, its size and kind - kept in the chat
-/// database (ChatStore) so only new or edited photos are processed again, and searched by a description and/or the
+/// store (IPhotoIndexStore) so only new or edited photos are processed again, and searched by a description and/or the
 /// details (PhotoQuery).
 /// </summary>
 internal sealed class PhotoIndex
@@ -58,11 +59,11 @@ internal sealed class PhotoIndex
 
     private static Task<PlaceLookup> _places;
 
-    private readonly ChatStore _store;
+    private readonly IPhotoIndexStore _store;
     private readonly List<IndexedPhoto> _entries = new List<IndexedPhoto>();
     private bool _loaded;
 
-    public PhotoIndex(ChatStore store)
+    public PhotoIndex(IPhotoIndexStore store)
     {
         _store = store;
     }
@@ -101,17 +102,15 @@ internal sealed class PhotoIndex
     /// </summary>
     public event Action Changed;
 
-    // The offline place list (Resources/Raw/places.tsv.gz: GeoNames' towns of 5,000+ people), loaded once.
+    // The offline place list (the embedded places.tsv.gz: GeoNames' towns of 5,000+ people, CC BY 4.0), loaded once.
     private static Task<PlaceLookup> Places()
     {
         if (_places == null || _places.IsFaulted)
-            _places = Task.Run(async () =>
+            _places = Task.Run(() =>
             {
-                using System.IO.Stream stream = await FileSystem.OpenAppPackageFileAsync("places.tsv.gz");
-                using System.IO.MemoryStream copy = new System.IO.MemoryStream();
-                await stream.CopyToAsync(copy);
-                copy.Position = 0;
-                return PlaceLookup.Load(copy);
+                using System.IO.Stream stream = typeof(PhotoIndex).Assembly.GetManifestResourceStream("places.tsv.gz")
+                    ?? throw new System.IO.FileNotFoundException("The place list places.tsv.gz isn't in " + typeof(PhotoIndex).Assembly.GetName().Name);
+                return PlaceLookup.Load(stream);
             });
         return _places;
     }
@@ -120,18 +119,18 @@ internal sealed class PhotoIndex
     {
         if (_loaded)
             return;
-        List<PhotoEmbeddingRecord> records = await _store.GetPhotoEmbeddingsAsync();
+        IReadOnlyList<ChatPhotoEmbedding> records = await _store.GetPhotoEmbeddingsAsync();
         lock (_entries)
         {
             _entries.Clear();
             // Embeddings made with another vision encoder size are in a slightly different space: they are made again.
-            foreach (PhotoEmbeddingRecord record in records.Where(r => r.VisionTokens == VisionTokens))
+            foreach (ChatPhotoEmbedding record in records.Where(r => r.VisionTokens == VisionTokens))
                 _entries.Add(ToEntry(record));
         }
         _loaded = true;
     }
 
-    private static IndexedPhoto ToEntry(PhotoEmbeddingRecord record)
+    private static IndexedPhoto ToEntry(ChatPhotoEmbedding record)
     {
         IndexedPhoto entry = new IndexedPhoto
         {
@@ -159,6 +158,8 @@ internal sealed class PhotoIndex
     /// <param name="embedImage">Schedules an image embedding using the shared model</param>
     /// <param name="maxPhotos">How many of the most recent photos to keep indexed</param>
     /// <param name="waitWhile">Indexing pauses while this is true (e.g. while the chat is answering)</param>
+    /// <param name="cancellationToken">Stops the indexing</param>
+    /// <param name="waitForWork">Waits until heavy work may go on (the device cool and charged enough), or null</param>
     public async Task IndexAsync(EmbeddingModel embedder, Func<byte[], CancellationToken, Task<float[]>> embedImage, int maxPhotos, Func<bool> waitWhile,
         CancellationToken cancellationToken, Func<CancellationToken, Task> waitForWork = null)
     {
@@ -172,7 +173,7 @@ internal sealed class PhotoIndex
             try { places = await Places(); } catch (Exception) { }
             List<PhotoItem> photos = await PhotoLibrary.GetRecentPhotosAsync(maxPhotos);
             Total = photos.Count;
-            Dictionary<string, PhotoEmbeddingRecord> known = (await _store.GetPhotoEmbeddingsAsync()).ToDictionary(r => r.PhotoId);
+            Dictionary<string, ChatPhotoEmbedding> known = (await _store.GetPhotoEmbeddingsAsync()).ToDictionary(r => r.PhotoId);
             HashSet<string> current = new HashSet<string>(photos.Select(p => p.Id));
             List<string> gone = known.Keys.Where(id => !current.Contains(id)).ToList();
             if (gone.Count > 0)
@@ -185,7 +186,7 @@ internal sealed class PhotoIndex
             foreach (PhotoItem photo in photos)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                known.TryGetValue(photo.Id, out PhotoEmbeddingRecord record);
+                known.TryGetValue(photo.Id, out ChatPhotoEmbedding record);
                 string embeddingModel = System.IO.Path.GetFileName(embedder.DefaultModelFile.Url);
                 bool embeddingCurrent = record != null && record.Version == photo.Version && record.EmbeddingModel == embeddingModel && record.VisionTokens == VisionTokens;
                 if (embeddingCurrent && record.DetailsVersion == DetailsVersion)
@@ -207,7 +208,7 @@ internal sealed class PhotoIndex
                         continue;
                     embedding = ToBytes(await embedImage(image, cancellationToken));
                 }
-                PhotoEmbeddingRecord updated = new PhotoEmbeddingRecord
+                ChatPhotoEmbedding updated = new ChatPhotoEmbedding
                 {
                     PhotoId = photo.Id,
                     Version = photo.Version,

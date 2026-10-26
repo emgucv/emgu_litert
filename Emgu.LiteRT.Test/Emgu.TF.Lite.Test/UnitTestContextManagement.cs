@@ -193,7 +193,7 @@ public class UnitTestContextManagement
         using var client = new FunctionInvokingChatClient(native) { MaximumIterationsPerRequest = 6 };
         try {
             var response = await client.GetResponseAsync(prompt, new ChatOptions { Tools = tools,
-                Instructions = string.Join("\n\n", ChatPlannerInstructions.Agent, ChatPlannerInstructions.Photos, ChatSearchIndex.Instructions,
+                Instructions = string.Join("\n\n", ChatPlannerInstructions.Agent, ChatPhotos.Instructions, ChatSearchIndex.Instructions,
                     ChatPlannerInstructions.Images, ChatPlannerInstructions.Camera, VisualAgentTools.Instructions),
                 Reasoning = new ReasoningOptions { Effort = thinking ? ReasoningEffort.Medium : ReasoningEffort.None } }, stop.Token);
             TestContext.Progress.WriteLine(response.Text); foreach (var info in diagnostics) TestContext.Progress.WriteLine(info);

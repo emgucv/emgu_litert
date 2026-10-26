@@ -113,7 +113,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <!-- The offline place list the MAUI demo's photo search uses (GeoNames, CC BY 4.0), for TestPlaceLookup. -->
-    <Content Include="..\..\..\Emgu.LiteRT.Example\Maui\Resources\Raw\places.tsv.gz" Link="places.tsv.gz">
+    <Content Include="..\..\..\Emgu.LiteRT.LM.Maui\Resources\places.tsv.gz" Link="places.tsv.gz">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="..\grace_hopper.jpg" Link="grace_hopper.jpg">

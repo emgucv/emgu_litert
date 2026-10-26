@@ -54,7 +54,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         public MeetingFeature Meetings;
         public ExerciseFeature Exercises;
         public MemoryFeature Memory;
-        public WorkloadService Workload;
+        public IIndexingWorkload Workload;
         public SearchServices Search;
     }
 
@@ -114,13 +114,12 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             DeviceActions = new DeviceActionsFeature(),
             WrittenDocuments = new WrittenDocumentsFeature(),
             Goals = new GoalsFeature(SharedStore.Goals),
-            PhotoSearch = new PhotoSearchFeature(),
             Meetings = new MeetingFeature(),
             Exercises = new ExerciseFeature(),
             Memory = new MemoryFeature(SharedStore.Memories)
         };
         parts.Server = new ServerFeature(parts.ServerOption);
-        parts.Workload = new WorkloadService(() => parts.ModelSettings.Embedder);
+        parts.Workload = new DeviceIndexingWorkload();
         // What the library's searches share: the demo's search model, workload and storage.
         parts.Search = new SearchServices
         {
@@ -133,6 +132,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         };
         parts.PastChats = new PastChatsFeature(SharedStore, parts.Search);
         parts.Documents = new DocumentsFeature(SharedStore, parts.Search);
+        parts.PhotoSearch = new PhotoSearchFeature(SharedStore, parts.Search);
         var options = new ChatPageOptions
         {
             Title = "LiteRT-LM Chat",
@@ -170,7 +170,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 
     // ---------- Services ----------
 
-    private WorkloadService Workload => (_parts ?? _building).Workload;
+    private IIndexingWorkload Workload => (_parts ?? _building).Workload;
 
     private SearchEmbedder Embedder => _parts.ModelSettings.Embedder;
 
@@ -180,7 +180,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 
     ChatStore IDemoHost.Store => SharedStore;
 
-    WorkloadService IDemoHost.Workload => Workload;
+    IIndexingWorkload IDemoHost.Workload => Workload;
 
     bool IDemoHost.PageVisible => _pageVisible;
 

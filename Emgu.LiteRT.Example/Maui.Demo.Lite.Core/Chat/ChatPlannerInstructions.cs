@@ -10,9 +10,6 @@ internal static class ChatPlannerInstructions
             "something lasting about themselves, save it with the remember tool. Base your answer on what the tools " +
             "return, mention where it came from, and keep it short.";
 
-    internal const string Photos = "When the user asks you to find or show their photos or pictures, use the find_photos tool with the request in their " +
-            "words; the photos it finds are shown to the user, not to you.";
-
     internal const string Images = "When the user asks you to draw, paint or create a picture, use the generate_image tool with a short English " +
             "description; the picture is shown to the user, not to you.";
 

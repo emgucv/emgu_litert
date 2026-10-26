@@ -366,7 +366,7 @@ See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HIS
 - Settings → Search my photos (Gemma 4; off by default) indexes your most recent photos on the device in the
   background - nothing leaves it - with when, where and how they were taken, so you can ask "show me my photos of the
   beach", "selfies from Spain last summer" or "photos taken with my Pixel in 2025"; the matches appear as thumbnails
-  above the reply. Places come from GPS positions and a list of towns in the app, `Resources/Raw/places.tsv.gz`
+  above the reply. Places come from GPS positions and a list of towns embedded in `Emgu.LiteRT.LM.Maui`, `Resources/places.tsv.gz`
   (from [GeoNames](https://www.geonames.org), CC BY 4.0; rebuilt by `tools/make_places.py`). On Android the app also
   asks to read the photos' locations; without it, search works without places. Turning it off deletes the index.
 - Settings → Embedding model selects Text Vision 440M (388 MB, default) or Multimodal 740M

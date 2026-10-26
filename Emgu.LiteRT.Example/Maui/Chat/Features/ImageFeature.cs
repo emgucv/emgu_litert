@@ -296,7 +296,7 @@ internal sealed class ImageFeature : DemoFeature
             _imagePauseReason = reason;
             UpdateStatus();
         });
-        await Demo.Workload.WaitForWorkAsync(false, modelPaused, cancel);
+        await Demo.Workload.WaitAsync(modelPaused, cancel);
         await EnsureModelAsync();
         int tokens = _zimage.CountPromptTokens(prompt);
         if (tokens > ZImageTurbo.MaxPromptTokens)
@@ -321,7 +321,7 @@ internal sealed class ImageFeature : DemoFeature
                 // Generate reports each stage synchronously on its worker thread, before the native graph runs.
                 // Keep the current latent state while waiting; cancellation still stops the pending generation.
                 if (p.Stage != "Done")
-                    Demo.Workload.WaitForWorkAsync(false, reason => MainThread.BeginInvokeOnMainThread(() =>
+                    Demo.Workload.WaitAsync(reason => MainThread.BeginInvokeOnMainThread(() =>
                     {
                         _imagePauseReason = reason;
                         UpdateStatus();

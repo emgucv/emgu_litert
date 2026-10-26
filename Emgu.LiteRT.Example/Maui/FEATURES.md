@@ -328,8 +328,9 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Photo search
 
-- Settings > "Search my photos" (off by default; `PhotoSearchFeature.cs`, `PhotoIndex.cs`, `PhotoLibrary.cs`) asks for photo
-  access:
+- Settings > "Search my photos" (off by default; since 2026-10-26 the library's `PhotoSearchFeature`, `PhotoIndex` and
+  `PhotoLibrary` in `Emgu.LiteRT.LM.Maui`, over the demo's `ChatStore` and `SearchServices`; the place list is embedded in
+  the library) asks for photo access:
   - Android: `READ_MEDIA_IMAGES` - a custom permission class, since MAUI's `Permissions.Photos` also asks for videos - plus
     `READ_MEDIA_VISUAL_USER_SELECTED`, and `READ_EXTERNAL_STORAGE` up to API 32.
   - iOS and Mac Catalyst: `NSPhotoLibraryUsageDescription` and PhotoKit, local images only.

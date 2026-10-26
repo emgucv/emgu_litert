@@ -19,6 +19,12 @@ internal sealed class ChatSettingsAdapter : IChatPageSettings
             bool legacy = _settings.Get("use_gpu", gpuDefault);
             return (T)(object)legacy;
         }
+        if (key == "photos_only_charging" && !_settings.Contains(key) && defaultValue is bool chargingDefault)
+        {
+            // The demo kept "Index photos only while charging" under its own key, without the chat prefix.
+            try { return (T)(object)Preferences.Default.Get("litert_lm_photos_only_charging", chargingDefault); }
+            catch (System.Exception) { return defaultValue; }
+        }
         return _settings.Get(key, defaultValue);
     }
 

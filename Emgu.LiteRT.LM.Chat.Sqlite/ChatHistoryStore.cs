@@ -30,7 +30,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
     /// <see cref="GetMessageId"/> need nothing else. With <see cref="IsPrivate"/> on, nothing is saved.
     /// </para>
     /// </summary>
-    public class ChatHistoryStore : IChatHistoryStore, IChatSearchStore, IChatDocumentStore
+    public class ChatHistoryStore : IChatHistoryStore, IChatSearchStore, IChatDocumentStore, IPhotoIndexStore
     {
         /// <summary>The version of the tables this store reads and writes (kept in the database, for migrations).</summary>
         public const int SchemaVersion = 1;
@@ -93,6 +93,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             await connection.CreateTableAsync<ChatEmbeddingRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<DocumentRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<DocumentItemRecord>().ConfigureAwait(false);
+            await connection.CreateTableAsync<PhotoEmbeddingRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<SchemaVersionRecord>().ConfigureAwait(false);
             if (await connection.FindAsync<SchemaVersionRecord>(SchemaName).ConfigureAwait(false) == null)
                 await connection.InsertAsync(new SchemaVersionRecord { Name = SchemaName, Version = SchemaVersion }).ConfigureAwait(false);
@@ -765,6 +766,55 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 connection.Execute("DELETE FROM DocumentItem WHERE DocumentId = ?", id);
                 connection.Delete<DocumentRecord>(id);
             }).ConfigureAwait(false);
+        }
+
+        // ---------- The photo search's index (IPhotoIndexStore) ----------
+
+        /// <summary>Every indexed photo, as records.</summary>
+        public async Task<List<PhotoEmbeddingRecord>> GetPhotoEmbeddingRecordsAsync()
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            return await db.Table<PhotoEmbeddingRecord>().ToListAsync().ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<ChatPhotoEmbedding>> GetPhotoEmbeddingsAsync() =>
+            (await GetPhotoEmbeddingRecordsAsync().ConfigureAwait(false)).Select(r => new ChatPhotoEmbedding
+            {
+                EmbeddingModel = r.EmbeddingModel, PhotoId = r.PhotoId, Version = r.Version, Taken = r.Taken, VisionTokens = r.VisionTokens,
+                DetailsVersion = r.DetailsVersion, Latitude = r.Latitude, Longitude = r.Longitude, Place = r.Place, Camera = r.Camera,
+                Width = r.Width, Height = r.Height, Kinds = r.Kinds, Embedding = r.Embedding
+            }).ToList();
+
+        /// <summary>Save a photo's embedding and details, as a record.</summary>
+        /// <param name="record">The photo</param>
+        public async Task SavePhotoEmbeddingAsync(PhotoEmbeddingRecord record)
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            await db.InsertOrReplaceAsync(record).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public Task SavePhotoEmbeddingAsync(ChatPhotoEmbedding record) => SavePhotoEmbeddingAsync(new PhotoEmbeddingRecord
+        {
+            EmbeddingModel = record.EmbeddingModel, PhotoId = record.PhotoId, Version = record.Version, Taken = record.Taken, VisionTokens = record.VisionTokens,
+            DetailsVersion = record.DetailsVersion, Latitude = record.Latitude, Longitude = record.Longitude, Place = record.Place, Camera = record.Camera,
+            Width = record.Width, Height = record.Height, Kinds = record.Kinds, Embedding = record.Embedding
+        });
+
+        /// <inheritdoc/>
+        public async Task DeletePhotoEmbeddingsAsync(IEnumerable<string> photoIds)
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            foreach (string id in photoIds)
+                await db.DeleteAsync<PhotoEmbeddingRecord>(id).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public async Task ClearPhotoEmbeddingsAsync()
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            await db.DeleteAllAsync<PhotoEmbeddingRecord>().ConfigureAwait(false);
         }
 
         // ---------- Helpers ----------

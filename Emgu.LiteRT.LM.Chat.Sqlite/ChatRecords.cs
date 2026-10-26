@@ -235,6 +235,54 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         public DateTime Created { get; set; }
     }
 
+    /// <summary>A photo's embedding and details, for the photo search (the "PhotoEmbedding" table; <see cref="IPhotoIndexStore"/>).</summary>
+    [Table("PhotoEmbedding")]
+    public class PhotoEmbeddingRecord
+    {
+        /// <summary>The search model's file it was embedded with</summary>
+        public string EmbeddingModel { get; set; }
+
+        /// <summary>The photo's id in the platform's photo library</summary>
+        [PrimaryKey]
+        public string PhotoId { get; set; }
+
+        /// <summary>The photo's version (changes when it is edited)</summary>
+        public long Version { get; set; }
+
+        /// <summary>When it was taken (UTC)</summary>
+        public DateTime Taken { get; set; }
+
+        /// <summary>The vision tokens the embedding was made with</summary>
+        public int VisionTokens { get; set; }
+
+        /// <summary>The version of the details read with it</summary>
+        public int DetailsVersion { get; set; }
+
+        /// <summary>Where it was taken, or null</summary>
+        public double? Latitude { get; set; }
+
+        /// <summary>Where it was taken, or null</summary>
+        public double? Longitude { get; set; }
+
+        /// <summary>The nearest town: "Town, Region, Country", or null</summary>
+        public string Place { get; set; }
+
+        /// <summary>The camera, or null</summary>
+        public string Camera { get; set; }
+
+        /// <summary>The photo's width</summary>
+        public int Width { get; set; }
+
+        /// <summary>The photo's height</summary>
+        public int Height { get; set; }
+
+        /// <summary>Its kinds, comma-separated, or null</summary>
+        public string Kinds { get; set; }
+
+        /// <summary>The embedding, as the floats' bytes</summary>
+        public byte[] Embedding { get; set; }
+    }
+
     [Table("SchemaVersion")]
     internal sealed class SchemaVersionRecord
     {

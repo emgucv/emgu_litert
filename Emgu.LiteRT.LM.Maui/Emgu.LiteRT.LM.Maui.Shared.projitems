@@ -18,5 +18,7 @@
       <DependentUpon>%(Filename)</DependentUpon>
     </Compile>
     <MauiXaml Include="$(MSBuildThisFileDirectory)Themes\*.xaml" />
+    <!-- The photo search's offline place list: GeoNames' towns of 5,000+ people (CC BY 4.0), as PhotoIndex reads it. -->
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Resources\places.tsv.gz" LogicalName="places.tsv.gz" />
   </ItemGroup>
 </Project>

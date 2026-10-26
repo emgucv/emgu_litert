@@ -13,7 +13,7 @@ internal interface IDemoHost
     ChatStore Store { get; }
 
     // Waits for a cool, charged device before heavy background work, and runs one embedding at a time.
-    WorkloadService Workload { get; }
+    IIndexingWorkload Workload { get; }
 
     // Whether the page is shown, and whether a voice message is being recorded (the message box's microphone).
     bool PageVisible { get; }

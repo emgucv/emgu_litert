@@ -16,7 +16,8 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>Return when heavy background work may go on.</summary>
         /// <param name="status">Told why it waits, and null when it goes on (only if it waited); may be null</param>
         /// <param name="cancel">Stops waiting</param>
-        Task WaitAsync(Action<string> status, CancellationToken cancel);
+        /// <param name="onlyWhileCharging">True to wait for a charger too, on a phone or tablet</param>
+        Task WaitAsync(Action<string> status, CancellationToken cancel, bool onlyWhileCharging = false);
 
         /// <summary>
         /// One embedding for a background index: waits while the device is too busy, then embeds holding the model's
@@ -27,7 +28,8 @@ namespace Emgu.LiteRT.LM.Maui
         /// <param name="embed">The embedding, run off the UI thread</param>
         /// <param name="paused">Told why it waits, and null when it goes on; may be null</param>
         /// <param name="cancel">Stops it</param>
-        Task<T> RunEmbeddingAsync<T>(SearchEmbedder embedder, Func<T> embed, Action<string> paused, CancellationToken cancel);
+        /// <param name="onlyWhileCharging">True to wait for a charger too, on a phone or tablet</param>
+        Task<T> RunEmbeddingAsync<T>(SearchEmbedder embedder, Func<T> embed, Action<string> paused, CancellationToken cancel, bool onlyWhileCharging = false);
     }
 
     /// <summary>The default <see cref="IIndexingWorkload"/>: <see cref="WorkloadPolicy"/> over <see cref="DeviceWorkload"/>.</summary>
@@ -36,19 +38,19 @@ namespace Emgu.LiteRT.LM.Maui
         private readonly WorkloadPolicy _policy = new WorkloadPolicy();
 
         /// <inheritdoc/>
-        public Task WaitAsync(Action<string> status, CancellationToken cancel) =>
-            _policy.WaitAsync(DeviceWorkload.ReadAsync, () => false, status, cancel);
+        public Task WaitAsync(Action<string> status, CancellationToken cancel, bool onlyWhileCharging = false) =>
+            _policy.WaitAsync(DeviceWorkload.ReadAsync, () => onlyWhileCharging, status, cancel);
 
         /// <inheritdoc/>
-        public async Task<T> RunEmbeddingAsync<T>(SearchEmbedder embedder, Func<T> embed, Action<string> paused, CancellationToken cancel)
+        public async Task<T> RunEmbeddingAsync<T>(SearchEmbedder embedder, Func<T> embed, Action<string> paused, CancellationToken cancel, bool onlyWhileCharging = false)
         {
             while (true)
             {
-                await WaitAsync(paused, cancel);
+                await WaitAsync(paused, cancel, onlyWhileCharging);
                 await embedder.Gate.WaitAsync(cancel);
                 try
                 {
-                    if (_policy.PauseReason(await DeviceWorkload.ReadAsync(), false) != null)
+                    if (_policy.PauseReason(await DeviceWorkload.ReadAsync(), onlyWhileCharging) != null)
                         continue;
                     return await Task.Run(embed, cancel);
                 }
