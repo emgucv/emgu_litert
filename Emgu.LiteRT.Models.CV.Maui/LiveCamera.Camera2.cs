@@ -181,7 +181,10 @@ public sealed partial class LiveCamera
         var surfaces = new List<Surface> { _reader.Surface };
         if (extra != null) surfaces.Add(extra);
         var configured = new SessionCallback();
+        // Deprecated in Android 11 for SessionConfiguration (Android 9), but it works on every version this supports.
+#pragma warning disable CA1422
         device.CreateCaptureSession(surfaces, configured, _handler);
+#pragma warning restore CA1422
         var session = await configured.Configured.Task.WaitAsync(TimeSpan.FromSeconds(10));
         _session = session;
         using var request = device.CreateCaptureRequest(CameraTemplate.Record);
@@ -381,7 +384,7 @@ public sealed partial class LiveCamera
         try
         {
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
-            recorder = Build.VERSION.SdkInt >= BuildVersionCodes.S ? new MediaRecorder(Android.App.Application.Context) : new MediaRecorder();
+            recorder = OperatingSystem.IsAndroidVersionAtLeast(31) ? new MediaRecorder(Android.App.Application.Context) : new MediaRecorder();
             if (withAudio) recorder.SetAudioSource(AudioSource.Mic);
             recorder.SetVideoSource(VideoSource.Surface);
             recorder.SetOutputFormat(OutputFormat.Mpeg4);

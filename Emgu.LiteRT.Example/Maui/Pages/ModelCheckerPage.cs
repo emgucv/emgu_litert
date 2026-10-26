@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using Emgu.TF.Lite;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 

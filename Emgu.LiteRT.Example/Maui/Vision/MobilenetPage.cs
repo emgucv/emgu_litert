@@ -9,6 +9,7 @@ using Emgu.CV.CvEnum;
 using Emgu.TF.Lite;
 using Emgu.TF.Lite.Models;
 using Microsoft.Maui.Controls.Shapes;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 

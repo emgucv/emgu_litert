@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.Models;
 using Emgu.LiteRT.Util;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 

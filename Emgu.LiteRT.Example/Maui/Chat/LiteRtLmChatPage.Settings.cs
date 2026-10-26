@@ -190,7 +190,7 @@ public partial class LiteRtLmChatPage
             Spacing = 6,
             Children =
             {
-                CpuThreadSettings.CreateView(ReloadCpuModelsAsync),
+                CpuThreadsView.Create(ReloadCpuModelsAsync),
                 Theme.Divider(),
                 readAloudRow,
                 voiceLanguageRow,

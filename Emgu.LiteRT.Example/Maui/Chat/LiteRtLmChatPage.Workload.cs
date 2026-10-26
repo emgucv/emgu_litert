@@ -1,3 +1,6 @@
+using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Maui;
+
 namespace Maui.Demo.Lite;
 
 public partial class LiteRtLmChatPage

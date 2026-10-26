@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Emgu.LiteRT.Util;
 using NUnit.Framework;
 using Maui.Demo.Lite;
+using Emgu.LiteRT.LM.Agents;
 
 namespace Emgu.TF.Lite.Test;
 

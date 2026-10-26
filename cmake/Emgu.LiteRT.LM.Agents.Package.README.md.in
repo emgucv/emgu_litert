@@ -50,6 +50,10 @@ Also in `Emgu.LiteRT.LM.Agents.Audio`: `AlertSoundLibrary` (named sounds an aler
 
 `AgentTools.Describe(call)` describes a tool call (e.g. "Searching Wikipedia for “Ada Lovelace”"), to show while it runs.
 
+## Heavy work on a phone
+
+`WorkloadPolicy` decides when heavy on-device work (background indexing, a long generation) should wait: while the device is hot, while the battery is low (20% or less, until it is back at 25% or on power), and, if asked, until a charger is connected. `WaitAsync` returns when the work may go on, reporting each reason to wait. `DownloadActivityRegistry` tracks the model downloads going on now, with their progress, and can pause them all. Neither has platform code; `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}` reads the device (`DeviceWorkload`) and keeps downloads going in the background (`BackgroundDownloads`).
+
 ## Visual agents and event monitors
 
 `Emgu.LiteRT.LM.Agents.Vision` and `.Events` provide a pure managed framework; the host supplies camera/image input,

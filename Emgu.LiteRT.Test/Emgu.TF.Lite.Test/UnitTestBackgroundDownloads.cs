@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Maui.Demo.Lite;
 using NUnit.Framework;
+using Emgu.LiteRT.LM.Agents;
 
 namespace Emgu.TF.Lite.Test;
 

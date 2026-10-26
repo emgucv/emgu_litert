@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.Models;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 

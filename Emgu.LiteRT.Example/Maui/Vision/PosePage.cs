@@ -7,6 +7,7 @@ using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 using Emgu.LiteRT.Models;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 

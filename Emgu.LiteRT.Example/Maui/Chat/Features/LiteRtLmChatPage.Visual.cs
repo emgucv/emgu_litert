@@ -11,6 +11,7 @@ using Emgu.LiteRT.Models;
 using Microsoft.Extensions.AI;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.Models.CV.Maui;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 

@@ -1,5 +1,6 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using Emgu.LiteRT.LM.Models;
+using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 

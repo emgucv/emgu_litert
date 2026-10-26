@@ -59,6 +59,12 @@ The parts are public for an app's own UI: `VoiceRecorder` (16 kHz mono WAV, with
 
 `PdfPageRenderer` renders a PDF's pages to JPEG with each platform's own renderer (Android's PdfRenderer, PDFKit on iOS and Mac Catalyst, Windows.Data.Pdf), for pages that are images - scans, charts drawn as shapes. It is the `IPdfPageRenderer` that `${EMGU_LITERT_LM_AGENTS_DOCUMENTS_NUGET_ID}`' `DocumentReader` takes (`OpenPdf = pdf => new PdfPageRenderer(pdf)`).
 
+For models on a phone:
+
+- `BackgroundDownloads.DownloadFileAsync` downloads a model's file and keeps the download going when the app leaves the screen, as far as each platform allows: a foreground service with a progress notification and a Pause button on Android (this package declares it, with the permissions it needs, in the app's manifest), a background task on iOS (which iOS ends after a short time; the download is then paused) and Mac Catalyst. A paused download continues from what it received. `BackgroundDownloads.Hint` says what to tell people on each platform.
+- `DeviceWorkload.ReadAsync` reads the battery and the heat for `${EMGU_LITERT_LM_AGENTS_NUGET_ID}`' `WorkloadPolicy`, which says when heavy work should wait: `await new WorkloadPolicy().WaitAsync(DeviceWorkload.ReadAsync, () => false, reason => ..., token)`.
+- `CpuThreadSettings.Count` is one CPU thread count for all of an app's models, kept in its preferences (at most the number of cores, 4 by default).
+
 ## Changing the look
 
 The controls are templated. Each finds its template, and the styles of its buttons, by key - first in the app's resources, then in the package's own `ChatStyles` - so an app replaces one by defining a resource with its key in `App.xaml`; nothing needs to be merged:

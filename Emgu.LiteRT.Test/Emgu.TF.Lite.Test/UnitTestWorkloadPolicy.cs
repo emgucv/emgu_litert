@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Models;
 using Maui.Demo.Lite;
 using NUnit.Framework;
+using Emgu.LiteRT.LM.Agents;
 
 namespace Emgu.TF.Lite.Test;
 

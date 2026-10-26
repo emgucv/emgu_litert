@@ -1,3 +1,8 @@
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+
+#if ANDROID
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -6,8 +11,19 @@ using AndroidX.Core.App;
 using AndroidX.Core.Content;
 using Application = Android.App.Application;
 
-namespace Maui.Demo.Lite;
+// The permissions the service needs, merged into the app's manifest.
+[assembly: UsesPermission(Android.Manifest.Permission.ForegroundService)]
+[assembly: UsesPermission("android.permission.FOREGROUND_SERVICE_DATA_SYNC")]
+[assembly: UsesPermission(Android.Manifest.Permission.WakeLock)]
+[assembly: UsesPermission("android.permission.POST_NOTIFICATIONS")]
 
+namespace Emgu.LiteRT.LM.Maui;
+
+/// <summary>
+/// The Android foreground service that keeps <see cref="BackgroundDownloads"/> going while the app is in the background: a progress
+/// notification with a Pause button, and a partial wake lock. It starts with the first download and stops with the last one; an app
+/// doesn't start it itself. This library declares it, and the permissions it needs, in the app's manifest.
+/// </summary>
 [Service(Exported = false, ForegroundServiceType = ForegroundService.TypeDataSync)]
 public sealed class DownloadForegroundService : Service
 {
@@ -57,24 +73,30 @@ public sealed class DownloadForegroundService : Service
         }
     }
 
+    /// <inheritdoc/>
     public override void OnCreate()
     {
         base.OnCreate();
         _instance = this;
         var notifications = (NotificationManager)GetSystemService(NotificationService);
-        notifications.CreateNotificationChannel(new NotificationChannel(ChannelId, "Model downloads", NotificationImportance.Low));
+        if (OperatingSystem.IsAndroidVersionAtLeast(26))
+            notifications.CreateNotificationChannel(new NotificationChannel(ChannelId, "Model downloads", NotificationImportance.Low));
         BackgroundDownloads.Activities.Changed += OnDownloadsChanged;
         var power = (PowerManager)GetSystemService(PowerService);
         _wakeLock = power.NewWakeLock(WakeLockFlags.Partial, "EmguLiteRT:ModelDownload");
         _wakeLock.Acquire();
     }
 
+    /// <inheritdoc/>
     public override StartCommandResult OnStartCommand(Intent intent, StartCommandFlags flags, int startId)
     {
         // Always enter foreground, including when a download finished before this callback was delivered.
         try
         {
-            StartForeground(NotificationId, BuildNotification(), ForegroundService.TypeDataSync);
+            if (OperatingSystem.IsAndroidVersionAtLeast(29))
+                StartForeground(NotificationId, BuildNotification(), ForegroundService.TypeDataSync);
+            else
+                StartForeground(NotificationId, BuildNotification());
             _starting?.TrySetResult(true);
             _starting = null;
             if (intent?.Action == PauseAction) BackgroundDownloads.Activities.PauseAll();
@@ -107,9 +129,11 @@ public sealed class DownloadForegroundService : Service
         long total = known ? downloads.Sum(d => d.Total.Value) : 0;
         int percent = total > 0 ? (int)Math.Clamp(received * 100.0 / total, 0, 100) : 0;
         var launch = PackageManager.GetLaunchIntentForPackage(PackageName);
-        var open = PendingIntent.GetActivity(this, 0, launch, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+        var flags = PendingIntentFlags.UpdateCurrent
+            | (OperatingSystem.IsAndroidVersionAtLeast(23) ? PendingIntentFlags.Immutable : 0);
+        var open = PendingIntent.GetActivity(this, 0, launch, flags);
         var pause = PendingIntent.GetService(this, 1, new Intent(this, typeof(DownloadForegroundService)).SetAction(PauseAction),
-            PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+            flags);
         return new NotificationCompat.Builder(this, ChannelId)
             .SetSmallIcon(Android.Resource.Drawable.StatSysDownload)
             .SetContentTitle(downloads.Length == 1 ? "Downloading " + downloads[0].Name : "Downloading models")
@@ -123,16 +147,21 @@ public sealed class DownloadForegroundService : Service
     {
         if (_stopping) return;
         _stopping = true;
-        StopForeground(StopForegroundFlags.Remove);
+        if (OperatingSystem.IsAndroidVersionAtLeast(24))
+            StopForeground(StopForegroundFlags.Remove);
+        else
+            StopForeground(true);
         StopSelf();
     }
 
+    /// <inheritdoc/>
     public override void OnTimeout(int startId, ForegroundService foregroundServiceType)
     {
         BackgroundDownloads.Activities.PauseAll();
         StopDownloadService();
     }
 
+    /// <inheritdoc/>
     public override void OnDestroy()
     {
         BackgroundDownloads.Activities.Changed -= OnDownloadsChanged;
@@ -147,5 +176,7 @@ public sealed class DownloadForegroundService : Service
         base.OnDestroy();
     }
 
+    /// <inheritdoc/>
     public override IBinder OnBind(Intent intent) => null;
 }
+#endif
