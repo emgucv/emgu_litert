@@ -100,7 +100,7 @@ On Linux the tests use the Ubuntu natives in `lib/runtimes/ubuntu-x64/native/` a
 | `docs/litert-lm.md` | working on `Emgu.LiteRT.LM`, `.LM.Models` or `.LM.Extensions.AI`: C API facts, streaming, embeddings and their GPU crash, model quirks, tool calls and constrained decoding, LiteRT-LM bugs worked around |
 | `docs/agents.md` | working on `Emgu.LiteRT.LM.Agents` or the reusable chat (`Emgu.LiteRT.LM.Chat`, `.Chat.Sqlite`, `.Maui`) |
 | `Emgu.LiteRT.Models/MODELS.md` | working on `Emgu.LiteRT.Models`, `.Models.CV`, `.Models.CV.Maui`, `Emgu.TF.Lite.Models` or `.ImageIO`: Z-Image-Turbo, the detectors, MediaPipe trackers, YAMNet (the per-model evaluations are the other `*.md` files beside it) |
-| `Emgu.LiteRT.Example/Maui/ARCHITECTURE.md` | changing the MAUI demo's structure: folders, the chat page's partials, `IChatHost` and the feature classes, `SearchEmbedder`, `Maui.Demo.Lite.Core` |
+| `Emgu.LiteRT.Example/Maui/ARCHITECTURE.md` | changing the MAUI demo's structure: folders, the chat page as a `ChatPage` and its `DemoFeature`s, how to add a feature, a model or a setting, `SearchEmbedder`, `Maui.Demo.Lite.Core` |
 | `Emgu.LiteRT.Example/Maui/FEATURES.md` | working on a chat feature: how each works and what was measured or verified on which device (compaction, GPU, documents, photos, images, server, voice, device actions, MCP, camera and sound monitors, exercise, meeting notes) |
 | `Emgu.LiteRT.Example/Maui/README.md` | building, running, deploying and debugging the demo |
 | `Emgu.LiteRT.Example/Maui/TODO.md` | looking for open work on the demo (finished items, and the completed plans, are in `Emgu.LiteRT.Example/Maui/history/`, under the same item numbers) |

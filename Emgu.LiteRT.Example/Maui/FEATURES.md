@@ -33,17 +33,19 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Layout and controls
 
-- A one-line header - back, a model chip that opens a bottom sheet with the model list, new chat, settings - then the
-  conversation, then the message box with per-message `ToggleChip`s: "Think" and "Web search" (plus "Plan" and "Voice chat",
-  below).
+- Since 2026-10-26 the page is `Emgu.LiteRT.LM.Maui`'s `ChatPage` (`Chat/LiteRtLmChatPage.cs` derives from it; see
+  [ARCHITECTURE.md](ARCHITECTURE.md)): a one-line header - back, a model button that opens the model list, new chat,
+  settings - then the conversation, then the message box with per-message chips: "Think" and "Web search" (the library's),
+  "Plan" (`TaskFeature`) and "Voice chat" (`VoiceModeFeature`). Each feature's settings section comes from its
+  `BuildSettingsSection`, in the order the page lists the features.
 - Read-aloud and the Tavily key are in the settings sheet.
 - Windows at least 820 points wide - desktops, a foldable's inner screen - show the model list and the settings in a side
-  panel instead (`UpdateLayout` moves the settings view between the sheet and the panel). Verified on Mac Catalyst (wide) and
-  a Pixel Fold's cover screen (narrow).
-- On phones the settings open in `BottomSheet` (`Theme.cs`). It had no scroll view or height limit, so a long settings view
-  ran off the top of the screen and its end (the context window) couldn't be reached; its content now scrolls in a
-  `ScrollView` limited to the window height less 40 + 170 points, with the title and closing button fixed. Verified on a
-  Galaxy Z Fold3 and a Pixel 8 emulator.
+  panel instead (the library's layout). Verified on Mac Catalyst (wide) and a Pixel Fold's cover screen (narrow).
+- On phones the settings open in the library's `BottomSheet`, whose content scrolls with the title and closing button
+  fixed - a port of the demo's sheet, which had no scroll view or height limit, so a long settings view ran off the top of
+  the screen and its end (the context window) couldn't be reached (verified on a Galaxy Z Fold3 and a Pixel 8 emulator).
+  The demo's own sheet, `MenuSheet` (`Theme.cs`), remains for menus of rows: the "+" menu (`DemoAttachmentSource`) and the
+  vision demo page.
 - The model picker offers Qwen3, Qwen3.5 0.8B VL, Qwen3.5 4B, Gemma 4 E2B and E4B (and Gemma 4 12B on Mac Catalyst and
   Windows, from `ChatModelCatalog`). Each model's `AcceptsImages`, `AcceptsAudio` and `CanThink` flags decide which of the
   attach, talk and thinking controls show.
@@ -126,7 +128,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 ## Voice chat (hands-free)
 
 - The "Voice chat" chip (Gemma 4; not on Windows, whose recorder reports no level) is a hands-free conversation
-  (`LiteRtLmChatPage.Voice.cs`). A full-screen view listens; `VoiceActivityDetector` ends the message after 0.9 s of quiet
+  (`VoiceModeFeature`, a layer over the page). A full-screen view listens; `VoiceActivityDetector` ends the message after 0.9 s of quiet
   (levels from AVAudioRecorder's metering, or Android's samples); the audio is sent without thinking, the reply is read, and
   it listens again.
 - A tap interrupts: the reply is cancelled, kept with "…" (`ChatMessageState.Interrupted`), and given to the model as text
@@ -217,12 +219,15 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 ## The chat agent and its tools
 
 - Every message goes through `Emgu.LiteRT.LM.Chat`'s `ChatConversation`, over `ChatClientBuilder(...).UseFunctionInvocation()`
-  on the model's `LiteRtLmChatClient` or the server's client (`EnsureClient`, behind the page's `PageChatClient`, so a
-  reloaded model keeps the conversation). It replaced a `ChatClientAgent` and, for Qwen, `Models.Chat`.
-- For Gemma 4 each message passes its tools in `ChatOptions.Tools` (`MessageOptionsAsync`, `ChatToolMode.Auto`), so settings
-  can change them in the middle of a conversation. `ChatAgentTools.Create(tavilyKey, webSearch, location, memories)` picks
-  them from `Emgu.LiteRT.LM.Agents`' `AgentTools` and holds the MAUI location lookup; the memories are `ChatStore.Memories`, an
-  `Emgu.LiteRT.LM.Chat.Sqlite` `SqliteAgentMemoryStore`. Each tool call shows as a step line.
+  on the model's `LiteRtLmChatClient` or the server's client (`ChatPage`'s stable client proxy, so a reloaded model keeps
+  the conversation; the server's client comes from the page's `CreateChatClient` override). It replaced a `ChatClientAgent`
+  and, for Qwen, `Models.Chat`.
+- For Gemma 4 each message passes its tools in `ChatOptions.Tools` (`ChatPage.ComposeOptionsAsync`, `ChatToolMode.Auto`),
+  so settings can change them in the middle of a conversation: the page's `ChatSkillSet` asks each feature for its tools
+  (`Tools`, or the `ToolGroups` its router turns on when the message mentions them) and instructions. The core tools,
+  memories, web search, location and the clipboard are the library's features (`CoreToolsFeature`, `MemoryFeature`,
+  `WebFeature`, `LocationFeature`, `ClipboardFeature`); the memories are `ChatStore.Memories`, an `Emgu.LiteRT.LM.Chat.Sqlite`
+  `SqliteAgentMemoryStore`. Each tool call shows as a step line.
 - Always: `get_current_date_time`, `convert_units` and `calculate` (`Emgu.LiteRT.LM.Agents.Calculator`, a recursive-descent
   evaluator: + - * / ^ %, parentheses, pi and e, sqrt/ln/log/sin/.../round/min/max/pow, × ÷ − ·, a trailing % as percent;
   -2 ^ 2 is -4). Small models get arithmetic wrong: Gemma 4 E2B called it for "1234.5 times 678.9" and answered 838,102.05.
@@ -260,7 +265,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Document questions
 
-- "+" > Document attaches a PDF, Word (.docx) or text file to the chat (`LiteRtLmChatPage.Documents.cs`; `DocumentReader` and the saved-document search are in
+- "+" > Document attaches a PDF, Word (.docx) or text file to the chat (`DocumentsFeature`; `DocumentReader` and the saved-document search are in
   the `Emgu.LiteRT.LM.Agents.Documents` package, `PdfPageRenderer` in `Emgu.LiteRT.LM.Maui`, since 2026-10-25). It shows as a chip above the message box - indexing progress, then e.g. "5 pages · 2 pictures ·
   1 page as image". Its cross removes it, as do New chat and opening a saved chat.
 - Reading:
@@ -419,7 +424,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Your own server
 
-- Settings > "Your own server" (`LiteRtLmChatPage.Server.cs`) takes an OpenAI-compatible server's address ("host:port" gets
+- Settings > "Your own server" (`ServerFeature`; the page's `ConnectRemoteAsync`/`CreateChatClient`/`AskModelOnceAsync` overrides) takes an OpenAI-compatible server's address ("host:port" gets
   `http://` and `/v1`), an optional API key (kept in `SecureStorage`) and one of its models (`GET /models`). LM Studio's
   `/api/v0/models` adds the model type - embeddings are left out, `vlm` takes images - and a loaded model's context length;
   otherwise 4096 is assumed until the first reply loads it.
@@ -471,8 +476,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 - `read_clipboard` (`AgentTools.ReadClipboard`, TODO item 26) gives the model the text the user last copied, wrapped as their
   data, cut to 3,000 characters, and ending with an instruction to act on it - without that, Gemma 4 E2B repeated the text
   for "Summarize".
-- It isn't a tool group, so there is no stub the model could call by itself: `ChatAgentTools.Create` adds it only to a
-  message for which `AgentTools.MentionsClipboard` is true ("clipboard", "what I just copied", "the text I copied"; not a
+- It isn't a tool group, so there is no stub the model could call by itself: the library's `ClipboardFeature` adds it only
+  to a message for which `AgentTools.MentionsClipboard` is true ("clipboard", "what I just copied", "the text I copied"; not a
   plain "paste" or "copy"), with the step line "Reading the clipboard". Verified on Mac Catalyst with Gemma 4 E2B;
   `UnitTestClipboardTool`.
 
@@ -491,7 +496,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   (`MessageRecord.ThinkingTranslation`) and shown again after reopening. Verified on Mac Catalyst with Spanish, German and
   Chinese.
 - A voice message that a model hears as audio (Gemma 4) also gets its words written down by the platform's speech recognizer
-  in the background (`SpeechRecognizer`; `LiteRtLmChatPage.Transcript.cs`). The words show under the chip, are kept in
+  in the background (`SpeechRecognizer`; `TranscriptFeature`). The words show under the chip, are kept in
   `MessageRecord.Transcript` (not given to the model), become the title of a chat still called "Voice message", and go into
   exports; the recording is kept too (`chats/attachments/...`). Verified on a Pixel Fold.
 - Settings > "Voice language" (`VoiceLanguages`, set as `SpeechRecognizer.Language`; the errors end with
@@ -523,7 +528,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Tool servers (MCP)
 
-- Settings > "Tool servers (MCP)" (`LiteRtLmChatPage.Mcp.cs`, TODO item 28) adds Model Context Protocol servers: an address
+- Settings > "Tool servers (MCP)" (`McpFeature`, TODO item 28) adds Model Context Protocol servers: an address
   (Streamable HTTP or SSE) with an optional authorization header kept in `SecureStorage`, or, on Mac Catalyst and Windows, a
   program started with stdio. It uses the official `ModelContextProtocol.Core` 2.2.0 client (referenced by the demo and the
   test project, not by `Emgu.LiteRT.LM.Agents`).
@@ -544,7 +549,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 - Sound monitors (TODO item 42): `Emgu.LiteRT.LM.Agents`' `Audio/SoundMonitors.cs` (`SoundGroups`: 30 sounds as groups of
   YAMNet classes with the words people use; `SoundPresenceMonitor`, `SoundMonitorRuntime`, `SoundMonitorTools` -
-  `create_sound_monitor` and the rest) and the page's `LiteRtLmChatPage.Sound.cs`: a `sound_monitor` tool group, the
+  `create_sound_monitor` and the rest) and the demo's `CameraFeature.Sound.cs`: a `sound_monitor` tool group, the
   microphone on while a monitor is enabled, a monitor card, and chime or spoken alerts that the page doesn't listen to;
   `MicrophoneGate` gives `VoiceRecorder` the microphone first. Not on Windows. Verified with Gemma 4 E2B on Mac Catalyst and
   with a Galaxy S10's microphone (`Emgu.LiteRT.Models/YAMNET.md`).
@@ -559,12 +564,12 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - The `record_clip` visual-alert action (TODO item 43) adds a `MediaRecorder` surface by configuring the session again for
     the length of a clip: 720p H.264 MP4, with sound when the microphone is already allowed, 3-30 s. Frames keep coming at 30
     fps during a clip and pause ~0.3 s at each end.
-  - The clip's card in the transcript (`LiteRtLmChatPage.VisualClips.cs`) plays it in place - Play/Pause with a progress bar,
+  - The clip's card in the transcript (`CameraFeature.Clips.cs`) plays it in place - Play/Pause with a progress bar,
     through Android's `VideoView` in `Emgu.LiteRT.LM.Maui`'s `InlineVideoView` (no extra packages), one clip at a time, the sound monitors not
     listening meanwhile - with Full screen (the system player), Share and Save to gallery.
   - The `take_photo` action (TODO item 44) takes a full-resolution still - the camera's largest JPEG, 12 MP on a Galaxy S10
     and a Pixel Fold - in the same session-reconfiguring way (`LiveCamera.TakePhotoAsync`; a card in
-    `LiteRtLmChatPage.VisualPhotos.cs` with Open, Share and Save to gallery), while `take_snapshot` stays a small analysis
+    `CameraFeature.Photos.cs` with Open, Share and Save to gallery), while `take_snapshot` stays a small analysis
     frame. A photo asked for together with a clip is taken first.
 - The `hand-gesture` visual agent (`HandVisualAgent`, in `Emgu.LiteRT.LM.Agents.CV`, TODO item 47) makes MediaPipe's seven gestures object classes of the
   camera monitors ("thumb up", "victory"...; `VisualClasses.CanonicalGesture` maps the words people use, and the visual
@@ -594,7 +599,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     noise when you see a person" went to the sound tool.
 - Background monitoring (TODO item 54): on Android, `MonitoringForegroundService` (microphone, plus the camera when a sound
   monitor photographs or records) keeps sound monitors listening with the app in the background or the screen off - an
-  ongoing notification with Stop, a partial wake lock, and a notification per alert. `LiteRtLmChatPage.Background.cs` starts
+  ongoing notification with Stop, a partial wake lock, and a notification per alert. `CameraFeature.Background.cs` starts
   it from the foreground (Android 14 refuses to start such services from the background). The camera may then be opened for
   an alert (`CameraUsable`) and is closed again afterwards. Camera monitors don't run in the background yet. Verified on a
   Galaxy S10 (Home, and screen off). Meeting recordings use the same service.
@@ -603,7 +608,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   The button is labelled with the camera it switches to, "Selfie camera" or "Back camera" (it was "Flip", which read as
   mirroring). A front camera's rotation is (sensor + display) % 360; its preview is mirrored, but its photos, clips and
   detector frames aren't. New chat goes back to the back camera.
-- Each camera and sound monitor's card shows the user's request that created it (`LiteRtLmChatPage.MonitorInfo.cs`, TODO item
+- Each camera and sound monitor's card shows the user's request that created it (`CameraFeature.MonitorInfo.cs`, TODO item
   45: kept in memory, not in private chats; tap to expand), and the camera preview's label says what the camera is doing
   ("Watching · 2 monitors", "● Recording clip · 7 s left").
 
@@ -622,7 +627,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 - The count is also said aloud with the device's text-to-speech: "Go!" when the body is first in view, each number (skipping
   to the latest when behind), and "Done. N jumping jacks." The sound monitors' mute is held meanwhile. The card's speaker
   button turns it off (on by default).
-- Settings > "Developer mode" (`LiteRtLmChatPage.Developer.cs`, off by default) draws the counted body on the camera preview
+- Settings > "Developer mode" (the library's switch, `IChatPageHost.DeveloperMode`; off by default) draws the counted body on the camera preview
   with the "Body pose" page's skeleton (`PoseDrawing.cs`) and shows the position read on the card. The preview's Maximize
   button makes it fill the conversation's area (Restore, or closing the camera, makes it small again), and while counting a
   maximized preview shows the count over the picture.
