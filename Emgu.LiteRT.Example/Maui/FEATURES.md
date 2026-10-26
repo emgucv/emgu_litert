@@ -520,10 +520,10 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Goals
 
-- Goals have streaks and a history (`GoalsFeature.cs`; `GoalHistory.cs` in `Emgu.LiteRT.LM.Agents`, TODO item 25): per
+- The goals feature is the library's since 2026-10-26 (`Emgu.LiteRT.LM.Maui`'s `GoalsFeature` over `GoalsSkill`; the demo gives it `ChatStore.Goals`, and `ExerciseFeature` adds the exercise counter to its group as the skill's extra tools, words and summary). Goals have streaks and a history (`GoalHistory.cs` in `Emgu.LiteRT.LM.Agents`, TODO item 25): per
   period (day, week from Monday, month) what was logged and whether the target was reached, the streak of periods in a row
   (the current period never breaks it), and the best streak.
-- Settings > Your goals shows a strip of the latest 12 periods and the streak, and `GoalStatusAsync` (so `get_goals` and the
+- Settings > Your goals shows a strip of the latest 12 periods and the streak, with Edit, Undo last (`IAgentGoalStore.DeleteLastProgressAsync`) and Delete, and `GoalStatusAsync` (so `get_goals` and the
   message instructions) adds "2-week-streak" from two periods in a row.
 
 ## Tool servers (MCP)

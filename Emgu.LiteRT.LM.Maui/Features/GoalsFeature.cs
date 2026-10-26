@@ -12,7 +12,9 @@ namespace Emgu.LiteRT.LM.Maui.Features
     /// <summary>
     /// The user's goals (<see cref="GoalsSkill"/>): "I want to run three times a week", "I ran today" - the agent keeps
     /// count. The settings list them with their progress, streak and history by period (<see cref="GoalHistory"/>), to
-    /// edit or delete. With "Remember things about me" on, never in a private chat.
+    /// edit, undo the last entry of or delete. With "Remember things about me" on, never in a private chat. Another
+    /// feature adds tools to the goals' group through the skill (<see cref="GoalsSkill.ExtraTools"/>; e.g. counting
+    /// exercises, which logs toward the goals), found through <see cref="IChatPageHost.Services"/>.
     /// </summary>
     public sealed class GoalsFeature : SkillFeature<GoalsSkill>
     {
@@ -28,6 +30,12 @@ namespace Emgu.LiteRT.LM.Maui.Features
         public override bool PersistEnabled => false;
 
         private IAgentGoalStore Store => Skill.Store;
+
+        /// <summary>Whether goals are kept right now: with "Remember things about me" on, not in a private chat.</summary>
+        public bool On => Host != null && Host.MemoryOn && !Host.IsPrivate;
+
+        /// <inheritdoc/>
+        public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
 
         /// <inheritdoc/>
         public override View BuildSettingsSection()
@@ -139,19 +147,8 @@ namespace Emgu.LiteRT.LM.Maui.Features
                 catch (Exception ex) { status.Text = goal.Text + " (" + ex.Message + ")"; }
             }
             await Refresh();
-            Label edit = ChatPage.Link("Edit", null);
-            Label delete = ChatPage.Link("Delete", null);
-            edit.Padding = delete.Padding = new Thickness(0, 4, 12, 4);
-            SemanticProperties.SetDescription(edit, "Edit this goal");
-            SemanticProperties.SetDescription(delete, "Delete this goal and its progress");
-            var row = new VerticalStackLayout
-            {
-                Padding = new Thickness(10, 7),
-                Spacing = 2,
-                Children = { status, streak, strip, historyLines, new HorizontalStackLayout { Children = { edit, delete } } }
-            };
-            TapGestureRecognizer editTap = new TapGestureRecognizer();
-            editTap.Tapped += async (s, e) =>
+            VerticalStackLayout row = null;
+            Label edit = ChatPage.Link("Edit", async () =>
             {
                 string text = await Host.PromptAsync("Edit goal", "The goal, with how much and how often, e.g. \"Read 20 pages a day\".",
                     "Save", "Cancel", goal.Text, 200);
@@ -161,18 +158,30 @@ namespace Emgu.LiteRT.LM.Maui.Features
                 goal = new AgentGoal(goal.Id, parsed.Text, parsed.Target, parsed.Unit, parsed.Period, goal.Created);
                 await Store.UpdateGoalAsync(goal);
                 await Refresh();
-            };
-            edit.GestureRecognizers.Add(editTap);
-            TapGestureRecognizer deleteTap = new TapGestureRecognizer();
-            deleteTap.Tapped += async (s, e) =>
+            });
+            Label undo = ChatPage.Link("Undo last", async () =>
+            {
+                if (await Store.DeleteLastProgressAsync(goal.Id))
+                    await Refresh();
+            });
+            Label delete = ChatPage.Link("Delete", async () =>
             {
                 if (!await Host.AskAsync("Delete goal", "Delete \"" + goal.Text + "\" and its progress?", "Delete", "Cancel"))
                     return;
                 await Store.DeleteGoalAsync(goal.Id);
                 list.Children.Remove(row);
                 await RefreshCountAsync();
+            });
+            edit.Padding = undo.Padding = delete.Padding = new Thickness(0, 4, 12, 4);
+            SemanticProperties.SetDescription(edit, "Edit this goal");
+            SemanticProperties.SetDescription(undo, "Delete the last progress logged for this goal");
+            SemanticProperties.SetDescription(delete, "Delete this goal and its progress");
+            row = new VerticalStackLayout
+            {
+                Padding = new Thickness(10, 7),
+                Spacing = 2,
+                Children = { status, streak, strip, historyLines, new HorizontalStackLayout { Children = { edit, undo, delete } } }
             };
-            delete.GestureRecognizers.Add(deleteTap);
             return row;
         }
     }

@@ -52,14 +52,9 @@ internal static class ChatToolGroups
         "dictat", "write down what"
     };
 
-    internal const string Goals = "goals";
-    internal const string GoalsSummary = "save the user's goals (habits, targets), log or check their progress, and count jumping jacks, squats or high knees with the camera";
-    internal static readonly string[] GoalsKeywords =
-    {
-        "goal", "habit", "target", "streak", "progress", "i want to", "i'd like to", "every day", "a day$", "a week$",
-        "per week$", "per day$", "each week$", "times a week", "how am i doing", "on track", "keep track", "track my",
-        "jumping jack", "jumping-jack", "star jump", "squat", "high knee", "knee raise", "exercise", "workout", "work out", "reps", "count my"
-    };
+    // The goals group is the library's (Emgu.LiteRT.LM.Agents' GoalsSkill, with the exercise counter's tools and words as its
+    // extras); the name is kept for the page's token estimate.
+    internal const string Goals = Emgu.LiteRT.LM.Agents.Skills.GoalsSkill.GroupName;
 
     internal const string Photos = "photo_search";
     internal const string PhotosSummary = "find and show the user's own photos and pictures on this device";

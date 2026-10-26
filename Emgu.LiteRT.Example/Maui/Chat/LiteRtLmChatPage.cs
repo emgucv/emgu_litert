@@ -106,7 +106,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             Translations = new TranslationFeature(),
             DeviceActions = new DeviceActionsFeature(),
             WrittenDocuments = new WrittenDocumentsFeature(),
-            Goals = new GoalsFeature(),
+            Goals = new GoalsFeature(SharedStore.Goals),
             PastChats = new PastChatsFeature(),
             PhotoSearch = new PhotoSearchFeature(),
             Meetings = new MeetingFeature(),

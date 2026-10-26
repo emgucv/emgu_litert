@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Agents.Audio;
+using Emgu.LiteRT.LM.Agents.Skills;
 using Emgu.LiteRT.LM.Agents.Vision;
 using Maui.Demo.Lite;
 using Microsoft.Agents.AI;
@@ -93,8 +94,13 @@ public class UnitTestToolRouting
                     (request, token) => { done?.Invoke(request.ToolName); return Task.FromResult(AgentTools.DeviceActionDone(request.Summary)); }),
                 () => AgentTools.DeviceActionInstructions(DeviceActionKinds.Timer | DeviceActionKinds.Alarm | DeviceActionKinds.CalendarEvent | DeviceActionKinds.Directions),
                 rerunAfterStub: true),
-            new ToolGroup(ChatToolGroups.Goals, ChatToolGroups.GoalsSummary, ChatToolGroups.GoalsKeywords,
-                () => AgentTools.Goals(store).Cast<AITool>().Append(AgentTools.CountExercise((exercise, target, seconds, token) => Task.FromResult("")))),
+            // The goals group as the demo has it: the library's skill with the exercise counter as its extra tools.
+            new GoalsSkill(store)
+            {
+                ExtraTools = () => new AITool[] { AgentTools.CountExercise((exercise, target, seconds, token) => Task.FromResult("")) },
+                ExtraKeywords = new[] { "jumping jack", "jumping-jack", "star jump", "squat", "high knee", "knee raise", "exercise", "workout", "work out", "reps", "count my" },
+                ExtraSummary = "count jumping jacks, squats or high knees with the camera"
+            }.ToolGroups().Single(),
             new ToolGroup(ChatToolGroups.Photos, ChatToolGroups.PhotosSummary, ChatToolGroups.PhotosKeywords,
                 () => new AITool[] { AgentTools.FindPhotos(Unused) }, () => ChatPlannerInstructions.Photos),
             new ToolGroup(ChatToolGroups.Documents, ChatToolGroups.DocumentsSummary, ChatToolGroups.DocumentsKeywords,

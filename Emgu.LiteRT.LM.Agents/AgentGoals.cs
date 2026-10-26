@@ -180,6 +180,11 @@ namespace Emgu.LiteRT.LM.Agents
         /// <summary>Log progress toward a goal.</summary>
         /// <param name="progress">The progress</param>
         Task AddProgressAsync(GoalProgress progress);
+
+        /// <summary>Delete the last progress logged for a goal (an "Undo last").</summary>
+        /// <param name="goalId">The goal's id</param>
+        /// <returns>False if it has none</returns>
+        Task<bool> DeleteLastProgressAsync(String goalId);
     }
 
     /// <summary>
@@ -245,6 +250,19 @@ namespace Emgu.LiteRT.LM.Agents
             lock (_goals)
                 _progress.Add(progress);
             return Task.FromResult(0);
+        }
+
+        /// <inheritdoc />
+        public Task<bool> DeleteLastProgressAsync(String goalId)
+        {
+            lock (_goals)
+            {
+                GoalProgress last = _progress.Where(p => p.GoalId == goalId).OrderByDescending(p => p.When).FirstOrDefault();
+                if (last == null)
+                    return Task.FromResult(false);
+                _progress.Remove(last);
+                return Task.FromResult(true);
+            }
         }
     }
 

@@ -344,9 +344,12 @@ namespace Emgu.LiteRT.LM.Maui
         {
             var label = new Label { Text = text };
             ChatResources.ApplyStyle(label, "ChatLinkStyle");
-            TapGestureRecognizer tap = new TapGestureRecognizer();
-            tap.Tapped += (s, e) => tapped();
-            label.GestureRecognizers.Add(tap);
+            if (tapped != null)
+            {
+                TapGestureRecognizer tap = new TapGestureRecognizer();
+                tap.Tapped += (s, e) => tapped();
+                label.GestureRecognizers.Add(tap);
+            }
             return label;
         }
 

@@ -62,6 +62,12 @@ namespace Emgu.LiteRT.LM.Agents.Skills
         /// <summary>More words that bring the group (e.g. "jumping jack"), or null.</summary>
         public IEnumerable<string> ExtraKeywords { get; set; }
 
+        /// <summary>
+        /// What the extra tools do, for the group's summary the planner reads ("count jumping jacks, squats or high knees
+        /// with the camera"); null adds "and more" when there are extra tools.
+        /// </summary>
+        public string ExtraSummary { get; set; }
+
         /// <inheritdoc/>
         public override string Name => "goals";
 
@@ -84,7 +90,7 @@ namespace Emgu.LiteRT.LM.Agents.Skills
         public override IEnumerable<ToolGroup> ToolGroups()
         {
             yield return new ToolGroup(GroupName,
-                "save the user's goals (habits, targets), log or check their progress" + (ExtraTools != null ? ", and more" : ""),
+                "save the user's goals (habits, targets), log or check their progress" + (ExtraTools != null ? ", and " + (ExtraSummary ?? "more") : ""),
                 Keywords.Concat(ExtraKeywords ?? Enumerable.Empty<string>()),
                 () =>
                 {

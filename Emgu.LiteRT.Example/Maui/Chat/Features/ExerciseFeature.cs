@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using Emgu.CV;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Agents.Skills;
 using Emgu.LiteRT.Models;
 using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
@@ -35,9 +36,28 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
     private CameraFeature Camera => Host.Services.Get<CameraFeature>();
 
     // The user's goals, or null when they aren't kept (memories off, or a private chat).
-    private IAgentGoalStore Goals => Host.Services.Get<GoalsFeature>()?.On == true ? Demo.Store.Goals : null;
+    private IAgentGoalStore Goals => Host.Services.Get<Emgu.LiteRT.LM.Maui.Features.GoalsFeature>()?.On == true ? Demo.Store.Goals : null;
+
+    // The words that bring the goals' group for an exercise.
+    private static readonly string[] Keywords =
+    {
+        "jumping jack", "jumping-jack", "star jump", "squat", "high knee", "knee raise", "exercise", "workout", "work out", "reps", "count my"
+    };
 
     public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    // Counting comes with the goals' group (it logs toward them; a group of its own would add a stub to every message).
+    public override void OnAttached(IChatPageHost host)
+    {
+        base.OnAttached(host);
+        GoalsSkill goals = host.Services.Get<Emgu.LiteRT.LM.Maui.Features.GoalsFeature>()?.Skill;
+        if (goals == null)
+            return;
+        goals.ExtraTools = () => Tools(Host?.HandsFree == true);
+        goals.ExtraInstructions = () => Tools(Host?.HandsFree == true).Any() ? Instructions : null;
+        goals.ExtraKeywords = Keywords;
+        goals.ExtraSummary = "count jumping jacks, squats or high knees with the camera";
+    }
 
     public override void OnDetached()
     {

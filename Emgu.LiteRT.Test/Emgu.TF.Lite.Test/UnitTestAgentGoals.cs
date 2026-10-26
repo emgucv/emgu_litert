@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 using Microsoft.Extensions.AI;
@@ -125,5 +126,16 @@ public class UnitTestAgentGoals
         Assert.That((await store.GetGoalsAsync()).Count, Is.EqualTo(1));
         Assert.That(AgentTools.Describe(new FunctionCallContent("1", "log_progress", new Dictionary<string, object> { ["goal"] = "run" })),
             Is.EqualTo("Logging progress: run"));
+
+        // Undo last: the latest entry goes (today's), the earlier ones stay; nothing left to undo after them.
+        string runningId = (await store.GetGoalsAsync()).Single().Id;
+        Assert.That((await store.GetProgressAsync(runningId, DateTime.MinValue)).Count, Is.EqualTo(4));
+        Assert.That(await store.DeleteLastProgressAsync(runningId), Is.True);
+        IList<GoalProgress> left = await store.GetProgressAsync(runningId, DateTime.MinValue);
+        Assert.That(left.Count, Is.EqualTo(3));
+        Assert.That(left.All(p => p.When < Now.Date), Is.True);
+        for (int i = 0; i < 3; i++)
+            Assert.That(await store.DeleteLastProgressAsync(runningId), Is.True);
+        Assert.That(await store.DeleteLastProgressAsync(runningId), Is.False);
     }
 }
