@@ -31,6 +31,9 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>Text given to the model before the message, or null.</summary>
         public string Context { get; }
+
+        /// <summary>True for a voice message the microphone recorded (its audio is among <see cref="Attachments"/>, or its words are the text).</summary>
+        public bool IsVoiceMessage { get; set; }
     }
 
     /// <summary>
@@ -134,6 +137,8 @@ namespace Emgu.LiteRT.LM.Maui
         private View _attach;
         private Layout _attachments;
         private CancellationTokenSource _replyCancel;
+        private Task _pendingSend;
+        private bool _replacingModel;
         private bool _atEnd = true;
         private bool _ownsClient;
         // The transcript's view of each message, and whether a pass that creates the missing ones is scheduled.
@@ -275,6 +280,19 @@ namespace Emgu.LiteRT.LM.Maui
         public Func<bool> RerunRequested { get; set; }
 
         /// <summary>
+        /// Sends a message once the model is ready, instead of <see cref="DefaultSendAsync"/>: for an app whose sending
+        /// does more (context from documents, saving the exchange with its extras...). The view has already cleared the
+        /// message box, stopped the speaker and started the Stop button, whose token it passes. Or null.
+        /// </summary>
+        public Func<ChatSendRequest, CancellationToken, Task> Sender { get; set; }
+
+        /// <summary>True while a message is being sent (from Send until the reply is complete or stopped).</summary>
+        public bool IsSending => _replyCancel != null;
+
+        /// <summary>The send going on, to wait for before e.g. releasing the model; a completed task when there is none.</summary>
+        public Task PendingSend => _pendingSend ?? Task.CompletedTask;
+
+        /// <summary>
         /// Shows the conversation's summary (<see cref="ChatConversation.Summary"/>) in an alert; the default message
         /// template's "Earlier messages were summarized" divider runs it when tapped.
         /// </summary>
@@ -381,12 +399,30 @@ namespace Emgu.LiteRT.LM.Maui
 
         private void OnSourceChanged()
         {
+            if (_replacingModel)
+                return;
             LanguageModel model = Model;
             IChatClient client = ChatClient;
             // Only the model client the view created itself; an app's client is the app's.
             if (_ownsClient)
                 Conversation?.Client.Dispose();
             _ownsClient = false;
+            CreateLoadState(model);
+            if (model == null && client == null)
+            {
+                Conversation = null;
+                return;
+            }
+            // The model's own client is created with the first message, once the model is loaded.
+            _ownsClient = client == null;
+            Conversation = client != null ? new ChatConversation(client, model) : new ChatConversation(model);
+            if (Parent != null && LoadState != null && LoadState.IsDownloaded)
+                _ = LoadModelAsync();
+            UpdateAttach();
+        }
+
+        private void CreateLoadState(LanguageModel model)
+        {
             LoadState = model != null ? new ModelLoadState(model) { DisplayName = model.GetType().Name } : null;
             if (LoadState != null)
             {
@@ -400,15 +436,31 @@ namespace Emgu.LiteRT.LM.Maui
             }
             if (_loadCard != null)
                 _loadCard.State = LoadState;
-            if (model == null && client == null)
+        }
+
+        /// <summary>
+        /// Replace the model and load the new one, keeping the conversation (which an app's <see cref="ChatClient"/>
+        /// continues on the new model): for another backend, context window or thread count of the same model. The old
+        /// model is the app's to release, once <see cref="PendingSend"/> is done.
+        /// </summary>
+        /// <param name="model">The new model (not loaded)</param>
+        public void ReplaceModel(LanguageModel model)
+        {
+            if (model == null)
+                throw new ArgumentNullException(nameof(model));
+            if (ChatClient == null)
+                throw new InvalidOperationException("ReplaceModel needs an app's ChatClient; without one, set Model (a new conversation).");
+            _replacingModel = true;
+            try
             {
-                Conversation = null;
-                return;
+                Model = model;
             }
-            // The model's own client is created with the first message, once the model is loaded.
-            _ownsClient = client == null;
-            Conversation = client != null ? new ChatConversation(client, model) : new ChatConversation(model);
-            if (Parent != null && LoadState != null && LoadState.IsDownloaded)
+            finally
+            {
+                _replacingModel = false;
+            }
+            CreateLoadState(model);
+            if (Parent != null && LoadState.IsDownloaded)
                 _ = LoadModelAsync();
             UpdateAttach();
         }
@@ -586,7 +638,8 @@ namespace Emgu.LiteRT.LM.Maui
         /// <param name="text">The message</param>
         /// <param name="attachments">Images and audio for models that take them, or null</param>
         /// <param name="context">Text given to the model before the message (e.g. document excerpts), not shown; or null</param>
-        public async Task SendAsync(string text, IEnumerable<DataContent> attachments = null, string context = null)
+        /// <param name="voiceMessage">True for a voice message (the microphone's; <see cref="ChatSendRequest.IsVoiceMessage"/>)</param>
+        public async Task SendAsync(string text, IEnumerable<DataContent> attachments = null, string context = null, bool voiceMessage = false)
         {
             ChatConversation conversation = Conversation;
             if (conversation == null || conversation.IsBusy || _replyCancel != null)
@@ -599,6 +652,7 @@ namespace Emgu.LiteRT.LM.Maui
             {
                 if (LoadState != null && !LoadState.IsReady)
                 {
+                    LoadState.Dismissed = false;
                     SetStatus("Waiting for the model to load...");
                     // Stop gives up on the message; the download or load goes on (the card's Cancel stops that).
                     Task<bool> load = LoadModelAsync();
@@ -614,26 +668,10 @@ namespace Emgu.LiteRT.LM.Maui
                         return;
                     }
                 }
-                SetStatus("Generating...");
-                ChatOptions options = OptionsProvider != null
-                    ? await OptionsProvider(new ChatSendRequest(text, attachments, context)) ?? new ChatOptions()
-                    : Options?.Clone() ?? new ChatOptions();
-                if (options.Reasoning == null)
-                    options.Reasoning = new ReasoningOptions { Effort = ThinkingEnabled ? ReasoningEffort.Medium : ReasoningEffort.None };
-                ChatMessageItem reply;
-                using (StatusUntilFirstText(conversation))
-                    reply = await conversation.SendAsync(text, attachments, options, context, cancel.Token);
-                // A tool group's stub ended the request: the message goes again, with the group's tools from the start.
-                for (int rerun = 0; rerun < 2 && !cancel.IsCancellationRequested && RerunRequested?.Invoke() == true; rerun++)
-                {
-                    options = OptionsProvider != null
-                        ? await OptionsProvider(new ChatSendRequest(text, attachments, context)) ?? new ChatOptions()
-                        : Options?.Clone() ?? new ChatOptions();
-                    if (options.Reasoning == null)
-                        options.Reasoning = new ReasoningOptions { Effort = ThinkingEnabled ? ReasoningEffort.Medium : ReasoningEffort.None };
-                    reply = await conversation.RegenerateAsync(reply, options, cancel.Token);
-                }
-                SetStatus(null);
+                ChatSendRequest request = new ChatSendRequest(text, attachments, context) { IsVoiceMessage = voiceMessage };
+                Task send = (Sender ?? DefaultSendAsync)(request, cancel.Token);
+                _pendingSend = send;
+                await send;
             }
             catch (Exception ex)
             {
@@ -641,10 +679,50 @@ namespace Emgu.LiteRT.LM.Maui
             }
             finally
             {
+                _pendingSend = null;
                 _replyCancel = null;
                 cancel.Dispose();
                 UpdateBusy();
             }
+        }
+
+        /// <summary>
+        /// What the view does to send a message once the model is ready (what <see cref="Sender"/> replaces): makes the
+        /// options (<see cref="OptionsProvider"/> or <see cref="Options"/>), streams the reply into the conversation with
+        /// "Generating..." until its first text, and sends the message again when <see cref="RerunRequested"/> says so. A
+        /// <see cref="Sender"/> of an app's own can call it for the plain send.
+        /// </summary>
+        /// <param name="request">The message</param>
+        /// <param name="cancellationToken">Stops the reply (the Stop button)</param>
+        public async Task DefaultSendAsync(ChatSendRequest request, CancellationToken cancellationToken)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+            ChatConversation conversation = Conversation;
+            if (conversation == null)
+                return;
+            SetStatus("Generating...");
+            ChatOptions options = await MakeOptionsAsync(request);
+            ChatMessageItem reply;
+            using (StatusUntilFirstText(conversation))
+                reply = await conversation.SendAsync(request.Text, request.Attachments, options, request.Context, cancellationToken);
+            // A tool group's stub ended the request: the message goes again, with the group's tools from the start.
+            for (int rerun = 0; rerun < 2 && !cancellationToken.IsCancellationRequested && RerunRequested?.Invoke() == true; rerun++)
+            {
+                options = await MakeOptionsAsync(request);
+                reply = await conversation.RegenerateAsync(reply, options, cancellationToken);
+            }
+            SetStatus(null);
+        }
+
+        private async Task<ChatOptions> MakeOptionsAsync(ChatSendRequest request)
+        {
+            ChatOptions options = OptionsProvider != null
+                ? await OptionsProvider(request) ?? new ChatOptions()
+                : Options?.Clone() ?? new ChatOptions();
+            if (options.Reasoning == null)
+                options.Reasoning = new ReasoningOptions { Effort = ThinkingEnabled ? ReasoningEffort.Medium : ReasoningEffort.None };
+            return options;
         }
 
         // Clears "Generating..." once the reply starts streaming.
@@ -653,7 +731,8 @@ namespace Emgu.LiteRT.LM.Maui
             ChatMessageItem reply = null;
             System.ComponentModel.PropertyChangedEventHandler onChanged = (s, e) =>
             {
-                if (reply != null && (reply.HasAnswer || reply.Thinking.Length > 0) && _status?.Text == "Generating...")
+                // The status of this send ("Generating...", "Reading the conversation so far...") goes once the reply starts.
+                if (reply != null && (reply.HasAnswer || reply.Thinking.Length > 0) && _status?.IsVisible == true)
                     SetStatus(null);
             };
             NotifyCollectionChangedEventHandler onAdded = (s, e) =>
@@ -772,7 +851,9 @@ namespace Emgu.LiteRT.LM.Maui
             UpdateTalk();
         }
 
-        private void SetStatus(string text)
+        /// <summary>The status line under the transcript ("Generating...", an error); null hides it. Cleared when a reply's text starts.</summary>
+        /// <param name="text">The status, or null</param>
+        public void SetStatus(string text)
         {
             if (_status == null)
                 return;

@@ -242,7 +242,7 @@ namespace Emgu.LiteRT.LM.Maui
                 }
                 SetStatus(null);
                 ClearInput();
-                await SendAsync(typed.Length > 0 ? typed + " " + words : words, attachments);
+                await SendAsync(typed.Length > 0 ? typed + " " + words : words, attachments, voiceMessage: true);
                 return;
             }
 
@@ -252,7 +252,7 @@ namespace Emgu.LiteRT.LM.Maui
             Task<string> transcript = TranscribeVoiceMessages && SpeechRecognizer.IsSupported ? TranscribeQuietlyAsync(wav) : null;
             ClearInput();
             using (TranscriptOf(recording, transcript))
-                await SendAsync(typed, attachments);
+                await SendAsync(typed, attachments, voiceMessage: true);
         }
 
         private void ClearInput()

@@ -16,7 +16,7 @@
     ThinkingViewTemplate   ThinkingView: PART_Header, PART_Spinner, PART_Title, PART_Chevron, PART_Accessory,
                            PART_Preview, PART_Body (a ReplyView)
     ModelLoadCardTemplate  ModelLoadCard: PART_Title, PART_Status, PART_Note (Labels), PART_Progress (a ProgressBar),
-                           PART_Download, PART_Cancel, PART_Retry (Buttons)
+                           PART_Download, PART_Cancel, PART_Retry, PART_Dismiss (Buttons)
     ChatViewTemplate       ChatView: PART_Scroll, PART_Transcript, PART_Empty, PART_Header, PART_LoadCard, PART_Status,
                            PART_Toolbar, PART_Input, PART_Send, PART_Stop, PART_Attach, PART_Attachments, PART_Talk
     ChatUserMessageTemplate, ChatReplyTemplate, ChatNoticeTemplate
@@ -31,9 +31,11 @@
                            ChatView's microphone, idle and while recording (Button styles)
     ChatAttachmentViewTemplate
                            ChatAttachmentView: PART_Image, PART_Label, PART_Remove
-    ChatPageTemplate       ChatPage: PART_Title (a Label), PART_Model, PART_Chats, PART_NewChat, PART_Settings (Buttons),
-                           PART_Chat (a ChatView), PART_Status (a Label), PART_SidePanel (a View shown on wide screens),
-                           PART_SideContent (the Layout its sections go in), PART_Sheet (a BottomSheet)
+    ChatPageTemplate       ChatPage: PART_Back, PART_Model, PART_Chats, PART_NewChat, PART_Settings (Buttons), PART_Title
+                           (a Label), PART_Chat (a ChatView), PART_Overlay (a Grid over the chat area, for the features'
+                           panels), PART_Status (a Label), PART_SidePanel (a View shown on wide screens), PART_SideContent
+                           (the Layout its sections go in), PART_Layers (a Grid over the page, for the features' screens),
+                           PART_Sheet (a BottomSheet)
     ChatHeaderButtonStyle, ChatModelButtonStyle
                            ChatPage's header buttons, and its model button (Button styles)
     ChatChipStyle, ChatChipOnStyle
@@ -317,6 +319,7 @@
         <Grid RowDefinitions="Auto,*">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8" Padding="12,8,12,4">
                 <HorizontalStackLayout Spacing="10">
+                    <Button x:Name="PART_Back" Text="‹" FontSize="22" IsVisible="False" WidthRequest="36" Padding="0" />
                     <Label x:Name="PART_Title" FontFamily="{StaticResource ChatTitleFont}" FontSize="20" FontAttributes="Bold" VerticalOptions="Center" IsVisible="False"
                            TextColor="{AppThemeBinding Light={StaticResource ChatPrimaryTextLight}, Dark={StaticResource ChatPrimaryTextDark}}" />
                     <Button x:Name="PART_Model" />
@@ -327,7 +330,11 @@
             </Grid>
             <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
                 <Grid RowDefinitions="*,Auto">
-                    <chat:ChatView x:Name="PART_Chat" />
+                    <Grid>
+                        <chat:ChatView x:Name="PART_Chat" />
+                        <!-- The features' overlays (a camera preview, a monitor panel) over the chat area. -->
+                        <Grid x:Name="PART_Overlay" InputTransparent="True" CascadeInputTransparent="False" />
+                    </Grid>
                     <Label x:Name="PART_Status" Grid.Row="1" FontSize="13" Margin="18,0,18,8" IsVisible="False" FontFamily="{StaticResource ChatBodyFont}" TextColor="{StaticResource ChatAccent}" />
                 </Grid>
                 <Border x:Name="PART_SidePanel" Grid.Column="1" WidthRequest="300" IsVisible="False" Margin="0,0,12,12" Padding="16,12" StrokeThickness="0"
@@ -340,6 +347,8 @@
                     </ScrollView>
                 </Border>
             </Grid>
+            <!-- The features' layers over the whole page (a hands-free voice screen), under the sheet. -->
+            <Grid x:Name="PART_Layers" Grid.RowSpan="2" InputTransparent="True" CascadeInputTransparent="False" />
             <chat:BottomSheet x:Name="PART_Sheet" Grid.RowSpan="2" />
         </Grid>
     </ControlTemplate>
@@ -361,6 +370,7 @@
                     <Button x:Name="PART_Download" Text="Download" Style="{StaticResource ChatSendButtonStyle}" />
                     <Button x:Name="PART_Retry" Text="Retry" Style="{StaticResource ChatSendButtonStyle}" />
                     <Button x:Name="PART_Cancel" Text="Cancel" Style="{StaticResource ChatStopButtonStyle}" />
+                    <Button x:Name="PART_Dismiss" Text="Not now" Style="{StaticResource ChatStopButtonStyle}" />
                 </HorizontalStackLayout>
             </VerticalStackLayout>
         </Border>

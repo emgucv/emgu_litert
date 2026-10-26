@@ -2,17 +2,25 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
+using Emgu.LiteRT.LM;
 using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.Util;
 using LanguageModel = Emgu.LiteRT.LM.Models.LanguageModel;
+using ModelLoadStage = Emgu.LiteRT.LM.Models.ModelLoadStage;
 
 namespace Emgu.LiteRT.LM.Maui
 {
-    // The models: choosing one (the list in a sheet, or the side panel), and loading it with its backend and settings.
+    // The models: choosing one (the list in a sheet, or the side panel), loading it with its backend and settings, and
+    // reloading it - for another backend, context window or thread count - with the chat going on.
     public partial class ChatPage
     {
         private ChatModelOption _model;
         private string _backend = "cpu";
         private LanguageModel _modelInstance;
+        private int _contextTokens;
+        private bool _gpuUnavailable;
+        private bool _remoteReady;
+        private int _reloadDepth;
         private VerticalStackLayout _sideModelList;
 
         /// <summary>The model chosen, or null before the page is built.</summary>
@@ -21,8 +29,19 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>The LiteRT-LM backend the model runs on: "cpu" or "gpu".</summary>
         public string SelectedBackend => _backend;
 
+        /// <summary>The model's instance on the device (loaded or loading), or null for a remote model.</summary>
+        protected LanguageModel ModelInstance => _modelInstance;
+
+        /// <summary>True while a model is being reloaded (CPU threads, the context window, a private chat...): no new work starts meanwhile.</summary>
+        public bool IsReloadingModel => _reloadDepth > 0;
+
+        /// <summary>True once the model is loaded and ready (a remote model: connected).</summary>
+        public bool ModelReady => _model?.IsRemote == true ? _remoteReady : _chatView?.LoadState?.IsReady == true;
+
         // "Use the GPU" is kept per platform (the key the Emgu LiteRT demo has always used: "use_gpu_Android", "use_gpu_MacCatalyst"...).
         private static string GpuKey => "use_gpu_" + DeviceInfo.Current.Platform;
+
+        private static bool OnPhone => DeviceInfo.Current.Platform == DevicePlatform.Android || DeviceInfo.Current.Platform == DevicePlatform.iOS;
 
         private void SelectInitialModel()
         {
@@ -35,8 +54,31 @@ namespace Emgu.LiteRT.LM.Maui
         }
 
         /// <summary>
+        /// Mark the page as reloading a model until the result is disposed (<see cref="IsReloadingModel"/>): a derived
+        /// page's own reloads (another search model, a private chat's cleanup) hold it too.
+        /// </summary>
+        protected IDisposable BeginReload()
+        {
+            _reloadDepth++;
+            return new ReloadScope(this);
+        }
+
+        private sealed class ReloadScope : IDisposable
+        {
+            private ChatPage _page;
+            public ReloadScope(ChatPage page) => _page = page;
+            public void Dispose()
+            {
+                if (_page == null) return;
+                _page._reloadDepth = Math.Max(0, _page._reloadDepth - 1);
+                _page = null;
+            }
+        }
+
+        /// <summary>
         /// Choose a model (loaded with the next message, or straight away if it is on the device): a new chat, as a
-        /// chat belongs to a model. Nothing while a reply is being written.
+        /// chat belongs to a model. The same model on another backend is reloaded instead, and the chat goes on
+        /// (<see cref="ReloadModelAsync"/>). Nothing while a reply is being written.
         /// </summary>
         /// <param name="option">The model (one of the page's)</param>
         /// <param name="backend">"cpu" or "gpu" (one of the model's), or null for the one in use or the model's first</param>
@@ -45,34 +87,43 @@ namespace Emgu.LiteRT.LM.Maui
             if (option == null)
                 throw new ArgumentNullException(nameof(option));
             // Not while a reply is being written (the page's own busy work - opening a chat - changes the model itself).
-            if (Conversation?.IsBusy == true)
+            if (Conversation?.IsBusy == true || IsReloadingModel)
             {
                 SetStatus("Wait for the reply to finish before changing the model.");
                 return;
             }
-            backend = backend ?? _backend;
-            if (!option.Backends.Contains(backend))
-                backend = option.Backends.FirstOrDefault() ?? "cpu";
-            if (_model == option && _backend == backend && _chatView.Model != null)
+            backend = Backend(option, backend ?? _backend);
+            bool chosen = _model == option && (_chatView.Model != null || option.IsRemote);
+            if (chosen && _backend == backend)
                 return;
+            if (chosen)
+            {
+                _ = ReloadModelAsync(backend);
+                return;
+            }
             _model = option;
             _backend = backend;
+            _gpuUnavailable = false;
+            _remoteReady = false;
             // The client holds the model's conversation; the old model goes with it.
             _client.Reset();
             LanguageModel previous = _modelInstance;
-            _modelInstance = option.Create();
-            if (option.ContextWindow > 0)
-                _modelInstance.MaxNumTokens = option.ContextWindow;
-            // A new conversation for the model (OnConversationChanged), and its load card.
+            _modelInstance = option.IsRemote ? null : NewInstance(option);
+            // A new conversation for the model (OnConversationChanged) and its load card; a remote model's conversation
+            // runs over the client alone.
             _chatView.Model = _modelInstance;
-            previous?.Dispose();
-            if (_modelButton != null)
-                _modelButton.Text = option.DisplayName + (option.Backends.Count > 1 ? " · " + backend.ToUpperInvariant() : string.Empty);
+            _chatView.AttachmentKinds = option.IsRemote
+                ? (option.AcceptsImages ? ChatAttachmentKinds.Image : ChatAttachmentKinds.None) | (option.AcceptsAudio ? ChatAttachmentKinds.Audio : ChatAttachmentKinds.None)
+                : (ChatAttachmentKinds?)null;
+            if (previous != null)
+                _ = Task.Run(() => previous.Dispose());
+            UpdateModelButton();
             _options.Settings.Set("model", option.Id);
             if (option.Backends.Count > 1)
                 _options.Settings.Set(GpuKey, backend == "gpu");
             UpdateChips();
             RefreshModelList();
+            UpdateContextSection();
             foreach (ChatFeature feature in _features)
             {
                 try { feature.OnModelChanged(option); }
@@ -80,7 +131,64 @@ namespace Emgu.LiteRT.LM.Maui
             }
         }
 
-        // The load card's name, size and backend, and the engine's threads and context window.
+        private static string Backend(ChatModelOption option, string backend) =>
+            option.Backends.Contains(backend) ? backend : option.Backends.FirstOrDefault() ?? "cpu";
+
+        // A new, unloaded instance of the model with the context window chosen for it.
+        private LanguageModel NewInstance(ChatModelOption option)
+        {
+            LanguageModel model = option.Create();
+            _contextTokens = option.MaxContextWindow > 0
+                ? ChatContextWindow.Choose(ContextSetting, option.ContextWindow, option.MaxContextWindow, OnPhone, option.CanUseTools)
+                : option.ContextWindow;
+            if (_contextTokens > 0)
+                model.MaxNumTokens = _contextTokens;
+            return model;
+        }
+
+        /// <summary>
+        /// Load the chosen model again - on another backend, with the context window or CPU threads chosen now - with
+        /// the chat going on: the model reads the conversation with the next message. A reply being written finishes
+        /// first. Nothing for a remote model.
+        /// </summary>
+        /// <param name="backend">"cpu" or "gpu", or null for the backend in use</param>
+        /// <returns>True once the model is ready</returns>
+        public async Task<bool> ReloadModelAsync(string backend = null)
+        {
+            ChatModelOption option = _model;
+            if (option == null || option.IsRemote)
+                return false;
+            using (BeginReload())
+            {
+                await _chatView.PendingSend;
+                _backend = Backend(option, backend ?? _backend);
+                if (option.Backends.Count > 1)
+                    _options.Settings.Set(GpuKey, _backend == "gpu");
+                _client.Reset();
+                LanguageModel previous = _modelInstance;
+                _modelInstance = NewInstance(option);
+                // The same conversation, on the new engine (LoadStateCreated sets the card up); it is given the chat
+                // again with the next message.
+                _chatView.ReplaceModel(_modelInstance);
+                ConfigureConversation(Conversation, option, _modelInstance);
+                RereadNext = Conversation?.Messages.Any(m => m.Role != ChatMessageRole.Notice) == true;
+                UpdateModelButton();
+                RefreshModelList();
+                // Freeing an engine can take a moment: not on the UI thread.
+                if (previous != null)
+                    await Task.Run(() => previous.Dispose());
+                ModelLoadState state = _chatView.LoadState;
+                return state == null || await state.LoadAsync();
+            }
+        }
+
+        private void UpdateModelButton()
+        {
+            if (_modelButton != null && _model != null)
+                _modelButton.Text = _model.DisplayName + (_model.Backends.Count > 1 ? " · " + _backend.ToUpperInvariant() : string.Empty);
+        }
+
+        // The load card's name, size and backend, the download, and the engine's threads and context window.
         private void ConfigureLoadState(ModelLoadState state)
         {
             ChatModelOption option = _model;
@@ -89,18 +197,42 @@ namespace Emgu.LiteRT.LM.Maui
             state.DisplayName = option.DisplayName;
             state.DownloadSize = option.DownloadSize;
             state.Backend = _backend;
+            // The download goes on when the app leaves the screen, as far as the platform allows, and a paused one continues.
+            state.Downloader = BackgroundDownloads.DownloadFileAsync;
+            state.Hint = BackgroundDownloads.Hint;
             int threads = _options.CpuThreads > 0 ? _options.CpuThreads : CpuThreadSettings.Count;
-            int context = option.ContextWindow;
+            int context = _contextTokens;
+            Action<EngineSettings> configure = _options.ConfigureEngine;
             state.ConfigureSettings = settings =>
             {
                 settings.NumThreads = threads;
                 if (context > 0)
                     settings.MaxNumTokens = context;
+                configure?.Invoke(settings);
+            };
+            state.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(ModelLoadState.IsReady) && state.IsReady)
+                {
+                    RefreshModelList();
+                    UpdateMemoryLabel();
+                }
             };
         }
 
-        /// <summary>True once the model is loaded and ready.</summary>
-        public bool ModelReady => _chatView?.LoadState?.IsReady == true;
+        // Loading on the GPU failed while creating the engine: offer the CPU (the chat goes on). Other failures show on the card.
+        private async void OnModelLoadFailed(object sender, EventArgs e)
+        {
+            ModelLoadState state = _chatView.LoadState;
+            if (state == null || _backend != "gpu" || _gpuUnavailable || state.FailedStage != ModelLoadStage.LoadingEngine)
+                return;
+            bool useCpu = await DisplayAlertAsync("GPU model could not load", state.Error + "\n\nRun this model on CPU instead?", "Run on CPU", "Cancel");
+            if (!useCpu)
+                return;
+            _gpuUnavailable = true;
+            await ReloadModelAsync("cpu");
+            SetStatus("The GPU isn't available on this device - using the CPU.");
+        }
 
         private async void OnModelButtonTapped()
         {
@@ -112,7 +244,7 @@ namespace Emgu.LiteRT.LM.Maui
                 SelectModel(_options.Models[index], parts[1]);
         }
 
-        // The models, one row per model and backend, with the one in use marked.
+        // The models, one row per model and backend, with the one in use marked and whether each is on the device.
         private View BuildModelList(bool inSheet)
         {
             var list = new VerticalStackLayout { Spacing = 2 };
@@ -120,12 +252,13 @@ namespace Emgu.LiteRT.LM.Maui
             {
                 int index = i;
                 ChatModelOption option = _options.Models[i];
+                string detail = string.Join(" ", new[] { DownloadStatus(option), option.Detail }.Where(s => !string.IsNullOrEmpty(s)));
                 foreach (string backend in option.Backends.Count == 0 ? new[] { "cpu" } : option.Backends)
                 {
                     string chosen = backend;
                     bool selected = option == _model && backend == _backend;
                     string title = option.DisplayName + (option.Backends.Count > 1 ? " · " + backend.ToUpperInvariant() : string.Empty);
-                    list.Children.Add(ListRow(title, option.Detail, selected, () =>
+                    list.Children.Add(ListRow(title, detail, selected, () =>
                     {
                         if (inSheet)
                             _sheet.Dismiss(index + ":" + chosen);
@@ -135,6 +268,32 @@ namespace Emgu.LiteRT.LM.Maui
                 }
             }
             return list;
+        }
+
+        // "Downloaded ·", "Download paused at 1.2 GB of 2.6 GB ·", or nothing, from the option's file.
+        private string DownloadStatus(ChatModelOption option)
+        {
+            DownloadableFile file = option.ModelFile;
+            if (file == null)
+                return null;
+            try
+            {
+                if (file.IsLocalFileVerified)
+                    return "Downloaded ·";
+                if (file.PartialDownloadBytes > 0)
+                    return "Download paused at " + FormatSize(file.PartialDownloadBytes) + (option.DownloadSize > 0 ? " of " + FormatSize(option.DownloadSize) : string.Empty) + " ·";
+            }
+            catch (Exception)
+            {
+            }
+            return null;
+        }
+
+        private static string FormatSize(long bytes)
+        {
+            if (bytes >= 1L << 30)
+                return string.Format("{0:0.0} GB", bytes / (double)(1L << 30));
+            return string.Format("{0:0} MB", bytes / (double)(1L << 20));
         }
 
         private void RefreshModelList()

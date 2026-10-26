@@ -14,8 +14,10 @@ namespace Emgu.LiteRT.LM.Maui
     /// hides itself once the model is ready.
     /// <para>
     /// Its look is the "ModelLoadCardTemplate" template (see <see cref="ChatStyles"/>), with the parts "PART_Title",
-    /// "PART_Status" and "PART_Note" (Labels), "PART_Progress" (a ProgressBar), and "PART_Download", "PART_Cancel" and
-    /// "PART_Retry" (Buttons, or other views that are tapped). A template without one of them just doesn't show that part.
+    /// "PART_Status" and "PART_Note" (Labels), "PART_Progress" (a ProgressBar), and "PART_Download" (reads "Continue" for
+    /// a paused download, "Load" for a downloaded model), "PART_Cancel", "PART_Retry" and "PART_Dismiss" ("Not now": the
+    /// card hides until loading is asked for again) - Buttons, or other views that are tapped. A template without one of
+    /// them just doesn't show that part.
     /// </para>
     /// </summary>
     public class ModelLoadCard : TemplatedView
@@ -33,6 +35,7 @@ namespace Emgu.LiteRT.LM.Maui
         private View _download;
         private View _cancel;
         private View _retry;
+        private View _dismiss;
 
         /// <summary>The loading to show.</summary>
         public ModelLoadState State
@@ -65,6 +68,7 @@ namespace Emgu.LiteRT.LM.Maui
             _download = Hook("PART_Download", () => _ = State?.LoadAsync());
             _cancel = Hook("PART_Cancel", () => State?.Cancel());
             _retry = Hook("PART_Retry", () => _ = State?.LoadAsync());
+            _dismiss = Hook("PART_Dismiss", () => { if (State != null) State.Dismissed = true; });
             Update();
         }
 
@@ -100,7 +104,7 @@ namespace Emgu.LiteRT.LM.Maui
         private void Update()
         {
             ModelLoadState state = State;
-            IsVisible = state != null && !state.IsReady;
+            IsVisible = state != null && !state.IsReady && !state.Dismissed;
             if (state == null || state.IsReady)
                 return;
             string name = state.DisplayName ?? state.Model.GetType().Name;
@@ -110,6 +114,7 @@ namespace Emgu.LiteRT.LM.Maui
                 status = "Couldn't load the model: " + state.Error;
             else if (!state.IsLoading)
                 status = state.IsDownloaded ? "Not loaded yet."
+                    : state.IsPaused ? "The download was paused" + (state.DownloadSize > 0 ? " at " + FormatSize(state.ModelFile.PartialDownloadBytes) + " of " + FormatSize(state.DownloadSize) + "." : ".")
                     : "The model needs to be downloaded first" + (state.DownloadSize > 0 ? " (" + FormatSize(state.DownloadSize) + ")." : ".");
             else
             {
@@ -142,19 +147,28 @@ namespace Emgu.LiteRT.LM.Maui
             }
             if (_note != null)
             {
-                _note.IsVisible = offerDownload && !OnWiFi();
-                _note.Text = "You're not on Wi-Fi: the download may use mobile data.";
+                // Before a download: the app's hint (e.g. how the download goes on in the background) and the Wi-Fi warning.
+                string note = offerDownload ? string.Join(" ", new[] { state.Hint, OnWiFi() ? null : "You're not on Wi-Fi: the download may use mobile data." }
+                    .Where(s => !string.IsNullOrEmpty(s))) : string.Empty;
+                _note.IsVisible = note.Length > 0;
+                _note.Text = note;
             }
             if (_download != null)
             {
                 _download.IsVisible = offerDownload || (!state.IsLoading && !state.HasError && state.IsDownloaded);
                 if (_download is Button downloadButton)
-                    downloadButton.Text = state.IsDownloaded ? "Load" : "Download";
+                    downloadButton.Text = state.IsDownloaded ? "Load" : state.IsPaused ? "Continue" : "Download";
             }
             if (_cancel != null)
                 _cancel.IsVisible = state.IsLoading && state.Stage != ModelLoadStage.LoadingEngine;
             if (_retry != null)
+            {
                 _retry.IsVisible = state.HasError;
+                if (_retry is Button retryButton)
+                    retryButton.Text = state.HasError && state.IsPaused ? "Continue" : "Retry";
+            }
+            if (_dismiss != null)
+                _dismiss.IsVisible = offerDownload;
         }
 
         private static bool OnWiFi()

@@ -19,6 +19,11 @@ namespace Emgu.LiteRT.LM.Maui
         private void BuildSettingsView()
         {
             var view = new VerticalStackLayout { Spacing = 6 };
+            if (_options.ShowCpuThreads)
+            {
+                view.Children.Add(CpuThreadsView.Create(() => ReloadModelAsync()));
+                view.Children.Add(Divider());
+            }
             view.Children.Add(SwitchRow("Read replies aloud", null, _chatView.ReadAloud, on =>
             {
                 _chatView.ReadAloud = on;
@@ -39,6 +44,8 @@ namespace Emgu.LiteRT.LM.Maui
                 view.Children.Add(Divider());
                 view.Children.Add(section);
             }
+            view.Children.Add(Divider());
+            view.Children.Add(BuildConversationMemorySection());
             view.Children.Add(Divider());
             view.Children.Add(SwitchRow("Developer mode", "Shows, after each reply, the tools and instructions the model was given.",
                 DeveloperMode, on => _options.Settings.Set("developer_mode", on)));

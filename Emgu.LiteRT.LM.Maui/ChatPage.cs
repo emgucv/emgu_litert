@@ -29,7 +29,7 @@ namespace Emgu.LiteRT.LM.Maui
     /// Register the handlers it needs with <c>builder.UseLiteRtChat()</c>. Its settings (the Think chip, the model, the
     /// features' switches) are kept by <see cref="ChatPageOptions.Settings"/>.
     /// </summary>
-    public partial class ChatPage : ContentPage, IChatPageHost
+    public partial class ChatPage : ContentPage, IChatPageHost, IChatOverlays
     {
         private const string TemplateKey = "ChatPageTemplate";
         // The side panel (chats, models, settings) instead of sheets from this width on.
@@ -41,6 +41,9 @@ namespace Emgu.LiteRT.LM.Maui
         private readonly List<ChatFeature> _features;
         private readonly ChatPageClient _client;
         private Label _titleLabel;
+        private Button _backButton;
+        private Grid _overlay;
+        private Grid _layers;
         private Button _modelButton;
         private Button _chatsButton;
         private Button _newChatButton;
@@ -52,6 +55,7 @@ namespace Emgu.LiteRT.LM.Maui
         private BottomSheet _sheet;
         private bool? _wide;
         private int _busyDepth;
+        private bool _started;
 
         /// <summary>
         /// Create the page.
@@ -128,6 +132,9 @@ namespace Emgu.LiteRT.LM.Maui
         {
             base.OnApplyTemplate();
             _titleLabel = GetTemplateChild("PART_Title") as Label;
+            _backButton = GetTemplateChild("PART_Back") as Button;
+            _overlay = GetTemplateChild("PART_Overlay") as Grid;
+            _layers = GetTemplateChild("PART_Layers") as Grid;
             _modelButton = GetTemplateChild("PART_Model") as Button;
             _chatsButton = GetTemplateChild("PART_Chats") as Button;
             _newChatButton = GetTemplateChild("PART_NewChat") as Button;
@@ -143,8 +150,13 @@ namespace Emgu.LiteRT.LM.Maui
                 _titleLabel.Text = _options.Title;
             Hook(_modelButton, "ChatModelButtonStyle", OnModelButtonTapped);
             Hook(_chatsButton, "ChatHeaderButtonStyle", OnChatsTapped);
-            Hook(_newChatButton, "ChatHeaderButtonStyle", StartNewChat);
+            Hook(_newChatButton, "ChatHeaderButtonStyle", () => StartNewChat());
             Hook(_settingsButton, "ChatHeaderButtonStyle", OnSettingsTapped);
+            Hook(_backButton, "ChatHeaderButtonStyle", () => _ = Navigation.PopAsync());
+            if (_backButton != null)
+                _backButton.IsVisible = _options.ShowBackButton;
+            SemanticProperties.SetDescription(_backButton, "Back");
+            _chatView.SizeChanged += (s, e) => ChatSizeChanged?.Invoke(this, EventArgs.Empty);
             if (_modelButton != null)
                 _modelButton.IsVisible = _options.ShowModelPicker;
             if (_chatsButton != null)
@@ -158,6 +170,7 @@ namespace Emgu.LiteRT.LM.Maui
             _chatView.LoadStateCreated = ConfigureLoadState;
             _chatView.OptionsProvider = ComposeOptionsAsync;
             _chatView.RerunRequested = () => _skills.TakeRerun();
+            _chatView.Sender = SendCoreAsync;
             _chatView.ThinkingEnabled = _options.Settings.Get("think", true);
             _chatView.ReadAloud = _options.Settings.Get("read_aloud", false);
             if (_options.AttachmentSource != null)
@@ -165,6 +178,7 @@ namespace Emgu.LiteRT.LM.Maui
             if (_options.ReplySpeaker != null)
                 _chatView.ReplySpeaker = _options.ReplySpeaker;
             _chatView.ExchangeCompleted += OnExchangeCompleted;
+            _chatView.ModelLoadFailed += OnModelLoadFailed;
             _chatView.PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(ChatView.Conversation))
@@ -172,8 +186,17 @@ namespace Emgu.LiteRT.LM.Maui
             };
             BuildSettingsView();
             BuildChips();
-            SelectInitialModel();
             UpdatePrivateState();
+            OnPageBuilt();
+        }
+
+        /// <summary>
+        /// Called once the page's views exist (at the end of applying the template, which happens in the constructor -
+        /// before a derived class's constructor body), for a derived page to add its own. The model is chosen later,
+        /// when the page first appears.
+        /// </summary>
+        protected virtual void OnPageBuilt()
+        {
         }
 
         private static void Hook(Button button, string styleKey, Action action)
@@ -188,8 +211,31 @@ namespace Emgu.LiteRT.LM.Maui
         protected override void OnAppearing()
         {
             base.OnAppearing();
+            // The model chosen last time (loading starts if it is on the device): on the first appearance, so a derived
+            // page's constructor has run.
+            if (!_started)
+            {
+                _started = true;
+                SelectInitialModel();
+            }
             foreach (ChatFeature feature in _features)
                 feature.OnAppearing();
+        }
+
+        /// <summary>
+        /// True in a hands-free chat (a voice conversation): replies are spoken, the model doesn't think first, and skills
+        /// leave out tools whose results need the screen (<see cref="ChatMessageContext.HandsFree"/>).
+        /// </summary>
+        public bool HandsFree { get; private set; }
+
+        /// <summary>Start or end a hands-free chat (<see cref="HandsFree"/>); the chips follow.</summary>
+        /// <param name="handsFree">True to start one</param>
+        public void SetHandsFree(bool handsFree)
+        {
+            if (HandsFree == handsFree)
+                return;
+            HandsFree = handsFree;
+            UpdateChips();
         }
 
         /// <inheritdoc/>
@@ -256,6 +302,7 @@ namespace Emgu.LiteRT.LM.Maui
                 try { feature.OnReplyCompleted(e); }
                 catch (Exception) { }
             }
+            UpdateMemoryLabel();
             ExchangeCompleted?.Invoke(this, e);
         }
 
@@ -331,8 +378,9 @@ namespace Emgu.LiteRT.LM.Maui
             return new VerticalStackLayout { Spacing = 4, Children = { row, Note(note) } };
         }
 
-        /// <summary>A list row (a saved chat, a model, a memory): a title, a detail line and, optionally, a delete cross.</summary>
-        internal static Border ListRow(string title, string detail, bool selected, Action tapped, Action deleted, string deleteDescription)
+        /// <summary>A list row (a saved chat, a model, a memory): a title, a detail line and, optionally, action links and a delete cross.</summary>
+        internal static Border ListRow(string title, string detail, bool selected, Action tapped, Action deleted, string deleteDescription,
+            IEnumerable<(string Text, Action Tapped)> actions = null)
         {
             var titleLabel = new Label { Text = title };
             ChatResources.ApplyStyle(titleLabel, "ChatListTitleStyle");
@@ -343,8 +391,15 @@ namespace Emgu.LiteRT.LM.Maui
                 ChatResources.ApplyStyle(detailLabel, "ChatListDetailStyle");
                 details.Children.Add(detailLabel);
             }
-            var row = new Grid { ColumnSpacing = 6, ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
+            var row = new Grid { ColumnSpacing = 6, ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto) } };
             row.Add(details, 0, 0);
+            if (actions != null && actions.Any())
+            {
+                var links = new HorizontalStackLayout { Spacing = 4, VerticalOptions = LayoutOptions.Center };
+                foreach ((string text, Action action) in actions)
+                    links.Children.Add(Link(text, action));
+                row.Add(links, 1, 0);
+            }
             if (deleted != null)
             {
                 var cross = new Label { Text = "✕", FontSize = 16, Padding = new Thickness(8, 4), VerticalOptions = LayoutOptions.Center };
@@ -353,7 +408,7 @@ namespace Emgu.LiteRT.LM.Maui
                 TapGestureRecognizer deleteTap = new TapGestureRecognizer();
                 deleteTap.Tapped += (s, e) => deleted();
                 cross.GestureRecognizers.Add(deleteTap);
-                row.Add(cross, 1, 0);
+                row.Add(cross, 2, 0);
             }
             var cell = new Border { Content = row, StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(10) } };
             ChatResources.ApplyStyle(cell, "ChatListRowStyle");

@@ -104,6 +104,28 @@ namespace Emgu.LiteRT.LM.Maui
         {
         }
 
+        /// <summary>Called when a saved chat was opened (its messages are in the conversation).</summary>
+        /// <param name="chatId">The chat</param>
+        public virtual void OnChatOpened(int chatId)
+        {
+        }
+
+        /// <summary>
+        /// The step line for a tool call of this feature's ("Searching Wikipedia for ...", shown while it runs), or null
+        /// for a call that isn't its; the page asks each feature, then Emgu.LiteRT.LM.Agents' <c>AgentTools.Describe</c>.
+        /// </summary>
+        /// <param name="call">The tool call</param>
+        public virtual string DescribeToolCall(FunctionCallContent call) => null;
+
+        /// <summary>
+        /// Called when a tool call of a reply has its result (<see cref="ChatToolStep.Result"/>), on the UI thread: a
+        /// feature may reword the step's text with the outcome (e.g. "Already remembered").
+        /// </summary>
+        /// <param name="step">The step</param>
+        public virtual void OnToolStepCompleted(ChatToolStep step)
+        {
+        }
+
         /// <summary>The feature's section of the settings (a switch, a list...), or null for none.</summary>
         public virtual View BuildSettingsSection() => null;
 

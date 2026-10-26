@@ -30,17 +30,26 @@ public sealed class MainPage : ChatPage
         options.Models.Add(new ChatModelOption("Qwen3", "Qwen3 0.6B", () => new Qwen3())
         {
             Detail = "~345 MB download. Fast, and can think before answering.",
-            DownloadSize = 345L << 20
+            DownloadSize = 345L << 20,
+            ModelFile = Qwen3.ModelFile
         });
-        options.Models.Add(new ChatModelOption("Gemma4E2B", "Gemma 4 E2B", () => new Gemma4E2B())
+        // Gemma 4 E2B runs on the GPU too (OpenCL on Android, Metal on a Mac), and its file allows a context window up
+        // to 32k: the settings offer the choice, with 8k as Automatic.
+        var gemma = new ChatModelOption("Gemma4E2B", "Gemma 4 E2B", () => new Gemma4E2B())
         {
             Detail = "~2.6 GB download. Understands images and speech, uses tools, and can think before answering.",
             DownloadSize = 2600L << 20,
+            ModelFile = Gemma4E2B.ModelFile,
             CanUseTools = true,
             AcceptsImages = true,
             AcceptsAudio = true,
-            CanSummarize = true
-        });
+            CanSummarize = true,
+            ContextWindow = 8192,
+            MaxContextWindow = 32000
+        };
+        if (DeviceInfo.Platform == DevicePlatform.Android || DeviceInfo.Platform == DevicePlatform.MacCatalyst)
+            gemma.Backends.Add("gpu");
+        options.Models.Add(gemma);
         foreach (ChatFeature feature in ChatPage.DefaultFeatures(new SqliteAgentMemoryStore(store), new SqliteAgentGoalStore(store)))
             options.Features.Add(feature);
         options.Features.Add(new DiceFeature());

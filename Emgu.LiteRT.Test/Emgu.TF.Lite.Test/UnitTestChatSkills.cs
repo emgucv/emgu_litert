@@ -99,6 +99,24 @@ public class UnitTestChatSkills
         Assert.That(Names(composed), Does.Contain("b_tool").And.Contain("b_group_tool"));
     }
 
+    private sealed class ScreenSkill : ChatSkill
+    {
+        public override string Name => "screen";
+        // A tool whose result is a card on the screen: left out hands-free.
+        public override IEnumerable<AITool> Tools(ChatMessageContext context) => context.HandsFree
+            ? Array.Empty<AITool>()
+            : new[] { AIFunctionFactory.Create(() => "shown", "show_card", "Shows a card.") };
+    }
+
+    [Test]
+    public async Task HandsFreeReachesTheSkills()
+    {
+        var skills = new ChatSkillSet();
+        skills.Add(new ScreenSkill());
+        Assert.That(Names(await skills.ComposeAsync(new ChatMessageContext { Prompt = "hi" }, null)), Is.EqualTo(new[] { "show_card" }));
+        Assert.That((await skills.ComposeAsync(new ChatMessageContext { Prompt = "hi", HandsFree = true }, null)).Tools, Is.Empty);
+    }
+
     [Test]
     public async Task AModelWithoutToolsGetsOnlyTheBaseInstructions()
     {
@@ -235,7 +253,8 @@ public class UnitTestChatSkills
         web.Enabled = true;
         web.TavilyApiKey = "tvly-test";
         composed = await skills.ComposeAsync(new ChatMessageContext { Prompt = "hi" }, null);
-        Assert.That(Names(composed), Does.Contain("search_web").And.Not.Contain("read_web_page"));
+        // Tavily's search, and its page reader under the same name as the keyless one.
+        Assert.That(Names(composed), Does.Contain("search_web").And.Contain("read_web_page"));
         Assert.That(composed.Instructions, Does.Contain("search_web"));
     }
 }

@@ -31,6 +31,12 @@ namespace Emgu.LiteRT.LM.Agents
 
         /// <summary>True when the model takes images.</summary>
         public bool ModelAcceptsImages { get; set; }
+
+        /// <summary>
+        /// True in a hands-free chat: the reply is spoken and nothing on the screen is looked at, so a skill whose tools
+        /// show cards or need a tap (confirmations, counting on the camera) leaves them out.
+        /// </summary>
+        public bool HandsFree { get; set; }
     }
 
     /// <summary>

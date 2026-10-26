@@ -22,7 +22,7 @@ namespace Emgu.LiteRT.LM.Maui
         /// True while a reply is being written, or the page is busy with a feature's work (<see cref="SetBusy"/>). (Not
         /// <see cref="Page.IsBusy"/>, the platform's activity indicator.)
         /// </summary>
-        public bool IsWorking => Conversation?.IsBusy == true || _busyDepth > 0;
+        public bool IsWorking => _chatView?.IsSending == true || Conversation?.IsBusy == true || _busyDepth > 0 || IsReloadingModel;
 
         /// <summary>Mark the page busy with a feature's work (new chats and opening chats wait), or done; counted.</summary>
         /// <param name="busy">True for busy</param>
@@ -32,6 +32,47 @@ namespace Emgu.LiteRT.LM.Maui
         }
 
         Page IChatPageHost.Page => this;
+
+        IChatOverlays IChatPageHost.Overlays => this;
+
+        int? IChatPageHost.CurrentChatId => CurrentChatId;
+
+        Task IChatPageHost.OpenChatAsync(int chatId) => OpenChatAsync(chatId);
+
+        bool IChatPageHost.IsReloadingModel => IsReloadingModel;
+
+        Task<bool> IChatPageHost.ReloadModelAsync() => ReloadModelAsync();
+
+        // ---------- IChatOverlays ----------
+
+        /// <summary>Raised when the chat area's size changes (<see cref="IChatOverlays.ChatSizeChanged"/>).</summary>
+        public event EventHandler ChatSizeChanged;
+
+        Size IChatOverlays.ChatSize => _chatView == null ? Size.Zero : new Size(_chatView.Width, _chatView.Height);
+
+        void IChatOverlays.AddOverlay(View view)
+        {
+            if (view != null && _overlay != null && !_overlay.Children.Contains(view))
+                _overlay.Children.Add(view);
+        }
+
+        void IChatOverlays.RemoveOverlay(View view)
+        {
+            if (view != null)
+                _overlay?.Children.Remove(view);
+        }
+
+        void IChatOverlays.ShowLayer(View view)
+        {
+            if (view != null && _layers != null && !_layers.Children.Contains(view))
+                _layers.Children.Add(view);
+        }
+
+        void IChatOverlays.HideLayer(View view)
+        {
+            if (view != null)
+                _layers?.Children.Remove(view);
+        }
 
         ChatConversation IChatPageHost.Conversation => Conversation;
 
@@ -50,6 +91,10 @@ namespace Emgu.LiteRT.LM.Maui
         bool IChatPageHost.MemoryOn => MemoryOn;
 
         bool IChatPageHost.DeveloperMode => DeveloperMode;
+
+        bool IChatPageHost.HandsFree => HandsFree;
+
+        void IChatPageHost.SetHandsFree(bool handsFree) => SetHandsFree(handsFree);
 
         int IChatPageHost.ContextWindow => Conversation?.ContextWindow ?? 4096;
 
@@ -78,6 +123,15 @@ namespace Emgu.LiteRT.LM.Maui
                 return;
             reply.Decorations.Add(card);
             _chatView.ScrollToEnd();
+        }
+
+        void IChatPageHost.RemoveCard(View card)
+        {
+            if (card == null || Conversation == null)
+                return;
+            foreach (ChatMessageItem item in Conversation.Messages)
+                if (item.Decorations.Remove(card))
+                    return;
         }
 
         void IChatPageHost.AddNotice(string text) => Conversation?.AddNotice(null, text);

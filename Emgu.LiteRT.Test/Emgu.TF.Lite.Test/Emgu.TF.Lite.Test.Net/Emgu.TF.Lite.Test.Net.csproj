@@ -34,6 +34,9 @@
     <Compile Include="..\UnitTestReplyMarkdown.cs" Link="UnitTestReplyMarkdown.cs" />
     <Compile Include="..\UnitTestChatConversation.cs" Link="UnitTestChatConversation.cs" />
     <Compile Include="..\UnitTestChatHistoryStore.cs" Link="UnitTestChatHistoryStore.cs" />
+    <Compile Include="..\UnitTestChatSkills.cs" Link="UnitTestChatSkills.cs" />
+    <Compile Include="..\UnitTestModelLoadState.cs" Link="UnitTestModelLoadState.cs" />
+    <Compile Include="..\UnitTestChatContextWindow.cs" Link="UnitTestChatContextWindow.cs" />
     <Compile Include="..\UnitTestReplySpeechText.cs" Link="UnitTestReplySpeechText.cs" />
     <Compile Include="..\UnitTestGoalHistory.cs" Link="UnitTestGoalHistory.cs" />
     <Compile Include="..\UnitTestHandTracker.cs" Link="UnitTestHandTracker.cs" />

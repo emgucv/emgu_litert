@@ -8,6 +8,25 @@ using Microsoft.Extensions.AI;
 
 namespace Emgu.LiteRT.LM.Maui
 {
+    /// <summary>An action on a saved chat, as a button on its row in the chat list (e.g. "Export").</summary>
+    public sealed class ChatAction
+    {
+        /// <summary>Create an action.</summary>
+        /// <param name="text">The button's text</param>
+        /// <param name="run">What it does with the chat</param>
+        public ChatAction(string text, Func<ChatHistoryEntry, Task> run)
+        {
+            Text = text ?? throw new ArgumentNullException(nameof(text));
+            Run = run ?? throw new ArgumentNullException(nameof(run));
+        }
+
+        /// <summary>The button's text.</summary>
+        public string Text { get; }
+
+        /// <summary>What it does with the chat.</summary>
+        public Func<ChatHistoryEntry, Task> Run { get; }
+    }
+
     /// <summary>
     /// What a <see cref="ChatPage"/> is made of: the models, where chats and memories are kept, the features, the
     /// instructions and the settings.
@@ -22,6 +41,18 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>Where chats are saved and listed (Emgu.LiteRT.LM.Chat.Sqlite's ChatHistoryStore), or null for no saved chats.</summary>
         public IChatHistoryStore History { get; set; }
+
+        /// <summary>
+        /// True (the default) to save each exchange into <see cref="History"/> as it completes. False when the app saves
+        /// the chats itself (with its own extras) and tells the page which chat it is in (<c>ChatPage.SetCurrentChat</c>).
+        /// </summary>
+        public bool AutoSave { get; set; } = true;
+
+        /// <summary>Buttons on each saved chat's row in the chat list (e.g. Export), besides opening and deleting it.</summary>
+        public IList<ChatAction> ChatActions { get; } = new List<ChatAction>();
+
+        /// <summary>True to show a back button in the header (for a page pushed without a navigation bar); false by default.</summary>
+        public bool ShowBackButton { get; set; }
 
         /// <summary>Where memories about the user are kept (SqliteAgentMemoryStore), for <see cref="Features.MemoryFeature"/>; or null.</summary>
         public IAgentMemoryStore Memory { get; set; }
@@ -59,6 +90,15 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>True to offer a private chat (with <see cref="History"/>); true by default.</summary>
         public bool ShowPrivateChat { get; set; } = true;
 
+        /// <summary>
+        /// True to show the context window choice in the settings for models with a <see cref="ChatModelOption.MaxContextWindow"/>
+        /// (with the "Conversation memory" section's usage and Compact now); true by default.
+        /// </summary>
+        public bool ShowContextWindow { get; set; } = true;
+
+        /// <summary>True to show the CPU threads slider in the settings (<see cref="CpuThreadsView"/>; reloads the model); false by default.</summary>
+        public bool ShowCpuThreads { get; set; }
+
         /// <summary>Where attachments come from, or null for <see cref="ChatView"/>'s default (the photo library, the camera, an audio file).</summary>
         public IChatAttachmentSource AttachmentSource { get; set; }
 
@@ -67,5 +107,8 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>The CPU threads the models run with, or 0 for <see cref="CpuThreadSettings.Count"/>.</summary>
         public int CpuThreads { get; set; }
+
+        /// <summary>Adjusts a model's engine settings before it loads (after the threads and the context window), or null.</summary>
+        public Action<Emgu.LiteRT.LM.EngineSettings> ConfigureEngine { get; set; }
     }
 }

@@ -32,6 +32,7 @@ namespace Emgu.LiteRT.LM.Chat
         private bool _progressPosted;
         private string _displayName;
         private long _downloadSize;
+        private bool _dismissed;
 
         /// <summary>
         /// Prepare to load a model.
@@ -59,6 +60,33 @@ namespace Emgu.LiteRT.LM.Chat
 
         /// <summary>Adjusts the engine settings before the engine is created (see <see cref="LanguageModel.Init"/>), or null.</summary>
         public Action<EngineSettings> ConfigureSettings { get; set; }
+
+        /// <summary>
+        /// Downloads the model's file when it isn't on the device yet, instead of <see cref="LanguageModel.Init"/>'s own
+        /// download: (the file, a name to show, a progress callback (total bytes or null, bytes received, percentage or
+        /// null), a cancellation token) - the shape of Emgu.LiteRT.LM.Maui's <c>BackgroundDownloads.DownloadFileAsync</c>,
+        /// which keeps a download going in the background and continues a paused one. Or null.
+        /// </summary>
+        public Func<DownloadableFile, string, Action<long?, long, double?>, CancellationToken, Task> Downloader { get; set; }
+
+        /// <summary>A line about downloads for the card (e.g. how the platform keeps them going in the background), or null.</summary>
+        public string Hint { get; set; }
+
+        /// <summary>
+        /// True when the user put the download off ("Not now"): a card hides itself until loading is asked for again
+        /// (sending a message clears it).
+        /// </summary>
+        public bool Dismissed
+        {
+            get => _dismissed;
+            set => Set(ref _dismissed, value);
+        }
+
+        /// <summary>True when a download was started and stopped before it was complete: loading continues it.</summary>
+        public bool IsPaused => !_isLoading && !IsReady && ModelFile.PartialDownloadBytes > 0;
+
+        /// <summary>The stage loading had reached when it failed (see <see cref="Error"/>), or null.</summary>
+        public ModelLoadStage? FailedStage { get; private set; }
 
         /// <summary>A name for the model to show, e.g. "Gemma 4 E2B"; defaults to the model's class name.</summary>
         public string DisplayName
@@ -165,12 +193,22 @@ namespace Emgu.LiteRT.LM.Chat
         private async Task<bool> RunAsync(CancellationToken cancellationToken)
         {
             Error = null;
+            FailedStage = null;
             IsLoading = true;
             _bytesReceived = 0;
             _totalBytes = null;
             RaiseProgress();
             try
             {
+                // The app's downloader first (a background download, continuing a paused one), then the model's own
+                // Init, which finds the file there and verifies it.
+                if (Downloader != null && !ModelFile.IsLocalFileVerified)
+                {
+                    Stage = ModelLoadStage.Downloading;
+                    _bytesReceived = ModelFile.PartialDownloadBytes;
+                    RaiseProgress();
+                    await Downloader(ModelFile, DisplayName ?? Model.GetType().Name, OnProgress, cancellationToken);
+                }
                 await Model.Init(ModelFile, Backend, ConfigureSettings, cancellationToken);
                 Stage = ModelLoadStage.Ready;
                 return true;
@@ -182,6 +220,7 @@ namespace Emgu.LiteRT.LM.Chat
             }
             catch (Exception ex)
             {
+                FailedStage = _stage;
                 Error = ex.Message;
                 return false;
             }

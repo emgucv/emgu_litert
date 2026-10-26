@@ -9,13 +9,54 @@ using Microsoft.Extensions.AI;
 namespace Emgu.LiteRT.LM.Maui
 {
     /// <summary>
+    /// Where a <see cref="ChatPage"/>'s features put their own views: overlays over the chat area (a camera preview, a
+    /// monitor panel) and layers over the whole page under the bottom sheet (a hands-free voice screen).
+    /// </summary>
+    public interface IChatOverlays
+    {
+        /// <summary>Put a view over the chat area (the transcript and the message box); it lays out as the Grid's child it is.</summary>
+        void AddOverlay(View view);
+
+        /// <summary>Take an overlay away.</summary>
+        void RemoveOverlay(View view);
+
+        /// <summary>Put a view over the whole page, under the bottom sheet.</summary>
+        void ShowLayer(View view);
+
+        /// <summary>Take a layer away.</summary>
+        void HideLayer(View view);
+
+        /// <summary>The chat area's size, for an overlay to size itself by.</summary>
+        Size ChatSize { get; }
+
+        /// <summary>Raised when <see cref="ChatSize"/> changes.</summary>
+        event EventHandler ChatSizeChanged;
+    }
+
+    /// <summary>
     /// What a <see cref="ChatPage"/> offers its features (<see cref="ChatFeature.Host"/>): the conversation and the model,
-    /// the page's state, its status line, cards on the reply, alerts, prompts and the bottom sheet.
+    /// the page's state, its status line, cards on the reply, alerts, prompts, the bottom sheet, and places for views of
+    /// their own.
     /// </summary>
     public interface IChatPageHost
     {
         /// <summary>The page.</summary>
         Page Page { get; }
+
+        /// <summary>Where the features put overlays and layers.</summary>
+        IChatOverlays Overlays { get; }
+
+        /// <summary>The saved chat being shown (null until its first exchange is saved, or without saved chats).</summary>
+        int? CurrentChatId { get; }
+
+        /// <summary>Open a saved chat (when nothing is being answered).</summary>
+        Task OpenChatAsync(int chatId);
+
+        /// <summary>True while a model is being reloaded: no new work starts meanwhile.</summary>
+        bool IsReloadingModel { get; }
+
+        /// <summary>Load the model again (e.g. after a thread count change); the chat goes on.</summary>
+        Task<bool> ReloadModelAsync();
 
         /// <summary>The conversation shown (a new one for each new chat or model).</summary>
         ChatConversation Conversation { get; }
@@ -43,6 +84,12 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>Settings > Developer mode: show what the model is given.</summary>
         bool DeveloperMode { get; }
+
+        /// <summary>True in a hands-free chat (replies spoken, nothing on the screen looked at; <see cref="Emgu.LiteRT.LM.Agents.ChatMessageContext.HandsFree"/>).</summary>
+        bool HandsFree { get; }
+
+        /// <summary>Start or end a hands-free chat (a voice feature's).</summary>
+        void SetHandsFree(bool handsFree);
 
         /// <summary>The model's context window in tokens.</summary>
         int ContextWindow { get; }
@@ -76,6 +123,9 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>Show a card above the reply being written (or the latest reply); on the UI thread.</summary>
         void AddCardToReply(View card);
+
+        /// <summary>Take a card away from whichever message it is on; on the UI thread.</summary>
+        void RemoveCard(View card);
 
         /// <summary>Add a notice to the transcript (the model never sees it); on the UI thread.</summary>
         void AddNotice(string text);

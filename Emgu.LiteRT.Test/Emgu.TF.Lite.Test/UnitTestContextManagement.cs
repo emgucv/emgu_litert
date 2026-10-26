@@ -73,6 +73,37 @@ public class UnitTestContextManagement
     [Ignore("Opt in with -p:TestModels=true; requires cached Gemma 4 E2B.")]
 #endif
     [Test]
+    public async Task ANewClientContinuesAChatWithThePreviousClientsToolCalls()
+    {
+        // A chat continued after the model was reloaded (ChatPage.ReloadModelAsync: another backend, context window or
+        // CPU threads) replays the previous client's tool calls and results to a new client, by call id.
+        using var model = new Emgu.LiteRT.LM.Models.Gemma4E2B { VisionBackend = null, AudioBackend = null };
+        using var stop = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        await model.Init(configureSettings: s => { s.EnableBenchmark(); s.NumThreads = 4; s.MaxNumTokens = 4096; }, cancellationToken: stop.Token);
+        int rolls = 0;
+        var options = new ChatOptions {
+            Tools = new List<AITool> { AIFunctionFactory.Create((int sides) => { rolls++; return 4; }, "roll_die", "Rolls a die with the given number of sides.") },
+            Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } };
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Roll a six-sided die with roll_die and tell me the number.") };
+        using (var first = new FunctionInvokingChatClient(new LiteRtLmChatClient(model)))
+        {
+            var response = await first.GetResponseAsync(messages, options, stop.Token);
+            TestContext.Progress.WriteLine(response.Text);
+            Assert.That(rolls, Is.EqualTo(1));
+            messages.AddRange(response.Messages);
+            Assert.That(messages.SelectMany(m => m.Contents).OfType<FunctionResultContent>().Count(), Is.EqualTo(1), "the first client's tool call and result are in the history");
+        }
+        messages.Add(new ChatMessage(ChatRole.User, "Roll it again please."));
+        using var second = new FunctionInvokingChatClient(new LiteRtLmChatClient(model));
+        var again = await second.GetResponseAsync(messages, options, stop.Token);
+        TestContext.Progress.WriteLine(again.Text);
+        Assert.That(rolls, Is.EqualTo(2));
+        Assert.That(again.Text, Is.Not.Empty);
+    }
+#if !TEST_MODELS
+    [Ignore("Opt in with -p:TestModels=true; requires cached Gemma 4 E2B.")]
+#endif
+    [Test]
     public async Task OlderHistoryCanCompactWhileCurrentToolRunsOnlyOnceWithThinkingOn()
     {
         using var model = new Emgu.LiteRT.LM.Models.Gemma4E2B { VisionBackend = null, AudioBackend = null };

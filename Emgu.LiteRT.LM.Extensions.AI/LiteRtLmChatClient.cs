@@ -128,6 +128,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                 throw new ObjectDisposedException(GetType().Name);
 
             List<AIChatMessage> original = messages.ToList();
+            LearnCallNames(original);
             List<AIChatMessage> all = ExpandToolMedia(original);
             String systemMessage = GetSystemMessage(all, options);
             List<AIChatMessage> turns = all.Where(m => m.Role != ChatRole.System).ToList();
@@ -584,6 +585,17 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             return expanded;
         }
 
+        // The tool calls the request carries were not necessarily made through this client: a chat continued after the
+        // model was reloaded (another backend, another context window) or restored from storage replays the calls of the
+        // previous client. Their results answer them by call id, so learn the names from the calls themselves.
+        private void LearnCallNames(IEnumerable<AIChatMessage> messages)
+        {
+            foreach (AIChatMessage message in messages)
+                foreach (FunctionCallContent call in message.Contents.OfType<FunctionCallContent>())
+                    if (call.CallId != null && call.Name != null)
+                        _callNames.TryAdd(call.CallId, call.Name);
+        }
+
         // A message in LiteRT-LM's format, e.g. {"role": "user", "content": [{"type": "text", "text": "Hello"}]}.
         private String ToLiteRtLmJson(AIChatMessage message)
         {
@@ -618,7 +630,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                             String name;
                             if (!_callNames.TryGetValue(result.CallId ?? String.Empty, out name))
                                 throw new InvalidOperationException(String.Format(
-                                    "Unknown tool call id {0}: the result must answer a call made through this client", result.CallId));
+                                    "Unknown tool call id {0}: the result must answer a tool call in the request", result.CallId));
                             writer.WriteStartObject();
                             writer.WriteString("type", "tool_response");
                             writer.WriteString("name", name);
