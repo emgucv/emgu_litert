@@ -61,9 +61,15 @@ internal sealed class McpFeature : DemoFeature
         _ = ConnectMcpServersAsync();
     }
 
-    public override async void OnDetached()
+    public override void OnDetached()
     {
         base.OnDetached();
+        _ = ShutdownAsync();
+    }
+
+    // The chat is being closed: the servers are disconnected.
+    public async Task ShutdownAsync()
+    {
         foreach (McpToolServer server in _mcpServers.Values.ToList())
             try { await server.DisposeAsync(); } catch (Exception) { }
         _mcpServers.Clear();

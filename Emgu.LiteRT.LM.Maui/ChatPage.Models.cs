@@ -296,12 +296,62 @@ namespace Emgu.LiteRT.LM.Maui
             return string.Format("{0:0} MB", bytes / (double)(1L << 20));
         }
 
-        private void RefreshModelList()
+        /// <summary>List the models again (a row's detail changed, e.g. a server's address).</summary>
+        protected void RefreshModelList()
         {
             if (_sideModelList == null || _wide != true)
                 return;
             _sideModelList.Children.Clear();
             _sideModelList.Children.Add(BuildModelList(false));
+        }
+
+        /// <summary>
+        /// Free the model's engine without loading it again (its file is being deleted): the card offers the download or
+        /// the load again, and the chat goes on when it is loaded. Nothing for a remote model.
+        /// </summary>
+        protected async Task UnloadModelAsync()
+        {
+            ChatModelOption option = _model;
+            if (option == null || option.IsRemote)
+                return;
+            using (BeginReload())
+            {
+                await _chatView.PendingSend;
+                _chatView.LoadState?.Cancel();
+                _client.Reset();
+                LanguageModel previous = _modelInstance;
+                _modelInstance = NewInstance(option);
+                _chatView.ReplaceModel(_modelInstance);
+                ConfigureConversation(Conversation, option, _modelInstance);
+                RereadNext = Conversation?.Messages.Any(m => m.Role != ChatMessageRole.Notice) == true;
+                RefreshModelList();
+                if (previous != null)
+                    await Task.Run(() => previous.Dispose());
+            }
+        }
+
+        /// <summary>
+        /// Free the model's engine for good (the page is closing): a load in progress is cancelled and waited for, a
+        /// reply being written finishes first.
+        /// </summary>
+        protected async Task ShutdownModelAsync()
+        {
+            using (BeginReload())
+            {
+                await _chatView.PendingSend;
+                ModelLoadState state = _chatView.LoadState;
+                if (state != null && state.IsLoading)
+                {
+                    // Creating an engine can't be interrupted: the cancel takes effect once it is done.
+                    state.Cancel();
+                    try { await state.LoadAsync(); } catch (Exception) { }
+                }
+                _client.Reset();
+                LanguageModel previous = _modelInstance;
+                _modelInstance = null;
+                if (previous != null)
+                    await Task.Run(() => previous.Dispose());
+            }
         }
     }
 }

@@ -41,6 +41,16 @@ internal sealed class StorageFeature : DemoFeature
         base.OnDetached();
     }
 
+    // Leaving the page: a search-model download in progress stops.
+    public void CancelRestore() => _searchRestoreCancel?.Cancel();
+
+    // A private chat: past-chat search is off (nothing saved is read); indexing goes on again when it ends.
+    public override void OnPrivateModeChanged(bool isPrivate)
+    {
+        UpdateSearchStorageState();
+        if (!isPrivate && PageVisible) { Demo.PhotoSearch.StartIndexing(); Demo.PastChats.StartIndexing(); }
+    }
+
     // A notice for a search feature's section: shown while the search model is deleted, with a button to download it again.
     public View CreateSearchModelNotice()
     {

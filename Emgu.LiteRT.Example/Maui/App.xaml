@@ -8,9 +8,12 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
-                <!-- The chat's code blocks and thinking in the demo's fonts (Emgu.LiteRT.LM.Maui's templates, replaced by key). -->
+                <!-- The chat's messages, code blocks and thinking in the demo's fonts (Emgu.LiteRT.LM.Maui's templates, replaced by key). -->
                 <local:ChatTemplates />
             </ResourceDictionary.MergedDictionaries>
+            <!-- The chat page's fonts (Emgu.LiteRT.LM.Maui's ChatTheme keys): the demo's Inter. -->
+            <x:String x:Key="ChatTitleFont">InterSemiBold</x:String>
+            <x:String x:Key="ChatBodyFont">InterRegular</x:String>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

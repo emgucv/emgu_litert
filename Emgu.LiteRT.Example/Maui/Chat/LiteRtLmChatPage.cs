@@ -2,488 +2,862 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Maui.Controls.Shapes;
-using Emgu.LiteRT.LM.Models;
-using Emgu.LiteRT.Util;
-using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Agents;
-using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.LM.Chat;
-using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
-using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
 using Emgu.LiteRT.LM.Chat.Sqlite;
+using Emgu.LiteRT.LM.Extensions.AI;
+using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Features;
+using Emgu.LiteRT.LM.Models;
+using Microsoft.Extensions.AI;
 
 namespace Maui.Demo.Lite;
 
 /// <summary>
-/// Chat demo backed by LiteRT-LM: downloads a .litertlm model and runs it entirely on this device
-/// through Emgu.LiteRT.LM.Models (LanguageModel, Chat). Wired up for Windows, iOS, Android and Mac
-/// Catalyst (Apple Silicon only). For models that accept images and audio (Gemma 4), the "+" button
-/// attaches a photo or an audio file to the next message, and the microphone button records a voice
-/// message: the model answers what was said (no transcription step). Replies can be read aloud. With "Allow web
-/// search" on (Gemma 4), messages go through a Microsoft Agent Framework agent over the model's IChatClient
-/// (Emgu.LiteRT.LM.Extensions.AI), which can search Wikipedia and - with a Tavily API key - the web (AgentTools).
+/// The chat demo: Emgu.LiteRT.LM.Maui's ChatPage with the demo's models (Maui.Demo.Lite.Core's ChatModelCatalog, and the
+/// user's own server), its saved chats, memories and goals (ChatStore, SQLite), the library's built-in features and the
+/// demo's own (Chat/Features: the camera and sound monitors, documents, tool servers, the voice chat, the server, storage,
+/// export, photo and past-chat search, image generation, goals, device actions, meeting notes, exercise counting...).
+/// The page itself adds what the demo does around a message: the document's excerpts, the task planner, the memories a
+/// reply drew on, the thinking's translation, and saving each exchange with the pictures and documents it made.
 /// </summary>
-public partial class LiteRtLmChatPage : ContentPage
+public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 {
-    // An image or audio file attached to the message being written.
-    private sealed class PendingAttachment
-    {
-        public ChatAttachment Attachment;
-        // The (re-encoded) image, for the thumbnails; null for audio.
-        public byte[] Image;
-        public string Name;
-        // The encoded image or audio and its media type, for the agent (Microsoft.Extensions.AI DataContent).
-        public byte[] Data;
-        public string MediaType;
-        // Its chip in the composer, while pending.
-        public View Chip;
-    }
-
-    // LiteRT-LM decodes audio with miniaudio, which reads WAV, MP3 and FLAC (not AAC/M4A).
-    private static readonly FilePickerFileType AudioFileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
-    {
-        { DevicePlatform.iOS, new[] { "com.microsoft.waveform-audio", "public.mp3", "org.xiph.flac" } },
-        { DevicePlatform.MacCatalyst, new[] { "com.microsoft.waveform-audio", "public.mp3", "org.xiph.flac" } },
-        { DevicePlatform.Android, new[] { "audio/wav", "audio/x-wav", "audio/mpeg", "audio/flac", "audio/x-flac" } },
-        { DevicePlatform.WinUI, new[] { ".wav", ".mp3", ".flac" } },
-    });
-
-    // Sample inputs bundled with the app (Resources/Raw, plus LiteRT-LM's audio test sample).
-    private static readonly string[] SampleImages = { "surfers.jpg", "tulips.jpg", "space_shuttle.jpg" };
-    private const string SampleAudio = "audio_sample.wav";
-
-    // Images are downscaled to this size before sending: the vision encoder resizes them anyway, and
-    // smaller images keep the base64-encoded message small.
-    private const int MaxImageSize = 1024;
-
-    // Voice messages stop (and are sent) after this long: audio models take a limited length of audio.
-    private static readonly TimeSpan MaxVoiceLength = TimeSpan.FromSeconds(30);
-
-    // Material Symbols "mic" (Apache 2.0); the bundled icon font is a subset without it.
-    private const string MicPathData = "M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z";
-
-    // The models this platform offers (Maui.Demo.Lite.Core's ChatModelCatalog).
-    private static readonly ModelOption[] Models = ChatModelCatalog.ModelsFor(
-#if ANDROID
-        ChatPlatform.Android);
-#elif MACCATALYST
-        ChatPlatform.MacCatalyst);
-#elif IOS
-        ChatPlatform.iOS);
-#else
-        ChatPlatform.Windows);
-#endif
-
-    // Layout: a one-line header, the conversation, and the message box with per-message toggle chips. The model
-    // list and the settings open in bottom sheets on narrow screens, and sit in a side panel on wide ones.
-    private const double WideLayoutWidth = 820;
-    private const double SidePanelWidth = 300;
-    private int _selectedModel;
-    private bool? _wide;
-    private readonly Grid _pageGrid;
-    private Grid _mainColumn;
-    private Border _sidePanel;
-    private VerticalStackLayout _sideModelList;
-    private Button _sideModelHeader;
-    private bool _modelsExpanded = true;
-    private VerticalStackLayout _sideSettingsHost;
-    private VerticalStackLayout _settingsView;
-    private Border _modelChip;
-    private Label _modelChipLabel;
-    private Label _titleLabel;
-    private Border _settingsButton;
-    private Border _newChatButton;
-    private HorizontalStackLayout _toggleRow;
-    private ToggleChip _thinkingSwitch;
-    private Label _statusLabel;
-    private Editor _promptEditor;
-    private Button _sendButton;
-    private ActivityIndicator _busyIndicator;
-    private Border _attachButton;
-    private HorizontalStackLayout _attachmentStrip;
-    private ScrollView _attachmentScroll;
-    private readonly MenuSheet _sheet;
-    private readonly List<PendingAttachment> _pending = new List<PendingAttachment>();
-    private Border _talkButton;
-    private Microsoft.Maui.Controls.Shapes.Path _micIcon;
-    private BoxView _stopIcon;
-    private Switch _readAloudSwitch;
-    private readonly VoiceRecorder _recorder = new VoiceRecorder();
-    private DateTime _recordingStarted;
-    private CancellationTokenSource _recordingTimer;
-
-    // Web search: an agent (Microsoft Agent Framework) over the model's IChatClient, with the tools of ChatAgentTools.
-    private const string TavilyKeyStorageName = "tavily_api_key";
-    private const string AgentInstructions = ChatPlannerInstructions.Agent;
-    private ToggleChip _webSearchSwitch;
-    // Task mode (LiteRtLmChatPage.Task.cs): the next message is planned and run step by step; off again after it is sent.
-    private ToggleChip _taskChip;
-    private Label _webSearchNotice;
-    private Entry _tavilyKeyEntry;
-    private Label _tavilyKeyStatus;
-    private Button _saveTavilyKeyButton;
-    private readonly SemaphoreSlim _tavilyKeySaveGate = new SemaphoreSlim(1, 1);
-    private string _savedTavilyKey;
-    // Whether the agent gets the location tool (Settings, off by default): the user's town and approximate
-    // coordinates, which leave the device in web searches that use them.
-    private Switch _shareLocationSwitch;
-    // Memories about the user (ChatStore): with "Remember things about me" on (the default; they stay on the device),
-    // the agent can save and delete them, and the latest are given to it with every message.
-    private const int MaxMemoryLength = 1200;
-    private Switch _memorySwitch;
-    private Label _memoryCountLabel;
-    private string _tavilyKey = string.Empty;
-    // The model's (or the server's) client with function invocation, which _conversation reaches through
-    // _clientProxy; made again for another model or backend, while the conversation goes on.
-    private IChatClient _chatClient;
-
-    private LanguageModel _model;
-    private ModelChoice? _loaded;
-    // GPU (Android): whether the loaded model runs on it, whether the one loading will, and whether it failed to
-    // load there (then the CPU is used for the rest of the session).
-    // Settings > "Voice language": a BCP-47 tag, or "" for the device's language.
-    private bool _selectedGpu;
-    private bool _loadedOnGpu;
-    private bool _loadingOnGpu;
-    // Context window (Settings, Gemma 4): Automatic (0: the model's DesktopContextTokens, 8k) or a size; the loaded model's
-    // and the loading one's, to reload the model when it changes.
-    private static readonly int[] ContextWindowChoices = { 0, 4096, 8192, 16384, 32000 };
-    private int _contextSetting;
-    private int _loadedContextTokens;
-    private int _loadingContextTokens;
-    private readonly List<ToggleChip> _contextChips = new List<ToggleChip>();
-    private VerticalStackLayout _contextSection;
-    private Label _contextNote;
-    private bool _updatingContextChips;
-    private bool _gpuUnavailable;
-
-    // Saved chats (ChatStore, SQLite): the current chat's id once its first exchange is saved.
-    private const string HistoryIconPath = "M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z";
-    private readonly ChatStore _store = new ChatStore(System.IO.Path.Combine(FileSystem.AppDataDirectory, "chats"));
-    private int? _conversationId;
-    private Border _historyButton;
-    private VerticalStackLayout _sideChatList;
-
-    // The conversation (Emgu.LiteRT.LM.Chat's ChatConversation): its messages - shown by _chatView, Emgu.LiteRT.LM.Maui's
-    // ChatView with the demo's templates (ChatTemplates.xaml) - streaming the replies, and keeping what the model is
-    // given within its context window: before a message that would make it too long, the earlier messages are
-    // summarized by the model (CanSummarize) or dropped, and the model continues from the summary and the latest
-    // messages, while the transcript keeps everything. Sizes are estimates (the model's tokenizer, plus measured costs
-    // of images, audio and tool calls - the conversation's defaults).
-    private readonly ChatView _chatView;
-    private readonly PageChatClient _clientProxy;
-    private readonly ChatConversation _conversation;
-    // The model reads the whole conversation with the next message (a reopened chat, after compacting, or a model
-    // loaded again): the status says so.
-    private bool _rereadNext;
-
-    // The page's own data for a user message, in its ChatMessageItem.Tag (the demo's message template binds to it).
-    private sealed class UserMessageInfo : System.ComponentModel.INotifyPropertyChanged
-    {
-        private string _transcript;
-        private bool _transcribing;
-        private string _dividerText;
-
-        // Its language (two-letter code), or null (LiteRtLmChatPage.Translation.cs).
-        public string Language;
-        // Its id in the ChatStore (0 if not saved).
-        public int MessageId;
-        // The task writing down the words of a voice message (LiteRtLmChatPage.Transcript.cs).
-        public Task TranscriptTask;
-
-        // The words of a voice message the model was given as audio, written down by the platform's speech recognizer
-        // for the transcript (not given to the model).
-        public string Transcript
-        {
-            get => _transcript;
-            set { _transcript = value; Raise(nameof(TranscriptText)); Raise(nameof(HasTranscript)); }
-        }
-
-        public bool Transcribing
-        {
-            get => _transcribing;
-            set { _transcribing = value; Raise(nameof(TranscriptText)); Raise(nameof(HasTranscript)); }
-        }
-
-        public string TranscriptText => !string.IsNullOrWhiteSpace(_transcript) ? "\u201C" + _transcript.Trim() + "\u201D"
-            : _transcribing ? "Writing down what you said..." : string.Empty;
-
-        public bool HasTranscript => !string.IsNullOrWhiteSpace(_transcript) || _transcribing;
-
-        // Above the first message the model still sees after compacting: whether the earlier ones were summarized.
-        public string DividerText
-        {
-            get => _dividerText ?? "Earlier messages summarized \u00B7 tap to read";
-            set { _dividerText = value; Raise(nameof(DividerText)); }
-        }
-
-        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
-
-        private void Raise(string name) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
-    }
-
-    // The conversation's client: forwards to the current model's or server's client (_chatClient), which is made again
-    // when the model is reloaded or changed - the conversation and its messages stay.
-    private sealed class PageChatClient : IChatClient
-    {
-        private readonly Func<IChatClient> _current;
-
-        public PageChatClient(Func<IChatClient> current)
-        {
-            _current = current;
-        }
-
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<AIChatMessage> messages, ChatOptions options = null,
-            CancellationToken cancellationToken = default)
-            => _current().GetResponseAsync(messages, options, cancellationToken);
-
-        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<AIChatMessage> messages,
-            ChatOptions options = null, CancellationToken cancellationToken = default)
-            => _current().GetStreamingResponseAsync(messages, options, cancellationToken);
-
-        public object GetService(Type serviceType, object serviceKey = null) => null;
-
-        public void Dispose()
-        {
-        }
-    }
-
-    // The messages of the chat (not the page's notices).
-    private IEnumerable<ChatMessageItem> ChatMessages => _conversation.Messages.Where(m => m.Role != ChatMessageRole.Notice);
-
-    // Room for what the model's conversation holds besides the messages: the chat template, or the agent's
-    // instructions, tool definitions and memories (LiteRtLmChatClient budgets the real sizes when it sends).
-    private const int ChatOverheadTokens = 50;
-    private const int AgentOverheadTokens = 900;
     private const int SummaryMaxTokens = 400;
-    private Label _memoryLabel;
-    private Label _compactButton;
 
-    // Loading: models load in the background as soon as they are selected (when already downloaded), shown in a
-    // card at the top of the conversation; a message sent meanwhile waits for it.
-    private Task<bool> _loadTask;
-    private ModelChoice? _loadingChoice;
-    private CancellationTokenSource _loadCancel;
-    private bool _pageStarted;
-    private bool _pageVisible;
-    private Border _loadCard;
-    private Label _loadTitle;
-    private Label _loadStage;
-    private ProgressBar _loadProgress;
-    private ActivityIndicator _loadSpinner;
-    private Button _loadPrimaryButton;
-    private Button _loadCancelButton;
-    private ActivityIndicator _chipSpinner;
-    private Action _loadPrimaryAction;
-    private Task _generation;
-    private bool _busy;
+    // The saved chats, memories, goals, documents and indexes (one database for the app).
+    private static readonly ChatStore SharedStore = new ChatStore(System.IO.Path.Combine(FileSystem.AppDataDirectory, "chats"));
 
-    public LiteRtLmChatPage()
+    // The demo's features (made before the page, so the base constructor attaches them).
+    private sealed class Parts
     {
-        Title = "LiteRT-LM Chat";
-        Shell.SetNavBarIsVisible(this, false);
-        BackgroundColor = Theme.PageBackground;
-
-        View header = BuildHeader();
-        BuildMessageToggles();
-        BuildSettingsView();
-
-        // The transcript: the conversation's messages in Emgu.LiteRT.LM.Maui's ChatView, with the demo's templates
-        // (ChatTemplates.xaml: its ChatViewTemplate has only the transcript - the page has its own message box).
-        _clientProxy = new PageChatClient(() => EnsureClient());
-        _conversation = new ChatConversation(_clientProxy)
-        {
-            DescribeToolCall = call => McpStepFor(call) ?? AgentTools.Describe(call)
-        };
-        _conversation.Messages.CollectionChanged += OnConversationMessagesChanged;
-        _conversation.Compacted += OnConversationCompacted;
-        _conversation.Summarizing += (s, summarizing) => SetStatus(summarizing ? "Summarizing the earlier conversation..." : "Generating...");
-        _chatView = new ChatView { Conversation = _conversation };
-
-        View composerCard = BuildComposer();
-        BuildMainColumn(header, composerCard);
-        BuildCameraPanel();
-        BuildSidePanel();
-
-        _pageGrid = new Grid
-        {
-            ColumnDefinitions = { new ColumnDefinition(new GridLength(0)), new ColumnDefinition(GridLength.Star) }
-        };
-        _pageGrid.Add(_sidePanel, 0, 0);
-        _pageGrid.Add(_mainColumn, 1, 0);
-
-        _sheet = new MenuSheet();
-        Content = new Grid { Children = { _pageGrid, BuildVoiceView(), _sheet } };
-
-        SizeChanged += (s, e) => UpdateLayout();
-        SelectModel(0);
+        public ChatPageOptions Options;
+        public ChatModelOption ServerOption;
+        public CameraFeature Camera;
+        public DocumentsFeature Documents;
+        public McpFeature Mcp;
+        public VoiceModeFeature VoiceMode;
+        public ServerFeature Server;
+        public TranscriptFeature Transcripts;
+        public ExportFeature Export;
+        public StorageFeature Storage;
+        public ModelSettingsFeature ModelSettings;
+        public TaskChipFeature TaskChip;
+        public MemoryFeature Memory;
     }
 
-    // Open with the model used last time, and start loading it if it is already downloaded.
+    private readonly Parts _parts;
+    private readonly MenuSheet _menu = new MenuSheet();
+    private DemoChatHost _host;
+    private WorkloadService _workload;
+    private MeetingFeature _meetingFeature;
+    private ExerciseFeature _exerciseFeature;
+    private ImageFeature _imageFeature;
+    private WrittenDocumentsFeature _writtenDocuments;
+    private TaskFeature _taskFeature;
+    private TranslationFeature _translationFeature;
+    private GoalsFeature _goalsFeature;
+    private PastChatsFeature _pastChatsFeature;
+    private PhotoSearchFeature _photoSearchFeature;
+    private DeviceActionsFeature _deviceActionsFeature;
+    private bool _pageVisible;
+    private int _sessionVersion;
+    private Task _reloadTask;
+    private IDisposable _privateDiagnostics;
+    private ChatConversation _hooked;
+
+    // The reply being written, so cards features add (found photos, documents, step lines...) are shown above it.
+    private StreamingBubble _agentBubble;
+    // The reply's bubble gets the user message's data and the document step of the send being made.
+    private UserMessageInfo _pendingUserInfo;
+    private string _pendingDocumentStep;
+
+    public LiteRtLmChatPage() : this(Build())
+    {
+    }
+
+    private LiteRtLmChatPage(Parts parts) : base(parts.Options)
+    {
+        _parts = parts;
+        Chat.AttachmentSource = new DemoAttachmentSource(ShowMenuAsync, () => IsPrivate, () => _sessionVersion,
+            (bytes, name) => { if (!_parts.ModelSettings.SearchDownloadRequired) _parts.Documents.AttachDocument(bytes, name); }, SetStatus);
+        Chat.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(ChatView.Conversation))
+                HookConversation();
+        };
+        HookConversation();
+    }
+
+    private static Parts Build()
+    {
+        IList<ChatModelOption> models = ChatModelOptions.FromCatalog(ChatModelCatalog.ModelsFor(DemoPlatform.Current), DemoPlatform.Current);
+        var parts = new Parts
+        {
+            ServerOption = models.First(m => m.Id == ChatModelOptions.ServerId),
+            Camera = new CameraFeature(),
+            Documents = new DocumentsFeature(),
+            Mcp = new McpFeature(),
+            VoiceMode = new VoiceModeFeature(),
+            Transcripts = new TranscriptFeature(),
+            Export = new ExportFeature(),
+            Storage = new StorageFeature(),
+            ModelSettings = new ModelSettingsFeature(),
+            TaskChip = new TaskChipFeature(),
+            Memory = new MemoryFeature(SharedStore.Memories)
+        };
+        parts.Server = new ServerFeature(parts.ServerOption);
+        var options = new ChatPageOptions
+        {
+            Title = "LiteRT-LM Chat",
+            History = SharedStore,
+            AutoSave = false,
+            Settings = new ChatSettingsAdapter(),
+            ShowBackButton = true,
+            ShowCpuThreads = true,
+            Instructions = ChatPlannerInstructions.Agent,
+            ReplySpeaker = parts.Camera.ReplySpeaker,
+            ConfigureEngine = settings =>
+            {
+                settings.EnableBenchmark();
+                settings.AudioNumThreads = CpuThreadSettings.Count;
+            }
+        };
+        foreach (ChatModelOption model in models)
+            options.Models.Add(model);
+        options.ChatActions.Add(parts.Export.Action);
+        // The settings' order: the library's (CPU threads, read aloud, private chat), then these sections, then the
+        // conversation memory and developer mode.
+        foreach (ChatFeature feature in new ChatFeature[]
+        {
+            new VoiceLanguageFeature(),
+            new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new ClipboardFeature(),
+            parts.Camera, parts.Server, parts.Mcp, parts.ModelSettings, new DemoSectionsFeature(), parts.Storage, parts.Export,
+            parts.Documents, parts.VoiceMode, parts.TaskChip, parts.Transcripts, new DemoToolsFeature()
+        })
+            options.Features.Add(feature);
+        parts.Options = options;
+        return parts;
+    }
+
+    // ---------- The old-style features (IChatHost), made when first used ----------
+
+    private DemoChatHost Host => _host ??= new DemoChatHost(this, this);
+
+    private MeetingFeature Meetings => _meetingFeature ??= new MeetingFeature(Host);
+
+    private ExerciseFeature Exercises => _exerciseFeature ??= new ExerciseFeature(Host);
+
+    private ImageFeature Images => _imageFeature ??= new ImageFeature(Host);
+
+    private WrittenDocumentsFeature WrittenDocuments => _writtenDocuments ??= new WrittenDocumentsFeature(Host);
+
+    private TaskFeature Tasks => _taskFeature ??= new TaskFeature(Host);
+
+    private TranslationFeature Translations => _translationFeature ??= new TranslationFeature(Host);
+
+    private GoalsFeature Goals => _goalsFeature ??= new GoalsFeature(Host);
+
+    private PastChatsFeature PastChats => _pastChatsFeature ??= new PastChatsFeature(Host);
+
+    private PhotoSearchFeature PhotoSearch => _photoSearchFeature ??= new PhotoSearchFeature(Host);
+
+    private DeviceActionsFeature ActionTools => _deviceActionsFeature ??= new DeviceActionsFeature(Host);
+
+    private WorkloadService Workload => _workload ??= new WorkloadService(() => _parts.ModelSettings.Embedder);
+
+    private SearchEmbedder Embedder => _parts.ModelSettings.Embedder;
+
+    private bool ServerSelected => SelectedModel == _parts.ServerOption;
+
+    // ---------- IDemoHost ----------
+
+    ChatStore IDemoHost.Store => SharedStore;
+
+    WorkloadService IDemoHost.Workload => Workload;
+
+    GoalsFeature IDemoHost.Goals => Goals;
+
+    PhotoSearchFeature IDemoHost.PhotoSearch => PhotoSearch;
+
+    PastChatsFeature IDemoHost.PastChats => PastChats;
+
+    ImageFeature IDemoHost.Images => Images;
+
+    MeetingFeature IDemoHost.Meetings => Meetings;
+
+    ExerciseFeature IDemoHost.Exercises => Exercises;
+
+    ExerciseFeature IDemoHost.ExercisesIfCreated => _exerciseFeature;
+
+    WrittenDocumentsFeature IDemoHost.WrittenDocuments => WrittenDocuments;
+
+    TaskFeature IDemoHost.Tasks => Tasks;
+
+    TranslationFeature IDemoHost.Translations => Translations;
+
+    DeviceActionsFeature IDemoHost.ActionTools => ActionTools;
+
+    bool IDemoHost.PageVisible => _pageVisible;
+
+    bool IDemoHost.IsRecording => Chat.IsRecording;
+
+    async Task IDemoHost.RunReloadAsync(Func<Task> work)
+    {
+        using (BeginReload())
+        {
+            Task task = work();
+            _reloadTask = task;
+            try { await task; }
+            finally { if (_reloadTask == task) _reloadTask = null; }
+        }
+    }
+
+    Task IDemoHost.ReleaseModelAsync() => UnloadModelAsync();
+
+    void IDemoHost.ResetRemote() => ResetRemote();
+
+    void IDemoHost.StartNewChat() => StartNewChat();
+
+    void IDemoHost.RefreshModelList() => RefreshModelList();
+
+    void IDemoHost.DropPendingImages()
+    {
+        foreach (DataContent image in Chat.PendingAttachments.Where(a => a.MediaType != null && a.MediaType.StartsWith("image/", StringComparison.Ordinal)).ToList())
+            Chat.PendingAttachments.Remove(image);
+    }
+
+    // A hands-free chat's recording: sent as a voice message, with the reply read aloud whatever the setting.
+    async Task IDemoHost.SendVoiceAsync(byte[] wav, TimeSpan length)
+    {
+        bool readAloud = Chat.ReadAloud;
+        Chat.ReadAloud = true;
+        try
+        {
+            var recording = new DataContent(wav, "audio/wav") { Name = string.Format("Voice message ({0:m\\:ss})", length) };
+            await Chat.SendAsync(string.Empty, new[] { recording }, null, voiceMessage: true);
+        }
+        finally
+        {
+            Chat.ReadAloud = readAloud;
+        }
+    }
+
+    void IDemoHost.StopReply() => Chat.StopReply();
+
+    // ---------- Lifecycle ----------
+
+    protected override void OnPageBuilt()
+    {
+        base.OnPageBuilt();
+        Shell.SetNavBarIsVisible(this, false);
+    }
+
+    // The "+" menu (the demo's MenuSheet): a layer over the page while it is open.
+    private async Task<string> ShowMenuAsync(string title, IReadOnlyList<(string Section, string Glyph, string Text, string Value)> rows)
+    {
+        IChatOverlays overlays = this;
+        overlays.ShowLayer(_menu);
+        try
+        {
+            return await _menu.ShowAsync(title, rows);
+        }
+        finally
+        {
+            overlays.HideLayer(_menu);
+        }
+    }
+
     protected override void OnAppearing()
     {
-        base.OnAppearing();
         _pageVisible = true;
-        PastChats.StartIndexing();
-        if (_pageStarted)
-        {
-            PhotoSearch.RefreshIndex();
-            return;
-        }
-        _pageStarted = true;
-        _ = ConnectMcpServersAsync();
-        int index = 0;
-        int found = ModelIndexOf(AppSettings.Chat.LastModel);
-        if (found >= 0)
-            index = found;
-        _selectedGpu = AppSettings.Chat.UseGpu;
-        SelectModel(index);
-        // Photo search: index photos added since the app last ran.
-        PhotoSearch.StartIndexing();
-        // Saved document indexes no chat uses (attached, then the chat was never saved).
-        _ = _store.DeleteUnusedDocumentsAsync();
+        base.OnAppearing();
     }
 
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
         _pageVisible = false;
-        EndVoiceMode();
-        _ = CancelRecordingAsync();
-        _ = CloseCameraAsync();
     }
 
-    // Wait for any in-flight generation before freeing the chat/engine: Chat.Send and the engine it
-    // runs on are native objects a background Task.Run is still reading, and disposing them out from
-    // under it is a hard crash, not a catchable exception.
-    private async Task CleanupModelAsync()
-    {
-        UiStallWatchdog.Mark("Releasing model " + (_model == null ? "(none)" : _model.GetType().Name));
-        Task pending = _generation;
-        if (pending != null && !pending.IsCompleted)
-        {
-            try { await pending; }
-            catch { /* already reported via SetStatus where it was awaited */ }
-        }
-
-        // The chat client's conversation must be released before the model's engine.
-        ResetAgent();
-        LanguageModel model = _model;
-        _model = null;
-        _loaded = null;
-        _serverConnected = null;
-        // Freeing an engine can take a moment: not on the UI thread.
-        await Task.Run(() => model?.Dispose());
-    }
-
-    // The reply being written, so cards features add (found photos, documents, step lines...) are shown above it.
-    private StreamingBubble _agentBubble;
-
-    private Window _resumeWindow;
-
-    // Window.Resumed: the app returns to the foreground (on desktops also when its window is activated). The page's
-    // Window is set after OnAppearing when it is pushed in the Shell, so this follows the property.
-    protected override void OnPropertyChanged(string propertyName = null)
-    {
-        base.OnPropertyChanged(propertyName);
-        if (propertyName == nameof(Window))
-            WatchAppResume();
-    }
-
-    private void WatchAppResume()
-    {
-        if (Window == _resumeWindow)
-            return;
-        if (_resumeWindow != null)
-        {
-            _resumeWindow.Resumed -= OnAppResumed;
-            _resumeWindow.Stopped -= CameraWindowStopped;
-            _resumeWindow.Resumed -= ServerAppResumed;
-            _resumeWindow.Stopped -= ServerAppStopped;
-        }
-        _resumeWindow = Window;
-        if (_resumeWindow != null)
-        {
-            _resumeWindow.Resumed += OnAppResumed;
-            _resumeWindow.Stopped += CameraWindowStopped;
-            _resumeWindow.Resumed += ServerAppResumed;
-            _resumeWindow.Stopped += ServerAppStopped;
-        }
-    }
-
-    private void OnAppResumed(object sender, EventArgs e)
-    {
-        _cameraSuspended = false;
-        if (_pageVisible)
-            PastChats.StartIndexing();
-        if (_pageVisible)
-            PhotoSearch.RefreshIndex();
-    }
-
+    // Leaving the chat: the monitors, the camera, the microphone, the models and the indexes are let go of.
     protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
     {
         base.OnNavigatedFrom(args);
-        if (!Navigation.NavigationStack.Contains(this) && !Navigation.ModalStack.Contains(this))
+        if (Navigation.NavigationStack.Contains(this) || Navigation.ModalStack.Contains(this))
+            return;
+        _sessionVersion++;
+        _parts.VoiceMode.EndVoiceMode();
+        Chat.ReplySpeaker?.Stop();
+        _meetingFeature?.Stop("the chat was closed");
+        _ = _parts.Camera.ShutdownAsync();
+        _ = _parts.Mcp.ShutdownAsync();
+        if (!IsPrivate)
+            _ = Chat.CancelRecordingAsync();
+        _parts.Documents.RemoveDocument();
+        _photoSearchFeature?.CancelIndexing();
+        _pastChatsFeature?.CancelIndexing();
+        _parts.Storage.CancelRestore();
+        _ = CloseAsync();
+    }
+
+    private async Task CloseAsync()
+    {
+        try
         {
-            _ = DisposeVisualMonitoringAsync();
-            _exerciseFeature?.Dispose();
-            _meetingFeature?.Stop("the chat was closed");
-            ReleaseAlertSounds();
-            _ = DisposeSoundMonitoringAsync();
-            _sessionVersion++;
-            if (_resumeWindow != null)
+            if (IsPrivate)
             {
-                _resumeWindow.Resumed -= OnAppResumed;
-                _resumeWindow.Stopped -= CameraWindowStopped;
-                _resumeWindow.Resumed -= ServerAppResumed;
-                _resumeWindow.Stopped -= ServerAppStopped;
-                _resumeWindow = null;
+                await Chat.CancelRecordingAsync();
+                await _parts.Documents.FinishPrivateDocumentsAsync();
             }
-            EndVoiceMode();
-            StopSpeaking();
-            _loadCancel?.Cancel();
-            if (!IsPrivateChat) _ = CancelRecordingAsync();
-            RemoveDocument();
-            PhotoSearch.CancelIndexing();
-            PastChats.CancelIndexing();
-            _chatExportCancel?.Cancel();
-            _searchRestoreCancel?.Cancel();
-            if (IsPrivateChat) _ = CleanupPrivateChatAsync();
-            else _ = CleanupAfterCpuReloadAsync();
+            try { await (_reloadTask ?? Task.CompletedTask); } catch (Exception) { }
+            if (_pastChatsFeature != null)
+                await _pastChatsFeature.StopIndexingAsync();
+            await ShutdownModelAsync();
+            await Embedder.ReleaseAsync();
+            if (_imageFeature != null)
+                await _imageFeature.ReleaseModelAsync();
+            if (IsPrivate)
+            {
+                ClearPrivateSessionContent();
+                Conversation?.Clear();
+            }
+        }
+        catch (Exception ex)
+        {
+            UiStallWatchdog.Mark("Closing the chat failed: " + ex.Message);
+        }
+        finally
+        {
+            _privateDiagnostics?.Dispose();
+            _privateDiagnostics = null;
         }
     }
 
-    // ---------- Busy / status ----------
+    // ---------- The conversation ----------
 
-    private void SetBusy(bool busy)
+    // A message the conversation adds: the user's gets the data of the send (its language), a reply its bubble data -
+    // which tools that show cards use (_agentBubble) - with the send's document step, and the status follows it.
+    private void HookConversation()
     {
-        _busy = busy;
-        UpdateExportChatButton();
-        UpdateModelDownloadRows();
-        _sendButton.IsVisible = !busy;
-        _busyIndicator.IsVisible = busy;
-        _busyIndicator.IsRunning = busy;
-        _promptEditor.IsEnabled = !busy;
-        _modelChip.Opacity = CanChangeModel ? 1 : 0.5;
-        _newChatButton.Opacity = CanChangeModel ? 1 : 0.5;
-        _attachButton.Opacity = busy ? 0.4 : 1;
-        _talkButton.Opacity = busy ? 0.4 : 1;
+        ChatConversation conversation = Conversation;
+        if (conversation == null || conversation == _hooked)
+            return;
+        _hooked = conversation;
+        _agentBubble = null;
+        conversation.Messages.CollectionChanged += (s, e) =>
+        {
+            if (e.Action != System.Collections.Specialized.NotifyCollectionChangedAction.Add || e.NewItems == null)
+                return;
+            foreach (ChatMessageItem item in e.NewItems)
+            {
+                if (item.Tag != null)
+                    continue; // restored, or the page's own
+                if (item.Role == ChatMessageRole.User && _pendingUserInfo != null)
+                {
+                    item.Tag = _pendingUserInfo;
+                }
+                else if (item.Role == ChatMessageRole.Assistant)
+                {
+                    StreamingBubble bubble = BubbleFor(item);
+                    _agentBubble = bubble;
+                    if (_pendingDocumentStep != null)
+                    {
+                        bubble.DocumentStep = _pendingDocumentStep;
+                        AddCard(bubble, StepLine(_pendingDocumentStep));
+                    }
+                    WatchReply(item);
+                }
+            }
+        };
+        conversation.Compacted += OnConversationCompacted;
     }
 
-    private void SetStatus(string message)
+    // A reply's bubble data, with its translate row.
+    private StreamingBubble BubbleFor(ChatMessageItem item)
     {
-        MainThread.BeginInvokeOnMainThread(() =>
+        var row = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.Accent, IsVisible = false };
+        var bubble = new StreamingBubble(item, row);
+        row.OnTap(() => Translations.OnTranslateTapped(bubble));
+        return bubble;
+    }
+
+    // While a reply streams: the status (the tool being called, "Generating..." between calls) and the device actions'
+    // step lines' outcomes.
+    private void WatchReply(ChatMessageItem item)
+    {
+        item.PropertyChanged += (s, e) =>
         {
-            _statusLabel.IsVisible = !string.IsNullOrEmpty(message);
-            _statusLabel.Text = message ?? string.Empty;
-        });
+            if ((e.PropertyName == nameof(ChatMessageItem.Text) || e.PropertyName == nameof(ChatMessageItem.Thinking))
+                && item.IsStreaming && item.Steps.All(step => !step.IsRunning))
+                Chat.SetStatus(null);
+        };
+        item.Steps.CollectionChanged += (s, e) =>
+        {
+            if (e.NewItems == null)
+                return;
+            foreach (ChatToolStep step in e.NewItems)
+            {
+                if (step.Call == null)
+                    continue;
+                UiStallWatchdog.Mark("Tool call: " + step.Description);
+                Chat.SetStatus(step.Description + "...");
+                string described = step.Description;
+                step.PropertyChanged += (o, p) =>
+                {
+                    if (p.PropertyName != nameof(ChatToolStep.IsRunning) || step.IsRunning)
+                        return;
+                    UiStallWatchdog.Mark("Tool result" + (step.Error != null ? ": " + step.Error : ""));
+                    string resultText = step.Result?.Result?.ToString() ?? string.Empty;
+                    // A fact the model tried to save again isn't a new memory: say so instead of "Remembering".
+                    if (resultText.StartsWith("Already remembered", StringComparison.Ordinal))
+                        step.Description = "Already remembered";
+                    else if (step.Error == null && DeviceActionsFeature.ToolNames.Contains(step.Name))
+                        // A device action: what the user chose, also in the saved chat.
+                        step.Description = described + DeviceActionsFeature.StepOutcome(resultText);
+                    if (item.IsStreaming)
+                        Chat.SetStatus("Generating...");
+                };
+            }
+        };
+    }
+
+    // A grey step line like the tool calls', for the page's own steps (the document's, the memories').
+    private static Label StepLine(string text) => new Label
+    {
+        Text = "\U0001F50E " + text,
+        FontFamily = Theme.BodyFont,
+        FontSize = 13,
+        TextColor = Theme.SecondaryText,
+        Margin = new Thickness(6, 0)
+    };
+
+    // A card above a reply (one of its decorations); without a reply, a notice of its own in the transcript.
+    private void AddCard(StreamingBubble bubble, View card)
+    {
+        if (bubble != null)
+            bubble.Item.Decorations.Add(card);
+        else
+            Conversation?.AddNotice(card);
+        Chat.ScrollToEnd();
+    }
+
+    // The conversation was compacted (before a message, or "compact now"): the excerpts given with the messages that
+    // were summarized or dropped are no longer in the model's context, the transcript gets its divider, and the summary
+    // is saved with the chat. (The library resets the tool groups and has the model re-read the conversation.)
+    private async void OnConversationCompacted(object sender, ChatCompactedEventArgs e)
+    {
+        ChatConversation conversation = Conversation;
+        if (conversation == null)
+            return;
+        UiStallWatchdog.Mark(string.Format("Compacted at message {0}, summarized {1}", e.ContextStart, e.Summarized));
+        _parts.Documents.ResetDocumentContext();
+        if (e.ContextStart < conversation.Messages.Count && conversation.Messages[e.ContextStart].Tag is UserMessageInfo info)
+            info.DividerText = e.Summary != null ? "Earlier messages summarized · tap to read" : "Earlier messages dropped from the model's memory";
+        // The store knows each message it saved or loaded, so it finds the last one the model no longer sees.
+        if (CurrentChatId != null && !IsPrivate)
+        {
+            try
+            {
+                await SharedStore.SaveCompactionAsync(CurrentChatId.Value, conversation);
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Could not save the chat: " + ex.Message);
+            }
+        }
+    }
+
+    // The conversation's settings for the selected model: what the instructions and the tool groups in use take, the
+    // summary's size, and a server's summary options (its model may think anyway, which used up the summary's tokens).
+    protected override void ConfigureConversation(ChatConversation conversation, ChatModelOption option, LanguageModel model)
+    {
+        base.ConfigureConversation(conversation, option, model);
+        conversation.OverheadTokens = option?.CanUseTools == true ? 900 + DemoToolsFeature.GroupTokens(Skills.Router.Active) : 50;
+        conversation.SummaryMaxTokens = SummaryMaxTokens;
+        conversation.SummaryOptions = option == _parts.ServerOption ? _parts.Server.SummaryOptions : null;
+    }
+
+    // ---------- The model and the server ----------
+
+    protected override IChatClient CreateChatClient(ChatModelOption option, LanguageModel model)
+    {
+        if (option == _parts.ServerOption)
+            return _parts.Server.CreateChatClient();
+        var client = new LiteRtLmChatClient(model) { EnableContextManagement = true };
+        client.ContextChanged += info => UiStallWatchdog.Mark("Context: " + info);
+        return client;
+    }
+
+    protected override Task<bool> ConnectRemoteAsync(ChatModelOption option, CancellationToken cancellationToken) =>
+        option == _parts.ServerOption ? _parts.Server.ConnectAsync(cancellationToken) : Task.FromResult(true);
+
+    public override Task<string> AskModelOnceAsync(string prompt, int maxTokens, CancellationToken cancellationToken = default) =>
+        ServerSelected ? _parts.Server.AskOnceAsync(prompt) : base.AskModelOnceAsync(prompt, maxTokens, cancellationToken);
+
+    // ---------- Sending ----------
+
+    // Thinking goes to a server as reasoning_effort, unless it rejected that - then its model thinks as the server is set up to.
+    protected override async Task<ChatOptions> ComposeOptionsAsync(ChatSendRequest request)
+    {
+        ChatOptions options = await base.ComposeOptionsAsync(request);
+        if (ServerSelected && _parts.Server.RejectsReasoning)
+            options.Reasoning = null;
+        return options;
+    }
+
+    // Given to the model before a message: image references for the tools, then document excerpts; null for none.
+    private static string JoinContext(string imageReferences, string document)
+    {
+        string context = (imageReferences ?? string.Empty) + (document ?? string.Empty);
+        return context.Length > 0 ? context : null;
+    }
+
+    // A message: with a document attached, the excerpts (and maybe a picture or page) most related to it; in task mode,
+    // planned and run step by step; the reply streamed, sent again when a tool group's stub asks (or a server rejected
+    // the reasoning option); then the translation offer, the memories it drew on, and the exchange saved.
+    protected override async Task SendCoreAsync(ChatSendRequest request, CancellationToken cancellationToken)
+    {
+        _parts.Camera.ClearCameraTurn();
+        Images.ClearDrawn();
+        WrittenDocuments.Clear();
+        ChatConversation conversation = Conversation;
+        if (conversation == null || !await EnsureRemoteAsync(cancellationToken))
+            return;
+        string prompt = request.Text ?? string.Empty;
+        List<DataContent> attachments = request.Attachments?.ToList() ?? new List<DataContent>();
+        UiStallWatchdog.Mark(string.Format("Send: {0} chars, {1} attachment(s), model {2}, think {3}", prompt.Length, attachments.Count,
+            SelectedModel?.DisplayName, Chat.ThinkingEnabled));
+        bool canUseTools = SelectedModel?.CanUseTools == true;
+        Chat.SetStatus("Generating...");
+        try
+        {
+            // With a document attached: the excerpts (and maybe a picture or page) most related to the message.
+            DocumentContext document = await _parts.Documents.GetDocumentContextAsync(prompt);
+            if (document?.Image != null)
+                attachments.Add(document.Image);
+            var info = new UserMessageInfo { Language = await TextLanguage.DetectAsync(prompt) };
+
+            // Task mode: for this message only.
+            bool planTask = _parts.TaskChip.TakePlan() && canUseTools && !HandsFree;
+            ChatOptions options = await ComposeOptionsAsync(request);
+            // The model is given references to the attached images for the camera tools.
+            int attachedImages = attachments.Count(a => a.MediaType != null && a.MediaType.StartsWith("image/", StringComparison.Ordinal));
+            string imageReferences = canUseTools && attachedImages > 0 && Emgu.LiteRT.Models.CV.Maui.LiveCamera.Supported
+                ? "Attached image references for analyze_visual_image: " + string.Join(", ", Enumerable.Range(1, attachedImages).Select(i => "image-" + i)) + "\n"
+                : null;
+            int searchedAt = conversation.CompactionCount;
+            ChatMessageItem userItem = null;
+            _documentRefresh = async (message, token) =>
+            {
+                userItem = message;
+                // Compacting may have summarized or dropped excerpts given before: they are searched again.
+                if (document != null && conversation.CompactionCount != searchedAt)
+                {
+                    searchedAt = conversation.CompactionCount;
+                    document = await _parts.Documents.RefreshDocumentContextAsync(prompt, document, message, attachments);
+                    message.Context = JoinContext(imageReferences, document?.Text);
+                }
+            };
+            _pendingUserInfo = info;
+            _pendingDocumentStep = document?.Step;
+
+            IChatClient client = planTask ? Tasks.CreateClient(prompt, attachments) : null;
+            ChatMessageItem reply = null;
+            for (int attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    reply = reply == null
+                        ? await conversation.SendAsync(prompt, attachments, options, JoinContext(imageReferences, document?.Text), cancellationToken, client)
+                        : await conversation.RegenerateAsync(reply, options, cancellationToken, client);
+                }
+                catch (System.ClientModel.ClientResultException ex) when (attempt == 0 && _parts.Server.ServerRejectedReasoning(ex))
+                {
+                    // The server doesn't take reasoning_effort: send it again without.
+                    UiStallWatchdog.Mark("Server rejected reasoning_effort: " + ex.Message);
+                    reply = conversation.Messages.LastOrDefault(m => m.Role == ChatMessageRole.Assistant);
+                    options.Reasoning = null;
+                    continue;
+                }
+                if (attempt < 2 && reply.State == ChatMessageState.Done && Skills.TakeRerun() && !cancellationToken.IsCancellationRequested)
+                {
+                    // A stub ended the request (rerunAfterStub): the message again, now with its group - without the
+                    // stub's turn, which the model handled worse.
+                    UiStallWatchdog.Mark("Sending the message again with the tool group: " + string.Join(", ", Skills.Router.Active));
+                    options = await ComposeOptionsAsync(request);
+                    continue;
+                }
+                break;
+            }
+
+            bool interrupted = reply.State == ChatMessageState.Interrupted;
+            if (interrupted)
+                UiStallWatchdog.Mark("Reply interrupted");
+            StreamingBubble bubble = reply.Tag as StreamingBubble;
+            if (bubble != null)
+            {
+                bubble.TargetLanguage = TranslationFeature.Target(info.Language);
+                bubble.Refresh();
+                _ = Translations.CheckThinkingLanguageAsync(bubble);
+            }
+            _parts.Documents.MarkDocumentContextGiven(document);
+            await ShowMemoriesUsedAsync(prompt, reply, bubble);
+            UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
+            if (userItem != null)
+                await SaveExchangeAsync(userItem, reply, bubble);
+            Chat.SetStatus(null);
+        }
+        finally
+        {
+            _documentRefresh = null;
+            _pendingUserInfo = null;
+            _pendingDocumentStep = null;
+        }
+    }
+
+    // The message about to be sent: the document's excerpts searched again after compacting, then the base's status.
+    private Func<ChatMessageItem, CancellationToken, Task> _documentRefresh;
+
+    protected override async Task OnBeforeStreamingAsync(ChatMessageItem message, CancellationToken cancellationToken)
+    {
+        if (_documentRefresh != null)
+            await _documentRefresh(message, cancellationToken);
+        await base.OnBeforeStreamingAsync(message, cancellationToken);
+    }
+
+    // Under a finished reply: the memories it drew on (AgentTools.MemoriesUsed: by their words - the model doesn't say), as a line
+    // that opens them, and saved with the chat as a step line. Not for memories deleted in the same turn ("forget that...").
+    private async Task ShowMemoriesUsedAsync(string prompt, ChatMessageItem reply, StreamingBubble bubble)
+    {
+        IList<AgentMemory> given = _parts.Memory.Skill.LastGiven;
+        if (bubble == null || given == null || given.Count == 0 || reply.State != ChatMessageState.Done || !reply.HasText)
+            return;
+        try
+        {
+            HashSet<string> kept = (await SharedStore.Memories.GetMemoriesAsync()).Select(m => m.Id).ToHashSet();
+            List<AgentMemory> used = AgentTools.MemoriesUsed(given, prompt, reply.Text).Where(m => kept.Contains(m.Id)).ToList();
+            if (used.Count == 0)
+                return;
+            bubble.MemoryStep = MemoryStepText(used);
+            var line = StepLine(bubble.MemoryStep);
+            line.Text = "\U0001F9E0 " + bubble.MemoryStep;
+            SemanticProperties.SetHint(line, "Shows these memories, to delete one");
+            line.OnTap(() => _ = ShowMemoriesAsync(used.Select(m => m.Id).ToHashSet()));
+            AddCard(bubble, line);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    // "Used a memory: The user is vegetarian." / "Used 2 memories: ... · ..."
+    internal static string MemoryStepText(IList<AgentMemory> used) =>
+        (used.Count == 1 ? "Used a memory: " : "Used " + used.Count + " memories: ") + string.Join(" · ", used.Select(m => m.Text));
+
+    // The memories a reply used, in a sheet, each with a button to delete it.
+    private async Task ShowMemoriesAsync(HashSet<string> only)
+    {
+        if (IsPrivate) return;
+        IList<AgentMemory> memories = (await SharedStore.Memories.GetMemoriesAsync()).Where(m => only.Contains(m.Id)).ToList();
+        if (memories.Count == 0)
+            return;
+        var list = new VerticalStackLayout { Spacing = 2 };
+        foreach (AgentMemory memory in memories)
+        {
+            string id = memory.Id;
+            var row = new Grid
+            {
+                Padding = new Thickness(10, 7),
+                ColumnSpacing = 6,
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+            };
+            row.Add(new Label { Text = memory.Text, FontFamily = Theme.BodyFont, FontSize = 14, TextColor = Theme.PrimaryText, VerticalOptions = LayoutOptions.Center }, 0, 0);
+            var delete = new Label
+            {
+                Text = Theme.GlyphClose,
+                FontFamily = Theme.IconFont,
+                FontSize = 18,
+                TextColor = Theme.SecondaryText,
+                Padding = new Thickness(6),
+                VerticalOptions = LayoutOptions.Center
+            };
+            SemanticProperties.SetDescription(delete, "Delete this memory");
+            delete.OnTap(async () =>
+            {
+                await SharedStore.Memories.DeleteMemoryAsync(id);
+                list.Children.Remove(row);
+            });
+            row.Add(delete, 1, 0);
+            list.Children.Add(row);
+        }
+        await ((IChatPageHost)this).ShowSheetAsync("Memories this reply used", list, "Close");
+        RefreshSettings();
+    }
+
+    // ---------- Saved chats ----------
+
+    // Save a completed exchange: the message (with its attachments), any tool steps, and the reply - with the page's
+    // extras: the message's language, the pictures the reply drew and the documents it wrote, the chat's document.
+    private async Task SaveExchangeAsync(ChatMessageItem userItem, ChatMessageItem reply, StreamingBubble bubble)
+    {
+        if (IsPrivate) return; // Write nothing to SQLite or attachments.
+        UserMessageInfo info = userItem.Tag as UserMessageInfo ?? new UserMessageInfo();
+        try
+        {
+            int id = CurrentChatId ?? await SharedStore.CreateConversationAsync(ChatHistoryStore.TitleOf(userItem), SelectedModel?.Id);
+            // The step lines: the document's (a card above the reply), then the tool calls, then the memories it used.
+            List<string> steps = new List<string>();
+            if (bubble?.DocumentStep != null)
+                steps.Add(bubble.DocumentStep);
+            steps.AddRange(reply.Steps.Select(step => step.Description));
+            if (bubble?.MemoryStep != null)
+                steps.Add(bubble.MemoryStep);
+            // Pictures the reply drew are kept with it (shown again when the chat is reopened, not given to the model),
+            // and the documents it wrote.
+            List<(string Kind, string MediaType, byte[] Data)> drawn = Images.Drawn();
+            drawn.AddRange(WrittenDocuments.Take());
+            ChatSavedExchange saved = await SharedStore.SaveExchangeAsync(id, userItem, reply, drawn, steps);
+            info.MessageId = saved.MessageId;
+            await SharedStore.SetLanguageAsync(saved.MessageId, info.Language);
+            if (bubble != null)
+                bubble.MessageId = saved.ReplyId;
+            // The document the chat uses now (or none), restored when it is opened again.
+            await SharedStore.SetConversationDocumentAsync(id, _parts.Documents.DocumentReady?.IsCompletedSuccessfully == true ? _parts.Documents.DocumentId : null);
+            SetCurrentChat(id);
+            _parts.Transcripts.Track(userItem, id);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Could not save the chat: " + ex.Message);
+        }
+    }
+
+    // Open a saved chat: switch to its model, show its messages with the page's data and cards, and give the model
+    // the conversation so far (the chat's document comes back through DocumentsFeature.OnChatOpened).
+    public override async Task OpenChatAsync(int chatId)
+    {
+        if (IsWorking)
+            return;
+        if (IsPrivate && !await SetPrivateAsync(false))
+            return;
+        ConversationRecord chat = (await SharedStore.GetConversationsAsync()).FirstOrDefault(c => c.Id == chatId);
+        if (chat == null || IsWorking)
+            return;
+        UiStallWatchdog.Mark("Open saved chat " + chatId);
+        SetBusy(true);
+        try
+        {
+            PrepareForChat(new ChatHistoryEntry(chat.Id, chat.Title, chat.Model, chat.Updated));
+            ChatConversation conversation = Conversation;
+            if (conversation == null)
+                return;
+            // The messages, with each reply's step lines (ChatHistoryStore reads them back, and the model sees those
+            // after the last compaction and the summary of the ones before); the page's data and cards with them.
+            ChatHistory history = await SharedStore.LoadAsync<MessageRecord>(chatId);
+            if (history == null)
+                return;
+            string lastUserLanguage = null;
+            foreach (ChatMessageItem item in history.Messages)
+            {
+                var record = (MessageRecord)history.RecordOf(item);
+                if (item.Role == ChatMessageRole.User)
+                {
+                    var info = new UserMessageInfo
+                    {
+                        // The language of a user message (detected now for chats saved before it was kept).
+                        Language = record.Language ?? await TextLanguage.DetectAsync(item.Text),
+                        MessageId = record.Id
+                    };
+                    if (chat.Summary == null)
+                        info.DividerText = "Earlier messages dropped from the model's memory";
+                    lastUserLanguage = info.Language;
+                    item.Tag = info;
+                    continue;
+                }
+                StreamingBubble bubble = BubbleFor(item);
+                bubble.MessageId = record.Id;
+                bubble.TargetLanguage = TranslationFeature.Target(record.Language ?? lastUserLanguage);
+                bubble.Translation = record.ThinkingTranslation;
+                bubble.ShowTranslation = !string.IsNullOrEmpty(record.ThinkingTranslation);
+                foreach (ChatSavedAttachment attachment in history.AttachmentsOf(item))
+                {
+                    // A document the reply wrote, or a picture it drew: cards above it, not given to the model.
+                    if (attachment.Kind == WrittenDocumentsFeature.Kind)
+                        item.Decorations.Add(WrittenDocuments.SavedCard(attachment.MediaType, await System.IO.File.ReadAllBytesAsync(attachment.Path)));
+                    else if (attachment.Kind == ImageFeature.GeneratedKind)
+                        item.Decorations.Add(Images.SavedImageView(await System.IO.File.ReadAllBytesAsync(attachment.Path)));
+                }
+                _ = Translations.CheckThinkingLanguageAsync(bubble);
+            }
+            SetStatus($"Opening conversation: {history.Messages.Count} messages...");
+            await Task.Yield();
+            history.Load(conversation);
+            _agentBubble = conversation.Messages.LastOrDefault(m => m.Role == ChatMessageRole.Assistant)?.Tag as StreamingBubble;
+            SetCurrentChat(chatId);
+            UiStallWatchdog.Mark($"Opened saved chat: {history.Messages.Count} messages");
+        }
+        finally
+        {
+            SetBusy(false);
+            SetStatus(null);
+        }
+        OnChatOpened(chatId);
+    }
+
+    // A new chat: the page's data for the reply being written, the pictures drawn and the documents written go (the
+    // features reset themselves: the camera closes, the monitors and the document go).
+    public override void StartNewChat()
+    {
+        if (IsWorking)
+        {
+            SetStatus("Hang on - still answering.");
+            return;
+        }
+        _sessionVersion++;
+        _agentBubble = null;
+        _imageFeature?.ClearDrawn();
+        _writtenDocuments?.Clear();
+        base.StartNewChat();
+    }
+
+    // ---------- Private chats ----------
+
+    // Starting or ending a private chat: what the indexes and the search model hold is finished or released first, and
+    // nothing of the session is kept (the document, the pictures, the prompt caches).
+    protected override async Task<bool> OnPrivateModeChangingAsync(bool isPrivate)
+    {
+        _sessionVersion++;
+        // Cancel every producer before awaiting the shared embedding load.
+        Task<bool> documentReady = _parts.Documents.DocumentReady;
+        _parts.Documents.RemoveDocument();
+        PastChats.CancelIndexing();
+        PhotoSearch.CancelIndexing();
+        await PastChats.StopIndexingAsync();
+        await PhotoSearch.WaitForIndexingAsync();
+        if (documentReady != null) { try { await documentReady; } catch (OperationCanceledException) { } }
+        await _parts.Documents.FinishPrivateDocumentsAsync();
+        Chat.ReplySpeaker?.Stop();
+        ClearPrivateSessionContent();
+        // Drop generated-image prompt/caption caches as well as transcript references.
+        if (IsPrivate)
+        {
+            await Embedder.ReleaseWithGateAsync();
+            await Images.ResetModelAsync();
+        }
+        if (isPrivate) _privateDiagnostics ??= UiStallWatchdog.SuppressPrivateDetails();
+        else { _privateDiagnostics?.Dispose(); _privateDiagnostics = null; }
+        return true;
+    }
+
+    private void ClearPrivateSessionContent()
+    {
+        _parts.Documents.RemoveDocument();
+        Chat.PendingAttachments.Clear();
+        _imageFeature?.ClearDrawn();
+        _writtenDocuments?.Clear();
+        _agentBubble = null;
+        _imageFeature?.ClearPromptCache();
+        _parts.Documents.ForgetFinishedPrivateDocuments();
     }
 }

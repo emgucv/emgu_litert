@@ -101,7 +101,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - Step 2 gave `ChatView` a microphone (`ChatView.Voice.cs`, `PART_Talk`, `VoiceMessages` Auto/Audio/Text/Off) and
     `ChatMessageItem.Transcript`; verified on a Galaxy S10 and Mac Catalyst by playing a spoken question through the device's
     speaker while recording. An app that replaces `ChatViewTemplate` in its resources replaces it for every `ChatView`, so a
-    test page in the demo sets the library's `ChatStyles` templates itself.
+    test page in the demo sets the library's `ChatStyles` templates itself. (The demo's own `ChatViewTemplate` override - the
+    transcript without the message box, for its old page - went with the move to `ChatPage` on 2026-10-26.)
   - Step 3 added the saved-chats package `Emgu.LiteRT.LM.Chat.Sqlite`: `ChatHistoryStore` over the demo's
     `Conversation`/`Message` tables, `ChatHistory`, and `UnitTestChatHistoryStore`, which also reads the demo's saved chats.
   - Step 4 added `Attach(conversation, chatId)` (`ChatHistoryBinding`), which saves exchanges, regenerated replies,
