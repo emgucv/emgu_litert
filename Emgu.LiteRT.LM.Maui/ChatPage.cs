@@ -85,8 +85,42 @@ namespace Emgu.LiteRT.LM.Maui
                 feature.OnAttached(this);
             _skills.AddRange(_features);
             _client = new ChatPageClient(CreateInnerClient);
+            // The page's Window is set after it is pushed: the features hear the app come to the front or leave it.
+            PropertyChanged += (s, e) => { if (e.PropertyName == nameof(Window)) WatchWindow(); };
             if (ControlTemplate == null)
                 ControlTemplate = ChatResources.Find<ControlTemplate>(TemplateKey);
+        }
+
+        private Window _watchedWindow;
+
+        private void WatchWindow()
+        {
+            Window window = Window;
+            if (window == _watchedWindow)
+                return;
+            if (_watchedWindow != null)
+            {
+                _watchedWindow.Resumed -= OnWindowResumed;
+                _watchedWindow.Stopped -= OnWindowStopped;
+            }
+            _watchedWindow = window;
+            if (window != null)
+            {
+                window.Resumed += OnWindowResumed;
+                window.Stopped += OnWindowStopped;
+            }
+        }
+
+        private void OnWindowResumed(object sender, EventArgs e)
+        {
+            foreach (ChatFeature feature in _features)
+                feature.OnAppResumed();
+        }
+
+        private void OnWindowStopped(object sender, EventArgs e)
+        {
+            foreach (ChatFeature feature in _features)
+                feature.OnAppStopped();
         }
 
         /// <summary>

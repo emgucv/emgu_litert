@@ -71,14 +71,6 @@ internal static class ChatToolGroups
         "document", "file", "pdf", "report", "contract", "paper", "manual", "my notes", "attached", "the doc"
     };
 
-    internal const string PastChats = "past_chats";
-    internal const string PastChatsSummary = "search the user's earlier conversations on this device";
-    internal static readonly string[] PastChatsKeywords =
-    {
-        "earlier", "previous", "last time", "we talked", "we discussed", "you said", "you told", "i said",
-        "i told you", "i asked", "remember when", "conversation", "chat", "mentioned", "recall"
-    };
-
     internal const string ImageGeneration = "image_generation";
     internal const string ImageGenerationSummary = "draw, paint or create a new picture from a description";
     internal static readonly string[] ImageGenerationKeywords =

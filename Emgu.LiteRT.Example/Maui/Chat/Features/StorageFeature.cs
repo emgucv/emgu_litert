@@ -1,6 +1,7 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using System.IO;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Features;
 using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.Models;
 using Emgu.LiteRT.Util;

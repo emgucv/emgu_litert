@@ -127,6 +127,47 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
 
     // Which schema the database holds, for migrations later. Version 1: the Conversation and Message tables above, as the
     // MAUI demo's chat page wrote them before this package existed.
+    /// <summary>A passage of a saved message, embedded with a search model (the past-chat search's index, <see cref="IChatSearchStore"/>).</summary>
+    [Table("ChatEmbedding")]
+    public class ChatEmbeddingRecord
+    {
+        /// <summary>The message's id and the passage's position</summary>
+        [PrimaryKey]
+        public string Id { get; set; }
+
+        /// <summary>The message</summary>
+        [Indexed]
+        public int MessageId { get; set; }
+
+        /// <summary>Its position among the message's passages</summary>
+        public int Position { get; set; }
+
+        /// <summary>The search model it was embedded with</summary>
+        public string Model { get; set; }
+
+        /// <summary>The passage's text</summary>
+        public string Text { get; set; }
+
+        /// <summary>Its embedding, as the floats' bytes</summary>
+        public byte[] Embedding { get; set; }
+    }
+
+    /// <summary>A search passage joined to its still-existing message and chat (a query's projection).</summary>
+    public sealed class ChatSearchRecord : ChatEmbeddingRecord
+    {
+        /// <summary>The chat</summary>
+        public int ConversationId { get; set; }
+
+        /// <summary>The chat's title</summary>
+        public string Title { get; set; }
+
+        /// <summary>The message's role</summary>
+        public string Role { get; set; }
+
+        /// <summary>When the message was saved (UTC)</summary>
+        public DateTime Created { get; set; }
+    }
+
     [Table("SchemaVersion")]
     internal sealed class SchemaVersionRecord
     {

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Chat;
 using Maui.Demo.Lite;
 using NUnit.Framework;
 
@@ -77,7 +78,7 @@ namespace Emgu.TF.Lite.Test
                 new DocumentItemRecord { DocumentId = "d1", Text = "Saved document", Data = new byte[60], Embedding = new byte[80] } });
             await _store.SavePhotoEmbeddingAsync(new PhotoEmbeddingRecord { PhotoId = "p1", Embedding = new byte[100] });
             await _store.SaveChatEmbeddingsAsync((await _store.GetMessagesAsync(chat))[0].Id,
-                new List<ChatEmbeddingRecord> { new ChatEmbeddingRecord { Id = "e1", MessageId = (await _store.GetMessagesAsync(chat))[0].Id, Text = "excerpt", Embedding = new byte[80] } });
+                new List<ChatSearchPassage> { new ChatSearchPassage { Id = "e1", MessageId = (await _store.GetMessagesAsync(chat))[0].Id, Text = "excerpt", Embedding = new byte[80] } });
             var snapshot = await _catalog.ReadAsync();
             long database = snapshot.Entries.Single(e => e.Kind == StorageKind.Database).Bytes;
             Assert.That(snapshot.DiskBytes, Is.EqualTo(database + 100 + 50 + 200 + 30 + 40));
@@ -132,8 +133,8 @@ namespace Emgu.TF.Lite.Test
             int chat = await _store.CreateConversationAsync("Keep", "ChatA");
             int message = await _store.AddMessageAsync(chat, MessageRecord.UserRole, "Keep text", null);
             await _store.SavePhotoEmbeddingAsync(new PhotoEmbeddingRecord { PhotoId = "p", Embedding = new byte[64] });
-            await _store.SaveChatEmbeddingsAsync(message, new List<ChatEmbeddingRecord> {
-                new ChatEmbeddingRecord { Id = "e", MessageId = message, Text = "Keep text", Embedding = new byte[64] } });
+            await _store.SaveChatEmbeddingsAsync(message, new List<ChatSearchPassage> {
+                new ChatSearchPassage { Id = "e", MessageId = message, Text = "Keep text", Embedding = new byte[64] } });
             foreach (StorageKind kind in new[] { StorageKind.PhotoIndex, StorageKind.ChatIndex })
                 await _catalog.DeleteAsync((await _catalog.ReadAsync()).Entries.Single(e => e.Kind == kind));
             Assert.That(await _store.GetPhotoEmbeddingsAsync(), Is.Empty);

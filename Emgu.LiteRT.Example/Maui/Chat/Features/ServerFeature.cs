@@ -81,13 +81,13 @@ internal sealed class ServerFeature : DemoFeature
         _ = LoadServerKeyAsync();
     }
 
-    protected override void OnAppStopped()
+    public override void OnAppStopped()
     {
         if (_foreground.Task.IsCompleted)
             _foreground = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
-    protected override void OnAppResumed() => _foreground.TrySetResult(true);
+    public override void OnAppResumed() => _foreground.TrySetResult(true);
 
     // LM Studio loads a model on its first request, with the context length it is set to: learn it then.
     public override void OnReplyCompleted(ChatExchangeEventArgs e) => _ = RefreshServerContextAsync();

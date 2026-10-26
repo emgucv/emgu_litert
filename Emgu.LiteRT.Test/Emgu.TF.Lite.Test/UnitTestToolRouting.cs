@@ -9,6 +9,7 @@ using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Agents.Skills;
 using Emgu.LiteRT.LM.Agents.Vision;
+using Emgu.LiteRT.LM.Chat;
 using Maui.Demo.Lite;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -105,8 +106,8 @@ public class UnitTestToolRouting
                 () => new AITool[] { AgentTools.FindPhotos(Unused) }, () => ChatPlannerInstructions.Photos),
             new ToolGroup(ChatToolGroups.Documents, ChatToolGroups.DocumentsSummary, ChatToolGroups.DocumentsKeywords,
                 () => new AITool[] { AgentTools.SearchDocuments((request, document, token) => Task.FromResult("none")) }, () => ChatPlannerInstructions.Documents),
-            new ToolGroup(ChatToolGroups.PastChats, ChatToolGroups.PastChatsSummary, ChatToolGroups.PastChatsKeywords,
-                () => new AITool[] { AgentTools.SearchChats(Unused) }, () => ChatPlannerInstructions.ChatSearch),
+            new ToolGroup(ChatSearchIndex.GroupName, ChatSearchIndex.GroupSummary, ChatSearchIndex.GroupKeywords,
+                () => new AITool[] { AgentTools.SearchChats(Unused) }, () => ChatSearchIndex.Instructions),
             new ToolGroup(ChatToolGroups.WriteDocument, ChatToolGroups.WriteDocumentSummary, ChatToolGroups.WriteDocumentKeywords,
                 () => new AITool[] { AgentTools.CreateDocument((document, token) =>
                 {
@@ -158,8 +159,8 @@ public class UnitTestToolRouting
             ("Show me my photos from Paris", new[] { ChatToolGroups.Photos }),
             ("Find my selfies from last summer", new[] { ChatToolGroups.Photos }),
             ("What does my rental contract say about pets?", new[] { ChatToolGroups.Documents }),
-            ("What did we talk about last time?", new[] { ChatToolGroups.PastChats }),
-            ("What was the restaurant you told me about?", new[] { ChatToolGroups.PastChats }),
+            ("What did we talk about last time?", new[] { ChatSearchIndex.GroupName }),
+            ("What was the restaurant you told me about?", new[] { ChatSearchIndex.GroupName }),
             ("Draw a red fox in the snow", new[] { ChatToolGroups.ImageGeneration }),
             ("Can you paint a lighthouse at sunset?", new[] { ChatToolGroups.ImageGeneration }),
             ("Make me a packing list as a Word document", new[] { ChatToolGroups.WriteDocument }),

@@ -79,7 +79,7 @@ internal sealed class PhotoSearchFeature : DemoFeature
         }
     }
 
-    protected override void OnAppResumed()
+    public override void OnAppResumed()
     {
         if (PageVisible)
             RefreshIndex();

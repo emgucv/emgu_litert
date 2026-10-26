@@ -174,9 +174,9 @@ internal sealed partial class CameraFeature : DemoFeature
         _ = CloseCameraAsync();
     }
 
-    protected override void OnAppResumed() => _cameraSuspended = false;
+    public override void OnAppResumed() => _cameraSuspended = false;
 
-    protected override async void OnAppStopped()
+    public override async void OnAppStopped()
     {
         _cameraSuspended = true;
         await CloseCameraAsync();

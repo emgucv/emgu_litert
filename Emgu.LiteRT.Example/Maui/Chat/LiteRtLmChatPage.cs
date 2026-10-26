@@ -53,11 +53,11 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         public MeetingFeature Meetings;
         public ExerciseFeature Exercises;
         public MemoryFeature Memory;
+        public WorkloadService Workload;
     }
 
     private readonly Parts _parts;
     private readonly MenuSheet _menu = new MenuSheet();
-    private WorkloadService _workload;
     private bool _pageVisible;
     private int _sessionVersion;
     private Task _reloadTask;
@@ -77,6 +77,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     private LiteRtLmChatPage(Parts parts) : base(parts.Options)
     {
         _parts = parts;
+        _building = null;
         Chat.AttachmentSource = new DemoAttachmentSource(ShowMenuAsync, () => IsPrivate, () => _sessionVersion,
             (bytes, name) => { if (!_parts.ModelSettings.SearchDownloadRequired) _parts.Documents.AttachDocument(bytes, name); }, SetStatus);
         Chat.PropertyChanged += (s, e) =>
@@ -86,6 +87,11 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         };
         HookConversation();
     }
+
+    // The parts being built, for the base constructor: it applies the template, which builds the features' settings
+    // sections before _parts is set (see Workload).
+    [ThreadStatic]
+    private static Parts _building;
 
     private static Parts Build()
     {
@@ -107,13 +113,22 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             DeviceActions = new DeviceActionsFeature(),
             WrittenDocuments = new WrittenDocumentsFeature(),
             Goals = new GoalsFeature(SharedStore.Goals),
-            PastChats = new PastChatsFeature(),
             PhotoSearch = new PhotoSearchFeature(),
             Meetings = new MeetingFeature(),
             Exercises = new ExerciseFeature(),
             Memory = new MemoryFeature(SharedStore.Memories)
         };
         parts.Server = new ServerFeature(parts.ServerOption);
+        parts.Workload = new WorkloadService(() => parts.ModelSettings.Embedder);
+        // The library's past-chat search over the demo's store, search model, workload and storage.
+        parts.PastChats = new PastChatsFeature(SharedStore, new SearchServices
+        {
+            Embedder = parts.ModelSettings.Embedder,
+            Workload = parts.Workload,
+            IndexModel = () => parts.ModelSettings.SearchModelFile,
+            DownloadRequired = () => parts.ModelSettings.SearchDownloadRequired,
+            CreateDownloadNotice = () => parts.Storage.CreateSearchModelNotice()
+        });
         var options = new ChatPageOptions
         {
             Title = "LiteRT-LM Chat",
@@ -145,12 +160,13 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         })
             options.Features.Add(feature);
         parts.Options = options;
+        _building = parts;
         return parts;
     }
 
     // ---------- Services ----------
 
-    private WorkloadService Workload => _workload ??= new WorkloadService(() => _parts.ModelSettings.Embedder);
+    private WorkloadService Workload => (_parts ?? _building).Workload;
 
     private SearchEmbedder Embedder => _parts.ModelSettings.Embedder;
 

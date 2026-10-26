@@ -5,8 +5,9 @@ using Emgu.LiteRT.LM.Maui;
 namespace Maui.Demo.Lite;
 
 // When heavy background work may run (WorkloadPolicy: not while the device is too hot or its battery too low), the
-// "Index photos only while charging" setting, and one embedding at a time on the shared search model.
-internal sealed class WorkloadService
+// "Index photos only while charging" setting, and one embedding at a time on the shared search model. The library's
+// search features take it as their IIndexingWorkload (without the photo rule).
+internal sealed class WorkloadService : IIndexingWorkload
 {
     private readonly WorkloadPolicy _policy = new();
     private readonly Func<SearchEmbedder> _embedder;
@@ -40,6 +41,11 @@ internal sealed class WorkloadService
             finally { embedder.Gate.Release(); }
         }
     }
+
+    Task IIndexingWorkload.WaitAsync(Action<string> status, CancellationToken cancel) => WaitForWorkAsync(false, status, cancel);
+
+    Task<T> IIndexingWorkload.RunEmbeddingAsync<T>(SearchEmbedder embedder, Func<T> embed, Action<string> paused, CancellationToken cancel) =>
+        RunIndexEmbeddingAsync(embed, paused, cancel);
 
     // The setting's row (phones only: a desktop is always plugged in).
     public View BuildPhotoChargingSetting()

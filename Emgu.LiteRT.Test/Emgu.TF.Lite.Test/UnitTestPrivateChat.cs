@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Chat;
 using Maui.Demo.Lite;
 using NUnit.Framework;
 
@@ -47,8 +48,8 @@ namespace Emgu.TF.Lite.Test
             await _store.SetConversationDocumentAsync(1, "PRIVATE DOC");
             await _store.SaveDocumentAsync(new DocumentRecord { Id = "PRIVATE DOC", Name = "private.pdf" },
                 new[] { new DocumentItemRecord { DocumentId = "PRIVATE DOC", Text = "PRIVATE CONTENT", Data = new byte[] { 4 }, Embedding = new byte[64] } });
-            await _store.SaveChatEmbeddingsAsync(1, new List<ChatEmbeddingRecord> {
-                new ChatEmbeddingRecord { Id = "private-embedding", MessageId = 1, Text = "PRIVATE SEARCH", Embedding = new byte[64] } });
+            await _store.SaveChatEmbeddingsAsync(1, new List<ChatSearchPassage> {
+                new ChatSearchPassage { Id = "private-embedding", MessageId = 1, Text = "PRIVATE SEARCH", Embedding = new byte[64] } });
             Assert.That(await _store.Memories.GetMemoriesAsync(), Is.Empty);
             Assert.That(await _store.GetMessagesAsync(1), Is.Empty);
             Assert.That(await _store.GetSearchMessagesAsync(), Is.Empty);
@@ -105,10 +106,10 @@ namespace Emgu.TF.Lite.Test
         {
             int chat = await _store.CreateConversationAsync("Trip", "Gemma4E2B");
             int message = await _store.AddMessageAsync(chat, MessageRecord.UserRole, "Paris", null);
-            await _store.SaveChatEmbeddingsAsync(message, new List<ChatEmbeddingRecord> {
-                new ChatEmbeddingRecord { Id = "e", MessageId = message, Model = "model-a", Text = "Paris", Embedding = new byte[8] } });
+            await _store.SaveChatEmbeddingsAsync(message, new List<ChatSearchPassage> {
+                new ChatSearchPassage { Id = "e", MessageId = message, Model = "model-a", Text = "Paris", Embedding = new byte[8] } });
             _store.IsPrivate = true;
-            var found = await new ChatSearchIndex(_store).SearchAsync("model-a", ChatSearch.Parse("Paris", DateTime.Now), null,
+            var found = await new ChatSearchIndex(_store).SearchAsync("model-a", new ChatSearchQuery("Paris"), null,
                 (_, _) => throw new Exception("Private chat must not perform a semantic query."), CancellationToken.None);
             Assert.That(found, Is.Empty);
             await new ChatSearchIndex(_store).IndexAsync("model-a",

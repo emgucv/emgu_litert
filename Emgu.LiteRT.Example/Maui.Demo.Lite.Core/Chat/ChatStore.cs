@@ -96,29 +96,6 @@ public class MessageRecord : ChatMessageRecord
     public string ThinkingTranslation { get; set; }
 }
 
-/// <summary>A passage of a saved message, embedded with the selected search model.</summary>
-[Table("ChatEmbedding")]
-public class ChatEmbeddingRecord
-{
-    [PrimaryKey]
-    public string Id { get; set; }
-    [Indexed]
-    public int MessageId { get; set; }
-    public int Position { get; set; }
-    public string Model { get; set; }
-    public string Text { get; set; }
-    public byte[] Embedding { get; set; }
-}
-
-/// <summary>A search passage joined to its still-existing message and conversation.</summary>
-public class ChatSearchRecord : ChatEmbeddingRecord
-{
-    public int ConversationId { get; set; }
-    public string Title { get; set; }
-    public string Role { get; set; }
-    public DateTime Created { get; set; }
-}
-
 /// <summary>
 /// A photo's embedding, for the chat's photo search (PhotoIndex): its id in the photo library, the version it was
 /// computed from, when it was taken, and the embedding (floats).
@@ -187,16 +164,9 @@ internal sealed partial class ChatStore : ChatHistoryStore
     {
         await connection.CreateTableAsync<ConversationRecord>();
         await connection.CreateTableAsync<MessageRecord>();
-        await connection.CreateTableAsync<ChatEmbeddingRecord>();
         await connection.CreateTableAsync<PhotoEmbeddingRecord>();
         await connection.CreateTableAsync<DocumentRecord>();
         await connection.CreateTableAsync<DocumentItemRecord>();
-    }
-
-    // A deleted chat's messages leave the chat search index too.
-    protected override void DeletingChat(SQLiteConnection connection, int chatId)
-    {
-        connection.Execute("DELETE FROM ChatEmbedding WHERE MessageId IN (SELECT Id FROM Message WHERE ConversationId = ?)", chatId);
     }
 
     private Task<SQLiteAsyncConnection> Db => GetConnectionAsync();
@@ -239,39 +209,6 @@ internal sealed partial class ChatStore : ChatHistoryStore
     {
         if (IsPrivate || messageId <= 0 || string.IsNullOrEmpty(language)) return;
         await (await Db).ExecuteAsync("UPDATE Message SET Language = ? WHERE Id = ?", language, messageId);
-    }
-
-    public async Task<List<MessageRecord>> GetSearchMessagesAsync()
-    {
-        if (IsPrivate) return new List<MessageRecord>();
-        return await (await Db).QueryAsync<MessageRecord>(
-            "SELECT m.* FROM Message m INNER JOIN Conversation c ON c.Id = m.ConversationId " +
-            "WHERE m.Role IN ('user', 'assistant') AND length(trim(m.Text)) > 0 ORDER BY m.Id");
-    }
-
-    public async Task<List<ChatSearchRecord>> GetChatEmbeddingsAsync()
-    {
-        if (IsPrivate) return new List<ChatSearchRecord>();
-        return await (await Db).QueryAsync<ChatSearchRecord>(
-            "SELECT e.*, m.ConversationId, m.Role, m.Created, c.Title FROM ChatEmbedding e " +
-            "INNER JOIN Message m ON m.Id = e.MessageId INNER JOIN Conversation c ON c.Id = m.ConversationId");
-    }
-
-    // Never resurrect an index entry if the chat was deleted while its embedding was computed.
-    public async Task SaveChatEmbeddingsAsync(int messageId, List<ChatEmbeddingRecord> passages)
-    {
-        if (IsPrivate) return;
-        await (await Db).RunInTransactionAsync(connection =>
-        {
-            connection.Execute("DELETE FROM ChatEmbedding WHERE MessageId = ?", messageId);
-            if (connection.Find<MessageRecord>(messageId) != null)
-                connection.InsertAll(passages);
-        });
-    }
-
-    public async Task ClearChatEmbeddingsAsync()
-    {
-        await (await Db).DeleteAllAsync<ChatEmbeddingRecord>();
     }
 
     // ---------- Documents ----------

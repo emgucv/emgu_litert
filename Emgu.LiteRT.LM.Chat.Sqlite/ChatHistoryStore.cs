@@ -30,7 +30,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
     /// <see cref="GetMessageId"/> need nothing else. With <see cref="IsPrivate"/> on, nothing is saved.
     /// </para>
     /// </summary>
-    public class ChatHistoryStore : IChatHistoryStore
+    public class ChatHistoryStore : IChatHistoryStore, IChatSearchStore
     {
         /// <summary>The version of the tables this store reads and writes (kept in the database, for migrations).</summary>
         public const int SchemaVersion = 1;
@@ -90,6 +90,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache);
             await connection.CreateTableAsync<ChatRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<ChatMessageRecord>().ConfigureAwait(false);
+            await connection.CreateTableAsync<ChatEmbeddingRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<SchemaVersionRecord>().ConfigureAwait(false);
             if (await connection.FindAsync<SchemaVersionRecord>(SchemaName).ConfigureAwait(false) == null)
                 await connection.InsertAsync(new SchemaVersionRecord { Name = SchemaName, Version = SchemaVersion }).ConfigureAwait(false);
@@ -184,6 +185,8 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             await db.RunInTransactionAsync(connection =>
             {
                 DeletingChat(connection, chatId);
+                // A deleted chat's messages leave the past-chat search index too.
+                connection.Execute("DELETE FROM ChatEmbedding WHERE MessageId IN (SELECT Id FROM Message WHERE ConversationId = ?)", chatId);
                 connection.Execute("DELETE FROM Message WHERE ConversationId = ?", chatId);
                 connection.Delete<ChatRecord>(chatId);
             }).ConfigureAwait(false);
@@ -553,6 +556,71 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
 
         IChatHistoryBinding IChatHistoryStore.Attach(ChatConversation conversation, int chatId, string model) =>
             Attach(conversation, chatId, model);
+
+        // ---------- The past-chat search's index (IChatSearchStore) ----------
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<ChatSearchMessage>> GetSearchMessagesAsync()
+        {
+            if (IsPrivate)
+                return new List<ChatSearchMessage>();
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            List<ChatMessageRecord> messages = await db.QueryAsync<ChatMessageRecord>(
+                "SELECT m.* FROM Message m INNER JOIN Conversation c ON c.Id = m.ConversationId " +
+                "WHERE m.Role IN ('user', 'assistant') AND length(trim(m.Text)) > 0 ORDER BY m.Id").ConfigureAwait(false);
+            return messages.Select(m => new ChatSearchMessage { Id = m.Id, Text = m.Text }).ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<ChatSearchHit>> GetChatEmbeddingsAsync()
+        {
+            if (IsPrivate)
+                return new List<ChatSearchHit>();
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            List<ChatSearchRecord> records = await db.QueryAsync<ChatSearchRecord>(
+                "SELECT e.*, m.ConversationId, m.Role, m.Created, c.Title FROM ChatEmbedding e " +
+                "INNER JOIN Message m ON m.Id = e.MessageId INNER JOIN Conversation c ON c.Id = m.ConversationId").ConfigureAwait(false);
+            return records.Select(r => new ChatSearchHit
+            {
+                Id = r.Id, MessageId = r.MessageId, Position = r.Position, Model = r.Model, Text = r.Text, Embedding = r.Embedding,
+                ConversationId = r.ConversationId, Title = r.Title, Role = r.Role, Created = r.Created
+            }).ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task SaveChatEmbeddingsAsync(int messageId, IReadOnlyList<ChatSearchPassage> passages)
+        {
+            if (IsPrivate)
+                return;
+            List<ChatEmbeddingRecord> records = passages.Select(p => new ChatEmbeddingRecord
+            {
+                Id = p.Id, MessageId = p.MessageId, Position = p.Position, Model = p.Model, Text = p.Text, Embedding = p.Embedding
+            }).ToList();
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            // Never resurrect an index entry if the chat was deleted while its embedding was computed.
+            await db.RunInTransactionAsync(connection =>
+            {
+                connection.Execute("DELETE FROM ChatEmbedding WHERE MessageId = ?", messageId);
+                if (connection.Find<ChatMessageRecord>(messageId) != null)
+                    connection.InsertAll(records);
+            }).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public async Task ClearChatEmbeddingsAsync()
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            await db.DeleteAllAsync<ChatEmbeddingRecord>().ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<int>> GetChatIdsAsync()
+        {
+            if (IsPrivate)
+                return new List<int>();
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            return (await db.Table<ChatRecord>().ToListAsync().ConfigureAwait(false)).Select(c => c.Id).ToList();
+        }
 
         // ---------- Helpers ----------
 

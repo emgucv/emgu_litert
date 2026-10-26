@@ -92,6 +92,16 @@ namespace Emgu.LiteRT.LM.Maui
         {
         }
 
+        /// <summary>Called when the app comes to the front (on desktops also when its window is activated).</summary>
+        public virtual void OnAppResumed()
+        {
+        }
+
+        /// <summary>Called when the app leaves the front (the window is stopped).</summary>
+        public virtual void OnAppStopped()
+        {
+        }
+
         /// <summary>Called when another model was chosen (its conversation is new).</summary>
         /// <param name="model">The model</param>
         public virtual void OnModelChanged(ChatModelOption model)
