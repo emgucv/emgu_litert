@@ -157,6 +157,7 @@ namespace Emgu.LiteRT.LM.Maui
             _chatView.ChatClient = _client;
             _chatView.LoadStateCreated = ConfigureLoadState;
             _chatView.OptionsProvider = ComposeOptionsAsync;
+            _chatView.RerunRequested = () => _skills.TakeRerun();
             _chatView.ThinkingEnabled = _options.Settings.Get("think", true);
             _chatView.ReadAloud = _options.Settings.Get("read_aloud", false);
             if (_options.AttachmentSource != null)

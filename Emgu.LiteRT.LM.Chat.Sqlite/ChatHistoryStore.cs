@@ -228,7 +228,8 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             Remember(message, messageId);
             foreach (string step in (steps ?? reply.Steps.Select(s => s.Description)).ToList())
                 await InsertAsync(chatId, ChatMessageRecord.StepRole, step, null, null, null, null).ConfigureAwait(false);
-            int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, ReplyText(reply), reply.Thinking, replyAttachments, null, null).ConfigureAwait(false);
+            int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, ReplyText(reply), reply.Thinking, replyAttachments, null, null,
+                reply.ThinkingDuration?.TotalSeconds).ConfigureAwait(false);
             Remember(reply, replyId);
             await TouchAsync(chatId).ConfigureAwait(false);
             OnChatsChanged();
@@ -271,7 +272,8 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             }
             foreach (ChatToolStep step in reply.Steps.ToList())
                 await InsertAsync(chatId, ChatMessageRecord.StepRole, step.Description, null, null, null, null).ConfigureAwait(false);
-            int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, ReplyText(reply), reply.Thinking, replyAttachments, null, null).ConfigureAwait(false);
+            int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, ReplyText(reply), reply.Thinking, replyAttachments, null, null,
+                reply.ThinkingDuration?.TotalSeconds).ConfigureAwait(false);
             Remember(reply, replyId);
             await TouchAsync(chatId).ConfigureAwait(false);
             OnChatsChanged();
@@ -309,10 +311,11 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         /// </summary>
         /// <returns>The row's id</returns>
         public async Task<int> AddMessageAsync(int chatId, string role, string text, string thinking = null,
-            IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments = null, string context = null, string transcript = null)
+            IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments = null, string context = null, string transcript = null,
+            double? thinkingSeconds = null)
         {
             ThrowIfPrivate();
-            int id = await InsertAsync(chatId, role, text, thinking, attachments, context, transcript).ConfigureAwait(false);
+            int id = await InsertAsync(chatId, role, text, thinking, attachments, context, transcript, thinkingSeconds).ConfigureAwait(false);
             await TouchAsync(chatId).ConfigureAwait(false);
             OnChatsChanged();
             return id;
@@ -387,7 +390,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         }
 
         private async Task<int> InsertAsync(int chatId, string role, string text, string thinking,
-            IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments, string context, string transcript)
+            IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments, string context, string transcript, double? thinkingSeconds = null)
         {
             SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
             var record = new ChatMessageRecord
@@ -396,6 +399,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 Role = role,
                 Text = text ?? string.Empty,
                 Thinking = string.IsNullOrEmpty(thinking) ? null : thinking,
+                ThinkingSeconds = thinkingSeconds,
                 Context = string.IsNullOrEmpty(context) ? null : context,
                 Transcript = string.IsNullOrWhiteSpace(transcript) ? null : transcript.Trim(),
                 Created = DateTime.UtcNow
@@ -486,7 +490,11 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 }
                 else
                 {
-                    item = new ChatMessageItem(ChatMessageRole.Assistant, row.Text) { Thinking = row.Thinking ?? string.Empty };
+                    item = new ChatMessageItem(ChatMessageRole.Assistant, row.Text)
+                    {
+                        Thinking = row.Thinking ?? string.Empty,
+                        ThinkingDuration = row.ThinkingSeconds != null ? TimeSpan.FromSeconds(row.ThinkingSeconds.Value) : (TimeSpan?)null
+                    };
                     foreach (string step in steps)
                         item.Steps.Add(new ChatToolStep(step));
                     steps.Clear();

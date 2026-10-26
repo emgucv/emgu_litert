@@ -268,6 +268,13 @@ namespace Emgu.LiteRT.LM.Maui
         public Action<ModelLoadState> LoadStateCreated { get; set; }
 
         /// <summary>
+        /// Asked after each reply whether the message should be sent again into the same reply, with options made anew
+        /// by <see cref="OptionsProvider"/>: for an agent whose tool group ended the request to be given from the start
+        /// (Emgu.LiteRT.LM.Agents' ToolRouter with RerunAfterStub; ChatSkillSet.TakeRerun). At most twice per message. Or null.
+        /// </summary>
+        public Func<bool> RerunRequested { get; set; }
+
+        /// <summary>
         /// Shows the conversation's summary (<see cref="ChatConversation.Summary"/>) in an alert; the default message
         /// template's "Earlier messages were summarized" divider runs it when tapped.
         /// </summary>
@@ -613,8 +620,19 @@ namespace Emgu.LiteRT.LM.Maui
                     : Options?.Clone() ?? new ChatOptions();
                 if (options.Reasoning == null)
                     options.Reasoning = new ReasoningOptions { Effort = ThinkingEnabled ? ReasoningEffort.Medium : ReasoningEffort.None };
+                ChatMessageItem reply;
                 using (StatusUntilFirstText(conversation))
-                    await conversation.SendAsync(text, attachments, options, context, cancel.Token);
+                    reply = await conversation.SendAsync(text, attachments, options, context, cancel.Token);
+                // A tool group's stub ended the request: the message goes again, with the group's tools from the start.
+                for (int rerun = 0; rerun < 2 && !cancel.IsCancellationRequested && RerunRequested?.Invoke() == true; rerun++)
+                {
+                    options = OptionsProvider != null
+                        ? await OptionsProvider(new ChatSendRequest(text, attachments, context)) ?? new ChatOptions()
+                        : Options?.Clone() ?? new ChatOptions();
+                    if (options.Reasoning == null)
+                        options.Reasoning = new ReasoningOptions { Effort = ThinkingEnabled ? ReasoningEffort.Medium : ReasoningEffort.None };
+                    reply = await conversation.RegenerateAsync(reply, options, cancel.Token);
+                }
                 SetStatus(null);
             }
             catch (Exception ex)

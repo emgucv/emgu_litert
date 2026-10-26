@@ -29,8 +29,14 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>The features: the tools and what the page shows for them. <see cref="ChatPage.DefaultFeatures"/> for the built-in ones.</summary>
         public IList<ChatFeature> Features { get; } = new List<ChatFeature>();
 
-        /// <summary>The agent's instructions; <see cref="ChatSkillSet.DefaultInstructions"/> by default.</summary>
+        /// <summary>The agent's instructions, for a model that can use tools; <see cref="ChatSkillSet.DefaultInstructions"/> by default.</summary>
         public string Instructions { get; set; } = ChatSkillSet.DefaultInstructions;
+
+        /// <summary>
+        /// The instructions for a model that can't use tools (<see cref="ChatModelOption.CanUseTools"/> off), which mustn't be
+        /// told about tools it doesn't have; <see cref="ChatSkillSet.PlainInstructions"/> by default.
+        /// </summary>
+        public string InstructionsWithoutTools { get; set; } = ChatSkillSet.PlainInstructions;
 
         /// <summary>The agent's instructions in a private chat; <see cref="ChatSkillSet.PrivateInstructions"/> by default.</summary>
         public string PrivateInstructions { get; set; } = ChatSkillSet.PrivateInstructions;

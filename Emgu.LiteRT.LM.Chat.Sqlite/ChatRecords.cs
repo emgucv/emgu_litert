@@ -74,6 +74,9 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         /// <summary>A reply's thinking, or null.</summary>
         public string Thinking { get; set; }
 
+        /// <summary>How long a reply thought, in seconds; null if it didn't, or for chats saved before this column (2026-10-26).</summary>
+        public double? ThinkingSeconds { get; set; }
+
         /// <summary>The words of a voice message the model was given as audio (shown, not given to the model); or null.</summary>
         public string Transcript { get; set; }
 

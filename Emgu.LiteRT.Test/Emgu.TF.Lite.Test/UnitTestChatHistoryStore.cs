@@ -61,6 +61,7 @@ namespace Emgu.TF.Lite.Test
                 Transcript = "What is in this picture"
             };
             ChatMessageItem reply = Reply("A fox in the snow.", "It looks like a fox.", "Looked in report.pdf", "Searching Wikipedia for “fox”");
+            reply.ThinkingDuration = TimeSpan.FromSeconds(4.5);
 
             int chatId = await _store.CreateChatAsync(ChatHistoryStore.TitleOf(message), "Gemma4E2B");
             ChatSavedExchange saved = await _store.SaveExchangeAsync(chatId, message, reply);
@@ -84,6 +85,8 @@ namespace Emgu.TF.Lite.Test
             Assert.That(user.Attachments[1].Data.ToArray(), Is.EqualTo(Wav));
             Assert.That(answer.Text, Is.EqualTo("A fox in the snow."));
             Assert.That(answer.Thinking, Is.EqualTo("It looks like a fox."));
+            // How long it thought is kept too (since 2026-10-26: "Thought for 5 s" after a reopen, not "Thoughts").
+            Assert.That(answer.ThinkingDuration, Is.EqualTo(TimeSpan.FromSeconds(4.5)));
             Assert.That(answer.Steps.Select(s => s.Description), Is.EqualTo(new[] { "Looked in report.pdf", "Searching Wikipedia for “fox”" }));
             Assert.That(history.Summary, Is.Null);
             Assert.That(history.ContextStart, Is.EqualTo(0));

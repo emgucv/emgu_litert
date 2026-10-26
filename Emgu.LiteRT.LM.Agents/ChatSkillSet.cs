@@ -48,6 +48,9 @@ namespace Emgu.LiteRT.LM.Agents
             "something lasting about themselves, save it with the remember tool. Base your answer on what the tools " +
             "return, mention where it came from, and keep it short.";
 
+        /// <summary>Instructions for an assistant without tools (a model that can't call them), which mustn't be told about tools.</summary>
+        public const string PlainInstructions = "You are a helpful assistant running on the user's device. Keep your answers short.";
+
         /// <summary>Instructions for a private chat: nothing is saved, nothing saved is read.</summary>
         public const string PrivateInstructions = "This is a private chat. Do not claim to remember or save anything for future chats. " +
             "You cannot access saved memories or past conversations. Use only this conversation and the available tools.";

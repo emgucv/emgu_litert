@@ -42,7 +42,10 @@ namespace Emgu.LiteRT.LM.Maui
                 ModelCanUseTools = _model?.CanUseTools == true,
                 ModelAcceptsImages = _model?.AcceptsImages == true
             };
-            _lastComposition = await _skills.ComposeAsync(context, IsPrivate ? _options.PrivateInstructions : _options.Instructions);
+            // A model without tools isn't told about them; a private chat is told nothing is saved.
+            string instructions = !context.ModelCanUseTools ? _options.InstructionsWithoutTools
+                : IsPrivate ? _options.PrivateInstructions : _options.Instructions;
+            _lastComposition = await _skills.ComposeAsync(context, instructions);
             var options = new ChatOptions { Instructions = _lastComposition.Instructions };
             if (_lastComposition.Tools.Count > 0)
             {

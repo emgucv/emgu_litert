@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Agents.Skills;
@@ -137,6 +138,64 @@ public class UnitTestChatSkills
         Assert.That(skills.Skills, Is.EqualTo(new ChatSkill[] { skills.Find("b"), a2 }));
         skills.SetPrivate(true);
         Assert.That(a2.LastPrivate, Is.True);
+    }
+
+    // A model that calls the tools it is told to, one per round, then answers.
+    private sealed class ScriptedChatClient : IChatClient
+    {
+        public readonly Queue<string> Calls = new Queue<string>();
+        public readonly List<List<string>> OfferedTools = new List<List<string>>();
+
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null, CancellationToken cancellationToken = default)
+        {
+            OfferedTools.Add(options?.Tools?.Select(t => t.Name).ToList() ?? new List<string>());
+            if (Calls.Count > 0)
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                    new List<AIContent> { new FunctionCallContent("call" + OfferedTools.Count, Calls.Dequeue(), new Dictionary<string, object>()) })));
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "done")));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            foreach (ChatResponseUpdate update in (await GetResponseAsync(messages, options, cancellationToken)).ToChatResponseUpdates())
+                yield return update;
+        }
+
+        public object GetService(Type serviceType, object serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    private sealed class RerunSkill : ChatSkill
+    {
+        public override string Name => "clock";
+        public override IEnumerable<ToolGroup> ToolGroups()
+        {
+            yield return new ToolGroup("clock", "set a timer", new[] { "timer" },
+                () => new[] { AIFunctionFactory.Create(() => "set", "set_timer", "Sets a timer.") }, rerunAfterStub: true);
+        }
+    }
+
+    [Test]
+    public async Task AStubThatEndsTheRequestAsksForARerun()
+    {
+        // As ChatPage runs it: the set's router adds a stub's group to the request being answered, and a group with
+        // RerunAfterStub ends the request instead, so the message is sent again (ChatView.RerunRequested) with its tools.
+        var skills = new ChatSkillSet(() => FunctionInvokingChatClient.CurrentContext?.Options, () => FunctionInvokingChatClient.CurrentContext.Terminate = true);
+        skills.Add(new RerunSkill());
+        var model = new ScriptedChatClient();
+        model.Calls.Enqueue("use_clock");
+        using var client = new FunctionInvokingChatClient(model);
+        // Words the keywords don't know: only the stub can get the group.
+        ChatSkillComposition composed = await skills.ComposeAsync(new ChatMessageContext { Prompt = "Ping me in ten minutes" }, null);
+        Assert.That(Names(composed), Is.EqualTo(new[] { "use_clock" }));
+        await client.GetResponseAsync("Ping me in ten minutes", new ChatOptions { Tools = composed.Tools, Instructions = composed.Instructions });
+        Assert.That(model.OfferedTools.Count, Is.EqualTo(1), "the request ended after the stub");
+        Assert.That(skills.TakeRerun(), Is.True);
+        Assert.That(skills.TakeRerun(), Is.False);
+        composed = await skills.ComposeAsync(new ChatMessageContext { Prompt = "Ping me in ten minutes" }, null);
+        Assert.That(Names(composed), Is.EqualTo(new[] { "set_timer" }));
     }
 
     [Test]
