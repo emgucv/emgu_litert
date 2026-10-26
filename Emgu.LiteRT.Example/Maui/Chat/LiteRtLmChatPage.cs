@@ -110,7 +110,7 @@ public partial class LiteRtLmChatPage : ContentPage
     private Border _attachButton;
     private HorizontalStackLayout _attachmentStrip;
     private ScrollView _attachmentScroll;
-    private readonly BottomSheet _sheet;
+    private readonly MenuSheet _sheet;
     private readonly List<PendingAttachment> _pending = new List<PendingAttachment>();
     private Border _talkButton;
     private Microsoft.Maui.Controls.Shapes.Path _micIcon;
@@ -320,7 +320,7 @@ public partial class LiteRtLmChatPage : ContentPage
         _pageGrid.Add(_sidePanel, 0, 0);
         _pageGrid.Add(_mainColumn, 1, 0);
 
-        _sheet = new BottomSheet();
+        _sheet = new MenuSheet();
         Content = new Grid { Children = { _pageGrid, BuildVoiceView(), _sheet } };
 
         SizeChanged += (s, e) => UpdateLayout();

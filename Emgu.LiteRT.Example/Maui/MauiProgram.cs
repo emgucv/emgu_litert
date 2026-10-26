@@ -1,5 +1,5 @@
-﻿//----------------------------------------------------------------------------
-//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.       
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
 
@@ -15,6 +15,8 @@ public static class MauiProgram
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
+			// The chat controls' handlers: ChatPromptEditor's on Mac Catalyst (Enter sends), InlineVideoView's on Android.
+			.UseLiteRtChat()
 			.ConfigureFonts(fonts =>
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -29,12 +31,7 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 #endif
 
-#if MACCATALYST
-        builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<ChatPromptEditor, ChatPromptEditorHandler>());
-#endif
-
 #if ANDROID
-        builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<InlineVideoView, InlineVideoHandler>());
         // Latin-script languages for the reading voice and the translations: ML Kit (Emgu.LiteRT.LM.Maui uses Apple's recognizer on iOS and Mac Catalyst).
         TextLanguage.IdentifyLatin = MlKitLanguage.IdentifyAsync;
 #endif

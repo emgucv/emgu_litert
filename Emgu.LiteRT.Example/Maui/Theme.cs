@@ -318,71 +318,14 @@ internal sealed class LoadingOverlay : Grid
     public void SetMessage(string message) => _label.Text = message;
 }
 
-/// <summary>
-/// A pill that switches an option on or off (e.g. "Think" above a chat's message box): filled with the accent
-/// colour when on.
-/// </summary>
-internal sealed class ToggleChip : Border
-{
-    private readonly Label _label;
-    private bool _isToggled;
-
-    public ToggleChip(string text)
-    {
-        _label = new Label { Text = text, FontFamily = Theme.TitleFont, FontSize = 13, VerticalOptions = LayoutOptions.Center };
-        StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(15) };
-        StrokeThickness = 1;
-        Padding = new Thickness(12, 6);
-        HeightRequest = 32;
-        Content = _label;
-        this.OnTap(() =>
-        {
-            if (IsEnabled)
-                IsToggled = !IsToggled;
-        });
-        Update();
-    }
-
-    public event EventHandler<ToggledEventArgs> Toggled;
-
-    public string Text
-    {
-        get => _label.Text;
-        set
-        {
-            _label.Text = value;
-            Update();
-        }
-    }
-
-    public bool IsToggled
-    {
-        get => _isToggled;
-        set
-        {
-            if (_isToggled == value)
-                return;
-            _isToggled = value;
-            Update();
-            Toggled?.Invoke(this, new ToggledEventArgs(value));
-        }
-    }
-
-    private void Update()
-    {
-        BackgroundColor = _isToggled ? Theme.Accent : Theme.CardBackground;
-        Stroke = _isToggled ? Theme.Accent : Theme.RowBorder;
-        _label.TextColor = _isToggled ? Colors.White : Theme.PrimaryText;
-        SemanticProperties.SetDescription(this, _label.Text + (_isToggled ? ": on" : ": off"));
-    }
-}
+// The toggle chips ("Think" above the chat's message box) are Emgu.LiteRT.LM.Maui's ToggleChip since 2026-10-26.
 
 /// <summary>
-/// In-page bottom sheet with a dimmed scrim, listing tappable rows or showing a view. The title and the closing
-/// button stay put; what's between them scrolls when it is taller than the screen allows (e.g. the chat's settings
-/// on a phone, whose end - the context window - was cut off before).
+/// In-page bottom sheet with a dimmed scrim, listing tappable rows (with section headings and glyphs) or showing a
+/// view. The title and the closing button stay put; what's between them scrolls when it is taller than the screen
+/// allows. (Emgu.LiteRT.LM.Maui's BottomSheet shows a view only; this one keeps the demo's row menus.)
 /// </summary>
-internal sealed class BottomSheet : Grid
+internal sealed class MenuSheet : Grid
 {
     // Room the sheet leaves above itself, and what its title and closing button take.
     private const double TopGap = 40;
@@ -396,7 +339,7 @@ internal sealed class BottomSheet : Grid
     private TaskCompletionSource<string> _tcs;
     private bool _animating;
 
-    public BottomSheet()
+    public MenuSheet()
     {
         IsVisible = false;
         _card = new Border

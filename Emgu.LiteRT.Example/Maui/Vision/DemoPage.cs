@@ -114,7 +114,7 @@ public abstract class DemoPage : ContentPage
     private Button _liveButton;
     private Action<string> _progressTarget;
     private readonly LoadingOverlay _loading;
-    private readonly BottomSheet _sheet;
+    private readonly MenuSheet _sheet;
 
     private readonly VerticalStackLayout _content;
     private Mat _currentImage;
@@ -201,7 +201,7 @@ public abstract class DemoPage : ContentPage
         content.Children.Add(Theme.AboutCard(about));
 
         _loading = new LoadingOverlay();
-        _sheet = new BottomSheet();
+        _sheet = new MenuSheet();
 
         // Cap the column width and centre it on wide windows.
         content.HorizontalOptions = LayoutOptions.Center;
