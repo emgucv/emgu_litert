@@ -2,48 +2,94 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Maui;
+using Microsoft.Extensions.AI;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace Maui.Demo.Lite;
 
 // Photo search: with Settings > "Search my photos" on (off by default), the most recent photos are indexed in the
 // background with the document search's embedding model (PhotoIndex), and Gemma 4's find_photos tool
 // (Emgu.LiteRT.LM.Agents' AgentTools.FindPhotos) shows the matches as thumbnails above the reply - the model
-// doesn't see them. The tool is offered with the setting off too, and then tells the model where to turn it on. Everything stays on the device; turning it off deletes the index.
-internal sealed class PhotoSearchFeature
+// doesn't see them. The tool is offered with the setting off too, and then tells the model where to turn it on. Everything
+// stays on the device; turning it off deletes the index. A tool group of the router; the indexing runs when the page shows
+// and when the app comes back (photos taken meanwhile), while no model is reloading.
+internal sealed class PhotoSearchFeature : DemoFeature
 {
-    private readonly IChatHost _host;
-    private string _photoPauseReason;
+    public const string Instructions = ChatPlannerInstructions.Photos;
 
-    public PhotoSearchFeature(IChatHost host) { _host = host; }
     // How many of the most recent photos are indexed: each takes about 1 s on a Mac's CPU and several seconds on a
     // phone's, in the background.
     private static int MaxIndexedPhotos => DeviceInfo.Idiom == DeviceIdiom.Desktop ? 1000 : 200;
-    public const string Instructions = ChatPlannerInstructions.Photos;
 
+    private string _photoPauseReason;
     private PhotoIndex _photoIndex;
     private Switch _photoSwitch;
     private Label _photoStatus;
     private CancellationTokenSource _photoIndexing;
     private Task _photoIndexTask;
+    private bool _started;
+
+    public override string Name => "photo_search";
+
+    public override string Title => "Search my photos";
+
+    public override bool PersistEnabled => false;
+
+    private ModelSettingsFeature Search => Host.Services.Get<ModelSettingsFeature>();
+
+    private SearchEmbedder Embedder => Search.Embedder;
 
     public bool On => _photoSwitch != null && _photoSwitch.IsToggled;
-    private bool PhotoSearchOn => On;
 
-    public View BuildSection(View searchModelNotice, View chargingSetting)
+    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    public override void OnAttached(IChatPageHost host)
     {
-        _photoIndex = new PhotoIndex(_host.Store);
+        base.OnAttached(host);
+        _photoIndex = new PhotoIndex(Demo.Store);
         _photoIndex.Changed += () => MainThread.BeginInvokeOnMainThread(UpdateStatus);
-        bool on = false;
-        on = AppSettings.Chat.PhotoSearch;
-        _photoSwitch = new Switch { IsToggled = on && _host.SearchModelTakesImages, IsEnabled = _host.SearchModelTakesImages, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
+    }
+
+    public override void OnDetached()
+    {
+        CancelIndexing();
+        base.OnDetached();
+    }
+
+    public override IEnumerable<ToolGroup> ToolGroups() => new[]
+    {
+        new ToolGroup(ChatToolGroups.Photos, ChatToolGroups.PhotosSummary, ChatToolGroups.PhotosKeywords,
+            () => new AITool[] { AgentTools.FindPhotos(FindAsync) },
+            () => Instructions)
+    };
+
+    // The page shown: photos added since the app last ran are indexed; shown again or the app back: those taken meanwhile.
+    public override void OnAppearing()
+    {
+        base.OnAppearing();
+        if (_started)
+            RefreshIndex();
+        else
+        {
+            _started = true;
+            StartIndexing();
+        }
+    }
+
+    protected override void OnAppResumed()
+    {
+        if (PageVisible)
+            RefreshIndex();
+    }
+
+    public override View BuildSettingsSection()
+    {
+        bool on = AppSettings.Chat.PhotoSearch;
+        bool images = Search.SupportsImages;
+        _photoSwitch = new Switch { IsToggled = on && images, IsEnabled = images && !Search.SearchDownloadRequired, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
         _photoSwitch.Toggled += OnPhotoSearchToggled;
         var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
         row.Add(new Label
@@ -56,6 +102,8 @@ internal sealed class PhotoSearchFeature
         }, 0, 0);
         row.Add(_photoSwitch, 1, 0);
         _photoStatus = new Label { FontFamily = Theme.TitleFont, FontSize = 13, TextColor = Theme.Accent, IsVisible = false };
+        View searchModelNotice = Host.Services.Get<StorageFeature>()?.CreateSearchModelNotice() ?? new ContentView();
+        UpdateStatus();
         return new VerticalStackLayout
         {
             Spacing = 6,
@@ -72,7 +120,7 @@ internal sealed class PhotoSearchFeature
                     TextColor = Theme.SecondaryText
                 },
                 searchModelNotice,
-                chargingSetting,
+                Demo.Workload.BuildPhotoChargingSetting(),
                 new Label { Text = "On phones and tablets, indexing pauses at 20% battery or lower without power. It also pauses if the device reports excessive heat, and resumes automatically when conditions improve.", FontSize = 12, TextColor = Theme.SecondaryText },
                 _photoStatus
             }
@@ -117,12 +165,13 @@ internal sealed class PhotoSearchFeature
     {
         _photoStatus.Text = message;
         _photoStatus.IsVisible = true;
-        _host.SetStatus(message);
+        Host.SetStatus(message);
     }
 
     // When an indexing pass last started; returning to the page or the app starts another at most this often.
     private DateTime _photoIndexStarted = DateTime.MinValue;
     private static readonly TimeSpan PhotoReindexInterval = TimeSpan.FromMinutes(1);
+
     // The page is shown again, or the app came back to the foreground: photos taken, edited or deleted in the meantime
     // are indexed or forgotten (a pass over unchanged photos only reads the library's list).
     public void RefreshIndex()
@@ -134,7 +183,7 @@ internal sealed class PhotoSearchFeature
     // Index the new photos in the background (incremental: only photos not yet indexed, or edited since).
     public void StartIndexing()
     {
-        if (_host.IsPrivateChat || _host.ReloadingModels || !_host.SearchModelTakesImages || !PhotoSearchOn || (_photoIndexTask != null && !_photoIndexTask.IsCompleted))
+        if (Host == null || Host.IsPrivate || Host.IsReloadingModel || !Search.SupportsImages || !On || (_photoIndexTask != null && !_photoIndexTask.IsCompleted))
             return;
         _photoIndexStarted = DateTime.UtcNow;
         _photoIndexing = new CancellationTokenSource();
@@ -148,16 +197,17 @@ internal sealed class PhotoSearchFeature
         {
             Progress<string> stage = new Progress<string>(text =>
             {
+                if (_photoStatus == null) return;
                 _photoStatus.IsVisible = true;
                 _photoStatus.Text = text;
             });
             await WaitForPhotoWorkAsync(cancel);
-            var embedder = await _host.Embedder.EnsureAsync(stage, cancel);
+            var embedder = await Embedder.EnsureAsync(stage, cancel);
             // Waits while the chat answers, so indexing doesn't slow the reply down.
-            await _photoIndex.IndexAsync(embedder, (image, token) => _host.RunIndexEmbeddingAsync(
+            await _photoIndex.IndexAsync(embedder, (image, token) => Demo.Workload.RunIndexEmbeddingAsync(
                 () => embedder.EmbedImage(image, visionTokensPerImage: PhotoIndex.VisionTokens),
                 reason => MainThread.BeginInvokeOnMainThread(() => { _photoPauseReason = reason; UpdateStatus(); }),
-                token, photos: true), MaxIndexedPhotos, () => _host.IsReplying, cancel, WaitForPhotoWorkAsync);
+                token, photos: true), MaxIndexedPhotos, () => Host.IsReplying, cancel, WaitForPhotoWorkAsync);
             UiStallWatchdog.Mark(string.Format("Photos indexed: {0}", _photoIndex.Count));
         }
         catch (OperationCanceledException)
@@ -166,20 +216,23 @@ internal sealed class PhotoSearchFeature
         catch (Exception ex)
         {
             UiStallWatchdog.Mark("Photo indexing failed: " + ex.Message);
-            _photoStatus.IsVisible = true;
-            _photoStatus.Text = "Indexing stopped: " + ex.Message;
+            if (_photoStatus != null)
+            {
+                _photoStatus.IsVisible = true;
+                _photoStatus.Text = "Indexing stopped: " + ex.Message;
+            }
         }
         UpdateStatus();
     }
 
-    private Task WaitForPhotoWorkAsync(CancellationToken cancel) => _host.WaitForWorkAsync(true, reason =>
+    private Task WaitForPhotoWorkAsync(CancellationToken cancel) => Demo.Workload.WaitForWorkAsync(true, reason =>
         MainThread.BeginInvokeOnMainThread(() => { _photoPauseReason = reason; UpdateStatus(); }), cancel);
 
     public void UpdateStatus()
     {
         if (_photoStatus == null)
             return;
-        if (!PhotoSearchOn)
+        if (!On)
         {
             _photoStatus.IsVisible = false;
             return;
@@ -198,17 +251,17 @@ internal sealed class PhotoSearchFeature
     // The find_photos tool: search the index, show the matches above the reply, and tell the model what was found.
     public async Task<string> FindAsync(string request, CancellationToken cancel)
     {
-        if (!PhotoSearchOn)
+        if (!On)
             return string.Format(CultureInfo.InvariantCulture,
                 "Photo search is turned off, so the user's photos can't be searched. Tell the user they can turn on \"Search my photos\" in {0}: their recent photos are then indexed on this device (the first time takes a while), and nothing leaves it.",
-                _host.SettingsLocation);
-        if (_host.Embedder.Model == null || _photoIndex.Count == 0)
+                Host.SettingsLocation);
+        if (Embedder.Model == null || _photoIndex.Count == 0)
             return _photoIndex.IsIndexing
                 ? "The photos are still being indexed - try again in a few minutes."
                 : "No photos are indexed yet.";
         // What, where, when, kind and camera, from the request; places and cameras as the indexed photos name them.
         PhotoQuery query = PhotoRequest.Parse(request, DateTime.Now, _photoIndex.KnownPlaces(), _photoIndex.KnownCameras());
-        (List<(IndexedPhoto Photo, float Score)> found, int matching) = await _photoIndex.SearchAsync(_host.Embedder.Model, _host.Embedder.Gate, query, cancel);
+        (List<(IndexedPhoto Photo, float Score)> found, int matching) = await _photoIndex.SearchAsync(Embedder.Model, Embedder.Gate, query, cancel);
         // Photos deleted since the last indexing pass: forgotten, and the search run again, since the scores of the
         // rest count relative to the best one.
         for (int attempt = 0; attempt < 3 && found.Count > 0; attempt++)
@@ -221,7 +274,7 @@ internal sealed class PhotoSearchFeature
                 break;
             UiStallWatchdog.Mark(string.Format("find_photos: {0} found photos no longer in the library", gone.Count));
             await _photoIndex.RemoveAsync(gone);
-            (found, matching) = await _photoIndex.SearchAsync(_host.Embedder.Model, _host.Embedder.Gate, query, cancel);
+            (found, matching) = await _photoIndex.SearchAsync(Embedder.Model, Embedder.Gate, query, cancel);
         }
         UiStallWatchdog.Mark(string.Format("find_photos {0}: {1} found of {2} matching{3}", query, found.Count, matching,
             found.Count > 0 && query.Description != null ? string.Format(CultureInfo.InvariantCulture, ", best {0:F3}", found[0].Score) : ""));
@@ -233,7 +286,7 @@ internal sealed class PhotoSearchFeature
             return string.Format(CultureInfo.InvariantCulture, "No photos {0} were found among the {1} most recent photos.{2}",
                 query, _photoIndex.Count, why);
         }
-        await MainThread.InvokeOnMainThreadAsync(() => _host.AddCardToReply(CreatePhotoStrip(found.Select(f => f.Photo).ToList())));
+        await MainThread.InvokeOnMainThreadAsync(() => Host.AddCardToReply(CreatePhotoStrip(found.Select(f => f.Photo).ToList())));
         // When and where, for the model to say (it can't see the photos).
         string details = string.Join("; ", found.Take(5).Select(f => PhotoCaption(f.Photo, true)));
         return string.Format(CultureInfo.InvariantCulture,
@@ -317,9 +370,9 @@ internal sealed class PhotoSearchFeature
         {
             Source = ImageSource.FromStream(() => new System.IO.MemoryStream(jpeg)),
             Aspect = Aspect.AspectFit,
-            HeightRequest = Math.Max(240, _host.PageSize.Height * 0.6)
+            HeightRequest = Math.Max(240, Host.PageSize.Height * 0.6)
         };
-        await _host.ShowSheetAsync("Photo", image, "Close");
+        await Host.ShowSheetAsync("Photo", image, "Close");
     }
 
     // Stops indexing without waiting; waiting for it to stop.
@@ -336,6 +389,7 @@ internal sealed class PhotoSearchFeature
     // Settings > Storage deleted the index or the search model: the switch goes off without clearing the index again.
     public void TurnOff()
     {
+        if (_photoSwitch == null) { AppSettings.Chat.PhotoSearch = false; return; }
         _photoSwitch.Toggled -= OnPhotoSearchToggled;
         _photoSwitch.IsToggled = false;
         _photoSwitch.Toggled += OnPhotoSearchToggled;
@@ -343,7 +397,10 @@ internal sealed class PhotoSearchFeature
     }
 
     // Turns photo search off as the user would, deleting the index.
-    public void SwitchOff() => _photoSwitch.IsToggled = false;
+    public void SwitchOff()
+    {
+        if (_photoSwitch != null) _photoSwitch.IsToggled = false;
+    }
 
     public void SetSwitchEnabled(bool enabled)
     {

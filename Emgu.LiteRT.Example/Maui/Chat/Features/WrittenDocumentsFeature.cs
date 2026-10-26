@@ -2,14 +2,11 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Maui;
+using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
 
 namespace Maui.Demo.Lite;
@@ -17,17 +14,32 @@ namespace Maui.Demo.Lite;
 // Documents the agent writes (create_document, Emgu.LiteRT.LM.Agents' DocumentWriter: Word, PDF or Markdown from the
 // model's Markdown): a card above the reply with Open and Share, saved with the reply as an attachment of kind
 // "document" (its file name in the media type, "...; name=Packing list.docx"), shown again when the chat is reopened and,
-// like the generated pictures, never given back to the model.
-internal sealed class WrittenDocumentsFeature
+// like the generated pictures, never given back to the model. A tool group of the router, with the meeting notes' tools
+// (they write a document too).
+internal sealed class WrittenDocumentsFeature : DemoFeature
 {
     public const string Kind = "document";
-    private readonly IChatHost _host;
     private readonly List<GeneratedDocument> _sendDocuments = new List<GeneratedDocument>();
-
-    public WrittenDocumentsFeature(IChatHost host) { _host = host; }
 
     public const string Instructions = "When the user asks for a document or a file (Word, PDF, Markdown), write the whole " +
         "content into create_document's content in Markdown - not into your reply - then say in one short sentence that it is ready.";
+
+    public override string Name => "written_documents";
+
+    public override string Title => "Writing documents";
+
+    public override bool PersistEnabled => false;
+
+    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    private MeetingFeature Meetings => Host?.Services.Get<MeetingFeature>();
+
+    public override IEnumerable<ToolGroup> ToolGroups() => new[]
+    {
+        new ToolGroup(ChatToolGroups.WriteDocument, ChatToolGroups.WriteDocumentSummary, ChatToolGroups.WriteDocumentKeywords,
+            () => new AITool[] { AgentTools.CreateDocument(SaveAsync, () => Prompt) }.Concat(Meetings?.Tools(Host?.HandsFree == true) ?? Array.Empty<AITool>()),
+            () => JoinInstructions(Instructions, Meetings?.Tools(Host?.HandsFree == true).Any() == true ? MeetingFeature.Instructions : null))
+    };
 
     // create_document's save: kept for the reply being written, with a card above it.
     public Task<string> SaveAsync(GeneratedDocument document, CancellationToken cancellationToken)
@@ -36,7 +48,7 @@ internal sealed class WrittenDocumentsFeature
             _sendDocuments.Add(document);
         return MainThread.InvokeOnMainThreadAsync(() =>
         {
-            _host.AddCardToReply(CreateCard(document.FileName, document.MediaType, document.Format, document.Data));
+            Host.AddCardToReply(CreateCard(document.FileName, document.MediaType, document.Format, document.Data));
             UiStallWatchdog.Mark("create_document: " + document.FileName + ", " + document.Data.Length + " bytes");
             return AgentTools.DocumentCreatedResult(document);
         });
@@ -54,6 +66,8 @@ internal sealed class WrittenDocumentsFeature
         lock (_sendDocuments)
             _sendDocuments.Clear();
     }
+
+    public override void OnNewConversation() => Clear();
 
     // A document a saved reply wrote, for above it again when the chat is reopened: its name and type from the media type.
     public View SavedCard(string mediaType, byte[] data)

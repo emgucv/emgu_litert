@@ -48,7 +48,7 @@ internal sealed class StorageFeature : DemoFeature
     public override void OnPrivateModeChanged(bool isPrivate)
     {
         UpdateSearchStorageState();
-        if (!isPrivate && PageVisible) { Demo.PhotoSearch.StartIndexing(); Demo.PastChats.StartIndexing(); }
+        if (!isPrivate && PageVisible) { Host.Services.Get<PhotoSearchFeature>()?.StartIndexing(); Host.Services.Get<PastChatsFeature>()?.StartIndexing(); }
     }
 
     // A notice for a search feature's section: shown while the search model is deleted, with a button to download it again.
@@ -86,8 +86,8 @@ internal sealed class StorageFeature : DemoFeature
         bool blocked = SearchDownloadRequired;
         if (_restoreSearchButton != null) _restoreSearchButton.IsVisible = blocked;
         foreach (View notice in _searchNotices) notice.IsVisible = blocked;
-        PhotoSearchFeature photos = Demo.PhotoSearch;
-        PastChatsFeature chats = Demo.PastChats;
+        PhotoSearchFeature photos = Host.Services.Get<PhotoSearchFeature>();
+        PastChatsFeature chats = Host.Services.Get<PastChatsFeature>();
         if (blocked && photos.On) { photos.TurnOff(); photos.CancelIndexing(); }
         if (blocked && chats.On) { chats.TurnOff(); chats.CancelIndexing(); }
         photos.SetSwitchEnabled(!blocked && Search.SupportsImages);
@@ -133,8 +133,8 @@ internal sealed class StorageFeature : DemoFeature
     // Deletes the entry; the chat to reopen afterwards (its attachments were deleted), or null.
     private async Task<int?> DeleteStorageCoreAsync(StorageCatalog catalog, StorageEntry entry)
     {
-        PhotoSearchFeature photos = Demo.PhotoSearch;
-        PastChatsFeature chats = Demo.PastChats;
+        PhotoSearchFeature photos = Host.Services.Get<PhotoSearchFeature>();
+        PastChatsFeature chats = Host.Services.Get<PastChatsFeature>();
         DocumentsFeature documents = Documents;
         int? reopen = null;
         try
@@ -178,7 +178,7 @@ internal sealed class StorageFeature : DemoFeature
             if (entry.Kind == StorageKind.Document && documents?.DocumentId == entry.Key) documents.RemoveDocument();
             if (entry.Kind == StorageKind.ImageModel)
             {
-                await Demo.Images.TurnOffAndResetAsync();
+                await Host.Services.Get<ImageFeature>().TurnOffAndResetAsync();
             }
             await Task.Run(() => catalog.DeleteAsync(entry));
             if (entry.Kind == StorageKind.Attachments && Host.CurrentChatId.HasValue)
@@ -188,7 +188,7 @@ internal sealed class StorageFeature : DemoFeature
         {
             UpdateSearchStorageState();
             photos.UpdateStatus();
-            Demo.Images.UpdateStatus();
+            Host.Services.Get<ImageFeature>()?.UpdateStatus();
             Demo.RefreshModelList();
             if (PageVisible) { chats.StartIndexing(); photos.StartIndexing(); }
         }

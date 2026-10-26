@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Emgu.CV;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.Models;
+using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.Models.CV.Maui;
 using Emgu.LiteRT.LM.Maui;
@@ -14,18 +15,35 @@ namespace Maui.Demo.Lite;
 // agent's, but its own instance, on as many frames as it keeps up with) and the exercise's IExerciseCounter. A card above the reply shows
 // the count, the time and Done. It ends at the target, the time asked for, Done, a 10 s pause after the first repetition, 30 s without
 // any, or 5 minutes; the count is then logged toward a goal that names the exercise ("30 jumping jacks a day") and returned to the model,
-// which says how it went.
-internal sealed class ExerciseFeature : IDisposable
+// which says how it went. Its tool comes with the goals' group (GoalsFeature); the camera feature gives it each frame (QueueFrame),
+// draws the body in developer mode (DrawPose) and shows the count over the maximized preview (UpdateOverlay).
+internal sealed class ExerciseFeature : DemoFeature, IDisposable
 {
     public const string Instructions =
         "To count jumping jacks, squats or high knees, call count_exercise: it opens the camera itself and counts until the user is done. " +
         "The count is logged to a matching goal by the app.";
 
-    private readonly IChatHost _host;
     private PoseDetector _exercisePose;
     private ExerciseSession _exercise;
 
-    public ExerciseFeature(IChatHost host) { _host = host; }
+    public override string Name => "exercise";
+
+    public override string Title => "Counting exercises";
+
+    public override bool PersistEnabled => false;
+
+    private CameraFeature Camera => Host.Services.Get<CameraFeature>();
+
+    // The user's goals, or null when they aren't kept (memories off, or a private chat).
+    private IAgentGoalStore Goals => Host.Services.Get<GoalsFeature>()?.On == true ? Demo.Store.Goals : null;
+
+    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    public override void OnDetached()
+    {
+        Dispose();
+        base.OnDetached();
+    }
 
     private sealed class ExerciseSession
     {
@@ -59,8 +77,8 @@ internal sealed class ExerciseFeature : IDisposable
         set => AppSettings.Chat.CountAloud = value;
     }
 
-    public IEnumerable<Microsoft.Extensions.AI.AITool> Tools(bool voiceMode) =>
-        LiveCamera.Supported && !voiceMode ? new[] { AgentTools.CountExercise(CountExerciseAsync) } : Array.Empty<Microsoft.Extensions.AI.AITool>();
+    public IEnumerable<AITool> Tools(bool handsFree) =>
+        LiveCamera.Supported && !handsFree && Camera != null ? new[] { AgentTools.CountExercise(CountExerciseAsync) } : Array.Empty<AITool>();
 
     private async Task<string> CountExerciseAsync(string exercise, int target, int seconds, CancellationToken token)
     {
@@ -69,9 +87,10 @@ internal sealed class ExerciseFeature : IDisposable
             return "Only " + string.Join(", ", AgentTools.CountableExercises) + " can be counted. Tell the user.";
         if (_exercise != null)
             return "The user's " + _exercise.Name + " are already being counted.";
-        bool wasOpen = _host.Camera?.IsRunning == true;
-        string opened = await _host.OpenCameraAsync(token);
-        if (_host.Camera?.IsRunning != true)
+        CameraFeature camera = Camera;
+        bool wasOpen = camera.Camera?.IsRunning == true;
+        string opened = await camera.OpenCameraAsync(token);
+        if (camera.Camera?.IsRunning != true)
             return opened + " Nothing could be counted without the camera. Tell the user.";
 
         var session = new ExerciseSession(name) { Target = target };
@@ -93,7 +112,7 @@ internal sealed class ExerciseFeature : IDisposable
             aloud.Clicked += (_, _) => { CountAloud = !CountAloud; ShowAloud(); };
             ShowAloud();
             var title = "\U0001F3C3  " + char.ToUpperInvariant(name[0]) + name.Substring(1) + (target > 0 ? " · target " + target : "");
-            _host.AddCardToReply(new Border
+            Host.AddCardToReply(new Border
             {
                 BackgroundColor = Theme.CardBackground, Stroke = Theme.RowBorder, StrokeThickness = 1,
                 StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) },
@@ -105,7 +124,7 @@ internal sealed class ExerciseFeature : IDisposable
                         new HorizontalStackLayout { Spacing = 8, Children = { done, aloud } } }
                 }
             });
-            _host.SetStatus("Counting " + name + "…");
+            Host.SetStatus("Counting " + name + "…");
         });
 
         var watch = Stopwatch.StartNew();
@@ -118,7 +137,7 @@ internal sealed class ExerciseFeature : IDisposable
             if (!_exercisePose.Imported)
                 await _exercisePose.PrepareAsync(PoseModelFiles.Lite, false, Math.Min(2, CpuThreadSettings.Count),
                     message => MainThread.BeginInvokeOnMainThread(() => session.Status.Text = message), token);
-            session.Camera = _host.Camera;
+            session.Camera = camera.Camera;
             watch.Restart();
             _exercise = session;
             speaker = SpeakExerciseAsync(session, speaking.Token);
@@ -149,7 +168,8 @@ internal sealed class ExerciseFeature : IDisposable
         if (!token.IsCancellationRequested && CountAloud)
             await SayAsync("Done. " + Repetitions(result.Count, name) + ".", TimeSpan.FromSeconds(6));
         string logged = null;
-        try { logged = await AgentTools.LogExerciseAsync(_host.Goals, result, DateTime.Now); }
+        IAgentGoalStore goals = Goals;
+        try { logged = await AgentTools.LogExerciseAsync(goals, result, DateTime.Now); }
         catch (Exception ex) { logged = null; Debug.WriteLine("Logging the exercise failed: " + ex.Message); }
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
@@ -162,14 +182,14 @@ internal sealed class ExerciseFeature : IDisposable
             session.Status.Text = Repetitions(result.Count, name) + " in " + FormatExerciseTime(watch.Elapsed)
                 + (logged != null ? "\n✓ " + logged.Substring(logged.IndexOf("Now: ", StringComparison.Ordinal) + 5) : "");
             session.Status.TextColor = logged != null ? Theme.Success : Theme.SecondaryText;
-            _host.SetStatus("Generating...");
+            Host.SetStatus("Generating...");
         });
         if (!wasOpen)
-            await _host.CloseCameraIfUnusedAsync();
-        return AgentTools.ExerciseResultText(result, logged, _host.Goals != null);
+            await camera.CloseCameraIfUnusedAsync();
+        return AgentTools.ExerciseResultText(result, logged, goals != null);
     }
 
-    // Updates the card's time four times a second and decides when the session ends; the counting itself happens in QueueExerciseFrame.
+    // Updates the card's time four times a second and decides when the session ends; the counting itself happens in QueueFrame.
     private async Task<string> WatchExerciseAsync(ExerciseSession session, Stopwatch watch, int target, int seconds, CancellationToken token)
     {
         using var stop = token.Register(() => session.Ended.TrySetCanceled());
@@ -186,10 +206,11 @@ internal sealed class ExerciseFeature : IDisposable
             if (count > 0 && Stopwatch.GetElapsedTime(last).TotalSeconds >= 10) return "the user stopped (none for 10 s)";
             if (count == 0 && elapsed.TotalSeconds >= 30) return session.PersonSeen ? "none were seen in 30 s" : "nobody was seen in full view in 30 s";
             if (elapsed.TotalMinutes >= 5) return "the 5-minute limit was reached";
-            if (_host.Camera != session.Camera || _host.Camera?.IsRunning != true) return "the camera was closed";
+            LiveCamera live = Camera?.Camera;
+            if (live != session.Camera || live?.IsRunning != true) return "the camera was closed";
             string time = FormatExerciseTime(elapsed) + (seconds > 0 ? " of " + FormatExerciseTime(TimeSpan.FromSeconds(seconds)) : "");
             string hint = !session.PersonSeen ? "Stand back so the camera sees you from head to toe" : count == 0 ? "Go!" : "Keep going";
-            if (_host.DeveloperMode)
+            if (Host.DeveloperMode)
                 hint += "\nPose: " + (Volatile.Read(ref session.Landmarks) == null ? "nobody" : session.Counter.Phase ?? "joints not in view");
             session.Time = time;
             await MainThread.InvokeOnMainThreadAsync(() =>
@@ -227,10 +248,11 @@ internal sealed class ExerciseFeature : IDisposable
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
         cts.CancelAfter(limit);
-        _host.BeginSoundMute();
+        CameraFeature camera = Camera;
+        camera?.BeginSoundMute();
         try { await MainThread.InvokeOnMainThreadAsync(() => TextToSpeech.Default.SpeakAsync(text, cancelToken: cts.Token)); }
         catch (Exception) when (!token.IsCancellationRequested) { }
-        finally { _host.EndSoundMute(); }
+        finally { camera?.EndSoundMute(); }
     }
 
     // The count over the maximized camera preview, where the card in the conversation is hidden; a finished count stays for 5 s.
@@ -250,13 +272,15 @@ internal sealed class ExerciseFeature : IDisposable
             });
     }
 
-    // Called by the page too, when the preview is maximized or restored.
+    // Called by the camera feature too, when the preview is maximized or restored.
     public void UpdateOverlay()
     {
+        CameraFeature camera = Camera;
+        if (camera == null) return;
         ExerciseSession session = _overlaySession;
-        bool show = _host.CameraMaximized && session != null && _host.Camera != null && session.Camera == _host.Camera;
-        if (!show) { _host.SetCameraOverlay(null, null); return; }
-        _host.SetCameraOverlay(session.Counter.Count.ToString(), (session.Finished ? "✓ " : "") + (session.Target > 0 ? "of " + session.Target + " " : "")
+        bool show = camera.CameraMaximized && session != null && camera.Camera != null && session.Camera == camera.Camera;
+        if (!show) { camera.SetCameraOverlay(null, null); return; }
+        camera.SetCameraOverlay(session.Counter.Count.ToString(), (session.Finished ? "✓ " : "") + (session.Target > 0 ? "of " + session.Target + " " : "")
             + (session.Counter.Count == 1 && session.Target <= 0 ? Singular(session.Name) : session.Name) + " · " + session.Time);
     }
 
@@ -269,7 +293,7 @@ internal sealed class ExerciseFeature : IDisposable
     public void DrawPose(LiveCamera camera, Mat preview)
     {
         ExerciseSession session = _exercise;
-        if (!_host.DeveloperMode || session == null || session.Camera != camera) return;
+        if (session == null || Host?.DeveloperMode != true || session.Camera != camera) return;
         float[][] landmarks = Volatile.Read(ref session.Landmarks);
         if (landmarks != null) PoseDrawing.Draw(preview, landmarks);
     }
@@ -313,6 +337,7 @@ internal sealed class ExerciseFeature : IDisposable
         });
     }
 
+    // The chat is closing: the count ends, the pose model goes.
     public void Dispose()
     {
         _exercise?.Ended.TrySetResult("the chat was closed");

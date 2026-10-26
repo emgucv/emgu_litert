@@ -2,15 +2,11 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Emgu.LiteRT.LM.Models;
-using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Models;
 using Microsoft.Extensions.AI;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace Maui.Demo.Lite;
 
@@ -20,12 +16,48 @@ namespace Maui.Demo.Lite;
 // fill the small window - with its tool calls as step lines and its result in the card,
 // and last the final answer is written from the results into the reply. Tools that change something outside the app still ask
 // with their own Confirm / Cancel cards. The saved chat holds the request and the final answer (the plan card isn't saved);
-// the model is given the conversation again with the next message.
-internal sealed class TaskFeature
+// the model is given the conversation again with the next message. The chip is this feature's; the page asks TakePlan()
+// when it sends and runs the message through CreateClient's client.
+internal sealed class TaskFeature : DemoFeature
 {
-    private readonly IChatHost _host;
+    private bool _planNext;
 
-    public TaskFeature(IChatHost host) { _host = host; }
+    public override string Name => "plan";
+
+    public override string Title => "Plan";
+
+    public override bool PersistEnabled => false;
+
+    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    public override ChatChip BuildComposerChip() =>
+        new ChatChip("\U0001F4CB Plan", () => _planNext, on => _planNext = on)
+        {
+            IsVisible = () => Host?.Model?.CanUseTools == true && Host.HandsFree != true
+        };
+
+    // Whether the message being sent is to be planned; the chip is off again afterwards.
+    public bool TakePlan()
+    {
+        if (!_planNext)
+            return false;
+        _planNext = false;
+        Host.RefreshChips();
+        return true;
+    }
+
+    // The tools the plan may use, by name, for the planner: the core tools and the skills' (their groups' names).
+    private string PlannerToolSummary
+    {
+        get
+        {
+            var tools = new List<string> { "date and time", "calculator", "unit and currency conversion", "weather", "Wikipedia" };
+            string skills = Host.Skills.ToolSummary;
+            if (!string.IsNullOrEmpty(skills))
+                tools.Add(skills);
+            return string.Join(", ", tools);
+        }
+    }
 
     // The chat client of a message the Plan chip is on for.
     public IChatClient CreateClient(string request, IList<DataContent> attachments) => new TaskModeClient(this, request, attachments);
@@ -44,17 +76,17 @@ internal sealed class TaskFeature
     private sealed class TaskModeClient : IChatClient
     {
         private readonly TaskFeature _feature;
-        private readonly IChatHost _host;
         private readonly string _request;
         private readonly IList<DataContent> _attachments;
 
         public TaskModeClient(TaskFeature feature, string request, IList<DataContent> attachments)
         {
             _feature = feature;
-            _host = feature._host;
             _request = request;
             _attachments = attachments;
         }
+
+        private IChatPageHost Host => _feature.Host;
 
         public async Task<ChatResponse> GetResponseAsync(IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, ChatOptions options = null,
             CancellationToken cancellationToken = default)
@@ -68,10 +100,10 @@ internal sealed class TaskFeature
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages,
             ChatOptions options = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken token = default)
         {
-            IChatClient client = _host.ChatClient;
-            _host.SetStatus("Planning...");
+            IChatClient client = Host.ChatClient;
+            Host.SetStatus("Planning...");
             UiStallWatchdog.Mark("Task mode: planning");
-            List<string> steps = TaskPlan.Parse(await _host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _host.ToolSummary), 400));
+            List<string> steps = TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary), 400));
             bool run = false;
             TaskPlan plan = null;
             TaskCard card = null;
@@ -84,11 +116,11 @@ internal sealed class TaskFeature
                 card = await MainThread.InvokeOnMainThreadAsync(() =>
                 {
                     TaskCard created = _feature.CreateTaskCard(plan, decision);
-                    _host.AddCardToReply(created.View);
+                    Host.AddCardToReply(created.View);
                     return created;
                 });
                 _feature._taskCard = card;
-                _host.SetStatus("Review the plan, then run it.");
+                Host.SetStatus("Review the plan, then run it.");
                 using (token.Register(() => decision.TrySetCanceled(token)))
                     run = await decision.Task;
                 _feature._taskDecision = null;
@@ -100,7 +132,7 @@ internal sealed class TaskFeature
             if (!run)
             {
                 // Not a task to break up: answered as usual.
-                _host.SetStatus("Generating...");
+                Host.SetStatus("Generating...");
                 await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(messages, options, token))
                     yield return update;
                 yield break;
@@ -116,7 +148,7 @@ internal sealed class TaskFeature
                     continue;
                 step.State = TaskPlan.State.Running;
                 await MainThread.InvokeOnMainThreadAsync(card.Refresh);
-                _host.SetStatus(string.Format("Step {0} of {1}: {2}", i + 1, plan.Steps.Count, step.Text));
+                Host.SetStatus(string.Format("Step {0} of {1}: {2}", i + 1, plan.Steps.Count, step.Text));
                 UiStallWatchdog.Mark("Task mode: step " + (i + 1));
                 // A request of its own: the task, the plan and the results so far are in the message.
                 var contents = new List<AIContent>();
@@ -125,7 +157,6 @@ internal sealed class TaskFeature
                 contents.Add(new TextContent(plan.StepPrompt(_request, i)));
                 var stepMessages = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, contents) };
                 var answer = new System.Text.StringBuilder();
-                var tools = new List<ChatResponseUpdate>();
                 IAsyncEnumerator<ChatResponseUpdate> stream = client.GetStreamingResponseAsync(stepMessages, options, stop.Token).GetAsyncEnumerator(stop.Token);
                 try
                 {
@@ -179,7 +210,7 @@ internal sealed class TaskFeature
             }
             await MainThread.InvokeOnMainThreadAsync(() => card.Close("Done"));
             // The final answer, from the results, in the reply.
-            _host.SetStatus("Writing the answer...");
+            Host.SetStatus("Writing the answer...");
             var final = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, plan.FinalPrompt(_request)) };
             await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(final, options, token))
                 yield return update;

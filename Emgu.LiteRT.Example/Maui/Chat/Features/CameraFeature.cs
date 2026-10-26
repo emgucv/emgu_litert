@@ -90,7 +90,7 @@ internal sealed partial class CameraFeature : DemoFeature
     public async Task ShutdownAsync()
     {
         Task visual = DisposeVisualMonitoringAsync();
-        Demo?.ExercisesIfCreated?.Dispose();
+        Exercises?.Dispose();
         ReleaseAlertSounds();
         await DisposeSoundMonitoringAsync();
         await visual;
@@ -190,6 +190,8 @@ internal sealed partial class CameraFeature : DemoFeature
 
     private Size ChatSize => Host.Overlays.ChatSize;
 
+    private ExerciseFeature Exercises => Host?.Services.Get<ExerciseFeature>();
+
     private void BuildCameraPanel()
     {
         _cameraPreview = new LiveCameraPreview { Aspect = Aspect.AspectFit, HeightRequest = 170, BackgroundColor = Colors.Black };
@@ -280,7 +282,7 @@ internal sealed partial class CameraFeature : DemoFeature
             Host.Page.Dispatcher.Dispatch(() => MoveCameraPanel(x, y));
         }
         UpdateCameraMaximizeButton();
-        Demo.ExercisesIfCreated?.UpdateOverlay();
+        Exercises?.UpdateOverlay();
     }
 
     // The count shown over the maximized preview (the exercise feature's); null hides it. UI thread.
@@ -408,7 +410,7 @@ internal sealed partial class CameraFeature : DemoFeature
             _cameraPanel.IsVisible = true;
             _cameraLabel.Text = "Opening camera…";
             var camera = _camera = new LiveCamera { RotationDegrees = () => Volatile.Read(ref _cameraRotation), Front = _cameraFront };
-            camera.FrameReady = frame => { QueueCameraPreview(camera, frame); QueueVisualFrame(camera, frame); Demo.ExercisesIfCreated?.QueueFrame(camera, frame); };
+            camera.FrameReady = frame => { QueueCameraPreview(camera, frame); QueueVisualFrame(camera, frame); Exercises?.QueueFrame(camera, frame); };
             camera.Failed = _ =>
             {
                 PauseVisualFeed();
@@ -508,7 +510,7 @@ internal sealed partial class CameraFeature : DemoFeature
             if (_camera != camera) return;
             _previewFrame ??= new Mat();
             frame.CopyTo(_previewFrame);
-            Demo.ExercisesIfCreated?.DrawPose(camera, _previewFrame);
+            Exercises?.DrawPose(camera, _previewFrame);
             // A selfie preview is a mirror; the frames the detectors, photos and clips get are not mirrored.
             if (_cameraFront) CvInvoke.Flip(_previewFrame, _previewFrame, Emgu.CV.CvEnum.FlipType.Horizontal);
             if (_previewQueued) return;

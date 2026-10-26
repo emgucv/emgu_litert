@@ -2,11 +2,10 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Maui;
+using Microsoft.Extensions.AI;
 
 namespace Maui.Demo.Lite;
 
@@ -14,22 +13,50 @@ namespace Maui.Demo.Lite;
 // AgentTools.Goals) keep the user's goals in ChatStore, with the memories - on with "Remember things about me", never
 // in a private chat. Each message's instructions list the goals with this period's progress, so "I ran today" is
 // logged without asking. Settings lists them with their progress, streak and history by period (GoalHistory), to edit, undo
-// the last entry or delete.
-internal sealed class GoalsFeature
+// the last entry or delete. A tool group of the router (with the exercise counter's tools, which log toward the goals),
+// matched by a message that names a goal. (The library's GoalsFeature has no Undo last: this one stays.)
+internal sealed class GoalsFeature : DemoFeature
 {
     private const int MaxGoalLength = 800;
-    private readonly IChatHost _host;
     private Label _goalsLabel;
+    // The goals and the instructions loaded for the message being sent (the group's match and instructions are synchronous).
+    private IList<AgentGoal> _goals = new List<AgentGoal>();
+    private string _instructions;
 
-    public GoalsFeature(IChatHost host) { _host = host; }
+    public override string Name => "goals";
 
-    private ChatStore _store => _host.Store;
+    public override string Title => "Your goals";
+
+    public override bool PersistEnabled => false;
+
+    private ChatStore Store => Demo.Store;
+
+    private ExerciseFeature Exercises => Host?.Services.Get<ExerciseFeature>();
 
     // Whether goals are kept: with "Remember things about me" on, never in a private chat.
-    public bool On => !_host.IsPrivateChat && _host.MemoryOn;
+    public bool On => Host != null && !Host.IsPrivate && Host.MemoryOn;
 
-    public IEnumerable<Microsoft.Extensions.AI.AIFunction> ToolsForMessage() =>
-        On ? AgentTools.Goals(_store.Goals) : Array.Empty<Microsoft.Extensions.AI.AIFunction>();
+    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    public override async Task PrepareAsync(ChatMessageContext context)
+    {
+        await base.PrepareAsync(context);
+        try { _goals = On ? await Store.Goals.GetGoalsAsync() : new List<AgentGoal>(); }
+        catch (Exception) { _goals = new List<AgentGoal>(); }
+        _instructions = await InstructionsAsync();
+    }
+
+    public override IEnumerable<ToolGroup> ToolGroups() => new[]
+    {
+        new ToolGroup(ChatToolGroups.Goals, ChatToolGroups.GoalsSummary, ChatToolGroups.GoalsKeywords,
+            // Counting jumping jacks comes with the goals: it logs toward them, and a group of its own would add a stub to every message.
+            () => ToolsForMessage().Concat((Exercises?.Tools(Host?.HandsFree == true) ?? Array.Empty<AITool>())),
+            () => JoinInstructions(_instructions, Exercises?.Tools(Host?.HandsFree == true).Any() == true ? ExerciseFeature.Instructions : null),
+            text => AgentTools.MentionsGoal(_goals, text))
+    };
+
+    public IEnumerable<AITool> ToolsForMessage() =>
+        On ? AgentTools.Goals(Store.Goals) : Array.Empty<AITool>();
 
     public async Task<string> InstructionsAsync()
     {
@@ -37,7 +64,7 @@ internal sealed class GoalsFeature
             return null;
         try
         {
-            return await AgentTools.GoalInstructionsAsync(_store.Goals, DateTime.Now, MaxGoalLength);
+            return await AgentTools.GoalInstructionsAsync(Store.Goals, DateTime.Now, MaxGoalLength);
         }
         catch (Exception)
         {
@@ -45,7 +72,10 @@ internal sealed class GoalsFeature
         }
     }
 
-    public View BuildSection()
+    // The agent may have saved or deleted a goal.
+    public override void OnReplyCompleted(ChatExchangeEventArgs e) => _ = RefreshCountAsync();
+
+    public override View BuildSettingsSection()
     {
         _goalsLabel = new Label
         {
@@ -77,11 +107,11 @@ internal sealed class GoalsFeature
 
     public async Task RefreshCountAsync()
     {
-        if (_goalsLabel == null || _host.IsPrivateChat) return;
+        if (_goalsLabel == null || Host == null || Host.IsPrivate) return;
         int count = 0;
         try
         {
-            count = (await _store.Goals.GetGoalsAsync()).Count;
+            count = (await Store.Goals.GetGoalsAsync()).Count;
         }
         catch (Exception)
         {
@@ -92,14 +122,14 @@ internal sealed class GoalsFeature
     // The goals in a sheet, each with its progress and Edit / Undo last / Delete.
     private async void OnGoalsTapped()
     {
-        if (_host.IsPrivateChat) return;
-        IList<AgentGoal> goals = await _store.Goals.GetGoalsAsync();
+        if (Host.IsPrivate) return;
+        IList<AgentGoal> goals = await Store.Goals.GetGoalsAsync();
         if (goals.Count == 0)
             return;
         var list = new VerticalStackLayout { Spacing = 2 };
         foreach (AgentGoal goal in goals)
             list.Children.Add(await BuildGoalRowAsync(goal, list));
-        await _host.ShowSheetAsync("Your goals", list, "Close");
+        await Host.ShowSheetAsync("Your goals", list, "Close");
         await RefreshCountAsync();
     }
 
@@ -116,8 +146,8 @@ internal sealed class GoalsFeature
         {
             try
             {
-                status.Text = await AgentTools.GoalStatusAsync(_store.Goals, goal, DateTime.Now);
-                GoalHistory history = GoalHistory.Compute(goal, await _store.Goals.GetProgressAsync(goal.Id, DateTime.MinValue), DateTime.Now, 12);
+                status.Text = await AgentTools.GoalStatusAsync(Store.Goals, goal, DateTime.Now);
+                GoalHistory history = GoalHistory.Compute(goal, await Store.Goals.GetProgressAsync(goal.Id, DateTime.MinValue), DateTime.Now, 12);
                 streak.Text = history.StreakText == null ? string.Empty : "\U0001F525 " + history.StreakText;
                 streak.IsVisible = history.StreakText != null;
                 strip.Children.Clear();
@@ -153,25 +183,25 @@ internal sealed class GoalsFeature
         };
         edit.OnTap(async () =>
         {
-            string text = await _host.PromptAsync("Edit goal", "The goal, with how much and how often, e.g. \"Read 20 pages a day\".",
+            string text = await Host.PromptAsync("Edit goal", "The goal, with how much and how often, e.g. \"Read 20 pages a day\".",
                 "Save", "Cancel", goal.Text, 200);
             if (string.IsNullOrWhiteSpace(text) || text.Trim() == goal.Text)
                 return;
             AgentGoal parsed = AgentGoal.FromText(text, goal.Created);
             goal = new AgentGoal(goal.Id, parsed.Text, parsed.Target, parsed.Unit, parsed.Period, goal.Created);
-            await _store.Goals.UpdateGoalAsync(goal);
+            await Store.Goals.UpdateGoalAsync(goal);
             await Refresh();
         });
         undo.OnTap(async () =>
         {
-            if (await _store.Goals.DeleteLastProgressAsync(goal.Id))
+            if (await Store.Goals.DeleteLastProgressAsync(goal.Id))
                 await Refresh();
         });
         delete.OnTap(async () =>
         {
-            if (!await _host.AskAsync("Delete goal", "Delete \"" + goal.Text + "\" and its progress?", "Delete", "Cancel"))
+            if (!await Host.AskAsync("Delete goal", "Delete \"" + goal.Text + "\" and its progress?", "Delete", "Cancel"))
                 return;
-            await _store.Goals.DeleteGoalAsync(goal.Id);
+            await Store.Goals.DeleteGoalAsync(goal.Id);
             list.Children.Remove(row);
             await RefreshCountAsync();
         });

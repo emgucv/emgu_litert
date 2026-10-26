@@ -18,7 +18,7 @@ internal sealed partial class CameraFeature
 
     private void StartMonitoringStopButton() => MonitoringForegroundService.StopRequested = () => MainThread.BeginInvokeOnMainThread(async () =>
     {
-        Demo.Meetings.Stop("the user pressed Stop in the notification");
+        Host.Services.Get<MeetingFeature>()?.Stop("the user pressed Stop in the notification");
         if (_soundRuntime == null) return;
         foreach (var monitor in _soundRuntime.Snapshot()) _soundRuntime.SetEnabled(monitor.Id, false);
         await UpdateSoundListeningAsync();
@@ -31,7 +31,7 @@ internal sealed partial class CameraFeature
     public async Task SyncBackgroundServiceAsync()
     {
         var monitors = _soundRuntime?.Snapshot().Where(m => m.Enabled).ToList() ?? new List<SoundMonitorInfo>();
-        string meeting = Demo?.Meetings.ActiveTitle;
+        string meeting = Host?.Services.Get<MeetingFeature>()?.ActiveTitle;
         if (meeting == null && (_soundDisposed || monitors.Count == 0))
         {
             if (_monitoringKey == null) return;

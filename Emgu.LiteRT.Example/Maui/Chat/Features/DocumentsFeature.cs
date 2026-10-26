@@ -114,6 +114,18 @@ internal sealed class DocumentsFeature : DemoFeature
             () => ChatPlannerInstructions.Documents)
     };
 
+    // The page shown the first time: saved document indexes no chat uses (attached, then the chat was never saved) go.
+    public override void OnAppearing()
+    {
+        base.OnAppearing();
+        if (_cleaned)
+            return;
+        _cleaned = true;
+        _ = Store.DeleteUnusedDocumentsAsync();
+    }
+
+    private bool _cleaned;
+
     // A new chat (or another model) starts without the document; an opened chat gets its own back (OnChatOpened).
     public override void OnNewConversation() => RemoveDocument();
 

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Maui;
+using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
 
 namespace Maui.Demo.Lite;
@@ -15,7 +16,8 @@ namespace Maui.Demo.Lite;
 // the transcript is longer than the window), shown in the card; the notes and the transcript are saved as a Word document with the reply,
 // the transcript is attached to the chat as its document - so later questions get the passages they need - and the notes go back to the
 // model. Gemma 4 could listen to the audio itself, but at ~25 tokens a second an hour is ~90k tokens, far over its window.
-internal sealed class MeetingFeature
+// Its tool comes with the written documents' group (WrittenDocumentsFeature).
+internal sealed class MeetingFeature : DemoFeature
 {
     public const string Instructions =
         "To record a meeting, lecture or conversation and take notes of it, call record_meeting: it records until the user presses Stop, " +
@@ -23,16 +25,27 @@ internal sealed class MeetingFeature
 
     private static readonly TimeSpan MeetingLimit = TimeSpan.FromHours(3);
 
-    private readonly IChatHost _host;
     private MeetingSession _meeting;
 
-    public MeetingFeature(IChatHost host) { _host = host; }
+    public override string Name => "meetings";
+
+    public override string Title => "Meeting notes";
+
+    public override bool PersistEnabled => false;
 
     // The meeting being recorded: its title ("" without one), or null.
     public string ActiveTitle => _meeting?.Title;
 
     // Ends the recording (the notes are then written, unless the chat is closing).
     public void Stop(string reason) => _meeting?.Ended.TrySetResult(reason);
+
+    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    public override void OnDetached()
+    {
+        Stop("the chat was closed");
+        base.OnDetached();
+    }
 
     private sealed class MeetingSession
     {
@@ -57,8 +70,10 @@ internal sealed class MeetingFeature
         false;
 #endif
 
-    public IEnumerable<Microsoft.Extensions.AI.AITool> Tools(bool voiceMode) =>
-        Supported && !voiceMode ? new[] { AgentTools.RecordMeeting(RecordMeetingAsync) } : Array.Empty<Microsoft.Extensions.AI.AITool>();
+    public IEnumerable<AITool> Tools(bool handsFree) =>
+        Supported && !handsFree ? new[] { AgentTools.RecordMeeting(RecordMeetingAsync) } : Array.Empty<AITool>();
+
+    private Task SyncBackgroundServiceAsync() => Host.Services.Get<CameraFeature>()?.SyncBackgroundServiceAsync() ?? Task.CompletedTask;
 
     private async Task<string> RecordMeetingAsync(string title, CancellationToken token)
     {
@@ -99,7 +114,7 @@ internal sealed class MeetingFeature
         // Without a background audio mode, iOS stops the microphone when the screen locks.
         MainThread.BeginInvokeOnMainThread(() => DeviceDisplay.Current.KeepScreenOn = true);
 #endif
-        await _host.SyncBackgroundServiceAsync();
+        await SyncBackgroundServiceAsync();
         Task transcribing = TranscribeMeetingAsync(session);
 
         string ending;
@@ -121,7 +136,7 @@ internal sealed class MeetingFeature
         if (last != null) QueueMeetingChunk(session, last);
         session.PendingSignal.Release();
         _meeting = null;
-        _ = _host.SyncBackgroundServiceAsync();
+        _ = SyncBackgroundServiceAsync();
 #if IOS
         MainThread.BeginInvokeOnMainThread(() => DeviceDisplay.Current.KeepScreenOn = false);
 #endif
@@ -132,7 +147,7 @@ internal sealed class MeetingFeature
             session.Time.Text = MeetingNotes.FormatTime(duration);
             session.Status.Text = "Writing down the last part…";
         });
-        _host.SetStatus("Writing down the last part of the meeting...");
+        Host.SetStatus("Writing down the last part of the meeting...");
         await transcribing;
 
         string heading = string.IsNullOrWhiteSpace(session.Title) ? "Meeting notes " + session.Started.ToString("yyyy-MM-dd HH.mm") : session.Title;
@@ -150,11 +165,11 @@ internal sealed class MeetingFeature
         {
             try
             {
-                _host.SetStatus("Writing the meeting notes...");
-                int maxPrompt = _host.ContextWindow - MeetingNotes.NotesTokens - 300;
+                Host.SetStatus("Writing the meeting notes...");
+                int maxPrompt = Host.ContextWindow - MeetingNotes.NotesTokens - 300;
                 var progress = new Progress<string>(text => MainThread.BeginInvokeOnMainThread(() => session.Status.Text = text));
                 notes = await MeetingNotes.WriteAsync(session.Transcript, session.Title, duration,
-                    (prompt, maxTokens, _) => _host.AskModelOnceAsync(prompt, maxTokens), _host.TokenCounter, maxPrompt, progress, token);
+                    (prompt, maxTokens, _) => Host.AskModelOnceAsync(prompt, maxTokens), Host.TokenCounter, maxPrompt, progress, token);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -166,7 +181,8 @@ internal sealed class MeetingFeature
 
         GeneratedDocument document = DocumentWriter.Create(heading,
             MeetingNotes.DocumentMarkdown(heading, session.Started, duration, notes, session.Transcript), "word");
-        await _host.SaveDocumentAsync(document);
+        // Saved with the reply, with a card (WrittenDocumentsFeature).
+        await Host.Services.Get<WrittenDocumentsFeature>().SaveAsync(document, CancellationToken.None);
         string transcriptName = DocumentWriter.FileName(heading + " transcript", ".txt");
         string transcriptText = "Transcript of " + heading + ", " + session.Started.ToString("f") + "\n\n" + session.Transcript.Text();
         await MainThread.InvokeOnMainThreadAsync(() =>
@@ -177,8 +193,9 @@ internal sealed class MeetingFeature
             if (notes != null)
                 session.Content.Children.Add(new ReplyView { Text = notes, FontSize = 14, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) });
             // Questions about the meeting later get the transcript's passages they need, as for an attached document.
-            _host.AttachDocument(Encoding.UTF8.GetBytes(transcriptText), transcriptName);
-            _host.SetStatus("Generating...");
+            if (Host.Services.Get<ModelSettingsFeature>()?.SearchDownloadRequired != true)
+                Host.Services.Get<DocumentsFeature>()?.AttachDocument(Encoding.UTF8.GetBytes(transcriptText), transcriptName);
+            Host.SetStatus("Generating...");
         });
         return AgentTools.MeetingResultText(duration, words, notes, document.FileName, problem);
 #else
@@ -295,14 +312,14 @@ internal sealed class MeetingFeature
                 new HorizontalStackLayout { Spacing = 8, Margin = new Thickness(0, 4, 0, 0), Children = { session.Stop, session.Pause } }
             }
         };
-        _host.AddCardToReply(new Border
+        Host.AddCardToReply(new Border
         {
             BackgroundColor = Theme.CardBackground, Stroke = Theme.RowBorder, StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) },
             Padding = new Thickness(14, 12), Margin = new Thickness(6, 2), MaximumWidthRequest = 520, HorizontalOptions = LayoutOptions.Start,
             Content = session.Content
         });
-        _host.SetStatus("Recording the meeting…");
+        Host.SetStatus("Recording the meeting…");
     }
 
     private static void EndMeetingCard(MeetingSession session, string text)

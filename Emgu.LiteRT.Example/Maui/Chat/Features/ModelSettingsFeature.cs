@@ -145,8 +145,8 @@ internal sealed class ModelSettingsFeature : DemoFeature, ISearchModelChoice
 
     private async Task ChangeEmbeddingModelAsync(int index, bool gpu)
     {
-        PhotoSearchFeature photos = Demo.PhotoSearch;
-        PastChatsFeature chats = Demo.PastChats;
+        PhotoSearchFeature photos = Host.Services.Get<PhotoSearchFeature>();
+        PastChatsFeature chats = Host.Services.Get<PastChatsFeature>();
         DocumentsFeature documents = Documents;
         try
         {

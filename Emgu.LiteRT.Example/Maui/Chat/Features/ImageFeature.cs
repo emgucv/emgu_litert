@@ -2,17 +2,14 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
 using Stopwatch = System.Diagnostics.Stopwatch;
 using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Emgu.CV;
-using Emgu.LiteRT.Models;
-using Microsoft.Maui.Controls.Shapes;
+using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.Models;
+using Microsoft.Extensions.AI;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace Maui.Demo.Lite;
 
@@ -21,17 +18,14 @@ namespace Maui.Demo.Lite;
 // (Emgu.LiteRT.Models' ZImageTurbo) on this device's CPU and shows it above the reply - the model doesn't see it. The
 // model is 10.6 GB, downloaded when the setting is turned on, and its first image writes ~9 GB of weight caches. The
 // pictures are saved with the reply (attachments of kind "generated", never given back to the model). On iOS the model
-// folder is kept out of iCloud backups. With the setting off the tool is offered anyway and tells the model where to turn it on.
-internal sealed class ImageFeature
+// folder is kept out of iCloud backups. With the setting off the tool is offered anyway and tells the model where to turn
+// it on. A tool group of the router.
+internal sealed class ImageFeature : DemoFeature
 {
     public const string GeneratedKind = "generated";
     public const string Instructions = ChatPlannerInstructions.Images;
 
-    private readonly IChatHost _host;
     private string _imagePauseReason;
-
-    public ImageFeature(IChatHost host) { _host = host; }
-
     private Switch _imageSwitch;
     private Label _imageStatus;
     private Button _imageDeleteButton;
@@ -43,8 +37,37 @@ internal sealed class ImageFeature
     // The pictures drawn for the reply being written, saved with it.
     private readonly List<byte[]> _sendImages = new List<byte[]>();
 
+    public override string Name => "images";
+
+    public override string Title => "Image generation";
+
+    public override bool PersistEnabled => false;
+
     // Everywhere the chat runs.
     public static bool Supported => true;
+
+    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    public override void OnAttached(IChatPageHost host)
+    {
+        base.OnAttached(host);
+        _zimage = new ZImageTurbo();
+        ExcludeFromBackup(_zimage.Folder);
+    }
+
+    public override IEnumerable<ToolGroup> ToolGroups()
+    {
+        if (!Supported)
+            return Array.Empty<ToolGroup>();
+        return new[]
+        {
+            new ToolGroup(ChatToolGroups.ImageGeneration, ChatToolGroups.ImageGenerationSummary, ChatToolGroups.ImageGenerationKeywords,
+                () => new AITool[] { AgentTools.GenerateImage(GenerateAsync) },
+                () => Instructions)
+        };
+    }
+
+    public override void OnNewConversation() => ClearDrawn();
 
     // iOS backs up the app's Library/Application Support (where ZImageTurbo keeps its ~21 GB) to iCloud unless told
     // not to; the model can be downloaded again.
@@ -65,14 +88,11 @@ internal sealed class ImageFeature
 
     private bool ImageGenerationOn => _imageSwitch != null && _imageSwitch.IsToggled;
 
-    public View BuildSection(View modelSelector)
+    public override View BuildSettingsSection()
     {
         if (!Supported)
-            return new ContentView { IsVisible = false };
-        _zimage = new ZImageTurbo();
-        ExcludeFromBackup(_zimage.Folder);
-        bool on = false;
-        on = AppSettings.Chat.ImageGeneration;
+            return null;
+        bool on = AppSettings.Chat.ImageGeneration;
         _imageSwitch = new Switch { IsToggled = on, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
         _imageSwitch.Toggled += OnImageGenerationToggled;
         var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
@@ -102,6 +122,7 @@ internal sealed class ImageFeature
         // Turned on before and the model isn't complete: go on downloading.
         if (on && !_zimage.IsDownloaded)
             StartImageModelDownload();
+        View modelSelector = Host.Services.Get<ModelSettingsFeature>()?.BuildImageModelSelector() ?? new ContentView();
         return new VerticalStackLayout
         {
             Spacing = 6,
@@ -133,7 +154,7 @@ internal sealed class ImageFeature
             string remainingSize = remaining >= 1e9
                 ? string.Format(CultureInfo.InvariantCulture, "{0:F1} GB", remaining / 1e9)
                 : string.Format(CultureInfo.InvariantCulture, "{0:F0} MB", Math.Ceiling(remaining / 1e6));
-            bool download = await _host.AskAsync("Image generation",
+            bool download = await Host.AskAsync("Image generation",
                 string.Format(CultureInfo.InvariantCulture,
                     "Download the image model ({0} remaining)? Model files and prepared caches use about {1:F0} GB in total.",
                     remainingSize, (ZImageTurbo.DownloadSize + 9e9) / 1e9),
@@ -189,6 +210,8 @@ internal sealed class ImageFeature
                 _zimageDownload = null;
                 _zimageDownloadFraction = -1;
                 UpdateStatus();
+                if (_imageStatus == null)
+                    return;
                 if (error != null)
                     _imageStatus.Text = "Download stopped: " + error + " (turn the switch off and on to retry)";
                 else if (paused && _imageSwitch.IsToggled)
@@ -233,7 +256,9 @@ internal sealed class ImageFeature
 
     private async void OnDeleteImageModelClicked(object sender, EventArgs e)
     {
-        await _host.OpenStorageAsync();
+        StorageFeature storage = Host.Services.Get<StorageFeature>();
+        if (storage != null)
+            await storage.OpenStorageAsync();
     }
 
     public Task EnsureModelAsync()
@@ -254,7 +279,7 @@ internal sealed class ImageFeature
         if (!ImageGenerationOn)
             return string.Format(CultureInfo.InvariantCulture,
                 "Image generation is turned off, so no picture can be drawn. Tell the user they can turn on \"Image generation\" in {0}; the image model is a {1:F1} GB download and runs on this device.",
-                _host.SettingsLocation,
+                Host.SettingsLocation,
                 ZImageTurbo.DownloadSize / 1e9);
         if (_zimageDownload != null)
             return string.Format(CultureInfo.InvariantCulture,
@@ -271,7 +296,7 @@ internal sealed class ImageFeature
             _imagePauseReason = reason;
             UpdateStatus();
         });
-        await _host.WaitForWorkAsync(false, modelPaused, cancel);
+        await Demo.Workload.WaitForWorkAsync(false, modelPaused, cancel);
         await EnsureModelAsync();
         int tokens = _zimage.CountPromptTokens(prompt);
         if (tokens > ZImageTurbo.MaxPromptTokens)
@@ -283,7 +308,7 @@ internal sealed class ImageFeature
         ImageTile tile = await MainThread.InvokeOnMainThreadAsync(() =>
         {
             ImageTile created = CreateImageTile(prompt);
-            _host.AddCardToReply(created.View);
+            Host.AddCardToReply(created.View);
             return created;
         });
         Stopwatch watch = Stopwatch.StartNew();
@@ -296,7 +321,7 @@ internal sealed class ImageFeature
                 // Generate reports each stage synchronously on its worker thread, before the native graph runs.
                 // Keep the current latent state while waiting; cancellation still stops the pending generation.
                 if (p.Stage != "Done")
-                    _host.WaitForWorkAsync(false, reason => MainThread.BeginInvokeOnMainThread(() =>
+                    Demo.Workload.WaitForWorkAsync(false, reason => MainThread.BeginInvokeOnMainThread(() =>
                     {
                         _imagePauseReason = reason;
                         UpdateStatus();
@@ -311,7 +336,7 @@ internal sealed class ImageFeature
             await MainThread.InvokeOnMainThreadAsync(() => ShowGeneratedImage(tile, png,
                 string.Format(CultureInfo.InvariantCulture, "{0:F0} s", result.Elapsed.TotalSeconds)));
             UiStallWatchdog.Mark(string.Format(CultureInfo.InvariantCulture, "generate_image done in {0:F1} s", result.Elapsed.TotalSeconds));
-            return Emgu.LiteRT.LM.Agents.AgentTools.ImageGeneratedResult(prompt);
+            return AgentTools.ImageGeneratedResult(prompt);
         }
         catch (OperationCanceledException)
         {
@@ -420,11 +445,12 @@ internal sealed class ImageFeature
 
     private async void ShowGeneratedImageLarge(byte[] png)
     {
+        Size page = Host.PageSize;
         Image image = new Image
         {
             Source = ImageUtil.ToImageSource(png),
             Aspect = Aspect.AspectFit,
-            HeightRequest = Math.Max(200, Math.Min(_host.PageSize.Width, _host.PageSize.Height) * 0.45)
+            HeightRequest = Math.Max(200, Math.Min(page.Width, page.Height) * 0.45)
         };
         var details = PngMetadata.ReadText(png);
         details.TryGetValue("Description", out string description);
@@ -470,14 +496,14 @@ internal sealed class ImageFeature
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                await _host.AskAsync("Couldn't " + button.Text.TrimEnd('…').ToLowerInvariant(), ex.Message, "OK", null);
+                await Host.AskAsync("Couldn't " + button.Text.TrimEnd('…').ToLowerInvariant(), ex.Message, "OK", null);
             }
             finally { button.IsEnabled = true; }
         }
 
         var again = Action("Draw it again", "Draw the same description again with a new seed");
         again.IsVisible = !string.IsNullOrEmpty(description);
-        again.Clicked += (_, _) => _host.DismissSheet("again");
+        again.Clicked += (_, _) => Host.DismissSheet("again");
         var gallery = Action("Add to " + PictureGallery.DestinationName, "Add the picture to the device's " + PictureGallery.DestinationName);
         gallery.Clicked += async (_, _) => await Run(gallery, async () => await PictureGallery.SaveAsync(png, fileName));
         var share = Action("Share…", "Share the picture with another app");
@@ -513,9 +539,9 @@ internal sealed class ImageFeature
         buttons.Add(save, 1, 1);
         content.Children.Add(buttons);
         content.Children.Add(status);
-        string choice = await _host.ShowSheetAsync("Picture", content, "Close");
-        if (choice == "again" && !string.IsNullOrEmpty(description) && !_host.IsBusy)
-            await _host.SendMessageAsync("Draw this again, using exactly this description: " + description);
+        string choice = await Host.ShowSheetAsync("Picture", content, "Close");
+        if (choice == "again" && !string.IsNullOrEmpty(description) && !Host.IsBusy)
+            await Host.SendMessageAsync("Draw this again, using exactly this description: " + description);
     }
 
     // Whether the model has been loaded (or is loading).

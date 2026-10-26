@@ -42,24 +42,22 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         public ExportFeature Export;
         public StorageFeature Storage;
         public ModelSettingsFeature ModelSettings;
-        public TaskChipFeature TaskChip;
+        public TaskFeature Tasks;
+        public ImageFeature Images;
         public TranslationFeature Translations;
+        public DeviceActionsFeature DeviceActions;
+        public WrittenDocumentsFeature WrittenDocuments;
+        public GoalsFeature Goals;
+        public PastChatsFeature PastChats;
+        public PhotoSearchFeature PhotoSearch;
+        public MeetingFeature Meetings;
+        public ExerciseFeature Exercises;
         public MemoryFeature Memory;
     }
 
     private readonly Parts _parts;
     private readonly MenuSheet _menu = new MenuSheet();
-    private DemoChatHost _host;
     private WorkloadService _workload;
-    private MeetingFeature _meetingFeature;
-    private ExerciseFeature _exerciseFeature;
-    private ImageFeature _imageFeature;
-    private WrittenDocumentsFeature _writtenDocuments;
-    private TaskFeature _taskFeature;
-    private GoalsFeature _goalsFeature;
-    private PastChatsFeature _pastChatsFeature;
-    private PhotoSearchFeature _photoSearchFeature;
-    private DeviceActionsFeature _deviceActionsFeature;
     private bool _pageVisible;
     private int _sessionVersion;
     private Task _reloadTask;
@@ -103,8 +101,16 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             Export = new ExportFeature(),
             Storage = new StorageFeature(),
             ModelSettings = new ModelSettingsFeature(),
-            TaskChip = new TaskChipFeature(),
+            Tasks = new TaskFeature(),
+            Images = new ImageFeature(),
             Translations = new TranslationFeature(),
+            DeviceActions = new DeviceActionsFeature(),
+            WrittenDocuments = new WrittenDocumentsFeature(),
+            Goals = new GoalsFeature(),
+            PastChats = new PastChatsFeature(),
+            PhotoSearch = new PhotoSearchFeature(),
+            Meetings = new MeetingFeature(),
+            Exercises = new ExerciseFeature(),
             Memory = new MemoryFeature(SharedStore.Memories)
         };
         parts.Server = new ServerFeature(parts.ServerOption);
@@ -133,35 +139,16 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         {
             new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new ClipboardFeature(),
-            parts.Camera, parts.Server, parts.Mcp, parts.ModelSettings, new DemoSectionsFeature(), parts.Storage, parts.Export,
-            parts.Documents, parts.VoiceMode, parts.TaskChip, parts.Transcripts, parts.Translations, new DemoToolsFeature()
+            parts.Camera, parts.Server, parts.Mcp, parts.ModelSettings, parts.Images, parts.Storage, parts.Export,
+            parts.Documents, parts.VoiceMode, parts.Tasks, parts.Transcripts, parts.Translations, parts.DeviceActions,
+            parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.Meetings, parts.Exercises
         })
             options.Features.Add(feature);
         parts.Options = options;
         return parts;
     }
 
-    // ---------- The old-style features (IChatHost), made when first used ----------
-
-    private DemoChatHost Host => _host ??= new DemoChatHost(this, this);
-
-    private MeetingFeature Meetings => _meetingFeature ??= new MeetingFeature(Host);
-
-    private ExerciseFeature Exercises => _exerciseFeature ??= new ExerciseFeature(Host);
-
-    private ImageFeature Images => _imageFeature ??= new ImageFeature(Host);
-
-    private WrittenDocumentsFeature WrittenDocuments => _writtenDocuments ??= new WrittenDocumentsFeature(Host);
-
-    private TaskFeature Tasks => _taskFeature ??= new TaskFeature(Host);
-
-    private GoalsFeature Goals => _goalsFeature ??= new GoalsFeature(Host);
-
-    private PastChatsFeature PastChats => _pastChatsFeature ??= new PastChatsFeature(Host);
-
-    private PhotoSearchFeature PhotoSearch => _photoSearchFeature ??= new PhotoSearchFeature(Host);
-
-    private DeviceActionsFeature ActionTools => _deviceActionsFeature ??= new DeviceActionsFeature(Host);
+    // ---------- Services ----------
 
     private WorkloadService Workload => _workload ??= new WorkloadService(() => _parts.ModelSettings.Embedder);
 
@@ -174,26 +161,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     ChatStore IDemoHost.Store => SharedStore;
 
     WorkloadService IDemoHost.Workload => Workload;
-
-    GoalsFeature IDemoHost.Goals => Goals;
-
-    PhotoSearchFeature IDemoHost.PhotoSearch => PhotoSearch;
-
-    PastChatsFeature IDemoHost.PastChats => PastChats;
-
-    ImageFeature IDemoHost.Images => Images;
-
-    MeetingFeature IDemoHost.Meetings => Meetings;
-
-    ExerciseFeature IDemoHost.Exercises => Exercises;
-
-    ExerciseFeature IDemoHost.ExercisesIfCreated => _exerciseFeature;
-
-    WrittenDocumentsFeature IDemoHost.WrittenDocuments => WrittenDocuments;
-
-    TaskFeature IDemoHost.Tasks => Tasks;
-
-    DeviceActionsFeature IDemoHost.ActionTools => ActionTools;
 
     bool IDemoHost.PageVisible => _pageVisible;
 
@@ -286,14 +253,14 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         _sessionVersion++;
         _parts.VoiceMode.EndVoiceMode();
         Chat.ReplySpeaker?.Stop();
-        _meetingFeature?.Stop("the chat was closed");
+        _parts.Meetings.Stop("the chat was closed");
         _ = _parts.Camera.ShutdownAsync();
         _ = _parts.Mcp.ShutdownAsync();
         if (!IsPrivate)
             _ = Chat.CancelRecordingAsync();
         _parts.Documents.RemoveDocument();
-        _photoSearchFeature?.CancelIndexing();
-        _pastChatsFeature?.CancelIndexing();
+        _parts.PhotoSearch.CancelIndexing();
+        _parts.PastChats.CancelIndexing();
         _parts.Storage.CancelRestore();
         _ = CloseAsync();
     }
@@ -308,12 +275,10 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                 await _parts.Documents.FinishPrivateDocumentsAsync();
             }
             try { await (_reloadTask ?? Task.CompletedTask); } catch (Exception) { }
-            if (_pastChatsFeature != null)
-                await _pastChatsFeature.StopIndexingAsync();
+            await _parts.PastChats.StopIndexingAsync();
             await ShutdownModelAsync();
             await Embedder.ReleaseAsync();
-            if (_imageFeature != null)
-                await _imageFeature.ReleaseModelAsync();
+            await _parts.Images.ReleaseModelAsync();
             if (IsPrivate)
             {
                 ClearPrivateSessionContent();
@@ -379,8 +344,8 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         return bubble;
     }
 
-    // While a reply streams: the status (the tool being called, "Generating..." between calls) and the device actions'
-    // step lines' outcomes.
+    // While a reply streams: the status (the tool being called, "Generating..." between calls) and the memory tool's
+    // step line.
     private void WatchReply(ChatMessageItem item)
     {
         item.PropertyChanged += (s, e) =>
@@ -399,7 +364,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                     continue;
                 UiStallWatchdog.Mark("Tool call: " + step.Description);
                 Chat.SetStatus(step.Description + "...");
-                string described = step.Description;
                 step.PropertyChanged += (o, p) =>
                 {
                     if (p.PropertyName != nameof(ChatToolStep.IsRunning) || step.IsRunning)
@@ -409,9 +373,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                     // A fact the model tried to save again isn't a new memory: say so instead of "Remembering".
                     if (resultText.StartsWith("Already remembered", StringComparison.Ordinal))
                         step.Description = "Already remembered";
-                    else if (step.Error == null && DeviceActionsFeature.ToolNames.Contains(step.Name))
-                        // A device action: what the user chose, also in the saved chat.
-                        step.Description = described + DeviceActionsFeature.StepOutcome(resultText);
                     if (item.IsStreaming)
                         Chat.SetStatus("Generating...");
                 };
@@ -470,10 +431,16 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     protected override void ConfigureConversation(ChatConversation conversation, ChatModelOption option, LanguageModel model)
     {
         base.ConfigureConversation(conversation, option, model);
-        conversation.OverheadTokens = option?.CanUseTools == true ? 900 + DemoToolsFeature.GroupTokens(Skills.Router.Active) : 50;
+        conversation.OverheadTokens = option?.CanUseTools == true ? 900 + GroupTokens(Skills.Router.Active) : 50;
         conversation.SummaryMaxTokens = SummaryMaxTokens;
         conversation.SummaryOptions = option == _parts.ServerOption ? _parts.Server.SummaryOptions : null;
     }
+
+    // The groups in use, for the context estimate before a send (LiteRtLmChatClient counts the real size): the camera
+    // group's tools and instructions are ~1,100 tokens, the others ~150-500.
+    private static int GroupTokens(IEnumerable<string> active) => active.Sum(name =>
+        name == ChatToolGroups.Camera ? 1100 : name == ChatToolGroups.DeviceActions || name == ChatToolGroups.Goals ? 500
+        : name.StartsWith("mcp_", StringComparison.Ordinal) ? 400 : name == ChatToolGroups.Sound ? 600 : 200);
 
     // ---------- The model and the server ----------
 
@@ -516,8 +483,8 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     protected override async Task SendCoreAsync(ChatSendRequest request, CancellationToken cancellationToken)
     {
         _parts.Camera.ClearCameraTurn();
-        Images.ClearDrawn();
-        WrittenDocuments.Clear();
+        _parts.Images.ClearDrawn();
+        _parts.WrittenDocuments.Clear();
         ChatConversation conversation = Conversation;
         if (conversation == null || !await EnsureRemoteAsync(cancellationToken))
             return;
@@ -536,7 +503,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             var info = new UserMessageInfo { Language = await TextLanguage.DetectAsync(prompt) };
 
             // Task mode: for this message only.
-            bool planTask = _parts.TaskChip.TakePlan() && canUseTools && !HandsFree;
+            bool planTask = _parts.Tasks.TakePlan() && canUseTools && !HandsFree;
             ChatOptions options = await ComposeOptionsAsync(request);
             // The model is given references to the attached images for the camera tools.
             int attachedImages = attachments.Count(a => a.MediaType != null && a.MediaType.StartsWith("image/", StringComparison.Ordinal));
@@ -559,7 +526,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             _pendingUserInfo = info;
             _pendingDocumentStep = document?.Step;
 
-            IChatClient client = planTask ? Tasks.CreateClient(prompt, attachments) : null;
+            IChatClient client = planTask ? _parts.Tasks.CreateClient(prompt, attachments) : null;
             ChatMessageItem reply = null;
             for (int attempt = 0; ; attempt++)
             {
@@ -601,6 +568,9 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             _parts.Documents.MarkDocumentContextGiven(document);
             await ShowMemoriesUsedAsync(prompt, reply, bubble);
             UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
+            // The features' progress during the reply ("Step 2 of 3", "Waiting for you to confirm...") is on the page's
+            // status line; the save's error, if any, replaces it.
+            SetStatus(null);
             if (userItem != null)
                 await SaveExchangeAsync(userItem, reply, bubble);
             Chat.SetStatus(null);
@@ -712,8 +682,8 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                 steps.Add(bubble.MemoryStep);
             // Pictures the reply drew are kept with it (shown again when the chat is reopened, not given to the model),
             // and the documents it wrote.
-            List<(string Kind, string MediaType, byte[] Data)> drawn = Images.Drawn();
-            drawn.AddRange(WrittenDocuments.Take());
+            List<(string Kind, string MediaType, byte[] Data)> drawn = _parts.Images.Drawn();
+            drawn.AddRange(_parts.WrittenDocuments.Take());
             ChatSavedExchange saved = await SharedStore.SaveExchangeAsync(id, userItem, reply, drawn, steps);
             info.MessageId = saved.MessageId;
             await SharedStore.SetLanguageAsync(saved.MessageId, info.Language);
@@ -781,9 +751,9 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                 {
                     // A document the reply wrote, or a picture it drew: cards above it, not given to the model.
                     if (attachment.Kind == WrittenDocumentsFeature.Kind)
-                        item.Decorations.Add(WrittenDocuments.SavedCard(attachment.MediaType, await System.IO.File.ReadAllBytesAsync(attachment.Path)));
+                        item.Decorations.Add(_parts.WrittenDocuments.SavedCard(attachment.MediaType, await System.IO.File.ReadAllBytesAsync(attachment.Path)));
                     else if (attachment.Kind == ImageFeature.GeneratedKind)
-                        item.Decorations.Add(Images.SavedImageView(await System.IO.File.ReadAllBytesAsync(attachment.Path)));
+                        item.Decorations.Add(_parts.Images.SavedImageView(await System.IO.File.ReadAllBytesAsync(attachment.Path)));
                 }
                 _ = _parts.Translations.CheckThinkingLanguageAsync(bubble);
             }
@@ -813,8 +783,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         }
         _sessionVersion++;
         _agentBubble = null;
-        _imageFeature?.ClearDrawn();
-        _writtenDocuments?.Clear();
         base.StartNewChat();
     }
 
@@ -828,10 +796,10 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         // Cancel every producer before awaiting the shared embedding load.
         Task<bool> documentReady = _parts.Documents.DocumentReady;
         _parts.Documents.RemoveDocument();
-        PastChats.CancelIndexing();
-        PhotoSearch.CancelIndexing();
-        await PastChats.StopIndexingAsync();
-        await PhotoSearch.WaitForIndexingAsync();
+        _parts.PastChats.CancelIndexing();
+        _parts.PhotoSearch.CancelIndexing();
+        await _parts.PastChats.StopIndexingAsync();
+        await _parts.PhotoSearch.WaitForIndexingAsync();
         if (documentReady != null) { try { await documentReady; } catch (OperationCanceledException) { } }
         await _parts.Documents.FinishPrivateDocumentsAsync();
         Chat.ReplySpeaker?.Stop();
@@ -840,7 +808,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         if (IsPrivate)
         {
             await Embedder.ReleaseWithGateAsync();
-            await Images.ResetModelAsync();
+            await _parts.Images.ResetModelAsync();
         }
         if (isPrivate) _privateDiagnostics ??= UiStallWatchdog.SuppressPrivateDetails();
         else { _privateDiagnostics?.Dispose(); _privateDiagnostics = null; }
@@ -851,10 +819,9 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     {
         _parts.Documents.RemoveDocument();
         Chat.PendingAttachments.Clear();
-        _imageFeature?.ClearDrawn();
-        _writtenDocuments?.Clear();
+        _parts.Images.ClearDrawn();
         _agentBubble = null;
-        _imageFeature?.ClearPromptCache();
+        _parts.Images.ClearPromptCache();
         _parts.Documents.ForgetFinishedPrivateDocuments();
     }
 }

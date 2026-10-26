@@ -2,12 +2,10 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Agents.Mcp;
+using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Maui;
 using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
 
@@ -16,12 +14,16 @@ namespace Maui.Demo.Lite;
 // Device actions (set_timer, set_alarm, add_calendar_event, add_reminder, open_directions): the agent's tool asks, a
 // card above the reply shows what will be done with Confirm / Cancel, and only a confirmed action is done
 // (DeviceActions.PerformAsync). The tool returns what happened, so the model can say so; the step line says it too and
-// is saved with the chat. Not offered in the voice chat, whose full-screen view would hide the card.
-internal sealed class DeviceActionsFeature
+// is saved with the chat. A tool group of the router, with a rerun after its stub (the clock/calendar/maps stub ends the
+// request and the message goes again with the tools). Not offered in a hands-free chat, whose full-screen view would
+// hide the card.
+internal sealed class DeviceActionsFeature : DemoFeature
 {
-    private readonly IChatHost _host;
+    public override string Name => "device_actions";
 
-    public DeviceActionsFeature(IChatHost host) { _host = host; }
+    public override string Title => "Timers, alarms, calendar, reminders, directions";
+
+    public override bool PersistEnabled => false;
 
     // The device actions' tool names (their step lines say what the user chose).
     public static readonly HashSet<string> ToolNames = new HashSet<string>
@@ -29,15 +31,25 @@ internal sealed class DeviceActionsFeature
         "set_timer", "set_alarm", "add_calendar_event", "add_reminder", "open_directions"
     };
 
-    public IEnumerable<AIFunction> ToolsForMessage(bool voiceMode)
+    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    public override IEnumerable<ToolGroup> ToolGroups() => new[]
     {
-        if (voiceMode || DeviceActions.Supported == DeviceActionKinds.None)
-            return Array.Empty<AIFunction>();
+        new ToolGroup(ChatToolGroups.DeviceActions, ChatToolGroups.DeviceActionsSummary, ChatToolGroups.DeviceActionsKeywords,
+            () => ToolsForMessage(Host?.HandsFree == true),
+            () => InstructionsForMessage(Host?.HandsFree == true),
+            rerunAfterStub: true)
+    };
+
+    public IEnumerable<AITool> ToolsForMessage(bool handsFree)
+    {
+        if (handsFree || DeviceActions.Supported == DeviceActionKinds.None)
+            return Array.Empty<AITool>();
         return AgentTools.DeviceActions(DeviceActions.Supported, ConfirmDeviceActionAsync);
     }
 
-    public static string InstructionsForMessage(bool voiceMode) =>
-        voiceMode ? null : AgentTools.DeviceActionInstructions(DeviceActions.Supported);
+    public static string InstructionsForMessage(bool handsFree) =>
+        handsFree ? null : AgentTools.DeviceActionInstructions(DeviceActions.Supported);
 
     // The step line's ending for a device action's result: what the user chose.
     public static string StepOutcome(string result)
@@ -51,15 +63,23 @@ internal sealed class DeviceActionsFeature
         return string.Empty;
     }
 
+    // A device action done: what the user chose on its step line, also in the saved chat.
+    public override void OnToolStepCompleted(ChatToolStep step)
+    {
+        if (step.Error != null || !ToolNames.Contains(step.Name))
+            return;
+        step.Description += StepOutcome(step.Result?.Result?.ToString() ?? string.Empty);
+    }
+
     private Task<string> ConfirmDeviceActionAsync(DeviceActionRequest request, CancellationToken cancellationToken)
     {
         return MainThread.InvokeOnMainThreadAsync(async () =>
         {
             var choice = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             Card card = Card.Create(request, confirmed => choice.TrySetResult(confirmed));
-            _host.AddCardToReply(card.View);
+            Host.AddCardToReply(card.View);
             UiStallWatchdog.Mark("Device action: waiting for confirmation of " + request.ToolName);
-            _host.SetStatus("Waiting for you to confirm...");
+            Host.SetStatus("Waiting for you to confirm...");
             bool confirmed;
             using (cancellationToken.Register(() => choice.TrySetResult(false)))
                 confirmed = await choice.Task;
@@ -67,14 +87,14 @@ internal sealed class DeviceActionsFeature
             {
                 card.Finish(cancellationToken.IsCancellationRequested ? "Stopped" : "Cancelled", false);
                 UiStallWatchdog.Mark("Device action cancelled");
-                _host.SetStatus("Generating...");
+                Host.SetStatus("Generating...");
                 return AgentTools.DeviceActionCancelled;
             }
             card.Finish("Working...", false);
             DeviceActionOutcome outcome = await DeviceActions.PerformAsync(request);
             card.Finish(outcome.ForUser, outcome.Done);
             UiStallWatchdog.Mark("Device action: " + outcome.ForUser);
-            _host.SetStatus("Generating...");
+            Host.SetStatus("Generating...");
             return outcome.ForModel;
         });
     }
