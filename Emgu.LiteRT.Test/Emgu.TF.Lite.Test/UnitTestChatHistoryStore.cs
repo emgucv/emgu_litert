@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Chat.Sqlite;
 using Maui.Demo.Lite;
@@ -410,6 +411,76 @@ namespace Emgu.TF.Lite.Test
             Assert.That(failed, Is.Null);
             _store.IsPrivate = false;
             Assert.That(await _store.GetChatsAsync(), Is.Empty);
+        }
+
+        [Test]
+        public async Task KeepsTheAgentsMemoriesAndGoalsInTheChatDatabase()
+        {
+            var memories = new SqliteAgentMemoryStore(_store);
+            Assert.That(await memories.AddMemoryAsync(" The user is vegetarian. "), Is.True);
+            Assert.That(await memories.AddMemoryAsync("the user is VEGETARIAN."), Is.False);
+            Assert.That(await memories.AddMemoryAsync("  "), Is.False);
+            Assert.That(await memories.AddMemoryAsync("The user lives in Lyon."), Is.True);
+            IList<AgentMemory> saved = await memories.GetMemoriesAsync();
+            Assert.That(saved.Select(m => m.Text), Is.EqualTo(new[] { "The user is vegetarian.", "The user lives in Lyon." }));
+            await memories.DeleteMemoryAsync(saved[0].Id);
+            await memories.DeleteMemoryAsync("not an id");
+            Assert.That((await memories.GetMemoriesAsync()).Single().Text, Is.EqualTo("The user lives in Lyon."));
+
+            var goals = new SqliteAgentGoalStore(_store);
+            var created = new DateTime(2026, 10, 1, 9, 0, 0);
+            string id = await goals.AddGoalAsync(new AgentGoal(null, "Run three times a week", 3, "runs", GoalPeriod.Week, created));
+            await goals.UpdateGoalAsync(new AgentGoal(id, "Run four times a week", 4, "runs", GoalPeriod.Week, created));
+            await goals.AddProgressAsync(new GoalProgress(id, 1, created.AddDays(1)));
+            await goals.AddProgressAsync(new GoalProgress(id, 1, created.AddDays(3)));
+            AgentGoal goal = (await goals.GetGoalsAsync()).Single();
+            Assert.That((goal.Text, goal.Target, goal.Period, goal.Created), Is.EqualTo(("Run four times a week", (double?)4, GoalPeriod.Week, created)));
+            Assert.That((await goals.GetProgressAsync(id, created.AddDays(2))).Select(p => p.When), Is.EqualTo(new[] { created.AddDays(3) }));
+            Assert.That(await goals.DeleteLastProgressAsync(id), Is.True);
+            Assert.That((await goals.GetProgressAsync(id, DateTime.MinValue)).Single().When, Is.EqualTo(created.AddDays(1)));
+            await goals.DeleteGoalAsync(id);
+            Assert.That(await goals.GetGoalsAsync(), Is.Empty);
+
+            // The demo's table names, in the chats' database; deleting a goal took its progress with it.
+            SQLiteAsyncConnection db = await _store.GetConnectionAsync();
+            Assert.That(await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Memory"), Is.EqualTo(1));
+            Assert.That(await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM GoalProgress"), Is.Zero);
+        }
+
+        [Test]
+        public async Task ReadsTheMemoriesAndGoalsTheDemoSaved()
+        {
+            // The tables as the MAUI demo's ChatStore created them before the stores moved here.
+            SQLiteAsyncConnection db = await _store.GetConnectionAsync();
+            await db.ExecuteAsync("CREATE TABLE \"Memory\" (\"Id\" integer primary key autoincrement not null, \"Text\" varchar, \"Created\" bigint)");
+            await db.ExecuteAsync("CREATE TABLE \"Goal\" (\"Id\" integer primary key autoincrement not null, \"Text\" varchar, \"Target\" float, \"Unit\" varchar, \"Period\" integer, \"Created\" bigint)");
+            await db.ExecuteAsync("CREATE TABLE \"GoalProgress\" (\"Id\" integer primary key autoincrement not null, \"GoalId\" integer, \"Amount\" float, \"When\" bigint)");
+            var when = new DateTime(2026, 9, 30, 18, 0, 0);
+            await db.ExecuteAsync("INSERT INTO Memory (Text, Created) VALUES (?, ?)", "The user is vegetarian.", when.Ticks);
+            await db.ExecuteAsync("INSERT INTO Goal (Text, Target, Unit, Period, Created) VALUES (?, ?, ?, ?, ?)", "Drink water", 8.0, "glasses", (int)GoalPeriod.Day, when.Ticks);
+            await db.ExecuteAsync("INSERT INTO GoalProgress (GoalId, Amount, \"When\") VALUES (1, 2, ?)", when.AddHours(1).Ticks);
+
+            Assert.That((await new SqliteAgentMemoryStore(_store).GetMemoriesAsync()).Single().Text, Is.EqualTo("The user is vegetarian."));
+            var goals = new SqliteAgentGoalStore(_store);
+            AgentGoal goal = (await goals.GetGoalsAsync()).Single();
+            Assert.That((goal.Text, goal.Target, goal.Unit, goal.Period, goal.Created), Is.EqualTo(("Drink water", (double?)8, "glasses", GoalPeriod.Day, when)));
+            Assert.That((await goals.GetProgressAsync(goal.Id, DateTime.MinValue)).Single().Amount, Is.EqualTo(2));
+        }
+
+        [Test]
+        public async Task PrivateChatsNeitherReadNorSaveMemoriesOrGoals()
+        {
+            _store.IsPrivate = true;
+            var memories = new SqliteAgentMemoryStore(_store);
+            var goals = new SqliteAgentGoalStore(_store);
+            Assert.That(await memories.AddMemoryAsync("Secret"), Is.False);
+            Assert.That(await memories.GetMemoriesAsync(), Is.Empty);
+            await memories.DeleteMemoryAsync("1");
+            Assert.ThrowsAsync<InvalidOperationException>(() => goals.AddGoalAsync(new AgentGoal(null, "Secret", null, null, GoalPeriod.None, DateTime.Now)));
+            Assert.ThrowsAsync<InvalidOperationException>(() => goals.AddProgressAsync(new GoalProgress("1", 1, DateTime.Now)));
+            Assert.That(await goals.GetGoalsAsync(), Is.Empty);
+            Assert.That(await goals.DeleteLastProgressAsync("1"), Is.False);
+            Assert.That(Directory.Exists(_folder) && Directory.EnumerateFileSystemEntries(_folder).Any(), Is.False, "The database was opened.");
         }
 
         // A client that is never called (the conversations above are only loaded).

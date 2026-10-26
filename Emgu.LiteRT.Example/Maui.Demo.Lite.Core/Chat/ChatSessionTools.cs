@@ -11,7 +11,7 @@ namespace Maui.Demo.Lite;
 // The chat agent's tools that need no device (the demo's ChatAgentTools adds the location, clipboard and web tools).
 internal static class ChatSessionTools
 {
-    internal static IList<AITool> Create(bool isPrivate, ChatStore memories,
+    internal static IList<AITool> Create(bool isPrivate, IAgentMemoryStore memories,
         Func<string, CancellationToken, Task<string>> findPhotos,
         Func<string, CancellationToken, Task<string>> generateImage,
         Func<string, CancellationToken, Task<string>> searchChats,

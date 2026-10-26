@@ -94,7 +94,7 @@ public partial class LiteRtLmChatPage
     {
         _routeAttachments = attachments;
         _routePrompt = prompt;
-        try { _routeGoals = Goals.On ? await _store.GetGoalsAsync() : new List<AgentGoal>(); }
+        try { _routeGoals = Goals.On ? await _store.Goals.GetGoalsAsync() : new List<AgentGoal>(); }
         catch (Exception) { _routeGoals = new List<AgentGoal>(); }
         _routeGoalInstructions = await Goals.InstructionsAsync();
         ToolRouter router = ToolRouter;

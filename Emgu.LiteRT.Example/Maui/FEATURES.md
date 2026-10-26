@@ -220,13 +220,13 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   reloaded model keeps the conversation). It replaced a `ChatClientAgent` and, for Qwen, `Models.Chat`.
 - For Gemma 4 each message passes its tools in `ChatOptions.Tools` (`MessageOptionsAsync`, `ChatToolMode.Auto`), so settings
   can change them in the middle of a conversation. `ChatAgentTools.Create(tavilyKey, webSearch, location, memories)` picks
-  them from `Emgu.LiteRT.LM.Agents`' `AgentTools` and holds the MAUI location lookup; `ChatStore` implements
-  `IAgentMemoryStore`. Each tool call shows as a step line.
+  them from `Emgu.LiteRT.LM.Agents`' `AgentTools` and holds the MAUI location lookup; the memories are `ChatStore.Memories`, an
+  `Emgu.LiteRT.LM.Chat.Sqlite` `SqliteAgentMemoryStore`. Each tool call shows as a step line.
 - Always: `get_current_date_time`, `convert_units` and `calculate` (`Emgu.LiteRT.LM.Agents.Calculator`, a recursive-descent
   evaluator: + - * / ^ %, parentheses, pi and e, sqrt/ln/log/sin/.../round/min/max/pow, × ÷ − ·, a trailing % as percent;
   -2 ^ 2 is -4). Small models get arithmetic wrong: Gemma 4 E2B called it for "1234.5 times 678.9" and answered 838,102.05.
 - Memories - `remember` and `forget`, with Settings > "Memories about you" > "Remember things about me" on (on by default):
-  - Kept in `ChatStore`'s `Memory` table, on the device only. The latest memories, up to 1,200 characters, go into each
+  - Kept in the chats database's `Memory` table (`SqliteAgentMemoryStore`), on the device only. The latest memories, up to 1,200 characters, go into each
     message's `ChatOptions.Instructions`, after the agent's own instructions.
   - `remember` skips a fact whose words (less stop words) are all in one already saved, since the model re-saves known facts
     in other words; the step line then says "Already remembered". Settings lists the memories, with delete.

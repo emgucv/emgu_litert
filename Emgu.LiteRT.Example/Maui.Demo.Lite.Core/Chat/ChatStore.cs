@@ -120,20 +120,6 @@ public class ChatSearchRecord : ChatEmbeddingRecord
 }
 
 /// <summary>
-/// Something the chat agent remembers about the user ("The user is vegetarian"), kept across chats.
-/// </summary>
-[Table("Memory")]
-public class MemoryRecord
-{
-    [PrimaryKey, AutoIncrement]
-    public int Id { get; set; }
-
-    public string Text { get; set; }
-
-    public DateTime Created { get; set; }
-}
-
-/// <summary>
 /// A photo's embedding, for the chat's photo search (PhotoIndex): its id in the photo library, the version it was
 /// computed from, when it was taken, and the embedding (floats).
 /// </summary>
@@ -178,15 +164,23 @@ public class PhotoEmbeddingRecord
 /// The chat page's saved chats: a SQLite database (chats/chats.db3 in the app's data folder), with images and
 /// audio stored as files in chats/attachments/{conversation id}/ and only their names in the database. (A
 /// subfolder, since the app data folder of an unsandboxed Mac Catalyst app is ~/Library itself.) The chats themselves
-/// are Emgu.LiteRT.LM.Chat.Sqlite's ChatHistoryStore; the page's own data - documents, memories, goals, the chat and
-/// photo search indexes, a message's language and translated thinking, a chat's document - is kept here, in the same
-/// database.
+/// are Emgu.LiteRT.LM.Chat.Sqlite's ChatHistoryStore, and so are the agent's memories and goals (its
+/// SqliteAgentMemoryStore and SqliteAgentGoalStore, in the same database); the page's own data - documents, the chat
+/// and photo search indexes, a message's language and translated thinking, a chat's document - is kept here.
 /// </summary>
-internal sealed partial class ChatStore : ChatHistoryStore, IAgentMemoryStore
+internal sealed partial class ChatStore : ChatHistoryStore
 {
     internal ChatStore(string folder) : base(folder)
     {
+        Memories = new SqliteAgentMemoryStore(this);
+        Goals = new SqliteAgentGoalStore(this);
     }
+
+    /// <summary>The agent's memories (remember / forget), kept across chats; none while private.</summary>
+    public SqliteAgentMemoryStore Memories { get; }
+
+    /// <summary>The user's goals and their progress (the goal tools); none while private.</summary>
+    public SqliteAgentGoalStore Goals { get; }
 
     // The page's own tables, and its columns of the chats and messages (DocumentId, Language, ThinkingTranslation).
     protected override async Task CreateTablesAsync(SQLiteAsyncConnection connection)
@@ -194,9 +188,6 @@ internal sealed partial class ChatStore : ChatHistoryStore, IAgentMemoryStore
         await connection.CreateTableAsync<ConversationRecord>();
         await connection.CreateTableAsync<MessageRecord>();
         await connection.CreateTableAsync<ChatEmbeddingRecord>();
-        await connection.CreateTableAsync<MemoryRecord>();
-        await connection.CreateTableAsync<GoalRecord>();
-        await connection.CreateTableAsync<GoalProgressRecord>();
         await connection.CreateTableAsync<PhotoEmbeddingRecord>();
         await connection.CreateTableAsync<DocumentRecord>();
         await connection.CreateTableAsync<DocumentItemRecord>();
@@ -383,28 +374,6 @@ internal sealed partial class ChatStore : ChatHistoryStore, IAgentMemoryStore
     /// <summary>Delete a saved chat, its messages and attachment files.</summary>
     public Task DeleteConversationAsync(int conversationId) => DeleteChatAsync(conversationId);
 
-    /// <summary>The memories, oldest first.</summary>
-    public async Task<List<MemoryRecord>> GetMemoriesAsync()
-    {
-        if (IsPrivate) return new List<MemoryRecord>();
-        return await (await Db).Table<MemoryRecord>().OrderBy(m => m.Id).ToListAsync();
-    }
-
-    /// <summary>Remember something; returns false if the same text is already remembered.</summary>
-    public async Task<bool> AddMemoryAsync(string text)
-    {
-        if (IsPrivate) return false;
-        text = (text ?? string.Empty).Trim();
-        if (text.Length == 0)
-            return false;
-        SQLiteAsyncConnection db = await Db;
-        foreach (MemoryRecord existing in await db.Table<MemoryRecord>().ToListAsync())
-            if (string.Equals(existing.Text, text, StringComparison.OrdinalIgnoreCase))
-                return false;
-        await db.InsertAsync(new MemoryRecord { Text = text, Created = DateTime.UtcNow });
-        return true;
-    }
-
     // ---------- Photo search ----------
 
     public async Task<List<PhotoEmbeddingRecord>> GetPhotoEmbeddingsAsync()
@@ -427,22 +396,5 @@ internal sealed partial class ChatStore : ChatHistoryStore, IAgentMemoryStore
     public async Task ClearPhotoEmbeddingsAsync()
     {
         await (await Db).DeleteAllAsync<PhotoEmbeddingRecord>();
-    }
-
-    public async Task DeleteMemoryAsync(int id)
-    {
-        if (IsPrivate) return;
-        await (await Db).DeleteAsync<MemoryRecord>(id);
-    }
-
-    // The memories for the agent's remember / forget tools (Emgu.LiteRT.LM.Agents).
-    async Task<IList<AgentMemory>> IAgentMemoryStore.GetMemoriesAsync()
-    {
-        return (await GetMemoriesAsync()).Select(m => new AgentMemory(m.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), m.Text)).ToList();
-    }
-
-    Task IAgentMemoryStore.DeleteMemoryAsync(string id)
-    {
-        return DeleteMemoryAsync(int.Parse(id, System.Globalization.CultureInfo.InvariantCulture));
     }
 }

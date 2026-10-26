@@ -48,7 +48,7 @@ public partial class LiteRtLmChatPage
             return options;
         await RouteToolsAsync(prompt, attachments);
         options.Tools = ChatAgentTools.Create(_tavilyKey, _webSearchSwitch.IsToggled, _shareLocationSwitch.IsToggled,
-            !IsPrivateChat && _memorySwitch.IsToggled ? _store : null, privateChat: IsPrivateChat,
+            !IsPrivateChat && _memorySwitch.IsToggled ? _store.Memories : null, privateChat: IsPrivateChat,
             readClipboard: AgentTools.MentionsClipboard(prompt));
         foreach (AITool tool in ToolRouter.Tools())
             options.Tools.Add(tool);

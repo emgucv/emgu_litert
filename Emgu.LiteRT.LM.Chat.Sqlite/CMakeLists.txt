@@ -25,8 +25,8 @@ IF(HAVE_LITE_BUILD)
   IF (DOTNET_FOUND)
     PROJECT(Emgu.LiteRT.LM.Chat.Sqlite)
     BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/NetStandard/Emgu.LiteRT.LM.Chat.Sqlite.csproj" "" ALL)
-    # Emgu.LiteRT.LM.Chat.Sqlite.csproj depends on Emgu.LiteRT.LM.Chat.
-    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.LM.Chat)
+    # Emgu.LiteRT.LM.Chat.Sqlite.csproj depends on Emgu.LiteRT.LM.Chat and Emgu.LiteRT.LM.Agents.
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.LM.Chat Emgu.LiteRT.LM.Agents)
 
     INSTALL(
       DIRECTORY

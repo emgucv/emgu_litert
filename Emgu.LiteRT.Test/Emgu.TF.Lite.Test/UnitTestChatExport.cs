@@ -64,7 +64,7 @@ namespace Emgu.TF.Lite.Test
             await _store.SetSummaryAsync(id, "A compacted model context", user);
             int other = await _store.CreateConversationAsync("Do not export", "Other model");
             await _store.AddMessageAsync(other, MessageRecord.UserRole, "OTHER_CHAT_PRIVATE", null);
-            await _store.AddMemoryAsync("GLOBAL_MEMORY_PRIVATE");
+            await _store.Memories.AddMemoryAsync("GLOBAL_MEMORY_PRIVATE");
             using var output = new MemoryStream();
             Assert.That(await ChatExporter.ExportAsync(_store, id, output), Is.Zero);
             Assert.That(output.CanWrite, Is.True, "The caller owns the output stream.");

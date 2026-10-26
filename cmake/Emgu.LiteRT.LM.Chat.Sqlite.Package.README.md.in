@@ -30,6 +30,7 @@ saving = store.Attach(conversation, chats[0].Id);
 - **Files:** the database is `chats.db3` in the folder, and images and audio are files in `attachments/<chat id>/`. `DeleteChatAsync` removes a chat with its files.
 - **Your own data:** `CreateTablesAsync` (override it) and `GetConnectionAsync()` keep your own tables in the same database. To keep more columns about a chat or a message, derive records from `ChatRecord` / `ChatMessageRecord` with the same `[Table]` name; `LoadAsync<TMessage>` reads them, and `ChatHistory.RecordOf(message)` has them. `SaveExchangeAsync` also keeps files of your own kinds with a reply (e.g. a picture it drew), which `ChatHistory.AttachmentsOf(message)` gives back.
 - **Private chats:** with `IsPrivate` on, nothing is saved and no saved chat is read.
+- **The agent's memories and goals:** `SqliteAgentMemoryStore` and `SqliteAgentGoalStore` keep what `${EMGU_LITERT_LM_AGENTS_NUGET_ID}`' memory and goal tools save in the same database (tables `Memory`, `Goal` and `GoalProgress`), so it lasts across chats: `AgentTools.Memory(new SqliteAgentMemoryStore(store))`, `AgentTools.Goals(new SqliteAgentGoalStore(store))`. They follow `IsPrivate` too.
 - **Message ids:** the store remembers which row each message it saved or loaded is (`GetMessageId`), so saving the compaction point needs nothing else.
 - **Schema:** the database records its schema version (`SchemaVersion`, 1). The tables are the ones the Emgu LiteRT MAUI demo's chat page wrote before this package existed, so chats it saved open unchanged.
 

@@ -93,7 +93,7 @@ public partial class LiteRtLmChatPage : IChatHost
 
     void IChatHost.EndSoundMute() => EndSoundMute();
 
-    IAgentGoalStore IChatHost.Goals => Goals.On ? _store : null;
+    IAgentGoalStore IChatHost.Goals => Goals.On ? _store.Goals : null;
 
     bool IChatHost.DeveloperMode => DeveloperMode;
 

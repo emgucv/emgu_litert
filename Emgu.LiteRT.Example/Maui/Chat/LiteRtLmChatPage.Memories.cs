@@ -36,7 +36,7 @@ public partial class LiteRtLmChatPage
             return null;
         try
         {
-            _memoriesGiven = AgentTools.MemoriesForInstructions(await ((IAgentMemoryStore)_store).GetMemoriesAsync(), MaxMemoryLength);
+            _memoriesGiven = AgentTools.MemoriesForInstructions(await _store.Memories.GetMemoriesAsync(), MaxMemoryLength);
             return AgentTools.MemoryInstructions(_memoriesGiven);
         }
         catch (Exception)
@@ -57,7 +57,7 @@ public partial class LiteRtLmChatPage
             return;
         try
         {
-            HashSet<string> kept = (await ((IAgentMemoryStore)_store).GetMemoriesAsync()).Select(m => m.Id).ToHashSet();
+            HashSet<string> kept = (await _store.Memories.GetMemoriesAsync()).Select(m => m.Id).ToHashSet();
             List<AgentMemory> used = AgentTools.MemoriesUsed(given, prompt, reply.Text).Where(m => kept.Contains(m.Id)).ToList();
             if (used.Count == 0)
                 return;
@@ -83,7 +83,7 @@ public partial class LiteRtLmChatPage
         int count = 0;
         try
         {
-            count = (await _store.GetMemoriesAsync()).Count;
+            count = (await _store.Memories.GetMemoriesAsync()).Count;
         }
         catch (Exception)
         {
@@ -97,13 +97,13 @@ public partial class LiteRtLmChatPage
     private async void OnMemoriesTapped(HashSet<string> only)
     {
         if (IsPrivateChat) return;
-        List<MemoryRecord> memories = await _store.GetMemoriesAsync();
+        IList<AgentMemory> memories = await _store.Memories.GetMemoriesAsync();
         if (only != null)
-            memories = memories.Where(m => only.Contains(m.Id.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToList();
+            memories = memories.Where(m => only.Contains(m.Id)).ToList();
         if (memories.Count == 0)
             return;
         var list = new VerticalStackLayout { Spacing = 2 };
-        foreach (MemoryRecord memory in memories)
+        foreach (AgentMemory memory in memories)
         {
             var row = new Grid
             {
@@ -122,10 +122,10 @@ public partial class LiteRtLmChatPage
                 VerticalOptions = LayoutOptions.Center
             };
             SemanticProperties.SetDescription(delete, "Delete this memory");
-            int id = memory.Id;
+            string id = memory.Id;
             delete.OnTap(async () =>
             {
-                await _store.DeleteMemoryAsync(id);
+                await _store.Memories.DeleteMemoryAsync(id);
                 list.Children.Remove(row);
                 await RefreshMemoryCountAsync();
             });

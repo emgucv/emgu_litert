@@ -19,10 +19,12 @@
   Emgu.LiteRT.LM.Chat.Sqlite saves chats (Emgu.LiteRT.LM.Chat's ChatConversation messages) in a SQLite database, and
   reads them back to continue them. Kept out of Emgu.LiteRT.LM.Chat so that package has no SQLite dependency. The
   tables are the ones the MAUI demo's chat page wrote before this package existed, so its saved chats open unchanged.
+  Emgu.LiteRT.LM.Agents is for the agent's memories and goals kept in the same database (AgentStores.cs).
   The references become nuget package dependencies when this project is packed.
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\Emgu.LiteRT.LM.Chat\NetStandard\Emgu.LiteRT.LM.Chat.csproj" />
+    <ProjectReference Include="..\..\Emgu.LiteRT.LM.Agents\NetStandard\Emgu.LiteRT.LM.Agents.csproj" />
     <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
   </ItemGroup>
 </Project>

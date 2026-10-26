@@ -29,7 +29,7 @@ internal sealed class GoalsFeature
     public bool On => !_host.IsPrivateChat && _host.MemoryOn;
 
     public IEnumerable<Microsoft.Extensions.AI.AIFunction> ToolsForMessage() =>
-        On ? AgentTools.Goals(_store) : Array.Empty<Microsoft.Extensions.AI.AIFunction>();
+        On ? AgentTools.Goals(_store.Goals) : Array.Empty<Microsoft.Extensions.AI.AIFunction>();
 
     public async Task<string> InstructionsAsync()
     {
@@ -37,7 +37,7 @@ internal sealed class GoalsFeature
             return null;
         try
         {
-            return await AgentTools.GoalInstructionsAsync(_store, DateTime.Now, MaxGoalLength);
+            return await AgentTools.GoalInstructionsAsync(_store.Goals, DateTime.Now, MaxGoalLength);
         }
         catch (Exception)
         {
@@ -81,7 +81,7 @@ internal sealed class GoalsFeature
         int count = 0;
         try
         {
-            count = (await _store.GetGoalsAsync()).Count;
+            count = (await _store.Goals.GetGoalsAsync()).Count;
         }
         catch (Exception)
         {
@@ -93,7 +93,7 @@ internal sealed class GoalsFeature
     private async void OnGoalsTapped()
     {
         if (_host.IsPrivateChat) return;
-        IList<AgentGoal> goals = await _store.GetGoalsAsync();
+        IList<AgentGoal> goals = await _store.Goals.GetGoalsAsync();
         if (goals.Count == 0)
             return;
         var list = new VerticalStackLayout { Spacing = 2 };
@@ -116,8 +116,8 @@ internal sealed class GoalsFeature
         {
             try
             {
-                status.Text = await AgentTools.GoalStatusAsync(_store, goal, DateTime.Now);
-                GoalHistory history = GoalHistory.Compute(goal, await _store.GetProgressAsync(goal.Id, DateTime.MinValue), DateTime.Now, 12);
+                status.Text = await AgentTools.GoalStatusAsync(_store.Goals, goal, DateTime.Now);
+                GoalHistory history = GoalHistory.Compute(goal, await _store.Goals.GetProgressAsync(goal.Id, DateTime.MinValue), DateTime.Now, 12);
                 streak.Text = history.StreakText == null ? string.Empty : "\U0001F525 " + history.StreakText;
                 streak.IsVisible = history.StreakText != null;
                 strip.Children.Clear();
@@ -159,19 +159,19 @@ internal sealed class GoalsFeature
                 return;
             AgentGoal parsed = AgentGoal.FromText(text, goal.Created);
             goal = new AgentGoal(goal.Id, parsed.Text, parsed.Target, parsed.Unit, parsed.Period, goal.Created);
-            await _store.UpdateGoalAsync(goal);
+            await _store.Goals.UpdateGoalAsync(goal);
             await Refresh();
         });
         undo.OnTap(async () =>
         {
-            if (await _store.DeleteLastProgressAsync(goal.Id))
+            if (await _store.Goals.DeleteLastProgressAsync(goal.Id))
                 await Refresh();
         });
         delete.OnTap(async () =>
         {
             if (!await _host.AskAsync("Delete goal", "Delete \"" + goal.Text + "\" and its progress?", "Delete", "Cancel"))
                 return;
-            await _store.DeleteGoalAsync(goal.Id);
+            await _store.Goals.DeleteGoalAsync(goal.Id);
             list.Children.Remove(row);
             await RefreshCountAsync();
         });

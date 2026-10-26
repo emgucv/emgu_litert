@@ -41,15 +41,15 @@ namespace Emgu.TF.Lite.Test
             Assert.ThrowsAsync<InvalidOperationException>(() => _store.CreateConversationAsync("PRIVATE TITLE", "Gemma4E2B"));
             Assert.ThrowsAsync<InvalidOperationException>(() => _store.AddMessageAsync(1, MessageRecord.UserRole, "PRIVATE TEXT", "PRIVATE THINKING",
                 new[] { ("image", "image/png", new byte[] { 1, 2, 3 }) }));
-            Assert.That(await _store.AddMemoryAsync("PRIVATE MEMORY"), Is.False);
-            await _store.DeleteMemoryAsync(1);
+            Assert.That(await _store.Memories.AddMemoryAsync("PRIVATE MEMORY"), Is.False);
+            await _store.Memories.DeleteMemoryAsync("1");
             await _store.SetSummaryAsync(1, "PRIVATE SUMMARY", 1);
             await _store.SetConversationDocumentAsync(1, "PRIVATE DOC");
             await _store.SaveDocumentAsync(new DocumentRecord { Id = "PRIVATE DOC", Name = "private.pdf" },
                 new[] { new DocumentItemRecord { DocumentId = "PRIVATE DOC", Text = "PRIVATE CONTENT", Data = new byte[] { 4 }, Embedding = new byte[64] } });
             await _store.SaveChatEmbeddingsAsync(1, new List<ChatEmbeddingRecord> {
                 new ChatEmbeddingRecord { Id = "private-embedding", MessageId = 1, Text = "PRIVATE SEARCH", Embedding = new byte[64] } });
-            Assert.That(await _store.GetMemoriesAsync(), Is.Empty);
+            Assert.That(await _store.Memories.GetMemoriesAsync(), Is.Empty);
             Assert.That(await _store.GetMessagesAsync(1), Is.Empty);
             Assert.That(await _store.GetSearchMessagesAsync(), Is.Empty);
             Assert.That(await _store.GetChatEmbeddingsAsync(), Is.Empty);
@@ -63,8 +63,8 @@ namespace Emgu.TF.Lite.Test
         {
             int chat = await _store.CreateConversationAsync("Normal chat", "Gemma4E2B");
             int message = await _store.AddMessageAsync(chat, MessageRecord.UserRole, "Normal text", null);
-            await _store.AddMemoryAsync("Normal memory");
-            int memory = (await _store.GetMemoriesAsync()).Single().Id;
+            await _store.Memories.AddMemoryAsync("Normal memory");
+            string memory = (await _store.Memories.GetMemoriesAsync()).Single().Id;
             await _store.SaveDocumentAsync(new DocumentRecord { Id = "normal", Name = "normal.pdf" },
                 new[] { new DocumentItemRecord { DocumentId = "normal", Text = "Normal document" } });
             await _store.SetConversationDocumentAsync(chat, "normal");
@@ -78,10 +78,10 @@ namespace Emgu.TF.Lite.Test
             }
             byte[] before = ReadDatabase();
             _store.IsPrivate = true;
-            IAgentMemoryStore agentMemory = _store;
+            IAgentMemoryStore agentMemory = _store.Memories;
             Assert.That(await agentMemory.GetMemoriesAsync(), Is.Empty);
             Assert.That(await agentMemory.AddMemoryAsync("Private fact"), Is.False);
-            await agentMemory.DeleteMemoryAsync(memory.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            await agentMemory.DeleteMemoryAsync(memory);
             await _store.SetSummaryAsync(chat, "Private summary", 999);
             await _store.SetConversationDocumentAsync(chat, null);
             await _store.DeleteUnusedDocumentsAsync();
@@ -89,7 +89,7 @@ namespace Emgu.TF.Lite.Test
             Assert.That(await _store.GetDocumentAsync("normal"), Is.Null);
             Assert.That(ReadDatabase(), Is.EqualTo(before));
             _store.IsPrivate = false;
-            Assert.That((await _store.GetMemoriesAsync()).Single().Text, Is.EqualTo("Normal memory"));
+            Assert.That((await _store.Memories.GetMemoriesAsync()).Single().Text, Is.EqualTo("Normal memory"));
             Assert.That((await _store.GetMessagesAsync(chat)).Single().Text, Is.EqualTo("Normal text"));
             Assert.That((await _store.GetDocumentAsync("normal")).Name, Is.EqualTo("normal.pdf"));
             var restored = (await _store.GetConversationsAsync()).Single();
@@ -119,10 +119,10 @@ namespace Emgu.TF.Lite.Test
         public void PrivateAgentHasNoMemoryOrPastChatToolsEvenWhenCallbacksAreProvided()
         {
             Task<string> Tool(string text, CancellationToken token) => Task.FromResult(text);
-            var privateTools = ChatSessionTools.Create(true, _store, Tool, Tool, Tool).Select(t => t.Name).ToList();
+            var privateTools = ChatSessionTools.Create(true, _store.Memories, Tool, Tool, Tool).Select(t => t.Name).ToList();
             Assert.That(privateTools, Does.Not.Contain("remember").And.Not.Contain("forget").And.Not.Contain("search_chats"));
             Assert.That(privateTools, Does.Contain("calculate").And.Contain("find_photos").And.Contain("generate_image"));
-            var regularTools = ChatSessionTools.Create(false, _store, Tool, Tool, Tool).Select(t => t.Name).ToList();
+            var regularTools = ChatSessionTools.Create(false, _store.Memories, Tool, Tool, Tool).Select(t => t.Name).ToList();
             Assert.That(regularTools, Does.Contain("remember").And.Contain("forget").And.Contain("search_chats"));
         }
 

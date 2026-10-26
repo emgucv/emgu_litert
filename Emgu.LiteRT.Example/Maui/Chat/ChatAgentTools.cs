@@ -13,13 +13,13 @@ namespace Maui.Demo.Lite;
 
 /// <summary>
 /// The tools the LiteRT-LM chat page's agent gets with a message, from Emgu.LiteRT.LM.Agents' AgentTools: the date and
-/// time, the calculator and unit conversion always, memories about the user (ChatStore) when memory is on, the user's
+/// time, the calculator and unit conversion always, memories about the user (ChatStore.Memories) when memory is on, the user's
 /// location (this file's MAUI lookup) when they allow it, and with web search on the weather, Wikipedia, currency
 /// conversion and a web page reader (Tavily's, with a Tavily API key, which also adds a web search).
 /// </summary>
 internal static class ChatAgentTools
 {
-    public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location, ChatStore memories,
+    public static IList<AITool> Create(string tavilyApiKey, bool webSearch, bool location, IAgentMemoryStore memories,
         Func<string, CancellationToken, Task<string>> findPhotos = null,
         Func<string, CancellationToken, Task<string>> generateImage = null,
         Func<string, CancellationToken, Task<string>> searchChats = null, bool privateChat = false,

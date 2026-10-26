@@ -11,7 +11,7 @@
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
 	<summary>Saved chats for Emgu.LiteRT.LM.Chat in a SQLite database: messages, thinking, tool steps, images and audio, and the compaction point.</summary>
-    <Description>Saves chats - Emgu.LiteRT.LM.Chat's ChatConversation messages - in a SQLite database and reads them back to continue them: the user's messages with their images, audio, context and voice transcripts, the replies with their thinking and tool step lines, and where the model's memory starts after the conversation was compacted, with its summary. An app keeps its own tables and columns in the same database.</Description>
+    <Description>Saves chats - Emgu.LiteRT.LM.Chat's ChatConversation messages - in a SQLite database and reads them back to continue them: the user's messages with their images, audio, context and voice transcripts, the replies with their thinking and tool step lines, and where the model's memory starts after the conversation was compacted, with its summary. An app keeps its own tables and columns in the same database, and the agent's memories and goals (Emgu.LiteRT.LM.Agents) can be kept there too.</Description>
     <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM Chat SQLite, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
 http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
 
