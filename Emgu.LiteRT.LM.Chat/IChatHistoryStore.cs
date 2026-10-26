@@ -62,7 +62,10 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>The saved chats, the most recently updated first (none while <see cref="IsPrivate"/>).</summary>
         Task<IReadOnlyList<ChatHistoryEntry>> ListChatsAsync();
 
-        /// <summary>Show a saved chat in a conversation and continue it.</summary>
+        /// <summary>
+        /// Show a saved chat in a conversation and continue it. The messages are added to the conversation on the caller's
+        /// synchronization context (the UI thread, when a page calls it), since views may be bound to them.
+        /// </summary>
         /// <param name="chatId">The chat</param>
         /// <param name="conversation">The conversation (not sending a message)</param>
         /// <returns>True if the chat was found</returns>

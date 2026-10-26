@@ -44,7 +44,8 @@ namespace Emgu.LiteRT.LM.Maui
         {
             if (option == null)
                 throw new ArgumentNullException(nameof(option));
-            if (IsWorking && _chatView.Model != null)
+            // Not while a reply is being written (the page's own busy work - opening a chat - changes the model itself).
+            if (Conversation?.IsBusy == true)
             {
                 SetStatus("Wait for the reply to finish before changing the model.");
                 return;

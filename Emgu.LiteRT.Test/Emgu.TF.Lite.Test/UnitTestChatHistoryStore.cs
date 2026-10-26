@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Chat;
@@ -381,6 +382,58 @@ namespace Emgu.TF.Lite.Test
             Assert.That(changed, Is.GreaterThanOrEqualTo(2));
             store.IsPrivate = true;
             Assert.That(_store.IsPrivate, Is.True);
+        }
+
+        // A synchronization context like a UI thread's: what is posted to it runs on the thread that pumps it.
+        private sealed class PumpedContext : System.Threading.SynchronizationContext
+        {
+            private readonly System.Collections.Concurrent.BlockingCollection<(SendOrPostCallback, object)> _queue = new();
+
+            public override void Post(SendOrPostCallback d, object state) => _queue.Add((d, state));
+
+            // Run what is posted until the task completes.
+            public T Pump<T>(Task<T> task)
+            {
+                while (!task.IsCompleted)
+                    if (_queue.TryTake(out (SendOrPostCallback Callback, object State) item, 50))
+                        item.Callback(item.State);
+                return task.GetAwaiter().GetResult();
+            }
+        }
+
+        [Test]
+        public async Task LoadsAChatIntoTheConversationOnTheCallersContext()
+        {
+            // The MAUI page loads a saved chat into a conversation whose messages are bound to views, which may only change on
+            // the UI thread: the messages must be added on the caller's synchronization context, not the database's thread
+            // (a ConfigureAwait(false) before the load crashed the page on Android).
+            var client = new ReplyingClient();
+            client.Replies.Enqueue("Hello!");
+            var conversation = new ChatConversation(client);
+            int chatId;
+            using (ChatHistoryBinding saving = _store.Attach(conversation))
+            {
+                await conversation.SendAsync("Hi");
+                await saving.FlushAsync();
+                chatId = saving.ChatId;
+            }
+            IChatHistoryStore store = _store;
+            var reopened = new ChatConversation(client);
+            var threads = new List<int>();
+            reopened.Messages.CollectionChanged += (s, e) => threads.Add(Environment.CurrentManagedThreadId);
+            var context = new PumpedContext();
+            System.Threading.SynchronizationContext previous = System.Threading.SynchronizationContext.Current;
+            System.Threading.SynchronizationContext.SetSynchronizationContext(context);
+            try
+            {
+                Assert.That(context.Pump(store.LoadChatAsync(chatId, reopened)), Is.True);
+            }
+            finally
+            {
+                System.Threading.SynchronizationContext.SetSynchronizationContext(previous);
+            }
+            Assert.That(reopened.Messages.Count, Is.EqualTo(2));
+            Assert.That(threads, Is.Not.Empty.And.All.EqualTo(Environment.CurrentManagedThreadId));
         }
 
         [Test]

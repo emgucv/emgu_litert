@@ -534,7 +534,9 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         {
             if (conversation == null)
                 throw new ArgumentNullException(nameof(conversation));
-            ChatHistory history = await LoadAsync(chatId).ConfigureAwait(false);
+            // Back on the caller's synchronization context for the load: the conversation's messages are bound to views,
+            // which may only change on the UI thread (a ConfigureAwait(false) here crashed the MAUI page on Android).
+            ChatHistory history = await LoadAsync(chatId);
             if (history == null)
                 return false;
             history.Load(conversation);
