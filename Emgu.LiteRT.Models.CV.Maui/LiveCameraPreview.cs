@@ -1,4 +1,7 @@
-// Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+
 using Emgu.CV;
 #if ANDROID
 using PreviewBase = Emgu.CV.Platform.Maui.UI.CvImageView;
@@ -6,10 +9,14 @@ using PreviewBase = Emgu.CV.Platform.Maui.UI.CvImageView;
 using PreviewBase = Microsoft.Maui.Controls.Image;
 #endif
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.Models.CV.Maui;
 
-// Match the Emgu CV demo's native rendering path. Keep the MAUI view and its measured size stable between frames.
-internal sealed class LiveCameraPreview : PreviewBase
+/// <summary>
+/// Shows <see cref="LiveCamera"/>'s frames (or any BGR Mats) through each platform's own image view, as Emgu CV's MAUI demo does: Emgu CV's
+/// CvImageView on Android, a UIImageView on iOS and Mac Catalyst, a WriteableBitmap on Windows. The view and its measured size stay the same
+/// between frames. Use it from the UI thread.
+/// </summary>
+public sealed class LiveCameraPreview : PreviewBase
 {
 #if MACCATALYST || IOS
     private UIKit.UIImage _appleImage;
@@ -19,7 +26,7 @@ internal sealed class LiveCameraPreview : PreviewBase
     private byte[] _pixels;
 #endif
 
-    // The caller retains the Mat until the next presentation (CvImageView also retains it for handler changes).
+    /// <summary>Show a frame. Keep the Mat unchanged until the next one is presented (CvImageView also keeps it for handler changes).</summary>
     public void Present(Mat frame)
     {
 #if ANDROID
@@ -49,6 +56,7 @@ internal sealed class LiveCameraPreview : PreviewBase
 #endif
     }
 
+    /// <summary>Show nothing, and release the platform image.</summary>
     public void ClearFrame()
     {
 #if ANDROID

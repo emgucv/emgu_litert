@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<Project>
+  <!-- https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022 -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+
+	<TargetFrameworks>net${DOTNET_VERSION_MAJOR}.0-android;net${DOTNET_VERSION_MAJOR}.0-ios</TargetFrameworks>
+	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx')) or $([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFrameworks>
+	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-windows10.0.19041.0</TargetFrameworks>
+
+	<MauiVersion Condition="'$(MauiVersion)' == ''">${DOTNET_VERSION_MAJOR}.0.0</MauiVersion>
+
+    <EmguLiteRTProjectRoot>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\))</EmguLiteRTProjectRoot>
+
+    <PackageId>${EMGU_LITERT_MODELS_CV_MAUI_NUGET_ID}</PackageId>
+	<title>${EMGU_LITERT_MODELS_CV_MAUI_NUGET_TITLE}</title>
+    <version>${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>The live camera for Emgu LiteRT's vision models in a MAUI app: frames as Emgu CV Mats, a preview, and on Android photos and video clips while it runs.</summary>
+    <Description>The live camera for the Emgu LiteRT vision models (Emgu.LiteRT.Models.CV) in a MAUI app: frames as Emgu CV Mats, upright and at most 960 px, for detectors and a preview that draws them; on Android through Camera2, which also takes full-resolution photos and records video clips while the preview and the detectors go on, elsewhere through OpenCV's capture. Android, Mac Catalyst and Windows.</Description>
+    <PackageReleaseNotes>This is the ${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT Models CV MAUI, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
+
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(EmguLiteRTProjectRoot)\platforms\nuget))</PackageOutputPath>
+	<PackageTags>litert emgu emgucv emgutflite maui camera camera2 opencv detection ai</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+
+  </PropertyGroup>
+
+    <ItemGroup>
+      <None Include="$(EmguLiteRTProjectRoot)\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="$(EmguLiteRTProjectRoot)\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />
+</Project>

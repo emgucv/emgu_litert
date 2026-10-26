@@ -1,0 +1,51 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.Models.CV.Maui.dll`: the live camera for the `${EMGU_LITERT_MODELS_CV_NUGET_ID}` detectors in a MAUI app.
+  - `LiveCamera` delivers frames as Emgu CV `Mat`s (8-bit BGR, at most 960 px on the long side, turned upright as `RotationDegrees` says, up to 30 a second) and JPEG snapshots on request (`CaptureAsync`).
+  - On Android it runs through Camera2, with the back or the selfie camera (`Front`). While the frames go on, it also takes full-resolution photos (`TakePhotoAsync`) and records H.264 clips with sound (`RecordClipAsync`). Where Camera2 can't be set up, it falls back to OpenCV's camera.
+  - On Mac Catalyst and Windows it is OpenCV's capture of the first camera. iOS isn't supported yet (`LiveCamera.Supported`).
+  - `LiveCameraPreview` shows the frames through each platform's own image view: Emgu CV's `CvImageView` on Android, a `UIImageView` on iOS and Mac Catalyst, a `WriteableBitmap` on Windows.
+
+It depends on Emgu CV's MAUI runtime package (`Emgu.CV.runtime.maui.mini`), which brings OpenCV's native libraries for each platform.
+
+## Getting Started
+
+Declare camera access (`android.permission.CAMERA` in AndroidManifest.xml, `NSCameraUsageDescription` in Info.plist, the `webcam` capability on Windows) and ask for it first.
+
+```csharp
+using Emgu.CV;
+using Emgu.LiteRT.Models.CV.Maui;
+
+// In the page: a LiveCameraPreview in the layout, and the Mat it shows (kept until the next one).
+LiveCameraPreview preview = new LiveCameraPreview();
+Mat shown = null;
+
+if (await Permissions.RequestAsync<Permissions.Camera>() != PermissionStatus.Granted) return;
+var camera = new LiveCamera { RotationDegrees = () => LiveCamera.FrameRotation(false) ?? 0 };
+camera.FrameReady = frame =>
+{
+    // On the camera's thread; the camera reuses its Mat, so copy it. Run a detector on another copy, off this thread.
+    Mat copy = frame.Clone();
+    MainThread.BeginInvokeOnMainThread(() =>
+    {
+        preview.Present(copy);
+        shown?.Dispose();
+        shown = copy;
+    });
+};
+camera.Failed = message => MainThread.BeginInvokeOnMainThread(() => preview.ClearFrame());
+await camera.StartAsync(CancellationToken.None);
+// ...
+await camera.StopAsync();
+```
+
+A real app keeps at most one frame waiting for the UI and drops the others, instead of queueing a copy of each.
+
+## Note
+
+On Android and iOS, apps on Emgu CV 4.12 should exclude `System.Drawing.Common`'s assets (`<PackageReference Include="System.Drawing.Common" Version="9.0.0" ExcludeAssets="all" />` for those targets). Emgu CV's MAUI runtime brings it through `Emgu.CV.Models`, and its Windows-only assembly makes Mono's AOT compiler fail (Android Release, iOS).
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

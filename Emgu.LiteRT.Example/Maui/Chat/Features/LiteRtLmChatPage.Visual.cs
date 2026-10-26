@@ -10,6 +10,7 @@ using Emgu.LiteRT.LM.Agents.Vision;
 using Emgu.LiteRT.Models;
 using Microsoft.Extensions.AI;
 using Emgu.LiteRT.LM.Agents.Audio;
+using Emgu.LiteRT.Models.CV.Maui;
 
 namespace Maui.Demo.Lite;
 

@@ -19,6 +19,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
 using Emgu.LiteRT.LM.Chat.Sqlite;
+using Emgu.LiteRT.Models.CV.Maui;
 
 // Sending a message and streaming the reply.
 namespace Maui.Demo.Lite;

@@ -601,6 +601,9 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # Emgu.LiteRT.Models.CV/: the detectors and image input that need Emgu CV (kept out of Emgu.LiteRT.Models so that package has no Emgu CV dependency).
   SET(EMGU_LITERT_MODELS_CV_NUGET_ID "${EMGU_LITERT_MODELS_NUGET_ID}.CV")
   SET(EMGU_LITERT_MODELS_CV_NUGET_TITLE "${EMGU_LITERT_MODELS_NUGET_TITLE} CV")
+  # Emgu.LiteRT.Models.CV.Maui/: the live camera for those detectors in a MAUI app (Emgu CV's MAUI runtime).
+  SET(EMGU_LITERT_MODELS_CV_MAUI_NUGET_ID "${EMGU_LITERT_MODELS_CV_NUGET_ID}.Maui")
+  SET(EMGU_LITERT_MODELS_CV_MAUI_NUGET_TITLE "${EMGU_LITERT_MODELS_CV_NUGET_TITLE} MAUI")
 
   # Select the paired core before configuring dependent runtime package IDs.
   SET(EMGU_LITERT_GPU_WINDOWS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.GPU.runtime.windows")
@@ -1301,6 +1304,17 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.CV.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models.CV/NetStandard/docs/README.md)
 
+# Emgu.LiteRT.Models.CV.Maui: the live camera for the Emgu.LiteRT.Models.CV detectors in a MAUI app (LiveCamera, LiveCameraPreview).
+# Its own nuget package (Android, iOS, Mac Catalyst, Windows), depending on Emgu CV's MAUI runtime and Microsoft.Maui.Controls.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.CV.Maui.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models.CV.Maui/Maui/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models.CV.Maui/Maui/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models.CV.Maui/Maui/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Models.CV.Maui.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Models.CV.Maui/Maui/docs/README.md)
+
 # Emgu.LiteRT.LM.Agents.CV: visual agents for Emgu.LiteRT.LM.Agents' camera monitors on the Emgu.LiteRT.Models.CV detectors. Its own nuget package,
 # depending on Emgu.LiteRT.LM.Agents and Emgu.LiteRT.Models.CV, versioned with the LiteRT-LM packages.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Agents.CV.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Agents.CV/NetStandard/Directory.Build.props)
@@ -1379,6 +1393,7 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.TF.Lite.Models)
   ADD_SUBDIRECTORY(Emgu.LiteRT.Models)
   ADD_SUBDIRECTORY(Emgu.LiteRT.Models.CV)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.Models.CV.Maui)
   # After Emgu.LiteRT.LM.Agents and Emgu.LiteRT.Models.CV, which it depends on.
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Agents.CV)
 ENDIF()

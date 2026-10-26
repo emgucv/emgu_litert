@@ -4,6 +4,7 @@ using Emgu.CV;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.Models;
 using Microsoft.Maui.Controls.Shapes;
+using Emgu.LiteRT.Models.CV.Maui;
 
 namespace Maui.Demo.Lite;
 

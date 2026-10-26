@@ -1,14 +1,24 @@
-// Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 using System.Diagnostics;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.Models.CV.Maui;
 
-// One worker owns the native capture and Mats. Preview consumers must copy a frame before returning.
-// Only requested snapshots are JPEG-encoded; the live preview receives raw pixels.
-internal sealed partial class LiveCamera
+/// <summary>
+/// The live camera: frames as 8-bit BGR Mats, at most 960 px on the long side and turned upright as <see cref="RotationDegrees"/> says, up to
+/// 30 a second, for detectors and a <see cref="LiveCameraPreview"/>; JPEG snapshots on request (<see cref="CaptureAsync"/>). On Android it runs
+/// through Camera2, which also takes full-resolution photos (<c>TakePhotoAsync</c>) and records clips (<c>RecordClipAsync</c>) while the frames go
+/// on, and falls back to OpenCV's camera backend where Camera2 can't be set up; on Mac Catalyst and Windows it is OpenCV's capture (the first
+/// camera). The app must declare camera access (<c>android.permission.CAMERA</c>, <c>NSCameraUsageDescription</c>, the <c>webcam</c>
+/// capability) and ask for it before <see cref="StartAsync"/>. One worker owns the native capture and the Mats.
+/// </summary>
+public sealed partial class LiveCamera
 {
+    /// <summary>Whether this platform has it: Android, Mac Catalyst and Windows.</summary>
     public static bool Supported => DeviceInfo.Platform == DevicePlatform.Android ||
         DeviceInfo.Platform == DevicePlatform.MacCatalyst || DeviceInfo.Platform == DevicePlatform.WinUI;
     private readonly CancellationTokenSource _stop = new();
@@ -17,10 +27,17 @@ internal sealed partial class LiveCamera
     private readonly TaskCompletionSource<bool> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private TaskCompletionSource<byte[]> _snapshot;
     private Task _worker;
+    /// <summary>False once the camera has stopped or failed (a stopped camera isn't started again: make a new one).</summary>
     public bool IsRunning => !_stop.IsCancellationRequested;
-    public Action<Mat> FrameReady;
-    public Action<string> Failed;
-    public Func<int> RotationDegrees;
+    /// <summary>
+    /// Called on the camera's thread with each frame. The Mat is reused for the next frame: copy what you keep before returning, and return
+    /// quickly (hand detection to another thread).
+    /// </summary>
+    public Action<Mat> FrameReady { get; set; }
+    /// <summary>Called with a message when the camera fails or is disconnected after it started (it has stopped then).</summary>
+    public Action<string> Failed { get; set; }
+    /// <summary>How far to turn each frame clockwise (0, 90, 180 or 270), asked for every frame; e.g. <c>() =&gt; LiveCamera.FrameRotation(front) ?? 0</c>.</summary>
+    public Func<int> RotationDegrees { get; set; }
     /// <summary>The selfie camera instead of the back one (Android, Camera2 only); set before <see cref="StartAsync"/>.</summary>
     public bool Front { get; init; }
     // Frames larger than this (on the long side) are scaled down: the detectors work at 192-640 px anyway.
@@ -52,12 +69,15 @@ internal sealed partial class LiveCamera
 #endif
     }
 
+    /// <summary>Open the camera; returns once the first frame has arrived (at most 15 s).</summary>
+    /// <exception cref="InvalidOperationException">No camera could be opened</exception>
     public async Task StartAsync(CancellationToken token)
     {
         _worker = Task.Run(RunAsync);
         await _ready.Task.WaitAsync(TimeSpan.FromSeconds(15), token);
     }
 
+    /// <summary>The next frame as a JPEG (quality 85), as the frames are: upright, at most 960 px.</summary>
     public async Task<byte[]> CaptureAsync(CancellationToken token)
     {
         // Chat snapshots and alert snapshots share this camera; each waits for its own fresh frame.
@@ -76,6 +96,7 @@ internal sealed partial class LiveCamera
         finally { _captureGate.Release(); }
     }
 
+    /// <summary>Close the camera and wait until it is closed.</summary>
     public async Task StopAsync()
     {
         _stop.Cancel();
@@ -88,7 +109,7 @@ internal sealed partial class LiveCamera
         try
         {
 #if ANDROID
-            // Camera2 first: it can record a video clip while the preview and the detector keep running (LiveCamera.Camera2.cs);
+            // Camera2 first: it can record a video clip while the preview and the detectors keep running (LiveCamera.Camera2.cs);
             // OpenCV's camera backend below takes over on a device where Camera2 can't be set up.
             if (await RunCamera2Async()) return;
             if (Front) throw new InvalidOperationException("The selfie camera needs Camera2, which couldn't be set up on this phone.");

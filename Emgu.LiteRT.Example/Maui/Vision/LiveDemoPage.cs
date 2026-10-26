@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using Emgu.CV;
 using Microsoft.Maui.Controls.Shapes;
+using Emgu.LiteRT.Models.CV.Maui;
 
 namespace Maui.Demo.Lite;
 

@@ -553,7 +553,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   clip, through the same `TakePhotoAsync`/`RecordClipAsync` as the camera monitors.
 - `take_photo` also plays a short shutter click (`camera_click.wav`, `CameraChimeAction("camera_click.wav")`, inside the sound
   mute) unless Settings > "Camera sounds" is off (TODO item 50); clips are silent.
-- On Android the live camera runs through Camera2 (`LiveCamera.Camera2.cs`; OpenCV's camera is the fallback). A 640x480 YUV
+- On Android the live camera runs through Camera2 (`Emgu.LiteRT.Models.CV.Maui/LiveCamera.Camera2.cs`, moved out of the demo on 2026-10-25; OpenCV's camera is the fallback). A 640x480 YUV
   reader feeds the preview and the detectors.
   - The `record_clip` visual-alert action (TODO item 43) adds a `MediaRecorder` surface by configuring the session again for
     the length of a clip: 720p H.264 MP4, with sound when the microphone is already allowed, 3-30 s. Frames keep coming at 30

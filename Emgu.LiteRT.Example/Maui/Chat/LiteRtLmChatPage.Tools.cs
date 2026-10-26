@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Emgu.LiteRT.LM.Agents;
 using Microsoft.Extensions.AI;
+using Emgu.LiteRT.Models.CV.Maui;
 
 namespace Maui.Demo.Lite;
 

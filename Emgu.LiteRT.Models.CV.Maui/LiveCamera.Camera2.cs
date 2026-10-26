@@ -1,4 +1,7 @@
-// Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+
 #if ANDROID
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -12,21 +15,26 @@ using Android.Views;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.Models.CV.Maui;
 
-// The Android live camera through Camera2 instead of OpenCV's camera backend (TODO item 43): a session with a 640x480 YUV image reader (what the
+// The Android live camera through Camera2 instead of OpenCV's camera backend (the MAUI demo's TODO item 43): a session with a 640x480 YUV image reader (what the
 // preview and the detectors get, as before). A clip adds a MediaRecorder's surface: the session is configured again with it when the clip starts
 // and without it when it ends (a persistent MediaCodec input surface, which would have avoided that, isn't accepted when a session is created:
 // it has no size until a recorder takes it), so the frames pause briefly at both ends while the preview and the detector keep running during the
-// clip. The S10's and the Pixel Fold's cameras all ran an analysis stream and a 720p recording together (TODO item 43).
-internal sealed partial class LiveCamera
+// clip. A Galaxy S10's and a Pixel Fold's cameras all ran an analysis stream and a 720p recording together.
+public sealed partial class LiveCamera
 {
-    internal sealed class ClipResult
+    /// <summary>A recorded clip (<see cref="RecordClipAsync"/>).</summary>
+    public sealed class ClipResult
     {
-        public string Path;
-        public TimeSpan Duration;
-        public bool WithAudio;
-        public long Bytes;
+        /// <summary>The MP4 file</summary>
+        public string Path { get; init; }
+        /// <summary>How long it recorded</summary>
+        public TimeSpan Duration { get; init; }
+        /// <summary>Whether it has sound</summary>
+        public bool WithAudio { get; init; }
+        /// <summary>The file's size</summary>
+        public long Bytes { get; init; }
     }
 
     private readonly SemaphoreSlim _recordGate = new(1, 1);
@@ -72,7 +80,7 @@ internal sealed partial class LiveCamera
     }
 
     /// <summary>The id of the first camera facing the user (<paramref name="front"/>) or, for the back, the first facing away (else the first listed); null if there is none.</summary>
-    internal static string FindCameraId(bool front)
+    public static string FindCameraId(bool front)
     {
         var manager = (CameraManager)Android.App.Application.Context.GetSystemService(Context.CameraService);
         string[] ids = manager.GetCameraIdList();
@@ -248,11 +256,17 @@ internal sealed partial class LiveCamera
     }
 
 
-    internal sealed class PhotoResult
+    /// <summary>A photo taken (<see cref="TakePhotoAsync"/>).</summary>
+    public sealed class PhotoResult
     {
-        public string Path;
-        public int Width, Height;
-        public long Bytes;
+        /// <summary>The JPEG file</summary>
+        public string Path { get; init; }
+        /// <summary>Its width in pixels</summary>
+        public int Width { get; init; }
+        /// <summary>Its height in pixels</summary>
+        public int Height { get; init; }
+        /// <summary>The file's size</summary>
+        public long Bytes { get; init; }
     }
 
     private sealed class ConvergenceCallback : CameraCaptureSession.CaptureCallback

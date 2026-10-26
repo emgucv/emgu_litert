@@ -2,6 +2,7 @@
 #if ANDROID
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.Models.CV.Maui;
 
 namespace Maui.Demo.Lite;
 

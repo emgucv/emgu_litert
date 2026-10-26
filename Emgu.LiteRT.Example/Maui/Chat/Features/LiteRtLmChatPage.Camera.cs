@@ -2,6 +2,7 @@
 using System.IO;
 using Emgu.CV;
 using Microsoft.Extensions.AI;
+using Emgu.LiteRT.Models.CV.Maui;
 
 namespace Maui.Demo.Lite;
 
