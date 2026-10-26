@@ -299,8 +299,8 @@ namespace Emgu.LiteRT.LM.Maui
             return new Unsubscriber(() => conversation.Messages.CollectionChanged -= onAdded);
         }
 
-        // Discards a recording in progress (the view left the page).
-        private async Task CancelRecordingAsync()
+        /// <summary>Discard a recording in progress (e.g. the page is leaving, or the camera needs the device).</summary>
+        public async Task CancelRecordingAsync()
         {
             if (!IsRecording)
                 return;

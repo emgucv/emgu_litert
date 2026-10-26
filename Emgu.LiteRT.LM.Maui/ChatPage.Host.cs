@@ -118,12 +118,20 @@ namespace Emgu.LiteRT.LM.Maui
 
         void IChatPageHost.AddCardToReply(View card)
         {
-            ChatMessageItem reply = Conversation?.Messages.LastOrDefault(m => m.Role == ChatMessageRole.Assistant);
-            if (reply == null)
+            if (card == null || Conversation == null)
                 return;
-            reply.Decorations.Add(card);
+            ChatMessageItem reply = Conversation.Messages.LastOrDefault(m => m.Role == ChatMessageRole.Assistant);
+            // Without a reply yet (a monitor's snapshot before the first message): a notice of its own.
+            if (reply != null)
+                reply.Decorations.Add(card);
+            else
+                Conversation.AddNotice(card);
             _chatView.ScrollToEnd();
         }
+
+        void IChatPageHost.RefreshChatList() => RefreshChatList();
+
+        void IChatPageHost.RefreshChips() => UpdateChips();
 
         void IChatPageHost.RemoveCard(View card)
         {

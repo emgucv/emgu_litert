@@ -95,6 +95,17 @@ namespace Emgu.LiteRT.LM.Maui
                 _featureChips.Add((chip, toggle));
                 chips.Children.Add(toggle);
             }
+            foreach (ChatFeature feature in _features)
+            {
+                View view;
+                try { view = feature.BuildComposerView(); }
+                catch (Exception) { view = null; }
+                if (view != null)
+                {
+                    view.Margin = new Thickness(0, 0, 6, 6);
+                    chips.Children.Add(view);
+                }
+            }
             _chips = chips;
             _chatView.Toolbar = chips;
             UpdateChips();
@@ -114,6 +125,8 @@ namespace Emgu.LiteRT.LM.Maui
                     view.IsToggled = chip.IsOn();
                 any |= view.IsVisible;
             }
+            // A feature's own view (shown or not) keeps the row.
+            any |= _chips.Children.OfType<View>().Any(v => !(v is ToggleChip));
             _chatView.Toolbar = any ? _chips : null;
         }
 

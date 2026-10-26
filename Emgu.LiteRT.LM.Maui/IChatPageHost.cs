@@ -150,5 +150,11 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>Build the settings and the chips again (e.g. after a feature's state changed what it shows).</summary>
         void RefreshSettings();
+
+        /// <summary>List the saved chats again (e.g. after a feature changed a chat's title).</summary>
+        void RefreshChatList();
+
+        /// <summary>Show the chips above the message box again as they are now (a feature's chip changed state on its own).</summary>
+        void RefreshChips();
     }
 }

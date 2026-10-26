@@ -131,6 +131,12 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>The feature's chip above the message box, or null for none.</summary>
         public virtual ChatChip BuildComposerChip() => null;
+
+        /// <summary>
+        /// A view of the feature's own in the row above the message box, beside the chips (e.g. a document attached to
+        /// the chat, with its progress), or null for none; the feature shows and hides it.
+        /// </summary>
+        public virtual View BuildComposerView() => null;
     }
 
     /// <summary>

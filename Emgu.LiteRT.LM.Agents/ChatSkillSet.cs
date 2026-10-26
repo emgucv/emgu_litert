@@ -155,6 +155,12 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         /// <summary>
+        /// Ask the skills for their tool groups again (e.g. a skill's tool servers connected or went); the groups in use
+        /// stay in use.
+        /// </summary>
+        public void RefreshGroups() => InvalidateRouter();
+
+        /// <summary>
         /// The tools and instructions for a message: the enabled skills' (after <see cref="ChatSkill.PrepareAsync"/>), the
         /// groups the message's words need (which stay for the conversation), a stub for each other group, and the
         /// disabled skills' <see cref="ChatSkill.DisabledInstructions"/>. A skill that throws is left out of that message.
