@@ -39,5 +39,7 @@
 	<string>The chat records your voice messages.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>The chat writes your voice messages down, for the model to read.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>With "Share my location" on, the assistant can answer questions about where you are, such as the weather here.</string>
 </dict>
 </plist>

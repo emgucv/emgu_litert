@@ -355,6 +355,35 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
+        public async Task WorksAsAnIChatHistoryStore()
+        {
+            // What a chat UI (Emgu.LiteRT.LM.Maui's ChatPage) uses, without the records.
+            IChatHistoryStore store = _store;
+            var client = new ReplyingClient();
+            client.Replies.Enqueue("Hello!");
+            var conversation = new ChatConversation(client);
+            int changed = 0;
+            store.ChatsChanged += (s, e) => changed++;
+            using (IChatHistoryBinding saving = store.Attach(conversation, model: "Qwen3"))
+            {
+                await conversation.SendAsync("Hi");
+                await ((ChatHistoryBinding)saving).FlushAsync();
+                Assert.That(saving.ChatId, Is.GreaterThan(0));
+                IReadOnlyList<ChatHistoryEntry> chats = await store.ListChatsAsync();
+                Assert.That(chats.Select(c => (c.Id, c.Title, c.Model)), Is.EqualTo(new[] { (saving.ChatId, "Hi", "Qwen3") }));
+                var reopened = new ChatConversation(client);
+                Assert.That(await store.LoadChatAsync(saving.ChatId, reopened), Is.True);
+                Assert.That(reopened.Messages.Select(m => m.Text), Is.EqualTo(new[] { "Hi", "Hello!" }));
+                Assert.That(await store.LoadChatAsync(saving.ChatId + 100, reopened), Is.False);
+                await store.DeleteChatAsync(saving.ChatId);
+                Assert.That(await store.ListChatsAsync(), Is.Empty);
+            }
+            Assert.That(changed, Is.GreaterThanOrEqualTo(2));
+            store.IsPrivate = true;
+            Assert.That(_store.IsPrivate, Is.True);
+        }
+
+        [Test]
         public async Task ReplacesARegeneratedReply()
         {
             var client = new ReplyingClient();

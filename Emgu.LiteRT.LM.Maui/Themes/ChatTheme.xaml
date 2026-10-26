@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  The colours and fonts of the chat controls. Merged into the app's resources (under the app's own) the first time a
+  chat control needs them, so an app changes one by defining a resource with the same key in App.xaml:
+  <Color x:Key="ChatAccent">#1E9E6A</Color>. The "...Light" / "...Dark" pairs follow the app's theme.
+
+  Fonts are font family names registered with ConfigureFonts; empty for the platform's default.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                    x:Class="Emgu.LiteRT.LM.Maui.ChatTheme">
+
+    <Color x:Key="ChatAccent">#3D7BF7</Color>
+    <Color x:Key="ChatDanger">#D93B3B</Color>
+    <Color x:Key="ChatSuccess">#2BA84A</Color>
+    <Color x:Key="ChatPrimaryTextLight">#1A1C2E</Color>
+    <Color x:Key="ChatPrimaryTextDark">#E8EAF2</Color>
+    <Color x:Key="ChatSecondaryTextLight">#8A8FA3</Color>
+    <Color x:Key="ChatSecondaryTextDark">#9AA0B4</Color>
+    <Color x:Key="ChatReplyBubbleLight">#E8EFFE</Color>
+    <Color x:Key="ChatReplyBubbleDark">#262A38</Color>
+    <Color x:Key="ChatSurfaceLight">#FFFFFF</Color>
+    <Color x:Key="ChatSurfaceDark">#1B1E29</Color>
+    <Color x:Key="ChatPageBackgroundLight">#EEF1F8</Color>
+    <Color x:Key="ChatPageBackgroundDark">#11131A</Color>
+    <Color x:Key="ChatRowBorderLight">#E1E5EF</Color>
+    <Color x:Key="ChatRowBorderDark">#353A4A</Color>
+    <Color x:Key="ChatSelectedRowLight">#E8EFFE</Color>
+    <Color x:Key="ChatSelectedRowDark">#262A38</Color>
+    <Color x:Key="ChatCodeBackground">#1F2430</Color>
+    <Color x:Key="ChatCodeText">#E6E9F0</Color>
+    <Color x:Key="ChatCodeSecondaryText">#9AA3B5</Color>
+
+    <x:String x:Key="ChatTitleFont"></x:String>
+    <x:String x:Key="ChatBodyFont"></x:String>
+    <x:String x:Key="ChatMonoFont"></x:String>
+</ResourceDictionary>

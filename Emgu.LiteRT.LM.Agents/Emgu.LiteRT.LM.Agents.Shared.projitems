@@ -10,5 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)*.cs" />
+    <!-- Skills/: the built-in ChatSkills (the glob above is this folder only). -->
+    <Compile Include="$(MSBuildThisFileDirectory)Skills\*.cs" />
   </ItemGroup>
 </Project>

@@ -2,11 +2,50 @@
 
 This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
 
-- `Emgu.LiteRT.LM.Maui.dll`: `ChatView`, a MAUI chat control for the on-device `${EMGU_LITERT_LM_MODELS_NUGET_ID}` language models, or any `IChatClient`. It shows the user's messages and the replies - streamed as they are written, with their thinking, tool steps, Markdown, code blocks with Copy, and maths - a message box with Send and Stop, an attach button for images and audio, a microphone for voice messages, and for an on-device model a card that downloads and loads it. Replies can be read aloud.
+- `Emgu.LiteRT.LM.Maui.dll`: `ChatPage`, a whole chat page for an app - the model picker, saved chats, memories, a settings sheet, and an agent whose skills an app adds or removes - and `ChatView`, the MAUI chat control it is built on, for the on-device `${EMGU_LITERT_LM_MODELS_NUGET_ID}` language models, or any `IChatClient`. The view shows the user's messages and the replies - streamed as they are written, with their thinking, tool steps, Markdown, code blocks with Copy, and maths - a message box with Send and Stop, an attach button for images and audio, a microphone for voice messages, and for an on-device model a card that downloads and loads it. Replies can be read aloud.
 
-The conversation logic comes from `${EMGU_LITERT_LM_CHAT_NUGET_ID}` (`ChatConversation`). The package has no native runtime dependency: add the LiteRT-LM native runtime packages for your platforms, as for `${EMGU_LITERT_LM_MODELS_NUGET_ID}`.
+The conversation logic comes from `${EMGU_LITERT_LM_CHAT_NUGET_ID}` (`ChatConversation`), the agent's skills from `${EMGU_LITERT_LM_AGENTS_NUGET_ID}` (`ChatSkill`, `ChatSkillSet`). The package has no native runtime dependency: add the LiteRT-LM native runtime packages for your platforms, as for `${EMGU_LITERT_LM_MODELS_NUGET_ID}`.
 
-## Getting Started
+`ChatPage` and the skill API are new in this release and may still change.
+
+## A chat page in a few lines
+
+```csharp
+using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Chat.Sqlite;
+using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Models;
+
+var store = new ChatHistoryStore(Path.Combine(FileSystem.AppDataDirectory, "MyApp", "chats"));
+var options = new ChatPageOptions { Title = "Assistant", History = store };
+options.Models.Add(new ChatModelOption("Gemma4E2B", "Gemma 4 E2B", () => new Gemma4E2B())
+    { DownloadSize = 2600L << 20, CanUseTools = true, AcceptsImages = true, AcceptsAudio = true, CanSummarize = true });
+foreach (ChatFeature feature in ChatPage.DefaultFeatures(new SqliteAgentMemoryStore(store), new SqliteAgentGoalStore(store)))
+    options.Features.Add(feature);
+MainPage = new ChatPage(options);          // in App, or push it on a NavigationPage
+```
+
+and in MauiProgram, `builder.UseMauiApp<App>().UseLiteRtChat()`. That gives a page with a header (the model, Chats, New, Settings), the chat, chips above the message box (Think, Web search), and the settings - a bottom sheet, or a side panel on screens 820 px and wider - with the page's own settings (read aloud, private chat, developer mode) and each feature's section. `ChatPageOptions` also takes the instructions (`Instructions`, `PrivateInstructions`), where settings are kept (`Settings`: MAUI's Preferences with the `litert_lm_chat_` prefix by default), `ConfigureClient` to wrap the model's client (logging, a server), and `AttachmentSource` / `ReplySpeaker` as the view's. `ChatModelOption` says what each model can do (`CanUseTools`, `AcceptsImages`, `AcceptsAudio`, `CanThink`, `CanSummarize`, `ContextWindow`, `Backends` - "cpu" and "gpu"); saved chats need `${EMGU_LITERT_LM_CHAT_SQLITE_NUGET_ID}`'s `ChatHistoryStore` (an `IChatHistoryStore`), memories and goals its `SqliteAgentMemoryStore` and `SqliteAgentGoalStore`. The page's members: `Chat` (the view), `Conversation`, `SelectedModel` / `SelectModel`, `CurrentChatId` / `OpenChatAsync` / `StartNewChat`, `IsPrivate` / `SetPrivateAsync`, `Skills`, `Features`, `SetStatus`, `AskModelOnceAsync`, `ExchangeCompleted`.
+
+### Skills and features
+
+The agent's tools come from the page's features. A `ChatSkill` (`${EMGU_LITERT_LM_AGENTS_NUGET_ID}`) is the pure part: the tools it adds with every message (`Tools`), tool groups the model gets only when a message needs them (`ToolGroups`, routed by `ToolRouter`), its instructions (`InstructionsAsync`, and `DisabledInstructions` while it is off), `Enabled`, and what happens on a new conversation. A `ChatFeature` is a skill with the page's UI: a settings section (`BuildSettingsSection`, with `ChatPage.SwitchRow`, `SectionTitle`, `Note`, `Link`), a chip above the message box (`BuildComposerChip`), cards on replies and the page's life (`OnAttached`, `OnAppearing`, `OnModelChanged`, `OnReplyCompleted`...), reaching the page through `Host` (`IChatPageHost`: the conversation, the model, the status line, alerts, prompts, the bottom sheet). `SkillFeature<TSkill>` puts UI on an existing skill. A feature's `Enabled` is kept in the settings (`feature_{Name}`) unless `PersistEnabled` says otherwise. The whole of a skill with one tool:
+
+```csharp
+public sealed class DiceFeature : ChatFeature
+{
+    public override string Name => "dice";
+    public override IEnumerable<AITool> Tools(ChatMessageContext context) => new AITool[]
+    {
+        AIFunctionFactory.Create((int sides) => Random.Shared.Next(1, sides + 1), "roll_die", "Rolls a die with the given number of sides.")
+    };
+    public override View BuildSettingsSection() => ChatPage.SwitchRow("Dice", "Lets the assistant roll dice.", Enabled, on => Enabled = on);
+}
+```
+
+The built-in features (`ChatPage.DefaultFeatures`, each one a class in `Emgu.LiteRT.LM.Maui.Features` an app can leave out): `CoreToolsFeature` (the date and time, the calculator, unit conversion), `MemoryFeature` (memories about the user, with the "Remember things about me" switch and the list), `WebFeature` (the weather, Wikipedia, currency conversion, reading pages; web search with a Tavily API key entered in the settings and kept in secure storage; the "Web search" chip), `LocationFeature` (the user's town, off until "Share my location" is on; the app declares `ACCESS_COARSE_LOCATION` / `NSLocationWhenInUseUsageDescription`), `ClipboardFeature` (only for a message about what the user copied) and `GoalsFeature` (the user's goals and their progress). The sample app `Emgu.LiteRT.Example/MauiChat` in the source repository is a `ChatPage` with them and a `DiceFeature`.
+
+## ChatView on its own
 
 ```xml
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
@@ -25,9 +64,7 @@ public MainPage()
 }
 ```
 
-That is a whole chat app. Instead of `Model`, give the view a `ChatClient` (a server, another provider, or a client with tools - with `Model` too if it runs that model), or a `Conversation` of your own, e.g. one opened from a saved chat with `ChatConversation.Load`. Other properties: `ThinkingEnabled`, `Options` (copied for each message: tools, the longest reply...), `Placeholder`, `AttachmentKinds` / `ShowAttachButton` / `AttachmentSource` (by default `MediaChatAttachmentSource`: the photo library, the camera or an audio file; images are scaled to 1024 px JPEG by `ChatImages.PrepareAsync`; taking photos needs the camera permission in the app's manifest / Info.plist), `ReadAloud` / `ReplySpeaker` (by default `TextToSpeechReplySpeaker`, sentence by sentence while the reply streams) and `Header` (a view above the transcript). `LoadState` (a `ModelLoadState`) tells how loading the model goes, `ExchangeCompleted` is raised after each reply (save it then) and `ModelLoadFailed` when the model can't be loaded. `SendAsync(text, attachments, context)` sends a message from code.
-
-The sample app `Emgu.LiteRT.Example/MauiChat` in the source repository is such an app, with a restyled Send button and user messages, and it reopens its last chat after a restart.
+That is a whole chat, without the page around it. Instead of `Model`, give the view a `ChatClient` (a server, another provider, or a client with tools - with `Model` too if it runs that model), or a `Conversation` of your own, e.g. one opened from a saved chat with `ChatConversation.Load`. Other properties: `ThinkingEnabled`, `Options` (copied for each message: tools, the longest reply...) or `OptionsProvider` (makes each message's options as it is sent, for an agent whose tools depend on the message), `LoadStateCreated` (to set a new model's backend, name or engine settings before it loads), `Placeholder`, `AttachmentKinds` / `ShowAttachButton` / `AttachmentSource` (by default `MediaChatAttachmentSource`: the photo library, the camera or an audio file; images are scaled to 1024 px JPEG by `ChatImages.PrepareAsync`; taking photos needs the camera permission in the app's manifest / Info.plist), `ReadAloud` / `ReplySpeaker` (by default `TextToSpeechReplySpeaker`, sentence by sentence while the reply streams), `Header` (a view above the transcript) and `Toolbar` (a view above the message box, e.g. chips). `LoadState` (a `ModelLoadState`) tells how loading the model goes, `ExchangeCompleted` is raised after each reply (save it then) and `ModelLoadFailed` when the model can't be loaded. `SendAsync(text, attachments, context)` sends a message from code. The message box is a `ChatPromptEditor`: with a keyboard, Enter sends and Shift+Enter adds a line (`UseLiteRtChat()` registers its Mac Catalyst handler).
 
 ### Saving chats
 
@@ -67,11 +104,18 @@ For models on a phone:
 
 ## Changing the look
 
-The controls are templated. Each finds its template, and the styles of its buttons, by key - first in the app's resources, then in the package's own `ChatStyles` - so an app replaces one by defining a resource with its key in `App.xaml`; nothing needs to be merged:
+The controls are templated. Each finds its template, and the styles of its buttons, by key - first in the app's resources, then in the package's own `ChatStyles` - so an app replaces one by defining a resource with its key in `App.xaml`; nothing needs to be merged. The colours and fonts are keys of the package's `ChatTheme` (merged into the app's resources under the app's own, the first time a control needs them), so `<Color x:Key="ChatAccent">#1E9E6A</Color>` in `App.xaml` recolours every control, and `<x:String x:Key="ChatBodyFont">MyFont</x:String>` sets their font (a family registered with `ConfigureFonts`):
 
 | Key | What it is |
 |---|---|
-| `ChatViewTemplate` | The whole view: transcript, model card, status, message box and buttons |
+| `ChatAccent`, `ChatDanger`, `ChatSuccess`, `ChatPrimaryText{Light,Dark}`, `ChatSecondaryText{Light,Dark}`, `ChatReplyBubble{Light,Dark}`, `ChatSurface{Light,Dark}`, `ChatPageBackground{Light,Dark}`, `ChatRowBorder{Light,Dark}`, `ChatSelectedRow{Light,Dark}`, `ChatCodeBackground`, `ChatCodeText`, `ChatCodeSecondaryText` | The colours (`ChatTheme`); the pairs follow the app's light or dark theme |
+| `ChatTitleFont`, `ChatBodyFont`, `ChatMonoFont` | The fonts, as `x:String` (empty for the platform's default) |
+| `ChatPageTemplate` | The page: the header's `PART_Title`, `PART_Model`, `PART_Chats`, `PART_NewChat`, `PART_Settings`; `PART_Chat` (the `ChatView`), `PART_Status`, `PART_SidePanel` / `PART_SideContent` (wide screens), `PART_Sheet` (a `BottomSheet`) |
+| `ChatHeaderButtonStyle`, `ChatModelButtonStyle`, `ChatChipStyle`, `ChatChipOnStyle` | The page's header buttons and model button; a `ToggleChip` off and on |
+| `ChatSheetStyle`, `ChatSheetTitleStyle`, `ChatSheetCloseStyle` | A `BottomSheet`'s card, title and closing button |
+| `ChatSectionTitleStyle`, `ChatSectionTextStyle`, `ChatSectionNoteStyle`, `ChatLinkStyle`, `ChatDividerStyle` | Settings sections: a heading, a row's text, a note, a tappable line, the line between sections |
+| `ChatListTitleStyle`, `ChatListDetailStyle`, `ChatListRowStyle` | A list row (saved chats, models, memories) |
+| `ChatViewTemplate` | The whole view: transcript, model card, status, toolbar, message box and buttons |
 | `ChatUserMessageTemplate`, `ChatReplyTemplate`, `ChatNoticeTemplate` | DataTemplates for a `ChatMessageItem`: the user's messages, the replies, notices (or set `ChatView.MessageTemplateSelector`) |
 | `ModelLoadCardTemplate` | The card that downloads and loads the model (`ModelLoadCard`) |
 | `ReplyViewTemplate`, `ReplyParagraphStyle`, `ReplyMathStyle` | A reply's text (`ReplyView`: Markdown, links, maths) |
@@ -80,9 +124,8 @@ The controls are templated. Each finds its template, and the styles of its butto
 | `ChatAttachmentViewTemplate` | An image or audio attachment (`ChatAttachmentView`) |
 | `ChatSendButtonStyle`, `ChatStopButtonStyle`, `ChatAttachButtonStyle`, `ChatDecorationTextStyle` | Styles of the buttons and of text decorations |
 | `ChatTalkButtonStyle`, `ChatTalkStopButtonStyle` | The microphone, and the microphone while recording |
-| `ChatAccent`, `ChatDanger`, `ChatPrimaryText{Light,Dark}`, `ChatSecondaryText{Light,Dark}`, `ChatReplyBubble{Light,Dark}`, `ChatSurface{Light,Dark}` | The colours the default templates use |
 
-A control template names its working parts `PART_...`; a template without one of them just doesn't have that feature (e.g. no `PART_Attach`, no attach button). `ChatViewTemplate`'s parts are `PART_Scroll` (a ScrollView), `PART_Transcript` (the Layout the messages go in), `PART_Empty`, `PART_LoadCard` (a `ModelLoadCard`), `PART_Status` (a Label), `PART_Input` (an InputView, e.g. an Editor), `PART_Send`, `PART_Stop`, `PART_Attach`, `PART_Talk` (Buttons, or views that are tapped), `PART_Attachments` (a Layout for attachments waiting to be sent) and `PART_Header` (a ContentView). The other controls list theirs in their documentation; `Themes/ChatStyles.xaml` in the source repository is a complete example.
+A control template names its working parts `PART_...`; a template without one of them just doesn't have that feature (e.g. no `PART_Attach`, no attach button). `ChatViewTemplate`'s parts are `PART_Scroll` (a ScrollView), `PART_Transcript` (the Layout the messages go in), `PART_Empty`, `PART_LoadCard` (a `ModelLoadCard`), `PART_Status` (a Label), `PART_Toolbar` and `PART_Header` (ContentViews), `PART_Input` (an InputView, e.g. an Editor), `PART_Send`, `PART_Stop`, `PART_Attach`, `PART_Talk` (Buttons, or views that are tapped) and `PART_Attachments` (a Layout for attachments waiting to be sent). The other controls list theirs in their documentation; `Themes/ChatStyles.xaml` in the source repository is a complete example.
 
 Message templates bind to `ChatMessageItem` (`Text`, `Thinking`, `Steps`, `Attachments`, `Transcript`, `Decorations`, `IsStreaming`, `IsInterrupted`, `IsFailed`, `StartsContext`...), and can use the package's `ReplyView`, `ThinkingView`, `ChatAttachmentView` and `ChatDecorationView` (which shows a decoration: a view as it is, anything else as text). A long saved chat is shown a few messages at a time, the latest first, so opening it doesn't hold the UI thread (`IsRenderingTranscript`).
 

@@ -9,6 +9,30 @@ using LanguageModel = Emgu.LiteRT.LM.Models.LanguageModel;
 
 namespace Emgu.LiteRT.LM.Maui
 {
+    /// <summary>A message being sent by a <see cref="ChatView"/>, for its <see cref="ChatView.OptionsProvider"/>.</summary>
+    public sealed class ChatSendRequest
+    {
+        /// <summary>Create one.</summary>
+        /// <param name="text">The message</param>
+        /// <param name="attachments">Its images and audio, or null</param>
+        /// <param name="context">Text given to the model before the message, or null</param>
+        public ChatSendRequest(string text, IEnumerable<DataContent> attachments, string context)
+        {
+            Text = text ?? string.Empty;
+            Attachments = attachments?.ToList() ?? new List<DataContent>();
+            Context = context;
+        }
+
+        /// <summary>The message.</summary>
+        public string Text { get; }
+
+        /// <summary>Its images and audio.</summary>
+        public IReadOnlyList<DataContent> Attachments { get; }
+
+        /// <summary>Text given to the model before the message, or null.</summary>
+        public string Context { get; }
+    }
+
     /// <summary>
     /// A chat: the transcript of a <see cref="ChatConversation"/> - user messages, and replies with their thinking, tool
     /// steps, Markdown, code and maths, streamed as they are written - a message box with Send and Stop, and for an
@@ -93,8 +117,13 @@ namespace Emgu.LiteRT.LM.Maui
         public static readonly BindableProperty HeaderProperty = BindableProperty.Create(
             nameof(Header), typeof(View), typeof(ChatView), null, propertyChanged: (b, o, n) => ((ChatView)b).ShowHeader());
 
+        /// <summary>A view shown above the message box, staying put (e.g. toggle chips), or null.</summary>
+        public static readonly BindableProperty ToolbarProperty = BindableProperty.Create(
+            nameof(Toolbar), typeof(View), typeof(ChatView), null, propertyChanged: (b, o, n) => ((ChatView)b).ShowToolbar());
+
         private ScrollView _scroll;
         private ContentView _header;
+        private ContentView _toolbar;
         private Layout _transcript;
         private View _empty;
         private ModelLoadCard _loadCard;
@@ -211,12 +240,32 @@ namespace Emgu.LiteRT.LM.Maui
             set => SetValue(HeaderProperty, value);
         }
 
+        /// <summary>A view shown above the message box, staying put (e.g. toggle chips), or null.</summary>
+        public View Toolbar
+        {
+            get => (View)GetValue(ToolbarProperty);
+            set => SetValue(ToolbarProperty, value);
+        }
+
         /// <summary>The message box's placeholder.</summary>
         public string Placeholder
         {
             get => (string)GetValue(PlaceholderProperty);
             set => SetValue(PlaceholderProperty, value);
         }
+
+        /// <summary>
+        /// Makes each message's options (tools, instructions...) as it is sent, instead of <see cref="Options"/>: for an agent
+        /// whose tools depend on the message. The reasoning effort is filled in from <see cref="ThinkingEnabled"/> when the
+        /// options leave it null. Or null.
+        /// </summary>
+        public Func<ChatSendRequest, Task<ChatOptions>> OptionsProvider { get; set; }
+
+        /// <summary>
+        /// Called with the <see cref="LoadState"/> made for a new <see cref="Model"/>, before loading starts: set its backend,
+        /// display name, download size or engine settings. Or null.
+        /// </summary>
+        public Action<ModelLoadState> LoadStateCreated { get; set; }
 
         /// <summary>
         /// Shows the conversation's summary (<see cref="ChatConversation.Summary"/>) in an alert; the default message
@@ -271,8 +320,13 @@ namespace Emgu.LiteRT.LM.Maui
             _attach = GetTemplateChild("PART_Attach") as View;
             _attachments = GetTemplateChild("PART_Attachments") as Layout;
             _header = GetTemplateChild("PART_Header") as ContentView;
+            _toolbar = GetTemplateChild("PART_Toolbar") as ContentView;
             ApplyTalkPart(GetTemplateChild("PART_Talk") as View);
             ShowHeader();
+            ShowToolbar();
+            // Enter sends on a desktop keyboard (ChatPromptEditor; Shift+Enter for a new line).
+            if (_input is ChatPromptEditor prompt)
+                prompt.SendRequested += (s, e) => _ = SendAsync();
             Hook(_send, "ChatSendButtonStyle", () => _ = SendAsync());
             Hook(_stop, "ChatStopButtonStyle", StopReply);
             Hook(_attach, "ChatAttachButtonStyle", () => _ = AttachAsync());
@@ -328,12 +382,15 @@ namespace Emgu.LiteRT.LM.Maui
             _ownsClient = false;
             LoadState = model != null ? new ModelLoadState(model) { DisplayName = model.GetType().Name } : null;
             if (LoadState != null)
+            {
                 LoadState.PropertyChanged += (s, e) =>
                 {
                     // Also when the card's Download or Retry button started the load.
                     if (e.PropertyName == nameof(ModelLoadState.HasError) && s is ModelLoadState state && state.HasError)
                         ModelLoadFailed?.Invoke(this, EventArgs.Empty);
                 };
+                LoadStateCreated?.Invoke(LoadState);
+            }
             if (_loadCard != null)
                 _loadCard.State = LoadState;
             if (model == null && client == null)
@@ -551,7 +608,9 @@ namespace Emgu.LiteRT.LM.Maui
                     }
                 }
                 SetStatus("Generating...");
-                ChatOptions options = Options?.Clone() ?? new ChatOptions();
+                ChatOptions options = OptionsProvider != null
+                    ? await OptionsProvider(new ChatSendRequest(text, attachments, context)) ?? new ChatOptions()
+                    : Options?.Clone() ?? new ChatOptions();
                 if (options.Reasoning == null)
                     options.Reasoning = new ReasoningOptions { Effort = ThinkingEnabled ? ReasoningEffort.Medium : ReasoningEffort.None };
                 using (StatusUntilFirstText(conversation))
@@ -625,6 +684,15 @@ namespace Emgu.LiteRT.LM.Maui
             {
                 _header.Content = Header;
                 _header.IsVisible = Header != null;
+            }
+        }
+
+        private void ShowToolbar()
+        {
+            if (_toolbar != null)
+            {
+                _toolbar.Content = Toolbar;
+                _toolbar.IsVisible = Toolbar != null;
             }
         }
 

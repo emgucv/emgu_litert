@@ -13,6 +13,7 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState activationState)
     {
-        return new Window(new NavigationPage(new MainPage())) { Title = "LiteRT Chat" };
+        // The chat page has its own header, so no NavigationPage around it.
+        return new Window(new MainPage()) { Title = "LiteRT Chat" };
     }
 }

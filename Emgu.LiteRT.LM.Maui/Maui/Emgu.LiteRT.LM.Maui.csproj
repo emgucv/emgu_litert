@@ -29,8 +29,10 @@
 	-->
 	<ItemGroup>
 		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Chat\NetStandard\Emgu.LiteRT.LM.Chat.csproj" />
-		<!-- SpeechSegmenter, which cuts a streamed reply into sentences for read-aloud. -->
+		<!-- SpeechSegmenter, which cuts a streamed reply into sentences for read-aloud; the ChatSkills ChatPage composes. -->
 		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Agents\NetStandard\Emgu.LiteRT.LM.Agents.csproj" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<!-- ChatClientBuilder / UseFunctionInvocation, which ChatPage runs the skills' tools with. -->
+		<PackageReference Include="Microsoft.Extensions.AI" Version="10.11.0" />
 	</ItemGroup>
 </Project>

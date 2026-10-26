@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!--
-  Restyling the chat: Emgu.LiteRT.LM.Maui's controls find their templates and styles by key, here first, so defining a
-  resource with one of their keys replaces it (the keys are listed in the library's Themes/ChatStyles.xaml). This app
-  replaces the Send button's style and the template of the user's messages; everything else keeps the default look.
+  Restyling the chat: Emgu.LiteRT.LM.Maui's controls find their colours, templates and styles by key, here first, so
+  defining a resource with one of their keys replaces it (the keys are listed in the library's Themes/ChatTheme.xaml
+  and Themes/ChatStyles.xaml). This app makes the accent green - the Send button, the user's bubbles, the chips and
+  the links follow - gives the Send button its own style, and replaces the template of the user's messages; everything
+  else keeps the default look.
 -->
 <Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
@@ -13,9 +15,11 @@
     <Application.Resources>
         <ResourceDictionary>
 
+            <Color x:Key="ChatAccent">#1E9E6A</Color>
+
             <Style x:Key="ChatSendButtonStyle" TargetType="Button">
                 <Setter Property="Text" Value="Ask" />
-                <Setter Property="BackgroundColor" Value="#1E9E6A" />
+                <Setter Property="BackgroundColor" Value="{StaticResource ChatAccent}" />
                 <Setter Property="TextColor" Value="White" />
                 <Setter Property="FontAttributes" Value="Bold" />
                 <Setter Property="CornerRadius" Value="8" />
@@ -27,7 +31,7 @@
             <!-- The user's messages: a green, square-cornered bubble with "You" above it, and any images or audio. -->
             <DataTemplate x:Key="ChatUserMessageTemplate" x:DataType="lm:ChatMessageItem">
                 <VerticalStackLayout Spacing="2" HorizontalOptions="End">
-                    <Label Text="You" FontSize="12" TextColor="#1E9E6A" HorizontalOptions="End" />
+                    <Label Text="You" FontSize="12" TextColor="{StaticResource ChatAccent}" HorizontalOptions="End" />
                     <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Attachments}" Spacing="6" HorizontalOptions="End"
                                            IsVisible="{Binding HasAttachments}">
                         <BindableLayout.ItemTemplate>
@@ -36,7 +40,7 @@
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </HorizontalStackLayout>
-                    <Border MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0" BackgroundColor="#1E9E6A" IsVisible="{Binding HasText}">
+                    <Border MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0" BackgroundColor="{StaticResource ChatAccent}" IsVisible="{Binding HasText}">
                         <Border.StrokeShape>
                             <RoundRectangle CornerRadius="4" />
                         </Border.StrokeShape>

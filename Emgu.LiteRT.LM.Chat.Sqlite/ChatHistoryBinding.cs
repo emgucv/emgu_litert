@@ -15,7 +15,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
     /// after another, in the background; a failed one is reported (<see cref="SaveFailed"/>), not thrown. Dispose it to
     /// stop saving.
     /// </summary>
-    public sealed class ChatHistoryBinding : IDisposable
+    public sealed class ChatHistoryBinding : IChatHistoryBinding
     {
         private readonly ChatHistoryStore _store;
         private readonly ChatConversation _conversation;

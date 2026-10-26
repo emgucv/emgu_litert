@@ -42,6 +42,19 @@ using (Gemma4E2B model = new Gemma4E2B())
 }
 ```
 
+## Skills
+
+A `ChatSkill` packages tools for a chat agent: the tools it adds with every message (`Tools`), tool groups the model gets only when a message needs them (`ToolGroups`, routed by `ToolRouter`: a group comes when a message's words call for it, or the model calls its stub, and stays for the conversation), its instructions (`InstructionsAsync`; `DisabledInstructions` while `Enabled` is off), `PrepareAsync` before a message, and `OnNewConversation`. A `ChatSkillSet` composes the skills into each message's `ChatOptions`:
+
+```csharp
+var skills = new ChatSkillSet(() => FunctionInvokingChatClient.CurrentContext?.Options);
+skills.AddRange(new ChatSkill[] { new CoreToolsSkill(), new WebSkill(), new MemorySkill(memoryStore), new GoalsSkill(goalStore) });
+ChatSkillComposition composed = await skills.ComposeAsync(new ChatMessageContext { Prompt = text, MemoryOn = true }, ChatSkillSet.DefaultInstructions);
+ChatResponse response = await client.GetResponseAsync(text, new ChatOptions { Tools = composed.Tools, Instructions = composed.Instructions });
+```
+
+The built-in skills (`Emgu.LiteRT.LM.Agents.Skills`): `CoreToolsSkill` (the date and time, the calculator, unit conversion), `MemorySkill` (memories about the user, in the instructions and the remember / forget tools), `WebSkill` (the weather, Wikipedia, currency conversion, reading pages; `TavilyApiKey` adds web search; off, it tells the agent to say so rather than invent current facts) and `GoalsSkill` (the goal tools as a group that comes for messages about goals or progress, with the goals' status in its instructions). Skills are pure: `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `ChatPage` shows them with a settings section and a chip each (`ChatFeature`).
+
 Sound monitors (`Emgu.LiteRT.LM.Agents.Audio`): `SoundMonitorTools.Create(...)` gives an agent `create_sound_monitor`, `list_sound_monitors` and `control_sound_monitor` ("tell me when the doorbell rings"), backed by a `SoundMonitorRuntime` that your app feeds with each window's 521 YAMNet class scores (`runtime.Advance(time, scores)`); it confirms sounds (`SoundGroups`: doorbell, dog, baby crying, smoke alarm... as groups of YAMNet classes), and runs your alert callback. The microphone and the classifier are yours - `Emgu.LiteRT.Models`' `YamNet` runs the model.
 
 Also in `Emgu.LiteRT.LM.Agents.Audio`: `AlertSoundLibrary` (named sounds an alert can play, built-in or added by the user, matched loosely by name), `AlertAudioCoordinator` (keeps alert sounds and spoken replies from talking over each other), and for voice chats `VoiceActivityDetector` (decides when a spoken message has ended, from microphone levels) and `SpeechSegmenter` (splits a streaming reply into sentences to read aloud, skipping code and tables).

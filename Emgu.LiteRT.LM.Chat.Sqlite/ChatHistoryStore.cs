@@ -30,7 +30,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
     /// <see cref="GetMessageId"/> need nothing else. With <see cref="IsPrivate"/> on, nothing is saved.
     /// </para>
     /// </summary>
-    public class ChatHistoryStore
+    public class ChatHistoryStore : IChatHistoryStore
     {
         /// <summary>The version of the tables this store reads and writes (kept in the database, for migrations).</summary>
         public const int SchemaVersion = 1;
@@ -521,6 +521,28 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             }
             return result;
         }
+
+        // ---------- IChatHistoryStore (what a chat UI needs, without the records) ----------
+
+        async Task<IReadOnlyList<ChatHistoryEntry>> IChatHistoryStore.ListChatsAsync()
+        {
+            List<ChatRecord> chats = await GetChatsAsync().ConfigureAwait(false);
+            return chats.Select(c => new ChatHistoryEntry(c.Id, c.Title, c.Model, c.Updated)).ToList();
+        }
+
+        async Task<bool> IChatHistoryStore.LoadChatAsync(int chatId, ChatConversation conversation)
+        {
+            if (conversation == null)
+                throw new ArgumentNullException(nameof(conversation));
+            ChatHistory history = await LoadAsync(chatId).ConfigureAwait(false);
+            if (history == null)
+                return false;
+            history.Load(conversation);
+            return true;
+        }
+
+        IChatHistoryBinding IChatHistoryStore.Attach(ChatConversation conversation, int chatId, string model) =>
+            Attach(conversation, chatId, model);
 
         // ---------- Helpers ----------
 

@@ -10,6 +10,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)*.cs" />
+    <!-- Features/: the built-in ChatFeatures of ChatPage (the glob above is this folder only). -->
+    <Compile Include="$(MSBuildThisFileDirectory)Features\*.cs" />
     <!-- Themes/: the default control templates, message templates and styles (XAML), with their code-behind. The MAUI
          SDK only finds XAML files under the project's own folder, so they are listed here. -->
     <Compile Include="$(MSBuildThisFileDirectory)Themes\*.xaml.cs">
