@@ -2,14 +2,9 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Maui;
-using Emgu.LiteRT.LM.Models;
 
 namespace Maui.Demo.Lite;
 
@@ -17,11 +12,16 @@ namespace Maui.Demo.Lite;
 // opened thinking offers "Translate to <language>": the model translates it in a conversation of its own (like the
 // summaries) - on request, so unread thinking costs nothing - and the translation is kept with the reply, with a way back to
 // the English. The language of a message is detected when it is sent (TextLanguage) and kept with it (MessageRecord.Language).
-internal sealed class TranslationFeature
+// No tools: the page calls it for each reply (CheckThinkingLanguageAsync) and from the translate row (OnTranslateTapped).
+internal sealed class TranslationFeature : DemoFeature
 {
-    private readonly IChatHost _host;
+    public override string Name => "translation";
 
-    public TranslationFeature(IChatHost host) { _host = host; }
+    public override string Title => "Thinking translation";
+
+    public override bool PersistEnabled => false;
+
+    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
 
     // The language to translate into: that of the message a reply answers, unless it is English or not known.
     public static string Target(string language) =>
@@ -90,38 +90,40 @@ internal sealed class TranslationFeature
             ShowTranslation(bubble);
             return;
         }
-        if (_host.IsBusy)
+        if (Host.IsBusy)
         {
-            _host.SetStatus("Hang on - still answering.");
+            Host.SetStatus("Hang on - still answering.");
             return;
         }
-        if (!_host.ModelReady)
+        if (!Host.ModelReady)
         {
-            _host.SetStatus("Load the model first.");
+            Host.SetStatus("Load the model first.");
             return;
         }
         string thinking = bubble.Thinking;
         string language = bubble.TargetLanguage;
         bubble.Translating = true;
         ShowTranslation(bubble);
-        _host.SetBusy(true);
-        _host.SetStatus("Translating the thinking...");
+        Host.SetBusy(true);
+        Host.SetStatus("Translating the thinking...");
         try
         {
             string translation = await TranslateTextAsync(thinking, language);
             bubble.Translation = translation;
             bubble.ShowTranslation = true;
-            await _host.SaveThinkingTranslationAsync(bubble.MessageId, language, translation);
-            _host.SetStatus(null);
+            // Kept with the saved chat (nothing in a private chat).
+            if (!Host.IsPrivate)
+                await Demo.Store.SetThinkingTranslationAsync(bubble.MessageId, language, translation);
+            Host.SetStatus(null);
         }
         catch (Exception ex)
         {
-            _host.SetStatus("Couldn't translate: " + ex.Message);
+            Host.SetStatus("Couldn't translate: " + ex.Message);
         }
         finally
         {
             bubble.Translating = false;
-            _host.SetBusy(false);
+            Host.SetBusy(false);
             ShowTranslation(bubble);
         }
     }
@@ -132,8 +134,8 @@ internal sealed class TranslationFeature
     private async Task<string> TranslateTextAsync(string text, string language)
     {
         string name = LanguageName(language, true);
-        Func<string, int> countTokens = _host.TokenCounter;
-        int contextWindow = _host.ContextWindow;
+        Func<string, int> countTokens = Host.TokenCounter;
+        int contextWindow = Host.ContextWindow;
         int pieceTokens = Math.Max(200, Math.Min(1200, (contextWindow - 500) / 3));
         List<string> pieces = await Task.Run(() => LanguageText.SplitForTranslation(text, pieceTokens, countTokens));
         string Prompt(string piece) =>
@@ -145,7 +147,7 @@ internal sealed class TranslationFeature
         {
             // A language can need more tokens than the English (Hindi, Thai: about three times).
             // (A server's model is asked with its own limits: AskModelOnceAsync summarizes on the server.)
-            string translated = await _host.AskModelOnceAsync(Prompt(piece), Math.Max(256, Math.Min(contextWindow - pieceTokens - 200, pieceTokens * 3)));
+            string translated = await Host.AskModelOnceAsync(Prompt(piece), Math.Max(256, Math.Min(contextWindow - pieceTokens - 200, pieceTokens * 3)));
             if (translated.Length == 0)
                 throw new Exception("The translation is empty");
             result.Append(result.Length > 0 ? "\n\n" : "").Append(translated);

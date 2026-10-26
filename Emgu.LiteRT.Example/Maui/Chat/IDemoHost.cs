@@ -25,7 +25,6 @@ internal interface IDemoHost
     ExerciseFeature ExercisesIfCreated { get; }
     WrittenDocumentsFeature WrittenDocuments { get; }
     TaskFeature Tasks { get; }
-    TranslationFeature Translations { get; }
     DeviceActionsFeature ActionTools { get; }
 
     // Whether the page is shown, and whether a voice message is being recorded (the message box's microphone).

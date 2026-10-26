@@ -43,6 +43,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         public StorageFeature Storage;
         public ModelSettingsFeature ModelSettings;
         public TaskChipFeature TaskChip;
+        public TranslationFeature Translations;
         public MemoryFeature Memory;
     }
 
@@ -55,7 +56,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     private ImageFeature _imageFeature;
     private WrittenDocumentsFeature _writtenDocuments;
     private TaskFeature _taskFeature;
-    private TranslationFeature _translationFeature;
     private GoalsFeature _goalsFeature;
     private PastChatsFeature _pastChatsFeature;
     private PhotoSearchFeature _photoSearchFeature;
@@ -104,6 +104,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             Storage = new StorageFeature(),
             ModelSettings = new ModelSettingsFeature(),
             TaskChip = new TaskChipFeature(),
+            Translations = new TranslationFeature(),
             Memory = new MemoryFeature(SharedStore.Memories)
         };
         parts.Server = new ServerFeature(parts.ServerOption);
@@ -133,7 +134,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new ClipboardFeature(),
             parts.Camera, parts.Server, parts.Mcp, parts.ModelSettings, new DemoSectionsFeature(), parts.Storage, parts.Export,
-            parts.Documents, parts.VoiceMode, parts.TaskChip, parts.Transcripts, new DemoToolsFeature()
+            parts.Documents, parts.VoiceMode, parts.TaskChip, parts.Transcripts, parts.Translations, new DemoToolsFeature()
         })
             options.Features.Add(feature);
         parts.Options = options;
@@ -153,8 +154,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     private WrittenDocumentsFeature WrittenDocuments => _writtenDocuments ??= new WrittenDocumentsFeature(Host);
 
     private TaskFeature Tasks => _taskFeature ??= new TaskFeature(Host);
-
-    private TranslationFeature Translations => _translationFeature ??= new TranslationFeature(Host);
 
     private GoalsFeature Goals => _goalsFeature ??= new GoalsFeature(Host);
 
@@ -193,8 +192,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     WrittenDocumentsFeature IDemoHost.WrittenDocuments => WrittenDocuments;
 
     TaskFeature IDemoHost.Tasks => Tasks;
-
-    TranslationFeature IDemoHost.Translations => Translations;
 
     DeviceActionsFeature IDemoHost.ActionTools => ActionTools;
 
@@ -378,7 +375,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     {
         var row = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.Accent, IsVisible = false };
         var bubble = new StreamingBubble(item, row);
-        row.OnTap(() => Translations.OnTranslateTapped(bubble));
+        row.OnTap(() => _parts.Translations.OnTranslateTapped(bubble));
         return bubble;
     }
 
@@ -599,7 +596,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             {
                 bubble.TargetLanguage = TranslationFeature.Target(info.Language);
                 bubble.Refresh();
-                _ = Translations.CheckThinkingLanguageAsync(bubble);
+                _ = _parts.Translations.CheckThinkingLanguageAsync(bubble);
             }
             _parts.Documents.MarkDocumentContextGiven(document);
             await ShowMemoriesUsedAsync(prompt, reply, bubble);
@@ -788,7 +785,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                     else if (attachment.Kind == ImageFeature.GeneratedKind)
                         item.Decorations.Add(Images.SavedImageView(await System.IO.File.ReadAllBytesAsync(attachment.Path)));
                 }
-                _ = Translations.CheckThinkingLanguageAsync(bubble);
+                _ = _parts.Translations.CheckThinkingLanguageAsync(bubble);
             }
             SetStatus($"Opening conversation: {history.Messages.Count} messages...");
             await Task.Yield();

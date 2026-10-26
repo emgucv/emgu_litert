@@ -83,9 +83,6 @@ internal interface IChatHost
     bool ModelReady { get; }
     void SetBusy(bool busy);
 
-    // Keeps a reply's translated thinking with the saved chat (nothing in a private chat).
-    Task SaveThinkingTranslationAsync(int messageId, string language, string translation);
-
     // The saved chats, memories and goals (SQLite); whether this is a private chat (nothing saved), and whether "Remember things about
     // me" is on.
     ChatStore Store { get; }

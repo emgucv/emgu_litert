@@ -103,12 +103,6 @@ internal sealed class DemoChatHost : IChatHost
 
     void IChatHost.SetBusy(bool busy) => _host.SetBusy(busy);
 
-    async Task IChatHost.SaveThinkingTranslationAsync(int messageId, string language, string translation)
-    {
-        if (!_host.IsPrivate)
-            await _demo.Store.SetThinkingTranslationAsync(messageId, language, translation);
-    }
-
     ChatStore IChatHost.Store => _demo.Store;
 
     bool IChatHost.IsPrivateChat => _host.IsPrivate;
