@@ -509,8 +509,9 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   in the background (`SpeechRecognizer`; `TranscriptFeature`). The words show under the chip, are kept in
   `MessageRecord.Transcript` (not given to the model), become the title of a chat still called "Voice message", and go into
   exports; the recording is kept too (`chats/attachments/...`). Verified on a Pixel Fold.
-- Settings > "Voice language" (`VoiceLanguages`, set as `SpeechRecognizer.Language`; the errors end with
-  `SpeechRecognizer.ChooseLanguageHint`) is the language the speech recognizer listens in. It's the device's by default, which
+- Settings > "Voice language" (the library's `VoiceLanguageFeature` since phase C, 2026-10-27; `VoiceLanguages`, set as
+  `SpeechRecognizer.Language`; the errors end with `SpeechRecognizer.ChooseLanguageHint`) is the language the speech
+  recognizer listens in. It's the device's by default, which
   gave nothing for Chinese speech on an English phone. On Android 13+ it asks the recognizer what it supports
   (`CheckRecognitionSupport`; the on-device recognizer lists only installed languages, Mandarin as `cmn-Hans-CN`), requests the
   language pack, and falls back to the normal recognizer meanwhile. Verified on a Pixel Fold with Chinese and Japanese
