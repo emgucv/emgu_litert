@@ -61,8 +61,11 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 - Tables (since 2026-10-27): `ReplyMarkdown` makes a header row followed by a separator row (`|---|:---:|---:|`, any number
   of dashes, a bar required) and the rows with bars after it a `ReplyBlockKind.Table` block (`TableHeader`, `TableRows`,
   `TableAlignments`; a missing cell is empty, an escaped `\|` stays in its cell; a table still streaming grows row by row).
-  `ReplyView` draws it as a grid - the header in bold over a line, thin lines between rows, cells wrapping at 220 points,
-  inline Markdown in cells - in a horizontal `ScrollView`, and a reply with a table uses the full width like one with code.
+  `ReplyView` draws it as a grid with a full border - lines around it and between every row and column (in thin grid rows
+  and columns of their own, so they show over any bubble colour), the header in bold on a light shade, inline Markdown in
+  cells - in a horizontal `ScrollView`, and a reply with a table uses the full width like one with code. A column whose
+  text is longer than 220 points gets that width and wraps: an `Auto` column measured a wrapping label at its one-line
+  width, so the row was one line high and the rest was cut off ("No confirmed natural" without "satellites").
   Read aloud, a row is its cells ("Chip, A18.") and the separator row is skipped. Checked on Mac Catalyst: Gemma 4 E2B's
   table of Mercury, Venus and Earth (three rows, wrapped cells) drew while streaming and in full - though its numbers came
   from Wikipedia snippets and one was wrong (Mercury's diameter as 1,550 km). Not yet seen on a phone's width, where the

@@ -10,7 +10,7 @@ namespace Emgu.LiteRT.LM.Maui
     /// <summary>
     /// Shows a chat reply: text with basic Markdown formatting (**bold**, *italic*, `inline code`, headings, bullet and
     /// numbered lists, quotes, links), fenced code blocks as <see cref="CodeBlockView"/>s with a Copy button, tables as a
-    /// grid (scrolled sideways when wider than the reply), and LaTeX maths as Unicode text (x² + y² = r², not $x^2 + y^2 = r^2$; display maths centered). Set <see cref="Text"/> as the
+    /// bordered grid (scrolled sideways when wider than the reply), and LaTeX maths as Unicode text (x² + y² = r², not $x^2 + y^2 = r^2$; display maths centered). Set <see cref="Text"/> as the
     /// reply streams: the views of earlier parts are kept and only the last one is updated.
     /// <para>
     /// Its look comes from templates and styles found by key (an app replaces one by defining a resource with the same
@@ -75,8 +75,12 @@ namespace Emgu.LiteRT.LM.Maui
             public Grid Table;
         }
 
-        // The widest a table's cell grows before its text wraps.
+        // The widest a table's cell's text grows before it wraps, and the space either side of it.
         private const double MaxCellWidth = 220;
+        private const double CellPadding = 10;
+
+        // A cell's length as shown, roughly: its text without the inline markup.
+        private static int PlainLength(string cell) => ReplyMarkdown.ParseInline(cell ?? string.Empty).Sum(r => r.Text.Length);
 
         private readonly List<Part> _shown = new List<Part>();
         private Layout _blocks;
@@ -240,7 +244,7 @@ namespace Emgu.LiteRT.LM.Maui
                     part.View = part.Label;
                     break;
                 case ReplyBlockKind.Table:
-                    part.Table = new Grid { ColumnSpacing = 16, RowSpacing = 0 };
+                    part.Table = new Grid { ColumnSpacing = 0, RowSpacing = 0, HorizontalOptions = LayoutOptions.Start };
                     part.View = new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = part.Table, Margin = new Thickness(0, 2) };
                     break;
                 default:
@@ -283,8 +287,9 @@ namespace Emgu.LiteRT.LM.Maui
             }
         }
 
-        // A table as a grid: the header in bold over a line, the rows with a thin line between them, each cell's text
-        // wrapping at MaxCellWidth. Rebuilt as the table streams in (tables are small).
+        // A table as a grid with a full border: a line around it and between every row and column (lines of their own
+        // in thin grid rows and columns, so they show over any background), the header in bold on a light shade, each
+        // cell's text wrapping at MaxCellWidth. Rebuilt as the table streams in (tables are small).
         private void FillTable(Grid grid, ReplyBlock block)
         {
             grid.Children.Clear();
@@ -293,42 +298,64 @@ namespace Emgu.LiteRT.LM.Maui
             int columns = block.TableHeader.Count;
             if (columns == 0)
                 return;
+            const double line = 1;
+            // Columns: a line, then a cell and a line for each column. A column whose text is longer than MaxCellWidth gets that
+            // width (plus the cells' margins): an Auto column measured a wrapping label at its one-line width, so its row was
+            // one line high and the rest of the text was cut off.
+            grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(line)));
             for (int c = 0; c < columns; c++)
-                grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-            int row = 0;
-            void AddRow(IReadOnlyList<string> cells, bool header)
+            {
+                int longest = block.TableRows.Select(r => PlainLength(r[c])).Append(PlainLength(block.TableHeader[c])).Max();
+                bool wraps = longest * FontSize * 0.55 > MaxCellWidth;
+                grid.ColumnDefinitions.Add(new ColumnDefinition(wraps ? new GridLength(MaxCellWidth + CellPadding * 2) : GridLength.Auto));
+                grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(line)));
+            }
+            // Rows: a line, then a row of cells and a line for the header and each row.
+            int rows = 1 + block.TableRows.Count;
+            grid.RowDefinitions.Add(new RowDefinition(new GridLength(line)));
+            for (int r = 0; r < rows; r++)
             {
                 grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+                grid.RowDefinitions.Add(new RowDefinition(new GridLength(line)));
+            }
+            int gridColumns = grid.ColumnDefinitions.Count, gridRows = grid.RowDefinitions.Count;
+
+            // The header's shade, under its cells.
+            BoxView shade = new BoxView { Color = QuoteMarkColor.WithAlpha(0.18f) };
+            grid.Add(shade, 0, 1);
+            Grid.SetColumnSpan(shade, gridColumns);
+
+            void AddRow(IReadOnlyList<string> cells, int row, bool header)
+            {
                 for (int c = 0; c < columns; c++)
                 {
                     Label cell = NewLabel("ReplyParagraphStyle", FontSize);
-                    cell.MaximumWidthRequest = MaxCellWidth;
                     cell.LineBreakMode = LineBreakMode.WordWrap;
-                    cell.Margin = new Thickness(0, 6);
+                    cell.Margin = new Thickness(CellPadding, 6);
                     cell.HorizontalTextAlignment = block.TableAlignments[c] == ReplyTableAlignment.Right ? TextAlignment.End
                         : block.TableAlignments[c] == ReplyTableAlignment.Center ? TextAlignment.Center : TextAlignment.Start;
                     FormattedString text = new FormattedString();
                     AddInline(text, c < cells.Count ? cells[c] : string.Empty, header ? FontAttributes.Bold : FontAttributes.None, 0, null);
                     cell.FormattedText = text;
-                    grid.Add(cell, c, row);
+                    grid.Add(cell, 1 + 2 * c, row);
                 }
-                row++;
             }
-            void AddLine(double thickness)
-            {
-                grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-                BoxView line = new BoxView { HeightRequest = thickness, Color = QuoteMarkColor };
-                grid.Add(line, 0, row);
-                Grid.SetColumnSpan(line, columns);
-                row++;
-            }
-            AddRow(block.TableHeader, true);
-            AddLine(1.5);
+            AddRow(block.TableHeader, 1, true);
             for (int r = 0; r < block.TableRows.Count; r++)
+                AddRow(block.TableRows[r], 3 + 2 * r, false);
+
+            // The lines: across at every even row, down at every even column.
+            for (int r = 0; r < gridRows; r += 2)
             {
-                if (r > 0)
-                    AddLine(0.5);
-                AddRow(block.TableRows[r], false);
+                BoxView across = new BoxView { Color = QuoteMarkColor, HeightRequest = line };
+                grid.Add(across, 0, r);
+                Grid.SetColumnSpan(across, gridColumns);
+            }
+            for (int c = 0; c < gridColumns; c += 2)
+            {
+                BoxView down = new BoxView { Color = QuoteMarkColor, WidthRequest = line };
+                grid.Add(down, c, 0);
+                Grid.SetRowSpan(down, gridRows);
             }
             SemanticProperties.SetDescription(grid, "Table: " + string.Join(", ", block.TableHeader) + "; " + block.TableRows.Count + " rows");
         }
