@@ -327,12 +327,34 @@ namespace Emgu.LiteRT.LM.Maui
             _sideContent.Children.Add(_settingsView);
         }
 
+        // Developer mode's notice: one line ("Developer: 18 tools and the instructions · Show") that opens to the tool list
+        // and the instructions - folded, as the instructions alone fill a phone's screen after every reply.
+        private static View DeveloperNotice(IReadOnlyList<string> tools, string instructions)
+        {
+            var body = new Label
+            {
+                Text = "Tools: " + (tools.Count == 0 ? "none" : string.Join(", ", tools)) + "\n\nInstructions:\n" + (instructions ?? "none"),
+                IsVisible = false
+            };
+            ChatResources.ApplyStyle(body, "ChatDecorationTextStyle");
+            string summary = "Developer: " + (tools.Count == 0 ? "no tools" : tools.Count == 1 ? "1 tool" : tools.Count + " tools") + " and the instructions";
+            Label header = null;
+            header = Link(summary + " · Show", () =>
+            {
+                body.IsVisible = !body.IsVisible;
+                header.Text = summary + (body.IsVisible ? " · Hide" : " · Show");
+                SemanticProperties.SetDescription(header, header.Text);
+            });
+            header.FontSize = 13;
+            SemanticProperties.SetDescription(header, header.Text);
+            return new VerticalStackLayout { Spacing = 4, Children = { header, body } };
+        }
+
         private void OnExchangeCompleted(object sender, ChatExchangeEventArgs e)
         {
             // Settings > Developer mode: what the model was given with the message.
             if (DeveloperMode && _lastComposition != null)
-                Conversation?.AddNotice(null, "Tools: " + (_lastComposition.Tools.Count == 0 ? "none" : string.Join(", ", _lastComposition.Tools.Select(t => t.Name)))
-                    + "\n\nInstructions:\n" + (_lastComposition.Instructions ?? "none"));
+                Conversation?.AddNotice(DeveloperNotice(_lastComposition.Tools.Select(t => t.Name).ToList(), _lastComposition.Instructions));
             // Saved by the history binding (AutoSave): the page and the features learn the chat's id.
             if (_binding != null && _binding.ChatId > 0 && _chatId != _binding.ChatId)
                 SetCurrentChat(_binding.ChatId);
