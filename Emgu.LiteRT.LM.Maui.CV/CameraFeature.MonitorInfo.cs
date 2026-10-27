@@ -1,11 +1,12 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using Emgu.LiteRT.LM.Agents.Vision;
+using Emgu.LiteRT.LM.Agents.CV;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 // What the camera and sound monitors show about themselves: the user's own request behind each monitor (kept in memory with the monitor, not in
 // private chats), and the camera preview's label, which says what the camera is doing - watching for monitors, recording a clip, taking a photo.
-internal sealed partial class CameraFeature
+public sealed partial class CameraFeature
 {
     private readonly Dictionary<Guid, string> _monitorRequests = new();
     private readonly HashSet<Guid> _expandedRequests = new();
@@ -40,7 +41,7 @@ internal sealed partial class CameraFeature
         bool expanded = _expandedRequests.Contains(id);
         var label = new Label
         {
-            Text = "You asked: “" + request + "”", FontSize = 11, FontAttributes = FontAttributes.Italic, TextColor = Theme.SecondaryText,
+            Text = "You asked: “" + request + "”", FontSize = 11, FontAttributes = FontAttributes.Italic, TextColor = CvViews.Color("ChatSecondaryText"),
             MaxLines = expanded ? int.MaxValue : 2, LineBreakMode = expanded ? LineBreakMode.WordWrap : LineBreakMode.TailTruncation
         };
         SemanticProperties.SetHint(label, expanded ? "Tap to show less" : "Tap to show all of the request");

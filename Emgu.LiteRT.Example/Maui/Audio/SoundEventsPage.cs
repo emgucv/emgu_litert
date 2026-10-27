@@ -6,6 +6,7 @@ using System.Diagnostics;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.Models;
+using Emgu.LiteRT.LM.Maui.CV;
 
 namespace Maui.Demo.Lite;
 

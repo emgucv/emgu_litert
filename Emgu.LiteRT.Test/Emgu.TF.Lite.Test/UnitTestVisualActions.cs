@@ -12,6 +12,7 @@ using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Maui.Demo.Lite;
 using NUnit.Framework;
+using Emgu.LiteRT.LM.Agents.CV;
 
 namespace Emgu.TF.Lite.Test;
 

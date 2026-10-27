@@ -6,13 +6,30 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui;
 
-// Adding a generated picture to the device's own photo collection: Android - MediaStore, in Pictures/Emgu LiteRT (no
-// permission needed to add one's own pictures from Android 10); iOS and Mac Catalyst - the Photos library through PhotoKit,
-// add-only access (NSPhotoLibraryAddUsageDescription; the system asks the first time); Windows - the Pictures folder.
-internal static class PictureGallery
+/// <summary>
+/// Adding a picture or a video to the device's own photo collection: Android - MediaStore, in Pictures/&lt;app&gt; or
+/// Movies/&lt;app&gt; (no permission needed to add one's own from Android 10); iOS and Mac Catalyst - the Photos library
+/// through PhotoKit, add-only access (NSPhotoLibraryAddUsageDescription; the system asks the first time); Windows - the
+/// Pictures folder.
+/// </summary>
+public static class PictureGallery
 {
+    /// <summary>The folder's name in the gallery (Pictures/&lt;name&gt;, Movies/&lt;name&gt;); the app's name by default.</summary>
+    public static string FolderName { get; set; } = AppInfo.Current?.Name ?? "Pictures";
+
+    /// <summary>
+    /// Whether a file picker's or saver's failure was the user cancelling: the Windows file picker reports cancelling as a
+    /// plain exception, "Operation cancelled or Path doesn't exist.", not an OperationCanceledException (Apple and Android do use that).
+    /// </summary>
+    /// <param name="exception">The result's exception, or null</param>
+    public static bool SaveWasCancelled(Exception exception)
+    {
+        return exception is OperationCanceledException
+            || (exception != null && exception.Message.StartsWith("Operation cancelled", StringComparison.OrdinalIgnoreCase));
+    }
+
     /// <summary>What the destination is called in the app's buttons.</summary>
     public static string DestinationName =>
 #if ANDROID
@@ -24,14 +41,14 @@ internal static class PictureGallery
 #endif
 
 #if ANDROID
-    /// <summary>Add a video file to the gallery (Movies/Emgu LiteRT); returns a short description of where it went.</summary>
+    /// <summary>Add a video file to the gallery (Movies/&lt;app&gt;); returns a short description of where it went.</summary>
     public static Task<string> SaveVideoAsync(string path, string fileName) => Task.Run(() =>
     {
         Android.Content.ContentResolver resolver = Android.App.Application.Context.ContentResolver;
         var values = new Android.Content.ContentValues();
         values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
         values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "video/mp4");
-        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, "Movies/Emgu LiteRT");
+        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, "Movies/" + FolderName);
         values.Put(Android.Provider.MediaStore.IMediaColumns.IsPending, 1);
         Android.Net.Uri uri = resolver.Insert(Android.Provider.MediaStore.Video.Media.ExternalContentUri, values)
             ?? throw new IOException("The gallery wouldn't take the video.");
@@ -49,17 +66,17 @@ internal static class PictureGallery
             resolver.Delete(uri, null, null);
             throw;
         }
-        return "Saved to the gallery (Movies/Emgu LiteRT)";
+        return "Saved to the gallery (Movies/&lt;app&gt;)";
     });
 
-    /// <summary>Add a JPEG file to the gallery (Pictures/Emgu LiteRT) without reading it into memory; returns a short description of where it went.</summary>
+    /// <summary>Add a JPEG file to the gallery (Pictures/&lt;app&gt;) without reading it into memory; returns a short description of where it went.</summary>
     public static Task<string> SavePhotoAsync(string path, string fileName) => Task.Run(() =>
     {
         Android.Content.ContentResolver resolver = Android.App.Application.Context.ContentResolver;
         var values = new Android.Content.ContentValues();
         values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
         values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "image/jpeg");
-        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, "Pictures/Emgu LiteRT");
+        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, "Pictures/" + FolderName);
         values.Put(Android.Provider.MediaStore.IMediaColumns.IsPending, 1);
         Android.Net.Uri uri = resolver.Insert(Android.Provider.MediaStore.Images.Media.ExternalContentUri, values)
             ?? throw new IOException("The gallery wouldn't take the photo.");
@@ -77,11 +94,14 @@ internal static class PictureGallery
             resolver.Delete(uri, null, null);
             throw;
         }
-        return "Saved to the gallery (Pictures/Emgu LiteRT)";
+        return "Saved to the gallery (Pictures/&lt;app&gt;)";
     });
 #endif
 
     /// <summary>Add the picture; returns a short description of where it went. Call on the UI thread.</summary>
+    private static string ImageMediaType(string fileName) =>
+        fileName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ? "image/jpeg" : "image/png";
+
     public static async Task<string> SaveAsync(byte[] png, string fileName)
     {
 #if ANDROID
@@ -89,8 +109,8 @@ internal static class PictureGallery
         Android.Content.ContentResolver resolver = Android.App.Application.Context.ContentResolver;
         var values = new Android.Content.ContentValues();
         values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
-        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "image/png");
-        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, "Pictures/Emgu LiteRT");
+        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, ImageMediaType(fileName));
+        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, "Pictures/" + FolderName);
         values.Put(Android.Provider.MediaStore.IMediaColumns.IsPending, 1);
         Android.Net.Uri uri = resolver.Insert(Android.Provider.MediaStore.Images.Media.ExternalContentUri, values)
             ?? throw new IOException("The gallery wouldn't take the picture.");
@@ -107,7 +127,7 @@ internal static class PictureGallery
             resolver.Delete(uri, null, null);
             throw;
         }
-        return "Saved to the gallery (Pictures/Emgu LiteRT)";
+        return "Saved to the gallery (Pictures/&lt;app&gt;)";
 #elif IOS || MACCATALYST
         Photos.PHAuthorizationStatus status = await Photos.PHPhotoLibrary.RequestAuthorizationAsync(Photos.PHAccessLevel.AddOnly);
         if (status != Photos.PHAuthorizationStatus.Authorized && status != Photos.PHAuthorizationStatus.Limited)
@@ -125,7 +145,7 @@ internal static class PictureGallery
         await changed.Task;
         return "Saved to Photos";
 #else
-        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Emgu LiteRT");
+        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), FolderName);
         Directory.CreateDirectory(folder);
         string path = Path.Combine(folder, fileName);
         await File.WriteAllBytesAsync(path, png);

@@ -4,15 +4,15 @@ using System.IO;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Maui;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 // Alert sounds (TODO item 53): the sounds the play_file alert action and a sound monitor's playFile option can play - the app's soft white noise and music-box
 // lullaby, and the user's own, added from a file or recorded - kept by AlertSoundLibrary and managed in Settings > "Alert sounds" (preview with play,
 // delete). While one plays the sound monitors don't listen (BeginSoundMute), so a lullaby can't be heard as a baby, and it stops if its monitor goes.
-internal sealed partial class CameraFeature
+public sealed partial class CameraFeature
 {
     private readonly AlertSoundLibrary _alertSounds = new(System.IO.Path.Combine(FileSystem.AppDataDirectory, "alert-sounds"),
-        async (name, _) => await FileSystem.OpenAppPackageFileAsync(name));
+        (name, _) => CvAssets.OpenAsync(name));
     private VerticalStackLayout _alertSoundRows;
     private Label _alertSoundStatus;
     private Button _alertSoundRecordButton;
@@ -47,7 +47,7 @@ internal sealed partial class CameraFeature
     {
         StartAlertSounds();
         _alertSoundRows = new VerticalStackLayout { Spacing = 4 };
-        _alertSoundStatus = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText, IsVisible = false };
+        _alertSoundStatus = new Label { FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText"), IsVisible = false };
         var add = new Button { Text = "Add a sound…", FontSize = 13, MinimumHeightRequest = 40, Padding = new Thickness(10, 0) };
         add.Clicked += async (_, _) => await AddAlertSoundFromFileAsync();
         _alertSoundRecordButton = new Button { Text = "Record a message", FontSize = 13, MinimumHeightRequest = 40, Padding = new Thickness(10, 0) };
@@ -58,11 +58,11 @@ internal sealed partial class CameraFeature
             Spacing = 6,
             Children =
             {
-                new Label { Text = "Alert sounds", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.PrimaryText },
+                new Label { Text = "Alert sounds", FontSize = 15, TextColor = CvViews.Color("ChatPrimaryText") },
                 new Label
                 {
                     Text = "Sounds an alert can play: \"play the lullaby when the baby cries\", \"play my rain sound when you see the dog\". Add your own from a file (WAV, MP3, M4A, AAC, FLAC or OGG, up to 25 MB) or record a message. They stay on this device. They play at the device's media volume.",
-                    FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText
+                    FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText")
                 },
                 _alertSoundRows,
                 new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = { add, _alertSoundRecordButton } },
@@ -77,12 +77,12 @@ internal sealed partial class CameraFeature
         _alertSoundRows.Children.Clear();
         var sounds = _alertSounds.List();
         if (sounds.Count == 0)
-            _alertSoundRows.Children.Add(new Label { Text = "Preparing the built-in sounds…", FontSize = 12, TextColor = Theme.SecondaryText });
+            _alertSoundRows.Children.Add(new Label { Text = "Preparing the built-in sounds…", FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText") });
         foreach (AlertSound sound in sounds)
         {
             AlertSound item = sound;
             var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 6 };
-            row.Add(new Label { Text = item.Name + (item.BuiltIn ? " (built in)" : ""), FontFamily = Theme.BodyFont, FontSize = 14, TextColor = Theme.PrimaryText, VerticalOptions = LayoutOptions.Center, LineBreakMode = LineBreakMode.TailTruncation }, 0, 0);
+            row.Add(new Label { Text = item.Name + (item.BuiltIn ? " (built in)" : ""), FontSize = 14, TextColor = CvViews.Color("ChatPrimaryText"), VerticalOptions = LayoutOptions.Center, LineBreakMode = LineBreakMode.TailTruncation }, 0, 0);
             var play = new Button { Text = "Play", FontSize = 12, MinimumHeightRequest = 40, Padding = new Thickness(8, 0) };
             play.Clicked += async (_, _) => await PreviewAlertSoundAsync(item, play);
             SemanticProperties.SetDescription(play, "Play " + item.Name);

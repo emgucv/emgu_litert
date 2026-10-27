@@ -1,7 +1,7 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using Emgu.LiteRT.LM.Agents.Events;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 internal sealed class CameraChimeAction : IVisualAction
 {
@@ -21,7 +21,7 @@ internal sealed class CameraChimeAction : IVisualAction
             string temporary = path + "." + Guid.NewGuid().ToString("N");
             try
             {
-                using (var source = await FileSystem.OpenAppPackageFileAsync(_asset))
+                using (var source = await CvAssets.OpenAsync(_asset))
                 using (var destination = File.Create(temporary))
                     await source.CopyToAsync(destination, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();

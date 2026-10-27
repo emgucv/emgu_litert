@@ -9,6 +9,7 @@ using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Vision;
 using Emgu.LiteRT.Models;
 using Emgu.LiteRT.Util;
+using Emgu.LiteRT.LM.Agents.CV;
 using Maui.Demo.Lite;
 using NUnit.Framework;
 

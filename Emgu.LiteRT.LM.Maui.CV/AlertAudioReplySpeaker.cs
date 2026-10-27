@@ -4,32 +4,38 @@ using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Maui;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
-// Reads replies aloud through the camera monitors' AlertAudioCoordinator (so a reply and an alert don't talk over each
-// other), for Emgu.LiteRT.LM.Maui's ChatView (IReplySpeaker): the reply is read while it is written, sentence by sentence.
-// The voice chat (VoiceModeFeature) follows the text being spoken (Speaking) and waits for the whole reply to have been
-// read (Completion).
-internal sealed class AlertAudioReplySpeaker : IReplySpeaker
+/// <summary>
+/// Reads replies aloud through the alert audio (<see cref="AlertAudioCoordinator"/>), so a reply doesn't talk over a
+/// monitor's spoken alert, sentence by sentence as the reply streams; the voice chat follows <see cref="Speaking"/> and
+/// waits for <see cref="Completion"/>.
+/// </summary>
+public sealed class AlertAudioReplySpeaker : IReplySpeaker
 {
     private readonly Func<string, CancellationToken, Task> _speak;
     private ReplyReader _reader;
 
+    /// <summary>Create a speaker over a function that speaks a sentence.</summary>
     public AlertAudioReplySpeaker(Func<string, CancellationToken, Task> speak)
     {
         _speak = speak;
     }
 
+    /// <summary>Create a speaker over the alert audio, so replies wait for an alert to finish.</summary>
     public AlertAudioReplySpeaker(AlertAudioCoordinator audio) : this(audio.SpeakReplyAsync)
     {
     }
 
     // The text about to be spoken.
+    /// <summary>Raised with each sentence as it is spoken (the voice chat follows it).</summary>
     public event Action<string> Speaking;
 
     // Completes when the reply being read has been read, or reading was stopped; completed when nothing is read.
+    /// <summary>Ends when the reply has been read out, or was stopped.</summary>
     public Task Completion => _reader?.Completion ?? Task.CompletedTask;
 
+    /// <summary>Read a reply aloud as it streams.</summary>
     public void Start(ChatMessageItem reply)
     {
         Stop();
@@ -41,6 +47,7 @@ internal sealed class AlertAudioReplySpeaker : IReplySpeaker
         reader.Follow(reply);
     }
 
+    /// <summary>Stop reading.</summary>
     public void Stop()
     {
         _reader?.Stop();
@@ -65,8 +72,10 @@ internal sealed class AlertAudioReplySpeaker : IReplySpeaker
             _speak = speak;
         }
 
+        /// <summary>Raised with each sentence as it is spoken (the voice chat follows it).</summary>
         public event Action<string> Speaking;
 
+        /// <summary>Ends when the reply has been read out, or was stopped.</summary>
         public Task Completion => _done.Task;
 
         public void Follow(ChatMessageItem reply)
@@ -104,6 +113,7 @@ internal sealed class AlertAudioReplySpeaker : IReplySpeaker
             Pump();
         }
 
+        /// <summary>Stop reading.</summary>
         public void Stop()
         {
             if (_reply != null)

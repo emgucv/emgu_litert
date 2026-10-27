@@ -13,12 +13,13 @@ using Microsoft.Extensions.AI;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.Models.CV.Maui;
+using Emgu.LiteRT.LM.Agents.CV;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 // The camera monitors ("tell me when you see a person"): the visual agents on the detectors, the monitors' runtime and
 // their actions (chime, speech, snapshot, a sound file; on Android a clip and a photo), the tools, and the monitors' card.
-internal sealed partial class CameraFeature
+public sealed partial class CameraFeature
 {
     private VisualAgentRegistry _visualAgents;
     private VisualMonitorRuntime _visualRuntime;
@@ -42,16 +43,16 @@ internal sealed partial class CameraFeature
     private void BuildVisualRegistry()
     {
         _visualAgents = new VisualAgentRegistry();
-        // Emgu.LiteRT.LM.Agents.CV's agents on the detectors DetectorFactory makes (the app's cache folder, its bundled GPU check pictures), with at
+        // Emgu.LiteRT.LM.Agents.CV's agents on the detectors the app's VisualDetectors makes, with at
         // most 2 of the CPU threads Settings allows, read each time an agent is prepared. The holistic agent after the pose and face agents, which
         // keep the plain postures and expressions.
         Func<int> threads = () => Math.Min(2, CpuThreadSettings.Count);
-        _visualAgents.Register(new CocoVisualAgent(DetectorFactory.Coco(), threads, CocoDetector.CanTryGpu));
-        _visualAgents.Register(new CocoVisualAgent(DetectorFactory.YoloX(), threads, CocoDetector.CanTryGpu));
-        _visualAgents.Register(new HandVisualAgent(DetectorFactory.Hand(), threads));
-        _visualAgents.Register(new PoseVisualAgent(DetectorFactory.Pose(), numThreads: threads));
-        _visualAgents.Register(new FaceVisualAgent(DetectorFactory.Face(), threads));
-        _visualAgents.Register(new HolisticVisualAgent(DetectorFactory.Holistic(), threads));
+        _visualAgents.Register(new CocoVisualAgent(_detectors.Coco(), threads, CocoDetector.CanTryGpu));
+        _visualAgents.Register(new CocoVisualAgent(_detectors.YoloX(), threads, CocoDetector.CanTryGpu));
+        _visualAgents.Register(new HandVisualAgent(_detectors.Hand(), threads));
+        _visualAgents.Register(new PoseVisualAgent(_detectors.Pose(), numThreads: threads));
+        _visualAgents.Register(new FaceVisualAgent(_detectors.Face(), threads));
+        _visualAgents.Register(new HolisticVisualAgent(_detectors.Holistic(), threads));
         _visualChime = new CameraChimeAction();
         _alertAudio = new AlertAudioCoordinator((text, token) => MainThread.InvokeOnMainThreadAsync(() => AlertVoice.SpeakAsync(text, token)),
             occurrence => _visualRuntime.Snapshot().Any(m => m.Id == occurrence.MonitorId &&
@@ -77,11 +78,10 @@ internal sealed partial class CameraFeature
         _visualRuntime = new VisualMonitorRuntime(_visualAgents, _visualActions, actionCoordinator: _alertAudio);
         _visualRuntime.Changed += QueueVisualMonitorUi;
         // The title stays (UpdateVisualMonitorUi rebuilds the rows after it), so it can be the handle to drag the card by.
-        _visualMonitorTitle = new Label { Text = "Camera monitors · session only", FontSize = 13, FontFamily = Theme.TitleFont,
-            TextColor = Theme.PrimaryText, MinimumHeightRequest = 32, VerticalTextAlignment = TextAlignment.Center };
+        _visualMonitorTitle = new Label { Text = "Camera monitors · session only", FontSize = 13, TextColor = CvViews.Color("ChatPrimaryText"), MinimumHeightRequest = 32, VerticalTextAlignment = TextAlignment.Center };
         SemanticProperties.SetHint(_visualMonitorTitle, "Drag to move the camera monitors card.");
         _visualMonitorRows = new VerticalStackLayout { Spacing = 6, Children = { _visualMonitorTitle } };
-        _visualMonitorPanel = Theme.Card(new ScrollView { Content = _visualMonitorRows }, 8);
+        _visualMonitorPanel = CvViews.Card(new ScrollView { Content = _visualMonitorRows }, 8);
         _visualMonitorPanel.WidthRequest = 310;
         _visualMonitorPanel.MaximumHeightRequest = 220;
         _visualMonitorPanel.HorizontalOptions = LayoutOptions.Start;
@@ -165,21 +165,21 @@ internal sealed partial class CameraFeature
         foreach (var monitor in monitors)
         {
             string detectorName = _visualAgents.Describe().FirstOrDefault(d => d.Id == monitor.AgentId)?.Name ?? monitor.AgentId;
-            _visualMonitorRows.Children.Add(new Label { Text = monitor.Condition, FontSize = 12, TextColor = Theme.PrimaryText });
+            _visualMonitorRows.Children.Add(new Label { Text = monitor.Condition, FontSize = 12, TextColor = CvViews.Color("ChatPrimaryText") });
             if (MonitorRequestLabel(monitor.Id) is View request) _visualMonitorRows.Children.Add(request);
             _visualMonitorRows.Children.Add(new Label { Text = detectorName + " · " + monitor.State + " · " + monitor.Status,
-                FontSize = 11, TextColor = Theme.SecondaryText });
+                FontSize = 11, TextColor = CvViews.Color("ChatSecondaryText") });
             foreach (var action in monitor.Actions)
             {
                 string detail = action.ActionId == "speak_text" ? "“" + action.Parameters.GetProperty("text").GetString() + "”"
                     : action.ActionId == "record_clip" ? action.Parameters.GetProperty("seconds").GetInt32() + " s" : null;
                 var result = monitor.LastActionResults.FirstOrDefault(r => r.ActionId == action.ActionId);
                 _visualMonitorRows.Children.Add(new Label { Text = action.Name + (detail == null ? "" : ": " + detail) +
-                    (result == null ? "" : " · " + result.State + " · " + result.Message), FontSize = 11, TextColor = Theme.SecondaryText });
+                    (result == null ? "" : " · " + result.State + " · " + result.Message), FontSize = 11, TextColor = CvViews.Color("ChatSecondaryText") });
             }
             if (monitor.LastEvent != null)
                 _visualMonitorRows.Children.Add(new Label { Text = monitor.LastEvent,
-                    FontSize = 11, TextColor = Theme.SecondaryText });
+                    FontSize = 11, TextColor = CvViews.Color("ChatSecondaryText") });
             var buttons = new HorizontalStackLayout { Spacing = 6 };
             bool pause = monitor.Enabled && monitor.State != VisualMonitorState.Faulted;
             var toggle = MonitorButton(pause ? "Pause" : "Resume");

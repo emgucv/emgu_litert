@@ -580,6 +580,10 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # Emgu.LiteRT.LM.Agents.Mcp and the MCP SDK).
   SET(EMGU_LITERT_LM_MAUI_MCP_NUGET_ID "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}.Mcp")
   SET(EMGU_LITERT_LM_MAUI_MCP_NUGET_TITLE "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_TITLE} MCP")
+  # Emgu.LiteRT.LM.Maui.CV/: ChatPage's camera and sound monitors and the exercise counter (kept out of Emgu.LiteRT.LM.Maui so
+  # that package needs neither Emgu CV nor the detectors).
+  SET(EMGU_LITERT_LM_MAUI_CV_NUGET_ID "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}.CV")
+  SET(EMGU_LITERT_LM_MAUI_CV_NUGET_TITLE "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_TITLE} CV")
 
   SET(EMGU_LITERT_UTIL_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Util")
   SET(EMGU_LITERT_UTIL_NUGET_TITLE "${EMGU_LITERT_NUGET_TITLE} Util")
@@ -1290,6 +1294,17 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Mcp.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Mcp/Maui/docs/README.md)
 
+# Emgu.LiteRT.LM.Maui.CV: ChatPage's CameraFeature and ExerciseFeature. Its own nuget package, depending on Emgu.LiteRT.LM.Maui,
+# Emgu.LiteRT.LM.Agents.CV, Emgu.LiteRT.Models.CV and Emgu.LiteRT.Models.CV.Maui (Emgu CV).
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.CV.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.CV/Maui/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.CV/Maui/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.CV/Maui/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.CV.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.CV/Maui/docs/README.md)
+
 # Emgu.TF.Lite.ImageIO: NativeImageIO/JpegData (renamed from Emgu.Models, then Emgu.LiteRT.ImageIO).
 # Its own nuget package, depending on Emgu.LiteRT.Util (Annotation) and Emgu.TF.Lite
 # (Emgu.TF.Lite.Toolbox's native pixel-conversion P/Invokes).
@@ -1417,6 +1432,7 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.Documents)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.Mcp)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.CV)
   # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and later to Emgu.TF.Lite.ImageIO/, and made
   # its own project+package (it used to be shared source imported directly into
   # Emgu.LiteRT.Tflite.Models.csproj and CVInterop.Lite.csproj). Depends on Emgu.TF.Lite

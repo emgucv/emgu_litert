@@ -236,17 +236,17 @@ monitoring remain future additions.
 | Component | Source |
 |---|---|
 | Context budgets and diagnostics | [LiteRtLmChatClient.cs](../../Emgu.LiteRT.LM.Extensions.AI/LiteRtLmChatClient.cs), [ContextManagement.cs](../../Emgu.LiteRT.LM.Extensions.AI/ContextManagement.cs) |
-| Shared planner/catalog metadata | [ChatPlannerInstructions.cs](../Maui.Demo.Lite.Core/Chat/ChatPlannerInstructions.cs), [VisualHostCatalog.cs](../Maui.Demo.Lite.Core/Visual/VisualHostCatalog.cs) |
+| Shared planner/catalog metadata | [ChatCamera.cs](../../Emgu.LiteRT.LM.Agents.CV/ChatCamera.cs), [VisualHostCatalog.cs](../../Emgu.LiteRT.LM.Agents.CV/VisualHostCatalog.cs) |
 | Chat tool schemas and planner instructions | [VisualAgentTools.cs](../../Emgu.LiteRT.LM.Agents/VisualAgentTools.cs) |
-| MAUI registration, tool handlers and controls | [CameraFeature.Visual.cs](Chat/Features/CameraFeature.Visual.cs) (a `ChatFeature` of the page, with its other partials) |
-| Camera capture and visibility lifecycle | [CameraFeature.cs](Chat/Features/CameraFeature.cs), [LiveCamera.cs](../../Emgu.LiteRT.Models.CV.Maui/LiveCamera.cs) |
+| MAUI registration, tool handlers and controls | [CameraFeature.Visual.cs](../../Emgu.LiteRT.LM.Maui.CV/CameraFeature.Visual.cs) (a `ChatFeature` of the page, with its other partials; the `Emgu.LiteRT.LM.Maui.CV` package) |
+| Camera capture and visibility lifecycle | [CameraFeature.cs](../../Emgu.LiteRT.LM.Maui.CV/CameraFeature.cs), [LiveCamera.cs](../../Emgu.LiteRT.Models.CV.Maui/LiveCamera.cs) |
 | Visual contracts and detector registry | [VisualAgents.cs](../../Emgu.LiteRT.LM.Agents/VisualAgents.cs) |
 | Conditions and presence state machine | [VisualEvents.cs](../../Emgu.LiteRT.LM.Agents/VisualEvents.cs) |
 | Rule binding, frame scheduling and action dispatch | [VisualMonitorRuntime.cs](../../Emgu.LiteRT.LM.Agents/VisualMonitorRuntime.cs) |
 | COCO model adapter | [CocoVisualAgent.cs](../../Emgu.LiteRT.LM.Agents.CV/CocoVisualAgent.cs) (`Emgu.LiteRT.LM.Agents.CV`, with the hand, pose, face and holistic agents) |
 | Action contracts, factories and validation | [VisualActions.cs](../../Emgu.LiteRT.LM.Agents/VisualActions.cs) |
-| MAUI factories and fixed speech | [CameraActionFactories.cs](Chat/Visual/CameraActionFactories.cs) |
-| Snapshot action | [CameraSnapshotAction.cs](../Maui.Demo.Lite.Core/Visual/CameraSnapshotAction.cs), [CameraFeature.Snapshots.cs](Chat/Features/CameraFeature.Snapshots.cs) |
+| MAUI factories and fixed speech | [CameraActionFactories.cs](../../Emgu.LiteRT.LM.Maui.CV/CameraActionFactories.cs) |
+| Snapshot action | [CameraSnapshotAction.cs](../../Emgu.LiteRT.LM.Agents.CV/CameraSnapshotAction.cs), [CameraFeature.Snapshots.cs](../../Emgu.LiteRT.LM.Maui.CV/CameraFeature.Snapshots.cs) |
 | Audio arbitration | [AlertAudioCoordinator.cs](../../Emgu.LiteRT.LM.Agents/AlertAudioCoordinator.cs) |
-| Native chime playback | [CameraChimeAction.cs](Chat/Visual/CameraChimeAction.cs) |
+| Native chime playback | [CameraChimeAction.cs](../../Emgu.LiteRT.LM.Maui.CV/CameraChimeAction.cs) |
 | Regression tests | [UnitTestVisualAgents.cs](../../Emgu.LiteRT.Test/Emgu.TF.Lite.Test/UnitTestVisualAgents.cs) |

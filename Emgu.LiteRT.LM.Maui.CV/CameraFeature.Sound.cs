@@ -3,15 +3,16 @@ using System.Diagnostics;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Microsoft.Extensions.AI;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Agents.CV;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 // Sound monitors (TODO item 42, Emgu.LiteRT.Models/YAMNET.md): "tell me when the doorbell rings". The agent's create_sound_monitor tool (Emgu.LiteRT.LM.Agents'
 // SoundMonitorTools) adds a monitor to a SoundMonitorRuntime; while any is enabled the feature listens through the microphone, cuts the audio
 // into YAMNet windows (SoundWindower) and feeds each window's 521 scores to the runtime, which confirms sounds and runs the alerts - the
 // chime and spoken words - on a worker of its own. No audio is kept or sent anywhere, and the language model isn't involved per sound.
 // The microphone is let go of while the voice recorder uses it (MicrophoneGate), and the app's own alert audio is not listened to.
-internal sealed partial class CameraFeature
+public sealed partial class CameraFeature
 {
 #if ANDROID || IOS || MACCATALYST
     private static readonly bool SoundSupported = true;
@@ -46,11 +47,10 @@ internal sealed partial class CameraFeature
     private void BuildSoundMonitoring()
     {
         // The title stays (UpdateSoundMonitorUi rebuilds the rows after it), so it can be the handle to drag the card by.
-        _soundTitle = new Label { Text = "Sound monitors · session only", FontSize = 13, FontFamily = Theme.TitleFont,
-            TextColor = Theme.PrimaryText, MinimumHeightRequest = 32, VerticalTextAlignment = TextAlignment.Center };
+        _soundTitle = new Label { Text = "Sound monitors · session only", FontSize = 13, TextColor = CvViews.Color("ChatPrimaryText"), MinimumHeightRequest = 32, VerticalTextAlignment = TextAlignment.Center };
         SemanticProperties.SetHint(_soundTitle, "Drag to move the sound monitors card.");
         _soundRows = new VerticalStackLayout { Spacing = 6, Children = { _soundTitle } };
-        _soundPanel = Theme.Card(new ScrollView { Content = _soundRows }, 8);
+        _soundPanel = CvViews.Card(new ScrollView { Content = _soundRows }, 8);
         _soundPanel.WidthRequest = 310;
         _soundPanel.MaximumHeightRequest = 220;
         _soundPanel.HorizontalOptions = LayoutOptions.End;
@@ -297,8 +297,10 @@ internal sealed partial class CameraFeature
     }
 
     // Listening is off while something plays, and for 2 s after. Holds can overlap (an alert while a clip plays).
+    /// <summary>Stop the sound monitors listening while a sound of the app's own plays (an alert, the camera click, a counted exercise).</summary>
     public void BeginSoundMute() => Interlocked.Increment(ref _soundMuteHolds);
 
+    /// <summary>Let the sound monitors listen again.</summary>
     public void EndSoundMute()
     {
         Interlocked.Exchange(ref _soundMutedUntil, Stopwatch.GetTimestamp() + 2 * Stopwatch.Frequency);
@@ -323,13 +325,13 @@ internal sealed partial class CameraFeature
         if (monitors.Count == 0) return;
         foreach (var monitor in monitors)
         {
-            _soundRows.Children.Add(new Label { Text = monitor.Description, FontSize = 12, TextColor = Theme.PrimaryText });
+            _soundRows.Children.Add(new Label { Text = monitor.Description, FontSize = 12, TextColor = CvViews.Color("ChatPrimaryText") });
             if (MonitorRequestLabel(monitor.Id) is View request) _soundRows.Children.Add(request);
             string state = !monitor.Enabled ? "Paused" : _soundSource != null ? "Listening" : _soundStatus ?? "Not listening";
             _soundRows.Children.Add(new Label { Text = state + (monitor.Heard > 0 ? " · heard " + monitor.Heard + (monitor.Heard == 1 ? " time" : " times") : ""),
-                FontSize = 11, TextColor = Theme.SecondaryText });
+                FontSize = 11, TextColor = CvViews.Color("ChatSecondaryText") });
             if (monitor.LastEvent != null)
-                _soundRows.Children.Add(new Label { Text = monitor.LastEvent, FontSize = 11, TextColor = Theme.SecondaryText });
+                _soundRows.Children.Add(new Label { Text = monitor.LastEvent, FontSize = 11, TextColor = CvViews.Color("ChatSecondaryText") });
             var buttons = new HorizontalStackLayout { Spacing = 6 };
             var toggle = MonitorButton(monitor.Enabled ? "Pause" : "Resume");
             var remove = MonitorButton("Remove");

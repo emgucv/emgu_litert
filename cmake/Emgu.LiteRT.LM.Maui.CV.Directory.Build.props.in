@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<Project>
+  <!-- https://learn.microsoft.com/en-us/visualstudio/msbuild/customize-by-directory?view=vs-2022 -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+
+	<TargetFrameworks>net${DOTNET_VERSION_MAJOR}.0-android;net${DOTNET_VERSION_MAJOR}.0-ios</TargetFrameworks>
+	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx')) or $([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFrameworks>
+	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-windows10.0.19041.0</TargetFrameworks>
+
+	<MauiVersion Condition="'$(MauiVersion)' == ''">${DOTNET_VERSION_MAJOR}.0.0</MauiVersion>
+
+    <EmguLiteRTProjectRoot>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\))</EmguLiteRTProjectRoot>
+
+    <PackageId>${EMGU_LITERT_LM_MAUI_CV_NUGET_ID}</PackageId>
+	<title>${EMGU_LITERT_LM_MAUI_CV_NUGET_TITLE}</title>
+    <version>${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+	<summary>The live camera and the camera and sound monitors of the Emgu LiteRT LM MAUI chat page, with Emgu CV: watching for objects, gestures, postures and expressions, alerts, photos and clips, and counting exercises.</summary>
+    <Description>The CameraFeature and ExerciseFeature of the Emgu LiteRT LM MAUI chat page (ChatPage): the live camera the model looks through, camera monitors that watch for objects, hand gestures, body postures and facial expressions with the visual agents and alert with a chime, spoken words, a sound, a snapshot, a photo or a clip, sound monitors that listen for a doorbell, a dog or a baby, background monitoring on Android, and counting jumping jacks, squats and high knees with the body pose. Android, iOS, Mac Catalyst and Windows; needs Emgu CV.</Description>
+    <PackageReleaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM MAUI CV, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
+
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageIcon>nuget_icon.png</PackageIcon>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<RepositoryUrl>${GITHUB_REPO_URL}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageOutputPath>$([System.IO.Path]::GetFullPath($(EmguLiteRTProjectRoot)\platforms\nuget))</PackageOutputPath>
+	<PackageTags>litert litert-lm llm gemma chat maui camera vision monitor emgucv emgu emgutflite ai</PackageTags>
+    <PackageProjectUrl>${NUGET_EMGU_URL}</PackageProjectUrl>
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+
+  </PropertyGroup>
+
+    <ItemGroup>
+      <None Include="$(EmguLiteRTProjectRoot)\LICENSE.txt">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+      <None Include="$(EmguLiteRTProjectRoot)\miscellaneous\nuget_icon.png">
+        <Pack>True</Pack>
+        <PackagePath></PackagePath>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="docs\README.md">
+        <Pack>True</Pack>
+        <PackagePath>docs\</PackagePath>
+      </None>
+    </ItemGroup>
+
+  <Import Project="SignBinary.Targets" Condition="exists('SignBinary.Targets')" />
+  <Import Project="SignPkg.Targets" Condition="exists('SignPkg.Targets')" />
+</Project>

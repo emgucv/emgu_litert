@@ -6,15 +6,19 @@ using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.Models.CV.Maui;
 using Microsoft.Extensions.AI;
+using Emgu.LiteRT.LM.Agents.CV;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
-// The live camera and what watches through it, as one feature of Emgu.LiteRT.LM.Maui's ChatPage: the camera preview
-// (a floating panel over the chat, dragged or maximized), the open_camera and capture_camera_frame tools, the camera
-// monitors (CameraFeature.Visual.cs, with their snapshots, clips and photos), the sound monitors (CameraFeature.Sound.cs),
-// the alert sounds (CameraFeature.AlertSounds.cs) and, on Android, the foreground service that keeps them going in the
-// background (CameraFeature.Background.cs). Two tool groups: the camera's and the sounds'.
-internal sealed partial class CameraFeature : DemoFeature
+/// <summary>
+/// The live camera and the camera and sound monitors of a chat page: the model looks through the camera (open_camera,
+/// capture_camera_frame), camera monitors watch for objects, gestures, postures and expressions with the visual agents
+/// (Emgu.LiteRT.LM.Agents.CV) on the detectors of <see cref="VisualDetectors"/> and alert with a chime, spoken words, a
+/// sound, a snapshot, a photo or a clip, sound monitors listen with YAMNet, and on Android a foreground service keeps the
+/// monitors running in the background. The preview and the monitors' panels are the page's overlays. Its
+/// <see cref="ReplySpeaker"/> reads replies through the alert audio.
+/// </summary>
+public sealed partial class CameraFeature : CvFeature
 {
     private LiveCamera _camera;
     private Border _cameraPanel;
@@ -36,32 +40,51 @@ internal sealed partial class CameraFeature : DemoFeature
     private Border _cameraOverlay;          // the exercise count over the maximized preview (ExerciseFeature)
     private Label _cameraOverlayCount, _cameraOverlayDetail;
     private double _cameraRestoreX, _cameraRestoreY;
-    private const string CameraInstructions = ChatPlannerInstructions.Camera;
+    private const string CameraInstructions = ChatCamera.Instructions;
 
-    public CameraFeature()
+    private readonly VisualDetectors _detectors;
+
+    /// <summary>Create the feature.</summary>
+    /// <param name="detectors">The detectors its visual agents and the exercise counter run on; null for the defaults (the app's cache folder, no GPU check)</param>
+    public CameraFeature(VisualDetectors detectors = null)
     {
+        _detectors = detectors ?? new VisualDetectors();
         BuildVisualRegistry();
         ReplySpeaker = new AlertAudioReplySpeaker(_alertAudio);
     }
 
+    /// <summary>The detectors the camera's agents run on.</summary>
+    public VisualDetectors Detectors => _detectors;
+
+    /// <summary>Saves a snapshot the user asked to keep (the JPEG and a file name) and returns what to say, or null to say nothing; by default <see cref="PictureGallery.SaveAsync"/>. An app gives a Save As dialog here.</summary>
+    public Func<byte[], string, Task<string>> SnapshotSaver { get; set; }
+
+    /// <inheritdoc/>
     public override string Name => "camera";
 
+    /// <inheritdoc/>
     public override string Title => "Camera and sound monitors";
 
     // The monitors stay until the chat is closed; the feature has no switch.
+    /// <inheritdoc/>
     public override bool PersistEnabled => false;
 
     // Reads replies aloud through the alert audio, so a reply and an alert don't talk over each other.
+    /// <summary>The reply speaker that reads replies through the alert audio, so they don't talk over an alert (give it to ChatPageOptions.ReplySpeaker).</summary>
     public AlertAudioReplySpeaker ReplySpeaker { get; }
 
     // The live camera (null when closed), and whether its preview fills the conversation's area.
+    /// <summary>The live camera while it is open, or null.</summary>
     public LiveCamera Camera => _camera;
 
+    /// <summary>Whether the preview fills the conversation's area.</summary>
     public bool CameraMaximized => _cameraMaximized;
 
     // The frames the tools took during the message being answered (given to the model with the conversation afterwards).
+    /// <summary>The frames the camera tools captured for the message being answered.</summary>
     public IReadOnlyList<byte[]> CameraTurnFrames => _cameraTurnFrames;
 
+    /// <inheritdoc/>
     public override void RegisterServices(ChatFeatureServices services)
     {
         services.Add(this);
@@ -69,6 +92,7 @@ internal sealed partial class CameraFeature : DemoFeature
         services.Add(ReplySpeaker);
     }
 
+    /// <inheritdoc/>
     public override void OnAttached(IChatPageHost host)
     {
         base.OnAttached(host);
@@ -78,6 +102,7 @@ internal sealed partial class CameraFeature : DemoFeature
         Host.Overlays.ChatSizeChanged += OnChatSizeChanged;
     }
 
+    /// <inheritdoc/>
     public override void OnDetached()
     {
         if (Host != null)
@@ -87,6 +112,7 @@ internal sealed partial class CameraFeature : DemoFeature
     }
 
     // The chat is being closed: the monitors and their alerts stop, the camera and the microphone are let go of.
+    /// <summary>Close the camera, stop the monitors and the background service (the chat is being closed).</summary>
     public async Task ShutdownAsync()
     {
         Task visual = DisposeVisualMonitoringAsync();
@@ -96,25 +122,27 @@ internal sealed partial class CameraFeature : DemoFeature
         await visual;
     }
 
+    /// <inheritdoc/>
     public override IEnumerable<ToolGroup> ToolGroups() => new[]
     {
-        new ToolGroup(ChatToolGroups.Camera, ChatToolGroups.CameraSummary, ChatToolGroups.CameraKeywords,
+        new ToolGroup(ChatCamera.GroupName, ChatCamera.GroupSummary, ChatCamera.GroupKeywords,
             CameraTools,
             () => JoinInstructions(Host?.Model?.AcceptsImages == true ? CameraInstructions : null, VisualInstructions)),
-        new ToolGroup(ChatToolGroups.Sound, ChatToolGroups.SoundSummary, ChatToolGroups.SoundKeywords,
+        new ToolGroup(ChatCamera.SoundGroupName, ChatCamera.SoundGroupSummary, ChatCamera.SoundGroupKeywords,
             SoundTools,
             () => SoundInstructions)
     };
 
     // The camera group comes with every message while the camera is open or monitors watch; the sound group while
     // sound monitors listen.
+    /// <inheritdoc/>
     public override async Task PrepareAsync(ChatMessageContext context)
     {
         await base.PrepareAsync(context);
         if (_camera?.IsRunning == true || _visualRuntime.Snapshot().Any())
-            Host.Skills.Activate(ChatToolGroups.Camera);
+            Host.Skills.Activate(ChatCamera.GroupName);
         if (_soundRuntime?.Snapshot().Count > 0)
-            Host.Skills.Activate(ChatToolGroups.Sound);
+            Host.Skills.Activate(ChatCamera.SoundGroupName);
     }
 
     private IEnumerable<AITool> CameraTools()
@@ -128,20 +156,23 @@ internal sealed partial class CameraFeature : DemoFeature
         return tools;
     }
 
+    /// <inheritdoc/>
     public override string ToolSummary => "the live camera, camera monitors, sound monitors";
 
+    /// <inheritdoc/>
     public override View BuildSettingsSection()
     {
         var sections = new VerticalStackLayout { Spacing = 6 };
 #if ANDROID
         sections.Children.Add(BuildCameraSoundSection());
-        sections.Children.Add(Theme.Divider());
+        sections.Children.Add(ChatPage.Divider());
 #endif
         sections.Children.Add(BuildAlertSoundsSection());
         return sections;
     }
 
     // The camera frames the tools took are given to the model with the conversation from now on.
+    /// <inheritdoc/>
     public override void OnReplyCompleted(ChatExchangeEventArgs e)
     {
         foreach (byte[] jpeg in _cameraTurnFrames)
@@ -150,6 +181,7 @@ internal sealed partial class CameraFeature : DemoFeature
     }
 
     // A new chat: the camera closes (the back camera next time), the monitors and their cards go.
+    /// <inheritdoc/>
     public override void OnNewConversation()
     {
         _ = CloseCameraAsync();
@@ -168,14 +200,17 @@ internal sealed partial class CameraFeature : DemoFeature
 #endif
     }
 
+    /// <inheritdoc/>
     public override void OnDisappearing()
     {
         base.OnDisappearing();
         _ = CloseCameraAsync();
     }
 
+    /// <inheritdoc/>
     public override void OnAppResumed() => _cameraSuspended = false;
 
+    /// <inheritdoc/>
     public override async void OnAppStopped()
     {
         _cameraSuspended = true;
@@ -195,8 +230,8 @@ internal sealed partial class CameraFeature : DemoFeature
     private void BuildCameraPanel()
     {
         _cameraPreview = new LiveCameraPreview { Aspect = Aspect.AspectFit, HeightRequest = 170, BackgroundColor = Colors.Black };
-        _cameraLabel = new Label { Text = "Live camera", FontFamily = Theme.TitleFont, FontSize = 13,
-            TextColor = Theme.PrimaryText, VerticalTextAlignment = TextAlignment.Center, MinimumHeightRequest = 40 };
+        _cameraLabel = new Label { Text = "Live camera", FontSize = 13,
+            TextColor = CvViews.Color("ChatPrimaryText"), VerticalTextAlignment = TextAlignment.Center, MinimumHeightRequest = 40 };
         var close = new Button { Text = "Close", FontSize = 12, Padding = new Thickness(8, 0), MinimumHeightRequest = 40 };
         close.Clicked += async (_, _) => await CloseCameraAsync();
         SemanticProperties.SetDescription(close, "Close live camera and stop capture");
@@ -213,13 +248,13 @@ internal sealed partial class CameraFeature : DemoFeature
             header.Add(flip, 1);
         }
 #endif
-        var hint = new Label { Text = "Drag to move · Ask what you see", FontSize = 11, TextColor = Theme.SecondaryText, VerticalTextAlignment = TextAlignment.Center };
+        var hint = new Label { Text = "Drag to move · Ask what you see", FontSize = 11, TextColor = CvViews.Color("ChatSecondaryText"), VerticalTextAlignment = TextAlignment.Center };
         _cameraMaximize = new Button { FontSize = 12, Padding = new Thickness(8, 0), MinimumHeightRequest = 36 };
         _cameraMaximize.Clicked += (_, _) => SetCameraMaximized(!_cameraMaximized);
         var footer = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
         footer.Add(hint, 0); footer.Add(_cameraMaximize, 1);
-        _cameraOverlayCount = new Label { FontFamily = Theme.TitleFont, FontSize = 64, TextColor = Colors.White, LineHeight = 1 };
-        _cameraOverlayDetail = new Label { FontFamily = Theme.BodyFont, FontSize = 14, TextColor = Colors.White };
+        _cameraOverlayCount = new Label { FontSize = 64, TextColor = Colors.White, LineHeight = 1 };
+        _cameraOverlayDetail = new Label { FontSize = 14, TextColor = Colors.White };
         _cameraOverlay = new Border
         {
             BackgroundColor = Color.FromRgba(0, 0, 0, 0.55), StrokeThickness = 0, StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
@@ -228,7 +263,7 @@ internal sealed partial class CameraFeature : DemoFeature
             Content = new VerticalStackLayout { Children = { _cameraOverlayCount, _cameraOverlayDetail } }
         };
         var previewArea = new Grid { Children = { _cameraPreview, _cameraOverlay } };
-        _cameraPanel = Theme.Card(new VerticalStackLayout { Spacing = 4, Children = { header, previewArea, footer } }, 8);
+        _cameraPanel = CvViews.Card(new VerticalStackLayout { Spacing = 4, Children = { header, previewArea, footer } }, 8);
         _cameraPanel.WidthRequest = 270;
         _cameraPanel.HorizontalOptions = LayoutOptions.End;
         _cameraPanel.VerticalOptions = LayoutOptions.Start;
@@ -286,6 +321,7 @@ internal sealed partial class CameraFeature : DemoFeature
     }
 
     // The count shown over the maximized preview (the exercise feature's); null hides it. UI thread.
+    /// <summary>Show a count and a detail over the maximized preview (the exercise counter), or clear them with nulls.</summary>
     public void SetCameraOverlay(string count, string detail)
     {
         if (_cameraOverlay == null) return;
@@ -376,6 +412,7 @@ internal sealed partial class CameraFeature : DemoFeature
     }
 
     // The camera tools: a request that names a camera ("use the selfie camera") switches to it.
+    /// <summary>Open the live camera for a tool; returns what to tell the model.</summary>
     public Task<string> OpenCameraAsync(CancellationToken token) => OpenCameraCoreAsync(token, true);
 
     private Task<string> OpenCameraCoreAsync(CancellationToken token, bool followRequest) => MainThread.InvokeOnMainThreadAsync(async () =>
@@ -494,6 +531,7 @@ internal sealed partial class CameraFeature : DemoFeature
     }
 
     // Forget the frames of the message being answered (before a send, and once they are with the conversation).
+    /// <summary>Forget the frames captured for the last message (before the next is sent).</summary>
     public void ClearCameraTurn(bool discardThumbnails = false)
     {
         if (discardThumbnails)
@@ -541,6 +579,8 @@ internal sealed partial class CameraFeature : DemoFeature
         if (rotation != null) _cameraRotation = rotation.Value;
     }
 
+    /// <summary>Close the live camera.</summary>
+
     public Task CloseCameraAsync()
     {
         PauseVisualFeed();
@@ -553,6 +593,7 @@ internal sealed partial class CameraFeature : DemoFeature
     }
 
     // Close the camera unless camera monitors need it.
+    /// <summary>Close the live camera unless a monitor or the exercise counter still needs it.</summary>
     public async Task CloseCameraIfUnusedAsync()
     {
         if (!_visualRuntime.Snapshot().Any())

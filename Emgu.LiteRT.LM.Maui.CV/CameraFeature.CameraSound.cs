@@ -1,23 +1,27 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 #if ANDROID
 using Emgu.LiteRT.LM.Agents.Audio;
+using Emgu.LiteRT.LM.Maui;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 // A short shutter click when the camera takes a full-resolution photo (TODO item 50), so a photo taken without anyone touching the phone - by a sound or
 // by something coming into view - doesn't go unnoticed. Settings > "Camera sounds" (on by default, Preferences litert_lm_chat_camera_sound) turns it off,
 // for a baby's room. Clips stay silent: the preview says "Recording clip", and a sound at the start would be in the clip. The sound monitors don't
 // listen while it plays (the alert mute), so the click can't be heard as a sound.
-internal sealed partial class CameraFeature
+public sealed partial class CameraFeature
 {
     private readonly CameraChimeAction _cameraClick = new CameraChimeAction("camera_click.wav");
 
-    private static bool CameraSoundOn => AppSettings.Chat.CameraSound;
+    /// <summary>The "camera sounds" settings key.</summary>
+    public const string CameraSoundKey = "camera_sound";
+
+    private bool CameraSoundOn => Host?.Settings.Get(CameraSoundKey, true) ?? true;
 
     private View BuildCameraSoundSection()
     {
-        var toggle = new Switch { IsToggled = CameraSoundOn, OnColor = Theme.Accent, VerticalOptions = LayoutOptions.Center };
-        toggle.Toggled += (_, e) => AppSettings.Chat.CameraSound = e.Value;
+        var toggle = new Switch { IsToggled = CameraSoundOn, OnColor = ChatResources.FindColor("ChatAccent"), VerticalOptions = LayoutOptions.Center };
+        toggle.Toggled += (_, e) => Host.Settings.Set(CameraSoundKey, e.Value);
         SemanticProperties.SetDescription(toggle, "Camera sounds");
         return new VerticalStackLayout
         {

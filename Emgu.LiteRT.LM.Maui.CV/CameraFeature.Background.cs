@@ -2,12 +2,12 @@
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Maui.Features;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 // Monitoring in the background (TODO item 54): on Android a foreground service (MonitoringForegroundService) keeps the microphone - and the
 // camera, for monitors that photograph or record - usable while the app isn't in front or the screen is off, shows what is being watched, and
 // posts a notification for each alert. The feature tells it when monitors start and stop; the Stop button in its notification pauses them all.
-internal sealed partial class CameraFeature
+public sealed partial class CameraFeature
 {
 #if ANDROID
     private string _monitoringKey;
@@ -29,6 +29,7 @@ internal sealed partial class CameraFeature
 
     // Starts, updates or stops the service to match the enabled sound monitors and a meeting being recorded (which has the microphone:
     // the monitors are paused meanwhile).
+    /// <summary>Start or stop the Android foreground service as the monitors (and a meeting recording) need it.</summary>
     public async Task SyncBackgroundServiceAsync()
     {
         var monitors = _soundRuntime?.Snapshot().Where(m => m.Enabled).ToList() ?? new List<SoundMonitorInfo>();
@@ -64,6 +65,7 @@ internal sealed partial class CameraFeature
     private bool CameraUsable => PageVisible && !_cameraSuspended;
     private void StartMonitoringStopButton() { }
     private void EndMonitoringStopButton() { }
+    /// <summary>Start or stop the Android foreground service as the monitors (and a meeting recording) need it; nothing on other platforms.</summary>
     public Task SyncBackgroundServiceAsync() => Task.CompletedTask;
     private void NotifySoundAlert(SoundEvent occurrence, SoundMonitorInfo monitor) { }
 #endif

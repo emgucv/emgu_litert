@@ -9,6 +9,8 @@ using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.LM.Maui.Documents;
 using Emgu.LiteRT.LM.Maui.Mcp;
+using Emgu.LiteRT.LM.Maui.CV;
+using Emgu.LiteRT.LM.Agents.CV;
 using Emgu.LiteRT.LM.Maui.Features;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Extensions.AI;
@@ -102,7 +104,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         var parts = new Parts
         {
             ServerOption = models.First(m => m.Id == ChatModelOptions.ServerId),
-            Camera = new CameraFeature(),
+            Camera = new CameraFeature(new VisualDetectors(FileSystem.CacheDirectory, DetectorFactory.ValidationImage)),
             Mcp = new McpFeature(),
             VoiceMode = new VoiceModeFeature(),
             Transcripts = new TranscriptFeature(),
@@ -134,6 +136,17 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         parts.PastChats = new PastChatsFeature(SharedStore, parts.Search);
         parts.Documents = new DocumentsFeature(SharedStore, parts.Search);
         parts.PhotoSearch = new PhotoSearchFeature(SharedStore, parts.Search);
+        // Snapshots the user keeps go through a Save As dialog, as the generated pictures do.
+        parts.Camera.SnapshotSaver = async (jpeg, fileName) =>
+        {
+            using var stream = new System.IO.MemoryStream(jpeg, writable: false);
+            var result = await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream);
+            if (result.IsSuccessful)
+                return "Saved to " + result.FilePath;
+            if (!PictureGallery.SaveWasCancelled(result.Exception))
+                throw result.Exception ?? new System.IO.IOException("The snapshot could not be saved.");
+            return null;
+        };
         // Meetings keep the camera feature's foreground service running (Android) and attach the transcript to the chat.
         parts.Meetings.SyncBackgroundService = () => parts.Camera.SyncBackgroundServiceAsync();
         parts.Meetings.TranscriptAttacher = (bytes, name) =>
@@ -457,8 +470,8 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     // The groups in use, for the context estimate before a send (LiteRtLmChatClient counts the real size): the camera
     // group's tools and instructions are ~1,100 tokens, the others ~150-500.
     private static int GroupTokens(IEnumerable<string> active) => active.Sum(name =>
-        name == ChatToolGroups.Camera ? 1100 : name == ChatToolGroups.DeviceActions || name == ChatToolGroups.Goals ? 500
-        : name.StartsWith("mcp_", StringComparison.Ordinal) ? 400 : name == ChatToolGroups.Sound ? 600 : 200);
+        name == ChatCamera.GroupName ? 1100 : name == ChatToolGroups.DeviceActions || name == ChatToolGroups.Goals ? 500
+        : name.StartsWith("mcp_", StringComparison.Ordinal) ? 400 : name == ChatCamera.SoundGroupName ? 600 : 200);
 
     // ---------- The model and the server ----------
 

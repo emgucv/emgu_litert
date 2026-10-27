@@ -10,6 +10,7 @@ using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Agents.Skills;
 using Emgu.LiteRT.LM.Agents.Vision;
 using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Agents.CV;
 using Maui.Demo.Lite;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -85,9 +86,9 @@ public class UnitTestToolRouting
         var store = new InMemoryAgentGoalStore();
         return new List<ToolGroup>
         {
-            new ToolGroup(ChatToolGroups.Camera, ChatToolGroups.CameraSummary, ChatToolGroups.CameraKeywords, Camera,
-                () => ChatPlannerInstructions.Camera + "\n\n" + VisualAgentTools.Instructions),
-            new ToolGroup(ChatToolGroups.Sound, ChatToolGroups.SoundSummary, ChatToolGroups.SoundKeywords,
+            new ToolGroup(ChatCamera.GroupName, ChatCamera.GroupSummary, ChatCamera.GroupKeywords, Camera,
+                () => ChatCamera.Instructions + "\n\n" + VisualAgentTools.Instructions),
+            new ToolGroup(ChatCamera.SoundGroupName, ChatCamera.SoundGroupSummary, ChatCamera.SoundGroupKeywords,
                 () => SoundMonitorTools.Create((a, b, c, d, e, t) => Task.FromResult("ok"), () => "none", (a, b, t) => Task.FromResult("ok")),
                 () => SoundMonitorTools.Instructions),
             new ToolGroup(ChatToolGroups.DeviceActions, ChatToolGroups.DeviceActionsSummary, ChatToolGroups.DeviceActionsKeywords,
@@ -125,25 +126,25 @@ public class UnitTestToolRouting
     {
         (string Message, string[] Groups)[] cases =
         {
-            ("When you see a person, take a picture", new[] { ChatToolGroups.Camera }),
-            ("Let me know when someone walks in", new[] { ChatToolGroups.Camera }),
-            ("Tell me if a dog shows up at the front door", new[] { ChatToolGroups.Camera }),
-            ("What am I holding?", new[] { ChatToolGroups.Camera }),
-            ("Switch the monitor to YOLOX", new[] { ChatToolGroups.Camera }),
-            ("Can you read the label on this bottle through the camera?", new[] { ChatToolGroups.Camera }),
-            ("Beep when I stand up", new[] { ChatToolGroups.Camera }),
-            ("Take a picture when you see me waving", new[] { ChatToolGroups.Camera }),
-            ("Say hello when someone raises their hand", new[] { ChatToolGroups.Camera }),
-            ("Record a clip when the person is lying down", new[] { ChatToolGroups.Camera }),
-            ("Play white noise for 6 seconds when you see a person", new[] { ChatToolGroups.Camera }),
-            ("Play my rain sound when the dog appears", new[] { ChatToolGroups.Camera }),
-            ("Play the lullaby when the baby cries", new[] { ChatToolGroups.Sound }),
-            ("Tell me if you hear a strange noise at night", new[] { ChatToolGroups.Sound }),
-            ("Let me know when you hear the doorbell", new[] { ChatToolGroups.Sound }),
-            ("Beep if my dog starts to bark", new[] { ChatToolGroups.Sound }),
-            ("Alert me when a baby cries", new[] { ChatToolGroups.Sound }),
-            ("When you hear the baby cry, take a video", new[] { ChatToolGroups.Sound }),
-            ("Listen for the smoke alarm while I'm out", new[] { ChatToolGroups.Sound }),
+            ("When you see a person, take a picture", new[] { ChatCamera.GroupName }),
+            ("Let me know when someone walks in", new[] { ChatCamera.GroupName }),
+            ("Tell me if a dog shows up at the front door", new[] { ChatCamera.GroupName }),
+            ("What am I holding?", new[] { ChatCamera.GroupName }),
+            ("Switch the monitor to YOLOX", new[] { ChatCamera.GroupName }),
+            ("Can you read the label on this bottle through the camera?", new[] { ChatCamera.GroupName }),
+            ("Beep when I stand up", new[] { ChatCamera.GroupName }),
+            ("Take a picture when you see me waving", new[] { ChatCamera.GroupName }),
+            ("Say hello when someone raises their hand", new[] { ChatCamera.GroupName }),
+            ("Record a clip when the person is lying down", new[] { ChatCamera.GroupName }),
+            ("Play white noise for 6 seconds when you see a person", new[] { ChatCamera.GroupName }),
+            ("Play my rain sound when the dog appears", new[] { ChatCamera.GroupName }),
+            ("Play the lullaby when the baby cries", new[] { ChatCamera.SoundGroupName }),
+            ("Tell me if you hear a strange noise at night", new[] { ChatCamera.SoundGroupName }),
+            ("Let me know when you hear the doorbell", new[] { ChatCamera.SoundGroupName }),
+            ("Beep if my dog starts to bark", new[] { ChatCamera.SoundGroupName }),
+            ("Alert me when a baby cries", new[] { ChatCamera.SoundGroupName }),
+            ("When you hear the baby cry, take a video", new[] { ChatCamera.SoundGroupName }),
+            ("Listen for the smoke alarm while I'm out", new[] { ChatCamera.SoundGroupName }),
             ("Set a 10 minute timer for the pasta", new[] { ChatToolGroups.DeviceActions }),
             ("Wake me up tomorrow at 6:45 am.", new[] { ChatToolGroups.DeviceActions }),
             ("Remind me to call mum on Sunday", new[] { ChatToolGroups.DeviceActions }),
@@ -219,12 +220,12 @@ public class UnitTestToolRouting
             new[] { new ChatMessage(ChatRole.User, "Ping me whenever my cat jumps on the table") }, session, new ChatClientAgentRunOptions(options)))
         {
         }
-        Assert.That(requested, Is.EqualTo(ChatToolGroups.Camera));
+        Assert.That(requested, Is.EqualTo(ChatCamera.GroupName));
         Assert.That(model.OfferedTools[1], Does.Contain("open_camera").And.Contain("create_visual_monitor").And.Not.Contain("use_camera"));
         Assert.That(model.Instructions[1], Does.Contain("create_visual_monitor"));
         Assert.That(opened, Is.EqualTo(1));
         // And it stays for the rest of the conversation.
-        Assert.That(router.IsActive(ChatToolGroups.Camera), Is.True);
+        Assert.That(router.IsActive(ChatCamera.GroupName), Is.True);
         Assert.That(router.Tools().Select(t => t.Name), Does.Contain("create_visual_monitor"));
         router.Reset();
         Assert.That(router.Tools().Select(t => t.Name), Does.Contain("use_camera"));

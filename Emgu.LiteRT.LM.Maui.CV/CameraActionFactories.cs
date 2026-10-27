@@ -3,8 +3,9 @@ using System.Text.Json;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Agents.CV;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 internal sealed class CameraChimeFactory(CameraChimeAction chime) : IVisualActionFactory
 {

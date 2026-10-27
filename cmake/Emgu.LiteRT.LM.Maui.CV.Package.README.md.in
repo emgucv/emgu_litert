@@ -1,0 +1,21 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Maui.CV.dll`: `CameraFeature` and `ExerciseFeature`, features of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `ChatPage` that need a camera and Emgu CV. `CameraFeature` gives the model the live camera to look through (open_camera, capture_camera_frame) and camera monitors that watch for objects, hand gestures, body postures and facial expressions with `${EMGU_LITERT_LM_AGENTS_CV_NUGET_ID}`'s visual agents on the Emgu.LiteRT.Models.CV detectors, alerting with a chime, spoken words, one of the app's sounds (two built in: white noise and a lullaby), a snapshot, a full-resolution photo or a video clip; sound monitors that listen for a doorbell, a dog barking, a baby crying... with YAMNet; and on Android a foreground service that keeps the monitors running in the background. `ExerciseFeature` counts jumping jacks, squats and high knees with the body pose, logging them toward the user's goals (`GoalsFeature`). The alert sounds the user adds are kept in the app's data folder.
+
+The detectors come from a `VisualDetectors` the app gives the camera feature: by default they keep their weights in the app's cache folder and skip the GPU accuracy check; an app with the check's pictures gives a loader for them.
+
+## Adding it to a chat page
+
+```csharp
+using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.CV;
+
+var camera = new CameraFeature(new VisualDetectors());
+options.Features.Add(camera);
+options.Features.Add(new ExerciseFeature());
+options.ReplySpeaker = camera.ReplySpeaker;   // replies read aloud through the alert audio, so they don't talk over an alert
+```
+
+Permissions: the camera and the microphone (`NSCameraUsageDescription` and `NSMicrophoneUsageDescription` in Info.plist on iOS and Mac Catalyst; on Android the library declares CAMERA, RECORD_AUDIO and the foreground service permissions). The app adds the LiteRT native runtime packages the detectors need.

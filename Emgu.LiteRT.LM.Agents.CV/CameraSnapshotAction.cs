@@ -5,12 +5,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents.Events;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Agents.CV;
 
-// Capture/presentation belongs to the host. Binding only validates configuration.
-internal sealed class CameraSnapshotFactory(Func<VisualEvent, CancellationToken, Task> capture) : IVisualActionFactory
+/// <summary>The take_snapshot action's factory: the capture and its showing belong to the host; binding only checks the parameters.</summary>
+/// <param name="capture">Captures a frame for an event</param>
+public sealed class CameraSnapshotFactory(Func<VisualEvent, CancellationToken, Task> capture) : IVisualActionFactory
 {
+    /// <inheritdoc/>
     public VisualActionDescriptor Descriptor => VisualHostCatalog.Snapshot;
+    /// <inheritdoc/>
     public VisualActionBinding Bind(JsonElement parameters)
     {
         VisualActionParameters.AllowOnly(parameters);
@@ -18,9 +21,13 @@ internal sealed class CameraSnapshotFactory(Func<VisualEvent, CancellationToken,
     }
 }
 
-internal sealed class CameraSnapshotAction(Func<VisualEvent, CancellationToken, Task> capture) : IVisualAction
+/// <summary>The take_snapshot action: the host's capture, within 15 seconds.</summary>
+/// <param name="capture">Captures a frame for an event</param>
+public sealed class CameraSnapshotAction(Func<VisualEvent, CancellationToken, Task> capture) : IVisualAction
 {
+    /// <inheritdoc/>
     public string Id => "take_snapshot";
+    /// <inheritdoc/>
     public async Task ExecuteAsync(VisualEvent occurrence, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();

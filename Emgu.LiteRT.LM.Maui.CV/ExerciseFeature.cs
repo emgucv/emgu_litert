@@ -8,18 +8,18 @@ using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
 using Emgu.LiteRT.Models.CV.Maui;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Features;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
-// Counting exercises - jumping jacks, squats, high knees (count_exercise): the model is far too slow to judge each movement, so the tool
-// call lasts as long as the exercise and the app counts - the camera's frames go through the pose model (the lite one, as the body-pose
-// agent's, but its own instance, on as many frames as it keeps up with) and the exercise's IExerciseCounter. A card above the reply shows
-// the count, the time and Done. It ends at the target, the time asked for, Done, a 10 s pause after the first repetition, 30 s without
-// any, or 5 minutes; the count is then logged toward a goal that names the exercise ("30 jumping jacks a day") and returned to the model,
-// which says how it went. Its tool comes with the goals' group (GoalsFeature); the camera feature gives it each frame (QueueFrame),
-// draws the body in developer mode (DrawPose) and shows the count over the maximized preview (UpdateOverlay).
-internal sealed class ExerciseFeature : DemoFeature, IDisposable
+/// <summary>
+/// Counting jumping jacks, squats and high knees with the body pose (count_exercise): the camera feature gives it each
+/// frame, the count is spoken and shown over the preview, and logged toward the user's goals (the library's GoalsFeature,
+/// whose group carries the tool). Needs <see cref="CameraFeature"/> on the page.
+/// </summary>
+public sealed class ExerciseFeature : CvFeature, IDisposable
 {
+    /// <summary>The instructions that go with count_exercise (the goals' group adds them).</summary>
     public const string Instructions =
         "To count jumping jacks, squats or high knees, call count_exercise: it opens the camera itself and counts until the user is done. " +
         "The count is logged to a matching goal by the app.";
@@ -27,16 +27,26 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
     private PoseDetector _exercisePose;
     private ExerciseSession _exercise;
 
+    /// <inheritdoc/>
     public override string Name => "exercise";
 
+    /// <inheritdoc/>
     public override string Title => "Counting exercises";
 
+    /// <inheritdoc/>
     public override bool PersistEnabled => false;
 
     private CameraFeature Camera => Host.Services.Get<CameraFeature>();
 
     // The user's goals, or null when they aren't kept (memories off, or a private chat).
-    private IAgentGoalStore Goals => Host.Services.Get<Emgu.LiteRT.LM.Maui.Features.GoalsFeature>()?.On == true ? Demo.Store.Goals : null;
+    private IAgentGoalStore Goals
+    {
+        get
+        {
+            GoalsFeature goals = Host.Services.Get<GoalsFeature>();
+            return goals?.On == true ? goals.Skill.Store : null;
+        }
+    }
 
     // The words that bring the goals' group for an exercise.
     private static readonly string[] Keywords =
@@ -44,13 +54,15 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
         "jumping jack", "jumping-jack", "star jump", "squat", "high knee", "knee raise", "exercise", "workout", "work out", "reps", "count my"
     };
 
+    /// <inheritdoc/>
     public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
 
     // Counting comes with the goals' group (it logs toward them; a group of its own would add a stub to every message).
+    /// <inheritdoc/>
     public override void OnAttached(IChatPageHost host)
     {
         base.OnAttached(host);
-        GoalsSkill goals = host.Services.Get<Emgu.LiteRT.LM.Maui.Features.GoalsFeature>()?.Skill;
+        GoalsSkill goals = host.Services.Get<GoalsFeature>()?.Skill;
         if (goals == null)
             return;
         goals.ExtraTools = () => Tools(Host?.HandsFree == true);
@@ -59,6 +71,7 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
         goals.ExtraSummary = "count jumping jacks, squats or high knees with the camera";
     }
 
+    /// <inheritdoc/>
     public override void OnDetached()
     {
         Dispose();
@@ -91,12 +104,16 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
     }
 
     // Counting aloud: on by default, the card's speaker button turns it off (and on), remembered for the next time.
-    private static bool CountAloud
+    /// <summary>The "count aloud" settings key.</summary>
+    public const string CountAloudKey = "count_aloud";
+
+    private bool CountAloud
     {
-        get => AppSettings.Chat.CountAloud;
-        set => AppSettings.Chat.CountAloud = value;
+        get => Host?.Settings.Get(CountAloudKey, true) ?? true;
+        set => Host?.Settings.Set(CountAloudKey, value);
     }
 
+    /// <summary>The count_exercise tool, where the live camera is supported and not in a hands-free chat; the goals' group carries it.</summary>
     public IEnumerable<AITool> Tools(bool handsFree) =>
         LiveCamera.Supported && !handsFree && Camera != null ? new[] { AgentTools.CountExercise(CountExerciseAsync) } : Array.Empty<AITool>();
 
@@ -117,13 +134,13 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
         Button done = null, aloud = null;
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
-            session.Count = new Label { Text = "0", FontFamily = Theme.TitleFont, FontSize = 44, TextColor = Theme.PrimaryText, HorizontalOptions = LayoutOptions.Start };
-            session.Status = new Label { Text = "Getting the body pose model ready…", FontFamily = Theme.BodyFont, FontSize = 13, TextColor = Theme.SecondaryText };
-            done = new Button { Text = "Done", FontFamily = Theme.TitleFont, FontSize = 14, BackgroundColor = Theme.Accent, TextColor = Colors.White,
+            session.Count = new Label { Text = "0", FontSize = 44, TextColor = CvViews.Color("ChatPrimaryText"), HorizontalOptions = LayoutOptions.Start };
+            session.Status = new Label { Text = "Getting the body pose model ready…", FontSize = 13, TextColor = CvViews.Color("ChatSecondaryText") };
+            done = new Button { Text = "Done", FontSize = 14, BackgroundColor = ChatResources.FindColor("ChatAccent"), TextColor = Colors.White,
                 CornerRadius = 12, Padding = new Thickness(16, 6), MinimumHeightRequest = 40, HorizontalOptions = LayoutOptions.Start };
             done.Clicked += (_, _) => session.Ended.TrySetResult("the user pressed Done");
             SemanticProperties.SetDescription(done, "Stop counting " + name);
-            aloud = new Button { FontFamily = Theme.TitleFont, FontSize = 14, CornerRadius = 12, Padding = new Thickness(12, 6), MinimumHeightRequest = 40 };
+            aloud = new Button { FontSize = 14, CornerRadius = 12, Padding = new Thickness(12, 6), MinimumHeightRequest = 40 };
             void ShowAloud()
             {
                 aloud.Text = CountAloud ? "\U0001F50A Counting aloud" : "\U0001F507 Silent";
@@ -134,13 +151,13 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
             var title = "\U0001F3C3  " + char.ToUpperInvariant(name[0]) + name.Substring(1) + (target > 0 ? " · target " + target : "");
             Host.AddCardToReply(new Border
             {
-                BackgroundColor = Theme.CardBackground, Stroke = Theme.RowBorder, StrokeThickness = 1,
+                BackgroundColor = CvViews.Color("ChatSurface"), Stroke = CvViews.Color("ChatRowBorder"), StrokeThickness = 1,
                 StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) },
                 Padding = new Thickness(14, 12), Margin = new Thickness(6, 2), MaximumWidthRequest = 420, HorizontalOptions = LayoutOptions.Start,
                 Content = new VerticalStackLayout
                 {
                     Spacing = 4,
-                    Children = { new Label { Text = title, FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText }, session.Count, session.Status,
+                    Children = { new Label { Text = title, FontSize = 15, TextColor = CvViews.Color("ChatPrimaryText") }, session.Count, session.Status,
                         new HorizontalStackLayout { Spacing = 8, Children = { done, aloud } } }
                 }
             });
@@ -153,7 +170,7 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
         Task speaker = Task.CompletedTask;
         try
         {
-            _exercisePose ??= DetectorFactory.Pose();
+            _exercisePose ??= Camera.Detectors.Pose();
             if (!_exercisePose.Imported)
                 await _exercisePose.PrepareAsync(PoseModelFiles.Lite, false, Math.Min(2, CpuThreadSettings.Count),
                     message => MainThread.BeginInvokeOnMainThread(() => session.Status.Text = message), token);
@@ -201,7 +218,7 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
             ShowExerciseOverlay(session);
             session.Status.Text = Repetitions(result.Count, name) + " in " + FormatExerciseTime(watch.Elapsed)
                 + (logged != null ? "\n✓ " + logged.Substring(logged.IndexOf("Now: ", StringComparison.Ordinal) + 5) : "");
-            session.Status.TextColor = logged != null ? Theme.Success : Theme.SecondaryText;
+            session.Status.TextColor = logged != null ? ChatResources.FindColor("ChatSuccess") : CvViews.Color("ChatSecondaryText");
             Host.SetStatus("Generating...");
         });
         if (!wasOpen)
@@ -293,6 +310,7 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
     }
 
     // Called by the camera feature too, when the preview is maximized or restored.
+    /// <summary>Show the count over the maximized preview again (the preview was rebuilt).</summary>
     public void UpdateOverlay()
     {
         CameraFeature camera = Camera;
@@ -310,6 +328,7 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
     private static string FormatExerciseTime(TimeSpan time) => ((int)time.TotalMinutes) + ":" + time.Seconds.ToString("00");
 
     // Developer mode: the latest body read while counting, drawn on a preview frame (before a selfie preview is mirrored, so it mirrors with it).
+    /// <summary>Draw the counted body on the preview frame, in developer mode.</summary>
     public void DrawPose(LiveCamera camera, Mat preview)
     {
         ExerciseSession session = _exercise;
@@ -319,6 +338,7 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
     }
 
     // Each camera frame while counting, unless one is still being read: the pose model and the counter, off the camera's thread.
+    /// <summary>Give the counter a camera frame (the camera feature calls it for each).</summary>
     public void QueueFrame(LiveCamera camera, Mat frame)
     {
         ExerciseSession session = _exercise;
@@ -358,6 +378,7 @@ internal sealed class ExerciseFeature : DemoFeature, IDisposable
     }
 
     // The chat is closing: the count ends, the pose model goes.
+    /// <summary>Stop a count and free the pose detector.</summary>
     public void Dispose()
     {
         _exercise?.Ended.TrySetResult("the chat was closed");

@@ -7,14 +7,21 @@ using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Vision;
 using Emgu.LiteRT.LM.Agents.Audio;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Agents.CV;
 
-// The play_file alert action (TODO item 53): "play the lullaby when you see the baby stand up". The sound is named in the user's words, matched against the
-// library when the rule is made (so a wrong name is refused with the names that exist, for the model to act on) and found again when it fires.
-internal sealed class PlayFileFactory(AlertSoundLibrary library, Func<AlertSound, int, CancellationToken, Task> play) : IVisualActionFactory
+/// <summary>
+/// The play_file alert action's factory: "play the lullaby when you see the baby stand up". The sound is named in the user's
+/// words, matched against the library when the rule is made (so a wrong name is refused with the names that exist, for the
+/// model to act on) and found again when it fires.
+/// </summary>
+/// <param name="library">The app's alert sounds</param>
+/// <param name="play">Plays a sound, once or repeated for the seconds</param>
+public sealed class PlayFileFactory(AlertSoundLibrary library, Func<AlertSound, int, CancellationToken, Task> play) : IVisualActionFactory
 {
+    /// <inheritdoc/>
     public VisualActionDescriptor Descriptor => VisualHostCatalog.PlayFile(library.Names());
 
+    /// <inheritdoc/>
     public VisualActionBinding Bind(JsonElement parameters)
     {
         VisualActionParameters.AllowOnly(parameters, "sound", "seconds");
@@ -31,10 +38,17 @@ internal sealed class PlayFileFactory(AlertSoundLibrary library, Func<AlertSound
     }
 }
 
-internal sealed class PlayFileAction(AlertSoundLibrary library, Func<AlertSound, int, CancellationToken, Task> play, string name, int seconds) : IVisualAction
+/// <summary>The play_file action: the named sound, once or repeated for the seconds.</summary>
+/// <param name="library">The app's alert sounds</param>
+/// <param name="play">Plays a sound</param>
+/// <param name="name">The sound's name</param>
+/// <param name="seconds">How long to repeat it, or 0 for once</param>
+public sealed class PlayFileAction(AlertSoundLibrary library, Func<AlertSound, int, CancellationToken, Task> play, string name, int seconds) : IVisualAction
 {
+    /// <inheritdoc/>
     public string Id => "play_file";
 
+    /// <inheritdoc/>
     public async Task ExecuteAsync(VisualEvent occurrence, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();

@@ -43,6 +43,7 @@ Directory.Build.props
 /Emgu.LiteRT.LM.Maui/Maui/docs/
 /Emgu.LiteRT.LM.Maui.Documents/Maui/docs/
 /Emgu.LiteRT.LM.Maui.Mcp/Maui/docs/
+/Emgu.LiteRT.LM.Maui.CV/Maui/docs/
 /Emgu.LiteRT.Models.CV.Maui/Maui/docs/
 /Emgu.TF.Lite.Models/NetStandard/docs/
 /Emgu.LiteRT.Models/NetStandard/docs/

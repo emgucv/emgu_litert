@@ -5,12 +5,12 @@ using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.Models.CV.Maui;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 // The record_clip alert action (TODO item 43): a few seconds of video from the live camera (Camera2, LiveCamera.Camera2.cs), with sound when the
 // microphone is allowed, shown in the transcript with the first frame, Play (in the card, InlineVideoView) / Full screen / Share / Save to gallery. Session only, like the snapshots: the clips
 // live in the app's cache folder, the latest five are kept, New chat deletes them, and nothing is sent to the model.
-internal sealed partial class CameraFeature
+public sealed partial class CameraFeature
 {
     private readonly Queue<(View Row, string Path, Action Stop)> _visualClips = new();
     private Action _stopPlayingClip;   // the one clip that plays in the chat now
@@ -48,19 +48,19 @@ internal sealed partial class CameraFeature
             }
             string condition = cause();
             var image = new Image { Aspect = Aspect.AspectFit };
-            if (thumbnail != null) image.Source = ImageUtil.ToImageSource(thumbnail);
+            if (thumbnail != null) image.Source = CvViews.ToImageSource(thumbnail);
             SemanticProperties.SetDescription(image, "Camera clip. Tap to play.");
-            var host = new Grid { HeightRequest = 150, WidthRequest = 210, HorizontalOptions = LayoutOptions.Start, BackgroundColor = Theme.ImageBackground, Children = { image } };
+            var host = new Grid { HeightRequest = 150, WidthRequest = 210, HorizontalOptions = LayoutOptions.Start, BackgroundColor = CvViews.Color("ChatRowBorder"), Children = { image } };
             string size = (clip.Bytes / 1048576.0).ToString("0.0") + " MB";
             var caption = new Label
             {
                 Text = "Camera clip · " + at.ToString("HH:mm:ss") + " · " + Math.Round(clip.Duration.TotalSeconds) + " s · " + size +
                     (clip.WithAudio ? " · with sound" : " · no sound (microphone not allowed)") + "\n" + condition + "\nSession only",
-                FontSize = 12, FontFamily = Theme.BodyFont, TextColor = Theme.SecondaryText
+                FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText")
             };
-            var status = new Label { FontSize = 12, FontFamily = Theme.BodyFont, TextColor = Theme.SecondaryText, IsVisible = false };
-            var progress = new ProgressBar { WidthRequest = 150, VerticalOptions = LayoutOptions.Center, ProgressColor = Theme.Accent };
-            var time = new Label { FontSize = 11, TextColor = Theme.SecondaryText, VerticalOptions = LayoutOptions.Center };
+            var status = new Label { FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText"), IsVisible = false };
+            var progress = new ProgressBar { WidthRequest = 150, VerticalOptions = LayoutOptions.Center, ProgressColor = ChatResources.FindColor("ChatAccent") };
+            var time = new Label { FontSize = 11, TextColor = CvViews.Color("ChatSecondaryText"), VerticalOptions = LayoutOptions.Center };
             var position = new HorizontalStackLayout { Spacing = 8, IsVisible = false, Children = { progress, time } };
             var play = MonitorButton("Play");
             var fullScreen = MonitorButton("Full screen");

@@ -403,7 +403,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   "Here is ..."" fixed it.
 - The enlarged picture (`ShowGeneratedImageLarge`, TODO item 17) shows its description and seed - kept in the PNG as iTXt
   chunks (`Emgu.LiteRT.Models`' `PngMetadata`), so saved chats and files have them - with "Draw it again" (which sends "Draw
-  this again, using exactly this description: ..."), "Add to Photos" (`PictureGallery.cs`: MediaStore on Android, add-only
+  this again, using exactly this description: ..."), "Add to Photos" (the library's `PictureGallery` since 2026-10-26: MediaStore on Android, add-only
   PhotoKit with `NSPhotoLibraryAddUsageDescription` on iOS and Mac Catalyst, the Pictures folder on Windows), "Share..." and
   "Save image...".
 - iOS: `Emgu.LiteRT` uses `LiteRt.framework` there, and the model folder (the app's Documents; `LocalApplicationData` on
@@ -549,9 +549,14 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Camera and sound monitors
 
+- Since 2026-10-26 the camera cluster is the library's: `CameraFeature` (its partials below), `ExerciseFeature`, the camera actions,
+  `AlertAudioReplySpeaker`, `MonitoringForegroundService`, `PoseDrawing` and the alert sounds live in the `Emgu.LiteRT.LM.Maui.CV`
+  package (Emgu CV; the demo gives it its `DetectorFactory` pictures as a `VisualDetectors` and a Save As dialog for snapshots),
+  the pure parts (`VisualHostCatalog`, the snapshot and play_file actions, the `ChatCamera` group constants) in
+  `Emgu.LiteRT.LM.Agents.CV`. The file names below are the package's.
 - Sound monitors (TODO item 42): `Emgu.LiteRT.LM.Agents`' `Audio/SoundMonitors.cs` (`SoundGroups`: 30 sounds as groups of
   YAMNet classes with the words people use; `SoundPresenceMonitor`, `SoundMonitorRuntime`, `SoundMonitorTools` -
-  `create_sound_monitor` and the rest) and the demo's `CameraFeature.Sound.cs`: a `sound_monitor` tool group, the
+  `create_sound_monitor` and the rest) and `CameraFeature.Sound.cs`: a `sound_monitor` tool group, the
   microphone on while a monitor is enabled, a monitor card, and chime or spoken alerts that the page doesn't listen to;
   `MicrophoneGate` gives `VoiceRecorder` the microphone first. Not on Windows. Verified with Gemma 4 E2B on Mac Catalyst and
   with a Galaxy S10's microphone (`Emgu.LiteRT.Models/YAMNET.md`).
@@ -599,7 +604,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     with the list.
   - With Gemma 4 E2B, the sound group's keywords and its stub summary had to say it's for sounds heard; otherwise "play white
     noise when you see a person" went to the sound tool.
-- Background monitoring (TODO item 54): on Android, `MonitoringForegroundService` (microphone, plus the camera when a sound
+- Background monitoring (TODO item 54): on Android, `MonitoringForegroundService` (the library's since 2026-10-26; microphone, plus the camera when a sound
   monitor photographs or records) keeps sound monitors listening with the app in the background or the screen off - an
   ongoing notification with Stop, a partial wake lock, and a notification per alert. `CameraFeature.Background.cs` starts
   it from the foreground (Android 14 refuses to start such services from the background). The camera may then be opened for
@@ -616,7 +621,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Exercise counting
 
-- `count_exercise` (`Emgu.LiteRT.LM.Agents`' `ExerciseTools.cs`, part of the goals tool group; the demo's `ExerciseFeature.cs`)
+- `count_exercise` (`Emgu.LiteRT.LM.Agents`' `ExerciseTools.cs`, part of the goals tool group; the library's `ExerciseFeature` in `Emgu.LiteRT.LM.Maui.CV` since 2026-10-26)
   counts jumping jacks, squats or high knees in front of the camera. The call lasts as long as the exercise; a card shows the
   count, the time and Done, and the feature runs its own pose detector on every frame it keeps up with. The count is logged
   toward a goal that names the exercise (`AgentTools.LogExerciseAsync`) and returned to the model.

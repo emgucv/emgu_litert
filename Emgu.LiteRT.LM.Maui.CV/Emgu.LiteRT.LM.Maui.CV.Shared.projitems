@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>2b9c4e71-5d3a-4c8f-b6e2-7a1f0d9c3e45</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Emgu.LiteRT.LM.Maui.CV</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)*.cs" />
+    <!-- The sounds the camera's alerts play: the chime, the camera click, white noise and the lullaby (synthesized by tools/make_alert_sounds.py). -->
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Resources\*.wav" LogicalName="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

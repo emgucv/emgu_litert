@@ -4,6 +4,7 @@ using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Maui;
 using Microsoft.Maui.Controls.Shapes;
+using Emgu.LiteRT.LM.Maui.CV;
 
 namespace Maui.Demo.Lite;
 

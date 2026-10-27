@@ -3,13 +3,14 @@
 using System.IO;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.Models.CV.Maui;
+using Emgu.LiteRT.LM.Maui;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 // The take_photo alert action (TODO item 44): one full-resolution photo from the live camera (Camera2, LiveCamera.TakePhotoAsync), shown in the
 // transcript as a thumbnail with its size, Open, Share and Save to gallery. Session only like the snapshots and clips: the JPEGs live in the app's
 // cache folder, the latest five are kept, New chat deletes them, and nothing is sent to the model.
-internal sealed partial class CameraFeature
+public sealed partial class CameraFeature
 {
     private readonly Queue<(View Row, string Path)> _visualPhotos = new();
     private const int MaximumVisualPhotos = 5;
@@ -43,17 +44,17 @@ internal sealed partial class CameraFeature
                 return;
             }
             string condition = cause();
-            var image = new Image { HeightRequest = 150, WidthRequest = 210, Aspect = Aspect.AspectFit, BackgroundColor = Theme.ImageBackground };
-            if (thumbnail != null) image.Source = ImageUtil.ToImageSource(thumbnail);
+            var image = new Image { HeightRequest = 150, WidthRequest = 210, Aspect = Aspect.AspectFit, BackgroundColor = CvViews.Color("ChatRowBorder") };
+            if (thumbnail != null) image.Source = CvViews.ToImageSource(thumbnail);
             image.OnTap(() => _ = OpenVisualPhotoAsync(photo.Path));
             SemanticProperties.SetDescription(image, "Full-resolution camera photo. Tap to open.");
             var caption = new Label
             {
                 Text = "Camera photo · " + at.ToString("HH:mm:ss") + " · " + photo.Width + "×" + photo.Height + " · " +
                     (photo.Bytes / 1048576.0).ToString("0.0") + " MB\n" + condition + "\nSession only",
-                FontSize = 12, FontFamily = Theme.BodyFont, TextColor = Theme.SecondaryText
+                FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText")
             };
-            var status = new Label { FontSize = 12, FontFamily = Theme.BodyFont, TextColor = Theme.SecondaryText, IsVisible = false };
+            var status = new Label { FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText"), IsVisible = false };
             var open = MonitorButton("Open");
             var share = MonitorButton("Share");
             var save = MonitorButton("Save to gallery");

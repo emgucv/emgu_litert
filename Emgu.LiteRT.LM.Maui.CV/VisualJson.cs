@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Vision;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 internal sealed class VisualImageSummary
 {

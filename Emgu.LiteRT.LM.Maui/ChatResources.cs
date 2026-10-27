@@ -72,6 +72,14 @@ namespace Emgu.LiteRT.LM.Maui
             return Colors.Transparent;
         }
 
+        /// <summary>A theme colour of a name ("ChatPrimaryText") for the app's current theme: the "{name}Dark" key in dark mode, else "{name}Light".</summary>
+        /// <param name="name">The colour's name</param>
+        public static Color ThemeColor(string name)
+        {
+            bool dark = Application.Current?.RequestedTheme == AppTheme.Dark;
+            return FindColor(name + (dark ? "Dark" : "Light"));
+        }
+
         /// <summary>
         /// Give a view's colour property the theme's light and dark colours of a name: the keys "{name}Light" and
         /// "{name}Dark" (e.g. "ChatSurface"), following the app's theme.

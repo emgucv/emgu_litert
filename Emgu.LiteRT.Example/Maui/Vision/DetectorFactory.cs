@@ -8,7 +8,8 @@ namespace Maui.Demo.Lite;
 // downloaded weights and the bundled images (Resources/Raw) their GPU accuracy check compares against the CPU.
 internal static class DetectorFactory
 {
-    private static Task<Mat> ValidationImage(string name) => LoadAsync(name);
+    // The bundled GPU check pictures (Resources/Raw), for the library's VisualDetectors too.
+    public static Task<Mat> ValidationImage(string name) => LoadAsync(name);
 
     private static async Task<Mat> LoadAsync(string name) => ImageUtil.Decode(await ImageUtil.ReadAppFileAsync(name).ConfigureAwait(false));
 

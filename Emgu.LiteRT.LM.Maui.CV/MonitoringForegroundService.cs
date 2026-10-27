@@ -1,3 +1,4 @@
+#if ANDROID
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -6,7 +7,13 @@ using AndroidX.Core.App;
 using AndroidX.Core.Content;
 using Application = Android.App.Application;
 
-namespace Maui.Demo.Lite;
+// The camera, the microphone and the foreground service that keeps them running in the background, for the app's manifest.
+[assembly: UsesPermission(Android.Manifest.Permission.Camera)]
+[assembly: UsesPermission(Android.Manifest.Permission.RecordAudio)]
+[assembly: UsesPermission("android.permission.FOREGROUND_SERVICE_MICROPHONE")]
+[assembly: UsesPermission("android.permission.FOREGROUND_SERVICE_CAMERA")]
+
+namespace Emgu.LiteRT.LM.Maui.CV;
 
 // Keeps the sound monitors (and the camera that records for them) running when the app is in the background or the screen is off (TODO item 54).
 // Android stops the microphone and camera of an app that isn't visible unless a foreground service of the matching type runs: this one shows an
@@ -149,3 +156,4 @@ public sealed class MonitoringForegroundService : Service
 
     public override IBinder OnBind(Intent intent) => null;
 }
+#endif
