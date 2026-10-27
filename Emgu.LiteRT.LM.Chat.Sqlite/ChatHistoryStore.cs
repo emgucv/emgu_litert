@@ -239,7 +239,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 .ToList();
             string transcript = message.Transcript;
             int messageId = await InsertAsync(chatId, ChatMessageRecord.UserRole, message.Text, null, files, message.Context, transcript,
-                language: message.Language).ConfigureAwait(false);
+                language: message.Language, names: message.Attachments.Select(a => a.Name).ToList()).ConfigureAwait(false);
             Remember(message, messageId);
             // A voice message's words written down while it was being saved (whoever watches for them found no id yet).
             if (message.Transcript != transcript)
@@ -454,6 +454,15 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             _ids.Add(message, new SavedId { Id = id });
         }
 
+        // A name that fits the attachments column: one line, no '|', at most 120 characters; null for none.
+        private static string SafeName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return null;
+            string safe = name.Replace('|', '/').Replace('\r', ' ').Replace('\n', ' ').Trim();
+            return safe.Length == 0 ? null : safe.Length > 120 ? safe.Substring(0, 120) : safe;
+        }
+
         private void ThrowIfPrivate()
         {
             if (IsPrivate)
@@ -462,7 +471,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
 
         private async Task<int> InsertAsync(int chatId, string role, string text, string thinking,
             IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments, string context, string transcript, double? thinkingSeconds = null,
-            string language = null, string thinkingTranslation = null)
+            string language = null, string thinkingTranslation = null, IReadOnlyList<string> names = null)
         {
             SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
             var record = new ChatMessageRecord
@@ -481,16 +490,20 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             await db.InsertAsync(record).ConfigureAwait(false);
 
             List<string> saved = new List<string>();
-            int index = 0;
+            int index = 0, position = -1;
             foreach (var attachment in attachments ?? Enumerable.Empty<(string, string, byte[])>())
             {
+                position++;
                 if (attachment.Data == null)
                     continue;
                 string folder = Path.Combine(AttachmentFolder, chatId.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 Directory.CreateDirectory(folder);
                 string name = string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}_{1}{2}", record.Id, index++, Extension(attachment.MediaType));
                 await WriteFileAsync(Path.Combine(folder, name), attachment.Data).ConfigureAwait(false);
-                saved.Add(string.Join("|", attachment.Kind, attachment.MediaType, name));
+                // The name it was shown with ("Voice message (0:08)", a file's name), kept after the file when there is one.
+                string shownName = SafeName(names != null && position < names.Count ? names[position] : null);
+                saved.Add(shownName == null ? string.Join("|", attachment.Kind, attachment.MediaType, name)
+                    : string.Join("|", attachment.Kind, attachment.MediaType, name, shownName));
             }
             if (saved.Count > 0)
             {
@@ -559,7 +572,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 {
                     var attachments = new List<DataContent>();
                     foreach (ChatSavedAttachment file in saved.Where(f => f.Kind == ChatSavedAttachment.ImageKind || f.Kind == ChatSavedAttachment.AudioKind))
-                        attachments.Add(new DataContent(await ReadFileAsync(file.Path).ConfigureAwait(false), file.MediaType) { Name = Path.GetFileName(file.Path) });
+                        attachments.Add(new DataContent(await ReadFileAsync(file.Path).ConfigureAwait(false), file.MediaType) { Name = file.Name ?? Path.GetFileName(file.Path) });
                     item = new ChatMessageItem(ChatMessageRole.User, row.Text, attachments, row.Context) { Transcript = row.Transcript, Language = row.Language };
                 }
                 else
@@ -598,14 +611,15 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 return result;
             foreach (string line in message.Attachments.Split('\n'))
             {
+                // kind|media type|file, and since 2026-10-27 |the name it was shown with (older rows have three parts).
                 string[] parts = line.Split('|');
                 // Only a plain file name in the chat's folder.
-                if (parts.Length != 3 || string.IsNullOrWhiteSpace(parts[2])
+                if ((parts.Length != 3 && parts.Length != 4) || string.IsNullOrWhiteSpace(parts[2])
                     || parts[2].IndexOfAny(new[] { '/', '\\', ':' }) >= 0 || parts[2] == "." || parts[2] == "..")
                     continue;
                 string path = Path.Combine(AttachmentFolder, message.ConversationId.ToString(System.Globalization.CultureInfo.InvariantCulture), parts[2]);
                 if (includeMissing || File.Exists(path))
-                    result.Add(new ChatSavedAttachment(parts[0], parts[1], path));
+                    result.Add(new ChatSavedAttachment(parts[0], parts[1], path, parts.Length == 4 && parts[3].Length > 0 ? parts[3] : null));
             }
             return result;
         }

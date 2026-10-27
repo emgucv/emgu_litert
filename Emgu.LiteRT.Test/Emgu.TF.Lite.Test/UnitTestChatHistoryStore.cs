@@ -263,6 +263,34 @@ namespace Emgu.TF.Lite.Test
                 { Transcript = " Is it raining? " }), Is.EqualTo("Is it raining?"));
         }
 
+        // A voice message reopened shows the name it was sent with ("Voice message (0:08)"), not its saved file's name;
+        // rows saved before names were kept still read, named after the file.
+        [Test]
+        public async Task KeepsTheNameAnAttachmentWasShownWith()
+        {
+            var message = new ChatMessageItem(ChatMessageRole.User, string.Empty, new[]
+            {
+                new DataContent(Wav, "audio/wav") { Name = "Voice message (0:08)" },
+                new DataContent(Jpeg, "image/jpeg") { Name = "beach|photo\n.jpg" },
+                new DataContent(Wav, "audio/wav")
+            });
+            int chatId = await _store.CreateChatAsync("Voice", null);
+            await _store.SaveExchangeAsync(chatId, message, Reply("Hi."));
+
+            IReadOnlyList<DataContent> loaded = (await _store.LoadAsync(chatId)).Messages[0].Attachments;
+            Assert.That(loaded[0].Name, Is.EqualTo("Voice message (0:08)"));
+            Assert.That(loaded[1].Name, Is.EqualTo("beach/photo .jpg"), "one line, no '|'");
+            Assert.That(loaded[2].Name, Does.EndWith(".wav"), "no name: the file's");
+            Assert.That(loaded[0].Data.ToArray(), Is.EqualTo(Wav));
+
+            ChatMessageRecord row = (await _store.GetMessagesAsync<ChatMessageRecord>(chatId))[0];
+            Assert.That(_store.GetAttachments(row).Select(a => a.Name), Is.EqualTo(new[] { "Voice message (0:08)", "beach/photo .jpg", null }));
+            // A row written before names were kept (three parts).
+            var old = new ChatMessageRecord { ConversationId = row.ConversationId, Attachments = string.Join("\n", row.Attachments.Split('\n').Select(l => string.Join("|", l.Split('|').Take(3)))) };
+            Assert.That(_store.GetAttachments(old).Select(a => a.Name), Is.All.Null);
+            Assert.That(_store.GetAttachments(old), Has.Count.EqualTo(3));
+        }
+
         // An app that saves the chats itself (ChatPage with AutoSave off): a voice message's words written down after the
         // exchange was saved are kept by SaveMessageChangesAsync, which titles a chat still called "Voice message" too.
         [Test]

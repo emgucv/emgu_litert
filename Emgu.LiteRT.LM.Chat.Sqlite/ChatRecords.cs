@@ -160,8 +160,9 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         public string Context { get; set; }
 
         /// <summary>
-        /// The attachments, one per line: the kind ("image", "audio", or an app's own), the media type and the file's
-        /// name in the chat's attachment folder, separated by '|'.
+        /// The attachments, one per line: the kind ("image", "audio", or an app's own), the media type, the file's
+        /// name in the chat's attachment folder and - since 2026-10-27, when it had one - the name it was shown with
+        /// (e.g. "Voice message (0:08)"), separated by '|'. Rows without the last part read as before.
         /// </summary>
         public string Attachments { get; set; }
 
@@ -184,12 +185,17 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         /// <param name="kind">"image", "audio", or an app's own kind</param>
         /// <param name="mediaType">The media type, e.g. "image/jpeg"</param>
         /// <param name="path">The file</param>
-        public ChatSavedAttachment(string kind, string mediaType, string path)
+        /// <param name="name">The name it was shown with (e.g. "Voice message (0:08)", the file the user picked), or null</param>
+        public ChatSavedAttachment(string kind, string mediaType, string path, string name = null)
         {
             Kind = kind;
             MediaType = mediaType;
             Path = path;
+            Name = name;
         }
+
+        /// <summary>The name it was shown with when it was sent, or null (saved before names were kept, or none).</summary>
+        public string Name { get; }
 
         /// <summary>"image", "audio", or an app's own kind.</summary>
         public string Kind { get; }
