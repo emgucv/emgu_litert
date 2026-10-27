@@ -1,0 +1,99 @@
+# Plan: the MAUI demo on the library's `ChatPage` (phases B and C)
+
+Status: phase A (the page, `ChatFeature`, the built-in features, the `MauiChat` sample) was done on 2026-10-26 before this
+plan; phase B as written below was done on 2026-10-26 (B1, B2.1, B2.2, B2.4 the swap, B2.5 the shrink, B2.6 the docs);
+phase C - the features any app wants moved into the library one per commit, the packages `Emgu.LiteRT.LM.Maui.Documents`,
+`.Mcp`, `.OpenAI` and `.CV` made on the way, the saved decorations of the AutoSave path, and the review of the demo-only
+features - was done on 2026-10-26/27. The outcome of each step is in [TODO.md](../TODO.md) item 55 and in
+[ARCHITECTURE.md](../ARCHITECTURE.md); the library's side in `docs/agents.md`. The text below is the plan as written on
+2026-10-26, before phase B began.
+
+## The plan as written (2026-10-26): phase B - the MAUI demo runs on the library's `ChatPage`
+
+## Context
+
+Phase A (commits 16d37a05, 23c358b8, 735f06f9, all on 2026-10-26) gave `Emgu.LiteRT.LM.Maui` a drop-in `ChatPage` with `ChatFeature` skills, proven on the `MauiChat` sample on Mac Catalyst and the Pixel Fold. The demo's `LiteRtLmChatPage` (`Emgu.LiteRT.Example/Maui/Chat/`, 39 partials + 10 feature classes, ~12k lines) still has its own page. The user's standing decision: the demo becomes `ChatPage` + plugins, kept working on Mac Catalyst and the Fold at every commit; the heavy features move to real `ChatFeature`s one at a time afterwards (phase C).
+
+Decisions taken for phase B (2026-10-26): the generic behaviours the demo has and the library lacks go **into the library first** (resumable background downloads with Continue, the GPU-to-CPU fallback, the context-window choice, CPU threads, keeping the chat when a model reloads, overlay slots), and the demo **uses the library's composer** (its own composer, attachment chips and voice-message code go; the "+" menu becomes an `IChatAttachmentSource`).
+
+Three exploration passes mapped the demo; the facts that shape the plan:
+- `ChatPage` applies its ControlTemplate in its constructor, so `OnApplyTemplate` (which builds everything and selects the model) runs **before a derived constructor's body**. The base must defer model selection to `OnAppearing` and offer `OnPageBuilt()`.
+- `ChatTemplates.xaml` (merged app-wide) overrides the library's `ChatViewTemplate` with a transcript-only one: a `ChatPage` in the demo would have no message box until that override is removed - so the template change and the page swap land in one commit.
+- The demo keeps one `ChatConversation` across model reloads (backend, context window, CPU threads, GPU fallback) with a "Reading the conversation so far..." status; the library starts a new chat on every `SelectModel`.
+- The demo's send path does a dozen things the library's doesn't (document context, task-mode client, server retry, memories-used card, saving drawn pictures/documents/steps/language, camera frames...). The seam is `ChatView.Sender`: the view keeps its guard/cancel/busy/model-wait and hands the send to the page's `SendCoreAsync`, which the demo overrides with its pipeline. Phase C dismantles that pipeline feature by feature.
+- The server is a model option without a `LanguageModel`; `ChatView` already supports `Model == null && ChatClient != null`.
+- `PendingAttachment` (demo) is `DataContent` plus a thumbnail the library already renders; `Theme.cs`'s `ToggleChip`/`BottomSheet` clash with the library's names; `MauiProgram` registers the demo's own `ChatPromptEditor` handler.
+- No checked-in code depends on the page's private names (the README's self-test was never committed). Tests use Core types only (`ChatStore`, `ChatSettings`, `ChatModelCatalog`, `ChatToolGroups`, `ChatPlannerInstructions`, `ChatSessionTools`, `ChatExporter`...), which all stay.
+
+## B1 - the library grows (3 commits; the `MauiChat` sample works after each)
+
+### B1.1 The send seam, lifecycle, hands-free
+- `Emgu.LiteRT.LM.Maui/ChatView.cs`: `Func<ChatSendRequest, CancellationToken, Task> Sender` (after the view's own guard, box clearing, `_replyCancel`, speaker stop, busy and model wait, it calls `Sender ?? DefaultSendAsync`); `public Task DefaultSendAsync(ChatSendRequest, CancellationToken)` (today's body from "Generating..." through the rerun loop); `bool IsSending`; `Task PendingSend` (the current send, for teardown to await); `ChatSendRequest.IsVoiceMessage` (set by the microphone path in `ChatView.Voice.cs`); `ReplaceModel(LanguageModel)` - a new `LoadState` (+ `LoadStateCreated`, the card) without a new conversation (`OnSourceChanged` skipped under a guard).
+- `Emgu.LiteRT.LM.Agents/ChatSkill.cs`: `ChatMessageContext.HandsFree`.
+- `ChatPage` (`ChatPage.cs`, `.Agent.cs`, `.Host.cs`): `protected virtual Task SendCoreAsync(ChatSendRequest, CancellationToken)` (default: `Chat.DefaultSendAsync`) wired as `Sender`; `ComposeOptionsAsync` becomes `protected virtual`, takes the request, sets `Reasoning` itself (`ThinkingEnabled && option.CanThink && !HandsFree`); `protected virtual Task OnBeforeStreamingAsync(ChatMessageItem, CancellationToken)` assigned to `Conversation.BeforeStreaming` (base: the reread status); `IsWorking` includes `Chat.IsSending`; `HandsFree` + `SetHandsFree(bool)` on the page and `IChatPageHost`; `SelectInitialModel()` moves from `OnApplyTemplate` to the first `OnAppearing`; `protected virtual void OnPageBuilt()` at the end of `OnApplyTemplate`.
+- Sample unchanged; `UnitTestChatSkills` gets a HandsFree case (features see it in the context).
+
+### B1.2 Downloads
+- `Emgu.LiteRT.LM.Chat/ModelLoadState.cs`: `Downloader` (`Func<DownloadableFile, string, Action<long?, long, double?>, CancellationToken, Task>`, the shape of `BackgroundDownloads.DownloadFileAsync`) used before `Model.Init` when the file isn't verified, progress seeded from `ModelFile.PartialDownloadBytes`; `IsPaused`; `FailedStage`; `Hint`; `Dismissed`.
+- `Emgu.LiteRT.LM.Maui/ModelLoadCard.cs` + `Themes/ChatStyles.xaml`: "Continue" instead of "Download" when paused (also after an error), `PART_Note` shows `Hint` and the Wi-Fi line, optional `PART_Dismiss` ("Not now"; `ChatView.SendAsync` clears `Dismissed` before waiting).
+- `ChatPage.Models.cs` `ConfigureLoadState`: `Downloader = BackgroundDownloads.DownloadFileAsync`, `Hint = BackgroundDownloads.Hint`, then `ChatPageOptions.ConfigureEngine?.Invoke(settings)` (new option, `Action<EngineSettings>`).
+- Test: new `UnitTestModelLoadState.cs` (a fake downloader awaited before `Init`, progress seeded, `IsPaused` after cancel; model-free with a fake `LanguageModel` if one exists in the tests, else the state's pure parts).
+
+### B1.3 Reload, GPU fallback, context window, CPU threads, model rows
+- `Emgu.LiteRT.LM.Chat/ChatModelOption.cs`: `MaxContextWindow`, `ModelFile` (for row status without instantiating the model), a constructor without `create` (`IsRemote => Create == null`), `AcceptsImages` stays settable (a server learns it after connecting).
+- New `Emgu.LiteRT.LM.Chat/ChatContextWindow.cs`: `Choose(setting, automatic, max, phone, canUseTools)` = the demo's `ContextTokensFor`/`AutomaticContextTokens` (`LiteRtLmChatPage.Context.cs:33`), `Choices = {0, 4096, 8192, 16384, 32000}`, `Name(tokens)`. Unit test.
+- `ChatPage.Models.cs`: `SelectModel` starts a new chat only for another option; the same option with another backend calls `ReloadModelAsync(backend)`. `public Task<bool> ReloadModelAsync(string backend = null)`: `BeginReload()`, `await Chat.PendingSend`, `_client.Reset()`, old engine disposed off-thread, new instance (+ context window), `Chat.ReplaceModel`, `ConfigureConversation(...)`, `_rereadNext` when the chat has messages. `IsReloadingModel`, `protected IDisposable BeginReload()`. GPU fallback: `ModelLoadFailed` with backend "gpu" and `FailedStage == LoadingEngine` asks "GPU model could not load... Run on CPU?" then `Settings.Set(GpuKey, false)` and `ReloadModelAsync("cpu")`. `protected virtual void ConfigureConversation(ChatConversation, ChatModelOption, LanguageModel)` (today's `OnConversationChanged` body; `OverheadTokens` from the active tool groups).
+- New `ChatPage.Context.cs`: settings section "Conversation memory" - usage label (`GetContextUsageAsync`), "Compact now", context chips when `MaxContextWindow > 0` (key `context_tokens`, the demo's phone/desktop notes from `Context.cs:96-105`); `Conversation.Compacted` → `_rereadNext`, `Skills.Reset()`. `ChatPageOptions.ShowContextWindow` (default true), `ShowCpuThreads` (default false; `CpuThreadSettings` slider + "Apply and reload" → `ReloadModelAsync()`; the demo's `Services/CpuThreadsView.cs` moves into the library).
+- Model list rows: a status line from `ModelFile` ("Downloaded", "Download paused · N of M", "Downloading... P%"), refreshed from the `LoadState`.
+
+### B1.4 Remote models, saving control, chat actions, what features can reach
+- `ChatPage.Agent.cs`: `protected virtual IChatClient CreateChatClient(ChatModelOption, LanguageModel)` (base: `LiteRtLmChatClient`; throws for a remote option), `protected virtual Task<bool> ConnectRemoteAsync(ChatModelOption, CancellationToken)`, `AskModelOnceAsync` virtual; `ModelReady` = remote ? connected : `LoadState.IsReady`; a remote option sets `Chat.Model = null` (the view's client-only mode) and `Chat.AttachmentKinds` from the option; the default `SendCoreAsync` connects first.
+- `ChatPage.Chats.cs`: `ChatPageOptions.AutoSave` (default true; false = the app saves itself), `protected void SetCurrentChat(int?)`, `OpenChatAsync` and `StartNewChat` virtual, `protected virtual Task<bool> OnPrivateModeChangingAsync(bool)` (false cancels), `ChatPageOptions.ChatActions` (`ChatAction(string text, Func<ChatHistoryEntry, Task> run)`, buttons on each chat row; sheet result `action:{index}:{id}`).
+- `ChatFeature.cs`: `DescribeToolCall(FunctionCallContent) => null` (the page chains the features, then `AgentTools.Describe`), `OnToolStepCompleted(ChatToolStep)` (the page watches each reply's `Steps`), `OnChatOpened(int)`.
+- `Themes/ChatStyles.xaml` `ChatPageTemplate`: `PART_Overlay` (a Grid over `PART_Chat`), `PART_Layers` (a Grid over the page, under `PART_Sheet`), optional `PART_Back` (`Navigation.PopAsync`; `ChatPageOptions.ShowBackButton`). `IChatPageHost` gains `Overlays` (`IChatOverlays`: `AddOverlay`/`RemoveOverlay`/`ShowLayer`/`HideLayer`, `ChatSize` + `ChatSizeChanged`), `CurrentChatId`, `OpenChatAsync`, `ReloadModelAsync`, `IsReloadingModel`, `RemoveCard(View)`, `HandsFree`/`SetHandsFree`. `Chat`, `Skills`, the sheet: public/protected as needed.
+- Docs: `cmake/Emgu.LiteRT.LM.Maui.Package.README.md.in`, `docs/agents.md` (the ChatPage bullet), `ARCHITECTURE.md` not yet.
+- Device check after B1 (sample): Catalyst - a Qwen3 download cancelled then continued ("Continue"), "Not now"; Fold - Gemma 4 E2B download through the foreground service, a backend switch mid-chat keeps the chat with the reread status, the context chips reload, CPU threads.
+
+## B2 - the demo derives (prep commits, then one swap commit, then shrink commits)
+
+### B2.1 Prep that leaves the old page running (one commit)
+- `MauiProgram.cs`: `builder.UseLiteRtChat()`; delete the demo's `Platforms/MacCatalyst/ChatPromptEditor.cs` handler and the Android video handler registration.
+- `Theme.cs`: rename `BottomSheet` → `MenuSheet` (its rows/sections API, used by the attach menu and `Vision/DemoPage.cs`, which the library sheet lacks); alias or delete `ToggleChip` (Chat-only; the library's has the same `Text`/`IsToggled`/`Toggled`).
+- `PendingAttachment` → `DataContent` across `.Attachments`, `.Sending`, `.VoiceMessages`, `.Documents` (`DocumentContext.Image`), `.Visual` (`VisualTools(IReadOnlyList<DataContent>)`), `.Voice`, `.Tools`; the image test is `MediaType.StartsWith("image/")`, the chip's name is `Name`.
+- `Maui.Demo.Lite.Core/Chat/ChatModelCatalog.cs`: `ModelOption.DownloadBytes`; new `ChatModelOptions.FromCatalog(models, platform)` → `ChatModelOption`s (`Id = Choice.ToString()`, `Backends` from `GpuOn*`, `ContextWindow = DesktopContextTokens`, `MaxContextWindow = MaxContextTokens`, `ModelFile = File`, `Create = () => ChatModelCatalog.Create(choice)`) plus the remote "Server" option. Unit test (next to `UnitTestChatModelCatalog`).
+- New `Services/ChatSettingsAdapter.cs : IChatPageSettings` over Preferences with the `litert_lm_chat_` prefix and the legacy `use_gpu` fallback (`ChatSettings`/`AppSettings.Chat` stay for the features; `UnitTestChatSettings` unchanged).
+- Catalyst: attach, send, voice message still work on the old page.
+
+### B2.2 Feature wrappers, unused until the swap (one commit, compiles against library + Core types only)
+- New `Chat/Features/*Feature.cs` classes from the partials' bodies: `CameraFeature` (Camera + Visual + Clips/Photos/Snapshots + Sound + AlertSounds + CameraSound + MonitorInfo + Background as one feature; `RegisterServices` adds the `VisualAgentRegistry`; panels through `Host.Overlays.AddOverlay`, sized by `ChatSize`), `DocumentsFeature`, `McpFeature` (groups per server, `DescribeToolCall`, `OnToolStepCompleted`), `VoiceModeFeature` (the layer through `ShowLayer`, `SetHandsFree`, refuses while `Chat.IsRecording`), `ServerFeature` (settings section; the connection logic goes on the page), `TranscriptFeature` (saves `message.Transcript` when it arrives via PropertyChanged), `ExportFeature` (a `ChatAction` + a settings link), `StorageFeature`, `ModelSettingsFeature`, `TaskChipFeature`, `DeveloperFeature`, a `WorkloadService` in `Services`. The reply reader → an `IReplySpeaker` over `_alertAudio` (`AlertAudioReplySpeaker`).
+- `DemoChatHost : IChatHost` over `IChatPageHost` + `ChatStore` + `SearchEmbedder` + the camera feature + workload, so the ten `*Feature.cs` classes compile unchanged. The demo keeps its own `GoalsFeature` (it has Undo last); don't import `Emgu.LiteRT.LM.Maui.Features` in demo files.
+
+### B2.3 + B2.4 The swap (one commit)
+- `ChatTemplates.xaml`: delete the `ChatViewTemplate` and `ChatAttachmentViewTemplate` overrides; `Tag.TranscriptText/HasTranscript` → the item's `Transcript`/`HasTranscript`; keep `Tag.DividerText`, `Tag.ThinkingDisplayText`, `Tag.TranslateRow`; colours by the `Chat*` keys; `App.xaml` defines `ChatTitleFont`/`ChatBodyFont`/`ChatMonoFont` = Inter.
+- `LiteRtLmChatPage : ChatPage`, `: base(CreateOptions())` with a static `CreateOptions()`: models from B2.1, `History` = a static `ChatStore`, `AutoSave = false`, `Settings = new ChatSettingsAdapter()`, features = library `CoreToolsFeature`, `MemoryFeature(Store.Memories)`, `WebFeature`, `LocationFeature`, `ClipboardFeature` + the demo's `GoalsFeature` + the B2.2 wrappers, `ShowCpuThreads = true`, `ShowBackButton = true`, `ConfigureEngine` (`EnableBenchmark`, `AudioNumThreads`), `ReplySpeaker`, `AttachmentSource = DemoAttachmentSource` (the "+" menu over `MenuSheet`: photo library, camera, sample images, audio file, document → `AttachDocument`), `Instructions = ChatPlannerInstructions.Agent`.
+- Overrides: `SendCoreAsync` (today's `.Sending.cs` pipeline minus the view's parts; task mode as the per-message `client`; the server reasoning retry; `SaveExchangeAsync` with drawn pictures, written documents, steps, language, document id → `SetCurrentChat`), `OnBeforeStreamingAsync` (document refresh after compaction + base), `ComposeOptionsAsync` (base; the old tool groups are now the features' `ToolGroups()` through `Skills.Router`), `ConfigureConversation` (+ `SummaryOptions` for the server), `CreateChatClient`/`ConnectRemoteAsync`/`AskModelOnceAsync` (the server), `OpenChatAsync` (today's `OpenConversationAsync`: records, tags, saved cards, document; then `SetCurrentChat`), `StartNewChat`, `OnPrivateModeChangingAsync` (today's cleanup under `BeginReload()`), `OnNavigatedFrom`, `OnPageBuilt` (window hooks, `Shell.SetNavBarIsVisible`).
+- Delete: `.Layout`, `.Settings`, `.ModelList`, `.Loading`, `.Downloads`, `.SavedChats`, `.Memories`, `.Private`, `.Agent`, `.Tools`, `.Keyboard`, `.Context`, `.Attachments`, `.VoiceMessages`, `.CpuThreads`, `.TranscriptView`, `.Host`, `.Workload`, `.Developer`, `.Export`, `.Storage`, `.ModelSettings`, `ChatAgentTools.cs`, `Features/LiteRtLmChatPage.*.cs`, the `Microsoft.Agents.AI` package reference. Name clashes resolved by deleting the demo's `SetStatus`/`SetBusy`/`StartNewChat`/`ModelReady`/`DeveloperMode`/`AskModelOnceAsync` in favour of the base's.
+- `LiteRtLmChatPage.Compat.cs` (temporary, ~40 lines): what the wrappers still reach by old names (`IsPrivateChat => IsPrivate`, `_store => Store`, `AddCard(bubble, card)`, `_agentBubble`, `_pageVisible`, `_voiceMode => HandsFree`, `CanChangeModel`).
+- Conscious losses, recorded in TODO: collapsible CPU/GPU model groups (the `*_models_expanded` keys fall out of use); the header Export button becomes a chat-row action plus a settings link.
+- Build Catalyst + Android; the Catalyst smoke (type, Enter, attach, voice message, model switch, open a chat, private) before committing.
+
+### B2.5 Shrink (one small commit each)
+Delete Compat members as each wrapper switches to `Host`/`Services`: the camera cluster, Documents, Mcp, Voice, Transcript, Export, Storage, ModelSettings, Developer. `IChatHost` shrinks to what `IChatPageHost` lacks; `UserMessageInfo`/`StreamingBubble` stay (the demo's templates). Phase C then turns the remaining demo-specific pipeline pieces into features.
+
+### B2.6 Docs
+`TODO.md` item 55 (B done, losses), `ARCHITECTURE.md` (the page is a `ChatPage` subclass + features; where to add a model, a setting, a feature), `FEATURES.md` (the template override is gone), `README.md`, `docs/agents.md`, `CLAUDE.md`'s "Structure of the MAUI demo" line.
+
+## Risks
+- Template-time ordering (B1.1) is the likeliest first-run crash; the sample must still restore its last model on the Fold after the move to `OnAppearing`.
+- `ReplaceModel`: the conversation doesn't own the model; `_client.Reset()`, `ConfigureConversation` and disposing the old engine only after `PendingSend` are what make it safe.
+- Voice mode and the library's recorder both want the microphone: the feature refuses to start while `Chat.IsRecording`; the reply-finished wait needs a completion signal on `IReplySpeaker` (add one if `ReplySpeaker.cs` has none).
+- The server retry re-enters `RegenerateAsync`: keep the `attempt == 0` guard. `OpenChatAsync` override must not call `History.LoadChatAsync` (it needs the records) and must `SetCurrentChat` itself (`AutoSave = false`).
+- `BackgroundDownloads.BeginAsync` is still called from the foreground (the card's button or a send).
+
+## Follow-up outside phase B
+- Windows CI: the native build with the LFS `.lib` fix passes now (run 40345458028); the one failing test, `TestCocoSsdMobilenetV1`, compares CompiledModel and Interpreter detections exactly and the CompiledModel finds one extra low-score box (surfboard 0.57) on Windows - loosen the comparison (ignore boxes under a score margin, or allow one extra below 0.6).
+
+## Verification
+- After every commit: `dotnet test Emgu.LiteRT.Test/.../Emgu.TF.Lite.Test.Net.csproj` (today 585 passed), full rebuilds (`--no-incremental`) of `LM.Chat`, `LM.Maui` (android + maccatalyst) and the demo for `net10.0-maccatalyst` and `net10.0-android` (`-p:RuntimeIdentifier=android-arm64`); no warnings from the changed files.
+- B1: the sample on Catalyst (`scratchpad/run_mauichat_catalyst.sh`) and the Fold (`copy_models_to_sample.sh`, `ui.sh` to drive it).
+- B2.4: the demo on Catalyst (`tools/run_catalyst`) and the Fold (`tools/deploy_android <Fold serial>`): existing saved chats, memories and goals from the same `chats.db3`; the side panel at 820 px; Enter sends; attach from the "+" menu; a voice message; model switch and backend switch mid-chat; open a chat; private mode; the server against LM Studio; an MCP group; the camera overlay and a monitor; background recording on Android.
