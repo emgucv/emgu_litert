@@ -226,6 +226,23 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
         if (index < 0 || index == _selected || Host.IsBusy)
             return;
         await Host.RunReloadAsync(() => SwitchAsync(index));
+        // After the reload, not in it: the searches don't start indexing while a reload is going on.
+        RestartSearches();
+    }
+
+    // The searches show their state again (a model without images, a deleted one) and go on indexing; the storage
+    // feature's notices follow the new model too.
+    private void RestartSearches()
+    {
+        StorageFeature storage = Host.Services.Get<StorageFeature>();
+        if (storage != null)
+            storage.RefreshSearchState();
+        else
+            foreach (IStorageParticipant participant in Host.Services.GetAll<IStorageParticipant>())
+            {
+                try { participant.StorageChanged(null); }
+                catch (Exception) { }
+            }
     }
 
     // Stop what uses the model, let it go, switch, have the participants rebuild, and load it again if it was loaded.
@@ -254,17 +271,6 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
         finally
         {
             Host.SetBusy(false);
-            // The searches show their state again (a model without images, a deleted one) and go on indexing; the storage
-            // feature's notices follow the new model too.
-            StorageFeature storage = Host.Services.Get<StorageFeature>();
-            if (storage != null)
-                storage.RefreshSearchState();
-            else
-                foreach (IStorageParticipant participant in Host.Services.GetAll<IStorageParticipant>())
-                {
-                    try { participant.StorageChanged(null); }
-                    catch (Exception) { }
-                }
         }
     }
 }
