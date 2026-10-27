@@ -258,6 +258,36 @@ namespace Emgu.TF.Lite.Test
             await _store.SetTranscriptAsync(chatId, saved.MessageId, "Something else");
             Assert.That((await _store.GetChatAsync(chatId)).Title, Is.EqualTo("What is the capital of Italy?"));
             Assert.That(ChatHistoryStore.Shorten(new string('a', 70), 60), Has.Length.EqualTo(60).And.EndsWith("…"));
+            // Written down before the chat was saved: the words are its title.
+            Assert.That(ChatHistoryStore.TitleOf(new ChatMessageItem(ChatMessageRole.User, "", new[] { new DataContent(Wav, "audio/wav") })
+                { Transcript = " Is it raining? " }), Is.EqualTo("Is it raining?"));
+        }
+
+        // An app that saves the chats itself (ChatPage with AutoSave off): a voice message's words written down after the
+        // exchange was saved are kept by SaveMessageChangesAsync, which titles a chat still called "Voice message" too.
+        [Test]
+        public async Task KeepsAVoiceMessagesWordsWrittenDownAfterTheSave()
+        {
+            var message = new ChatMessageItem(ChatMessageRole.User, string.Empty, new[] { new DataContent(Wav, "audio/wav") });
+            int chatId = await _store.CreateChatAsync(ChatHistoryStore.TitleOf(message), null);
+            await _store.SaveExchangeAsync(chatId, message, Reply("Rome."));
+            Assert.That((await _store.GetChatAsync(chatId)).Title, Is.EqualTo("Voice message"));
+            bool changed = false;
+            _store.ChatsChanged += (s, e) => changed = true;
+
+            message.Transcript = "  What is the capital of Italy?  ";
+            await _store.SaveMessageChangesAsync(message);
+            Assert.That((await _store.GetChatAsync(chatId)).Title, Is.EqualTo("What is the capital of Italy?"));
+            Assert.That((await _store.LoadAsync(chatId)).Messages[0].Transcript, Is.EqualTo("What is the capital of Italy?"));
+            Assert.That(changed, Is.True, "the chat list is told");
+
+            // A chat with a title of its own keeps it.
+            int other = await _store.CreateChatAsync("Trip", null);
+            var second = new ChatMessageItem(ChatMessageRole.User, string.Empty, new[] { new DataContent(Wav, "audio/wav") });
+            await _store.SaveExchangeAsync(other, second, Reply("Yes."));
+            second.Transcript = "Is it raining?";
+            await _store.SaveMessageChangesAsync(second);
+            Assert.That((await _store.GetChatAsync(other)).Title, Is.EqualTo("Trip"));
         }
 
         // An app's own column on a message.

@@ -4,14 +4,11 @@ using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 
-// The base of the demo's own features for Emgu.LiteRT.LM.Maui's ChatPage: the library's ChatFeature with the demo's host
-// (IDemoHost), the message being sent (Context) and whether the page is shown. Each feature registers itself as a
-// service, so the others find it (Host.Services.Get<CameraFeature>()).
+// The base of the demo's own features for Emgu.LiteRT.LM.Maui's ChatPage: the library's ChatFeature with the message
+// being sent (Context), whether the page is shown, and the demo's settings rows. Each feature registers itself as a
+// service, so the others find it (Host.Services.Get<ModelSettingsFeature>()).
 internal abstract class DemoFeature : ChatFeature
 {
-    // The demo's page (null before the feature is attached).
-    protected IDemoHost Demo => Host as IDemoHost;
-
     // The message being sent: its words and attachments, read by the tools made for it (null before the first).
     protected ChatMessageContext Context { get; private set; }
 

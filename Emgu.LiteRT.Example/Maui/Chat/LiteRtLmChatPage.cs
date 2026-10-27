@@ -28,7 +28,7 @@ namespace Maui.Demo.Lite;
 /// The page itself adds what the demo does around a message: the document's excerpts, the task planner, the memories a
 /// reply drew on, and saving each exchange with the pictures and documents it made.
 /// </summary>
-public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
+public sealed class LiteRtLmChatPage : ChatPage
 {
     private const int SummaryMaxTokens = 400;
 
@@ -48,7 +48,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         public McpFeature Mcp;
         public VoiceModeFeature VoiceMode;
         public ServerFeature Server;
-        public TranscriptFeature Transcripts;
         public ExportFeature Export;
         public StorageFeature Storage;
         public ModelSettingsFeature ModelSettings;
@@ -69,7 +68,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 
     private readonly Parts _parts;
     private readonly MenuSheet _menu = new MenuSheet();
-    private bool _pageVisible;
     private int _sessionVersion;
     private IDisposable _privateDiagnostics;
     private ChatConversation _hooked;
@@ -111,7 +109,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             Camera = new CameraFeature(new VisualDetectors(FileSystem.CacheDirectory, DetectorFactory.ValidationImage)),
             Mcp = new McpFeature(),
             VoiceMode = new VoiceModeFeature(),
-            Transcripts = new TranscriptFeature(),
             Export = new ExportFeature((id, stream, cancel) => ChatExporter.ExportAsync(SharedStore, id, stream, cancel)),
             ModelSettings = new ModelSettingsFeature(),
             Tasks = new TaskFeature(),
@@ -200,7 +197,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new ClipboardFeature(),
             parts.Camera, parts.Server, parts.Mcp, parts.ModelSettings, parts.Images, parts.Storage, parts.Export,
-            parts.Documents, parts.VoiceMode, parts.Tasks, parts.Transcripts, parts.Translations, parts.DeviceActions,
+            parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
             parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.Meetings, parts.Exercises
         })
             options.Features.Add(feature);
@@ -214,14 +211,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     private IIndexingWorkload Workload => (_parts ?? _building).Workload;
 
     private SearchEmbedder Embedder => _parts.ModelSettings.Embedder;
-
-    // ---------- IDemoHost ----------
-
-    ChatHistoryStore IDemoHost.Store => SharedStore;
-
-    IIndexingWorkload IDemoHost.Workload => Workload;
-
-    bool IDemoHost.PageVisible => _pageVisible;
 
     // What the storage page lists: the catalog's models, the two search models (downloadable again from the page), the
     // image model's folder, and the store's documents, indexes and attachments.
@@ -259,18 +248,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         {
             overlays.HideLayer(_menu);
         }
-    }
-
-    protected override void OnAppearing()
-    {
-        _pageVisible = true;
-        base.OnAppearing();
-    }
-
-    protected override void OnDisappearing()
-    {
-        base.OnDisappearing();
-        _pageVisible = false;
     }
 
     // Leaving the chat: the monitors, the camera, the microphone, the models and the indexes are let go of.
@@ -662,7 +639,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             // The document the chat uses now (or none), restored when it is opened again.
             await SharedStore.SetChatDocumentAsync(id, _parts.Documents.DocumentReady?.IsCompletedSuccessfully == true ? _parts.Documents.DocumentId : null);
             SetCurrentChat(id);
-            _parts.Transcripts.Track(userItem, id);
+            // (A voice message's words written down later are kept by the base page, which watches them.)
         }
         catch (Exception ex)
         {

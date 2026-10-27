@@ -48,8 +48,13 @@ namespace Emgu.LiteRT.LM.Maui
             conversation.Compacted += OnConversationCompacted;
             conversation.Messages.CollectionChanged += (s, e) =>
             {
-                foreach (ChatMessageItem reply in e.NewItems?.OfType<ChatMessageItem>().Where(m => m.Role == ChatMessageRole.Assistant && m.IsStreaming) ?? Enumerable.Empty<ChatMessageItem>())
-                    WatchSteps(reply);
+                foreach (ChatMessageItem item in e.NewItems?.OfType<ChatMessageItem>() ?? Enumerable.Empty<ChatMessageItem>())
+                {
+                    if (item.Role == ChatMessageRole.Assistant && item.IsStreaming)
+                        WatchSteps(item);
+                    else if (item.Role == ChatMessageRole.User && !item.HasTranscript && item.Attachments.Count > 0)
+                        WatchTranscript(item);
+                }
             };
             _rereadNext = false;
             _skills.Reset();
@@ -472,6 +477,33 @@ namespace Emgu.LiteRT.LM.Maui
         // ---------- Tool steps ----------
 
         // Tell the features when a tool call of a reply has its result (a feature may reword the step with the outcome).
+        // A voice message's words, written down by the speech recognizer while (or after) the model answers: with AutoSave
+        // the history binding keeps them; an app that saves the chats itself gets them kept here once it has saved the
+        // message (or with the message, when they come first - ChatHistoryStore.SaveExchangeAsync writes them then), and a
+        // chat still titled "Voice message" is titled with them.
+        private void WatchTranscript(ChatMessageItem message)
+        {
+            if (_options.AutoSave || _options.History == null)
+                return;
+            System.ComponentModel.PropertyChangedEventHandler handler = null;
+            handler = async (s, e) =>
+            {
+                if (e.PropertyName != nameof(ChatMessageItem.Transcript) || !message.HasTranscript)
+                    return;
+                message.PropertyChanged -= handler;
+                try
+                {
+                    await ((IChatPageHost)this).SaveMessageChangesAsync(message);
+                    Dispatcher.Dispatch(RefreshChatList);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Saving a voice message's words: " + ex.Message);
+                }
+            };
+            message.PropertyChanged += handler;
+        }
+
         private void WatchSteps(ChatMessageItem reply)
         {
             reply.Steps.CollectionChanged += (s, e) =>

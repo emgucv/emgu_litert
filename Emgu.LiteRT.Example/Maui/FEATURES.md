@@ -515,8 +515,9 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   again after reopening. Verified on Mac Catalyst with Spanish, German and Chinese; after the move, again with Spanish
   (Gemma 4 E2B on the GPU: translated, the chat reopened with the translation and the row, the row back to the English).
 - A voice message that a model hears as audio (Gemma 4) also gets its words written down by the platform's speech recognizer
-  in the background (`SpeechRecognizer`; `TranscriptFeature`). The words show under the chip, are kept in
-  `MessageRecord.Transcript` (not given to the model), become the title of a chat still called "Voice message", and go into
+  in the background (`SpeechRecognizer`; the base `ChatPage` keeps them for a page that saves its chats itself, as the
+  demo's does - the demo's own `TranscriptFeature` until 2026-10-27). The words show under the chip, are kept in
+  `ChatMessageRecord.Transcript` (not given to the model), become the title of a chat still called "Voice message", and go into
   exports; the recording is kept too (`chats/attachments/...`). Verified on a Pixel Fold.
 - Settings > "Voice language" (the library's `VoiceLanguageFeature` since phase C, 2026-10-27; `VoiceLanguages`, set as
   `SpeechRecognizer.Language`; the errors end with `SpeechRecognizer.ChooseLanguageHint`) is the language the speech

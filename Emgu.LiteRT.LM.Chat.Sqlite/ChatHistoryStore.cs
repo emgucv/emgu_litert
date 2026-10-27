@@ -169,12 +169,17 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             return chat.Id;
         }
 
-        /// <summary>A title for a chat that starts with this message: its text, else "Image" or "Voice message".</summary>
+        /// <summary>
+        /// A title for a chat that starts with this message: its text, else a voice message's words (its
+        /// <see cref="ChatMessageItem.Transcript"/>, when written down already), else "Image" or "Voice message".
+        /// </summary>
         /// <param name="message">The first message</param>
         public static string TitleOf(ChatMessageItem message)
         {
             if (message != null && !string.IsNullOrWhiteSpace(message.Text))
                 return message.Text;
+            if (message != null && !string.IsNullOrWhiteSpace(message.Transcript))
+                return message.Transcript.Trim();
             if (message != null && message.Attachments.Any(a => a.HasTopLevelMediaType("image")))
                 return "Image";
             return "Voice message";
@@ -232,9 +237,13 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             var files = message.Attachments
                 .Select(a => (a.HasTopLevelMediaType("image") ? ChatSavedAttachment.ImageKind : ChatSavedAttachment.AudioKind, a.MediaType, a.Data.ToArray()))
                 .ToList();
-            int messageId = await InsertAsync(chatId, ChatMessageRecord.UserRole, message.Text, null, files, message.Context, message.Transcript,
+            string transcript = message.Transcript;
+            int messageId = await InsertAsync(chatId, ChatMessageRecord.UserRole, message.Text, null, files, message.Context, transcript,
                 language: message.Language).ConfigureAwait(false);
             Remember(message, messageId);
+            // A voice message's words written down while it was being saved (whoever watches for them found no id yet).
+            if (message.Transcript != transcript)
+                await SetTranscriptAsync(chatId, messageId, message.Transcript).ConfigureAwait(false);
             foreach (string step in (steps ?? reply.Steps.Select(s => s.Description)).ToList())
                 await InsertAsync(chatId, ChatMessageRecord.StepRole, step, null, null, null, null).ConfigureAwait(false);
             int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, ReplyText(reply), reply.Thinking, replyAttachments, null, null,
@@ -292,7 +301,8 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
 
         /// <summary>
         /// Save what changed on a message after its exchange was saved: a user message's <see cref="ChatMessageItem.Language"/>
-        /// (detected later) and its <see cref="ChatMessageItem.Transcript"/>, a reply's thinking translation. Nothing for a
+        /// (detected later) and its <see cref="ChatMessageItem.Transcript"/> - a chat still titled "Voice message" is then
+        /// titled with the words, as <see cref="SetTranscriptAsync"/> does -, a reply's thinking translation. Nothing for a
         /// message this store didn't save or load, or while <see cref="IsPrivate"/>.
         /// </summary>
         /// <param name="message">The message</param>
@@ -304,8 +314,13 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             if (id <= 0 || IsPrivate)
                 return;
             SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            string transcript = string.IsNullOrWhiteSpace(message.Transcript) ? null : message.Transcript.Trim();
             await db.ExecuteAsync("UPDATE Message SET Language = ?, ThinkingTranslation = ?, Transcript = ? WHERE Id = ?",
-                message.Language, message.ThinkingTranslation, message.Transcript, id).ConfigureAwait(false);
+                message.Language, message.ThinkingTranslation, transcript, id).ConfigureAwait(false);
+            if (transcript != null && await db.ExecuteAsync(
+                    "UPDATE Conversation SET Title = ? WHERE Id = (SELECT ConversationId FROM Message WHERE Id = ?) AND Title = ?",
+                    Shorten(transcript, 60), id, "Voice message").ConfigureAwait(false) > 0)
+                OnChatsChanged();
         }
 
         /// <summary>Record a saved message's language (null for unknown); nothing while <see cref="IsPrivate"/>.</summary>
