@@ -105,12 +105,14 @@ public sealed partial class CameraFeature
         _alertSoundStatus.IsVisible = !string.IsNullOrEmpty(text);
     }
 
-    // One preview at a time: Play again (or on another sound) stops the one that plays.
+    // One preview at a time: Stop stops it, Play on another sound stops it and plays that one. Whether this click is a Stop is
+    // decided before cancelling: on the main thread the cancel can run the playing preview's end at once (its button back to
+    // "Play"), and a check after it took Stop for Play and started the sound again.
     private async Task PreviewAlertSoundAsync(AlertSound sound, Button button)
     {
-        bool wasPlaying = _alertPreview != null;
+        bool stopping = _alertPreview != null && button.Text == "Stop";
         _alertPreview?.Cancel();
-        if (wasPlaying && button.Text == "Stop") return;
+        if (stopping) return;
         var source = _alertPreview = new CancellationTokenSource();
         button.Text = "Stop";
         try { await PlayAlertSoundAsync(sound, 0, source.Token); }
