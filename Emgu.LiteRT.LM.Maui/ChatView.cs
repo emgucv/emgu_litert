@@ -287,7 +287,7 @@ namespace Emgu.LiteRT.LM.Maui
         public Func<Exception, ChatOptions, bool> ResendRequested { get; set; }
 
         /// <summary>
-        /// Sends a message once the model is ready, instead of <see cref="DefaultSendAsync"/>: for an app whose sending
+        /// Sends a message once the model is ready, instead of <see cref="DefaultSendAsync(ChatSendRequest, CancellationToken)"/>: for an app whose sending
         /// does more (context from documents, saving the exchange with its extras...). The view has already cleared the
         /// message box, stopped the speaker and started the Stop button, whose token it passes. Or null.
         /// </summary>
@@ -701,7 +701,16 @@ namespace Emgu.LiteRT.LM.Maui
         /// </summary>
         /// <param name="request">The message</param>
         /// <param name="cancellationToken">Stops the reply (the Stop button)</param>
-        public async Task DefaultSendAsync(ChatSendRequest request, CancellationToken cancellationToken)
+        public Task DefaultSendAsync(ChatSendRequest request, CancellationToken cancellationToken) => DefaultSendAsync(request, cancellationToken, null);
+
+        /// <summary>
+        /// The plain send (<see cref="DefaultSendAsync(ChatSendRequest, CancellationToken)"/>) through a client of the
+        /// message's own, e.g. one that plans the message and runs its steps.
+        /// </summary>
+        /// <param name="request">The message</param>
+        /// <param name="cancellationToken">Stops the reply (the Stop button)</param>
+        /// <param name="client">The client for this message, or null for the conversation's</param>
+        public async Task DefaultSendAsync(ChatSendRequest request, CancellationToken cancellationToken, IChatClient client)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
@@ -715,7 +724,7 @@ namespace Emgu.LiteRT.LM.Maui
             {
                 try
                 {
-                    reply = await conversation.SendAsync(request.Text, request.Attachments, options, request.Context, cancellationToken);
+                    reply = await conversation.SendAsync(request.Text, request.Attachments, options, request.Context, cancellationToken, client);
                 }
                 catch (Exception ex) when (!(ex is OperationCanceledException) && !cancellationToken.IsCancellationRequested
                     && ResendRequested?.Invoke(ex, options) == true)
@@ -724,15 +733,15 @@ namespace Emgu.LiteRT.LM.Maui
                     // the same message again into the same reply, with the options changed.
                     reply = conversation.Messages.LastOrDefault(m => m.Role == ChatMessageRole.Assistant);
                     reply = reply == null
-                        ? await conversation.SendAsync(request.Text, request.Attachments, options, request.Context, cancellationToken)
-                        : await conversation.RegenerateAsync(reply, options, cancellationToken);
+                        ? await conversation.SendAsync(request.Text, request.Attachments, options, request.Context, cancellationToken, client)
+                        : await conversation.RegenerateAsync(reply, options, cancellationToken, client);
                 }
             }
             // A tool group's stub ended the request: the message goes again, with the group's tools from the start.
             for (int rerun = 0; rerun < 2 && !cancellationToken.IsCancellationRequested && RerunRequested?.Invoke() == true; rerun++)
             {
                 options = await MakeOptionsAsync(request);
-                reply = await conversation.RegenerateAsync(reply, options, cancellationToken);
+                reply = await conversation.RegenerateAsync(reply, options, cancellationToken, client);
             }
             SetStatus(null);
         }

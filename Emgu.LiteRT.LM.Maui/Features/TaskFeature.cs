@@ -3,46 +3,53 @@
 //----------------------------------------------------------------------------
 
 using Emgu.LiteRT.LM.Agents;
-using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.Features;
 
-// Task mode (TODO item 23): with the "Plan" chip on, a message is first broken into a short plan (the model writes a numbered
-// list), shown as a checklist the user can edit, skip steps of and stop. Each step then runs on its own - a fresh conversation
-// for the model, given the task, the plan and the earlier steps' short results (TaskPlan.StepPrompt), so its tool output doesn't
-// fill the small window - with its tool calls as step lines and its result in the card,
-// and last the final answer is written from the results into the reply. Tools that change something outside the app still ask
-// with their own Confirm / Cancel cards. The saved chat holds the request and the final answer (the plan card isn't saved);
-// the model is given the conversation again with the next message. The chip is this feature's; the page asks TakePlan()
-// when it sends and runs the message through CreateClient's client.
-internal sealed class TaskFeature : DemoFeature
+/// <summary>
+/// Task mode: with the "Plan" chip on, a message is first broken into a short plan (the model writes a numbered list,
+/// Emgu.LiteRT.LM.Agents' <see cref="TaskPlan"/>), shown as a checklist above the reply the user can edit, skip steps of
+/// and stop. Each step then runs on its own - a fresh request for the model, given the task, the plan and the earlier
+/// steps' short results (<see cref="TaskPlan.StepPrompt"/>), so its tool output doesn't fill the small window - with its
+/// tool calls as step lines and its result in the card, and last the final answer is written from the results into the
+/// reply. Tools that change something outside the app still ask with their own Confirm / Cancel cards. The saved chat
+/// holds the request and the final answer (the plan card isn't saved); the model is given the conversation again with
+/// the next message. The chip is this feature's, shown for a model that can use tools and not hands-free; the page runs
+/// the message through the client of <see cref="CreateMessageClient"/> when the chip is on.
+/// </summary>
+public sealed class TaskFeature : ChatFeature
 {
     private bool _planNext;
 
+    /// <inheritdoc/>
     public override string Name => "plan";
 
+    /// <inheritdoc/>
     public override string Title => "Plan";
 
+    /// <summary>The chip is per message (nothing to switch in the settings).</summary>
     public override bool PersistEnabled => false;
 
+    /// <inheritdoc/>
     public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
 
+    /// <inheritdoc/>
     public override ChatChip BuildComposerChip() =>
         new ChatChip("\U0001F4CB Plan", () => _planNext, on => _planNext = on)
         {
             IsVisible = () => Host?.Model?.CanUseTools == true && Host.HandsFree != true
         };
 
-    // Whether the message being sent is to be planned; the chip is off again afterwards.
+    /// <summary>Whether the message being sent is to be planned (the chip was on); the chip is off again afterwards.</summary>
     public bool TakePlan()
     {
         if (!_planNext)
             return false;
         _planNext = false;
-        Host.RefreshChips();
+        Host?.RefreshChips();
         return true;
     }
 
@@ -59,7 +66,18 @@ internal sealed class TaskFeature : DemoFeature
         }
     }
 
-    // The chat client of a message the Plan chip is on for.
+    /// <summary>The task-mode client for a message with the Plan chip on (a model with tools, not hands-free); null otherwise.</summary>
+    /// <param name="request">The message, as prepared</param>
+    public override IChatClient CreateMessageClient(ChatSendRequest request)
+    {
+        if (!TakePlan() || Host?.Model?.CanUseTools != true || Host.HandsFree)
+            return null;
+        return CreateClient(request.Text ?? string.Empty, request.Attachments.ToList());
+    }
+
+    /// <summary>The chat client of a message to plan and run step by step.</summary>
+    /// <param name="request">The message's text</param>
+    /// <param name="attachments">Its attachments (given to the first step)</param>
     public IChatClient CreateClient(string request, IList<DataContent> attachments) => new TaskModeClient(this, request, attachments);
 
     // Completed by the card's buttons: true to run the plan, false to just answer. (A test completes it.)
@@ -67,6 +85,12 @@ internal sealed class TaskFeature : DemoFeature
     // The plan being run (for the card's sake and for tests).
     private TaskPlan _taskPlan;
     private TaskCard _taskCard;
+
+    private static string TitleFont => ChatResources.Find<string>("ChatTitleFont");
+    private static string BodyFont => ChatResources.Find<string>("ChatBodyFont");
+    private static Color Accent => ChatResources.FindColor("ChatAccent");
+    private static Color PrimaryText => ChatResources.ThemeColor("ChatPrimaryText");
+    private static Color SecondaryText => ChatResources.ThemeColor("ChatSecondaryText");
 
     // A task, as the chat client of the message that asks for it (ChatConversation.SendAsync with this client): it plans
     // the task, shows the plan above the reply and waits for Run (or "Just answer"); then each step runs as a request of its
@@ -102,7 +126,6 @@ internal sealed class TaskFeature : DemoFeature
         {
             IChatClient client = Host.ChatClient;
             Host.SetStatus("Planning...");
-            UiStallWatchdog.Mark("Task mode: planning");
             List<string> steps = TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary), 400));
             bool run = false;
             TaskPlan plan = null;
@@ -127,8 +150,6 @@ internal sealed class TaskFeature : DemoFeature
                 if (!run)
                     await MainThread.InvokeOnMainThreadAsync(() => card.Close("Answering without a plan"));
             }
-            else
-                UiStallWatchdog.Mark("Task mode: no plan");
             if (!run)
             {
                 // Not a task to break up: answered as usual.
@@ -137,7 +158,6 @@ internal sealed class TaskFeature : DemoFeature
                     yield return update;
                 yield break;
             }
-
             using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
             card.Stop = stop.Cancel;
             await MainThread.InvokeOnMainThreadAsync(card.Begin);
@@ -149,7 +169,6 @@ internal sealed class TaskFeature : DemoFeature
                 step.State = TaskPlan.State.Running;
                 await MainThread.InvokeOnMainThreadAsync(card.Refresh);
                 Host.SetStatus(string.Format("Step {0} of {1}: {2}", i + 1, plan.Steps.Count, step.Text));
-                UiStallWatchdog.Mark("Task mode: step " + (i + 1));
                 // A request of its own: the task, the plan and the results so far are in the message.
                 var contents = new List<AIContent>();
                 if (i == 0)
@@ -178,7 +197,7 @@ internal sealed class TaskFeature : DemoFeature
                         {
                             step.State = TaskPlan.State.Failed;
                             step.Result = TaskPlan.ShortResult(ex.Message);
-                            UiStallWatchdog.Mark("Task mode: step failed: " + ex.Message);
+                            System.Diagnostics.Debug.WriteLine("Task mode: step failed: " + ex.Message);
                             break;
                         }
                         answer.Append(update.Contents.OfType<TextContent>().Select(t => t.Text).DefaultIfEmpty(string.Empty).Aggregate(string.Concat));
@@ -249,17 +268,19 @@ internal sealed class TaskFeature : DemoFeature
     {
         var card = new TaskCard();
         bool running = false, finished = false;
+        Color accent = Accent, primaryText = PrimaryText, secondaryText = SecondaryText, success = ChatResources.FindColor("ChatSuccess");
+        string titleFont = TitleFont, bodyFont = BodyFont;
         var rows = new VerticalStackLayout { Spacing = 6 };
-        var editor = new Editor { IsVisible = false, AutoSize = EditorAutoSizeOption.TextChanges, FontFamily = Theme.BodyFont, FontSize = 14, TextColor = Theme.PrimaryText, MinimumHeightRequest = 100 };
-        var status = new Label { FontFamily = Theme.TitleFont, FontSize = 12, TextColor = Theme.SecondaryText, IsVisible = false };
+        var editor = new Editor { IsVisible = false, AutoSize = EditorAutoSizeOption.TextChanges, FontFamily = bodyFont, FontSize = 14, TextColor = primaryText, MinimumHeightRequest = 100 };
+        var status = new Label { FontFamily = titleFont, FontSize = 12, TextColor = secondaryText, IsVisible = false };
         Button MakeButton(string text, bool primary) => new Button
         {
             Text = text,
-            FontFamily = Theme.TitleFont,
+            FontFamily = titleFont,
             FontSize = 13,
-            BackgroundColor = primary ? Theme.Accent : Colors.Transparent,
-            TextColor = primary ? Colors.White : Theme.Accent,
-            BorderColor = Theme.Accent,
+            BackgroundColor = primary ? accent : Colors.Transparent,
+            TextColor = primary ? Colors.White : accent,
+            BorderColor = accent,
             BorderWidth = primary ? 0 : 1,
             CornerRadius = 12,
             Padding = new Thickness(14, 4),
@@ -284,7 +305,7 @@ internal sealed class TaskFeature : DemoFeature
                 {
                     Text = TaskStateIcon(step.State),
                     FontSize = 15,
-                    TextColor = step.State == TaskPlan.State.Done ? Theme.Success : step.State == TaskPlan.State.Running ? Theme.Accent : Theme.SecondaryText,
+                    TextColor = step.State == TaskPlan.State.Done ? success : step.State == TaskPlan.State.Running ? accent : secondaryText,
                     VerticalOptions = LayoutOptions.Start,
                     WidthRequest = 18
                 }, 0, 0);
@@ -292,19 +313,19 @@ internal sealed class TaskFeature : DemoFeature
                 text.Children.Add(new Label
                 {
                     Text = step.Text,
-                    FontFamily = Theme.BodyFont,
+                    FontFamily = bodyFont,
                     FontSize = 14,
-                    TextColor = step.State == TaskPlan.State.Skipped ? Theme.SecondaryText : Theme.PrimaryText,
+                    TextColor = step.State == TaskPlan.State.Skipped ? secondaryText : primaryText,
                     TextDecorations = step.State == TaskPlan.State.Skipped ? TextDecorations.Strikethrough : TextDecorations.None
                 });
                 if (!string.IsNullOrWhiteSpace(step.Result))
                     text.Children.Add(new Label
                     {
                         Text = step.Result,
-                        FontFamily = Theme.BodyFont,
+                        FontFamily = bodyFont,
                         FontSize = 12,
                         FontAttributes = FontAttributes.Italic,
-                        TextColor = step.State == TaskPlan.State.Failed ? Colors.IndianRed : Theme.SecondaryText,
+                        TextColor = step.State == TaskPlan.State.Failed ? Colors.IndianRed : secondaryText,
                         MaxLines = 3,
                         LineBreakMode = LineBreakMode.TailTruncation
                     });
@@ -313,19 +334,13 @@ internal sealed class TaskFeature : DemoFeature
                 if (!finished && (step.State == TaskPlan.State.Pending || (step.State == TaskPlan.State.Skipped && !running)) && !editor.IsVisible)
                 {
                     TaskPlan.Step captured = step;
-                    var skip = new Label
-                    {
-                        Text = step.State == TaskPlan.State.Skipped ? "Undo" : "Skip",
-                        FontFamily = Theme.TitleFont,
-                        FontSize = 12,
-                        TextColor = Theme.Accent,
-                        VerticalOptions = LayoutOptions.Start
-                    };
-                    skip.OnTap(() =>
+                    Label skip = ChatPage.Link(step.State == TaskPlan.State.Skipped ? "Undo" : "Skip", () =>
                     {
                         captured.State = captured.State == TaskPlan.State.Skipped ? TaskPlan.State.Pending : TaskPlan.State.Skipped;
                         Refresh();
                     });
+                    skip.FontSize = 12;
+                    skip.VerticalOptions = LayoutOptions.Start;
                     grid.Add(skip, 2, 0);
                 }
                 rows.Children.Add(grid);
@@ -373,17 +388,17 @@ internal sealed class TaskFeature : DemoFeature
         };
 
         var content = new VerticalStackLayout { Spacing = 8 };
-        content.Children.Add(new Label { Text = "\U0001F4CB  Plan", FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText });
+        content.Children.Add(new Label { Text = "\U0001F4CB  Plan", FontFamily = titleFont, FontSize = 15, TextColor = primaryText });
         content.Children.Add(rows);
-        content.Children.Add(new Label { Text = "One step per line, in the order they run.", FontFamily = Theme.BodyFont, FontSize = 11, TextColor = Theme.SecondaryText, IsVisible = false });
+        content.Children.Add(new Label { Text = "One step per line, in the order they run.", FontFamily = bodyFont, FontSize = 11, TextColor = secondaryText, IsVisible = false });
         content.Children.Add(editor);
         content.Children.Add(status);
         content.Children.Add(buttons);
         card.View = new Border
         {
-            Stroke = Theme.Chevron,
+            Stroke = ChatResources.ThemeColor("ChatRowBorder"),
             StrokeThickness = 1,
-            BackgroundColor = Theme.TileBackground,
+            BackgroundColor = ChatResources.ThemeColor("ChatSurface"),
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(14) },
             Padding = new Thickness(12, 10),
             Margin = new Thickness(6, 0),

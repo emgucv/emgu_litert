@@ -156,6 +156,15 @@ namespace Emgu.LiteRT.LM.Maui
         public virtual View RestoreSavedFile(ChatSavedFile file) => null;
 
         /// <summary>
+        /// A client to run this message through instead of the model's own (e.g. task mode's, which plans the message
+        /// and runs the steps one by one), or null. Asked once per message, after <see cref="PrepareMessageAsync"/>; the
+        /// first feature's client wins. The client is given the page's client (<see cref="IChatPageHost.ChatClient"/>) to
+        /// talk to the model.
+        /// </summary>
+        /// <param name="request">The message, as prepared</param>
+        public virtual IChatClient CreateMessageClient(ChatSendRequest request) => null;
+
+        /// <summary>
         /// The step line for a tool call of this feature's ("Searching Wikipedia for ...", shown while it runs), or null
         /// for a call that isn't its; the page asks each feature, then Emgu.LiteRT.LM.Agents' <c>AgentTools.Describe</c>.
         /// </summary>

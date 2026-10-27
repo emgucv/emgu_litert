@@ -518,7 +518,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Task mode
 
-- The Plan chip (TODO item 23; `TaskFeature.cs`, `Emgu.LiteRT.LM.Agents`' `TaskPlan`) has the model write a short numbered
+- The Plan chip (TODO item 23; the library's `TaskFeature` in `Emgu.LiteRT.LM.Maui` since phase C, 2026-10-26 - the page runs
+  the message through the client of its `CreateMessageClient`, a `ChatFeature` hook; `Emgu.LiteRT.LM.Agents`' `TaskPlan`) has the model write a short numbered
   plan (`TaskPlan.PlanPrompt`/`Parse`), shown as a checklist card the user can edit, skip steps of, and stop.
 - Each step then runs as a request of its own (`TaskModeClient`, the `IChatClient` of that one message), given only the task,
   the plan and the earlier steps' short results (`StepPrompt`). Its tool calls show as step lines (its own bubble stays

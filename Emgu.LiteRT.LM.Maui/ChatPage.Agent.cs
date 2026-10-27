@@ -67,7 +67,7 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>
         /// A request to the model failed: whether to send the message again with the options changed - a remote model
         /// may take the reasoning option out after its server rejected it (<see cref="IRemoteChatModel.ShouldResend"/>).
-        /// The view's <see cref="ChatView.DefaultSendAsync"/> asks it; a derived page's own send loop should too.
+        /// The view's <see cref="ChatView.DefaultSendAsync(ChatSendRequest, CancellationToken)"/> asks it; a derived page's own send loop should too.
         /// </summary>
         /// <param name="error">What the request threw</param>
         /// <param name="options">The message's options, changed when it returns true</param>
@@ -83,7 +83,7 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>
         /// Send a message once the model is ready (the view's <see cref="ChatView.Sender"/>): by default the view's
-        /// <see cref="ChatView.DefaultSendAsync"/> - the options from <see cref="ComposeOptionsAsync"/>, the reply streamed,
+        /// <see cref="ChatView.DefaultSendAsync(ChatSendRequest, CancellationToken)"/> - the options from <see cref="ComposeOptionsAsync"/>, the reply streamed,
         /// a rerun when a tool group asks for one - after connecting a remote model. A derived page overrides it to do
         /// more around the send (e.g. give the model document excerpts as context, or save the exchange with its own
         /// extras), on the view's cancellation token.
@@ -97,7 +97,7 @@ namespace Emgu.LiteRT.LM.Maui
             ChatSendRequest prepared = await PrepareRequestAsync(request, cancellationToken);
             foreach (string step in PendingStepLines)
                 AddCardToNextReply(StepLine(step));
-            await _chatView.DefaultSendAsync(prepared, cancellationToken);
+            await _chatView.DefaultSendAsync(prepared, cancellationToken, CreateMessageClient(prepared));
         }
 
         // The features' additions to the message being sent, and the request they were made for.
@@ -176,6 +176,24 @@ namespace Emgu.LiteRT.LM.Maui
                 reply.Decorations.Add(card);
             };
             conversation.Messages.CollectionChanged += handler;
+        }
+
+        /// <summary>
+        /// A client of a feature's to run the message through instead of the model's own (<see cref="ChatFeature.CreateMessageClient"/>;
+        /// e.g. task mode's), or null: the first feature's. A derived page's own send asks it after preparing the message.
+        /// </summary>
+        /// <param name="request">The message, as prepared</param>
+        protected IChatClient CreateMessageClient(ChatSendRequest request)
+        {
+            foreach (ChatFeature feature in _features)
+            {
+                IChatClient client;
+                try { client = feature.CreateMessageClient(request); }
+                catch (Exception) { client = null; }
+                if (client != null)
+                    return client;
+            }
+            return null;
         }
 
         /// <summary>A grey step line for above a reply, like the tool calls' ("Looked in report.pdf: pages 2 and 5").</summary>

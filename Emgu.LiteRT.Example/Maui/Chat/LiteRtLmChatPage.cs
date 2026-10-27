@@ -511,14 +511,13 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             List<DataContent> attachments = prepared.Attachments.ToList();
             var info = new UserMessageInfo { Language = await TextLanguage.DetectAsync(prompt) };
 
-            // Task mode: for this message only.
-            bool planTask = _parts.Tasks.TakePlan() && canUseTools && !HandsFree;
             ChatOptions options = await ComposeOptionsAsync(request);
             _sendingUserItem = null;
             _pendingUserInfo = info;
             _pendingDocumentStep = PendingStepLines.FirstOrDefault();
 
-            IChatClient client = planTask ? _parts.Tasks.CreateClient(prompt, attachments) : null;
+            // A feature's client for this message (task mode's, with the Plan chip on), or none.
+            IChatClient client = CreateMessageClient(prepared);
             ChatMessageItem reply = null;
             for (int attempt = 0; ; attempt++)
             {
