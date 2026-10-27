@@ -29,6 +29,12 @@ namespace Emgu.LiteRT.LM.Agents
     public static partial class AgentTools
     {
         private const int MaxResultLength = 1500;
+        // search_web: 5 results at Tavily's "advanced" depth (better passages; 2 of the free plan's 1,000 monthly credits a
+        // search instead of 1), about 500 characters each - 3 "basic" results in 1,500 characters gave a small model too
+        // little to go on.
+        private const int SearchResults = 5;
+        private const string SearchDepth = "advanced";
+        private const int MaxSearchLength = 2500;
         private const int TopArticleLength = 1100;
         private const int OtherArticleLength = 300;
 
@@ -720,8 +726,9 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         /// <summary>
-        /// search_web: searches the web with Tavily (https://tavily.com, an API key is needed; free for about 1,000
-        /// searches a month) and returns extracts of the best matching pages.
+        /// search_web: searches the web with Tavily (https://tavily.com, an API key is needed; the free plan's 1,000
+        /// credits a month are about 500 of these searches, at "advanced" depth) and returns extracts of the 5 best
+        /// matching pages.
         /// </summary>
         /// <param name="apiKey">The Tavily API key</param>
         /// <param name="http">The HttpClient to use, or null for DefaultHttpClient</param>
@@ -762,8 +769,8 @@ namespace Emgu.LiteRT.LM.Agents
             string body = WriteJson(writer =>
             {
                 writer.WriteString("query", query ?? string.Empty);
-                writer.WriteNumber("max_results", 3);
-                writer.WriteString("search_depth", "basic");
+                writer.WriteNumber("max_results", SearchResults);
+                writer.WriteString("search_depth", SearchDepth);
             });
             using (JsonDocument response = await PostTavilyAsync(http, apiKey, "search", body, cancellationToken).ConfigureAwait(false))
             {
@@ -774,7 +781,7 @@ namespace Emgu.LiteRT.LM.Agents
                 {
                     text.Append("Page: ").Append(result.GetProperty("title").GetString())
                         .Append(" (").Append(result.GetProperty("url").GetString()).Append(")\n")
-                        .Append(Shorten(result.GetProperty("content").GetString(), MaxResultLength / count)).Append("\n\n");
+                        .Append(Shorten(result.GetProperty("content").GetString(), MaxSearchLength / count)).Append("\n\n");
                 }
                 return text.Length > 0 ? text.ToString().TrimEnd() : "No results found for \"" + query + "\".";
             }

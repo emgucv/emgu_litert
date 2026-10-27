@@ -261,7 +261,9 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - `convert_currency`, and `read_web_page` (the built-in reader, or Tavily's with a key).
   - `search_wikipedia`: MediaWiki search plus intro extracts, with most of the ~1,500-character budget for the best match.
   - With a Tavily API key (kept in `SecureStorage`): `search_web` and `read_web_page` through Tavily's `/search` and
-    `/extract`.
+    `/extract`. Since 2026-10-27 a search asks for 5 results at "advanced" depth (2 credits, so the free plan's 1,000 monthly
+    credits are about 500 searches) and gives the model about 2,500 characters of them; before, 3 "basic" results in 1,500
+    characters gave Gemma 4 E2B little to go on.
   - Verified on Mac Catalyst and the iOS simulator (Wikipedia; Tavily wasn't verified - no key).
 
 ## Document questions
