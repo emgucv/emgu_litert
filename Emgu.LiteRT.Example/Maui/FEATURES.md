@@ -426,18 +426,25 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Your own server
 
-- Settings > "Your own server" (`ServerFeature`; the page's `ConnectRemoteAsync`/`CreateChatClient`/`AskModelOnceAsync` overrides) takes an OpenAI-compatible server's address ("host:port" gets
+- Settings > "Your own server" (the library's `ServerFeature`, in `Emgu.LiteRT.LM.Maui.OpenAI` since phase C, 2026-10-26; the
+  page gives it the catalog's remote option, `ChatModelOptions.ServerId`) takes an OpenAI-compatible server's address ("host:port" gets
   `http://` and `/v1`), an optional API key (kept in `SecureStorage`) and one of its models (`GET /models`). LM Studio's
   `/api/v0/models` adds the model type - embeddings are left out, `vlm` takes images - and a loaded model's context length;
-  otherwise 4096 is assumed until the first reply loads it.
+  otherwise 4096 is assumed until the first reply loads it. The feature is the option's `IRemoteChatModel`
+  (`ChatModelOption.Remote`): the library page connects through it before the first message, makes the client, drops the
+  reasoning option it rejected, writes the summaries and answers `AskModelOnceAsync` - the demo's page overrides nothing for it.
 - "Your server" in the model list (not one of the catalogue's models: it's index `Models.Length`, and saved chats record
   `Server`) chats through the same conversation, tools and compaction as Gemma 4, over `Microsoft.Extensions.AI.OpenAI`'s
   `IChatClient`. Its version 10.10.1 turns the servers' `reasoning_content` into `TextReasoningContent`, so thinking shows as
   it does for local models.
 - The Think chip is sent as `reasoning_effort` (medium or none; LM Studio honours both, `none` giving 0 reasoning tokens). A
   server whose 400 response names it gets the message again without it, and no more for that address
-  (`ServerRejectedReasoning`); the message is sent again into the same reply (`ChatConversation.RegenerateAsync`), so nothing
-  is duplicated.
+  (`ServerRejectedReasoning`, through `IRemoteChatModel.ShouldResend` - the page's `ShouldResend`, asked by `ChatView.DefaultSendAsync`'s
+  `ResendRequested` and the demo's send loop); the message is sent again into the same reply (`ChatConversation.RegenerateAsync`), so nothing
+  is duplicated. A model that doesn't take images (`llm` in LM Studio's list) has the attach button and the pending images
+  dropped (`IChatPageHost.ModelCapabilitiesChanged`). Checked on Catalyst with a mock server (the scratchpad's
+  `mock_openai_server.py`: the model list, a 400 for `reasoning_effort`, streamed replies): connect in the settings, the row
+  in the model list, a reply after the resend, a second message without the option, the chat saved under "Your own server".
 - Token counts are estimated (`ApproximateTokens`: ~3.5 ASCII characters a token). Summaries are written by the server's
   model without thinking, and allowed `SummaryMaxTokens` + 1600 tokens in case it thinks anyway: LM Studio runs Gemma 4 with
   thinking on by default, which used up 400 tokens before any summary came out.

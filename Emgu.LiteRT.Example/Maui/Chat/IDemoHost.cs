@@ -26,13 +26,6 @@ internal interface IDemoHost
     // Frees the chat model's engine (its file is being deleted); the page offers to download or load it again.
     Task ReleaseModelAsync();
 
-    // Forget the server's connection, so the next message connects again; start a new chat; list the models again
-    // (their rows changed); drop the images attached to the next message (the server's model doesn't take them).
-    void ResetRemote();
-    void StartNewChat();
-    void RefreshModelList();
-    void DropPendingImages();
-
     // Send a recording as a voice message, the reply read aloud (a hands-free chat); stop the reply being written.
     Task SendVoiceAsync(byte[] wav, TimeSpan length);
     void StopReply();

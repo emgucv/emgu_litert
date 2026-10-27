@@ -5,25 +5,42 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Emgu.LiteRT.LM.Chat;
-using Emgu.LiteRT.LM.Maui;
 using Microsoft.Extensions.AI;
 using OpenAI;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.OpenAI;
 
-// A model on a server of the user's own - LM Studio, Ollama, llama.cpp's server, vLLM... - through its
-// OpenAI-compatible API (Microsoft.Extensions.AI.OpenAI's IChatClient), in place of a model on the device: the remote
-// "Your own server" option of the model list. It chats through the same agent as Gemma 4, with the same tools (the
-// server's model must support tool calling), and the same saved chats and compaction - with the token counts
-// estimated, since there is no tokenizer on the device. Settings > "Your own server" holds the address, the key and
-// the model; the page's ConnectRemoteAsync and CreateChatClient come here.
-internal sealed class ServerFeature : DemoFeature
+/// <summary>
+/// A model on a server of the user's own - LM Studio, Ollama, llama.cpp's server, vLLM... - through its OpenAI-compatible
+/// API (Microsoft.Extensions.AI.OpenAI's client), in place of a model on the device: the remote "Your own server"
+/// option of the model list (<see cref="Option"/>, which the app adds to the page's models). It chats through the same
+/// agent as the models on the device, with the same tools (the server's model must support tool calling), and the same
+/// saved chats and compaction - with the token counts estimated, since there is no tokenizer on the device. The
+/// settings' "Your own server" takes the address (kept in the page's settings as "server_url"), the API key (in
+/// SecureStorage) and one of the server's models ("server_model"); the page reaches the server through the option's
+/// <see cref="ChatModelOption.Remote"/>, which this feature is: it connects before the first message, makes the client,
+/// drops the reasoning option a server rejected, and writes the summaries. A request that failed while the app was in
+/// the background is sent again once it is in front.
+/// </summary>
+public sealed class ServerFeature : ChatFeature, IRemoteChatModel
 {
+    /// <summary>The id of the option made when none is given.</summary>
+    public const string DefaultId = "Server";
+
+    /// <summary>The settings key of the server's address.</summary>
+    public const string UrlSettingKey = "server_url";
+
+    /// <summary>The settings key of the model chosen on the server.</summary>
+    public const string ModelSettingKey = "server_model";
+
     private const string ServerKeyStorageName = "litert_lm_chat_server_key";
 
     // Without a context length from the server, the conversation is kept within this (LM Studio's default).
     private const int DefaultServerContextTokens = 4096;
     private const int SummaryMaxTokens = 400;
+    // Room for a server that thinks anyway (LM Studio runs Gemma 4 with thinking on unless told otherwise, and it used
+    // up SummaryMaxTokens before any summary came out).
+    private const int ThinkingRoomTokens = 1600;
 
     private static readonly HttpClient ServerHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
 
@@ -44,56 +61,80 @@ internal sealed class ServerFeature : DemoFeature
     // Whether the app is in front: a server request that failed while it wasn't is sent again once it is.
     private TaskCompletionSource<bool> _foreground = CompletedForeground();
 
-    public ServerFeature(ChatModelOption option)
+    /// <summary>Create the feature, for a remote option of the app's or one of its own.</summary>
+    /// <param name="option">The remote option of the model list this feature connects (its <see cref="ChatModelOption.Remote"/> is set); null for a new "Your own server" option with the <see cref="DefaultId"/></param>
+    public ServerFeature(ChatModelOption option = null)
     {
-        Option = option ?? throw new ArgumentNullException(nameof(option));
-        _serverUrl = AppSettings.Chat.ServerUrl;
-        _serverModel = AppSettings.Chat.ServerModel;
+        if (option != null && !option.IsRemote)
+            throw new ArgumentException("The server's option must be a remote one (no model on the device)", nameof(option));
+        Option = option ?? new ChatModelOption(DefaultId, "Your own server") { CanUseTools = true, CanSummarize = true };
+        Option.Remote = this;
         UpdateOptionDetail();
     }
 
+    /// <inheritdoc/>
     public override string Name => "server";
 
+    /// <inheritdoc/>
     public override string Title => "Your own server";
 
+    /// <inheritdoc/>
     public override bool PersistEnabled => false;
 
-    // The remote option of the model list this feature connects.
+    /// <summary>The remote option of the model list this feature connects: add it to the page's models.</summary>
     public ChatModelOption Option { get; }
 
+    /// <summary>True while the server is the model chosen.</summary>
     public bool IsSelected => Host?.Model == Option;
 
-    // The server refused reasoning_effort: the message goes without it.
+    /// <summary>The server refused reasoning_effort: messages go without it.</summary>
     public bool RejectsReasoning => _serverRejectsReasoning;
 
-    // The context length of the server's model, and whether the server said (else a default).
+    /// <summary>The context length of the server's model (a default until the server says: <see cref="ContextKnown"/>).</summary>
     public int ContextTokens => _serverContextTokens;
 
+    /// <summary>True once the server said its model's context length.</summary>
     public bool ContextKnown => _serverContextKnown;
 
+    /// <summary>The model chosen on the server, or the option's name until one is.</summary>
     public string ModelLabel => string.IsNullOrEmpty(_serverModel) ? Option.DisplayName : _serverModel;
 
+    /// <summary>The server's address as set up (empty until the user adds one).</summary>
+    public string ServerUrl => _serverUrl;
+
+    /// <inheritdoc/>
     public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
 
+    /// <inheritdoc/>
     public override void OnAttached(IChatPageHost host)
     {
         base.OnAttached(host);
+        _serverUrl = host.Settings.Get(UrlSettingKey, string.Empty) ?? string.Empty;
+        _serverModel = host.Settings.Get(ModelSettingKey, string.Empty) ?? string.Empty;
+        UpdateOptionDetail();
         _ = LoadServerKeyAsync();
     }
 
+    /// <inheritdoc/>
     public override void OnAppStopped()
     {
         if (_foreground.Task.IsCompleted)
             _foreground = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
+    /// <inheritdoc/>
     public override void OnAppResumed() => _foreground.TrySetResult(true);
 
-    // LM Studio loads a model on its first request, with the context length it is set to: learn it then.
-    public override void OnReplyCompleted(ChatExchangeEventArgs e) => _ = RefreshServerContextAsync();
+    /// <inheritdoc/>
+    public override void OnReplyCompleted(ChatExchangeEventArgs e)
+    {
+        // LM Studio loads a model on its first request, with the context length it is set to: learn it then.
+        _ = RefreshServerContextAsync();
+    }
 
-    // The server's address as typed, made into the API's base address: "http://host:1234" gets "/v1".
-    private static string NormalizeServerUrl(string text)
+    /// <summary>The server's address as typed, made into the API's base address: "host:1234" gets "http://" and "/v1".</summary>
+    /// <param name="text">The address as typed</param>
+    public static string NormalizeServerUrl(string text)
     {
         string url = (text ?? string.Empty).Trim().TrimEnd('/');
         if (url.Length == 0)
@@ -105,6 +146,7 @@ internal sealed class ServerFeature : DemoFeature
         return url;
     }
 
+    /// <inheritdoc/>
     public override View BuildSettingsSection()
     {
         _serverUrlEntry = new Entry
@@ -112,44 +154,33 @@ internal sealed class ServerFeature : DemoFeature
             Text = _serverUrl,
             Placeholder = "Server address, e.g. http://192.168.1.20:1234/v1",
             Keyboard = Keyboard.Url,
-            FontFamily = Theme.BodyFont,
-            FontSize = 14,
-            TextColor = Theme.PrimaryText,
-            PlaceholderColor = Theme.SecondaryText
+            FontSize = 14
         };
         _serverKeyEntry = new Entry
         {
             Text = _serverKey,
             Placeholder = "API key (if the server needs one)",
             IsPassword = true,
-            FontFamily = Theme.BodyFont,
-            FontSize = 14,
-            TextColor = Theme.PrimaryText,
-            PlaceholderColor = Theme.SecondaryText
+            FontSize = 14
         };
         _serverUrlEntry.Completed += (s, e) => _ = ApplyServerSettingsAsync();
         _serverKeyEntry.Completed += (s, e) => _ = ApplyServerSettingsAsync();
         var connect = new Button { Text = "Connect" };
         connect.Clicked += (s, e) => _ = ApplyServerSettingsAsync(true);
-        _serverModelButton = new Button { Text = "Model: " + (string.IsNullOrEmpty(_serverModel) ? "choose after connecting" : _serverModel) };
+        _serverModelButton = new Button { Text = ModelButtonText() };
         _serverModelButton.Clicked += OnServerModelTapped;
-        _serverStatus = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText };
+        _serverStatus = new Label();
+        ChatResources.ApplyStyle(_serverStatus, "ChatSectionNoteStyle");
         return new VerticalStackLayout
         {
             Spacing = 6,
             Children =
             {
-                Theme.SectionTitle("Your own server"),
-                new Label
-                {
-                    Text = "Chat with a model on a computer of yours instead of this device: any server with an OpenAI-compatible " +
-                        "API, such as LM Studio (turn on \"Serve on Local Network\") or Ollama. Then pick \"Your own server\" in the " +
-                        "model list. Your messages, pictures and the tools' results go to that server. Tools need a model that " +
-                        "supports tool calling.",
-                    FontFamily = Theme.BodyFont,
-                    FontSize = 12,
-                    TextColor = Theme.SecondaryText
-                },
+                ChatPage.SectionTitle("Your own server"),
+                ChatPage.Note("Chat with a model on a computer of yours instead of this device: any server with an OpenAI-compatible " +
+                    "API, such as LM Studio (turn on \"Serve on Local Network\") or Ollama. Then pick \"" + Option.DisplayName + "\" in the " +
+                    "model list. Your messages, pictures and the tools' results go to that server. Tools need a model that " +
+                    "supports tool calling."),
                 _serverUrlEntry,
                 _serverKeyEntry,
                 connect,
@@ -158,6 +189,8 @@ internal sealed class ServerFeature : DemoFeature
             }
         };
     }
+
+    private string ModelButtonText() => "Model: " + (string.IsNullOrEmpty(_serverModel) ? "choose after connecting" : _serverModel);
 
     private async Task LoadServerKeyAsync()
     {
@@ -176,7 +209,7 @@ internal sealed class ServerFeature : DemoFeature
             return;
         _serverUrlEntry.Text = url;
         _serverUrl = url;
-        AppSettings.Chat.ServerUrl = url;
+        Host.Settings.Set(UrlSettingKey, url);
         if (key != _serverKey)
         {
             _serverKey = key;
@@ -212,8 +245,8 @@ internal sealed class ServerFeature : DemoFeature
     private void Reconnect()
     {
         UpdateOptionDetail();
-        Demo.ResetRemote();
-        Demo.RefreshModelList();
+        Host.ResetRemote();
+        Host.RefreshModelList();
     }
 
     // The model list's row for the server says what it is set up with.
@@ -253,16 +286,16 @@ internal sealed class ServerFeature : DemoFeature
         SetServerModel(picked);
         // A chat belongs to a model: another model starts a new chat.
         if (IsSelected)
-            Demo.StartNewChat();
+            Host.StartNewChat();
         Reconnect();
     }
 
     private void SetServerModel(string id)
     {
         _serverModel = id ?? string.Empty;
-        AppSettings.Chat.ServerModel = _serverModel;
+        Host.Settings.Set(ModelSettingKey, _serverModel);
         if (_serverModelButton != null)
-            _serverModelButton.Text = "Model: " + (string.IsNullOrEmpty(_serverModel) ? "choose after connecting" : _serverModel);
+            _serverModelButton.Text = ModelButtonText();
         UpdateOptionDetail();
     }
 
@@ -345,39 +378,41 @@ internal sealed class ServerFeature : DemoFeature
         return models;
     }
 
-    // The page's ConnectRemoteAsync: check that the server answers and has the model, and learn what the model
-    // takes. False (with the status saying why) when it can't be reached.
-    public async Task<bool> ConnectAsync(CancellationToken token)
+    // ---------- IRemoteChatModel ----------
+
+    /// <summary>
+    /// Check that the server answers and has the model, and learn what the model takes (the page's connection before
+    /// the first message).
+    /// </summary>
+    /// <param name="cancellationToken">Cancels it</param>
+    /// <returns>Null when the server is ready, else why it can't be reached</returns>
+    public async Task<string> ConnectAsync(CancellationToken cancellationToken)
     {
         string url = _serverUrl;
         if (string.IsNullOrEmpty(url))
-        {
-            Host.SetStatus("Add your server's address in Settings > Your own server, then try again.");
-            return false;
-        }
-        Host.SetStatus("Connecting to " + url + "...");
+            return "Add your server's address in Settings > Your own server, then try again.";
+        Host?.SetStatus("Connecting to " + url + "...");
         try
         {
-            List<ServerModelInfo> models = await FetchServerModelsAsync(url, _serverKey, token);
+            List<ServerModelInfo> models = await FetchServerModelsAsync(url, _serverKey, cancellationToken);
             ChooseServerModel(models);
             ApplyServerModelInfo(models.First(m => m.Id == _serverModel));
         }
         catch (Exception ex)
         {
-            if (token.IsCancellationRequested)
-                return false;
-            UiStallWatchdog.Mark("Server connection failed: " + ex.Message);
-            Host.SetStatus("Could not reach your server at " + url + ": " + ex.Message +
+            if (cancellationToken.IsCancellationRequested)
+                return "The connection was cancelled.";
+            System.Diagnostics.Debug.WriteLine("Server connection failed: " + ex.Message);
+            return "Could not reach your server at " + url + ": " + ex.Message +
                 " Check that the server is running and accepts connections from the network (LM Studio: \"Serve on Local Network\"), " +
-                "and its address in Settings > Your own server.");
-            return false;
+                "and its address in Settings > Your own server.";
         }
-        if (token.IsCancellationRequested)
-            return false;
+        if (cancellationToken.IsCancellationRequested)
+            return "The connection was cancelled.";
         if (_serverRejectsReasoningUrl != url)
             _serverRejectsReasoning = false;
-        UiStallWatchdog.Mark("Server ready: " + _serverModel + ", context " + _serverContextTokens);
-        return true;
+        System.Diagnostics.Debug.WriteLine("Server ready: " + _serverModel + ", context " + _serverContextTokens);
+        return null;
     }
 
     private void ApplyServerModelInfo(ServerModelInfo model)
@@ -386,23 +421,46 @@ internal sealed class ServerFeature : DemoFeature
         _serverContextTokens = model.ContextTokens ?? DefaultServerContextTokens;
         Option.ContextWindow = _serverContextTokens;
         Option.AcceptsImages = model.Vision ?? true;
+        // The page follows: what can be attached, the pending images a text-only model doesn't take, the context window.
         if (IsSelected)
-        {
-            if (Host.Conversation != null)
-                Host.Conversation.ContextWindow = _serverContextTokens;
-            if (!Option.AcceptsImages)
-                Demo.DropPendingImages();
-        }
+            Host.ModelCapabilitiesChanged();
     }
 
-    // A server's 400 that names the reasoning option: remember it for this server, and let the message be sent again.
+    /// <summary>
+    /// A server's 400 that names the reasoning option: remember it for this server (messages go without it from now on).
+    /// </summary>
+    /// <param name="ex">What the request threw</param>
+    /// <returns>True when it was that, so the message can be sent again without the option</returns>
     public bool ServerRejectedReasoning(ClientResultException ex)
     {
-        if (!IsSelected || _serverRejectsReasoning || ex.Status != 400
+        if (ex == null || !IsSelected || _serverRejectsReasoning || ex.Status != 400
             || ex.Message.IndexOf("reasoning", StringComparison.OrdinalIgnoreCase) < 0)
             return false;
         _serverRejectsReasoning = true;
         _serverRejectsReasoningUrl = _serverUrl;
+        return true;
+    }
+
+    /// <summary>Drops the reasoning option when the server rejected it.</summary>
+    /// <param name="options">The message's options</param>
+    public void AdjustOptions(ChatOptions options)
+    {
+        if (options != null && _serverRejectsReasoning)
+            options.Reasoning = null;
+    }
+
+    /// <summary>
+    /// The server rejected the reasoning option: the message goes again without it (<see cref="ServerRejectedReasoning"/>).
+    /// </summary>
+    /// <param name="error">What the request threw</param>
+    /// <param name="options">The message's options; the reasoning option is taken out when it returns true</param>
+    public bool ShouldResend(Exception error, ChatOptions options)
+    {
+        if (!(error is ClientResultException ex) || !ServerRejectedReasoning(ex))
+            return false;
+        System.Diagnostics.Debug.WriteLine("Server rejected reasoning_effort: " + ex.Message);
+        if (options != null)
+            options.Reasoning = null;
         return true;
     }
 
@@ -420,7 +478,7 @@ internal sealed class ServerFeature : DemoFeature
         catch (Exception) { }
     }
 
-    // The page's CreateChatClient for the server.
+    /// <summary>The client for the server's model (the page adds function invocation).</summary>
     public IChatClient CreateChatClient()
     {
         var client = new OpenAIClient(new ApiKeyCredential(string.IsNullOrEmpty(_serverKey) ? "none" : _serverKey),
@@ -489,30 +547,35 @@ internal sealed class ServerFeature : DemoFeature
         }
     }
 
-    // The conversation's summary options for the server: without thinking, and with room for a server that thinks
-    // anyway (LM Studio runs Gemma 4 with thinking on unless told otherwise, and it used up SummaryMaxTokens before
-    // any summary came out).
+    /// <summary>
+    /// The conversation's summary options for the server: without thinking, and with room for a server that thinks anyway.
+    /// </summary>
     public ChatOptions SummaryOptions => new ChatOptions
     {
-        MaxOutputTokens = SummaryMaxTokens + 1600,
+        MaxOutputTokens = SummaryMaxTokens + ThinkingRoomTokens,
         Reasoning = _serverRejectsReasoning ? null : new ReasoningOptions { Effort = ReasoningEffort.None }
     };
 
-    // Summarize with the server's model, without thinking (the page's AskModelOnceAsync for the server).
-    public async Task<string> AskOnceAsync(string prompt)
+    /// <summary>One question to the server's model in a request of its own, without thinking; its answer.</summary>
+    /// <param name="prompt">The question</param>
+    /// <param name="maxTokens">The longest answer (the request allows room for a server that thinks anyway); 0 for the summaries' size</param>
+    /// <param name="cancellationToken">Cancels it</param>
+    public async Task<string> AskOnceAsync(string prompt, int maxTokens, CancellationToken cancellationToken)
     {
         using IChatClient client = CreateChatClient();
         ChatOptions options = SummaryOptions;
+        if (maxTokens > 0)
+            options.MaxOutputTokens = maxTokens + ThinkingRoomTokens;
         ChatResponse response;
-        try { response = await client.GetResponseAsync(prompt, options); }
+        try { response = await client.GetResponseAsync(prompt, options, cancellationToken); }
         catch (ClientResultException ex) when (ServerRejectedReasoning(ex))
         {
             options.Reasoning = null;
-            response = await client.GetResponseAsync(prompt, options);
+            response = await client.GetResponseAsync(prompt, options, cancellationToken);
         }
         string text = new Emgu.LiteRT.LM.Models.ChatReply(response.Text ?? string.Empty).Text.Trim();
         if (text.Length == 0)
-            throw new Exception("The summary is empty");
+            throw new Exception("The answer is empty");
         return text;
     }
 }

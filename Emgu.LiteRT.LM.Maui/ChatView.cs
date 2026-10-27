@@ -280,6 +280,13 @@ namespace Emgu.LiteRT.LM.Maui
         public Func<bool> RerunRequested { get; set; }
 
         /// <summary>
+        /// Asked when a request threw, with what it threw and the message's options: true to send the message again into
+        /// the same reply with the options as the call left them (e.g. a server rejected the reasoning option, so it
+        /// goes without). Once per message; the error is thrown on when it answers false. Or null.
+        /// </summary>
+        public Func<Exception, ChatOptions, bool> ResendRequested { get; set; }
+
+        /// <summary>
         /// Sends a message once the model is ready, instead of <see cref="DefaultSendAsync"/>: for an app whose sending
         /// does more (context from documents, saving the exchange with its extras...). The view has already cleared the
         /// message box, stopped the speaker and started the Stop button, whose token it passes. Or null.
@@ -705,7 +712,22 @@ namespace Emgu.LiteRT.LM.Maui
             ChatOptions options = await MakeOptionsAsync(request);
             ChatMessageItem reply;
             using (StatusUntilFirstText(conversation))
-                reply = await conversation.SendAsync(request.Text, request.Attachments, options, request.Context, cancellationToken);
+            {
+                try
+                {
+                    reply = await conversation.SendAsync(request.Text, request.Attachments, options, request.Context, cancellationToken);
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException) && !cancellationToken.IsCancellationRequested
+                    && ResendRequested?.Invoke(ex, options) == true)
+                {
+                    // The request was refused for something in its options (a server that doesn't take reasoning_effort):
+                    // the same message again into the same reply, with the options changed.
+                    reply = conversation.Messages.LastOrDefault(m => m.Role == ChatMessageRole.Assistant);
+                    reply = reply == null
+                        ? await conversation.SendAsync(request.Text, request.Attachments, options, request.Context, cancellationToken)
+                        : await conversation.RegenerateAsync(reply, options, cancellationToken);
+                }
+            }
             // A tool group's stub ended the request: the message goes again, with the group's tools from the start.
             for (int rerun = 0; rerun < 2 && !cancellationToken.IsCancellationRequested && RerunRequested?.Invoke() == true; rerun++)
             {

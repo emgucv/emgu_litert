@@ -58,6 +58,22 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>Load the model again (e.g. after a thread count change); the chat goes on.</summary>
         Task<bool> ReloadModelAsync();
 
+        /// <summary>Forget a remote model's connection, so the next message connects again (its settings changed).</summary>
+        void ResetRemote();
+
+        /// <summary>
+        /// The chosen model's abilities changed (a remote model's, learned after connecting: <see cref="ChatModelOption.AcceptsImages"/>,
+        /// <see cref="ChatModelOption.ContextWindow"/>): what can be attached follows, attachments it doesn't take are
+        /// dropped from the next message, and the conversation's context window is set.
+        /// </summary>
+        void ModelCapabilitiesChanged();
+
+        /// <summary>List the models again (their rows changed: a remote model's detail, a model's file deleted).</summary>
+        void RefreshModelList();
+
+        /// <summary>Start a new chat (the model's conversation anew; nothing while a reply is being written).</summary>
+        void StartNewChat();
+
         /// <summary>The conversation shown (a new one for each new chat or model).</summary>
         ChatConversation Conversation { get; }
 

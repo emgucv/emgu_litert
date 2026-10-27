@@ -191,7 +191,7 @@ internal sealed class StorageFeature : DemoFeature
             UpdateSearchStorageState();
             photos.UpdateStatus();
             Host.Services.Get<ImageFeature>()?.UpdateStatus();
-            Demo.RefreshModelList();
+            Host.RefreshModelList();
             if (PageVisible) { chats.StartIndexing(); photos.StartIndexing(); }
         }
         return reopen;

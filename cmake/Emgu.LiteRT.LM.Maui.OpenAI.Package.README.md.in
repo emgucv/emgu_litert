@@ -1,0 +1,20 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Maui.OpenAI.dll`: `ServerFeature`, a feature of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `ChatPage` for a model on a server of the user's own - LM Studio, Ollama, llama.cpp's server, vLLM, or any server with an OpenAI-compatible API - in place of a model on the device. It is the remote "Your own server" option of the page's model list (`ServerFeature.Option`, a `ChatModelOption` the app adds to its models), chatting through the same agent, with the same tools (the server's model must support tool calling), saved chats and compaction, over `Microsoft.Extensions.AI.OpenAI`'s client. Its settings section takes the server's address ("host:port" gets `http://` and `/v1`), an optional API key kept in secure storage, and one of the server's models (`GET /models`; LM Studio's own API also says which models take images and a loaded model's context length). The Think chip goes as `reasoning_effort`; a server that rejects it gets the message again without it. A request that failed while the app was in the background is sent again once it is in front.
+
+It is kept out of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}` so that package doesn't depend on the OpenAI SDK.
+
+## Adding it to a chat page
+
+```csharp
+using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.OpenAI;
+
+var server = new ServerFeature();
+options.Models.Add(server.Option);
+options.Features.Add(server);
+```
+
+The user adds the server's address in the settings and picks "Your own server" in the model list. Messages, pictures and the tools' results go to that server, so the section says so.

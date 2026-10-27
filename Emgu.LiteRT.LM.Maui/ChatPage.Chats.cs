@@ -76,6 +76,8 @@ namespace Emgu.LiteRT.LM.Maui
             // The instructions and the core tools that come with every message, roughly.
             conversation.OverheadTokens = option?.CanUseTools == true ? 900 : 50;
             conversation.DescribeToolCall = DescribeToolCall;
+            // A remote model's summaries may need options of their own (its server may think anyway).
+            conversation.SummaryOptions = option?.Remote?.SummaryOptions;
         }
 
         /// <summary>

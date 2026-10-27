@@ -43,6 +43,14 @@ namespace Emgu.LiteRT.LM.Maui
 
         Task<bool> IChatPageHost.ReloadModelAsync() => ReloadModelAsync();
 
+        void IChatPageHost.ResetRemote() => ResetRemote();
+
+        void IChatPageHost.ModelCapabilitiesChanged() => ApplyModelCapabilities();
+
+        void IChatPageHost.RefreshModelList() => RefreshModelList();
+
+        void IChatPageHost.StartNewChat() => StartNewChat();
+
         // ---------- IChatOverlays ----------
 
         /// <summary>Raised when the chat area's size changes (<see cref="IChatOverlays.ChatSizeChanged"/>).</summary>

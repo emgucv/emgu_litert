@@ -30,26 +30,56 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>
         /// The client that talks to a model, before the page adds function invocation and <see cref="ChatPageOptions.ConfigureClient"/>:
-        /// LiteRT-LM's for a model on the device. A derived page overrides it for a remote model (a server's client).
+        /// LiteRT-LM's for a model on the device, the <see cref="ChatModelOption.Remote"/>'s for a remote model. A derived
+        /// page overrides it for a remote model without one.
         /// </summary>
         /// <param name="option">The model chosen</param>
         /// <param name="model">Its instance on the device, or null for a remote model</param>
         protected virtual IChatClient CreateChatClient(ChatModelOption option, LanguageModel model)
         {
+            if (option?.Remote != null)
+                return option.Remote.CreateChatClient();
             if (model == null)
                 throw new InvalidOperationException(option?.IsRemote == true
-                    ? "A remote model needs a client: override CreateChatClient."
+                    ? "A remote model needs a client: set the option's Remote, or override CreateChatClient."
                     : "The model isn't loaded.");
             return new LiteRtLmChatClient(model) { EnableContextManagement = true };
         }
 
         /// <summary>
-        /// Connect to a remote model before its first message (nothing to do by default): a derived page overrides it to
-        /// reach the server, and returns false (with a status) when it can't.
+        /// Connect to a remote model before its first message: the <see cref="ChatModelOption.Remote"/>'s
+        /// <see cref="IRemoteChatModel.ConnectAsync"/>, its problem shown as the status; nothing to do without one. A
+        /// derived page overrides it to reach a server of its own, and returns false (with a status) when it can't.
         /// </summary>
         /// <param name="option">The remote model</param>
         /// <param name="cancellationToken">Cancels it</param>
-        protected virtual Task<bool> ConnectRemoteAsync(ChatModelOption option, CancellationToken cancellationToken) => Task.FromResult(true);
+        protected virtual async Task<bool> ConnectRemoteAsync(ChatModelOption option, CancellationToken cancellationToken)
+        {
+            if (option?.Remote == null)
+                return true;
+            string problem = await option.Remote.ConnectAsync(cancellationToken);
+            if (problem == null)
+                return true;
+            SetStatus(problem);
+            return false;
+        }
+
+        /// <summary>
+        /// A request to the model failed: whether to send the message again with the options changed - a remote model
+        /// may take the reasoning option out after its server rejected it (<see cref="IRemoteChatModel.ShouldResend"/>).
+        /// The view's <see cref="ChatView.DefaultSendAsync"/> asks it; a derived page's own send loop should too.
+        /// </summary>
+        /// <param name="error">What the request threw</param>
+        /// <param name="options">The message's options, changed when it returns true</param>
+        /// <returns>True to send the message again into the same reply</returns>
+        protected bool ShouldResend(Exception error, ChatOptions options)
+        {
+            IRemoteChatModel remote = _model?.Remote;
+            if (remote == null || error == null || options == null)
+                return false;
+            try { return remote.ShouldResend(error, options); }
+            catch (Exception) { return false; }
+        }
 
         /// <summary>
         /// Send a message once the model is ready (the view's <see cref="ChatView.Sender"/>): by default the view's
@@ -232,15 +262,22 @@ namespace Emgu.LiteRT.LM.Maui
                 options.Tools = _lastComposition.Tools;
                 options.ToolMode = ChatToolMode.Auto;
             }
+            // What a remote model doesn't take (e.g. the reasoning option its server rejected) goes.
+            _model?.Remote?.AdjustOptions(options);
             return options;
         }
 
-        /// <summary>One question to the model in a request of its own (not part of the conversation); its answer.</summary>
+        /// <summary>
+        /// One question to the model in a request of its own (not part of the conversation); its answer. A remote model
+        /// answers through its <see cref="ChatModelOption.Remote"/>.
+        /// </summary>
         /// <param name="prompt">The question</param>
         /// <param name="maxTokens">The longest answer</param>
         /// <param name="cancellationToken">Cancels it</param>
         public virtual async Task<string> AskModelOnceAsync(string prompt, int maxTokens, CancellationToken cancellationToken = default)
         {
+            if (_model?.Remote != null)
+                return await _model.Remote.AskOnceAsync(prompt, maxTokens, cancellationToken);
             ChatResponse response = await _client.GetResponseAsync(new[] { new AIChatMessage(ChatRole.User, prompt) },
                 new ChatOptions { MaxOutputTokens = maxTokens, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } }, cancellationToken);
             return new ChatReply(response.Text ?? string.Empty).Text.Trim();

@@ -98,10 +98,12 @@ public static class PictureGallery
     });
 #endif
 
-    /// <summary>Add the picture; returns a short description of where it went. Call on the UI thread.</summary>
     private static string ImageMediaType(string fileName) =>
         fileName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ? "image/jpeg" : "image/png";
 
+    /// <summary>Add the picture to the gallery; returns a short description of where it went. Call on the UI thread.</summary>
+    /// <param name="png">The picture's bytes (PNG, or JPEG by the file name)</param>
+    /// <param name="fileName">The file name it is saved under</param>
     public static async Task<string> SaveAsync(byte[] png, string fileName)
     {
 #if ANDROID

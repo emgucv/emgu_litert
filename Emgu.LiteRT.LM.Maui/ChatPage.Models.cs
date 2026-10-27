@@ -5,6 +5,7 @@
 using Emgu.LiteRT.LM;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.Util;
+using Microsoft.Extensions.AI;
 using LanguageModel = Emgu.LiteRT.LM.Models.LanguageModel;
 using ModelLoadStage = Emgu.LiteRT.LM.Models.ModelLoadStage;
 
@@ -112,9 +113,7 @@ namespace Emgu.LiteRT.LM.Maui
             // A new conversation for the model (OnConversationChanged) and its load card; a remote model's conversation
             // runs over the client alone.
             _chatView.Model = _modelInstance;
-            _chatView.AttachmentKinds = option.IsRemote
-                ? (option.AcceptsImages ? ChatAttachmentKinds.Image : ChatAttachmentKinds.None) | (option.AcceptsAudio ? ChatAttachmentKinds.Audio : ChatAttachmentKinds.None)
-                : (ChatAttachmentKinds?)null;
+            ApplyModelCapabilities();
             if (previous != null)
                 _ = Task.Run(() => previous.Dispose());
             UpdateModelButton();
@@ -294,6 +293,36 @@ namespace Emgu.LiteRT.LM.Maui
             if (bytes >= 1L << 30)
                 return string.Format("{0:0.0} GB", bytes / (double)(1L << 30));
             return string.Format("{0:0} MB", bytes / (double)(1L << 20));
+        }
+
+        /// <summary>
+        /// Apply what the chosen model takes: for a remote model, the attachment kinds from the option (a model on the
+        /// device says itself), dropping the pending attachments it doesn't take, and the conversation's context
+        /// window from the option. Called when the model is chosen and when a remote model's abilities are learned
+        /// (<see cref="IChatPageHost.ModelCapabilitiesChanged"/>).
+        /// </summary>
+        protected void ApplyModelCapabilities()
+        {
+            ChatModelOption option = _model;
+            if (option == null || _chatView == null)
+                return;
+            if (!option.IsRemote)
+            {
+                _chatView.AttachmentKinds = null;
+                return;
+            }
+            ChatAttachmentKinds kinds = (option.AcceptsImages ? ChatAttachmentKinds.Image : ChatAttachmentKinds.None)
+                | (option.AcceptsAudio ? ChatAttachmentKinds.Audio : ChatAttachmentKinds.None);
+            _chatView.AttachmentKinds = kinds;
+            foreach (DataContent attachment in _chatView.PendingAttachments.ToList())
+            {
+                bool image = attachment.MediaType != null && attachment.MediaType.StartsWith("image/", StringComparison.Ordinal);
+                bool audio = attachment.MediaType != null && attachment.MediaType.StartsWith("audio/", StringComparison.Ordinal);
+                if ((image && !kinds.HasFlag(ChatAttachmentKinds.Image)) || (audio && !kinds.HasFlag(ChatAttachmentKinds.Audio)))
+                    _chatView.PendingAttachments.Remove(attachment);
+            }
+            if (Conversation != null && option.ContextWindow > 0)
+                Conversation.ContextWindow = option.ContextWindow;
         }
 
         /// <summary>List the models again (a row's detail changed, e.g. a server's address).</summary>

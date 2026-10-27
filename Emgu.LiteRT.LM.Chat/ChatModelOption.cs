@@ -63,6 +63,13 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>True for a remote model (a server's): nothing is loaded on the device.</summary>
         public bool IsRemote => Create == null;
 
+        /// <summary>
+        /// How a chat page reaches a remote model (<see cref="IsRemote"/>): its connection, client, summaries and
+        /// one-off questions. Set by whatever offers the model (e.g. a server feature); null for a model on the device,
+        /// or for a remote model whose page supplies the client itself.
+        /// </summary>
+        public IRemoteChatModel Remote { get; set; }
+
         /// <summary>A line about the model for the model list ("~2.6 GB download. Understands images..."), or null.</summary>
         public string Detail { get; set; }
 

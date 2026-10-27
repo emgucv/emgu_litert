@@ -9,6 +9,7 @@ using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.LM.Maui.Documents;
 using Emgu.LiteRT.LM.Maui.Mcp;
+using Emgu.LiteRT.LM.Maui.OpenAI;
 using Emgu.LiteRT.LM.Maui.CV;
 using Emgu.LiteRT.LM.Agents.CV;
 using Emgu.LiteRT.LM.Maui.Features;
@@ -195,8 +196,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 
     private SearchEmbedder Embedder => _parts.ModelSettings.Embedder;
 
-    private bool ServerSelected => SelectedModel == _parts.ServerOption;
-
     // ---------- IDemoHost ----------
 
     ChatStore IDemoHost.Store => SharedStore;
@@ -219,18 +218,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     }
 
     Task IDemoHost.ReleaseModelAsync() => UnloadModelAsync();
-
-    void IDemoHost.ResetRemote() => ResetRemote();
-
-    void IDemoHost.StartNewChat() => StartNewChat();
-
-    void IDemoHost.RefreshModelList() => RefreshModelList();
-
-    void IDemoHost.DropPendingImages()
-    {
-        foreach (DataContent image in Chat.PendingAttachments.Where(a => a.MediaType != null && a.MediaType.StartsWith("image/", StringComparison.Ordinal)).ToList())
-            Chat.PendingAttachments.Remove(image);
-    }
 
     // A hands-free chat's recording: sent as a voice message, with the reply read aloud whatever the setting.
     async Task IDemoHost.SendVoiceAsync(byte[] wav, TimeSpan length)
@@ -457,14 +444,13 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         }
     }
 
-    // The conversation's settings for the selected model: what the instructions and the tool groups in use take, the
-    // summary's size, and a server's summary options (its model may think anyway, which used up the summary's tokens).
+    // The conversation's settings for the selected model: what the instructions and the tool groups in use take, and the
+    // summary's size (the base gives a server its own summary options).
     protected override void ConfigureConversation(ChatConversation conversation, ChatModelOption option, LanguageModel model)
     {
         base.ConfigureConversation(conversation, option, model);
         conversation.OverheadTokens = option?.CanUseTools == true ? 900 + GroupTokens(Skills.Router.Active) : 50;
         conversation.SummaryMaxTokens = SummaryMaxTokens;
-        conversation.SummaryOptions = option == _parts.ServerOption ? _parts.Server.SummaryOptions : null;
     }
 
     // The groups in use, for the context estimate before a send (LiteRtLmChatClient counts the real size): the camera
@@ -473,33 +459,19 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         name == ChatCamera.GroupName ? 1100 : name == ChatToolGroups.DeviceActions || name == ChatToolGroups.Goals ? 500
         : name.StartsWith("mcp_", StringComparison.Ordinal) ? 400 : name == ChatCamera.SoundGroupName ? 600 : 200);
 
-    // ---------- The model and the server ----------
+    // ---------- The model ----------
 
+    // The model on the device, with the watchdog told about its context management (the base makes a server's client).
     protected override IChatClient CreateChatClient(ChatModelOption option, LanguageModel model)
     {
-        if (option == _parts.ServerOption)
-            return _parts.Server.CreateChatClient();
+        if (option?.Remote != null)
+            return base.CreateChatClient(option, model);
         var client = new LiteRtLmChatClient(model) { EnableContextManagement = true };
         client.ContextChanged += info => UiStallWatchdog.Mark("Context: " + info);
         return client;
     }
 
-    protected override Task<bool> ConnectRemoteAsync(ChatModelOption option, CancellationToken cancellationToken) =>
-        option == _parts.ServerOption ? _parts.Server.ConnectAsync(cancellationToken) : Task.FromResult(true);
-
-    public override Task<string> AskModelOnceAsync(string prompt, int maxTokens, CancellationToken cancellationToken = default) =>
-        ServerSelected ? _parts.Server.AskOnceAsync(prompt) : base.AskModelOnceAsync(prompt, maxTokens, cancellationToken);
-
     // ---------- Sending ----------
-
-    // Thinking goes to a server as reasoning_effort, unless it rejected that - then its model thinks as the server is set up to.
-    protected override async Task<ChatOptions> ComposeOptionsAsync(ChatSendRequest request)
-    {
-        ChatOptions options = await base.ComposeOptionsAsync(request);
-        if (ServerSelected && _parts.Server.RejectsReasoning)
-            options.Reasoning = null;
-        return options;
-    }
 
     // Given to the model before a message: image references for the tools, then document excerpts; null for none.
     private static string JoinContext(string imageReferences, string document)
@@ -555,12 +527,11 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                         ? await conversation.SendAsync(prompt, attachments, options, prepared.Context, cancellationToken, client)
                         : await conversation.RegenerateAsync(reply, options, cancellationToken, client);
                 }
-                catch (System.ClientModel.ClientResultException ex) when (attempt == 0 && _parts.Server.ServerRejectedReasoning(ex))
+                catch (Exception ex) when (attempt == 0 && !(ex is OperationCanceledException) && ShouldResend(ex, options))
                 {
-                    // The server doesn't take reasoning_effort: send it again without.
-                    UiStallWatchdog.Mark("Server rejected reasoning_effort: " + ex.Message);
+                    // The server doesn't take reasoning_effort: send it again without (ShouldResend took it out).
+                    UiStallWatchdog.Mark("Request refused, sending it again: " + ex.Message);
                     reply = conversation.Messages.LastOrDefault(m => m.Role == ChatMessageRole.Assistant);
-                    options.Reasoning = null;
                     continue;
                 }
                 if (attempt < 2 && reply.State == ChatMessageState.Done && Skills.TakeRerun() && !cancellationToken.IsCancellationRequested)
