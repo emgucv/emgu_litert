@@ -358,6 +358,11 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     `ExifInterface` (Android's own `android.media.ExifInterface` returned an empty LensModel) for GPS (which needs
     `ACCESS_MEDIA_LOCATION`, asked for separately and optional, and `MediaStore.SetRequireOriginal`), the camera, the capture
     date (MediaStore's `datetaken` was the file's date for copied photos) and selfies (a LensModel naming the front camera).
+    While the locations can't be read, Settings > Search my photos shows a note and "Allow photo locations…"
+    (`PhotoLibrary.RequestLocationsAsync`: the permission request, or the app's settings page when Android answers at once
+    without asking). On the Pixel Fold (API 37, photo access allowed) Android granted it at once, without a dialog. Once
+    the locations can be read, the next pass reads every photo's details again with its embedding kept (the
+    "photo_locations_indexed" setting records what the index was built with), so the places appear without re-embedding.
   - iOS and Mac Catalyst: PhotoKit's location, size, favourite flag and subtypes (`Screenshot`, `PhotoPanorama`,
     `PhotoDepthEffect`), the Selfies smart album, and the camera from the image data's `{TIFF}` properties.
   - Windows: `StorageFile`'s image properties (untested).

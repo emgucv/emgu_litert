@@ -82,6 +82,48 @@ internal static class PhotoLibrary
 #endif
     }
 
+    /// <summary>
+    /// Whether the photos' locations can be read: on Android 10+ only with ACCESS_MEDIA_LOCATION (without it Android
+    /// strips the GPS position from the photos it hands out); always elsewhere.
+    /// </summary>
+    public static bool CanReadLocations
+    {
+        get
+        {
+#if ANDROID
+            return !OperatingSystem.IsAndroidVersionAtLeast(29) || HasMediaLocation();
+#else
+            return true;
+#endif
+        }
+    }
+
+    /// <summary>
+    /// Ask for the photos' locations (Android: ACCESS_MEDIA_LOCATION, with the system's dialog). When Android shows no
+    /// dialog - the user said no before - the app's settings page opens instead, where the permission can be allowed.
+    /// Call on the UI thread.
+    /// </summary>
+    /// <returns>True when the locations can be read now</returns>
+    public static async Task<bool> RequestLocationsAsync()
+    {
+#if ANDROID
+        if (CanReadLocations)
+            return true;
+        var asked = System.Diagnostics.Stopwatch.StartNew();
+        try { await Permissions.RequestAsync<MediaLocationPermission>(); }
+        catch (Exception) { }
+        if (CanReadLocations)
+            return true;
+        // An answer within half a second came without a dialog: Android won't ask again, so the settings page it is.
+        if (asked.ElapsedMilliseconds < 500)
+            AppInfo.Current.ShowSettingsUI();
+        return false;
+#else
+        await Task.CompletedTask;
+        return true;
+#endif
+    }
+
 #if ANDROID
     // READ_MEDIA_IMAGES on Android 13+, READ_EXTERNAL_STORAGE before (MAUI's Permissions.Photos also asks for videos).
     private sealed class ReadPhotosPermission : Permissions.BasePlatformPermission

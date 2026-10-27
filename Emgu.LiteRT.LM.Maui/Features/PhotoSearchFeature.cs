@@ -31,6 +31,9 @@ namespace Emgu.LiteRT.LM.Maui.Features
         /// <summary>The "Index photos only while charging" settings key.</summary>
         public const string ChargingSettingKey = "photos_only_charging";
 
+        /// <summary>Whether the index was last built with the photos' locations readable (Android: ACCESS_MEDIA_LOCATION); once they are, their details are read again.</summary>
+        public const string LocationsIndexedKey = "photo_locations_indexed";
+
         private readonly IPhotoIndexStore _store;
         private readonly SearchServices _search;
         private bool _visible;
@@ -49,9 +52,12 @@ namespace Emgu.LiteRT.LM.Maui.Features
     public int MaxIndexedPhotos { get; set; } = DeviceInfo.Idiom == DeviceIdiom.Desktop ? 1000 : 200;
 
     private string _photoPauseReason;
+    // Why the last indexing pass stopped (an error), shown with the count until the next pass starts.
+    private string _photoError;
     private PhotoIndex _photoIndex;
     private Switch _photoSwitch;
     private Label _photoStatus;
+    private View _locationsRow;
     private CancellationTokenSource _photoIndexing;
     private Task _photoIndexTask;
     private bool _started;
@@ -113,8 +119,24 @@ namespace Emgu.LiteRT.LM.Maui.Features
         else
         {
             _started = true;
+            // The saved index first (a database read), so the settings show its count while a pass waits for the
+            // device and the search model.
+            _ = LoadIndexAsync();
             StartIndexing();
         }
+    }
+
+    private async Task LoadIndexAsync()
+    {
+        try
+        {
+            await _photoIndex.EnsureLoadedAsync();
+        }
+        catch (Exception ex)
+        {
+            _photoError = "the saved index couldn't be read: " + ex.Message;
+        }
+        MainThread.BeginInvokeOnMainThread(UpdateStatus);
     }
 
     /// <inheritdoc/>
@@ -126,8 +148,24 @@ namespace Emgu.LiteRT.LM.Maui.Features
     /// <inheritdoc/>
     public override void OnAppResumed()
     {
-        if (_visible)
+        // Back from the app's settings page: the photo locations may be allowed now.
+        UpdateLocationsRow();
+        if (_visible && LocationsNewlyReadable)
+            RestartIndexing();
+        else if (_visible)
             RefreshIndex();
+    }
+
+    // The photos' locations can be read, but the index was built without them: its details are read again.
+    private bool LocationsNewlyReadable => PhotoLibrary.CanReadLocations
+        && !Host.Settings.Get(LocationsIndexedKey, DeviceInfo.Platform != DevicePlatform.Android);
+
+    // Stop the pass going on (if any) and start one now, e.g. to add the places once the locations can be read.
+    private async void RestartIndexing()
+    {
+        CancelIndexing();
+        await WaitForIndexingAsync();
+        StartIndexing();
     }
 
     /// <inheritdoc/>
@@ -177,6 +215,21 @@ namespace Emgu.LiteRT.LM.Maui.Features
         charging.IsVisible = DeviceInfo.Platform == DevicePlatform.Android || DeviceInfo.Platform == DevicePlatform.iOS;
         section.Children.Add(charging);
         section.Children.Add(ChatPage.Note("On phones and tablets, indexing pauses at 20% battery or lower without power. It also pauses if the device reports excessive heat, and resumes automatically when conditions improve."));
+        // Android hides where the photos were taken until the app may read their locations: a way to allow it.
+        var allowLocations = new Button { Text = "Allow photo locations…", HorizontalOptions = LayoutOptions.Start };
+        SemanticProperties.SetDescription(allowLocations, "Allow the app to read where your photos were taken");
+        allowLocations.Clicked += async (_, _) => await AllowLocationsAsync();
+        _locationsRow = new VerticalStackLayout
+        {
+            Spacing = 4,
+            Children =
+            {
+                ChatPage.Note("Android hides where your photos were taken until you allow photo locations, so searches by place (\"photos from Paris\") find nothing. If no question appears, the app's settings page opens: allow access to media location under its permissions, then come back."),
+                allowLocations
+            }
+        };
+        section.Children.Add(_locationsRow);
+        UpdateLocationsRow();
         section.Children.Add(_photoStatus);
         UpdateStatus();
         return section;
@@ -216,6 +269,28 @@ namespace Emgu.LiteRT.LM.Maui.Features
         }
     }
 
+    // The note and button for the photo locations: while the search is on and they can't be read.
+    private void UpdateLocationsRow()
+    {
+        if (_locationsRow != null)
+            _locationsRow.IsVisible = On && !PhotoLibrary.CanReadLocations;
+    }
+
+    private async Task AllowLocationsAsync()
+    {
+        bool allowed;
+        try { allowed = await PhotoLibrary.RequestLocationsAsync(); }
+        catch (Exception ex)
+        {
+            Host.SetStatus("Could not ask for photo locations: " + ex.Message);
+            return;
+        }
+        UpdateLocationsRow();
+        // Allowed in the dialog: the places are added now (from the settings page, when the app comes back).
+        if (allowed && LocationsNewlyReadable)
+            RestartIndexing();
+    }
+
     private void ShowPhotoAccessError(string message)
     {
         _photoStatus.Text = message;
@@ -240,6 +315,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
         if (Host == null || Host.IsPrivate || Host.IsReloadingModel || !_search.SupportsImages || !On || _search.Embedder == null || (_photoIndexTask != null && !_photoIndexTask.IsCompleted))
             return;
         _photoIndexStarted = DateTime.UtcNow;
+        _photoError = null;
         _photoIndexing = new CancellationTokenSource();
         CancellationToken cancel = _photoIndexing.Token;
         _photoIndexTask = IndexPhotosAsync(cancel);
@@ -256,23 +332,24 @@ namespace Emgu.LiteRT.LM.Maui.Features
                 _photoStatus.Text = text;
             });
             await WaitForPhotoWorkAsync(cancel);
+            bool locations = PhotoLibrary.CanReadLocations;
+            bool refreshDetails = LocationsNewlyReadable;
             var embedder = await Embedder.EnsureAsync(stage, cancel);
             // Waits while the chat answers, so indexing doesn't slow the reply down.
             await _photoIndex.IndexAsync(embedder, (image, token) => _search.Workload.RunEmbeddingAsync(Embedder,
                 () => embedder.EmbedImage(image, visionTokensPerImage: PhotoIndex.VisionTokens),
                 reason => MainThread.BeginInvokeOnMainThread(() => { _photoPauseReason = reason; UpdateStatus(); }),
-                token, _onlyWhileCharging), MaxIndexedPhotos, () => Host.IsReplying, cancel, WaitForPhotoWorkAsync);
+                token, _onlyWhileCharging), MaxIndexedPhotos, () => Host.IsReplying, cancel, WaitForPhotoWorkAsync, refreshDetails);
+            // The index now has the details as they can be read (with or without the locations).
+            await MainThread.InvokeOnMainThreadAsync(() => Host.Settings.Set(LocationsIndexedKey, locations));
         }
         catch (OperationCanceledException)
         {
         }
         catch (Exception ex)
         {
-            if (_photoStatus != null)
-            {
-                _photoStatus.IsVisible = true;
-                _photoStatus.Text = "Indexing stopped: " + ex.Message;
-            }
+            // Kept with the count (UpdateStatus below used to replace it at once, so a failure read "0 photos indexed").
+            _photoError = ex.Message;
         }
         UpdateStatus();
     }
@@ -283,6 +360,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
     /// <summary>Show the index's state in the settings (how many photos, paused and why).</summary>
     public void UpdateStatus()
     {
+        UpdateLocationsRow();
         if (_photoStatus == null)
             return;
         if (!On)
@@ -291,6 +369,12 @@ namespace Emgu.LiteRT.LM.Maui.Features
             return;
         }
         _photoStatus.IsVisible = true;
+        if (_photoError != null && !_photoIndex.IsIndexing)
+        {
+            _photoStatus.Text = string.Format(CultureInfo.InvariantCulture, "Indexing stopped: {0}. {1} photos indexed, {2} with a place.",
+                _photoError.TrimEnd('.'), _photoIndex.Count, _photoIndex.WithPlaceCount);
+            return;
+        }
         if (_photoPauseReason != null)
         {
             _photoStatus.Text = $"Photo indexing paused: {_photoPauseReason}. {_photoIndex.Count} photos indexed.";

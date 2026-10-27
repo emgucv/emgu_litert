@@ -115,6 +115,9 @@ internal sealed class PhotoIndex
         return _places;
     }
 
+    /// <summary>Read the saved index (once), so <see cref="Count"/> is right before any indexing pass - which first waits for the device and the search model.</summary>
+    public Task EnsureLoadedAsync() => LoadAsync();
+
     private async Task LoadAsync()
     {
         if (_loaded)
@@ -160,15 +163,17 @@ internal sealed class PhotoIndex
     /// <param name="waitWhile">Indexing pauses while this is true (e.g. while the chat is answering)</param>
     /// <param name="cancellationToken">Stops the indexing</param>
     /// <param name="waitForWork">Waits until heavy work may go on (the device cool and charged enough), or null</param>
+    /// <param name="refreshDetails">True to read every photo's details again (keeping its embedding), e.g. once the photos' locations can be read</param>
     public async Task IndexAsync(EmbeddingModel embedder, Func<byte[], CancellationToken, Task<float[]>> embedImage, int maxPhotos, Func<bool> waitWhile,
-        CancellationToken cancellationToken, Func<CancellationToken, Task> waitForWork = null)
+        CancellationToken cancellationToken, Func<CancellationToken, Task> waitForWork = null, bool refreshDetails = false)
     {
         IsIndexing = true;
         Changed?.Invoke();
         try
         {
-            if (waitForWork != null) await waitForWork(cancellationToken);
             await LoadAsync();
+            Changed?.Invoke();
+            if (waitForWork != null) await waitForWork(cancellationToken);
             PlaceLookup places = null;
             try { places = await Places(); } catch (Exception) { }
             List<PhotoItem> photos = await PhotoLibrary.GetRecentPhotosAsync(maxPhotos);
@@ -189,7 +194,7 @@ internal sealed class PhotoIndex
                 known.TryGetValue(photo.Id, out ChatPhotoEmbedding record);
                 string embeddingModel = System.IO.Path.GetFileName(embedder.DefaultModelFile.Url);
                 bool embeddingCurrent = record != null && record.Version == photo.Version && record.EmbeddingModel == embeddingModel && record.VisionTokens == VisionTokens;
-                if (embeddingCurrent && record.DetailsVersion == DetailsVersion)
+                if (embeddingCurrent && record.DetailsVersion == DetailsVersion && !refreshDetails)
                     continue;
                 while (waitWhile != null && waitWhile())
                     await Task.Delay(1000, cancellationToken);
