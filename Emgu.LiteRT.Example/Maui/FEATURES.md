@@ -375,8 +375,15 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     settings panel beside the chat".
   - The page parses the request with the indexed photos' places and cameras, filters by the details, then ranks by the
     description - or, without one, lists the 12 most recent matches.
-  - It returns photos scoring at least 0.6 and within 0.04 of the best, up to 8 (0.06 let three screenshots of shapes through
-    for "a piece of fruit", at 0.63 against the apple's 0.687). They show as a row of thumbnails above the reply, with date
+  - It returns photos that stand out: `Emgu.LiteRT.LM.Chat`'s `ChatPhotos.SelectMatches` (since 2026-10-27) keeps a photo
+    whose similarity is at least 0.6 and whose lift - the similarity minus its similarity to "a photo" - is at least 0.035
+    and within 0.04 of the best lift, up to 8. The old rule (a similarity of 0.6, within 0.04 of the best) showed eight photos
+    of walls for "show me cat photos" on the Pixel Fold, which has no cat photos: with nothing to find, ordinary photos score
+    0.62-0.65 against any text. Measured with EmbeddingGemma 2 Text Vision at 140 tokens on 18 photos (the repository's test
+    photos, and drawn walls, doorways and a screenshot): the right photo's lift was 0.040-0.162, the best photo's with nothing
+    to find ("cat", "a car", "food", "a birthday cake", "mountains", "snow") 0.026 at most; `UnitTestPhotoMatches` keeps the
+    numbers. Checked on the Fold: "show me cat photos" finds none. (Before, 0.06 below the best let three screenshots of shapes
+    through for "a piece of fruit", at 0.63 against the apple's 0.687.) They show as a row of thumbnails above the reply, with date
     and town captions (tap one to see it larger, in a sheet), and the model is told how many were found and when, where and
     with what each was taken.
 - Verified:

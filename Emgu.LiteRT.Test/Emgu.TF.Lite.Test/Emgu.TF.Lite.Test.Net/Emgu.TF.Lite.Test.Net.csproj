@@ -16,6 +16,7 @@
   <ItemGroup>
     <Compile Include="..\UnitTest1.cs" Link="UnitTest1.cs" />
     <Compile Include="..\UnitTestLiteRtLm.cs" Link="UnitTestLiteRtLm.cs" />
+    <Compile Include="..\UnitTestPhotoMatches.cs" Link="UnitTestPhotoMatches.cs" />
     <Compile Include="..\UnitTestLiteRtModels.cs" Link="UnitTestLiteRtModels.cs" />
     <Compile Include="..\UnitTestYoloX.cs" Link="UnitTestYoloX.cs" />
     <Compile Include="..\UnitTestDFine.cs" Link="UnitTestDFine.cs" />

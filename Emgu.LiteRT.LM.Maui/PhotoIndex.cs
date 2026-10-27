@@ -48,12 +48,7 @@ internal sealed class PhotoIndex
     internal const int VisionTokens = 140;
     // Raised when what LoadDetailsAsync reads changes: the details are read again (without embedding again).
     private const int DetailsVersion = 3;
-    // A photo is shown if it matches the description at least this well, and not much worse than the best match
-    // (text-to-photo cosine similarity with EmbeddingGemma 2: 0.67-0.79 for the right photo of six, 0.58-0.63 for
-    // the best wrong one; within 0.06 let three screenshots of shapes through for "a piece of fruit").
-    private const float MinScore = 0.6f;
-    private const float MaxBelowBest = 0.04f;
-    private const int MaxResults = 8;
+    // Which photos are shown: Emgu.LiteRT.LM.Chat's ChatPhotos.SelectMatches (a match must stand out against "a photo").
     // Without a description (only place, dates...), the most recent matches.
     private const int MaxListed = 12;
 
@@ -264,21 +259,20 @@ internal sealed class PhotoIndex
         if (query.Description == null)
             return (candidates.OrderByDescending(e => e.Taken).Take(MaxListed).Select(e => (e, 0f)).ToList(), candidates.Count);
 
-        float[] text;
+        float[] text, baseline;
         await gate.WaitAsync(cancellationToken);
         try
         {
             text = await Task.Run(() => embedder.EmbedQuery(query.Description), cancellationToken);
+            baseline = await Task.Run(() => embedder.EmbedQuery(ChatPhotos.BaselineQuery), cancellationToken);
         }
         finally
         {
             gate.Release();
         }
-        List<(IndexedPhoto Photo, float Score)> scored = candidates
-            .Select(e => (e, EmbeddingModel.CosineSimilarity(text, e.Embedding))).ToList();
-        float best = scored.Max(s => s.Item2);
-        return (scored.Where(s => s.Item2 >= MinScore && s.Item2 >= best - MaxBelowBest)
-            .OrderByDescending(s => s.Item2).Take(MaxResults).ToList(), candidates.Count);
+        float[] scores = candidates.Select(e => EmbeddingModel.CosineSimilarity(text, e.Embedding)).ToArray();
+        float[] baselineScores = candidates.Select(e => EmbeddingModel.CosineSimilarity(baseline, e.Embedding)).ToArray();
+        return (ChatPhotos.SelectMatches(scores, baselineScores).Select(i => (candidates[i], scores[i])).ToList(), candidates.Count);
     }
 
     // Common ways of naming countries the place list spells otherwise.
