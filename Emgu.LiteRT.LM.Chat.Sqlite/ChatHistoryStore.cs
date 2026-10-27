@@ -30,7 +30,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
     /// <see cref="GetMessageId"/> need nothing else. With <see cref="IsPrivate"/> on, nothing is saved.
     /// </para>
     /// </summary>
-    public class ChatHistoryStore : IChatHistoryStore, IChatSearchStore, IChatDocumentStore, IPhotoIndexStore
+    public partial class ChatHistoryStore : IChatHistoryStore, IChatSearchStore, IChatDocumentStore, IPhotoIndexStore
     {
         /// <summary>The version of the tables this store reads and writes (kept in the database, for migrations).</summary>
         public const int SchemaVersion = 1;

@@ -18,7 +18,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
     /// and the indexing's progress; indexing runs while the page is shown and no model is reloading, again when chats
     /// change. Nothing in a private chat.
     /// </summary>
-    public sealed class PastChatsFeature : ChatFeature
+    public sealed class PastChatsFeature : ChatFeature, IStorageParticipant
     {
         /// <summary>The switch's settings key.</summary>
         public const string SettingKey = "search_chats";
@@ -61,7 +61,11 @@ namespace Emgu.LiteRT.LM.Maui.Features
         private bool SwitchAllowed => Host != null && !Host.IsPrivate && !_search.IsDownloadRequired;
 
         /// <inheritdoc/>
-        public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+        public override void RegisterServices(ChatFeatureServices services)
+        {
+            services.Add(this);
+            services.Add<IStorageParticipant>(this);
+        }
 
         /// <inheritdoc/>
         public override void OnAttached(IChatPageHost host)
@@ -109,7 +113,13 @@ namespace Emgu.LiteRT.LM.Maui.Features
         }
 
         /// <inheritdoc/>
-        public override void OnPrivateModeChanged(bool isPrivate) => SetSwitchEnabled(!isPrivate && !_search.IsDownloadRequired);
+        public override void OnPrivateModeChanged(bool isPrivate)
+        {
+            SetSwitchEnabled(!isPrivate && !_search.IsDownloadRequired);
+            // Indexing paused for the private chat goes on once it ends.
+            if (!isPrivate && _visible)
+                StartIndexing();
+        }
 
         /// <inheritdoc/>
         public override View BuildSettingsSection()
@@ -313,6 +323,35 @@ namespace Emgu.LiteRT.LM.Maui.Features
         {
             if (_switch != null)
                 _switch.IsEnabled = enabled;
+        }
+
+        // ---------- IStorageParticipant ----------
+
+        // Before storage deletes something: the indexing stops (cancelled before any search is waited for, since they
+        // may share the model's load); the search goes off with its model or its index.
+        /// <inheritdoc/>
+        public async Task PrepareStorageDeleteAsync(StorageEntry entry)
+        {
+            CancelIndexing();
+            if ((entry.Kind == StorageKind.SearchModel && entry.Key == _search.IndexModel?.Invoke()) || entry.Kind == StorageKind.ChatIndex)
+                TurnOff();
+            await StopIndexingAsync();
+        }
+
+        // After: the switch follows the search model (off and disabled while it is deleted), and indexing goes on.
+        /// <inheritdoc/>
+        public void StorageChanged(StorageEntry entry)
+        {
+            if (Host == null)
+                return;
+            if (_search.IsDownloadRequired && On)
+            {
+                TurnOff();
+                CancelIndexing();
+            }
+            SetSwitchEnabled(SwitchAllowed);
+            if (_visible)
+                StartIndexing();
         }
     }
 }

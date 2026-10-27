@@ -14,6 +14,7 @@ using Emgu.LiteRT.LM.Maui.CV;
 using Emgu.LiteRT.LM.Agents.CV;
 using Emgu.LiteRT.LM.Maui.Features;
 using Emgu.LiteRT.LM.Models;
+using Emgu.LiteRT.Models;
 using Microsoft.Extensions.AI;
 
 namespace Maui.Demo.Lite;
@@ -66,7 +67,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     private readonly MenuSheet _menu = new MenuSheet();
     private bool _pageVisible;
     private int _sessionVersion;
-    private Task _reloadTask;
     private IDisposable _privateDiagnostics;
     private ChatConversation _hooked;
 
@@ -110,7 +110,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             VoiceMode = new VoiceModeFeature(),
             Transcripts = new TranscriptFeature(),
             Export = new ExportFeature((id, stream, cancel) => ChatExporter.ExportAsync(SharedStore, id, stream, cancel)),
-            Storage = new StorageFeature(),
             ModelSettings = new ModelSettingsFeature(),
             Tasks = new TaskFeature(),
             Images = new ImageFeature(),
@@ -124,16 +123,18 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         };
         parts.Server = new ServerFeature(parts.ServerOption);
         parts.Workload = new DeviceIndexingWorkload();
-        // What the library's searches share: the demo's search model, workload and storage.
+        // What the library's searches share: the demo's search model and workload (the storage feature adds the
+        // deleted-model notice and check).
         parts.Search = new SearchServices
         {
+            Choice = parts.ModelSettings,
             Embedder = parts.ModelSettings.Embedder,
             Workload = parts.Workload,
             IndexModel = () => parts.ModelSettings.SearchModelFile,
             DownloadRequired = () => parts.ModelSettings.SearchDownloadRequired,
-            SupportsImages = parts.ModelSettings.SupportsImages,
-            CreateDownloadNotice = () => parts.Storage.CreateSearchModelNotice()
+            SupportsImages = parts.ModelSettings.SupportsImages
         };
+        parts.Storage = new StorageFeature(CreateStorageCatalog, parts.Search);
         parts.PastChats = new PastChatsFeature(SharedStore, parts.Search);
         parts.Documents = new DocumentsFeature(SharedStore, parts.Search);
         parts.PhotoSearch = new PhotoSearchFeature(SharedStore, parts.Search);
@@ -206,18 +207,20 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 
     bool IDemoHost.IsRecording => Chat.IsRecording;
 
-    async Task IDemoHost.RunReloadAsync(Func<Task> work)
+    // What the storage page lists: the catalog's models, the two search models (downloadable again from the page), the
+    // image model's folder, and the store's documents, indexes and attachments.
+    private static StorageCatalog CreateStorageCatalog()
     {
-        using (BeginReload())
-        {
-            Task task = work();
-            _reloadTask = task;
-            try { await task; }
-            finally { if (_reloadTask == task) _reloadTask = null; }
-        }
+        ModelOption[] catalog = ChatModelCatalog.ModelsFor(DemoPlatform.Current);
+        var models = catalog.Select(m => new StorageModel(m.Name, System.IO.Path.GetFileName(m.File.LocalFile))).ToList();
+        using var vision = new EmbeddingGemma2TextVision();
+        using var multimodal = new EmbeddingGemma2Multimodal();
+        models.Add(new StorageModel("EmbeddingGemma 2 Text Vision 440M", System.IO.Path.GetFileName(vision.DefaultModelFile.LocalFile), isSearch: true) { Download = vision.DefaultModelFile });
+        models.Add(new StorageModel("EmbeddingGemma 2 Multimodal 740M", System.IO.Path.GetFileName(multimodal.DefaultModelFile.LocalFile), isSearch: true) { Download = multimodal.DefaultModelFile });
+        using var image = new ZImageTurbo();
+        return new StorageCatalog(SharedStore, System.IO.Path.GetDirectoryName(catalog[0].File.LocalFile), ExportFeature.ExportFolder, models,
+            new[] { new StorageFolder(ImageFeature.StorageKey, "Z-Image-Turbo", image.Folder, "Image model, host tensors, and prepared weight caches. Deleting turns image generation off.") });
     }
-
-    Task IDemoHost.ReleaseModelAsync() => UnloadModelAsync();
 
     // A hands-free chat's recording: sent as a voice message, with the reply read aloud whatever the setting.
     async Task IDemoHost.SendVoiceAsync(byte[] wav, TimeSpan length)
@@ -302,7 +305,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                 await Chat.CancelRecordingAsync();
                 await _parts.Documents.FinishPrivateDocumentsAsync();
             }
-            try { await (_reloadTask ?? Task.CompletedTask); } catch (Exception) { }
+            try { await PendingReload; } catch (Exception) { }
             await _parts.PastChats.StopIndexingAsync();
             await ShutdownModelAsync();
             await Embedder.ReleaseAsync();

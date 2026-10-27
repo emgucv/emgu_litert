@@ -64,6 +64,29 @@ namespace Emgu.LiteRT.LM.Maui
             return new ReloadScope(this);
         }
 
+        private Task _reloadTask;
+
+        /// <summary>The reload work going on (<see cref="RunReloadAsync"/>), to wait for before closing; a completed task when there is none.</summary>
+        protected Task PendingReload => _reloadTask ?? Task.CompletedTask;
+
+        /// <summary>
+        /// Run work under <see cref="BeginReload"/> (<see cref="IsReloadingModel"/> while it runs) and remember it as
+        /// <see cref="PendingReload"/>: a feature's own reload (another search model, a storage deletion).
+        /// </summary>
+        /// <param name="work">The work</param>
+        protected async Task RunReloadAsync(Func<Task> work)
+        {
+            if (work == null)
+                throw new ArgumentNullException(nameof(work));
+            using (BeginReload())
+            {
+                Task task = work();
+                _reloadTask = task;
+                try { await task; }
+                finally { if (_reloadTask == task) _reloadTask = null; }
+            }
+        }
+
         private sealed class ReloadScope : IDisposable
         {
             private ChatPage _page;

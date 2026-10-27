@@ -6,7 +6,9 @@ using Stopwatch = System.Diagnostics.Stopwatch;
 using System.Globalization;
 using Emgu.CV;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Features;
 using Emgu.LiteRT.Models;
 using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
@@ -20,10 +22,12 @@ namespace Maui.Demo.Lite;
 // pictures are saved with the reply (attachments of kind "generated", never given back to the model). On iOS the model
 // folder is kept out of iCloud backups. With the setting off the tool is offered anyway and tells the model where to turn
 // it on. A tool group of the router.
-internal sealed class ImageFeature : DemoFeature
+internal sealed class ImageFeature : DemoFeature, IStorageParticipant
 {
     public const string GeneratedKind = "generated";
     public const string Instructions = ChatPlannerInstructions.Images;
+    // The image model's folder in the storage catalog.
+    public const string StorageKey = "image";
 
     private string _imagePauseReason;
     private Switch _imageSwitch;
@@ -46,7 +50,11 @@ internal sealed class ImageFeature : DemoFeature
     // Everywhere the chat runs.
     public static bool Supported => true;
 
-    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+    public override void RegisterServices(ChatFeatureServices services)
+    {
+        services.Add(this);
+        services.Add<IStorageParticipant>(this);
+    }
 
     public override void OnAttached(IChatPageHost host)
     {
@@ -54,6 +62,14 @@ internal sealed class ImageFeature : DemoFeature
         _zimage = new ZImageTurbo();
         ExcludeFromBackup(_zimage.Folder);
     }
+
+    // ---------- IStorageParticipant ----------
+
+    // Storage is deleting the image model's folder: image generation is turned off and the model let go of first.
+    public Task PrepareStorageDeleteAsync(StorageEntry entry) =>
+        entry.Kind == StorageKind.Folder && entry.Key == StorageKey ? TurnOffAndResetAsync() : Task.CompletedTask;
+
+    public void StorageChanged(StorageEntry entry) => UpdateStatus();
 
     public override IEnumerable<ToolGroup> ToolGroups()
     {

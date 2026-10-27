@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Chat.Sqlite;
+using Emgu.LiteRT.Util;
 using Maui.Demo.Lite;
 using NUnit.Framework;
 
@@ -27,8 +28,9 @@ namespace Emgu.TF.Lite.Test
             _exports = Path.Combine(_folder, "exports");
             Directory.CreateDirectory(_models);
             _store = new ChatStore(Path.Combine(_folder, "chats"));
-            _catalog = new StorageCatalog(_store, _models, _image, _exports,
-                new[] { ("Chat A", "a.litertlm", false), ("Search B", "embedding-b.litertlm", true) });
+            _catalog = new StorageCatalog(_store, _models, _exports,
+                new[] { new StorageModel("Chat A", "a.litertlm"), new StorageModel("Search B", "embedding-b.litertlm", isSearch: true) { Download = new DownloadableFile("https://example.com/embedding-b.litertlm", "storage-test") } },
+                new[] { new StorageFolder("image", "Z-Image-Turbo", _image, "Image model, host tensors, and prepared weight caches.") });
         }
 
         [TearDown]
@@ -144,7 +146,7 @@ namespace Emgu.TF.Lite.Test
             FileWithSize(Path.Combine(_image, "host", "weights.bin"), 20);
             FileWithSize(Path.Combine(_image, "cache", "compiled.xnnpack_cache"), 30);
             FileWithSize(Path.Combine(_models, "a.litertlm"), 10);
-            await _catalog.DeleteAsync((await _catalog.ReadAsync()).Entries.Single(e => e.Kind == StorageKind.ImageModel));
+            await _catalog.DeleteAsync((await _catalog.ReadAsync()).Entries.Single(e => e.Kind == StorageKind.Folder && e.Key == "image"));
             Assert.That(Directory.Exists(_image), Is.False);
             Assert.That(File.Exists(Path.Combine(_models, "a.litertlm")), Is.True);
         }
@@ -164,7 +166,7 @@ namespace Emgu.TF.Lite.Test
             FileWithSize(Path.Combine(_exports, "export-x", "chat.zip"), 10);
             await _catalog.DeleteAsync((await _catalog.ReadAsync()).Entries.Single(e => e.Kind == StorageKind.Exports));
             Assert.That(Directory.Exists(_exports), Is.False);
-            Assert.That(File.Exists(Path.Combine(_store.StorageFolder, "chats.db3")), Is.True);
+            Assert.That(File.Exists(Path.Combine(_store.Folder, "chats.db3")), Is.True);
         }
     }
 }

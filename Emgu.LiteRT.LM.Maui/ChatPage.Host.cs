@@ -43,6 +43,10 @@ namespace Emgu.LiteRT.LM.Maui
 
         Task<bool> IChatPageHost.ReloadModelAsync() => ReloadModelAsync();
 
+        Task IChatPageHost.RunReloadAsync(Func<Task> work) => RunReloadAsync(work);
+
+        Task IChatPageHost.ReleaseModelAsync() => UnloadModelAsync();
+
         void IChatPageHost.ResetRemote() => ResetRemote();
 
         void IChatPageHost.ModelCapabilitiesChanged() => ApplyModelCapabilities();

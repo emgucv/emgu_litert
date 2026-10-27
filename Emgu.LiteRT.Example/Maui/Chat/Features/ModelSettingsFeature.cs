@@ -128,7 +128,7 @@ internal sealed class ModelSettingsFeature : DemoFeature, ISearchModelChoice
             _embeddingModelDetail.Text += (_selectedEmbedding == 2
                 ? " Text, vision and audio embeddings use Windows GPU."
                 : " Text and vision embeddings use Windows GPU.") + " A compatible Direct3D 12 GPU is required.";
-        Storage?.UpdateSearchStorageState();
+        Storage?.RefreshSearchState();
     }
 
     private async void OnEmbeddingModelTapped(object sender, EventArgs e)
@@ -142,7 +142,7 @@ internal sealed class ModelSettingsFeature : DemoFeature, ISearchModelChoice
         int index = entry % 2 + 1;
         bool gpu = entry >= 2;
         if (index == _selectedEmbedding && gpu == _selectedEmbeddingGpu) return;
-        await Demo.RunReloadAsync(() => ChangeEmbeddingModelAsync(index, gpu));
+        await Host.RunReloadAsync(() => ChangeEmbeddingModelAsync(index, gpu));
     }
 
     private async Task ChangeEmbeddingModelAsync(int index, bool gpu)

@@ -26,5 +26,9 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>The service of a type, or null.</summary>
         /// <typeparam name="T">The type</typeparam>
         public T Get<T>() where T : class => _services.TryGetValue(typeof(T), out object service) ? service as T : null;
+
+        /// <summary>Every service that is a <typeparamref name="T"/>, whatever type it was added by (e.g. the <see cref="IStorageParticipant"/>s).</summary>
+        /// <typeparam name="T">The type or interface</typeparam>
+        public IReadOnlyList<T> GetAll<T>() where T : class => _services.Values.OfType<T>().Distinct().ToList();
     }
 }

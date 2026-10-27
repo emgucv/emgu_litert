@@ -19,13 +19,6 @@ internal interface IDemoHost
     bool PageVisible { get; }
     bool IsRecording { get; }
 
-    // Runs work during which the models are reloading (IChatPageHost.IsReloadingModel: nothing new starts, the settings
-    // wait); leaving the page waits for it.
-    Task RunReloadAsync(Func<Task> work);
-
-    // Frees the chat model's engine (its file is being deleted); the page offers to download or load it again.
-    Task ReleaseModelAsync();
-
     // Send a recording as a voice message, the reply read aloud (a hands-free chat); stop the reply being written.
     Task SendVoiceAsync(byte[] wav, TimeSpan length);
     void StopReply();

@@ -58,6 +58,16 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>Load the model again (e.g. after a thread count change); the chat goes on.</summary>
         Task<bool> ReloadModelAsync();
 
+        /// <summary>
+        /// Run work during which the models count as reloading (<see cref="IsReloadingModel"/>: nothing new starts, the
+        /// settings wait) - another search model, a storage deletion; a page that closes waits for it.
+        /// </summary>
+        /// <param name="work">The work</param>
+        Task RunReloadAsync(Func<Task> work);
+
+        /// <summary>Free the chat model's engine (its file is being deleted); the page offers to download or load it again.</summary>
+        Task ReleaseModelAsync();
+
         /// <summary>Forget a remote model's connection, so the next message connects again (its settings changed).</summary>
         void ResetRemote();
 

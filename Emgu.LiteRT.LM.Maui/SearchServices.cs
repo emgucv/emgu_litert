@@ -77,6 +77,7 @@ namespace Emgu.LiteRT.LM.Maui
         {
             if (choice == null)
                 throw new ArgumentNullException(nameof(choice));
+            Choice = choice;
             Embedder = new SearchEmbedder(choice);
             Workload = new DeviceIndexingWorkload();
             IndexModel = () =>
@@ -86,6 +87,9 @@ namespace Emgu.LiteRT.LM.Maui
             };
             DownloadRequired = () => choice.DownloadRequired;
         }
+
+        /// <summary>Which search model (its name, and a new instance for a download); null when the app gives no choice.</summary>
+        public ISearchModelChoice Choice { get; set; }
 
         /// <summary>The search model, shared by the searches.</summary>
         public SearchEmbedder Embedder { get; set; }

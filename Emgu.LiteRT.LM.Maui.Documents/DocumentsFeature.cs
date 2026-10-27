@@ -44,7 +44,7 @@ namespace Emgu.LiteRT.LM.Maui.Documents
     /// (<see cref="IChatDocumentStore"/>), with the document each chat uses, restored when the chat is opened; a private
     /// chat's document is indexed in memory only.
     /// </summary>
-    public sealed class DocumentsFeature : ChatFeature
+    public sealed class DocumentsFeature : ChatFeature, IStorageParticipant
     {
         private sealed class DocumentState
         {
@@ -136,7 +136,37 @@ namespace Emgu.LiteRT.LM.Maui.Documents
         private SearchEmbedder Embedder => _search.Embedder;
 
         /// <inheritdoc/>
-        public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+        public override void RegisterServices(ChatFeatureServices services)
+        {
+            services.Add(this);
+            services.Add<IStorageParticipant>(this);
+        }
+
+        // ---------- IStorageParticipant ----------
+
+        // Before storage deletes something: a document being read is let go of (it may share the search model's load
+        // with the searches, so it is cancelled before any of them is waited for), as is the document itself or its
+        // search model.
+        /// <inheritdoc/>
+        public async Task PrepareStorageDeleteAsync(StorageEntry entry)
+        {
+            Task<bool> ready = DocumentReady;
+            bool pending = ready != null && !ready.IsCompleted;
+            bool gone = (entry.Kind == StorageKind.SearchModel && entry.Key == _search.IndexModel?.Invoke())
+                || (entry.Kind == StorageKind.Document && entry.Key == DocumentId);
+            if (pending || gone)
+                RemoveDocument();
+            if (pending)
+            {
+                try { await ready; }
+                catch (OperationCanceledException) { }
+            }
+        }
+
+        /// <inheritdoc/>
+        public void StorageChanged(StorageEntry entry)
+        {
+        }
 
         /// <inheritdoc/>
         public override View BuildComposerView() => _documentBar;

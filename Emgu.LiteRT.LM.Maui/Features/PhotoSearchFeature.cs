@@ -23,7 +23,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
     /// platform (iOS and Mac Catalyst: NSPhotoLibraryUsageDescription in Info.plist; Android: the permissions this
     /// assembly declares).
     /// </summary>
-    public sealed class PhotoSearchFeature : ChatFeature
+    public sealed class PhotoSearchFeature : ChatFeature, IStorageParticipant
     {
         /// <summary>The switch's settings key.</summary>
         public const string SettingKey = "photo_search";
@@ -73,7 +73,11 @@ namespace Emgu.LiteRT.LM.Maui.Features
     private bool SwitchAllowed => _search.SupportsImages && !_search.IsDownloadRequired;
 
     /// <inheritdoc/>
-    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+    public override void RegisterServices(ChatFeatureServices services)
+    {
+        services.Add(this);
+        services.Add<IStorageParticipant>(this);
+    }
 
     /// <inheritdoc/>
     public override void OnAttached(IChatPageHost host)
@@ -127,7 +131,13 @@ namespace Emgu.LiteRT.LM.Maui.Features
     }
 
     /// <inheritdoc/>
-    public override void OnPrivateModeChanged(bool isPrivate) => SetSwitchEnabled(!isPrivate && SwitchAllowed);
+    public override void OnPrivateModeChanged(bool isPrivate)
+    {
+        SetSwitchEnabled(!isPrivate && SwitchAllowed);
+        // Indexing paused for the private chat goes on once it ends.
+        if (!isPrivate && _visible)
+            StartIndexing();
+    }
 
     /// <inheritdoc/>
     public override View BuildSettingsSection()
@@ -445,6 +455,41 @@ namespace Emgu.LiteRT.LM.Maui.Features
     public void SetSwitchEnabled(bool enabled)
     {
         if (_photoSwitch != null) _photoSwitch.IsEnabled = enabled;
+    }
+
+    // ---------- IStorageParticipant ----------
+
+    // Before storage deletes something: the indexing stops (it may share the search model's load with the other
+    // searches, so it is cancelled before any of them is waited for); the search goes off with its model or its index.
+    /// <inheritdoc/>
+    public async Task PrepareStorageDeleteAsync(StorageEntry entry)
+    {
+        CancelIndexing();
+        if (entry.Kind == StorageKind.SearchModel && entry.Key == _search.IndexModel?.Invoke())
+            TurnOff();
+        if (entry.Kind == StorageKind.PhotoIndex)
+        {
+            TurnOff();
+            await ClearIndexAsync();
+        }
+        await WaitForIndexingAsync();
+    }
+
+    // After: the switch follows the search model (off and disabled while it is deleted), and indexing goes on.
+    /// <inheritdoc/>
+    public void StorageChanged(StorageEntry entry)
+    {
+        if (Host == null)
+            return;
+        if (_search.IsDownloadRequired && On)
+        {
+            TurnOff();
+            CancelIndexing();
+        }
+        SetSwitchEnabled(!Host.IsPrivate && SwitchAllowed);
+        UpdateStatus();
+        if (_visible)
+            StartIndexing();
     }
     }
 }
