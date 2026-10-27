@@ -739,7 +739,7 @@ namespace Emgu.LiteRT.LM.Agents
             return AIFunctionFactory.Create(
                 ([Description("What to search for")] string query, CancellationToken cancellationToken) => SearchWebAsync(client, key, query, cancellationToken),
                 "search_web",
-                "Searches the web and returns extracts of the best matching pages. Use it for news, recent events and anything Wikipedia doesn't cover.");
+                "Searches the web and returns extracts of the best matching pages. Use it for news, recent events and anything Wikipedia doesn't cover. For news or recent events, put \"news\" or \"latest\" in the query: those searches return recent articles, with their dates.");
         }
 
         /// <summary>
@@ -764,13 +764,57 @@ namespace Emgu.LiteRT.LM.Agents
             return apiKey.Trim();
         }
 
+        // Words that make a search a news search, over the past month; those that ask for the last few days narrow it.
+        private static readonly System.Text.RegularExpressions.Regex NewsWords = new System.Text.RegularExpressions.Regex(
+            @"\b(news|latest|recent|recently|newest|update|updates|updated|breaking|headlines?|announced|announcement|current|currently|this (week|month|year)|today|tonight|yesterday|right now)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        private static readonly System.Text.RegularExpressions.Regex DayWords = new System.Text.RegularExpressions.Regex(
+            @"\b(today|tonight|yesterday|right now|breaking)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        private static readonly System.Text.RegularExpressions.Regex WeekWords = new System.Text.RegularExpressions.Regex(
+            @"\bthis week\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// How recent search_web's results should be, from the words of its query: null for an ordinary search; for a news
+        /// question ("latest", "news", "recent", "update"...) Tavily's time range - "day" for today, yesterday or breaking
+        /// news, "week" for this week, else "month". A news search uses Tavily's news topic, which also dates each result.
+        /// </summary>
+        /// <param name="query">The search's query, as the model wrote it</param>
+        public static string NewsTimeRange(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query) || !NewsWords.IsMatch(query))
+                return null;
+            if (DayWords.IsMatch(query))
+                return "day";
+            return WeekWords.IsMatch(query) ? "week" : "month";
+        }
+
         private static async Task<string> SearchWebAsync(HttpClient http, string apiKey, string query, CancellationToken cancellationToken)
+        {
+            string timeRange = NewsTimeRange(query);
+            string found = await SearchWebAsync(http, apiKey, query, timeRange, cancellationToken).ConfigureAwait(false);
+            // A news search that found nothing recent: once more as an ordinary search.
+            if (found == null && timeRange != null)
+                found = await SearchWebAsync(http, apiKey, query, null, cancellationToken).ConfigureAwait(false);
+            if (found == null)
+                return "No results found for \"" + query + "\".";
+            // Today's date first, so the model can tell how old each result is.
+            return "Today is " + DateTime.Now.ToString("d MMMM yyyy", CultureInfo.InvariantCulture) + ".\n\n" + found;
+        }
+
+        // One Tavily search; null when it found nothing.
+        private static async Task<string> SearchWebAsync(HttpClient http, string apiKey, string query, string timeRange, CancellationToken cancellationToken)
         {
             string body = WriteJson(writer =>
             {
                 writer.WriteString("query", query ?? string.Empty);
                 writer.WriteNumber("max_results", SearchResults);
                 writer.WriteString("search_depth", SearchDepth);
+                if (timeRange != null)
+                {
+                    writer.WriteString("topic", "news");
+                    writer.WriteString("time_range", timeRange);
+                }
             });
             using (JsonDocument response = await PostTavilyAsync(http, apiKey, "search", body, cancellationToken).ConfigureAwait(false))
             {
@@ -780,10 +824,14 @@ namespace Emgu.LiteRT.LM.Agents
                 foreach (JsonElement result in results.EnumerateArray())
                 {
                     text.Append("Page: ").Append(result.GetProperty("title").GetString())
-                        .Append(" (").Append(result.GetProperty("url").GetString()).Append(")\n")
-                        .Append(Shorten(result.GetProperty("content").GetString(), MaxSearchLength / count)).Append("\n\n");
+                        .Append(" (").Append(result.GetProperty("url").GetString()).Append(")\n");
+                    // The news topic dates each result (Tavily's estimate of when it was published or updated).
+                    if (result.TryGetProperty("published_date", out JsonElement published) && published.ValueKind == JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(published.GetString()))
+                        text.Append("Published: ").Append(published.GetString()).Append("\n");
+                    text.Append(Shorten(result.GetProperty("content").GetString(), MaxSearchLength / count)).Append("\n\n");
                 }
-                return text.Length > 0 ? text.ToString().TrimEnd() : "No results found for \"" + query + "\".";
+                return text.Length > 0 ? text.ToString().TrimEnd() : null;
             }
         }
 

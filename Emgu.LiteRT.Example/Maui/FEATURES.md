@@ -263,7 +263,12 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - With a Tavily API key (kept in `SecureStorage`): `search_web` and `read_web_page` through Tavily's `/search` and
     `/extract`. Since 2026-10-27 a search asks for 5 results at "advanced" depth (2 credits, so the free plan's 1,000 monthly
     credits are about 500 searches) and gives the model about 2,500 characters of them; before, 3 "basic" results in 1,500
-    characters gave Gemma 4 E2B little to go on.
+    characters gave Gemma 4 E2B little to go on. A query with news words ("news", "latest", "recent", "update"...) searches
+    Tavily's news over the past month (`AgentTools.NewsTimeRange`; "day" for today, yesterday or breaking news, "week" for
+    this week), each result with its publication date and the answer starting with today's date; if that finds nothing, an
+    ordinary search follows. The tool's description asks the model to put "news" or "latest" in such queries. Checked on
+    the Pixel Fold: "the latest news about the James Webb Space Telescope" gave recent articles, where the ordinary search
+    had included one dated January 2025.
   - Verified on Mac Catalyst and the iOS simulator (Wikipedia; Tavily wasn't verified - no key).
 
 ## Document questions
