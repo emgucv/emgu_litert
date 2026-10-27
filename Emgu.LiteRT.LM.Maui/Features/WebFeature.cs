@@ -2,7 +2,9 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
+using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Agents.Skills;
+using Emgu.LiteRT.LM.Chat;
 
 namespace Emgu.LiteRT.LM.Maui.Features
 {
@@ -20,6 +22,9 @@ namespace Emgu.LiteRT.LM.Maui.Features
 
         /// <summary>The secure storage name of the Twelve Data API key (stock prices): "twelvedata_api_key".</summary>
         public const string StockKeyStorageName = "twelvedata_api_key";
+
+        /// <summary>The kind of the saved file a stock chart is kept as with its reply (its <see cref="StockChart"/> as JSON).</summary>
+        public const string StockChartKind = "stock_chart";
 
         private const string Key = "web_search";
         private readonly ApiKeyRow _searchKey;
@@ -41,8 +46,20 @@ namespace Emgu.LiteRT.LM.Maui.Features
             base.OnAttached(host);
             Enabled = host.Settings.Get(Key, false);
             Skill.SettingsLocation = host.SettingsLocation + " > Web search";
+            // A stock tool's prices: a chart above the reply, kept with it in the saved chat.
+            Skill.StockChartReady = chart => MainThread.BeginInvokeOnMainThread(() =>
+                Host?.AddCardToReply(StockChartView.Create(chart), new ChatSavedFile(StockChartKind, "application/json", chart.ToJson())));
             _ = _searchKey.LoadAsync();
             _ = _stockKey.LoadAsync();
+        }
+
+        /// <inheritdoc/>
+        public override View RestoreSavedFile(ChatSavedFile file)
+        {
+            if (file?.Kind != StockChartKind)
+                return null;
+            StockChart chart = StockChart.FromJson(file.Data);
+            return chart != null ? StockChartView.Create(chart) : null;
         }
 
         /// <inheritdoc/>

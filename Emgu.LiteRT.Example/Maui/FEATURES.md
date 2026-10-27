@@ -277,6 +277,12 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     `/symbol_search` (a US stock or ETF first). The key goes in the request's header, not its URL. `AgentTools.Stocks.cs`;
     `UnitTestStocks` checks the reading of Twelve Data's responses. Checked against the live service with its demo key
     (Apple's quote, its past year and this year so far).
+  - Charts: a quote also fetches the day's prices every 5 minutes (one more credit) and a history plots its closes - a
+    card above the reply (`StockChartView`, `Emgu.LiteRT.LM.Maui`: the last price and its change, green or red, a line with
+    the previous close dashed, the times or dates below and the high and low beside it), from the skill's
+    `StockChartReady` (`StockChart`, `Emgu.LiteRT.LM.Agents`, kept with the reply as a saved file of kind "stock_chart" and
+    drawn again when the chat is reopened). Checked on Mac Catalyst with the demo key: Apple's day (09:30-15:55), its past
+    year, and the day's chart back on reopening the chat.
   - Verified on Mac Catalyst and the iOS simulator (Wikipedia; Tavily wasn't verified - no key).
 
 ## Document questions

@@ -33,13 +33,14 @@ namespace Emgu.LiteRT.LM.Agents
         /// </summary>
         /// <param name="apiKey">The Twelve Data API key (twelvedata.com; free for 800 requests a day)</param>
         /// <param name="http">The HttpClient to use, or null for DefaultHttpClient</param>
-        public static AIFunction StockQuote(string apiKey, HttpClient http = null)
+        /// <param name="chart">Given the day's prices every 5 minutes, to plot (one more request); or null for none</param>
+        public static AIFunction StockQuote(string apiKey, HttpClient http = null, Action<StockChart> chart = null)
         {
             string key = CheckTwelveDataKey(apiKey);
             HttpClient client = http ?? DefaultHttpClient;
             return AIFunctionFactory.Create(
                 ([Description("The stock's ticker symbol (e.g. AAPL, MSFT, SHOP:TSX) or the company's name")] string symbol, CancellationToken cancellationToken) =>
-                    StockQuoteAsync(client, key, symbol, cancellationToken),
+                    StockQuoteAsync(client, key, symbol, chart, cancellationToken),
                 "get_stock_quote",
                 "Gets the latest price of a stock or ETF, with its change since the previous close, the day's range and the 52-week range. Use it for questions about a stock price or how a stock is doing today.");
         }
@@ -50,14 +51,15 @@ namespace Emgu.LiteRT.LM.Agents
         /// </summary>
         /// <param name="apiKey">The Twelve Data API key</param>
         /// <param name="http">The HttpClient to use, or null for DefaultHttpClient</param>
-        public static AIFunction StockHistory(string apiKey, HttpClient http = null)
+        /// <param name="chart">Given the period's closes, to plot; or null for none</param>
+        public static AIFunction StockHistory(string apiKey, HttpClient http = null, Action<StockChart> chart = null)
         {
             string key = CheckTwelveDataKey(apiKey);
             HttpClient client = http ?? DefaultHttpClient;
             return AIFunctionFactory.Create(
                 ([Description("The stock's ticker symbol (e.g. AAPL, MSFT) or the company's name")] string symbol,
                  [Description("The period: \"1 week\", \"1 month\", \"3 months\", \"6 months\", \"1 year\", \"5 years\", \"10 years\" or \"year to date\"")] string period,
-                 CancellationToken cancellationToken) => StockHistoryAsync(client, key, symbol, period, DateTime.Today, cancellationToken),
+                 CancellationToken cancellationToken) => StockHistoryAsync(client, key, symbol, period, DateTime.Today, chart, cancellationToken),
                 "get_stock_history",
                 "Gets how a stock or ETF did over a past period: its change in price and percent, its high and low, and its closing prices along the way. Use it for questions like \"how did Apple do this year?\".");
         }
@@ -95,7 +97,7 @@ namespace Emgu.LiteRT.LM.Agents
             return ("1month", (int)Math.Ceiling(days / 30.44) + 1, null, name);
         }
 
-        private static async Task<string> StockQuoteAsync(HttpClient http, string key, string symbol, CancellationToken cancellationToken)
+        private static async Task<string> StockQuoteAsync(HttpClient http, string key, string symbol, Action<StockChart> chart, CancellationToken cancellationToken)
         {
             (string resolved, string error) = await ResolveStockSymbolAsync(http, key, symbol, cancellationToken).ConfigureAwait(false);
             if (resolved == null)
@@ -103,11 +105,85 @@ namespace Emgu.LiteRT.LM.Agents
             using (JsonDocument quote = await GetTwelveDataAsync(http, key, "quote?symbol=" + Uri.EscapeDataString(resolved), cancellationToken).ConfigureAwait(false))
             {
                 string failed = TwelveDataError(quote.RootElement, resolved);
-                return failed ?? FormatStockQuote(quote.RootElement);
+                if (failed != null)
+                    return failed;
+                if (chart != null)
+                {
+                    // The day's prices to plot; the answer stands without them.
+                    try
+                    {
+                        using (JsonDocument day = await GetTwelveDataAsync(http, key, "time_series?symbol=" + Uri.EscapeDataString(resolved)
+                            + "&interval=5min&outputsize=100", cancellationToken).ConfigureAwait(false))
+                        {
+                            StockChart plotted = TwelveDataError(day.RootElement, resolved) == null ? IntradayChart(day.RootElement, quote.RootElement) : null;
+                            if (plotted != null)
+                                chart(plotted);
+                        }
+                    }
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    {
+                    }
+                }
+                return FormatStockQuote(quote.RootElement);
             }
         }
 
-        private static async Task<string> StockHistoryAsync(HttpClient http, string key, string symbol, string period, DateTime today, CancellationToken cancellationToken)
+        /// <summary>
+        /// The latest day's prices of a Twelve Data 5-minute time series, to plot, with the quote's name, currency and
+        /// previous close (the line the day is compared with); null without prices.
+        /// </summary>
+        /// <param name="series">The /time_series response's root element (5-minute bars, newest first)</param>
+        /// <param name="quote">The /quote response's root element</param>
+        public static StockChart IntradayChart(JsonElement series, JsonElement quote)
+        {
+            if (!series.TryGetProperty("values", out JsonElement values) || values.ValueKind != JsonValueKind.Array)
+                return null;
+            var bars = values.EnumerateArray().Select(v => (Time: Text(v, "datetime"), Close: Number(v, "close")))
+                .Where(b => b.Time != null && b.Time.Length >= 10 && b.Close.HasValue).ToList();
+            if (bars.Count == 0)
+                return null;
+            // Only the newest bar's day (the series reaches back into the day before).
+            string day = bars[0].Time.Substring(0, 10);
+            var chart = new StockChart
+            {
+                Symbol = Text(quote, "symbol"),
+                Name = Text(quote, "name"),
+                Currency = Text(quote, "currency"),
+                Intraday = true,
+                PreviousClose = Number(quote, "previous_close"),
+                Period = DateTime.TryParse(day, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date)
+                    ? date.ToString("d MMMM yyyy", CultureInfo.InvariantCulture) : day
+            };
+            foreach (var bar in bars.Where(b => b.Time.StartsWith(day, StringComparison.Ordinal)).Reverse())
+                chart.Points.Add((bar.Time, bar.Close.Value));
+            return chart.Points.Count > 0 ? chart : null;
+        }
+
+        /// <summary>A Twelve Data time series' closes, oldest first, to plot; null without prices.</summary>
+        /// <param name="series">The /time_series response's root element (newest first)</param>
+        /// <param name="periodName">The period in words ("the past year")</param>
+        public static StockChart HistoryChart(JsonElement series, string periodName)
+        {
+            if (!series.TryGetProperty("values", out JsonElement values) || values.ValueKind != JsonValueKind.Array)
+                return null;
+            JsonElement meta = series.TryGetProperty("meta", out JsonElement m) ? m : default;
+            var chart = new StockChart
+            {
+                Symbol = meta.ValueKind == JsonValueKind.Object ? Text(meta, "symbol") : null,
+                Currency = meta.ValueKind == JsonValueKind.Object ? Text(meta, "currency") : null,
+                Period = periodName
+            };
+            foreach (JsonElement value in values.EnumerateArray().Reverse())
+            {
+                string time = Text(value, "datetime");
+                double? close = Number(value, "close");
+                if (time != null && close.HasValue)
+                    chart.Points.Add((time, close.Value));
+            }
+            return chart.Points.Count > 1 ? chart : null;
+        }
+
+        private static async Task<string> StockHistoryAsync(HttpClient http, string key, string symbol, string period, DateTime today, Action<StockChart> chart, CancellationToken cancellationToken)
         {
             (string resolved, string error) = await ResolveStockSymbolAsync(http, key, symbol, cancellationToken).ConfigureAwait(false);
             if (resolved == null)
@@ -119,7 +195,12 @@ namespace Emgu.LiteRT.LM.Agents
             using (JsonDocument series = await GetTwelveDataAsync(http, key, query, cancellationToken).ConfigureAwait(false))
             {
                 string failed = TwelveDataError(series.RootElement, resolved);
-                return failed ?? FormatStockHistory(series.RootElement, range.Name);
+                if (failed != null)
+                    return failed;
+                StockChart plotted = chart != null ? HistoryChart(series.RootElement, range.Name) : null;
+                if (plotted != null)
+                    chart(plotted);
+                return FormatStockHistory(series.RootElement, range.Name);
             }
         }
 

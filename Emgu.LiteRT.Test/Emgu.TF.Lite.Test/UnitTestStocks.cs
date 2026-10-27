@@ -1,5 +1,6 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using System;
+using System.Linq;
 using System.Text.Json;
 using Emgu.LiteRT.LM.Agents;
 using NUnit.Framework;
@@ -70,6 +71,50 @@ public class UnitTestStocks
         var range = AgentTools.StockHistoryRange("year to date", new DateTime(2026, 10, 27));
         Assert.That(range.Start, Is.EqualTo(new DateTime(2026, 1, 1)));
         Assert.That(range.Name, Is.EqualTo("this year so far"));
+    }
+
+    [Test]
+    public void TheDaysChartKeepsTheLatestDayOldestFirst()
+    {
+        // 5-minute bars, newest first, reaching back into the day before (as 100 bars do).
+        using JsonDocument series = JsonDocument.Parse(@"{""meta"":{""symbol"":""AAPL"",""interval"":""5min"",""currency"":""USD""},""values"":[
+            {""datetime"":""2026-10-27 15:55:00"",""close"":""347.1""},
+            {""datetime"":""2026-10-27 15:50:00"",""close"":""346.6""},
+            {""datetime"":""2026-10-27 09:30:00"",""close"":""343.2""},
+            {""datetime"":""2026-10-26 15:55:00"",""close"":""343.9""}],""status"":""ok""}");
+        using JsonDocument quote = JsonDocument.Parse(Quote);
+        StockChart chart = AgentTools.IntradayChart(series.RootElement, quote.RootElement);
+        Assert.That(chart.Points.Select(p => p.Time), Is.EqualTo(new[] { "2026-10-27 09:30:00", "2026-10-27 15:50:00", "2026-10-27 15:55:00" }));
+        Assert.That((chart.Symbol, chart.Name, chart.Currency, chart.Intraday), Is.EqualTo(("AAPL", "Apple Inc.", "USD", true)));
+        Assert.That(chart.Period, Is.EqualTo("27 October 2026"));
+        Assert.That(chart.PreviousClose, Is.EqualTo(343.91).Within(1e-9));
+        Assert.That(chart.Change, Is.EqualTo(347.1 - 343.91).Within(1e-9), "compared with the previous close");
+        Assert.That(chart.Label(chart.Points[0].Time), Is.EqualTo("09:30"));
+    }
+
+    [Test]
+    public void AHistorysChartHasItsClosesOldestFirst()
+    {
+        using JsonDocument series = JsonDocument.Parse(Weekly);
+        StockChart chart = AgentTools.HistoryChart(series.RootElement, "the past 3 weeks");
+        Assert.That(chart.Points.Select(p => p.Price), Is.EqualTo(new[] { 340.00, 347.73001, 347.1 }));
+        Assert.That((chart.Symbol, chart.Intraday, chart.PreviousClose), Is.EqualTo(("AAPL", false, (double?)null)));
+        Assert.That(chart.Change, Is.EqualTo(7.1).Within(1e-9), "from the first close");
+        Assert.That(chart.Label("2026-10-12"), Is.EqualTo("12 Oct"));
+        Assert.That(chart.Label("2026-10-12", longPeriod: true), Is.EqualTo("Oct 2026"));
+    }
+
+    [Test]
+    public void AChartIsKeptAsJson()
+    {
+        var chart = new StockChart { Symbol = "AAPL", Name = "Apple Inc.", Currency = "USD", Period = "27 October 2026", Intraday = true, PreviousClose = 343.91 };
+        chart.Points.Add(("2026-10-27 09:30:00", 343.2));
+        chart.Points.Add(("2026-10-27 15:55:00", 347.1));
+        StockChart back = StockChart.FromJson(chart.ToJson());
+        Assert.That((back.Symbol, back.Name, back.Currency, back.Period, back.Intraday, back.PreviousClose),
+            Is.EqualTo(("AAPL", "Apple Inc.", "USD", "27 October 2026", true, (double?)343.91)));
+        Assert.That(back.Points, Is.EqualTo(chart.Points));
+        Assert.That(StockChart.FromJson(System.Text.Encoding.UTF8.GetBytes("not json")), Is.Null);
     }
 
     [Test]

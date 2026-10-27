@@ -2,6 +2,7 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -31,6 +32,12 @@ namespace Emgu.LiteRT.LM.Agents.Skills
 
         /// <summary>A Twelve Data API key (twelvedata.com) for stock prices (get_stock_quote, get_stock_history), or null / empty for none.</summary>
         public string TwelveDataApiKey { get; set; }
+
+        /// <summary>
+        /// Given the prices a stock tool fetched, to plot above the reply (the day's prices with a quote, the period's
+        /// closes with a history); called from the tool's thread. Null for no charts (and one request less per quote).
+        /// </summary>
+        public Action<StockChart> StockChartReady { get; set; }
 
         /// <summary>
         /// Where the user turns web search on and enters the key, in words for the agent: "Settings > Web search" by default.
@@ -63,8 +70,8 @@ namespace Emgu.LiteRT.LM.Agents.Skills
             }
             if (HasStocks)
             {
-                tools.Add(AgentTools.StockQuote(TwelveDataApiKey, _http));
-                tools.Add(AgentTools.StockHistory(TwelveDataApiKey, _http));
+                tools.Add(AgentTools.StockQuote(TwelveDataApiKey, _http, StockChartReady));
+                tools.Add(AgentTools.StockHistory(TwelveDataApiKey, _http, StockChartReady));
             }
             return tools;
         }
