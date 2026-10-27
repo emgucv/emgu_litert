@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Chat.Sqlite;
-using Maui.Demo.Lite;
 using Microsoft.Extensions.AI;
 using NUnit.Framework;
 using SQLite;
@@ -16,7 +15,7 @@ using SQLite;
 namespace Emgu.TF.Lite.Test
 {
     // Emgu.LiteRT.LM.Chat.Sqlite's ChatHistoryStore: saving exchanges, reading them back, compaction, private chats, and
-    // reading the chats the MAUI demo's ChatStore saved. No model.
+    // reading the chats the MAUI demo's ChatHistoryStore saved. No model.
     [TestFixture]
     public class UnitTestChatHistoryStore
     {
@@ -294,21 +293,22 @@ namespace Emgu.TF.Lite.Test
                 Is.EqualTo(ChatHistoryStore.SchemaVersion));
         }
 
-        // The demo's chat page saved its chats with its own ChatStore (linked into the tests) before this package existed:
-        // they must open unchanged.
+        // A chat saved row by row, the way the demo's chat page saved its chats before this package existed (a voice
+        // message's transcript and language set afterwards, a step line, a picture, a summary): it must open unchanged.
         [Test]
         public async Task ReadsTheChatsTheDemoSaved()
         {
             await _store.CloseAsync();
-            var demo = new ChatStore(_folder);
-            int chatId = await demo.CreateConversationAsync("Voice message", "Gemma4E2B");
-            int first = await demo.AddMessageAsync(chatId, MessageRecord.UserRole, "", null,
-                new List<(string, string, byte[])> { ("audio", "audio/wav", Wav) }, null, "en");
+            var demo = new ChatHistoryStore(_folder);
+            int chatId = await demo.CreateChatAsync("Voice message", "Gemma4E2B");
+            int first = await demo.AddMessageAsync(chatId, ChatMessageRecord.UserRole, "", null,
+                new List<(string, string, byte[])> { ("audio", "audio/wav", Wav) });
+            await demo.SetLanguageAsync(first, "en");
             await demo.SetTranscriptAsync(chatId, first, "How far is the Moon?");
-            await demo.AddMessageAsync(chatId, MessageRecord.StepRole, "Searching Wikipedia for “Moon”", null);
-            int firstReply = await demo.AddMessageAsync(chatId, MessageRecord.AssistantRole, "About 384,400 km.", "The Moon...");
-            await demo.AddMessageAsync(chatId, MessageRecord.UserRole, "And the Sun?", null, null, "Excerpt: the Sun.");
-            await demo.AddMessageAsync(chatId, MessageRecord.AssistantRole, "About 150 million km.", null,
+            await demo.AddMessageAsync(chatId, ChatMessageRecord.StepRole, "Searching Wikipedia for “Moon”", null);
+            int firstReply = await demo.AddMessageAsync(chatId, ChatMessageRecord.AssistantRole, "About 384,400 km.", "The Moon...");
+            await demo.AddMessageAsync(chatId, ChatMessageRecord.UserRole, "And the Sun?", null, null, "Excerpt: the Sun.");
+            await demo.AddMessageAsync(chatId, ChatMessageRecord.AssistantRole, "About 150 million km.", null,
                 new List<(string, string, byte[])> { ("generated", "image/png", new byte[] { 1, 2 }) });
             await demo.SetSummaryAsync(chatId, "The user asked how far the Moon is.", firstReply);
             await demo.CloseAsync();
@@ -334,8 +334,8 @@ namespace Emgu.TF.Lite.Test
             await _store.SaveExchangeAsync(chatId, new ChatMessageItem(ChatMessageRole.User, "Thanks"), Reply("You're welcome."));
             await _store.CloseAsync();
             SQLiteAsyncConnection.ResetPool();
-            demo = new ChatStore(_folder);
-            List<MessageRecord> rows = await demo.GetMessagesAsync(chatId);
+            demo = new ChatHistoryStore(_folder);
+            List<ChatMessageRecord> rows = await demo.GetMessagesAsync<ChatMessageRecord>(chatId);
             Assert.That(rows.Select(r => r.Text).TakeLast(2), Is.EqualTo(new[] { "Thanks", "You're welcome." }));
             Assert.That(rows.First().Language, Is.EqualTo("en"));
             await demo.CloseAsync();
@@ -598,7 +598,7 @@ namespace Emgu.TF.Lite.Test
         [Test]
         public async Task ReadsTheMemoriesAndGoalsTheDemoSaved()
         {
-            // The tables as the MAUI demo's ChatStore created them before the stores moved here.
+            // The tables as the MAUI demo's ChatHistoryStore created them before the stores moved here.
             SQLiteAsyncConnection db = await _store.GetConnectionAsync();
             await db.ExecuteAsync("CREATE TABLE \"Memory\" (\"Id\" integer primary key autoincrement not null, \"Text\" varchar, \"Created\" bigint)");
             await db.ExecuteAsync("CREATE TABLE \"Goal\" (\"Id\" integer primary key autoincrement not null, \"Text\" varchar, \"Target\" float, \"Unit\" varchar, \"Period\" integer, \"Created\" bigint)");

@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Chat.Sqlite;
 using Emgu.LiteRT.Util;
-using Maui.Demo.Lite;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test
@@ -16,7 +15,7 @@ namespace Emgu.TF.Lite.Test
     public class UnitTestStorage
     {
         private string _folder, _models, _image, _exports;
-        private ChatStore _store;
+        private ChatHistoryStore _store;
         private StorageCatalog _catalog;
 
         [SetUp]
@@ -27,7 +26,7 @@ namespace Emgu.TF.Lite.Test
             _image = Path.Combine(_folder, "image");
             _exports = Path.Combine(_folder, "exports");
             Directory.CreateDirectory(_models);
-            _store = new ChatStore(Path.Combine(_folder, "chats"));
+            _store = new ChatHistoryStore(Path.Combine(_folder, "chats"));
             _catalog = new StorageCatalog(_store, _models, _exports,
                 new[] { new StorageModel("Chat A", "a.litertlm"), new StorageModel("Search B", "embedding-b.litertlm", isSearch: true) { Download = new DownloadableFile("https://example.com/embedding-b.litertlm", "storage-test") } },
                 new[] { new StorageFolder("image", "Z-Image-Turbo", _image, "Image model, host tensors, and prepared weight caches.") });
@@ -74,14 +73,14 @@ namespace Emgu.TF.Lite.Test
             FileWithSize(Path.Combine(_models, "old.litertlm_123_456.xnnpack_cache"), 50);
             FileWithSize(Path.Combine(_image, "cache", "graph.xnnpack_cache"), 200);
             FileWithSize(Path.Combine(_exports, "export-test", "chat.zip"), 30);
-            int chat = await _store.CreateConversationAsync("Saved chat", "ChatA");
-            await _store.AddMessageAsync(chat, MessageRecord.UserRole, "Keep this text", null,
+            int chat = await _store.CreateChatAsync("Saved chat", "ChatA");
+            await _store.AddMessageAsync(chat, ChatMessageRecord.UserRole, "Keep this text", null,
                 new[] { ("image", "image/png", new byte[40]) });
             await _store.SaveDocumentAsync(new DocumentRecord { Id = "d1", Name = "report.pdf" }, new[] {
                 new DocumentItemRecord { DocumentId = "d1", Text = "Saved document", Data = new byte[60], Embedding = new byte[80] } });
             await _store.SavePhotoEmbeddingAsync(new PhotoEmbeddingRecord { PhotoId = "p1", Embedding = new byte[100] });
-            await _store.SaveChatEmbeddingsAsync((await _store.GetMessagesAsync(chat))[0].Id,
-                new List<ChatSearchPassage> { new ChatSearchPassage { Id = "e1", MessageId = (await _store.GetMessagesAsync(chat))[0].Id, Text = "excerpt", Embedding = new byte[80] } });
+            await _store.SaveChatEmbeddingsAsync((await _store.GetMessagesAsync<ChatMessageRecord>(chat))[0].Id,
+                new List<ChatSearchPassage> { new ChatSearchPassage { Id = "e1", MessageId = (await _store.GetMessagesAsync<ChatMessageRecord>(chat))[0].Id, Text = "excerpt", Embedding = new byte[80] } });
             var snapshot = await _catalog.ReadAsync();
             long database = snapshot.Entries.Single(e => e.Kind == StorageKind.Database).Bytes;
             Assert.That(snapshot.DiskBytes, Is.EqualTo(database + 100 + 50 + 200 + 30 + 40));
@@ -95,18 +94,18 @@ namespace Emgu.TF.Lite.Test
         [Test]
         public async Task DeletingDocumentDetachesAllChatsAndReclaimsDatabaseSpace()
         {
-            int first = await _store.CreateConversationAsync("First", "ChatA"), second = await _store.CreateConversationAsync("Second", "ChatA");
-            await _store.AddMessageAsync(first, MessageRecord.UserRole, "Keep my question", null, context: "Keep the excerpt used in this answer");
+            int first = await _store.CreateChatAsync("First", "ChatA"), second = await _store.CreateChatAsync("Second", "ChatA");
+            await _store.AddMessageAsync(first, ChatMessageRecord.UserRole, "Keep my question", null, context: "Keep the excerpt used in this answer");
             await _store.SaveDocumentAsync(new DocumentRecord { Id = "large", Name = "large.pdf" }, new[] {
                 new DocumentItemRecord { DocumentId = "large", Text = "Report", Data = new byte[1024 * 1024] } });
-            await _store.SetConversationDocumentAsync(first, "large");
-            await _store.SetConversationDocumentAsync(second, "large");
+            await _store.SetChatDocumentAsync(first, "large");
+            await _store.SetChatDocumentAsync(second, "large");
             var before = await _catalog.ReadAsync();
             await _catalog.DeleteAsync(before.Entries.Single(e => e.Kind == StorageKind.Document));
             Assert.That(await _store.GetDocumentAsync("large"), Is.Null);
             Assert.That(await _store.GetDocumentItemsAsync("large"), Is.Empty);
-            Assert.That((await _store.GetConversationsAsync()).All(c => c.DocumentId == null), Is.True);
-            var saved = (await _store.GetMessagesAsync(first)).Single();
+            Assert.That((await _store.GetChatsAsync()).All(c => c.DocumentId == null), Is.True);
+            var saved = (await _store.GetMessagesAsync<ChatMessageRecord>(first)).Single();
             Assert.That(saved.Text, Is.EqualTo("Keep my question"));
             Assert.That(saved.Context, Does.Contain("Keep the excerpt"));
             Assert.That((await _catalog.ReadAsync()).DiskBytes, Is.LessThan(before.DiskBytes - 900_000));
@@ -115,26 +114,26 @@ namespace Emgu.TF.Lite.Test
         [Test]
         public async Task DeletingAttachmentsPreservesMessagesAndOtherStorage()
         {
-            int chat = await _store.CreateConversationAsync("Keep chat", "ChatA");
-            await _store.AddMessageAsync(chat, MessageRecord.AssistantRole, "Keep this reply", null,
+            int chat = await _store.CreateChatAsync("Keep chat", "ChatA");
+            await _store.AddMessageAsync(chat, ChatMessageRecord.AssistantRole, "Keep this reply", null,
                 new[] { ("generated", "image/png", new byte[] { 1, 2, 3 }) });
             FileWithSize(Path.Combine(_models, "a.litertlm"), 20);
             await _catalog.DeleteAsync((await _catalog.ReadAsync()).Entries.Single(e => e.Kind == StorageKind.Attachments));
-            var messages = await _store.GetMessagesAsync(chat);
+            var messages = await _store.GetMessagesAsync<ChatMessageRecord>(chat);
             Assert.That(messages.Single().Text, Is.EqualTo("Keep this reply"));
             Assert.That(messages.Single().Attachments, Is.Null);
             Assert.That(Directory.Exists(_store.AttachmentFolder), Is.False);
             Assert.That(File.Exists(Path.Combine(_models, "a.litertlm")), Is.True);
-            await _store.AddMessageAsync(chat, MessageRecord.UserRole, "New attachment", null,
+            await _store.AddMessageAsync(chat, ChatMessageRecord.UserRole, "New attachment", null,
                 new[] { ("audio", "audio/wav", new byte[] { 4, 5 }) });
-            Assert.That(_store.GetAttachments((await _store.GetMessagesAsync(chat)).Last()), Has.Count.EqualTo(1));
+            Assert.That(_store.GetAttachments((await _store.GetMessagesAsync<ChatMessageRecord>(chat)).Last()), Has.Count.EqualTo(1));
         }
 
         [Test]
         public async Task IndexDeletionKeepsChatsDocumentsAndImageDeletionKeepsModels()
         {
-            int chat = await _store.CreateConversationAsync("Keep", "ChatA");
-            int message = await _store.AddMessageAsync(chat, MessageRecord.UserRole, "Keep text", null);
+            int chat = await _store.CreateChatAsync("Keep", "ChatA");
+            int message = await _store.AddMessageAsync(chat, ChatMessageRecord.UserRole, "Keep text", null);
             await _store.SavePhotoEmbeddingAsync(new PhotoEmbeddingRecord { PhotoId = "p", Embedding = new byte[64] });
             await _store.SaveChatEmbeddingsAsync(message, new List<ChatSearchPassage> {
                 new ChatSearchPassage { Id = "e", MessageId = message, Text = "Keep text", Embedding = new byte[64] } });
@@ -142,7 +141,7 @@ namespace Emgu.TF.Lite.Test
                 await _catalog.DeleteAsync((await _catalog.ReadAsync()).Entries.Single(e => e.Kind == kind));
             Assert.That(await _store.GetPhotoEmbeddingsAsync(), Is.Empty);
             Assert.That(await _store.GetChatEmbeddingsAsync(), Is.Empty);
-            Assert.That(await _store.GetMessagesAsync(chat), Has.Count.EqualTo(1));
+            Assert.That(await _store.GetMessagesAsync<ChatMessageRecord>(chat), Has.Count.EqualTo(1));
             FileWithSize(Path.Combine(_image, "host", "weights.bin"), 20);
             FileWithSize(Path.Combine(_image, "cache", "compiled.xnnpack_cache"), 30);
             FileWithSize(Path.Combine(_models, "a.litertlm"), 10);

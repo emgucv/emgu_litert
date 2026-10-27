@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Agents.Mcp;
-using Maui.Demo.Lite;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;

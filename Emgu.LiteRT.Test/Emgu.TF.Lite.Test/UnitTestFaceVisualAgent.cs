@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Vision;
 using Emgu.LiteRT.Models;
-using Maui.Demo.Lite;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;

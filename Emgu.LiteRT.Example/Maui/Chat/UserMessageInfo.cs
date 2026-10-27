@@ -7,7 +7,7 @@ internal sealed class UserMessageInfo : System.ComponentModel.INotifyPropertyCha
 {
     private string _dividerText;
 
-    // Its id in the ChatStore (0 if not saved).
+    // Its id in the saved chats (0 if not saved).
     public int MessageId;
 
     // Above the first message the model still sees after compacting: whether the earlier ones were summarized.

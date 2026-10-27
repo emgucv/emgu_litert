@@ -11,7 +11,6 @@ using Emgu.LiteRT.LM.Agents.Skills;
 using Emgu.LiteRT.LM.Agents.Vision;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Agents.CV;
-using Maui.Demo.Lite;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using NUnit.Framework;
@@ -269,7 +268,7 @@ public class UnitTestToolRouting
             response = await client.GetResponseAsync(prompt, new ChatOptions
             {
                 Tools = tools,
-                Instructions = string.Join("\n\n", new[] { ChatPlannerInstructions.Agent, router.Instructions() }.Where(t => t != null)),
+                Instructions = string.Join("\n\n", new[] { ChatSkillSet.DefaultInstructions, router.Instructions() }.Where(t => t != null)),
                 Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }
             }, stop.Token);
             if (!router.TakeRerun())
@@ -302,7 +301,7 @@ public class UnitTestToolRouting
         ChatResponse response = await client.GetResponseAsync(prompt, new ChatOptions
         {
             Tools = tools,
-            Instructions = ChatPlannerInstructions.Agent + "\n\n" + AgentTools.DeviceActionInstructions(kinds),
+            Instructions = ChatSkillSet.DefaultInstructions + "\n\n" + AgentTools.DeviceActionInstructions(kinds),
             Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }
         }, stop.Token);
         TestContext.Progress.WriteLine(prompt + " -> " + response.Text);
@@ -336,7 +335,7 @@ public class UnitTestToolRouting
         core.Add(AgentTools.Memory(new InMemoryAgentMemoryStore())[0]);
         core.Add(AgentTools.Memory(new InMemoryAgentMemoryStore())[1]);
         ToolRouter router = new ToolRouter(DemoGroups(), null);
-        int coreSize = Size(core) + ChatPlannerInstructions.Agent.Length;
+        int coreSize = Size(core) + ChatSkillSet.DefaultInstructions.Length;
         int stubs = Size(router.Tools());
         foreach (ToolGroup group in router.Groups)
             router.Activate(group.Name);

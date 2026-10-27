@@ -1,7 +1,6 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using System.Linq;
 using Emgu.LiteRT.LM.Chat;
-using Maui.Demo.Lite;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;

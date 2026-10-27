@@ -200,7 +200,7 @@ The chat page is built on the reusable chat libraries:
   `ChatFeature` in `Chat/Features/` (`ARCHITECTURE.md` says how to add one); the demo's own message and reply templates are
   in `ChatTemplates.xaml`.
 - `Emgu.LiteRT.LM.Chat`'s `ChatConversation`: sending, tools and compaction.
-- `Emgu.LiteRT.LM.Chat.Sqlite`'s `ChatHistoryStore`, the base of the page's `ChatStore`, for saved chats.
+- `Emgu.LiteRT.LM.Chat.Sqlite`'s `ChatHistoryStore` for saved chats, with its `SqliteAgentMemoryStore` and `SqliteAgentGoalStore` for the memories and goals.
 
 See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HISTORY_PLAN.md](history/CHAT_VOICE_AND_HISTORY_PLAN.md);
 [`Emgu.LiteRT.Example/MauiChat`](../MauiChat/README.md) is a minimal app using them.

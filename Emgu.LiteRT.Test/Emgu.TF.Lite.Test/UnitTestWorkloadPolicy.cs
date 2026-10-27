@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Models;
-using Maui.Demo.Lite;
 using NUnit.Framework;
 using Emgu.LiteRT.LM.Agents;
 

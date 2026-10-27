@@ -3,7 +3,6 @@ using System;
 using System.Text.Json;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.CV;
-using Maui.Demo.Lite;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;

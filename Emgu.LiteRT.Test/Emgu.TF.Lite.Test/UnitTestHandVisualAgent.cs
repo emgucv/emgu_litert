@@ -10,7 +10,6 @@ using Emgu.LiteRT.LM.Agents.Vision;
 using Emgu.LiteRT.Models;
 using Emgu.LiteRT.Util;
 using Emgu.LiteRT.LM.Agents.CV;
-using Maui.Demo.Lite;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;

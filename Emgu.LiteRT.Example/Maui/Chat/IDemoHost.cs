@@ -1,4 +1,5 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+using Emgu.LiteRT.LM.Chat.Sqlite;
 using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
@@ -9,8 +10,8 @@ namespace Maui.Demo.Lite;
 // members here only as a feature needs them.
 internal interface IDemoHost
 {
-    // The saved chats, memories, goals, documents and indexes (SQLite).
-    ChatStore Store { get; }
+    // The saved chats, documents and indexes (SQLite; the memories and goals are in the same database).
+    ChatHistoryStore Store { get; }
 
     // Waits for a cool, charged device before heavy background work, and runs one embedding at a time.
     IIndexingWorkload Workload { get; }

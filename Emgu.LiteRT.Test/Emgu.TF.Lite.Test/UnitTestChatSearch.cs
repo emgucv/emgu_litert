@@ -11,7 +11,6 @@ using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Chat.Sqlite;
-using Maui.Demo.Lite;
 using Microsoft.Extensions.AI;
 using NUnit.Framework;
 
@@ -20,14 +19,14 @@ namespace Emgu.TF.Lite.Test
     [TestFixture]
     public class UnitTestChatSearch
     {
-        private readonly List<(ChatStore Store, string Folder)> _stores = new();
+        private readonly List<(ChatHistoryStore Store, string Folder)> _stores = new();
 
         private static ChatSearchQuery ToQuery(PhotoQuery query) => new ChatSearchQuery(query.Description, query.From, query.To);
 
-        private ChatStore CreateStore()
+        private ChatHistoryStore CreateStore()
         {
             string folder = Path.Combine(TestContext.CurrentContext.WorkDirectory, "chat-search-test-" + Guid.NewGuid().ToString("N"));
-            var store = new ChatStore(folder);
+            var store = new ChatHistoryStore(folder);
             _stores.Add((store, folder));
             return store;
         }
@@ -148,10 +147,10 @@ namespace Emgu.TF.Lite.Test
         public async Task IndexPersistsReplacesPrunesAndClearsWithoutDeletingChats()
         {
             var store = CreateStore();
-            int chat = await store.CreateConversationAsync("Trip decisions", "Gemma4E2B");
-            int user = await store.AddMessageAsync(chat, MessageRecord.UserRole, "Visit Paris in June", null);
-            int reply = await store.AddMessageAsync(chat, MessageRecord.AssistantRole, "Book the train", "private reasoning");
-            await store.AddMessageAsync(chat, MessageRecord.StepRole, "Searching", null);
+            int chat = await store.CreateChatAsync("Trip decisions", "Gemma4E2B");
+            int user = await store.AddMessageAsync(chat, ChatMessageRecord.UserRole, "Visit Paris in June", null);
+            int reply = await store.AddMessageAsync(chat, ChatMessageRecord.AssistantRole, "Book the train", "private reasoning");
+            await store.AddMessageAsync(chat, ChatMessageRecord.StepRole, "Searching", null);
             var sources = await store.GetSearchMessagesAsync();
             Assert.That(sources.Select(s => s.Id), Is.EquivalentTo(new[] { user, reply }));
             List<ChatSearchPassage> Passages(string model) => new List<ChatSearchPassage>
@@ -160,7 +159,7 @@ namespace Emgu.TF.Lite.Test
                     Model = model, Text = "Visit Paris in June", Embedding = new byte[] { 1, 2, 3, 4 } }
             };
             await store.SaveChatEmbeddingsAsync(user, Passages("model-a"));
-            var reopened = new ChatStore(_stores.Last().Folder);
+            var reopened = new ChatHistoryStore(_stores.Last().Folder);
             var found = await reopened.GetChatEmbeddingsAsync();
             Assert.That(found, Has.Count.EqualTo(1));
             Assert.That(found[0].Title, Is.EqualTo("Trip decisions"));
@@ -174,9 +173,9 @@ namespace Emgu.TF.Lite.Test
             Assert.That(found[0].Model, Is.EqualTo("model-b"));
             await store.ClearChatEmbeddingsAsync();
             Assert.That(await reopened.GetChatEmbeddingsAsync(), Is.Empty);
-            Assert.That(await store.GetMessagesAsync(chat), Has.Count.EqualTo(3));
+            Assert.That(await store.GetMessagesAsync<ChatMessageRecord>(chat), Has.Count.EqualTo(3));
             await store.SaveChatEmbeddingsAsync(user, Passages("model-b"));
-            await store.DeleteConversationAsync(chat);
+            await store.DeleteChatAsync(chat);
             Assert.That(await reopened.GetChatEmbeddingsAsync(), Is.Empty);
             // An in-flight embedding must not resurrect a deleted message's index.
             await reopened.SaveChatEmbeddingsAsync(user, Passages("model-b"));
@@ -189,8 +188,8 @@ namespace Emgu.TF.Lite.Test
         {
             var store = CreateStore();
             var index = new ChatSearchIndex(store);
-            int chat = await store.CreateConversationAsync("Long chat", "Gemma4E2B");
-            await store.AddMessageAsync(chat, MessageRecord.UserRole, new string('a', 1900), null);
+            int chat = await store.CreateChatAsync("Long chat", "Gemma4E2B");
+            await store.AddMessageAsync(chat, ChatMessageRecord.UserRole, new string('a', 1900), null);
             using var cancelled = new CancellationTokenSource();
             int calls = 0;
             Assert.ThrowsAsync<OperationCanceledException>(async () => await index.IndexAsync("model-a", (text, token) =>
@@ -205,7 +204,7 @@ namespace Emgu.TF.Lite.Test
             Assert.That(calls, Is.EqualTo(3));
             await index.IndexAsync("model-a", Embed, null, CancellationToken.None);
             Assert.That(calls, Is.EqualTo(3), "Unchanged messages must not be re-embedded.");
-            await store.AddMessageAsync(chat, MessageRecord.AssistantRole, "New reply", null);
+            await store.AddMessageAsync(chat, ChatMessageRecord.AssistantRole, "New reply", null);
             await index.IndexAsync("model-a", Embed, null, CancellationToken.None);
             Assert.That(calls, Is.EqualTo(4));
             await index.IndexAsync("model-b", Embed, null, CancellationToken.None);
@@ -218,10 +217,10 @@ namespace Emgu.TF.Lite.Test
         {
             var store = CreateStore();
             var index = new ChatSearchIndex(store);
-            int trip = await store.CreateConversationAsync("Travel", "Gemma4E2B");
-            int cooking = await store.CreateConversationAsync("Recipes", "Gemma4E2B");
-            await store.AddMessageAsync(trip, MessageRecord.UserRole, "Visit Paris", null);
-            await store.AddMessageAsync(cooking, MessageRecord.AssistantRole, "Bake bread", null);
+            int trip = await store.CreateChatAsync("Travel", "Gemma4E2B");
+            int cooking = await store.CreateChatAsync("Recipes", "Gemma4E2B");
+            await store.AddMessageAsync(trip, ChatMessageRecord.UserRole, "Visit Paris", null);
+            await store.AddMessageAsync(cooking, ChatMessageRecord.AssistantRole, "Bake bread", null);
             Task<float[]> Embed(string text, CancellationToken token) => Task.FromResult(
                 text.Contains("Paris") ? new[] { 1f, 0f, 0f } : new[] { 0f, 1f, 0f });
             await index.IndexAsync("model-a", Embed, null, CancellationToken.None);
@@ -253,13 +252,13 @@ namespace Emgu.TF.Lite.Test
         {
             var store = CreateStore();
             var index = new ChatSearchIndex(store);
-            int trip = await store.CreateConversationAsync("Paris travel decisions", "Gemma4E2B");
-            await store.AddMessageAsync(trip, MessageRecord.UserRole, "For Paris, let's travel by train on June 12 and stay at Hotel Lantern.", null);
-            await store.AddMessageAsync(trip, MessageRecord.AssistantRole, "Agreed: the train on June 12, with a room at Hotel Lantern in Paris.", null);
-            int food = await store.CreateConversationAsync("Dinner preferences", "Gemma4E2B");
-            await store.AddMessageAsync(food, MessageRecord.UserRole, "I am vegetarian and prefer mushroom risotto for dinner.", null);
-            int code = await store.CreateConversationAsync("Software project", "Gemma4E2B");
-            await store.AddMessageAsync(code, MessageRecord.AssistantRole, "Use SQLite transactions to update database records atomically.", null);
+            int trip = await store.CreateChatAsync("Paris travel decisions", "Gemma4E2B");
+            await store.AddMessageAsync(trip, ChatMessageRecord.UserRole, "For Paris, let's travel by train on June 12 and stay at Hotel Lantern.", null);
+            await store.AddMessageAsync(trip, ChatMessageRecord.AssistantRole, "Agreed: the train on June 12, with a room at Hotel Lantern in Paris.", null);
+            int food = await store.CreateChatAsync("Dinner preferences", "Gemma4E2B");
+            await store.AddMessageAsync(food, ChatMessageRecord.UserRole, "I am vegetarian and prefer mushroom risotto for dinner.", null);
+            int code = await store.CreateChatAsync("Software project", "Gemma4E2B");
+            await store.AddMessageAsync(code, ChatMessageRecord.AssistantRole, "Use SQLite transactions to update database records atomically.", null);
             using var embedding = new EmbeddingGemma2TextVision();
             await embedding.Init(configureSettings: settings => settings.NumThreads = 4);
             Task<float[]> Document(string text, CancellationToken token) => Task.Run(() => embedding.EmbedDocuments(new[] { text })[0], token);

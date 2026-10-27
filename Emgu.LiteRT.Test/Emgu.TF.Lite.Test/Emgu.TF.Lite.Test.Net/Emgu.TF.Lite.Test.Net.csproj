@@ -159,8 +159,6 @@
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Agents.Documents\NetStandard\Emgu.LiteRT.LM.Agents.Documents.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Chat\NetStandard\Emgu.LiteRT.LM.Chat.csproj" />
     <ProjectReference Include="..\..\..\Emgu.LiteRT.LM.Chat.Sqlite\NetStandard\Emgu.LiteRT.LM.Chat.Sqlite.csproj" />
-    <!-- The MAUI demo's code without UI (saved chats, tool groups, MCP, storage, the camera monitors' catalogue). -->
-    <ProjectReference Include="..\..\..\Emgu.LiteRT.Example\Maui.Demo.Lite.Core\Maui.Demo.Lite.Core.csproj" />
     <!-- Annotation/DownloadableFile/FileDownloadManager moved from Emgu.Models into
          Emgu.LiteRT.Util - needs a direct reference now for UnitTest1.cs to compile. -->
     <ProjectReference Include="..\..\..\Emgu.LiteRT.Util\NetStandard\Emgu.LiteRT.Util.csproj" />

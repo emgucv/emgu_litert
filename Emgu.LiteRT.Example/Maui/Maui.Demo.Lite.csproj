@@ -79,8 +79,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\Emgu.LiteRT.Runtime\Maui\UI\Emgu.LiteRT.runtime.maui.csproj" />
-		<!-- The demo's code without UI or device (saved chats, tool groups, MCP, storage, the camera monitors' catalogue), also tested by the test project. -->
-		<ProjectReference Include="..\Maui.Demo.Lite.Core\Maui.Demo.Lite.Core.csproj" />
 	    <ProjectReference Include="..\..\Emgu.TF.Lite\NetStandard\Emgu.TF.Lite.csproj" />
 	  
 	    <!-- <ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.TF.Lite.Models\Emgu.TF.Lite.Models.IOS\Emgu.TF.Lite.Models.IOS.csproj" /> -->
@@ -118,7 +116,7 @@
 		<PackageReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="Xamarin.AndroidX.Fragment.Ktx" Version="1.9.0" />
 		<!-- Native Save As dialogs for generated pictures; 13.0.0 supports the existing MAUI 10.0.11 version. -->
 		<PackageReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="CommunityToolkit.Maui.Core" Version="13.0.0" />
-		<!-- The chat page's saved chats (ChatStore.cs): SQLite. -->
+		<!-- The chat page's saved chats (Emgu.LiteRT.LM.Chat.Sqlite's ChatHistoryStore): SQLite. -->
 		<PackageReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="sqlite-net-pcl" Version="1.11.285" />
 		<!-- The chat page's documents (LiteRtLmChatPage.Documents.cs): Emgu.LiteRT.LM.Agents.Documents reads them, with PdfPig. -->
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.LM.Agents.Documents\NetStandard\Emgu.LiteRT.LM.Agents.Documents.csproj" />

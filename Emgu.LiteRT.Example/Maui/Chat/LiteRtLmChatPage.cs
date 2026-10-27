@@ -22,7 +22,7 @@ namespace Maui.Demo.Lite;
 
 /// <summary>
 /// The chat demo: Emgu.LiteRT.LM.Maui's ChatPage with the library's models (Emgu.LiteRT.LM.Chat's ChatModelCatalog, and the
-/// user's own server), its saved chats, memories and goals (ChatStore, SQLite), the library's built-in features and the
+/// user's own server), its saved chats, memories and goals (ChatHistoryStore and the agent stores, SQLite), the library's built-in features and the
 /// demo's own (Chat/Features: the camera and sound monitors, documents, tool servers, the voice chat, the server, storage,
 /// export, photo and past-chat search, image generation, goals, device actions, meeting notes, exercise counting...).
 /// The page itself adds what the demo does around a message: the document's excerpts, the task planner, the memories a
@@ -33,7 +33,11 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     private const int SummaryMaxTokens = 400;
 
     // The saved chats, memories, goals, documents and indexes (one database for the app).
-    private static readonly ChatStore SharedStore = new ChatStore(System.IO.Path.Combine(FileSystem.AppDataDirectory, "chats"));
+    private static readonly ChatHistoryStore SharedStore = new ChatHistoryStore(System.IO.Path.Combine(FileSystem.AppDataDirectory, "chats"));
+
+    // The agent's memories (remember / forget) and the user's goals, in the same database; none while private.
+    private static readonly SqliteAgentMemoryStore Memories = new SqliteAgentMemoryStore(SharedStore);
+    private static readonly SqliteAgentGoalStore Goals = new SqliteAgentGoalStore(SharedStore);
 
     // The demo's features (made before the page, so the base constructor attaches them).
     private sealed class Parts
@@ -114,10 +118,10 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             Translations = new TranslationFeature(),
             DeviceActions = new DeviceActionsFeature(),
             WrittenDocuments = new WrittenDocumentsFeature(),
-            Goals = new GoalsFeature(SharedStore.Goals),
+            Goals = new GoalsFeature(Goals),
             Meetings = new MeetingFeature(),
             Exercises = new ExerciseFeature(),
-            Memory = new MemoryFeature(SharedStore.Memories)
+            Memory = new MemoryFeature(Memories)
         };
         // The user's own server: its remote option goes last in the model list ("Server", the id saved chats have).
         parts.Server = new ServerFeature();
@@ -179,7 +183,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             Settings = new ChatSettingsAdapter(),
             ShowBackButton = true,
             ShowCpuThreads = true,
-            Instructions = ChatPlannerInstructions.Agent,
             ReplySpeaker = parts.Camera.ReplySpeaker,
             ConfigureEngine = settings =>
             {
@@ -214,7 +217,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 
     // ---------- IDemoHost ----------
 
-    ChatStore IDemoHost.Store => SharedStore;
+    ChatHistoryStore IDemoHost.Store => SharedStore;
 
     IIndexingWorkload IDemoHost.Workload => Workload;
 
@@ -573,7 +576,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             return;
         try
         {
-            HashSet<string> kept = (await SharedStore.Memories.GetMemoriesAsync()).Select(m => m.Id).ToHashSet();
+            HashSet<string> kept = (await Memories.GetMemoriesAsync()).Select(m => m.Id).ToHashSet();
             List<AgentMemory> used = AgentTools.MemoriesUsed(given, prompt, reply.Text).Where(m => kept.Contains(m.Id)).ToList();
             if (used.Count == 0)
                 return;
@@ -597,7 +600,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     private async Task ShowMemoriesAsync(HashSet<string> only)
     {
         if (IsPrivate) return;
-        IList<AgentMemory> memories = (await SharedStore.Memories.GetMemoriesAsync()).Where(m => only.Contains(m.Id)).ToList();
+        IList<AgentMemory> memories = (await Memories.GetMemoriesAsync()).Where(m => only.Contains(m.Id)).ToList();
         if (memories.Count == 0)
             return;
         var list = new VerticalStackLayout { Spacing = 2 };
@@ -623,7 +626,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             SemanticProperties.SetDescription(delete, "Delete this memory");
             delete.OnTap(async () =>
             {
-                await SharedStore.Memories.DeleteMemoryAsync(id);
+                await Memories.DeleteMemoryAsync(id);
                 list.Children.Remove(row);
             });
             row.Add(delete, 1, 0);
@@ -644,7 +647,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         UserMessageInfo info = userItem.Tag as UserMessageInfo ?? new UserMessageInfo();
         try
         {
-            int id = CurrentChatId ?? await SharedStore.CreateConversationAsync(ChatHistoryStore.TitleOf(userItem), SelectedModel?.Id);
+            int id = CurrentChatId ?? await SharedStore.CreateChatAsync(ChatHistoryStore.TitleOf(userItem), SelectedModel?.Id);
             // The step lines: the document's (a card above the reply), then the tool calls, then the memories it used.
             List<string> steps = new List<string>();
             if (bubble?.DocumentStep != null)
@@ -657,7 +660,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             ChatSavedExchange saved = await SharedStore.SaveExchangeAsync(id, userItem, reply, null, steps);
             info.MessageId = saved.MessageId;
             // The document the chat uses now (or none), restored when it is opened again.
-            await SharedStore.SetConversationDocumentAsync(id, _parts.Documents.DocumentReady?.IsCompletedSuccessfully == true ? _parts.Documents.DocumentId : null);
+            await SharedStore.SetChatDocumentAsync(id, _parts.Documents.DocumentReady?.IsCompletedSuccessfully == true ? _parts.Documents.DocumentId : null);
             SetCurrentChat(id);
             _parts.Transcripts.Track(userItem, id);
         }
@@ -675,7 +678,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             return;
         if (IsPrivate && !await SetPrivateAsync(false))
             return;
-        ConversationRecord chat = (await SharedStore.GetConversationsAsync()).FirstOrDefault(c => c.Id == chatId);
+        ChatRecord chat = await SharedStore.GetChatAsync(chatId);
         if (chat == null || IsWorking)
             return;
         UiStallWatchdog.Mark("Open saved chat " + chatId);
@@ -688,14 +691,14 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                 return;
             // The messages, with each reply's step lines (ChatHistoryStore reads them back, and the model sees those
             // after the last compaction and the summary of the ones before); the page's data and cards with them.
-            ChatHistory history = await SharedStore.LoadAsync<MessageRecord>(chatId);
+            ChatHistory history = await SharedStore.LoadAsync(chatId);
             if (history == null)
                 return;
             // (A message's language and a reply's thinking translation come back on the items; the library's
             // TranslationFeature offers the translate rows again from OnChatOpened.)
             foreach (ChatMessageItem item in history.Messages)
             {
-                var record = (MessageRecord)history.RecordOf(item);
+                ChatMessageRecord record = history.RecordOf(item);
                 if (item.Role == ChatMessageRole.User)
                 {
                     var info = new UserMessageInfo { MessageId = record.Id };

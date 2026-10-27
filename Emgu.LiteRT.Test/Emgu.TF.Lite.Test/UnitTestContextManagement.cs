@@ -11,7 +11,6 @@ using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Agents.Vision;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Agents.CV;
-using Maui.Demo.Lite;
 using System.Text.Json;
 using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
 using Microsoft.Extensions.AI;
@@ -194,7 +193,7 @@ public class UnitTestContextManagement
         using var client = new FunctionInvokingChatClient(native) { MaximumIterationsPerRequest = 6 };
         try {
             var response = await client.GetResponseAsync(prompt, new ChatOptions { Tools = tools,
-                Instructions = string.Join("\n\n", ChatPlannerInstructions.Agent, ChatPhotos.Instructions, ChatSearchIndex.Instructions,
+                Instructions = string.Join("\n\n", ChatSkillSet.DefaultInstructions, ChatPhotos.Instructions, ChatSearchIndex.Instructions,
                     ChatImageGeneration.Instructions, ChatCamera.Instructions, VisualAgentTools.Instructions),
                 Reasoning = new ReasoningOptions { Effort = thinking ? ReasoningEffort.Medium : ReasoningEffort.None } }, stop.Token);
             TestContext.Progress.WriteLine(response.Text); foreach (var info in diagnostics) TestContext.Progress.WriteLine(info);

@@ -8,7 +8,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Chat.Sqlite;
-using Maui.Demo.Lite;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test
@@ -17,13 +16,15 @@ namespace Emgu.TF.Lite.Test
     public class UnitTestChatExport
     {
         private string _folder;
-        private ChatStore _store;
+        private ChatHistoryStore _store;
+        private SqliteAgentMemoryStore _memories;
 
         [SetUp]
         public void Setup()
         {
             _folder = Path.Combine(TestContext.CurrentContext.WorkDirectory, "chat-export-test-" + Guid.NewGuid().ToString("N"));
-            _store = new ChatStore(_folder);
+            _store = new ChatHistoryStore(_folder);
+            _memories = new SqliteAgentMemoryStore(_store);
         }
 
         [TearDown]
@@ -54,18 +55,18 @@ namespace Emgu.TF.Lite.Test
         [Test]
         public async Task ExportsCompleteMarkdownAndExactAttachmentsWithRelativeLinks()
         {
-            int id = await _store.CreateConversationAsync("Trip / 日本 [2026]", "Gemma4E2B");
+            int id = await _store.CreateChatAsync("Trip / 日本 [2026]", "Gemma4E2B");
             string text = "日本へ行こう\n\n```csharp\nvar x = 42;\n```";
             byte[] photo = { 1, 2, 3, 4 }, audio = { 5, 6, 7 }, generated = { 8, 9, 10 };
-            int user = await _store.AddMessageAsync(id, MessageRecord.UserRole, text, null,
+            int user = await _store.AddMessageAsync(id, ChatMessageRecord.UserRole, text, null,
                 new[] { ("image", "image/jpeg", photo), ("audio", "audio/wav", audio) }, "A passage from the itinerary.");
-            await _store.AddMessageAsync(id, MessageRecord.StepRole, "Calculated travel time", null);
-            int reply = await _store.AddMessageAsync(id, MessageRecord.AssistantRole, "**Train booked.**", "Reasoning with ``` and </details> delimiters.",
+            await _store.AddMessageAsync(id, ChatMessageRecord.StepRole, "Calculated travel time", null);
+            int reply = await _store.AddMessageAsync(id, ChatMessageRecord.AssistantRole, "**Train booked.**", "Reasoning with ``` and </details> delimiters.",
                 new[] { ("generated", "image/png", generated) });
             await _store.SetSummaryAsync(id, "A compacted model context", user);
-            int other = await _store.CreateConversationAsync("Do not export", "Other model");
-            await _store.AddMessageAsync(other, MessageRecord.UserRole, "OTHER_CHAT_PRIVATE", null);
-            await _store.Memories.AddMemoryAsync("GLOBAL_MEMORY_PRIVATE");
+            int other = await _store.CreateChatAsync("Do not export", "Other model");
+            await _store.AddMessageAsync(other, ChatMessageRecord.UserRole, "OTHER_CHAT_PRIVATE", null);
+            await _memories.AddMemoryAsync("GLOBAL_MEMORY_PRIVATE");
             using var output = new MemoryStream();
             Assert.That(await ChatExporter.ExportAsync(_store, id, output), Is.Zero);
             Assert.That(output.CanWrite, Is.True, "The caller owns the output stream.");
@@ -91,10 +92,10 @@ namespace Emgu.TF.Lite.Test
         [Test]
         public async Task MissingAttachmentsAreReportedWithoutBrokenLinks()
         {
-            int chat = await _store.CreateConversationAsync("Missing file", "Gemma4E2B");
-            await _store.AddMessageAsync(chat, MessageRecord.UserRole, "Look at this", null,
+            int chat = await _store.CreateChatAsync("Missing file", "Gemma4E2B");
+            await _store.AddMessageAsync(chat, ChatMessageRecord.UserRole, "Look at this", null,
                 new[] { ("image", "image/png", new byte[] { 1 }) });
-            var message = (await _store.GetMessagesAsync(chat)).Single();
+            var message = (await _store.GetMessagesAsync<ChatMessageRecord>(chat)).Single();
             File.Delete(_store.GetAttachments(message).Single().Path);
             using var output = new MemoryStream();
             Assert.That(await ChatExporter.ExportAsync(_store, chat, output), Is.EqualTo(1));
@@ -107,8 +108,8 @@ namespace Emgu.TF.Lite.Test
         [Test]
         public async Task ExportsStoredDocumentContentAndImagesWithoutPretendingToHaveOriginalPdf()
         {
-            int chat = await _store.CreateConversationAsync("Document chat", "Gemma4E2B");
-            await _store.AddMessageAsync(chat, MessageRecord.UserRole, "Summarize the report", null);
+            int chat = await _store.CreateChatAsync("Document chat", "Gemma4E2B");
+            await _store.AddMessageAsync(chat, ChatMessageRecord.UserRole, "Summarize the report", null);
             byte[] image = { 9, 8, 7, 6 };
             await _store.SaveDocumentAsync(new DocumentRecord { Id = "doc-1", Name = "Report [final].pdf", PageCount = 2 },
                 new List<DocumentItemRecord>
@@ -116,7 +117,7 @@ namespace Emgu.TF.Lite.Test
                     new DocumentItemRecord { DocumentId = "doc-1", Position = 0, Text = "Quarterly revenue grew.", Location = "Page 1" },
                     new DocumentItemRecord { DocumentId = "doc-1", Position = 1, IsImage = true, MediaType = "image/png", Data = image, Location = "Page 2" }
                 });
-            await _store.SetConversationDocumentAsync(chat, "doc-1");
+            await _store.SetChatDocumentAsync(chat, "doc-1");
             using var output = new MemoryStream();
             Assert.That(await ChatExporter.ExportAsync(_store, chat, output), Is.Zero);
             output.Position = 0;
@@ -132,11 +133,11 @@ namespace Emgu.TF.Lite.Test
         [Test]
         public async Task DeletedChatAndCancellationCannotProduceASuccessfulExport()
         {
-            int chat = await _store.CreateConversationAsync("Deleted", "Gemma4E2B");
-            await _store.DeleteConversationAsync(chat);
+            int chat = await _store.CreateChatAsync("Deleted", "Gemma4E2B");
+            await _store.DeleteChatAsync(chat);
             using var output = new MemoryStream();
             Assert.ThrowsAsync<InvalidOperationException>(() => ChatExporter.ExportAsync(_store, chat, output));
-            chat = await _store.CreateConversationAsync("Cancelled", "Gemma4E2B");
+            chat = await _store.CreateChatAsync("Cancelled", "Gemma4E2B");
             using var cancel = new CancellationTokenSource();
             cancel.Cancel();
             Assert.ThrowsAsync<OperationCanceledException>(() => ChatExporter.ExportAsync(_store, chat, output, cancel.Token));
@@ -147,7 +148,7 @@ namespace Emgu.TF.Lite.Test
         public void AttachmentReferencesCannotReadOutsideTheirChatFolder()
         {
             foreach (string name in new[] { "../secret.txt", "..\\secret.txt", "C:secret.txt", "/secret.txt", ".." })
-                Assert.That(_store.GetAttachments(new MessageRecord { ConversationId = 1, Attachments = "image|image/png|" + name }, includeMissing: true), Is.Empty);
+                Assert.That(_store.GetAttachments(new ChatMessageRecord { ConversationId = 1, Attachments = "image|image/png|" + name }, includeMissing: true), Is.Empty);
         }
     }
 }

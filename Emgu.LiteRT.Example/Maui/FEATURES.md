@@ -6,7 +6,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Saved chats
 
-- `ChatStore` keeps the chats in SQLite (`sqlite-net-pcl`), in `chats/chats.db3` in the app data folder - a subfolder,
+- The library's `ChatHistoryStore` (`Emgu.LiteRT.LM.Chat.Sqlite`; the demo's own `ChatStore` until 2026-10-27) keeps the chats in SQLite (`sqlite-net-pcl`), in `chats/chats.db3` in the app data folder - a subfolder,
   because an unsandboxed Mac Catalyst app's data folder is `~/Library` itself. Photos and audio are files in
   `chats/attachments/<id>/`.
 - Each completed exchange is saved: the user's message with its attachments, the tool step lines, and the answer with its
@@ -227,8 +227,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   so settings can change them in the middle of a conversation: the page's `ChatSkillSet` asks each feature for its tools
   (`Tools`, or the `ToolGroups` its router turns on when the message mentions them) and instructions. The core tools,
   memories, web search, location and the clipboard are the library's features (`CoreToolsFeature`, `MemoryFeature`,
-  `WebFeature`, `LocationFeature`, `ClipboardFeature`); the memories are `ChatStore.Memories`, an `Emgu.LiteRT.LM.Chat.Sqlite`
-  `SqliteAgentMemoryStore`. Each tool call shows as a step line.
+  `WebFeature`, `LocationFeature`, `ClipboardFeature`); the memories are an `Emgu.LiteRT.LM.Chat.Sqlite`
+  `SqliteAgentMemoryStore` over the chat store. Each tool call shows as a step line.
 - Always: `get_current_date_time`, `convert_units` and `calculate` (`Emgu.LiteRT.LM.Agents.Calculator`, a recursive-descent
   evaluator: + - * / ^ %, parentheses, pi and e, sqrt/ln/log/sin/.../round/min/max/pow, × ÷ − ·, a trailing % as percent;
   -2 ^ 2 is -4). Small models get arithmetic wrong: Gemma 4 E2B called it for "1234.5 times 678.9" and answered 838,102.05.
@@ -267,7 +267,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 ## Document questions
 
 - "+" > Document attaches a PDF, Word (.docx) or text file to the chat (the library's `DocumentsFeature` in `Emgu.LiteRT.LM.Maui.Documents`
-  since 2026-10-26, over the demo's `ChatStore` and `SearchServices`; `DocumentReader` and the saved-document search are in
+  since 2026-10-26, over the demo's `ChatHistoryStore` and `SearchServices`; `DocumentReader` and the saved-document search are in
   the `Emgu.LiteRT.LM.Agents.Documents` package, `PdfPageRenderer` in `Emgu.LiteRT.LM.Maui`, since 2026-10-25). It shows as a chip above the message box - indexing progress, then e.g. "5 pages · 2 pictures ·
   1 page as image". Its cross removes it, as do New chat and opening a saved chat.
 - Reading:
@@ -281,7 +281,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     on phones, page images first) are only indexed when the selected model takes images; only the first 150 pages are read.
 - The index uses the shared search model (`SearchEmbedder`, EmbeddingGemma 2 Text Vision by default; downloaded on first use,
   kept while the page is open, released with it).
-- Indexes are saved in the chat database: `ChatStore`'s `Document` (id = the file's SHA-256 in hex, name, pages, chip
+- Indexes are saved in the chat database: `ChatHistoryStore`'s `Document` (id = the file's SHA-256 in hex, name, pages, chip
   summary, `Settings`) and `DocumentItem` (each passage's text and location, or each image's bytes, media type, location and
   page flag, with its embedding as floats), plus `Conversation.DocumentId`.
   - Attaching a file whose saved index has the current settings (`IndexSettings`: embedding model file, passage size and
@@ -330,7 +330,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 ## Photo search
 
 - Settings > "Search my photos" (off by default; since 2026-10-26 the library's `PhotoSearchFeature`, `PhotoIndex` and
-  `PhotoLibrary` in `Emgu.LiteRT.LM.Maui`, over the demo's `ChatStore` and `SearchServices`; the place list is embedded in
+  `PhotoLibrary` in `Emgu.LiteRT.LM.Maui`, over the demo's `ChatHistoryStore` and `SearchServices`; the place list is embedded in
   the library) asks for photo access:
   - Android: `READ_MEDIA_IMAGES` - a custom permission class, since MAUI's `Permissions.Photos` also asks for videos - plus
     `READ_MEDIA_VISUAL_USER_SELECTED`, and `READ_EXTERNAL_STORAGE` up to API 32.
@@ -342,7 +342,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     visionTokensPerImage)` chooses). 70 was 2.3 times faster on an M1's CPU (461 vs 1041 ms per photo) with the same 6/6
     text matches, but sees less detail. `PhotoEmbedding.VisionTokens` records it, so a change re-embeds the photos.
   - It pauses while the chat answers, and shares the model with document search through `SearchEmbedder.Gate`.
-  - Embeddings are kept in `ChatStore`'s `PhotoEmbedding` table (photo id, version, date, floats), so later runs only embed
+  - Embeddings are kept in `ChatHistoryStore`'s `PhotoEmbedding` table (photo id, version, date, floats), so later runs only embed
     new or edited photos (by the library's modification date: MediaStore's `date_modified`, PhotoKit's `ModificationDate`)
     and drop those no longer among the most recent. Turning the setting off deletes them.
   - A pass runs when the page opens, when it is shown again, and when the app returns to the foreground (`Window.Resumed`,
@@ -393,7 +393,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   `ZImageTurbo` (10.6 GB) to its default folder, `LocalApplicationData/Z-Image-Turbo` (`~/Documents/Z-Image-Turbo` for the
   Catalyst app - on this Mac a link to the data volume), with progress in the settings. An interrupted download resumes on
   the next start; Storage deletes the model.
-- Gemma 4 then gets `generate_image` (with `ChatPlannerInstructions.Images`). The page checks the description's length
+- Gemma 4 then gets `generate_image` (with `ChatImageGeneration`'s instructions). The page checks the description's length
   (`CountPromptTokens`, at most 24 tokens - if it's too long, it asks the model for a shorter one), draws 8 steps with a random
   seed on the CPU, and shows a 220-point tile above the reply (a spinner with the stage and the seconds while drawing; tap it
   to see it larger, in a sheet).
@@ -543,7 +543,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Goals
 
-- The goals feature is the library's since 2026-10-26 (`Emgu.LiteRT.LM.Maui`'s `GoalsFeature` over `GoalsSkill`; the demo gives it `ChatStore.Goals`, and `ExerciseFeature` adds the exercise counter to its group as the skill's extra tools, words and summary). Goals have streaks and a history (`GoalHistory.cs` in `Emgu.LiteRT.LM.Agents`, TODO item 25): per
+- The goals feature is the library's since 2026-10-26 (`Emgu.LiteRT.LM.Maui`'s `GoalsFeature` over `GoalsSkill`; the demo gives it a `SqliteAgentGoalStore` over its chat store, and `ExerciseFeature` adds the exercise counter to its group as the skill's extra tools, words and summary). Goals have streaks and a history (`GoalHistory.cs` in `Emgu.LiteRT.LM.Agents`, TODO item 25): per
   period (day, week from Monday, month) what was logged and whether the target was reached, the streak of periods in a row
   (the current period never breaks it), and the best streak.
 - Settings > Your goals shows a strip of the latest 12 periods and the streak, with Edit, Undo last (`IAgentGoalStore.DeleteLastProgressAsync`) and Delete, and `GoalStatusAsync` (so `get_goals` and the
