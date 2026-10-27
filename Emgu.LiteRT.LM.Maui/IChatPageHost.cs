@@ -102,6 +102,20 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>True while a reply is being written.</summary>
         bool IsReplying { get; }
 
+        /// <summary>True while a voice message is being recorded (the message box's microphone).</summary>
+        bool IsRecording { get; }
+
+        /// <summary>Reads the replies aloud when the user asks (the view's <see cref="ChatView.ReplySpeaker"/>); a voice chat follows it.</summary>
+        IReplySpeaker ReplySpeaker { get; }
+
+        /// <summary>Stop the reply being written (as the Stop button does).</summary>
+        void StopReply();
+
+        /// <summary>Send a recording as a voice message, with the reply read aloud whatever the setting (a hands-free chat).</summary>
+        /// <param name="wav">The recording (WAV)</param>
+        /// <param name="length">How long it is, for the message's name</param>
+        Task SendVoiceMessageAsync(byte[] wav, TimeSpan length);
+
         /// <summary>True in a private chat: nothing is saved, nothing saved is read.</summary>
         bool IsPrivate { get; }
 

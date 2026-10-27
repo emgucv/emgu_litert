@@ -24,6 +24,12 @@ namespace Emgu.LiteRT.LM.Maui
         /// Stop reading.
         /// </summary>
         void Stop();
+
+        /// <summary>Raised with each piece of text as it is about to be spoken (a voice chat shows it, and pauses listening meanwhile).</summary>
+        event Action<string> Speaking;
+
+        /// <summary>Ends when the reply being read has been read out, or reading was stopped; completed when nothing is being read.</summary>
+        Task Completion { get; }
     }
 
     /// <summary>
@@ -44,8 +50,11 @@ namespace Emgu.LiteRT.LM.Maui
         /// </summary>
         public Func<string, Task<string>> DetectLanguage { get; set; } = TextLanguage.DetectAsync;
 
-        /// <summary>Raised with each piece of text as it is about to be spoken (e.g. to pause listening meanwhile).</summary>
+        /// <inheritdoc/>
         public event Action<string> Speaking;
+
+        /// <inheritdoc/>
+        public Task Completion => _reader?.Completion ?? Task.CompletedTask;
 
         /// <inheritdoc/>
         public void Start(ChatMessageItem reply)
@@ -87,7 +96,8 @@ namespace Emgu.LiteRT.LM.Maui
             private readonly SpeechSegmenter _segmenter = new SpeechSegmenter();
             private readonly List<string> _queue = new List<string>();
             private readonly CancellationTokenSource _stop = new CancellationTokenSource();
-            private bool _speaking;
+            private readonly TaskCompletionSource<bool> _done = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            private bool _speaking, _finished;
 
             public Reader(TextToSpeechReplySpeaker owner, ChatMessageItem reply)
             {
@@ -96,6 +106,9 @@ namespace Emgu.LiteRT.LM.Maui
                 reply.PropertyChanged += OnReplyChanged;
                 Read();
             }
+
+            // Ends when the reply has been read out, or reading was stopped.
+            public Task Completion => _done.Task;
 
             private void OnReplyChanged(object sender, PropertyChangedEventArgs e)
             {
@@ -115,6 +128,7 @@ namespace Emgu.LiteRT.LM.Maui
                     case ChatMessageState.Done:
                         _queue.AddRange(_segmenter.Finish(_reply.Text));
                         _reply.PropertyChanged -= OnReplyChanged;
+                        _finished = true;
                         break;
                     default:
                         // Interrupted or failed: no more.
@@ -129,6 +143,9 @@ namespace Emgu.LiteRT.LM.Maui
                 _reply.PropertyChanged -= OnReplyChanged;
                 _stop.Cancel();
                 _queue.Clear();
+                _finished = true;
+                if (!_speaking)
+                    _done.TrySetResult(true);
             }
 
             private async void Pump()
@@ -157,6 +174,8 @@ namespace Emgu.LiteRT.LM.Maui
                 {
                     _speaking = false;
                 }
+                if (_finished)
+                    _done.TrySetResult(true);
             }
         }
 

@@ -136,6 +136,30 @@ namespace Emgu.LiteRT.LM.Maui
 
         bool IChatPageHost.IsReplying => Conversation?.IsBusy == true;
 
+        bool IChatPageHost.IsRecording => _chatView?.IsRecording == true;
+
+        IReplySpeaker IChatPageHost.ReplySpeaker => _chatView?.ReplySpeaker;
+
+        void IChatPageHost.StopReply() => _chatView?.StopReply();
+
+        // A hands-free chat's recording: sent as a voice message, with the reply read aloud whatever the setting.
+        async Task IChatPageHost.SendVoiceMessageAsync(byte[] wav, TimeSpan length)
+        {
+            if (wav == null)
+                throw new ArgumentNullException(nameof(wav));
+            bool readAloud = _chatView.ReadAloud;
+            _chatView.ReadAloud = true;
+            try
+            {
+                var recording = new DataContent(wav, "audio/wav") { Name = string.Format("Voice message ({0:m\\:ss})", length) };
+                await _chatView.SendAsync(string.Empty, new[] { recording }, null, voiceMessage: true);
+            }
+            finally
+            {
+                _chatView.ReadAloud = readAloud;
+            }
+        }
+
         bool IChatPageHost.IsPrivate => IsPrivate;
 
         bool IChatPageHost.MemoryOn => MemoryOn;

@@ -128,7 +128,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 ## Voice chat (hands-free)
 
 - The "Voice chat" chip (Gemma 4; not on Windows, whose recorder reports no level) is a hands-free conversation
-  (`VoiceModeFeature`, a layer over the page). A full-screen view listens; `VoiceActivityDetector` ends the message after 0.9 s of quiet
+  (the library's `VoiceModeFeature` since phase C, 2026-10-27, a layer over the page; it follows the page's `IReplySpeaker`,
+  whose `Speaking` event and `Completion` task are the interface's now, and sends through `IChatPageHost.SendVoiceMessageAsync`). A full-screen view listens; `VoiceActivityDetector` ends the message after 0.9 s of quiet
   (levels from AVAudioRecorder's metering, or Android's samples); the audio is sent without thinking, the reply is read, and
   it listens again.
 - A tap interrupts: the reply is cancelled, kept with "…" (`ChatMessageState.Interrupted`), and given to the model as text

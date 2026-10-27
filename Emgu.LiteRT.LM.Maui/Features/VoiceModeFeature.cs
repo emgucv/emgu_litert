@@ -1,20 +1,26 @@
-// Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+
 using System.Diagnostics;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Chat;
-using Emgu.LiteRT.LM.Maui;
 using Microsoft.Maui.Controls.Shapes;
-using Emgu.LiteRT.LM.Maui.CV;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.Features;
 
-// Hands-free voice conversation (the "Voice chat" chip, Gemma 4): a full-screen layer that listens, sends what was said
-// to the model as audio once the speaker pauses (VoiceActivityDetector), has the reply read aloud while it is written
-// (the page's AlertAudioReplySpeaker), and listens again. A tap on the circle sends at once while listening, or stops the
-// reply and listens while the model answers. With headphones, speaking interrupts the reply too; through a loudspeaker
-// the microphone would hear the reply itself, so it is off until the reply has been read. While it runs the page is
-// hands-free (IChatPageHost.SetHandsFree): no thinking first, no tools that need the screen.
-internal sealed class VoiceModeFeature : DemoFeature
+/// <summary>
+/// Hands-free voice conversation (the "Voice chat" chip): a full-screen layer that listens, sends what was said to the
+/// model as audio once the speaker pauses (<see cref="VoiceActivityDetector"/>) - or as the words the
+/// <see cref="SpeechRecognizer"/> wrote down, for a model that doesn't take audio - has the reply read aloud while it is
+/// written (the page's <see cref="IReplySpeaker"/>), and listens again. A tap on the circle sends at once while
+/// listening, or stops the reply and listens while the model answers. With headphones, speaking interrupts the reply
+/// too; through a loudspeaker the microphone would hear the reply itself, so it is off until the reply has been read.
+/// While it runs the page is hands-free (<see cref="IChatPageHost.SetHandsFree"/>): no thinking first, no tools that
+/// need the screen. Shown where the recorder reports the microphone's level (not on Windows). The app needs the
+/// microphone permission (and the speech recognition one, for a model without audio).
+/// </summary>
+public sealed class VoiceModeFeature : ChatFeature
 {
     private enum VoiceState { Listening, Thinking, Speaking }
 
@@ -37,46 +43,80 @@ internal sealed class VoiceModeFeature : DemoFeature
     private bool _voiceMode, _voiceTapped, _voiceHeadphones;
     private CancellationTokenSource _voiceLoop, _voiceInterrupt;
     private IVoiceInput _voiceInput;
+    private IReplySpeaker _speaker;
 
+    /// <inheritdoc/>
     public override string Name => "voice_chat";
 
+    /// <inheritdoc/>
     public override string Title => "Voice chat";
 
+    /// <summary>The chip is per chat (nothing to switch in the settings).</summary>
     public override bool PersistEnabled => false;
 
-    // Whether a voice chat is on.
+    /// <summary>Whether a voice chat is on.</summary>
     public bool IsOn => _voiceMode;
 
-    // Gemma 4 takes speech; measuring the microphone's level needs a recorder that reports it (not Windows').
-    // With a model that doesn't take audio, what was said is sent as text (SpeechRecognizer).
+    // A model that takes speech, or the speech recognizer for one that doesn't; measuring the microphone's level needs
+    // a recorder that reports it (not Windows').
     private bool VoiceModeSupported => VoiceRecorder.SupportsLevel && Host?.Model != null && (Host.Model.AcceptsAudio || SpeechRecognizer.IsSupported);
 
-    private AlertAudioReplySpeaker Speaker => Host.Services.Get<AlertAudioReplySpeaker>();
+    private static Color Accent => ChatResources.FindColor("ChatAccent");
+    private static Color PrimaryText => ChatResources.ThemeColor("ChatPrimaryText");
+    private static Color SecondaryText => ChatResources.ThemeColor("ChatSecondaryText");
 
+    /// <inheritdoc/>
     public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
 
+    /// <inheritdoc/>
     public override void OnAttached(IChatPageHost host)
     {
         base.OnAttached(host);
         BuildVoiceView();
-        if (Speaker != null)
-            Speaker.Speaking += OnSpeaking;
+        FollowSpeaker();
     }
 
+    /// <inheritdoc/>
     public override void OnDetached()
     {
         EndVoiceMode();
-        if (Speaker != null)
-            Speaker.Speaking -= OnSpeaking;
+        if (_speaker != null)
+            _speaker.Speaking -= OnSpeaking;
+        _speaker = null;
         base.OnDetached();
     }
 
+    // The page's speaker (it may be given after the features are attached): followed for the words being read.
+    private IReplySpeaker FollowSpeaker()
+    {
+        IReplySpeaker speaker = Host?.ReplySpeaker;
+        if (speaker != _speaker)
+        {
+            if (_speaker != null)
+                _speaker.Speaking -= OnSpeaking;
+            _speaker = speaker;
+            if (_speaker != null)
+                _speaker.Speaking += OnSpeaking;
+        }
+        return _speaker;
+    }
+
+    /// <inheritdoc/>
     public override ChatChip BuildComposerChip() =>
         new ChatChip("Voice chat", () => _voiceMode, on => { if (on) _ = StartVoiceModeAsync(); else EndVoiceMode(); })
         {
             IsVisible = () => VoiceModeSupported
         };
 
+    /// <inheritdoc/>
+    public override void OnAppearing()
+    {
+        base.OnAppearing();
+        // The page's speaker exists once its template is applied (after the features were attached).
+        FollowSpeaker();
+    }
+
+    /// <inheritdoc/>
     public override void OnDisappearing()
     {
         base.OnDisappearing();
@@ -91,7 +131,7 @@ internal sealed class VoiceModeFeature : DemoFeature
             HeightRequest = 170,
             StrokeShape = new Ellipse(),
             Stroke = Colors.Transparent,
-            BackgroundColor = Theme.Accent,
+            BackgroundColor = Accent,
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.Center,
             Content = new Microsoft.Maui.Controls.Shapes.Path
@@ -105,19 +145,22 @@ internal sealed class VoiceModeFeature : DemoFeature
                 VerticalOptions = LayoutOptions.Center
             }
         };
-        _voiceCircle.OnTap(OnVoiceCircleTapped);
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += (s, e) => OnVoiceCircleTapped();
+        _voiceCircle.GestureRecognizers.Add(tap);
+        string titleFont = ChatResources.Find<string>("ChatTitleFont"), bodyFont = ChatResources.Find<string>("ChatBodyFont");
         _voiceStatus = new Label
         {
-            FontFamily = Theme.TitleFont,
+            FontFamily = titleFont,
             FontSize = 22,
-            TextColor = Theme.PrimaryText,
+            TextColor = PrimaryText,
             HorizontalTextAlignment = TextAlignment.Center
         };
         _voiceCaption = new Label
         {
-            FontFamily = Theme.BodyFont,
+            FontFamily = bodyFont,
             FontSize = 16,
-            TextColor = Theme.PrimaryText,
+            TextColor = PrimaryText,
             HorizontalTextAlignment = TextAlignment.Center,
             MaxLines = 5,
             LineBreakMode = LineBreakMode.TailTruncation,
@@ -125,19 +168,17 @@ internal sealed class VoiceModeFeature : DemoFeature
         };
         _voiceHint = new Label
         {
-            FontFamily = Theme.BodyFont,
+            FontFamily = bodyFont,
             FontSize = 13,
-            TextColor = Theme.SecondaryText,
+            TextColor = SecondaryText,
             HorizontalTextAlignment = TextAlignment.Center
         };
-        Button end = Theme.SecondaryButton("End voice chat", null);
-        end.ImageSource = null;
-        end.HorizontalOptions = LayoutOptions.Center;
+        var end = new Button { Text = "End voice chat", HorizontalOptions = LayoutOptions.Center };
+        ChatResources.ApplyStyle(end, "ChatHeaderButtonStyle");
         end.Clicked += (_, _) => EndVoiceMode();
 
         _voiceView = new Grid
         {
-            BackgroundColor = Theme.PageBackground,
             Children =
             {
                 new VerticalStackLayout
@@ -159,26 +200,27 @@ internal sealed class VoiceModeFeature : DemoFeature
                 }
             }
         };
+        ChatResources.SetThemeColor(_voiceView, VisualElement.BackgroundColorProperty, "ChatPageBackground");
     }
 
-    /// <summary>
-    /// Start a voice conversation with the microphone, or (self-tests) with another input.
-    /// </summary>
+    /// <summary>Start a voice conversation with the microphone, or (self-tests) with another input.</summary>
+    /// <param name="input">The input, or null for the microphone</param>
+    /// <param name="headphones">Whether headphones are in (speech interrupts the reply), or null to ask the device</param>
     public async Task StartVoiceModeAsync(IVoiceInput input = null, bool? headphones = null)
     {
         if (_voiceMode)
             return;
-        if (Host.IsBusy || Host.IsReloadingModel || Demo.IsRecording || !VoiceModeSupported)
+        if (Host.IsBusy || Host.IsReloadingModel || Host.IsRecording || !VoiceModeSupported)
         {
             Host.SetHandsFree(false);
             return;
         }
-        UiStallWatchdog.Mark("Voice chat on");
+        Debug.WriteLine("Voice chat on");
         _voiceMode = true;
         Host.SetHandsFree(true);
         _voiceInput = input ?? _recorder;
         _voiceHeadphones = headphones ?? VoiceRecorder.HeadphonesConnected();
-        Speaker?.Stop();
+        FollowSpeaker()?.Stop();
         _voiceCaption.Text = string.Empty;
         Host.Overlays.ShowLayer(_voiceView);
         try { DeviceDisplay.Current.KeepScreenOn = true; } catch (Exception) { }
@@ -203,17 +245,17 @@ internal sealed class VoiceModeFeature : DemoFeature
         }
     }
 
+    /// <summary>End the voice chat (the reply being written, if any, is finished in the chat, just not read aloud).</summary>
     public void EndVoiceMode()
     {
         if (!_voiceMode)
             return;
-        UiStallWatchdog.Mark("Voice chat off");
+        Debug.WriteLine("Voice chat off");
         _voiceMode = false;
         _voiceLoop?.Cancel();
         _voiceLoop = null;
         _voiceInterrupt?.Cancel();
-        // The reply being written (if any) is finished in the chat, just not read aloud.
-        Speaker?.Stop();
+        _speaker?.Stop();
         _voiceView.AbortAnimation("voicePulse");
         Host.Overlays.HideLayer(_voiceView);
         Host.SetHandsFree(false);
@@ -252,7 +294,7 @@ internal sealed class VoiceModeFeature : DemoFeature
                 _voiceCaption.Text = string.Empty;
                 CancellationTokenSource interrupt = CancellationTokenSource.CreateLinkedTokenSource(token);
                 _voiceInterrupt = interrupt;
-                Task send = Demo.SendVoiceAsync(wav, length);
+                Task send = Host.SendVoiceMessageAsync(wav, length);
                 Task replied = WaitForReplyAsync(send);
                 Task tapped = Task.Delay(Timeout.Infinite, interrupt.Token);
                 Task spoke = Task.Delay(Timeout.Infinite, interrupt.Token);
@@ -265,9 +307,9 @@ internal sealed class VoiceModeFeature : DemoFeature
                 bool bySpeech = first == spoke && first.Status == TaskStatus.RanToCompletion;
                 if (first != replied)
                 {
-                    UiStallWatchdog.Mark(bySpeech ? "Voice chat: interrupted by speech" : "Voice chat: interrupted");
-                    Demo.StopReply();
-                    Speaker?.Stop();
+                    Debug.WriteLine(bySpeech ? "Voice chat: interrupted by speech" : "Voice chat: interrupted");
+                    Host.StopReply();
+                    _speaker?.Stop();
                     await send;
                 }
                 interrupt.Cancel();
@@ -306,7 +348,7 @@ internal sealed class VoiceModeFeature : DemoFeature
         }
         catch (Exception ex) when (!token.IsCancellationRequested)
         {
-            UiStallWatchdog.Mark("Voice chat: listening for an interruption failed: " + ex.Message);
+            Debug.WriteLine("Voice chat: listening for an interruption failed: " + ex.Message);
         }
         await Task.Delay(Timeout.Infinite, token);
     }
@@ -315,7 +357,7 @@ internal sealed class VoiceModeFeature : DemoFeature
     private async Task WaitForReplyAsync(Task send)
     {
         await send;
-        AlertAudioReplySpeaker speaker = Speaker;
+        IReplySpeaker speaker = FollowSpeaker();
         if (speaker != null)
             await speaker.Completion;
     }
@@ -399,18 +441,18 @@ internal sealed class VoiceModeFeature : DemoFeature
         switch (state)
         {
             case VoiceState.Listening:
-                _voiceCircle.BackgroundColor = Theme.Accent;
+                _voiceCircle.BackgroundColor = Accent;
                 _voiceStatus.Text = "Listening...";
                 _voiceHint.Text = "Speak, then pause - the model answers.";
                 break;
             case VoiceState.Thinking:
-                _voiceCircle.BackgroundColor = Theme.SecondaryText;
+                _voiceCircle.BackgroundColor = SecondaryText;
                 _voiceStatus.Text = "Thinking...";
                 _voiceHint.Text = "Tap the circle to stop and speak again.";
                 Pulse(0.03, 2000);
                 break;
             case VoiceState.Speaking:
-                _voiceCircle.BackgroundColor = Theme.Success;
+                _voiceCircle.BackgroundColor = ChatResources.FindColor("ChatSuccess");
                 _voiceStatus.Text = "Speaking...";
                 _voiceHint.Text = _voiceHeadphones ? "Speak or tap the circle to interrupt." : "Tap the circle to interrupt.";
                 Pulse(0.05, 1600);

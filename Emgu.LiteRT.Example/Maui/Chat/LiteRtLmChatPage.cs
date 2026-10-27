@@ -205,8 +205,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 
     bool IDemoHost.PageVisible => _pageVisible;
 
-    bool IDemoHost.IsRecording => Chat.IsRecording;
-
     // What the storage page lists: the catalog's models, the two search models (downloadable again from the page), the
     // image model's folder, and the store's documents, indexes and attachments.
     private static StorageCatalog CreateStorageCatalog()
@@ -221,24 +219,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         return new StorageCatalog(SharedStore, System.IO.Path.GetDirectoryName(catalog[0].File.LocalFile), ExportFeature.ExportFolder, models,
             new[] { new StorageFolder(ImageFeature.StorageKey, "Z-Image-Turbo", image.Folder, "Image model, host tensors, and prepared weight caches. Deleting turns image generation off.") });
     }
-
-    // A hands-free chat's recording: sent as a voice message, with the reply read aloud whatever the setting.
-    async Task IDemoHost.SendVoiceAsync(byte[] wav, TimeSpan length)
-    {
-        bool readAloud = Chat.ReadAloud;
-        Chat.ReadAloud = true;
-        try
-        {
-            var recording = new DataContent(wav, "audio/wav") { Name = string.Format("Voice message ({0:m\\:ss})", length) };
-            await Chat.SendAsync(string.Empty, new[] { recording }, null, voiceMessage: true);
-        }
-        finally
-        {
-            Chat.ReadAloud = readAloud;
-        }
-    }
-
-    void IDemoHost.StopReply() => Chat.StopReply();
 
     // ---------- Lifecycle ----------
 

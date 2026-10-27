@@ -27,12 +27,10 @@ public sealed class AlertAudioReplySpeaker : IReplySpeaker
     {
     }
 
-    // The text about to be spoken.
-    /// <summary>Raised with each sentence as it is spoken (the voice chat follows it).</summary>
+    /// <inheritdoc/>
     public event Action<string> Speaking;
 
-    // Completes when the reply being read has been read, or reading was stopped; completed when nothing is read.
-    /// <summary>Ends when the reply has been read out, or was stopped.</summary>
+    /// <inheritdoc/>
     public Task Completion => _reader?.Completion ?? Task.CompletedTask;
 
     /// <summary>Read a reply aloud as it streams.</summary>

@@ -15,11 +15,6 @@ internal interface IDemoHost
     // Waits for a cool, charged device before heavy background work, and runs one embedding at a time.
     IIndexingWorkload Workload { get; }
 
-    // Whether the page is shown, and whether a voice message is being recorded (the message box's microphone).
+    // Whether the page is shown.
     bool PageVisible { get; }
-    bool IsRecording { get; }
-
-    // Send a recording as a voice message, the reply read aloud (a hands-free chat); stop the reply being written.
-    Task SendVoiceAsync(byte[] wav, TimeSpan length);
-    void StopReply();
 }
