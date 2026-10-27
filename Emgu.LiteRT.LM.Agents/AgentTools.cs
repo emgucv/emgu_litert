@@ -947,6 +947,8 @@ namespace Emgu.LiteRT.LM.Agents
                 case "remove_goal": return "Removing the goal: " + Argument("goal");
                 case "search_wikipedia": return "Searching Wikipedia for “" + Argument("query") + "”";
                 case "search_web": return "Searching the web for “" + Argument("query") + "”";
+                case "get_stock_quote": return "Getting the price of " + Argument("symbol");
+                case "get_stock_history": return "Getting " + Argument("symbol") + "’s prices over " + Argument("period");
                 case "read_web_page": return "Reading " + Argument("url");
                 default: return "Calling " + call.Name;
             }

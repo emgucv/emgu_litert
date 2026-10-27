@@ -269,6 +269,14 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     ordinary search follows. The tool's description asks the model to put "news" or "latest" in such queries. Checked on
     the Pixel Fold: "the latest news about the James Webb Space Telescope" gave recent articles, where the ordinary search
     had included one dated January 2025.
+  - With a Twelve Data API key (free at twelvedata.com: 800 requests a day; kept in `SecureStorage` as
+    "twelvedata_api_key", entered under Settings > Web search since 2026-10-27): `get_stock_quote` (the price, the change
+    from the previous close, the day's and the 52-week range) and `get_stock_history` ("1 week" to "10 years", or "year to
+    date": daily bars up to 3 months, weekly up to 2 years, monthly beyond; the tool works out the change, the high and the
+    low and lists up to 12 closes, so the model needs no arithmetic). Both take a ticker or a company name, looked up with
+    `/symbol_search` (a US stock or ETF first). The key goes in the request's header, not its URL. `AgentTools.Stocks.cs`;
+    `UnitTestStocks` checks the reading of Twelve Data's responses. Checked against the live service with its demo key
+    (Apple's quote, its past year and this year so far).
   - Verified on Mac Catalyst and the iOS simulator (Wikipedia; Tavily wasn't verified - no key).
 
 ## Document questions
