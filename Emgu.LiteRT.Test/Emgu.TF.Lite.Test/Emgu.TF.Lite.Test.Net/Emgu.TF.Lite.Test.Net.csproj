@@ -28,7 +28,6 @@
     <Compile Include="..\UnitTestVoiceLanguages.cs" Link="UnitTestVoiceLanguages.cs" />
     <Compile Include="..\UnitTestTaskPlan.cs" Link="UnitTestTaskPlan.cs" />
     <Compile Include="..\UnitTestMeetingNotes.cs" Link="UnitTestMeetingNotes.cs" />
-    <Compile Include="..\UnitTestChatSettings.cs" Link="UnitTestChatSettings.cs" />
     <Compile Include="..\UnitTestChatModelCatalog.cs" Link="UnitTestChatModelCatalog.cs" />
     <Compile Include="..\UnitTestMathText.cs" Link="UnitTestMathText.cs" />
     <Compile Include="..\UnitTestReplyMarkdown.cs" Link="UnitTestReplyMarkdown.cs" />
@@ -79,6 +78,7 @@
     <Compile Include="..\UnitTestStorage.cs" Link="UnitTestStorage.cs" />
     <Compile Include="..\UnitTestPrivateChat.cs" Link="UnitTestPrivateChat.cs" />
     <Compile Include="..\UnitTestPngEncoder.cs" Link="UnitTestPngEncoder.cs" />
+    <Compile Include="..\ChatSessionTools.cs" Link="ChatSessionTools.cs" />
   </ItemGroup>
 
   <ItemGroup>

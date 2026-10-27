@@ -3,9 +3,9 @@ using Emgu.LiteRT.LM.Maui;
 
 namespace Maui.Demo.Lite;
 
-// The demo's settings for Emgu.LiteRT.LM.Maui's ChatPage: the keys the demo has always used ("litert_lm_chat_" + the
-// page's short names, the same ones ChatSettings reads for the features), and the GPU default ChatSettings has - the
-// legacy "litert_lm_chat_use_gpu" key, then the GPU everywhere but Windows.
+// The demo's settings for Emgu.LiteRT.LM.Maui's ChatPage and its features: the keys the demo has always used
+// ("litert_lm_chat_" + the page's short names), with two old keys read as defaults so saved settings carry over - the
+// single "litert_lm_chat_use_gpu" before the GPU choice was kept per platform, and "litert_lm_photos_only_charging".
 internal sealed class ChatSettingsAdapter : IChatPageSettings
 {
     private const string Prefix = "litert_lm_chat_";

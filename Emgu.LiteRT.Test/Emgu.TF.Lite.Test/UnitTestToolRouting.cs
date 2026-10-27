@@ -18,7 +18,7 @@ using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
 
-// Tool groups added on demand (Emgu.LiteRT.LM.Agents' ToolRouter, the demo's ChatToolGroups): which messages get
+// Tool groups added on demand (Emgu.LiteRT.LM.Agents' ToolRouter, the groups' constants in Emgu.LiteRT.LM.Chat): which messages get
 // which group, the stub tools that add a group in the middle of a request, and the size of what every message carries;
 // no model or native library.
 [TestFixture]
@@ -150,13 +150,13 @@ public class UnitTestToolRouting
             ("Remind me to call mum on Sunday", new[] { ChatDeviceActions.GroupName }),
             ("Put lunch with Sam in my calendar for Friday at 12:30", new[] { ChatDeviceActions.GroupName }),
             ("How do I walk to Stanley Park?", new[] { ChatDeviceActions.GroupName }),
-            ("I want to run three times a week.", new[] { ChatToolGroups.Goals }),
-            ("How am I doing with my goals?", new[] { ChatToolGroups.Goals }),
-            ("Count my jumping jacks", new[] { ChatToolGroups.Goals }),
-            ("Let's do 30 seconds of star jumps", new[] { ChatToolGroups.Goals }),
-            ("I want to do 30 jumping jacks every day", new[] { ChatToolGroups.Goals }),
-            ("Count my squats", new[] { ChatToolGroups.Goals }),
-            ("Let's do high knees for a minute", new[] { ChatToolGroups.Goals }),
+            ("I want to run three times a week.", new[] { GoalsSkill.GroupName }),
+            ("How am I doing with my goals?", new[] { GoalsSkill.GroupName }),
+            ("Count my jumping jacks", new[] { GoalsSkill.GroupName }),
+            ("Let's do 30 seconds of star jumps", new[] { GoalsSkill.GroupName }),
+            ("I want to do 30 jumping jacks every day", new[] { GoalsSkill.GroupName }),
+            ("Count my squats", new[] { GoalsSkill.GroupName }),
+            ("Let's do high knees for a minute", new[] { GoalsSkill.GroupName }),
             ("Show me my photos from Paris", new[] { ChatPhotos.GroupName }),
             ("Find my selfies from last summer", new[] { ChatPhotos.GroupName }),
             ("What does my rental contract say about pets?", new[] { ChatDocuments.GroupName }),

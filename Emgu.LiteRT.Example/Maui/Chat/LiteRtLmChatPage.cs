@@ -21,7 +21,7 @@ using Microsoft.Extensions.AI;
 namespace Maui.Demo.Lite;
 
 /// <summary>
-/// The chat demo: Emgu.LiteRT.LM.Maui's ChatPage with the demo's models (Maui.Demo.Lite.Core's ChatModelCatalog, and the
+/// The chat demo: Emgu.LiteRT.LM.Maui's ChatPage with the library's models (Emgu.LiteRT.LM.Chat's ChatModelCatalog, and the
 /// user's own server), its saved chats, memories and goals (ChatStore, SQLite), the library's built-in features and the
 /// demo's own (Chat/Features: the camera and sound monitors, documents, tool servers, the voice chat, the server, storage,
 /// export, photo and past-chat search, image generation, goals, device actions, meeting notes, exercise counting...).
@@ -39,7 +39,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     private sealed class Parts
     {
         public ChatPageOptions Options;
-        public ChatModelOption ServerOption;
         public CameraFeature Camera;
         public DocumentsFeature Documents;
         public McpFeature Mcp;
@@ -102,10 +101,9 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 
     private static Parts Build()
     {
-        IList<ChatModelOption> models = ChatModelOptions.FromCatalog(ChatModelCatalog.ModelsFor(DemoPlatform.Current), DemoPlatform.Current);
+        IList<ChatModelOption> models = ChatModelCatalog.For(ChatDevicePlatform.Current);
         var parts = new Parts
         {
-            ServerOption = models.First(m => m.Id == ChatModelOptions.ServerId),
             Camera = new CameraFeature(new VisualDetectors(FileSystem.CacheDirectory, DetectorFactory.ValidationImage)),
             Mcp = new McpFeature(),
             VoiceMode = new VoiceModeFeature(),
@@ -121,7 +119,9 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             Exercises = new ExerciseFeature(),
             Memory = new MemoryFeature(SharedStore.Memories)
         };
-        parts.Server = new ServerFeature(parts.ServerOption);
+        // The user's own server: its remote option goes last in the model list ("Server", the id saved chats have).
+        parts.Server = new ServerFeature();
+        models.Add(parts.Server.Option);
         parts.Workload = new DeviceIndexingWorkload();
         // Pictures drawn with Z-Image-Turbo: the demo's model selector above the switch, and a Save As dialog.
         parts.Images = new ImageFeature(parts.Workload)
@@ -224,14 +224,14 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     // image model's folder, and the store's documents, indexes and attachments.
     private static StorageCatalog CreateStorageCatalog()
     {
-        ModelOption[] catalog = ChatModelCatalog.ModelsFor(DemoPlatform.Current);
-        var models = catalog.Select(m => new StorageModel(m.Name, System.IO.Path.GetFileName(m.File.LocalFile))).ToList();
+        IList<ChatModelOption> catalog = ChatModelCatalog.For(ChatDevicePlatform.Current);
+        var models = catalog.Select(m => new StorageModel(m.DisplayName, System.IO.Path.GetFileName(m.ModelFile.LocalFile))).ToList();
         using var vision = new EmbeddingGemma2TextVision();
         using var multimodal = new EmbeddingGemma2Multimodal();
         models.Add(new StorageModel("EmbeddingGemma 2 Text Vision 440M", System.IO.Path.GetFileName(vision.DefaultModelFile.LocalFile), isSearch: true) { Download = vision.DefaultModelFile });
         models.Add(new StorageModel("EmbeddingGemma 2 Multimodal 740M", System.IO.Path.GetFileName(multimodal.DefaultModelFile.LocalFile), isSearch: true) { Download = multimodal.DefaultModelFile });
         using var image = new ZImageTurbo();
-        return new StorageCatalog(SharedStore, System.IO.Path.GetDirectoryName(catalog[0].File.LocalFile), ExportFeature.ExportFolder, models,
+        return new StorageCatalog(SharedStore, System.IO.Path.GetDirectoryName(catalog[0].ModelFile.LocalFile), ExportFeature.ExportFolder, models,
             new[] { new StorageFolder(ImageFeature.StorageKey, "Z-Image-Turbo", image.Folder, "Image model, host tensors, and prepared weight caches. Deleting turns image generation off.") });
     }
 
@@ -454,7 +454,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     // The groups in use, for the context estimate before a send (LiteRtLmChatClient counts the real size): the camera
     // group's tools and instructions are ~1,100 tokens, the others ~150-500.
     private static int GroupTokens(IEnumerable<string> active) => active.Sum(name =>
-        name == ChatCamera.GroupName ? 1100 : name == ChatDeviceActions.GroupName || name == ChatToolGroups.Goals ? 500
+        name == ChatCamera.GroupName ? 1100 : name == ChatDeviceActions.GroupName || name == Emgu.LiteRT.LM.Agents.Skills.GoalsSkill.GroupName ? 500
         : name.StartsWith("mcp_", StringComparison.Ordinal) ? 400 : name == ChatCamera.SoundGroupName ? 600 : 200);
 
     // ---------- The model ----------

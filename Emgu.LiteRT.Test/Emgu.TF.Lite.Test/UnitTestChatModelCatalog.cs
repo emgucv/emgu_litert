@@ -1,12 +1,13 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using System;
+using System.Collections.Generic;
 using System.Linq;
-using Maui.Demo.Lite;
+using Emgu.LiteRT.LM.Chat;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
 
-// The MAUI demo's model list (Maui.Demo.Lite.Core's ChatModelCatalog), per platform.
+// Emgu.LiteRT.LM.Chat's ChatModelCatalog: the models a chat offers per platform, as ChatModelOptions. No model is loaded.
 [TestFixture]
 public class UnitTestChatModelCatalog
 {
@@ -15,62 +16,55 @@ public class UnitTestChatModelCatalog
     {
         foreach (ChatPlatform platform in Enum.GetValues(typeof(ChatPlatform)))
         {
-            var choices = ChatModelCatalog.ModelsFor(platform).Select(m => m.Choice).ToList();
-            Assert.That(choices.Take(5), Is.EqualTo(new[] { ModelChoice.Qwen3, ModelChoice.Qwen35_0_8B_VL, ModelChoice.Qwen35_4B, ModelChoice.Gemma4E2B, ModelChoice.Gemma4E4B }), platform.ToString());
-            Assert.That(choices, Does.Not.Contain(ModelChoice.Server), "the server isn't in the list");
+            IList<ChatModelOption> models = ChatModelCatalog.For(platform);
+            Assert.That(models.Take(5).Select(m => m.Id), Is.EqualTo(new[] { "Qwen3", "Qwen35_0_8B_VL", "Qwen35_4B", "Gemma4E2B", "Gemma4E4B" }), platform.ToString());
+            Assert.That(models.All(m => !m.IsRemote), Is.True, "the server isn't in the catalog");
         }
     }
 
     [Test]
     public void Gemma4_12BIsOnlyOfferedOnDesktops()
     {
-        Assert.That(ChatModelCatalog.ModelsFor(ChatPlatform.Android).Any(m => m.Choice == ModelChoice.Gemma4_12B), Is.False);
-        Assert.That(ChatModelCatalog.ModelsFor(ChatPlatform.iOS).Any(m => m.Choice == ModelChoice.Gemma4_12B), Is.False);
-        ModelOption mac = ChatModelCatalog.ModelsFor(ChatPlatform.MacCatalyst).Single(m => m.Choice == ModelChoice.Gemma4_12B);
-        ModelOption windows = ChatModelCatalog.ModelsFor(ChatPlatform.Windows).Single(m => m.Choice == ModelChoice.Gemma4_12B);
+        Assert.That(ChatModelCatalog.For(ChatPlatform.Android).Any(m => m.Id == "Gemma4_12B"), Is.False);
+        Assert.That(ChatModelCatalog.For(ChatPlatform.iOS).Any(m => m.Id == "Gemma4_12B"), Is.False);
+        ChatModelOption mac = ChatModelCatalog.For(ChatPlatform.MacCatalyst).Single(m => m.Id == "Gemma4_12B");
+        ChatModelOption windows = ChatModelCatalog.For(ChatPlatform.Windows).Single(m => m.Id == "Gemma4_12B");
         Assert.That(mac.Detail, Does.Contain("Mac"));
         Assert.That(windows.Detail, Does.Contain("CPU only on Windows"));
-        Assert.That(mac.GpuOnMac && !windows.GpuOnWindows, Is.True);
+        Assert.That(mac.Backends, Is.EqualTo(new[] { "cpu", "gpu" }));
+        Assert.That(windows.Backends, Is.EqualTo(new[] { "cpu" }));
     }
 
     [Test]
     public void TheFlagsMatchWhatTheModelsCanDo()
     {
-        foreach (ModelOption option in ChatModelCatalog.ModelsFor(ChatPlatform.MacCatalyst))
+        foreach (ChatModelOption option in ChatModelCatalog.For(ChatPlatform.MacCatalyst))
         {
-            Assert.That(option.File, Is.Not.Null, option.Name);
-            bool gemma = option.Choice.ToString().StartsWith("Gemma4", StringComparison.Ordinal);
-            Assert.That(option.CanUseTools, Is.EqualTo(gemma), option.Name + " tools");
-            Assert.That(option.MaxContextTokens > 0, Is.EqualTo(gemma), option.Name + " context window choice");
-            Assert.That(ChatModelCatalog.Create(option.Choice).GetType().Name, Is.EqualTo(option.Choice.ToString()), option.Name + " instance");
+            Assert.That(option.ModelFile, Is.Not.Null, option.DisplayName);
+            bool gemma = option.Id.StartsWith("Gemma4", StringComparison.Ordinal);
+            Assert.That(option.CanUseTools, Is.EqualTo(gemma), option.DisplayName + " tools");
+            Assert.That(option.MaxContextWindow > 0, Is.EqualTo(gemma), option.DisplayName + " context window choice");
+            Assert.That(option.Create().GetType().Name, Is.EqualTo(option.Id), option.DisplayName + " instance");
         }
     }
 
     [Test]
-    public void BecomesTheLibrarysModelOptions()
+    public void TheGpuIsOfferedWhereItWasVerified()
     {
-        // For Emgu.LiteRT.LM.Maui's ChatPage: the ModelChoice's name is the id (saved chats and the "model" setting carry
-        // over), the GPU per platform a backend, and the user's own server a remote option at the end.
-        var android = ChatModelOptions.FromCatalog(ChatModelCatalog.ModelsFor(ChatPlatform.Android), ChatPlatform.Android);
-        var mac = ChatModelOptions.FromCatalog(ChatModelCatalog.ModelsFor(ChatPlatform.MacCatalyst), ChatPlatform.MacCatalyst);
-        Assert.That(android.Select(o => o.Id), Is.EqualTo(new[] { "Qwen3", "Qwen35_0_8B_VL", "Qwen35_4B", "Gemma4E2B", "Gemma4E4B", "Server" }));
-        Assert.That(mac.Select(o => o.Id), Does.Contain("Gemma4_12B"));
-        var gemma = android.Single(o => o.Id == "Gemma4E2B");
+        IList<ChatModelOption> android = ChatModelCatalog.For(ChatPlatform.Android);
+        IList<ChatModelOption> mac = ChatModelCatalog.For(ChatPlatform.MacCatalyst);
+        ChatModelOption gemma = android.Single(o => o.Id == "Gemma4E2B");
         Assert.That(gemma.DisplayName, Is.EqualTo("Gemma 4 E2B"));
         Assert.That(gemma.Backends, Is.EqualTo(new[] { "cpu", "gpu" }));
         Assert.That(android.Single(o => o.Id == "Gemma4E4B").Backends, Is.EqualTo(new[] { "cpu" }), "E4B's GPU wasn't verified on Android");
+        Assert.That(android.Single(o => o.Id == "Qwen3").Backends, Is.EqualTo(new[] { "cpu" }));
         Assert.That(mac.Single(o => o.Id == "Gemma4E4B").Backends, Is.EqualTo(new[] { "cpu", "gpu" }));
+        Assert.That(ChatModelCatalog.For(ChatPlatform.iOS).All(o => o.Backends.SequenceEqual(new[] { "cpu" })), Is.True);
         Assert.That(gemma.CanUseTools && gemma.AcceptsImages && gemma.AcceptsAudio && gemma.CanSummarize, Is.True);
         Assert.That(gemma.ContextWindow, Is.EqualTo(8192));
         Assert.That(gemma.MaxContextWindow, Is.EqualTo(32000));
         Assert.That(gemma.DownloadSize, Is.EqualTo(2600L << 20));
-        Assert.That(gemma.ModelFile, Is.Not.Null);
-        Assert.That(gemma.IsRemote, Is.False);
-        Assert.That(gemma.Create().GetType().Name, Is.EqualTo("Gemma4E2B"));
-        var qwen = android.Single(o => o.Id == "Qwen35_0_8B_VL");
-        Assert.That(qwen.CanThink, Is.False);
-        var server = android.Last();
-        Assert.That(server.IsRemote, Is.True);
-        Assert.That(server.Id, Is.EqualTo(ChatModelOptions.ServerId));
+        Assert.That(android.Single(o => o.Id == "Qwen35_0_8B_VL").CanThink, Is.False);
+        Assert.That(ChatModelCatalog.For(ChatPlatform.Android), Is.Not.SameAs(android), "each call makes new options");
     }
 }

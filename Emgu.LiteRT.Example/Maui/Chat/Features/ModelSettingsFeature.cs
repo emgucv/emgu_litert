@@ -17,8 +17,13 @@ internal sealed class ModelSettingsFeature : DemoFeature, ISearchModelChoice
         "EmbeddingGemma 2 Text Vision 440M · GPU", "EmbeddingGemma 2 Multimodal 740M · GPU",
 #endif
     };
-    private int _selectedEmbedding = AppSettings.Chat.EmbeddingModel;
-    private bool _selectedEmbeddingGpu = ReadEmbeddingGpuSelection();
+    // The page's settings keys ("litert_lm_chat_" + these, the demo's).
+    private const string EmbeddingModelKey = "embedding_model";
+    private const string EmbeddingGpuKey = "embedding_windows_gpu";
+
+    // 1 Text Vision, 2 Multimodal (read from the settings when attached; the old text-only 0 reads as 1).
+    private int _selectedEmbedding = 1;
+    private bool _selectedEmbeddingGpu;
     private Button _embeddingModelButton;
     private Label _embeddingModelDetail;
 
@@ -51,13 +56,22 @@ internal sealed class ModelSettingsFeature : DemoFeature, ISearchModelChoice
     }
 
     // The user deleted the search model in Settings > Storage: it isn't downloaded again until they ask.
-    public bool SearchDownloadRequired => AppSettings.Chat.SearchModelDeleted(SearchModelFile);
+    public bool SearchDownloadRequired => StorageFeature.IsSearchModelDeleted(Host?.Settings, SearchModelFile);
 
     private DocumentsFeature Documents => Host.Services.Get<DocumentsFeature>();
 
     private StorageFeature Storage => Host.Services.Get<StorageFeature>();
 
     public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    public override void OnAttached(IChatPageHost host)
+    {
+        base.OnAttached(host);
+        _selectedEmbedding = host.Settings.Get(EmbeddingModelKey, 1) == 2 ? 2 : 1;
+#if WINDOWS_WEBGPU
+        _selectedEmbeddingGpu = host.Settings.Get(EmbeddingGpuKey, false);
+#endif
+    }
 
     // ---------- ISearchModelChoice ----------
 
@@ -79,19 +93,10 @@ internal sealed class ModelSettingsFeature : DemoFeature, ISearchModelChoice
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
             _selectedEmbeddingGpu = false;
-            AppSettings.Chat.EmbeddingGpu = false;
+            Host.Settings.Set(EmbeddingGpuKey, false);
             UpdateEmbeddingModelDetail();
         });
         return true;
-    }
-
-    private static bool ReadEmbeddingGpuSelection()
-    {
-#if WINDOWS_WEBGPU
-        return AppSettings.Chat.EmbeddingGpu;
-#else
-        return false;
-#endif
     }
 
     public EmbeddingModel CreateEmbeddingModel()
@@ -162,8 +167,8 @@ internal sealed class ModelSettingsFeature : DemoFeature, ISearchModelChoice
             bool modelChanged = _selectedEmbedding != index;
             _selectedEmbedding = index;
             _selectedEmbeddingGpu = gpu;
-            AppSettings.Chat.EmbeddingModel = index;
-            AppSettings.Chat.EmbeddingGpu = gpu;
+            Host.Settings.Set(EmbeddingModelKey, index);
+            Host.Settings.Set(EmbeddingGpuKey, gpu);
             UpdateEmbeddingModelDetail();
             if (modelChanged) await photos.ClearIndexAsync();
             if (!SupportsImages && photos.On)

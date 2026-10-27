@@ -47,7 +47,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   The demo's own sheet, `MenuSheet` (`Theme.cs`), remains for menus of rows: the "+" menu (`DemoAttachmentSource`) and the
   vision demo page.
 - The model picker offers Qwen3, Qwen3.5 0.8B VL, Qwen3.5 4B, Gemma 4 E2B and E4B (and Gemma 4 12B on Mac Catalyst and
-  Windows, from `ChatModelCatalog`). Each model's `AcceptsImages`, `AcceptsAudio` and `CanThink` flags decide which of the
+  Windows, from `Emgu.LiteRT.LM.Chat`'s `ChatModelCatalog`). Each model's `AcceptsImages`, `AcceptsAudio` and `CanThink` flags decide which of the
   attach, talk and thinking controls show.
 - Gemma 4 always gets the agent's tools and instructions. The Web search chip sets `ChatToolMode.Auto` or `None` per
   message, so it can change in the middle of a conversation.
@@ -162,7 +162,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   tools (`CanUseTools`: Gemma 4) their `DesktopContextTokens`, 8k, on phones too; the other models stay at 4k.
 - Settings > Context window (Gemma 4 only, up to `ModelOption.MaxContextTokens` 32000, under the files' 32003 limit; Qwen
   hides it) chooses Automatic - 8k for Gemma 4, else 4k - or 4k, 8k, 16k or 32k, saved for all models
-  (`ChatSettings.ContextTokens`). `ContextTokensFor(option)` is what `LoadModelAsync` sets `MaxNumTokens` to, and
+  (the page's "context_tokens" setting). `ContextTokensFor(option)` is what `LoadModelAsync` sets `MaxNumTokens` to, and
   `ModelReady`/`PrepareModelAsync` compare it with the loaded or loading window, so a change reloads the model and the chat
   continues (compacted with the next message if it no longer fits).
   - Verified with memories off, a code word recalled after each reload: Mac Catalyst's Metal GPU 8k → 16k → 32k → 8k,
@@ -430,7 +430,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 ## Your own server
 
 - Settings > "Your own server" (the library's `ServerFeature`, in `Emgu.LiteRT.LM.Maui.OpenAI` since phase C, 2026-10-26; the
-  page gives it the catalog's remote option, `ChatModelOptions.ServerId`) takes an OpenAI-compatible server's address ("host:port" gets
+  its own remote option, id "Server", is last in the model list) takes an OpenAI-compatible server's address ("host:port" gets
   `http://` and `/v1`), an optional API key (kept in `SecureStorage`) and one of its models (`GET /models`). LM Studio's
   `/api/v0/models` adds the model type - embeddings are left out, `vlm` takes images - and a loaded model's context length;
   otherwise 4096 is assumed until the first reply loads it. The feature is the option's `IRemoteChatModel`

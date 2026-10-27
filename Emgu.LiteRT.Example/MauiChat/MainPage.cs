@@ -26,31 +26,13 @@ public sealed class MainPage : ChatPage
         // The saved chats, in a folder of the sample's own: on Mac Catalyst the app data folder can be ~/Library itself.
         var store = new ChatHistoryStore(Path.Combine(FileSystem.AppDataDirectory, "MauiChat", "chats"));
         var options = new ChatPageOptions { Title = "LiteRT Chat", History = store };
-        // Qwen3 0.6B: a 345 MB download, quick on a phone's CPU, no tools. Gemma 4 E2B (2.6 GB) understands images and
-        // speech, and calls the features' tools. The page downloads a model (after a tap) and loads it.
-        options.Models.Add(new ChatModelOption("Qwen3", "Qwen3 0.6B", () => new Qwen3())
-        {
-            Detail = "~345 MB download. Fast, and can think before answering.",
-            DownloadSize = 345L << 20,
-            ModelFile = Qwen3.ModelFile
-        });
-        // Gemma 4 E2B runs on the GPU too (OpenCL on Android, Metal on a Mac), and its file allows a context window up
-        // to 32k: the settings offer the choice, with 8k as Automatic.
-        var gemma = new ChatModelOption("Gemma4E2B", "Gemma 4 E2B", () => new Gemma4E2B())
-        {
-            Detail = "~2.6 GB download. Understands images and speech, uses tools, and can think before answering.",
-            DownloadSize = 2600L << 20,
-            ModelFile = Gemma4E2B.ModelFile,
-            CanUseTools = true,
-            AcceptsImages = true,
-            AcceptsAudio = true,
-            CanSummarize = true,
-            ContextWindow = 8192,
-            MaxContextWindow = 32000
-        };
-        if (DeviceInfo.Platform == DevicePlatform.Android || DeviceInfo.Platform == DevicePlatform.MacCatalyst)
-            gemma.Backends.Add("gpu");
-        options.Models.Add(gemma);
+        // Two of the library's models (ChatModelCatalog: what each can do, its download, its context window and where its
+        // GPU was verified): Qwen3 0.6B, a 350 MB download, quick on a phone's CPU, no tools; Gemma 4 E2B (2.6 GB)
+        // understands images and speech and calls the features' tools, on the GPU too (OpenCL on Android, Metal on a
+        // Mac), with a context window up to 32k. The page downloads a model (after a tap) and loads it.
+        foreach (ChatModelOption model in ChatModelCatalog.For(ChatDevicePlatform.Current))
+            if (model.Id == "Qwen3" || model.Id == "Gemma4E2B")
+                options.Models.Add(model);
         foreach (ChatFeature feature in ChatPage.DefaultFeatures(new SqliteAgentMemoryStore(store), new SqliteAgentGoalStore(store)))
             options.Features.Add(feature);
         // Documents the model writes (create_document): a card with Open and Share, kept with the reply in the saved chat.

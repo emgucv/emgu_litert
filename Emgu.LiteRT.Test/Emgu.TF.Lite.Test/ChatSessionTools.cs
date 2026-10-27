@@ -6,9 +6,11 @@ using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 using Microsoft.Extensions.AI;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.TF.Lite.Test;
 
-// The chat agent's tools that need no device (the demo's ChatAgentTools adds the location, clipboard and web tools).
+// A test fixture: a realistic set of the chat agent's tools that need no device (date and time, calculator, units, and
+// the memory, search, photo and image tools when given), for the routing and context-size tests. The apps build their
+// tools from the ChatPage features; this was the demo's list before its page moved onto them.
 internal static class ChatSessionTools
 {
     internal static IList<AITool> Create(bool isPrivate, IAgentMemoryStore memories,

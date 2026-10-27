@@ -118,17 +118,6 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
-        public void PrivateAgentHasNoMemoryOrPastChatToolsEvenWhenCallbacksAreProvided()
-        {
-            Task<string> Tool(string text, CancellationToken token) => Task.FromResult(text);
-            var privateTools = ChatSessionTools.Create(true, _store.Memories, Tool, Tool, Tool).Select(t => t.Name).ToList();
-            Assert.That(privateTools, Does.Not.Contain("remember").And.Not.Contain("forget").And.Not.Contain("search_chats"));
-            Assert.That(privateTools, Does.Contain("calculate").And.Contain("find_photos").And.Contain("generate_image"));
-            var regularTools = ChatSessionTools.Create(false, _store.Memories, Tool, Tool, Tool).Select(t => t.Name).ToList();
-            Assert.That(regularTools, Does.Contain("remember").And.Contain("forget").And.Contain("search_chats"));
-        }
-
-        [Test]
         public void TemporaryPickerCleanupKeepsUserOriginalsOutsideCache()
         {
             string cache = Path.Combine(_folder, "cache"), original = Path.Combine(_folder, "original.jpg");

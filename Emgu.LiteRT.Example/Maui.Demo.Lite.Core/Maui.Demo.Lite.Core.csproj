@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-  The MAUI demo's code that needs no UI or device: saved chats (ChatStore), the chat agent's tool groups and instructions,
-  tool servers (MCP), chat export and search, storage bookkeeping, the camera monitors' catalogue and actions, and the
-  workload policy. The demo and the test project both reference it (the tests used to link these files from the demo).
+  The MAUI demo's code that needs no UI or device: its store (ChatStore: the library's ChatHistoryStore with the
+  demo's own columns), the agent's instructions (ChatPlannerInstructions) and the thinking translation's text helpers
+  (LanguageText). Everything else moved into the libraries in phase C (2026-10-26/27). The demo and the test project
+  both reference it.
   The TargetFramework (net<major>.0 of the dotnet CMake found) comes from the Directory.Build.props generated from
   cmake/Maui.Demo.Lite.Core.Directory.Build.props.in. Nothing here may use MAUI.
   -->
@@ -18,10 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Emgu.LiteRT.Models\NetStandard\Emgu.LiteRT.Models.csproj" />
     <ProjectReference Include="..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
     <ProjectReference Include="..\..\Emgu.LiteRT.LM.Agents\NetStandard\Emgu.LiteRT.LM.Agents.csproj" />
-    <ProjectReference Include="..\..\Emgu.LiteRT.LM.Agents.Documents\NetStandard\Emgu.LiteRT.LM.Agents.Documents.csproj" />
     <ProjectReference Include="..\..\Emgu.LiteRT.LM.Chat.Sqlite\NetStandard\Emgu.LiteRT.LM.Chat.Sqlite.csproj" />
     <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
   </ItemGroup>

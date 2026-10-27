@@ -116,9 +116,18 @@ namespace Emgu.TF.Lite.Test
                 ("The garden is shared.", "page 1", new[] { 0f, 1f }));
             await Save("b", "recipes.docx", "m1", ("Notice the pepper.", "page 1", new[] { 0.9f, 0.1f }));
             await Save("c", "old.pdf", "m2", ("Stale vector.", "page 1", new[] { 1f, 0f }));
-            // As the chat page does: the store's passages for one embedding model, narrowed to a document, ranked against the request.
+            // As DocumentsFeature does: the store's passages for one embedding model, narrowed to a document, ranked against the request.
             float[] query = { 1f, 0f };
-            var passages = await store.GetDocumentLibraryPassagesAsync("m1");
+            async Task<List<DocumentLibraryPassage>> Passages(string model) => (await store.GetDocumentPassagesAsync(model))
+                .Select(p => new DocumentLibraryPassage
+                {
+                    DocumentId = p.DocumentId,
+                    DocumentName = p.DocumentName,
+                    Location = p.Location,
+                    Text = p.Text,
+                    Embedding = Enumerable.Range(0, p.Embedding.Length / 4).Select(i => BitConverter.ToSingle(p.Embedding, i * 4)).ToArray()
+                }).ToList();
+            var passages = await Passages("m1");
             Assert.That(passages.Select(p => p.Embedding.Length), Is.All.EqualTo(2));
 
             var all = DocumentLibrarySearch.Rank(passages, query, 3200);
@@ -131,7 +140,7 @@ namespace Emgu.TF.Lite.Test
 
             Assert.That(DocumentLibrarySearch.Rank(passages, query, 10), Has.Count.EqualTo(1));
 
-            Assert.That(await store.GetDocumentLibraryPassagesAsync("m3"), Is.Empty);
+            Assert.That(await Passages("m3"), Is.Empty);
             Assert.That(DocumentLibrarySearch.Format(all), Does.Contain("[lease.pdf, page 2").And.Contain("three months"));
         }
 

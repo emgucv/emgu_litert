@@ -8,7 +8,6 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
-using Emgu.LiteRT.LM.Agents.Documents;
 using Emgu.LiteRT.LM.Chat.Sqlite;
 using SQLite;
 
@@ -95,7 +94,7 @@ internal sealed partial class ChatStore : ChatHistoryStore
     /// Add a message, saving its attachments (encoded bytes) as files, with its language; returns its id. (It hides
     /// ChatHistoryStore.AddMessageAsync, whose last parameter is a voice message's transcript.)
     /// </summary>
-    public new async Task<int> AddMessageAsync(int conversationId, string role, string text, string thinking,
+    public async Task<int> AddMessageAsync(int conversationId, string role, string text, string thinking,
         IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments = null, string context = null,
         string language = null)
     {
@@ -111,25 +110,7 @@ internal sealed partial class ChatStore : ChatHistoryStore
         await (await Db).ExecuteAsync("UPDATE Message SET Language = ? WHERE Id = ?", language, messageId);
     }
 
-    // ---------- Documents (the index is the base store's; the demo's names and Emgu.LiteRT.LM.Agents.Documents' types) ----------
-
-    /// <summary>The same passages as Emgu.LiteRT.LM.Agents.Documents' search takes them (DocumentLibrarySearch).</summary>
-    public async Task<List<DocumentLibraryPassage>> GetDocumentLibraryPassagesAsync(string embeddingFile) =>
-        (await GetDocumentPassagesAsync(embeddingFile)).Select(p => new DocumentLibraryPassage
-        {
-            DocumentId = p.DocumentId,
-            DocumentName = p.DocumentName,
-            Location = p.Location,
-            Text = p.Text,
-            Embedding = ToFloats(p.Embedding)
-        }).ToList();
-
-    private static float[] ToFloats(byte[] bytes)
-    {
-        float[] values = new float[bytes.Length / sizeof(float)];
-        Buffer.BlockCopy(bytes, 0, values, 0, values.Length * sizeof(float));
-        return values;
-    }
+    // ---------- Documents (the index is the base store's; the demo's names) ----------
 
     /// <summary>Record the document a chat uses (null for none).</summary>
     public Task SetConversationDocumentAsync(int conversationId, string documentId) => SetChatDocumentAsync(conversationId, documentId);
