@@ -314,6 +314,27 @@ namespace Emgu.LiteRT.LM.Maui
 
         private System.Windows.Input.ICommand _showSummaryCommand;
 
+        /// <summary>
+        /// Copies a message's text (the command's parameter, a <see cref="ChatMessageItem"/>) to the clipboard and says so in
+        /// the status line; the default user message template's "Copy" under the bubble runs it when tapped.
+        /// </summary>
+        public System.Windows.Input.ICommand CopyMessageCommand => _copyMessageCommand ??= new Command<ChatMessageItem>(async message =>
+        {
+            if (string.IsNullOrEmpty(message?.Text))
+                return;
+            try
+            {
+                await Clipboard.Default.SetTextAsync(message.Text);
+                SetStatus("Copied.");
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Couldn't copy: " + ex.Message);
+            }
+        });
+
+        private System.Windows.Input.ICommand _copyMessageCommand;
+
         /// <summary>Loading the <see cref="Model"/>, or null without one.</summary>
         public ModelLoadState LoadState { get; private set; }
 

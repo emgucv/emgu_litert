@@ -22,7 +22,8 @@
     ChatUserMessageTemplate, ChatReplyTemplate, ChatNoticeTemplate
                            ChatView's messages and notices (DataTemplates of an Emgu.LiteRT.LM.Chat ChatMessageItem); they
                            show the item's Decorations with ChatDecorationView, and the user template's "Earlier messages
-                           were summarized" divider shows the summary when tapped (ChatView.ShowSummaryCommand)
+                           were summarized" divider shows the summary when tapped (ChatView.ShowSummaryCommand) and its "Copy" under the
+                           bubble copies the message (ChatView.CopyMessageCommand)
     ChatDecorationTextStyle
                            a decoration that isn't a View (Label style)
     ChatSendButtonStyle, ChatStopButtonStyle, ChatAttachButtonStyle
@@ -405,6 +406,15 @@
                 </Border.StrokeShape>
                 <Label Text="{Binding Text}" TextColor="White" FontSize="15" FontFamily="{StaticResource ChatBodyFont}" />
             </Border>
+            <!-- Copies the message's text (ChatView.CopyMessageCommand). -->
+            <Label Text="Copy" IsVisible="{Binding HasText}" HorizontalOptions="End" Margin="0,-4,8,0" FontSize="12"
+                   FontFamily="{StaticResource ChatBodyFont}" SemanticProperties.Description="Copy this message"
+                   TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type chat:ChatView}}, Path=CopyMessageCommand, x:DataType=chat:ChatView}"
+                                          CommandParameter="{Binding .}" />
+                </Label.GestureRecognizers>
+            </Label>
             <VerticalStackLayout BindableLayout.ItemsSource="{Binding Decorations}" IsVisible="{Binding HasDecorations}" Spacing="6" HorizontalOptions="End">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="x:Object">
