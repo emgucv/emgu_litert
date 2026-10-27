@@ -215,7 +215,8 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         /// <param name="chatId">The chat (<see cref="CreateChatAsync"/>)</param>
         /// <param name="message">The user's message</param>
         /// <param name="reply">The reply</param>
-        /// <param name="replyAttachments">Files of the app's own kinds to keep with the reply (e.g. a picture it drew), or null</param>
+        /// <param name="replyAttachments">Files of the app's own kinds to keep with the reply (e.g. a picture it drew), or null for
+        /// the reply's <see cref="ChatMessageItem.SavedFiles"/></param>
         /// <param name="steps">The step lines to keep with the reply, or null for its <see cref="ChatMessageItem.Steps"/>
         /// (e.g. an app's own line first, which isn't one of the reply's steps)</param>
         /// <returns>The ids of the message and the reply</returns>
@@ -227,6 +228,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             if (reply == null)
                 throw new ArgumentNullException(nameof(reply));
             ThrowIfPrivate();
+            replyAttachments ??= SavedFilesOf(reply);
             var files = message.Attachments
                 .Select(a => (a.HasTopLevelMediaType("image") ? ChatSavedAttachment.ImageKind : ChatSavedAttachment.AudioKind, a.MediaType, a.Data.ToArray()))
                 .ToList();
@@ -251,7 +253,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         /// <param name="chatId">The chat</param>
         /// <param name="message">The user's message</param>
         /// <param name="reply">The new reply</param>
-        /// <param name="replyAttachments">Files of the app's own kinds to keep with the reply, or null</param>
+        /// <param name="replyAttachments">Files of the app's own kinds to keep with the reply, or null for the reply's <see cref="ChatMessageItem.SavedFiles"/></param>
         /// <returns>The ids of the message and the new reply</returns>
         public async Task<ChatSavedExchange> ReplaceReplyAsync(int chatId, ChatMessageItem message, ChatMessageItem reply,
             IEnumerable<(string Kind, string MediaType, byte[] Data)> replyAttachments = null)
@@ -260,6 +262,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 throw new ArgumentNullException(nameof(message));
             if (reply == null)
                 throw new ArgumentNullException(nameof(reply));
+            replyAttachments ??= SavedFilesOf(reply);
             int messageId = GetMessageId(message);
             if (messageId <= 0)
                 return await SaveExchangeAsync(chatId, message, reply, replyAttachments).ConfigureAwait(false);
@@ -285,6 +288,10 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             OnChatsChanged();
             return new ChatSavedExchange(messageId, replyId);
         }
+
+        // The app's own files a reply carries (ChatMessageItem.SavedFiles), as attachments to save; null when none.
+        private static List<(string Kind, string MediaType, byte[] Data)> SavedFilesOf(ChatMessageItem reply) =>
+            reply.SavedFiles.Count == 0 ? null : reply.SavedFiles.Select(f => (f.Kind, f.MediaType, f.Data)).ToList();
 
         // An interrupted reply is kept as cut off.
         private static string ReplyText(ChatMessageItem reply) =>
@@ -504,6 +511,9 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                     foreach (string step in steps)
                         item.Steps.Add(new ChatToolStep(step));
                     steps.Clear();
+                    // The app's own files kept with the reply (a picture it drew, a document it wrote), for the app to show again.
+                    foreach (ChatSavedAttachment file in saved)
+                        item.SavedFiles.Add(new ChatSavedFile(file.Kind, file.MediaType, await ReadFileAsync(file.Path).ConfigureAwait(false)));
                 }
                 Remember(item, row.Id);
                 records[item] = row;

@@ -101,6 +101,34 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
+        public async Task SavesAReplysOwnFilesWithoutBeingGivenThem()
+        {
+            // A feature kept a document with the reply (ChatMessageItem.SavedFiles, through the page's AddCardToReply):
+            // the store saves it with the reply by default - the binding's path - and reads it back.
+            int chatId = await _store.CreateChatAsync("Write a packing list", null);
+            var message = new ChatMessageItem(ChatMessageRole.User, "Write a packing list");
+            ChatMessageItem reply = Reply("Here is your packing list.");
+            byte[] docx = { 0x50, 0x4B, 3, 4 };
+            reply.SavedFiles.Add(new ChatSavedFile("written_document", "application/vnd.openxmlformats-officedocument.wordprocessingml.document; name=Packing list.docx", docx));
+            await _store.SaveExchangeAsync(chatId, message, reply);
+
+            ChatHistory history = await _store.LoadAsync(chatId);
+            ChatSavedFile file = history.Messages[1].SavedFiles.Single();
+            Assert.That(file.Kind, Is.EqualTo("written_document"));
+            Assert.That(file.MediaType, Does.EndWith("name=Packing list.docx"));
+            Assert.That(file.Data, Is.EqualTo(docx));
+            Assert.That(history.Messages[1].Attachments, Is.Empty);
+
+            // A regenerated reply replaces the file with its own.
+            ChatMessageItem again = Reply("A shorter list.");
+            again.SavedFiles.Add(new ChatSavedFile("written_document", "text/markdown; name=Packing list.md", new byte[] { 1 }));
+            await _store.ReplaceReplyAsync(chatId, message, again);
+            history = await _store.LoadAsync(chatId);
+            Assert.That(history.Messages, Has.Count.EqualTo(2));
+            Assert.That(history.Messages[1].SavedFiles.Single().MediaType, Is.EqualTo("text/markdown; name=Packing list.md"));
+        }
+
+        [Test]
         public async Task KeepsAnAppsOwnFilesWithAReplyAndDeletesAChatWithItsFiles()
         {
             int chatId = await _store.CreateChatAsync("Draw a fox", null);
@@ -117,6 +145,10 @@ namespace Emgu.TF.Lite.Test
             Assert.That(picture.Kind, Is.EqualTo("generated"));
             Assert.That(picture.MediaType, Is.EqualTo("image/png"));
             Assert.That(File.ReadAllBytes(picture.Path), Is.EqualTo(png));
+            // And read back as the reply's own files, for the app to show again (since 2026-10-26).
+            ChatSavedFile file = reply.SavedFiles.Single();
+            Assert.That((file.Kind, file.MediaType, file.Data), Is.EqualTo(("generated", "image/png", png)));
+            Assert.That(history.Messages[0].SavedFiles, Is.Empty);
             string folder = Path.GetDirectoryName(picture.Path);
 
             await _store.DeleteChatAsync(chatId);

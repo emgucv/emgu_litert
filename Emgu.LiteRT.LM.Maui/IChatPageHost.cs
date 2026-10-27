@@ -150,6 +150,15 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>Show a card above the reply being written (or the latest reply); on the UI thread.</summary>
         void AddCardToReply(View card);
 
+        /// <summary>
+        /// Show a card above the reply being written (or the latest reply) and keep a file with it: the chats' store
+        /// saves the file with the reply (<see cref="ChatMessageItem.SavedFiles"/>), and when the chat is opened again
+        /// the feature is asked for the card (<see cref="ChatFeature.RestoreSavedFile"/>). On the UI thread.
+        /// </summary>
+        /// <param name="card">The card, or null to keep the file only (the card was added before, e.g. while the picture was being drawn)</param>
+        /// <param name="file">The file</param>
+        void AddCardToReply(View card, ChatSavedFile file);
+
         /// <summary>Take a card away from whichever message it is on; on the UI thread.</summary>
         void RemoveCard(View card);
 

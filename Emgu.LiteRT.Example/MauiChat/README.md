@@ -9,8 +9,10 @@ A whole chat app in one C# file, built on the Emgu LiteRT chat libraries:
 - Its features (`ChatPage.DefaultFeatures`): the date and time, a calculator and unit conversion; memories about the
   user; the web (the weather, Wikipedia, currency conversion, reading pages - and web search with a Tavily API key,
   entered in the settings); the user's location (off until allowed); the clipboard (only for a message about it); and
-  the user's goals. Plus one of the app's own, `DiceFeature` (also in `MainPage.cs`): a `roll_die` tool, a line of
-  instructions and a switch in the settings - about 20 lines.
+  the user's goals; and `WrittenDocumentsFeature` (documents the model writes with `create_document` - Word, PDF or
+  Markdown - as a card with Open and Share, kept with the reply in the saved chat). Plus one of the app's own,
+  `DiceFeature` (also in `MainPage.cs`): a `roll_die` tool, a line of instructions and a switch in the settings - about
+  20 lines.
 - `Emgu.LiteRT.LM.Chat.Sqlite`'s `ChatHistoryStore`, `SqliteAgentMemoryStore` and `SqliteAgentGoalStore`: the chats,
   memories and goals, saved in one SQLite database.
 

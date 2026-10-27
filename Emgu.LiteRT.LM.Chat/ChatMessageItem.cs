@@ -317,6 +317,13 @@ namespace Emgu.LiteRT.LM.Chat
         /// </summary>
         public ObservableCollection<object> Decorations { get; } = new ObservableCollection<object>();
 
+        /// <summary>
+        /// The app's own files kept with a reply (a picture it drew, a document it wrote; <see cref="ChatSavedFile"/>):
+        /// the chats' store saves them with the reply and reads them back when the chat is opened, for the app to show
+        /// again as <see cref="Decorations"/>. Not given to the model.
+        /// </summary>
+        public IList<ChatSavedFile> SavedFiles { get; } = new List<ChatSavedFile>();
+
         /// <summary>What the model is given: <see cref="Context"/> followed by <see cref="Text"/>.</summary>
         public string ModelText => string.IsNullOrEmpty(Context) ? Text : Context + Text;
 

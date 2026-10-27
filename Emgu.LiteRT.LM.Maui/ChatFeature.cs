@@ -148,6 +148,14 @@ namespace Emgu.LiteRT.LM.Maui
         }
 
         /// <summary>
+        /// The card for a file this feature kept with a reply (<see cref="IChatPageHost.AddCardToReply(View, ChatSavedFile)"/>),
+        /// read back with a saved chat: the page shows it above the reply again. Null for a file that isn't this
+        /// feature's (the page asks each feature).
+        /// </summary>
+        /// <param name="file">The file, with its kind</param>
+        public virtual View RestoreSavedFile(ChatSavedFile file) => null;
+
+        /// <summary>
         /// The step line for a tool call of this feature's ("Searching Wikipedia for ...", shown while it runs), or null
         /// for a call that isn't its; the page asks each feature, then Emgu.LiteRT.LM.Agents' <c>AgentTools.Describe</c>.
         /// </summary>

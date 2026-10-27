@@ -6,6 +6,7 @@ using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Chat.Sqlite;
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Features;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Extensions.AI;
 
@@ -52,6 +53,8 @@ public sealed class MainPage : ChatPage
         options.Models.Add(gemma);
         foreach (ChatFeature feature in ChatPage.DefaultFeatures(new SqliteAgentMemoryStore(store), new SqliteAgentGoalStore(store)))
             options.Features.Add(feature);
+        // Documents the model writes (create_document): a card with Open and Share, kept with the reply in the saved chat.
+        options.Features.Add(new WrittenDocumentsFeature());
         options.Features.Add(new DiceFeature());
         return options;
     }

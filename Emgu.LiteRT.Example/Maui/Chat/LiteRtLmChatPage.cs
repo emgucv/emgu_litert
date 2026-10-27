@@ -489,8 +489,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     protected override async Task SendCoreAsync(ChatSendRequest request, CancellationToken cancellationToken)
     {
         _parts.Camera.ClearCameraTurn();
-        _parts.Images.ClearDrawn();
-        _parts.WrittenDocuments.Clear();
         ChatConversation conversation = Conversation;
         if (conversation == null || !await EnsureRemoteAsync(cancellationToken))
             return;
@@ -671,11 +669,9 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             steps.AddRange(reply.Steps.Select(step => step.Description));
             if (bubble?.MemoryStep != null)
                 steps.Add(bubble.MemoryStep);
-            // Pictures the reply drew are kept with it (shown again when the chat is reopened, not given to the model),
-            // and the documents it wrote.
-            List<(string Kind, string MediaType, byte[] Data)> drawn = _parts.Images.Drawn();
-            drawn.AddRange(_parts.WrittenDocuments.Take());
-            ChatSavedExchange saved = await SharedStore.SaveExchangeAsync(id, userItem, reply, drawn, steps);
+            // The pictures the reply drew and the documents it wrote are the reply's SavedFiles (kept with it, shown
+            // again when the chat is reopened, not given to the model).
+            ChatSavedExchange saved = await SharedStore.SaveExchangeAsync(id, userItem, reply, null, steps);
             info.MessageId = saved.MessageId;
             await SharedStore.SetLanguageAsync(saved.MessageId, info.Language);
             if (bubble != null)
@@ -738,14 +734,8 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                 bubble.TargetLanguage = TranslationFeature.Target(record.Language ?? lastUserLanguage);
                 bubble.Translation = record.ThinkingTranslation;
                 bubble.ShowTranslation = !string.IsNullOrEmpty(record.ThinkingTranslation);
-                foreach (ChatSavedAttachment attachment in history.AttachmentsOf(item))
-                {
-                    // A document the reply wrote, or a picture it drew: cards above it, not given to the model.
-                    if (attachment.Kind == WrittenDocumentsFeature.Kind)
-                        item.Decorations.Add(_parts.WrittenDocuments.SavedCard(attachment.MediaType, await System.IO.File.ReadAllBytesAsync(attachment.Path)));
-                    else if (attachment.Kind == ImageFeature.GeneratedKind)
-                        item.Decorations.Add(_parts.Images.SavedImageView(await System.IO.File.ReadAllBytesAsync(attachment.Path)));
-                }
+                // The documents the reply wrote and the pictures it drew: cards above it, not given to the model.
+                RestoreSavedFiles(item);
                 _ = _parts.Translations.CheckThinkingLanguageAsync(bubble);
             }
             SetStatus($"Opening conversation: {history.Messages.Count} messages...");
@@ -810,7 +800,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     {
         _parts.Documents.RemoveDocument();
         Chat.PendingAttachments.Clear();
-        _parts.Images.ClearDrawn();
         _agentBubble = null;
         _parts.Images.ClearPromptCache();
         _parts.Documents.ForgetFinishedPrivateDocuments();

@@ -38,8 +38,6 @@ internal sealed class ImageFeature : DemoFeature, IStorageParticipant
     private CancellationTokenSource _zimageDownload;
     private Task _zimageDownloadTask;
     private double _zimageDownloadFraction = -1;
-    // The pictures drawn for the reply being written, saved with it.
-    private readonly List<byte[]> _sendImages = new List<byte[]>();
 
     public override string Name => "images";
 
@@ -83,7 +81,6 @@ internal sealed class ImageFeature : DemoFeature, IStorageParticipant
         };
     }
 
-    public override void OnNewConversation() => ClearDrawn();
 
     // iOS backs up the app's Library/Application Support (where ZImageTurbo keeps its ~21 GB) to iCloud unless told
     // not to; the model can be downloaded again.
@@ -347,10 +344,12 @@ internal sealed class ImageFeature : DemoFeature, IStorageParticipant
                 MainThread.BeginInvokeOnMainThread(() => tile.Stage.Text = text);
             }), cancel);
             byte[] png = await Task.Run(() => AddPictureDetails(EncodePng(result), prompt, seed));
-            lock (_sendImages)
-                _sendImages.Add(png);
-            await MainThread.InvokeOnMainThreadAsync(() => ShowGeneratedImage(tile, png,
-                string.Format(CultureInfo.InvariantCulture, "{0:F0} s", result.Elapsed.TotalSeconds)));
+            await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                ShowGeneratedImage(tile, png, string.Format(CultureInfo.InvariantCulture, "{0:F0} s", result.Elapsed.TotalSeconds));
+                // Kept with the reply (shown again when the chat is reopened, not given to the model).
+                Host.AddCardToReply(null, new ChatSavedFile(GeneratedKind, "image/png", png));
+            });
             UiStallWatchdog.Mark(string.Format(CultureInfo.InvariantCulture, "generate_image done in {0:F1} s", result.Elapsed.TotalSeconds));
             return AgentTools.ImageGeneratedResult(prompt);
         }
@@ -441,6 +440,8 @@ internal sealed class ImageFeature : DemoFeature, IStorageParticipant
         tile.Stage.Text = caption;
         tile.View.OnTap(() => ShowGeneratedImageLarge(png));
     }
+
+    public override View RestoreSavedFile(ChatSavedFile file) => file.Kind == GeneratedKind ? SavedImageView(file.Data) : null;
 
     // A picture a saved reply drew, for above it again when the chat is reopened.
     public View SavedImageView(byte[] png)
@@ -554,19 +555,6 @@ internal sealed class ImageFeature : DemoFeature, IStorageParticipant
 
     // Whether the model has been loaded (or is loading).
     public bool ModelLoaded => _zimageInit != null;
-
-    // The pictures drawn for the reply being written, to save with it; and forgetting them for the next reply.
-    public List<(string Kind, string MediaType, byte[] Data)> Drawn()
-    {
-        lock (_sendImages)
-            return _sendImages.Select(png => (GeneratedKind, "image/png", png)).ToList();
-    }
-
-    public void ClearDrawn()
-    {
-        lock (_sendImages)
-            _sendImages.Clear();
-    }
 
     public void ClearPromptCache() => _zimage?.ClearPromptCache();
 

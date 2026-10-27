@@ -177,6 +177,8 @@ namespace Emgu.LiteRT.LM.Maui
                 SetStatus("Opening the chat...");
                 if (!await _options.History.LoadChatAsync(chatId, Conversation))
                     return;
+                foreach (ChatMessageItem item in Conversation.Messages.ToList())
+                    RestoreSavedFiles(item);
                 AttachHistory(chatId);
             }
             finally
@@ -200,6 +202,31 @@ namespace Emgu.LiteRT.LM.Maui
             else
                 Conversation?.Clear();
             _skills.Reset();
+        }
+
+        /// <summary>
+        /// Show the files a saved reply kept (<see cref="ChatMessageItem.SavedFiles"/>: the pictures it drew, the documents
+        /// it wrote) above it again, as the cards the features make of them (<see cref="ChatFeature.RestoreSavedFile"/>).
+        /// A page that reads chats back itself calls it for each message.
+        /// </summary>
+        /// <param name="item">A message read back from the store</param>
+        protected void RestoreSavedFiles(ChatMessageItem item)
+        {
+            if (item == null || item.SavedFiles.Count == 0)
+                return;
+            foreach (ChatSavedFile file in item.SavedFiles.ToList())
+            {
+                foreach (ChatFeature feature in _features)
+                {
+                    View card;
+                    try { card = feature.RestoreSavedFile(file); }
+                    catch (Exception) { card = null; }
+                    if (card == null)
+                        continue;
+                    item.Decorations.Add(card);
+                    break;
+                }
+            }
         }
 
         /// <summary>After a saved chat's messages were shown: the model re-reads them with the next message, the features are told, the list is marked.</summary>

@@ -13,10 +13,11 @@ namespace Emgu.LiteRT.LM.Maui.Features;
 
 /// <summary>
 /// Documents the agent writes (create_document, Emgu.LiteRT.LM.Agents' <see cref="DocumentWriter"/>: Word, PDF or Markdown
-/// from the model's Markdown): a card above the reply with Open and Share. A page that saves the chats itself keeps them
-/// with the reply as attachments of kind <see cref="ChatWrittenDocuments.AttachmentKind"/> (<see cref="Take"/>; the file
-/// name in the media type, "...; name=Packing list.docx") and shows them again when the chat is reopened
-/// (<see cref="SavedCard"/>), never given back to the model. A tool group that comes when the message asks for a file,
+/// from the model's Markdown): a card above the reply with Open and Share. The document is kept with the reply
+/// (<see cref="IChatPageHost.AddCardToReply(View, ChatSavedFile)"/>: an attachment of kind
+/// <see cref="ChatWrittenDocuments.AttachmentKind"/>, the file name in the media type, "...; name=Packing list.docx"),
+/// so the chats' store saves it and the card comes back when the chat is reopened (<see cref="RestoreSavedFile"/>),
+/// never given back to the model. A tool group that comes when the message asks for a file,
 /// with <see cref="MeetingFeature"/>'s tool when that feature is on the page (its notes are a document too).
 /// </summary>
 public sealed class WrittenDocumentsFeature : ChatFeature
@@ -24,7 +25,6 @@ public sealed class WrittenDocumentsFeature : ChatFeature
     /// <summary>The kind of a reply's saved attachment that is a document it wrote.</summary>
     public const string Kind = ChatWrittenDocuments.AttachmentKind;
 
-    private readonly List<GeneratedDocument> _sendDocuments = new List<GeneratedDocument>();
     private string _prompt = string.Empty;
 
     /// <inheritdoc/>
@@ -58,44 +58,22 @@ public sealed class WrittenDocumentsFeature : ChatFeature
                 : ChatWrittenDocuments.Instructions);
     }
 
-    /// <summary>create_document's save: the document is kept for the reply being written, with a card above it.</summary>
+    /// <summary>create_document's save: the document is kept with the reply being written, with a card above it.</summary>
     /// <param name="document">The document</param>
     /// <param name="cancellationToken">Unused</param>
     /// <returns>What the model is told</returns>
     public Task<string> SaveAsync(GeneratedDocument document, CancellationToken cancellationToken)
     {
-        lock (_sendDocuments)
-            _sendDocuments.Add(document);
         return MainThread.InvokeOnMainThreadAsync(() =>
         {
-            Host.AddCardToReply(CreateCard(document.FileName, document.MediaType, document.Format, document.Data));
+            Host.AddCardToReply(CreateCard(document.FileName, document.MediaType, document.Format, document.Data),
+                new ChatSavedFile(Kind, document.MediaType + "; name=" + document.FileName, document.Data));
             return AgentTools.DocumentCreatedResult(document);
         });
     }
 
-    /// <summary>The documents written for the reply, as attachments to save with it (kind, media type with the file name, bytes).</summary>
-    public List<(string Kind, string MediaType, byte[] Data)> Take()
-    {
-        lock (_sendDocuments)
-            return _sendDocuments.Select(d => (Kind, d.MediaType + "; name=" + d.FileName, d.Data)).ToList();
-    }
-
-    /// <summary>Forget the documents written for the reply (before the next message).</summary>
-    public void Clear()
-    {
-        lock (_sendDocuments)
-            _sendDocuments.Clear();
-    }
-
     /// <inheritdoc/>
-    public override void OnNewConversation() => Clear();
-
-    /// <inheritdoc/>
-    public override void OnReplyCompleted(ChatExchangeEventArgs e)
-    {
-        // A page that saves the chats itself took them with the reply; the next reply starts afresh.
-        Clear();
-    }
+    public override View RestoreSavedFile(ChatSavedFile file) => file.Kind == Kind ? SavedCard(file.MediaType, file.Data) : null;
 
     /// <summary>A document a saved reply wrote, for above it again when the chat is reopened: its name and type from the media type.</summary>
     /// <param name="mediaType">The saved attachment's media type, with the file name ("...; name=...")</param>

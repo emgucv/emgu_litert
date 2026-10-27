@@ -10,7 +10,7 @@ namespace Emgu.LiteRT.LM.Maui
     /// <summary>
     /// A card above the reply that asks before a tool does something outside the chat (a timer, a calendar event, a tool
     /// server's tool...): the request's title and details, its confirm button and Cancel; then, <see cref="Finish"/>, what
-    /// came of it. Made for a <see cref="DeviceActionRequest"/> and shown with <see cref="IChatPageHost.AddCardToReply"/>.
+    /// came of it. Made for a <see cref="DeviceActionRequest"/> and shown with <see cref="IChatPageHost.AddCardToReply(View)"/>.
     /// </summary>
     public sealed class ConfirmationCard
     {

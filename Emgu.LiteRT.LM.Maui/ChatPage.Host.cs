@@ -166,17 +166,28 @@ namespace Emgu.LiteRT.LM.Maui
 
         void IChatPageHost.SetBusy(bool busy) => SetBusy(busy);
 
-        void IChatPageHost.AddCardToReply(View card)
+        void IChatPageHost.AddCardToReply(View card) => AddCardToReply(card, null);
+
+        void IChatPageHost.AddCardToReply(View card, ChatSavedFile file) => AddCardToReply(card, file);
+
+        // A card above the latest reply (a notice of its own without a reply yet: a monitor's snapshot before the first
+        // message), and a file kept with the reply (dropped without one: nothing to save it with).
+        private void AddCardToReply(View card, ChatSavedFile file)
         {
-            if (card == null || Conversation == null)
+            if ((card == null && file == null) || Conversation == null)
                 return;
             ChatMessageItem reply = Conversation.Messages.LastOrDefault(m => m.Role == ChatMessageRole.Assistant);
-            // Without a reply yet (a monitor's snapshot before the first message): a notice of its own.
             if (reply != null)
-                reply.Decorations.Add(card);
-            else
+            {
+                if (card != null)
+                    reply.Decorations.Add(card);
+                if (file != null)
+                    reply.SavedFiles.Add(file);
+            }
+            else if (card != null)
                 Conversation.AddNotice(card);
-            _chatView.ScrollToEnd();
+            if (card != null)
+                _chatView.ScrollToEnd();
         }
 
         void IChatPageHost.RefreshChatList() => RefreshChatList();
