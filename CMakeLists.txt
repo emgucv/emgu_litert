@@ -584,6 +584,10 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # doesn't depend on Microsoft.Extensions.AI.OpenAI and the OpenAI SDK).
   SET(EMGU_LITERT_LM_MAUI_OPENAI_NUGET_ID "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}.OpenAI")
   SET(EMGU_LITERT_LM_MAUI_OPENAI_NUGET_TITLE "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_TITLE} OpenAI")
+  # Emgu.LiteRT.LM.Maui.Images/: ChatPage's pictures drawn with Z-Image-Turbo (kept out of Emgu.LiteRT.LM.Maui so that
+  # package doesn't depend on Emgu.LiteRT.Models).
+  SET(EMGU_LITERT_LM_MAUI_IMAGES_NUGET_ID "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}.Images")
+  SET(EMGU_LITERT_LM_MAUI_IMAGES_NUGET_TITLE "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_TITLE} Images")
   # Emgu.LiteRT.LM.Maui.CV/: ChatPage's camera and sound monitors and the exercise counter (kept out of Emgu.LiteRT.LM.Maui so
   # that package needs neither Emgu CV nor the detectors).
   SET(EMGU_LITERT_LM_MAUI_CV_NUGET_ID "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}.CV")
@@ -1309,6 +1313,17 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.OpenAI.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.OpenAI/Maui/docs/README.md)
 
+# Emgu.LiteRT.LM.Maui.Images: ChatPage's ImageFeature. Its own nuget package, depending on Emgu.LiteRT.LM.Maui and
+# Emgu.LiteRT.Models (Z-Image-Turbo).
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Images.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Images/Maui/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Images/Maui/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Images/Maui/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Images.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Images/Maui/docs/README.md)
+
 # Emgu.LiteRT.LM.Maui.CV: ChatPage's CameraFeature and ExerciseFeature. Its own nuget package, depending on Emgu.LiteRT.LM.Maui,
 # Emgu.LiteRT.LM.Agents.CV, Emgu.LiteRT.Models.CV and Emgu.LiteRT.Models.CV.Maui (Emgu CV).
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.CV.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.CV/Maui/Directory.Build.props)
@@ -1448,6 +1463,7 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.Documents)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.Mcp)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.OpenAI)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.Images)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.CV)
   # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and later to Emgu.TF.Lite.ImageIO/, and made
   # its own project+package (it used to be shared source imported directly into

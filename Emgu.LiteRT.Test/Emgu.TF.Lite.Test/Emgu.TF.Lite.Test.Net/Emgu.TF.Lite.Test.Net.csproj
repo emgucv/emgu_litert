@@ -78,6 +78,7 @@
     <Compile Include="..\SystemSqlite.cs" Link="SystemSqlite.cs" />
     <Compile Include="..\UnitTestStorage.cs" Link="UnitTestStorage.cs" />
     <Compile Include="..\UnitTestPrivateChat.cs" Link="UnitTestPrivateChat.cs" />
+    <Compile Include="..\UnitTestPngEncoder.cs" Link="UnitTestPngEncoder.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -12,11 +12,5 @@ internal static class ChatToolGroups
     // extras); the name is kept for the page's token estimate.
     internal const string Goals = Emgu.LiteRT.LM.Agents.Skills.GoalsSkill.GroupName;
 
-    internal const string ImageGeneration = "image_generation";
-    internal const string ImageGenerationSummary = "draw, paint or create a new picture from a description";
-    internal static readonly string[] ImageGenerationKeywords =
-    {
-        "draw", "paint", "sketch", "illustrat", "generate an image", "generate a picture", "create an image",
-        "create a picture", "make an image", "make a picture", "imagine", "picture of a", "image of a", "artwork"
-    };
+    // The image generation group is the library's too (Emgu.LiteRT.LM.Chat's ChatImageGeneration).
 }

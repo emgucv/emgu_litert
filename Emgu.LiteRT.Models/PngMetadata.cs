@@ -6,9 +6,11 @@ using System.Text;
 
 namespace Emgu.LiteRT.Models;
 
-// Text in a PNG file: the generated pictures carry their description and seed (iTXt chunks, UTF-8), so a picture shows
-// them again when a saved chat is opened - the picture is all that is kept - and a saved or shared file knows how it was
-// made. No MAUI types: linked into the tests.
+/// <summary>
+/// Text in a PNG file: the generated pictures carry their description and seed (iTXt chunks, UTF-8), so a picture shows
+/// them again when a saved chat is opened - the picture is all that is kept - and a saved or shared file knows how it was
+/// made (<see cref="PngEncoder"/> writes the picture itself).
+/// </summary>
 public static class PngMetadata
 {
     private static readonly byte[] Signature = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };

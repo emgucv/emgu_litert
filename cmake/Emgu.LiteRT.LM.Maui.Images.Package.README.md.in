@@ -1,0 +1,18 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Maui.Images.dll`: `ImageFeature`, a feature of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `ChatPage` that lets the model draw pictures ("draw a red fox in the snow") with Z-Image-Turbo (`${EMGU_LITERT_MODELS_NUGET_ID}`' `ZImageTurbo`), 256 x 256, on the device's CPU, through the generate_image tool. Its settings section has the "Image generation" switch (off by default; turning it on downloads the model, a 10.6 GB download that goes on in the background), and a picture is shown above the reply as it is drawn, kept with the reply in the saved chat, and opens large with its description and seed, "Draw it again", "Add to Photos", Share and Save. The description and seed are written into the PNG. The model's folder is kept out of iCloud backups on iOS, and a storage feature on the page can delete it (the feature is an `IStorageParticipant`; `ImageFeature.StorageKey` names the folder for a `StorageFolder`).
+
+It is kept out of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}` so that package doesn't depend on the models package.
+
+## Adding it to a chat page
+
+```csharp
+using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Images;
+
+options.Features.Add(new ImageFeature());   // or new ImageFeature(workload) to share the searches' IIndexingWorkload
+```
+
+`PictureSaver` adds a "Save image…" button that calls the app's Save As dialog (e.g. CommunityToolkit.Maui's `FileSaver`); `ModelSelector` adds a view of the app's own above the switch. The app adds the LiteRT native runtime packages the model needs, and `NSPhotoLibraryAddUsageDescription` on iOS for "Add to Photos".

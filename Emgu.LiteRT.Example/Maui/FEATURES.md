@@ -387,7 +387,9 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Image generation
 
-- Settings > "Image generation" (off by default; `ImageFeature.cs`) asks before downloading `Emgu.LiteRT.Models`'
+- Settings > "Image generation" (off by default; the library's `ImageFeature` in `Emgu.LiteRT.LM.Maui.Images` since
+  2026-10-27, its PNG written by `Emgu.LiteRT.Models`' `PngEncoder` instead of Emgu CV; the demo gives it its model
+  selector and a Save As dialog) asks before downloading `Emgu.LiteRT.Models`'
   `ZImageTurbo` (10.6 GB) to its default folder, `LocalApplicationData/Z-Image-Turbo` (`~/Documents/Z-Image-Turbo` for the
   Catalyst app - on this Mac a link to the data volume), with progress in the settings. An interrupted download resumes on
   the next start; Storage deletes the model.

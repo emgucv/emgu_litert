@@ -116,8 +116,8 @@ public class UnitTestToolRouting
                     return Task.FromResult(AgentTools.DocumentCreatedResult(document));
                 }, request), AgentTools.RecordMeeting((title, token) => Task.FromResult("none")) },
                 () => "When the user asks for a document or a file (Word, PDF, Markdown), write the whole content into create_document's content in Markdown - not into your reply - then say in one short sentence that it is ready."),
-            new ToolGroup(ChatToolGroups.ImageGeneration, ChatToolGroups.ImageGenerationSummary, ChatToolGroups.ImageGenerationKeywords,
-                () => new AITool[] { AgentTools.GenerateImage(Unused) }, () => ChatPlannerInstructions.Images),
+            new ToolGroup(ChatImageGeneration.GroupName, ChatImageGeneration.GroupSummary, ChatImageGeneration.GroupKeywords,
+                () => new AITool[] { AgentTools.GenerateImage(Unused) }, () => ChatImageGeneration.Instructions),
         };
     }
 
@@ -162,8 +162,8 @@ public class UnitTestToolRouting
             ("What does my rental contract say about pets?", new[] { ChatDocuments.GroupName }),
             ("What did we talk about last time?", new[] { ChatSearchIndex.GroupName }),
             ("What was the restaurant you told me about?", new[] { ChatSearchIndex.GroupName }),
-            ("Draw a red fox in the snow", new[] { ChatToolGroups.ImageGeneration }),
-            ("Can you paint a lighthouse at sunset?", new[] { ChatToolGroups.ImageGeneration }),
+            ("Draw a red fox in the snow", new[] { ChatImageGeneration.GroupName }),
+            ("Can you paint a lighthouse at sunset?", new[] { ChatImageGeneration.GroupName }),
             ("Make me a packing list as a Word document", new[] { ChatWrittenDocuments.GroupName }),
             ("Write that up as a PDF", new[] { ChatWrittenDocuments.GroupName }),
             ("Can you export this as Markdown?", new[] { ChatWrittenDocuments.GroupName }),

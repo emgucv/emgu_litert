@@ -10,6 +10,7 @@ using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.LM.Maui.Documents;
 using Emgu.LiteRT.LM.Maui.Mcp;
 using Emgu.LiteRT.LM.Maui.OpenAI;
+using Emgu.LiteRT.LM.Maui.Images;
 using Emgu.LiteRT.LM.Maui.CV;
 using Emgu.LiteRT.LM.Agents.CV;
 using Emgu.LiteRT.LM.Maui.Features;
@@ -112,7 +113,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             Export = new ExportFeature((id, stream, cancel) => ChatExporter.ExportAsync(SharedStore, id, stream, cancel)),
             ModelSettings = new ModelSettingsFeature(),
             Tasks = new TaskFeature(),
-            Images = new ImageFeature(),
             Translations = new TranslationFeature(),
             DeviceActions = new DeviceActionsFeature(),
             WrittenDocuments = new WrittenDocumentsFeature(),
@@ -123,6 +123,21 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         };
         parts.Server = new ServerFeature(parts.ServerOption);
         parts.Workload = new DeviceIndexingWorkload();
+        // Pictures drawn with Z-Image-Turbo: the demo's model selector above the switch, and a Save As dialog.
+        parts.Images = new ImageFeature(parts.Workload)
+        {
+            ModelSelector = () => parts.ModelSettings.BuildImageModelSelector(),
+            PictureSaver = async (png, fileName) =>
+            {
+                using var stream = new System.IO.MemoryStream(png, writable: false);
+                var result = await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream);
+                if (result.IsSuccessful)
+                    return "Saved to " + result.FilePath;
+                if (!PictureGallery.SaveWasCancelled(result.Exception))
+                    throw result.Exception ?? new System.IO.IOException("The image could not be saved.");
+                return null;
+            }
+        };
         // What the library's searches share: the demo's search model and workload (the storage feature adds the
         // deleted-model notice and check).
         parts.Search = new SearchServices
