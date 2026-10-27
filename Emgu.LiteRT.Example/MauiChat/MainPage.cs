@@ -37,6 +37,8 @@ public sealed class MainPage : ChatPage
             options.Features.Add(feature);
         // Documents the model writes (create_document): a card with Open and Share, kept with the reply in the saved chat.
         options.Features.Add(new WrittenDocumentsFeature());
+        // The model's thinking translated on request into the language of the message (it thinks in English).
+        options.Features.Add(new TranslationFeature());
         options.Features.Add(new DiceFeature());
         return options;
     }

@@ -454,7 +454,9 @@
                 </Border.StrokeShape>
                 <VerticalStackLayout Spacing="4">
                     <chat:ThinkingView Thinking="{Binding Thinking}" IsThinking="{Binding IsThinking}"
-                                       Duration="{Binding ThinkingDuration}" AlwaysExpanded="{Binding IsFinishedWithoutAnswer}" />
+                                       Duration="{Binding ThinkingDuration}" AlwaysExpanded="{Binding IsFinishedWithoutAnswer}"
+                                       DisplayText="{Binding ThinkingDisplayText}"
+                                       Accessory="{Binding ThinkingAccessory}" />
                     <chat:ReplyView Text="{Binding Text}" IsVisible="{Binding HasAnswer}" />
                     <Label Text="…" IsVisible="{Binding IsInterrupted}" FontSize="15"
                            TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />

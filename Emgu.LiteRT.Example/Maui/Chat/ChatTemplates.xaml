@@ -3,7 +3,7 @@
   The demo's look for Emgu.LiteRT.LM.Maui's chat controls: the message, code block and thinking templates replaced by key
   (see the library's Themes/ChatStyles.xaml), with the demo's Inter fonts, its colours (Theme.cs) and its Material Symbols
   chevron. Merged in App.xaml. The chat page (LiteRtLmChatPage) is the library's ChatPage; its messages' Tag holds the
-  page's data for them (UserMessageInfo, StreamingBubble), which these templates bind to.
+  page's data for them (UserMessageInfo, StreamingBubble); the user template binds the divider text in it.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
@@ -96,8 +96,8 @@
                 <VerticalStackLayout Spacing="4">
                     <chat:ThinkingView x:Name="Thinking" Thinking="{Binding Thinking}" IsThinking="{Binding IsThinking}"
                                        Duration="{Binding ThinkingDuration}" AlwaysExpanded="{Binding IsFinishedWithoutAnswer}"
-                                       DisplayText="{Binding Tag.ThinkingDisplayText, x:DataType={x:Null}}"
-                                       Accessory="{Binding Tag.TranslateRow, x:DataType={x:Null}}" />
+                                       DisplayText="{Binding ThinkingDisplayText}"
+                                       Accessory="{Binding ThinkingAccessory}" />
                     <BoxView HeightRequest="1" Color="#C2C7D6">
                         <BoxView.IsVisible>
                             <MultiBinding Converter="{StaticResource AllTrue}">

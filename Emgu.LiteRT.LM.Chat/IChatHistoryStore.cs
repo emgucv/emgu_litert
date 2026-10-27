@@ -82,5 +82,13 @@ namespace Emgu.LiteRT.LM.Chat
         /// <param name="chatId">The saved chat it continues, or 0 to create one with the first exchange</param>
         /// <param name="model">The model (a <see cref="ChatModelOption.Id"/>), for a chat it creates; or null</param>
         IChatHistoryBinding Attach(ChatConversation conversation, int chatId = 0, string model = null);
+
+        /// <summary>
+        /// Save what changed on a message after its exchange was saved (its <see cref="ChatMessageItem.Language"/>, a
+        /// reply's <see cref="ChatMessageItem.ThinkingTranslation"/>, a voice message's <see cref="ChatMessageItem.Transcript"/>);
+        /// nothing for a message the store didn't save or load, or in a private chat.
+        /// </summary>
+        /// <param name="message">The message</param>
+        Task SaveMessageChangesAsync(ChatMessageItem message);
     }
 }

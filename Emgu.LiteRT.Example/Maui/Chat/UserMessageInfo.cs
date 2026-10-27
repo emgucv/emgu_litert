@@ -2,13 +2,11 @@
 namespace Maui.Demo.Lite;
 
 // The page's own data for a user message, in its ChatMessageItem.Tag (the demo's message template binds to it): its
-// language, its id in the store, and the divider above the first message the model still sees after compacting.
+// id in the store, and the divider above the first message the model still sees after compacting.
 internal sealed class UserMessageInfo : System.ComponentModel.INotifyPropertyChanged
 {
     private string _dividerText;
 
-    // Its language (two-letter code), or null (TranslationFeature).
-    public string Language;
     // Its id in the ChatStore (0 if not saved).
     public int MessageId;
 

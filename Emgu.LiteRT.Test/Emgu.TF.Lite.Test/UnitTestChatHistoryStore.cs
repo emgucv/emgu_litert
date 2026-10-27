@@ -101,6 +101,37 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
+        public async Task KeepsTheLanguageAndTheThinkingTranslation()
+        {
+            // The message's language and the reply's translated thinking (the library's TranslationFeature): saved with the
+            // exchange when known, saved later with SaveMessageChangesAsync, and read back onto the items.
+            int chatId = await _store.CreateChatAsync("¿Cuánto es 36 - 7?", null);
+            var message = new ChatMessageItem(ChatMessageRole.User, "¿Cuánto es 36 - 7?") { Language = "es" };
+            ChatMessageItem reply = Reply("29.", "36 - 7 = 29.");
+            await _store.SaveExchangeAsync(chatId, message, reply);
+
+            reply.Language = "es";
+            reply.ThinkingTranslation = "36 - 7 = 29 (pensamiento).";
+            await _store.SaveMessageChangesAsync(reply);
+            await _store.SaveMessageChangesAsync(new ChatMessageItem(ChatMessageRole.User, "never saved"));   // nothing to update
+
+            ChatHistory history = await _store.LoadAsync(chatId);
+            Assert.That(history.Messages[0].Language, Is.EqualTo("es"));
+            ChatMessageItem loaded = history.Messages[1];
+            Assert.That((loaded.Language, loaded.ThinkingTranslation), Is.EqualTo(("es", "36 - 7 = 29 (pensamiento).")));
+            Assert.That(loaded.ShowThinkingTranslation, Is.True, "a translated reply opens on its translation");
+            Assert.That(loaded.ThinkingDisplayText, Is.EqualTo("36 - 7 = 29 (pensamiento)."));
+            loaded.ShowThinkingTranslation = false;
+            Assert.That(loaded.ThinkingDisplayText, Is.Null, "the English again");
+
+            _store.IsPrivate = true;
+            loaded.ThinkingTranslation = "private";
+            await _store.SaveMessageChangesAsync(loaded);
+            _store.IsPrivate = false;
+            Assert.That((await _store.LoadAsync(chatId)).Messages[1].ThinkingTranslation, Is.EqualTo("36 - 7 = 29 (pensamiento)."), "nothing saved while private");
+        }
+
+        [Test]
         public async Task SavesAReplysOwnFilesWithoutBeingGivenThem()
         {
             // A feature kept a document with the reply (ChatMessageItem.SavedFiles, through the page's AddCardToReply):
@@ -232,9 +263,9 @@ namespace Emgu.TF.Lite.Test
 
         // An app's own column on a message.
         [Table("Message")]
-        public class LanguageMessageRecord : ChatMessageRecord
+        public class RatedMessageRecord : ChatMessageRecord
         {
-            public string Language { get; set; }
+            public string Rating { get; set; }
         }
 
         private sealed class AppStore : ChatHistoryStore
@@ -243,7 +274,7 @@ namespace Emgu.TF.Lite.Test
 
             protected override async Task CreateTablesAsync(SQLiteAsyncConnection connection)
             {
-                await connection.CreateTableAsync<LanguageMessageRecord>();
+                await connection.CreateTableAsync<RatedMessageRecord>();
             }
         }
 
@@ -255,10 +286,10 @@ namespace Emgu.TF.Lite.Test
             int chatId = await _store.CreateChatAsync("Hola", null);
             ChatSavedExchange saved = await _store.SaveExchangeAsync(chatId, new ChatMessageItem(ChatMessageRole.User, "Hola"), Reply("¡Hola!"));
             SQLiteAsyncConnection db = await _store.GetConnectionAsync();
-            await db.ExecuteAsync("UPDATE Message SET Language = ? WHERE Id = ?", "es", saved.MessageId);
+            await db.ExecuteAsync("UPDATE Message SET Rating = ? WHERE Id = ?", "good", saved.MessageId);
 
-            ChatHistory history = await _store.LoadAsync<LanguageMessageRecord>(chatId);
-            Assert.That(((LanguageMessageRecord)history.RecordOf(history.Messages[0])).Language, Is.EqualTo("es"));
+            ChatHistory history = await _store.LoadAsync<RatedMessageRecord>(chatId);
+            Assert.That(((RatedMessageRecord)history.RecordOf(history.Messages[0])).Rating, Is.EqualTo("good"));
             Assert.That(await db.ExecuteScalarAsync<int>("SELECT Version FROM SchemaVersion WHERE Name = ?", "Emgu.LiteRT.LM.Chat.Sqlite"),
                 Is.EqualTo(ChatHistoryStore.SchemaVersion));
         }

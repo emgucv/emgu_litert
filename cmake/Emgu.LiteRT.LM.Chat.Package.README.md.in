@@ -62,7 +62,7 @@ To save chats your own way, use `ExchangeCompleted`, which is raised after each 
 
 ### For apps
 
-- `ChatMessageItem.Decorations`: your own objects (or views) shown with a message, e.g. cards above a reply; `ChatMessageItem.Tag`: your own data for a message; `ChatMessageItem.Transcript`: a voice message's words, shown but never given to the model (it hears the audio).
+- `ChatMessageItem.Decorations`: your own objects (or views) shown with a message, e.g. cards above a reply; `ChatMessageItem.Tag`: your own data for a message; `ChatMessageItem.Transcript`: a voice message's words, shown but never given to the model (it hears the audio); `ChatMessageItem.Language`, `ThinkingTranslation` and `ThinkingAccessory`: a message's language, a reply's thinking translated (shown instead of the thinking through `ThinkingDisplayText` while `ShowThinkingTranslation` is on) and a view of your own under the thinking's header. `LanguageText.SplitForTranslation` cuts a long text into pieces a small model can translate one at a time.
 - `AddNotice(content, text)`: a transcript item the model never sees, e.g. an alert.
 - `ChatToolStep`: step lines of your own ("Looked in report.pdf...").
 - `BeforeStreaming`: runs after any compaction and before the reply streams, e.g. to change the message's `Context`.

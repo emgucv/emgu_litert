@@ -28,14 +28,7 @@ public class ConversationRecord : ChatRecord
 [Table("Message")]
 public class MessageRecord : ChatMessageRecord
 {
-    /// <summary>
-    /// A user message's language (a two-letter code such as "es", detected when it was sent; null if unknown - voice
-    /// messages, older chats). For a reply: the language its thinking was translated into (null: not translated).
-    /// </summary>
-    public string Language { get; set; }
-
-    /// <summary>The reply's thinking translated into <see cref="Language"/> on request (null: not translated).</summary>
-    public string ThinkingTranslation { get; set; }
+    // A message's language and a reply's thinking translation are the base record's (ChatMessageRecord) since 2026-10-27.
 }
 
 
@@ -45,7 +38,7 @@ public class MessageRecord : ChatMessageRecord
 /// subfolder, since the app data folder of an unsandboxed Mac Catalyst app is ~/Library itself.) The chats themselves
 /// are Emgu.LiteRT.LM.Chat.Sqlite's ChatHistoryStore, and so are the agent's memories and goals (its
 /// SqliteAgentMemoryStore and SqliteAgentGoalStore, in the same database); the page's own data - documents, the chat
-/// and photo search indexes, a message's language and translated thinking, a chat's document - is kept here.
+/// and photo search indexes, a chat's document - is kept here.
 /// </summary>
 internal sealed partial class ChatStore : ChatHistoryStore
 {
@@ -61,7 +54,7 @@ internal sealed partial class ChatStore : ChatHistoryStore
     /// <summary>The user's goals and their progress (the goal tools); none while private.</summary>
     public SqliteAgentGoalStore Goals { get; }
 
-    // The page's own tables, and its columns of the chats and messages (DocumentId, Language, ThinkingTranslation).
+    // The page's own tables, and its column of the chats (DocumentId).
     protected override async Task CreateTablesAsync(SQLiteAsyncConnection connection)
     {
         await connection.CreateTableAsync<ConversationRecord>();
@@ -81,15 +74,6 @@ internal sealed partial class ChatStore : ChatHistoryStore
     /// <summary>Start a saved chat; returns its id.</summary>
     public Task<int> CreateConversationAsync(string title, string model) => CreateChatAsync(title, model);
 
-    /// <summary>Keep a reply's thinking translated into a language (shown again when the chat is reopened).</summary>
-    public async Task SetThinkingTranslationAsync(int messageId, string language, string translation)
-    {
-        if (IsPrivate || messageId <= 0) return;
-        SQLiteAsyncConnection db = await Db;
-        await db.ExecuteAsync("UPDATE Message SET Language = ?, ThinkingTranslation = ? WHERE Id = ?",
-            string.IsNullOrEmpty(language) ? null : language, string.IsNullOrEmpty(translation) ? null : translation, messageId);
-    }
-
     /// <summary>
     /// Add a message, saving its attachments (encoded bytes) as files, with its language; returns its id. (It hides
     /// ChatHistoryStore.AddMessageAsync, whose last parameter is a voice message's transcript.)
@@ -101,13 +85,6 @@ internal sealed partial class ChatStore : ChatHistoryStore
         int id = await base.AddMessageAsync(conversationId, role, text, thinking, attachments, context);
         await SetLanguageAsync(id, language);
         return id;
-    }
-
-    /// <summary>Keep a user message's language.</summary>
-    public async Task SetLanguageAsync(int messageId, string language)
-    {
-        if (IsPrivate || messageId <= 0 || string.IsNullOrEmpty(language)) return;
-        await (await Db).ExecuteAsync("UPDATE Message SET Language = ? WHERE Id = ?", language, messageId);
     }
 
     // ---------- Documents (the index is the base store's; the demo's names) ----------

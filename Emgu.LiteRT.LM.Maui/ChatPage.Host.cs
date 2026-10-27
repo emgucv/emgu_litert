@@ -192,6 +192,9 @@ namespace Emgu.LiteRT.LM.Maui
 
         void IChatPageHost.AddCardToReply(View card) => AddCardToReply(card, null);
 
+        Task IChatPageHost.SaveMessageChangesAsync(ChatMessageItem message) =>
+            _options.History == null || IsPrivate || message == null ? Task.CompletedTask : _options.History.SaveMessageChangesAsync(message);
+
         void IChatPageHost.AddCardToReply(View card, ChatSavedFile file) => AddCardToReply(card, file);
 
         // A card above the latest reply (a notice of its own without a reply yet: a monitor's snapshot before the first

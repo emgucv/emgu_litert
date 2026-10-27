@@ -2,9 +2,8 @@
 
   <!--
   The MAUI demo's code that needs no UI or device: its store (ChatStore: the library's ChatHistoryStore with the
-  demo's own columns), the agent's instructions (ChatPlannerInstructions) and the thinking translation's text helpers
-  (LanguageText). Everything else moved into the libraries in phase C (2026-10-26/27). The demo and the test project
-  both reference it.
+  demo's own columns) and the agent's instructions (ChatPlannerInstructions). Everything else moved into the libraries
+  in phase C and its follow-ups (2026-10-26/27). The demo and the test project both reference it.
   The TargetFramework (net<major>.0 of the dotnet CMake found) comes from the Directory.Build.props generated from
   cmake/Maui.Demo.Lite.Core.Directory.Build.props.in. Nothing here may use MAUI.
   -->

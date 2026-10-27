@@ -232,12 +232,13 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             var files = message.Attachments
                 .Select(a => (a.HasTopLevelMediaType("image") ? ChatSavedAttachment.ImageKind : ChatSavedAttachment.AudioKind, a.MediaType, a.Data.ToArray()))
                 .ToList();
-            int messageId = await InsertAsync(chatId, ChatMessageRecord.UserRole, message.Text, null, files, message.Context, message.Transcript).ConfigureAwait(false);
+            int messageId = await InsertAsync(chatId, ChatMessageRecord.UserRole, message.Text, null, files, message.Context, message.Transcript,
+                language: message.Language).ConfigureAwait(false);
             Remember(message, messageId);
             foreach (string step in (steps ?? reply.Steps.Select(s => s.Description)).ToList())
                 await InsertAsync(chatId, ChatMessageRecord.StepRole, step, null, null, null, null).ConfigureAwait(false);
             int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, ReplyText(reply), reply.Thinking, replyAttachments, null, null,
-                reply.ThinkingDuration?.TotalSeconds).ConfigureAwait(false);
+                reply.ThinkingDuration?.TotalSeconds, reply.Language, reply.ThinkingTranslation).ConfigureAwait(false);
             Remember(reply, replyId);
             await TouchAsync(chatId).ConfigureAwait(false);
             OnChatsChanged();
@@ -282,11 +283,53 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             foreach (ChatToolStep step in reply.Steps.ToList())
                 await InsertAsync(chatId, ChatMessageRecord.StepRole, step.Description, null, null, null, null).ConfigureAwait(false);
             int replyId = await InsertAsync(chatId, ChatMessageRecord.AssistantRole, ReplyText(reply), reply.Thinking, replyAttachments, null, null,
-                reply.ThinkingDuration?.TotalSeconds).ConfigureAwait(false);
+                reply.ThinkingDuration?.TotalSeconds, reply.Language, reply.ThinkingTranslation).ConfigureAwait(false);
             Remember(reply, replyId);
             await TouchAsync(chatId).ConfigureAwait(false);
             OnChatsChanged();
             return new ChatSavedExchange(messageId, replyId);
+        }
+
+        /// <summary>
+        /// Save what changed on a message after its exchange was saved: a user message's <see cref="ChatMessageItem.Language"/>
+        /// (detected later) and its <see cref="ChatMessageItem.Transcript"/>, a reply's thinking translation. Nothing for a
+        /// message this store didn't save or load, or while <see cref="IsPrivate"/>.
+        /// </summary>
+        /// <param name="message">The message</param>
+        public async Task SaveMessageChangesAsync(ChatMessageItem message)
+        {
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
+            int id = GetMessageId(message);
+            if (id <= 0 || IsPrivate)
+                return;
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            await db.ExecuteAsync("UPDATE Message SET Language = ?, ThinkingTranslation = ?, Transcript = ? WHERE Id = ?",
+                message.Language, message.ThinkingTranslation, message.Transcript, id).ConfigureAwait(false);
+        }
+
+        /// <summary>Record a saved message's language (null for unknown); nothing while <see cref="IsPrivate"/>.</summary>
+        /// <param name="messageId">The message's id</param>
+        /// <param name="language">A two-letter code, or null</param>
+        public async Task SetLanguageAsync(int messageId, string language)
+        {
+            if (messageId <= 0 || IsPrivate)
+                return;
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            await db.ExecuteAsync("UPDATE Message SET Language = ? WHERE Id = ?", string.IsNullOrEmpty(language) ? null : language, messageId).ConfigureAwait(false);
+        }
+
+        /// <summary>Record a saved reply's thinking translated into a language; nothing while <see cref="IsPrivate"/>.</summary>
+        /// <param name="messageId">The reply's id</param>
+        /// <param name="language">The translation's language</param>
+        /// <param name="translation">The translation</param>
+        public async Task SetThinkingTranslationAsync(int messageId, string language, string translation)
+        {
+            if (messageId <= 0 || IsPrivate)
+                return;
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            await db.ExecuteAsync("UPDATE Message SET Language = ?, ThinkingTranslation = ? WHERE Id = ?",
+                string.IsNullOrEmpty(language) ? null : language, string.IsNullOrEmpty(translation) ? null : translation, messageId).ConfigureAwait(false);
         }
 
         // The app's own files a reply carries (ChatMessageItem.SavedFiles), as attachments to save; null when none.
@@ -403,7 +446,8 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         }
 
         private async Task<int> InsertAsync(int chatId, string role, string text, string thinking,
-            IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments, string context, string transcript, double? thinkingSeconds = null)
+            IEnumerable<(string Kind, string MediaType, byte[] Data)> attachments, string context, string transcript, double? thinkingSeconds = null,
+            string language = null, string thinkingTranslation = null)
         {
             SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
             var record = new ChatMessageRecord
@@ -415,6 +459,8 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 ThinkingSeconds = thinkingSeconds,
                 Context = string.IsNullOrEmpty(context) ? null : context,
                 Transcript = string.IsNullOrWhiteSpace(transcript) ? null : transcript.Trim(),
+                Language = language,
+                ThinkingTranslation = thinkingTranslation,
                 Created = DateTime.UtcNow
             };
             await db.InsertAsync(record).ConfigureAwait(false);
@@ -499,14 +545,17 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                     var attachments = new List<DataContent>();
                     foreach (ChatSavedAttachment file in saved.Where(f => f.Kind == ChatSavedAttachment.ImageKind || f.Kind == ChatSavedAttachment.AudioKind))
                         attachments.Add(new DataContent(await ReadFileAsync(file.Path).ConfigureAwait(false), file.MediaType) { Name = Path.GetFileName(file.Path) });
-                    item = new ChatMessageItem(ChatMessageRole.User, row.Text, attachments, row.Context) { Transcript = row.Transcript };
+                    item = new ChatMessageItem(ChatMessageRole.User, row.Text, attachments, row.Context) { Transcript = row.Transcript, Language = row.Language };
                 }
                 else
                 {
                     item = new ChatMessageItem(ChatMessageRole.Assistant, row.Text)
                     {
                         Thinking = row.Thinking ?? string.Empty,
-                        ThinkingDuration = row.ThinkingSeconds != null ? TimeSpan.FromSeconds(row.ThinkingSeconds.Value) : (TimeSpan?)null
+                        ThinkingDuration = row.ThinkingSeconds != null ? TimeSpan.FromSeconds(row.ThinkingSeconds.Value) : (TimeSpan?)null,
+                        Language = row.Language,
+                        ThinkingTranslation = row.ThinkingTranslation,
+                        ShowThinkingTranslation = row.ThinkingTranslation != null
                     };
                     foreach (string step in steps)
                         item.Steps.Add(new ChatToolStep(step));

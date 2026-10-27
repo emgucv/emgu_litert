@@ -502,12 +502,18 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   26 of 26 test phrases right on a Galaxy S10, 2-3 ms each, short ones included) and Apple's `NLLanguageRecognizer` on iOS and
   Mac Catalyst. ML Kit's Common library needs `Xamarin.AndroidX.Fragment.Ktx` 1.9.0 pinned in the demo for Android; otherwise
   D8 fails with `FragmentKt` defined twice.
-- `TextToSpeechReplySpeaker` uses it to pick the reading voice, and each saved user message keeps it (`MessageRecord.Language`).
+- `TextToSpeechReplySpeaker` uses it to pick the reading voice, and each saved user message keeps it
+  (`ChatMessageItem.Language`, the base store's `ChatMessageRecord.Language`).
 - Gemma 4 thinks in English whatever the language, so the opened thinking of a reply to a non-English message offers
-  "Translate to <language>" (`TranslationFeature.cs`). The model translates it on request, in conversations of its own like a
-  summary (the agent's conversation is released and re-read with the next message). The translation is saved with the reply
-  (`MessageRecord.ThinkingTranslation`) and shown again after reopening. Verified on Mac Catalyst with Spanish, German and
-  Chinese.
+  "Translate to <language>" (the library's `TranslationFeature`, `Emgu.LiteRT.LM.Maui/Features/`, since 2026-10-27; the
+  demo's before). The row is the reply's `ThinkingAccessory`, which the thinking view shows under its header; the feature
+  detects the message's language when the reply is done and saves it with `IChatPageHost.SaveMessageChangesAsync`. The
+  model translates the thinking on request, in conversations of its own like a summary (the agent's conversation is
+  released and re-read with the next message; `LanguageText.SplitForTranslation` cuts a long one into pieces). The
+  translation is the reply's `ThinkingTranslation`, shown instead of the English through `ThinkingDisplayText`, saved with
+  the reply (`ChatMessageRecord.ThinkingTranslation`, the same column the demo used, so older chats keep theirs) and shown
+  again after reopening. Verified on Mac Catalyst with Spanish, German and Chinese; after the move, again with Spanish
+  (Gemma 4 E2B on the GPU: translated, the chat reopened with the translation and the row, the row back to the English).
 - A voice message that a model hears as audio (Gemma 4) also gets its words written down by the platform's speech recognizer
   in the background (`SpeechRecognizer`; `TranscriptFeature`). The words show under the chip, are kept in
   `MessageRecord.Transcript` (not given to the model), become the title of a chat still called "Voice message", and go into

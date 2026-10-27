@@ -165,6 +165,13 @@ namespace Emgu.LiteRT.LM.Maui
         void AddCardToReply(View card);
 
         /// <summary>
+        /// Save what a feature changed on a message after it was saved (its language, a reply's thinking translation),
+        /// through the page's history store; nothing in a private chat or without a store.
+        /// </summary>
+        /// <param name="message">The message</param>
+        Task SaveMessageChangesAsync(ChatMessageItem message);
+
+        /// <summary>
         /// Show a card above the reply being written (or the latest reply) and keep a file with it: the chats' store
         /// saves the file with the reply (<see cref="ChatMessageItem.SavedFiles"/>), and when the chat is opened again
         /// the feature is asked for the card (<see cref="ChatFeature.RestoreSavedFile"/>). On the UI thread.

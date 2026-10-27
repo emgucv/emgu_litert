@@ -147,6 +147,15 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         /// <summary>The words of a voice message the model was given as audio (shown, not given to the model); or null.</summary>
         public string Transcript { get; set; }
 
+        /// <summary>
+        /// A user message's language (a two-letter code, or null); for a reply, the language its thinking was translated
+        /// into (null: not translated). <see cref="ChatMessageItem.Language"/>.
+        /// </summary>
+        public string Language { get; set; }
+
+        /// <summary>A reply's thinking translated into <see cref="Language"/> on request (null: not translated).</summary>
+        public string ThinkingTranslation { get; set; }
+
         /// <summary>What the model was given before a user message's text (e.g. document excerpts); or null.</summary>
         public string Context { get; set; }
 

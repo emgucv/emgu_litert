@@ -153,6 +153,10 @@ namespace Emgu.LiteRT.LM.Chat
         private bool _startsContext;
         private string _context;
         private string _transcript;
+        private string _language;
+        private string _thinkingTranslation;
+        private bool _showThinkingTranslation;
+        private object _thinkingAccessory;
         private readonly List<DataContent> _attachments;
 
         /// <summary>
@@ -206,8 +210,56 @@ namespace Emgu.LiteRT.LM.Chat
             {
                 bool wasThinking = IsThinking;
                 if (Set(ref _thinking, value ?? string.Empty))
+                {
                     RaiseIsThinking(wasThinking);
+                    Raise(nameof(ThinkingDisplayText));
+                }
             }
+        }
+
+        /// <summary>
+        /// A user message's language (a two-letter code such as "es", or null if unknown); for a reply, the language its
+        /// thinking was translated into (<see cref="ThinkingTranslation"/>). Kept with a saved chat.
+        /// </summary>
+        public string Language
+        {
+            get => _language;
+            set => Set(ref _language, string.IsNullOrWhiteSpace(value) ? null : value.Trim());
+        }
+
+        /// <summary>A reply's thinking translated into <see cref="Language"/> on request, or null. Kept with a saved chat; not given to the model.</summary>
+        public string ThinkingTranslation
+        {
+            get => _thinkingTranslation;
+            set
+            {
+                if (Set(ref _thinkingTranslation, string.IsNullOrWhiteSpace(value) ? null : value))
+                    Raise(nameof(ThinkingDisplayText));
+            }
+        }
+
+        /// <summary>True to show the <see cref="ThinkingTranslation"/> in place of the thinking (when there is one).</summary>
+        public bool ShowThinkingTranslation
+        {
+            get => _showThinkingTranslation;
+            set
+            {
+                if (Set(ref _showThinkingTranslation, value))
+                    Raise(nameof(ThinkingDisplayText));
+            }
+        }
+
+        /// <summary>The thinking as shown: the <see cref="ThinkingTranslation"/> when it is chosen, else null (the thinking itself).</summary>
+        public string ThinkingDisplayText => _showThinkingTranslation && _thinkingTranslation != null ? _thinkingTranslation.Trim() : null;
+
+        /// <summary>
+        /// The app's own view shown with the thinking's header (a ChatView shows a View there, e.g. a feature's "Translate"
+        /// row), or null. Not saved, not given to the model.
+        /// </summary>
+        public object ThinkingAccessory
+        {
+            get => _thinkingAccessory;
+            set => Set(ref _thinkingAccessory, value);
         }
 
         /// <summary>How long the model thought, from its first thinking to its first answer text; null if unknown (e.g. a restored reply).</summary>

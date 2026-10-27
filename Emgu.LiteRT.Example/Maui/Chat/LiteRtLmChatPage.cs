@@ -26,7 +26,7 @@ namespace Maui.Demo.Lite;
 /// demo's own (Chat/Features: the camera and sound monitors, documents, tool servers, the voice chat, the server, storage,
 /// export, photo and past-chat search, image generation, goals, device actions, meeting notes, exercise counting...).
 /// The page itself adds what the demo does around a message: the document's excerpts, the task planner, the memories a
-/// reply drew on, the thinking's translation, and saving each exchange with the pictures and documents it made.
+/// reply drew on, and saving each exchange with the pictures and documents it made.
 /// </summary>
 public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 {
@@ -324,7 +324,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 
     // ---------- The conversation ----------
 
-    // A message the conversation adds: the user's gets the data of the send (its language), a reply its bubble data -
+    // A message the conversation adds: the user's gets the page's data for it (UserMessageInfo), a reply its bubble data -
     // which tools that show cards use (_agentBubble) - with the send's document step, and the status follows it.
     private void HookConversation()
     {
@@ -361,14 +361,8 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         conversation.Compacted += OnConversationCompacted;
     }
 
-    // A reply's bubble data, with its translate row.
-    private StreamingBubble BubbleFor(ChatMessageItem item)
-    {
-        var row = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.Accent, IsVisible = false };
-        var bubble = new StreamingBubble(item, row);
-        row.OnTap(() => _parts.Translations.OnTranslateTapped(bubble));
-        return bubble;
-    }
+    // A reply's bubble data (its translate row is the library's TranslationFeature's, the reply's ThinkingAccessory).
+    private static StreamingBubble BubbleFor(ChatMessageItem item) => new StreamingBubble(item);
 
     // While a reply streams: the status (the tool being called, "Generating..." between calls) and the memory tool's
     // step line.
@@ -480,7 +474,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
 
     // A message: the features' additions (the document's excerpts as the message's context, and maybe a picture or page),
     // in task mode planned and run step by step; the reply streamed, sent again when a tool group's stub asks (or a
-    // server rejected the reasoning option); then the translation offer, the memories it drew on, and the exchange saved.
+    // server rejected the reasoning option); then the memories it drew on, and the exchange saved.
     protected override async Task SendCoreAsync(ChatSendRequest request, CancellationToken cancellationToken)
     {
         _parts.Camera.ClearCameraTurn();
@@ -504,7 +498,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
                 new ChatSendRequest(prompt, request.Attachments, JoinContext(imageReferences, request.Context)) { IsVoiceMessage = request.IsVoiceMessage },
                 cancellationToken);
             List<DataContent> attachments = prepared.Attachments.ToList();
-            var info = new UserMessageInfo { Language = await TextLanguage.DetectAsync(prompt) };
+            var info = new UserMessageInfo();
 
             ChatOptions options = await ComposeOptionsAsync(request);
             _sendingUserItem = null;
@@ -544,12 +538,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             if (interrupted)
                 UiStallWatchdog.Mark("Reply interrupted");
             StreamingBubble bubble = reply.Tag as StreamingBubble;
-            if (bubble != null)
-            {
-                bubble.TargetLanguage = TranslationFeature.Target(info.Language);
-                bubble.Refresh();
-                _ = _parts.Translations.CheckThinkingLanguageAsync(bubble);
-            }
             await ShowMemoriesUsedAsync(prompt, reply, bubble);
             UiStallWatchdog.Mark(string.Format("Reply done: {0} chars, {1} chars thinking", reply.Text.Length, reply.Thinking.Length));
             // The features' progress during the reply ("Step 2 of 3", "Waiting for you to confirm...") is on the page's
@@ -648,7 +636,8 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     // ---------- Saved chats ----------
 
     // Save a completed exchange: the message (with its attachments), any tool steps, and the reply - with the page's
-    // extras: the message's language, the pictures the reply drew and the documents it wrote, the chat's document.
+    // extras: the step lines, the pictures the reply drew and the documents it wrote, the chat's document. (The message's
+    // language and the reply's thinking translation are the items' own, saved by the base store.)
     private async Task SaveExchangeAsync(ChatMessageItem userItem, ChatMessageItem reply, StreamingBubble bubble)
     {
         if (IsPrivate) return; // Write nothing to SQLite or attachments.
@@ -667,9 +656,6 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             // again when the chat is reopened, not given to the model).
             ChatSavedExchange saved = await SharedStore.SaveExchangeAsync(id, userItem, reply, null, steps);
             info.MessageId = saved.MessageId;
-            await SharedStore.SetLanguageAsync(saved.MessageId, info.Language);
-            if (bubble != null)
-                bubble.MessageId = saved.ReplyId;
             // The document the chat uses now (or none), restored when it is opened again.
             await SharedStore.SetConversationDocumentAsync(id, _parts.Documents.DocumentReady?.IsCompletedSuccessfully == true ? _parts.Documents.DocumentId : null);
             SetCurrentChat(id);
@@ -705,32 +691,22 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             ChatHistory history = await SharedStore.LoadAsync<MessageRecord>(chatId);
             if (history == null)
                 return;
-            string lastUserLanguage = null;
+            // (A message's language and a reply's thinking translation come back on the items; the library's
+            // TranslationFeature offers the translate rows again from OnChatOpened.)
             foreach (ChatMessageItem item in history.Messages)
             {
                 var record = (MessageRecord)history.RecordOf(item);
                 if (item.Role == ChatMessageRole.User)
                 {
-                    var info = new UserMessageInfo
-                    {
-                        // The language of a user message (detected now for chats saved before it was kept).
-                        Language = record.Language ?? await TextLanguage.DetectAsync(item.Text),
-                        MessageId = record.Id
-                    };
+                    var info = new UserMessageInfo { MessageId = record.Id };
                     if (chat.Summary == null)
                         info.DividerText = "Earlier messages dropped from the model's memory";
-                    lastUserLanguage = info.Language;
                     item.Tag = info;
                     continue;
                 }
-                StreamingBubble bubble = BubbleFor(item);
-                bubble.MessageId = record.Id;
-                bubble.TargetLanguage = TranslationFeature.Target(record.Language ?? lastUserLanguage);
-                bubble.Translation = record.ThinkingTranslation;
-                bubble.ShowTranslation = !string.IsNullOrEmpty(record.ThinkingTranslation);
+                BubbleFor(item);
                 // The documents the reply wrote and the pictures it drew: cards above it, not given to the model.
                 RestoreSavedFiles(item);
-                _ = _parts.Translations.CheckThinkingLanguageAsync(bubble);
             }
             SetStatus($"Opening conversation: {history.Messages.Count} messages...");
             await Task.Yield();
