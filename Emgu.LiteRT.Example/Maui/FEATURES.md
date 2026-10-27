@@ -525,6 +525,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 - The Plan chip (TODO item 23; the library's `TaskFeature` in `Emgu.LiteRT.LM.Maui` since phase C, 2026-10-26 - the page runs
   the message through the client of its `CreateMessageClient`, a `ChatFeature` hook; `Emgu.LiteRT.LM.Agents`' `TaskPlan`) has the model write a short numbered
   plan (`TaskPlan.PlanPrompt`/`Parse`), shown as a checklist card the user can edit, skip steps of, and stop.
+- The card is kept with the reply when it closes (a saved file of kind `task_plan`, JSON: the steps, their states and
+  results, how it ended) and comes back, closed, when the chat is reopened (2026-10-27; checked on Catalyst).
 - Each step then runs as a request of its own (`TaskModeClient`, the `IChatClient` of that one message), given only the task,
   the plan and the earlier steps' short results (`StepPrompt`). Its tool calls show as step lines (its own bubble stays
   hidden), and the final answer is written from the results into the reply (`FinalPrompt`).

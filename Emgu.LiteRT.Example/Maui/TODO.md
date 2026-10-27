@@ -156,7 +156,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] The plan card isn't saved with the chat (the request, the step lines and the final answer are), so it's not there after reopening.
+- [x] The plan card is saved with the chat (2026-10-27): kept with the reply as a saved file of kind `task_plan` (JSON: the steps with their state and result, and how it ended) when the card closes, and shown again, closed, when the chat is reopened (`TaskFeature.RestoreSavedFile`).
 - [ ] The steps don't see the earlier chat (only the request): "plan the same trip but cheaper" has no "same trip" to go on.
 - [ ] Proposed by the model for long requests (now only the chip); the planner's steps are sometimes redundant (a "review" step at the end).
 - [ ] Try it on phones (E2B on a phone's 8k window with the tool definitions: the step prompts are ~1-1.5k tokens) and with a server model.
@@ -198,7 +198,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] stdio on Mac Catalyst and Windows is untested (a program such as `npx -y <server>`); OAuth for servers that need it (the SDK has
       a client for it) - only a static header now; resources and prompts of servers aren't used, only tools.
-- [ ] A reusable package (`Emgu.LiteRT.LM.Agents.Mcp`?) if an app other than the demo wants it.
+- [x] A reusable package: `Emgu.LiteRT.LM.Agents.Mcp` (the servers as agent tools) and `Emgu.LiteRT.LM.Maui.Mcp` (`McpFeature` for any `ChatPage`, phase C, 2026-10-26).
 
 ## 29. Serve the Mac's models to phones ("Server" option)
 

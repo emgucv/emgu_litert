@@ -2,7 +2,9 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
+using System.Text.Json;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
@@ -16,12 +18,15 @@ namespace Emgu.LiteRT.LM.Maui.Features;
 /// steps' short results (<see cref="TaskPlan.StepPrompt"/>), so its tool output doesn't fill the small window - with its
 /// tool calls as step lines and its result in the card, and last the final answer is written from the results into the
 /// reply. Tools that change something outside the app still ask with their own Confirm / Cancel cards. The saved chat
-/// holds the request and the final answer (the plan card isn't saved); the model is given the conversation again with
-/// the next message. The chip is this feature's, shown for a model that can use tools and not hands-free; the page runs
+/// holds the request, the step lines, the final answer and the plan (a saved file of kind <see cref="PlanKind"/>: the
+/// card comes back, closed, when the chat is reopened); the model is given the conversation again with the next message. The chip is this feature's, shown for a model that can use tools and not hands-free; the page runs
 /// the message through the client of <see cref="CreateMessageClient"/> when the chip is on.
 /// </summary>
 public sealed class TaskFeature : ChatFeature
 {
+    /// <summary>The kind of a reply's saved file that is its plan (JSON: the steps with their state and result, and how it ended).</summary>
+    public const string PlanKind = "task_plan";
+
     private bool _planNext;
 
     /// <inheritdoc/>
@@ -253,6 +258,60 @@ public sealed class TaskFeature : ChatFeature
         public Action Stop;
     }
 
+    /// <inheritdoc/>
+    public override View RestoreSavedFile(ChatSavedFile file)
+    {
+        if (file.Kind != PlanKind)
+            return null;
+        (TaskPlan plan, string outcome) = LoadPlan(file.Data);
+        if (plan == null)
+            return null;
+        TaskCard card = CreateTaskCard(plan, new TaskCompletionSource<bool>());
+        card.Close(outcome);
+        return card.View;
+    }
+
+    private sealed class SavedStep
+    {
+        public string Text { get; set; }
+        public string State { get; set; }
+        public string Result { get; set; }
+    }
+
+    private sealed class SavedPlan
+    {
+        public string Outcome { get; set; }
+        public List<SavedStep> Steps { get; set; }
+    }
+
+    private static byte[] SavePlan(TaskPlan plan, string outcome) => JsonSerializer.SerializeToUtf8Bytes(new SavedPlan
+    {
+        Outcome = outcome,
+        Steps = plan.Steps.Select(s => new SavedStep { Text = s.Text, State = s.State.ToString(), Result = s.Result }).ToList()
+    });
+
+    // A saved plan; null for one that can't be read (the card is left out).
+    private static (TaskPlan Plan, string Outcome) LoadPlan(byte[] data)
+    {
+        try
+        {
+            SavedPlan saved = JsonSerializer.Deserialize<SavedPlan>(data);
+            if (saved?.Steps == null || saved.Steps.Count == 0)
+                return (null, null);
+            var plan = new TaskPlan(saved.Steps.Select(s => s.Text ?? string.Empty));
+            for (int i = 0; i < saved.Steps.Count; i++)
+            {
+                plan.Steps[i].Result = saved.Steps[i].Result;
+                plan.Steps[i].State = Enum.TryParse(saved.Steps[i].State, out TaskPlan.State state) ? state : TaskPlan.State.Pending;
+            }
+            return (plan, saved.Outcome);
+        }
+        catch (JsonException)
+        {
+            return (null, null);
+        }
+    }
+
     private static string TaskStateIcon(TaskPlan.State state) => state switch
     {
         TaskPlan.State.Running => "▶",
@@ -417,6 +476,9 @@ public sealed class TaskFeature : ChatFeature
         };
         card.Close = outcome =>
         {
+            // Kept with the reply, so the card comes back when the chat is reopened.
+            if (!finished && Host != null)
+                Host.AddCardToReply(null, new ChatSavedFile(PlanKind, "application/json", SavePlan(plan, outcome)));
             finished = true;
             running = false;
             status.Text = outcome;
