@@ -120,7 +120,7 @@ The controls are templated. Each finds its template, and the styles of its butto
 | `ChatViewTemplate` | The whole view: transcript, model card, status, toolbar, message box and buttons |
 | `ChatUserMessageTemplate`, `ChatReplyTemplate`, `ChatNoticeTemplate` | DataTemplates for a `ChatMessageItem`: the user's messages, the replies, notices (or set `ChatView.MessageTemplateSelector`) |
 | `ModelLoadCardTemplate` | The card that downloads and loads the model (`ModelLoadCard`) |
-| `ReplyViewTemplate`, `ReplyParagraphStyle`, `ReplyMathStyle` | A reply's text (`ReplyView`: Markdown, links, maths) |
+| `ReplyViewTemplate`, `ReplyParagraphStyle`, `ReplyMathStyle` | A reply's text (`ReplyView`: Markdown, links, maths, tables) |
 | `CodeBlockViewTemplate` | A code block (`CodeBlockView`) |
 | `ThinkingViewTemplate` | The thinking: "Thinking...", then "Thought for N s", tapped to show it (`ThinkingView`) |
 | `ChatAttachmentViewTemplate` | An image or audio attachment (`ChatAttachmentView`) |

@@ -37,6 +37,10 @@ namespace Emgu.LiteRT.LM.Chat
             s = Regex.Replace(s, @"\[([^\]]*)\]\([^)]*\)", "$1");                          // [text](url) -> text
             s = Regex.Replace(s, @"https?://\S+", " ");                                     // bare URLs
             s = Regex.Replace(s, @"^\s{0,3}(#{1,6}|>|[-*+]|\d+[.)])\s+", "", RegexOptions.Multiline); // headings, quotes, list markers
+            // Tables: the separator row goes, each row is read as its cells ("iPhone 16e, A18 chip.").
+            s = Regex.Replace(s, @"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$", "", RegexOptions.Multiline);
+            s = Regex.Replace(s, @"^[ \t]*\|(.*)\|[ \t]*$", m => string.Join(", ", m.Groups[1].Value.Split('|').Select(c => c.Trim()).Where(c => c.Length > 0)) + ".",
+                RegexOptions.Multiline);
             s = Regex.Replace(s, @"[*_`~|]+", "");                                          // emphasis, code, tables
             StringBuilder result = new StringBuilder(s.Length);
             for (int i = 0; i < s.Length; i++)

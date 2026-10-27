@@ -118,4 +118,48 @@ public class UnitTestReplyMarkdown
         Assert.That(preview, Does.EndWith("word100"));
         Assert.That(preview.Length, Is.LessThanOrEqualTo(61));
     }
+
+    [Test]
+    public void ATableIsABlockWithItsCellsAndAlignments()
+    {
+        string reply = "| Spec | iPhone 16e | iPhone 17e |\n|:---|:---:|---:|\n| Chip | A18 | **A19** |\n| Price | $599 | $599 |\n| Note | a \\| b |";
+        IReadOnlyList<ReplyBlock> blocks = ReplyMarkdown.SplitBlocks(reply);
+        Assert.That(blocks, Has.Count.EqualTo(1));
+        ReplyBlock table = blocks[0];
+        Assert.That(table.Kind, Is.EqualTo(ReplyBlockKind.Table));
+        Assert.That(table.TableHeader, Is.EqualTo(new[] { "Spec", "iPhone 16e", "iPhone 17e" }));
+        Assert.That(table.TableAlignments, Is.EqualTo(new[] { ReplyTableAlignment.Left, ReplyTableAlignment.Center, ReplyTableAlignment.Right }));
+        Assert.That(table.TableRows[0], Is.EqualTo(new[] { "Chip", "A18", "**A19**" }), "cells keep their inline Markdown");
+        Assert.That(table.TableRows[2], Is.EqualTo(new[] { "Note", "a | b", "" }), "an escaped bar stays in its cell; a missing cell is empty");
+    }
+
+    [Test]
+    public void ATableBetweenParagraphsSplitsTheText()
+    {
+        string reply = "Here is the comparison:\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nBoth are good.";
+        IReadOnlyList<ReplyBlock> blocks = ReplyMarkdown.SplitBlocks(reply);
+        Assert.That(blocks.Select(b => b.Kind), Is.EqualTo(new[] { ReplyBlockKind.Text, ReplyBlockKind.Table, ReplyBlockKind.Text }));
+        Assert.That(blocks[0].Text, Is.EqualTo("Here is the comparison:"));
+        Assert.That(blocks[1].TableRows, Has.Count.EqualTo(1));
+        Assert.That(blocks[2].Text, Is.EqualTo("Both are good."));
+    }
+
+    [Test]
+    public void AStreamingTableGrowsAndLinesWithBarsAloneStayText()
+    {
+        // Before the separator row arrives, the header is text; then it is a table with no rows yet.
+        Assert.That(ReplyMarkdown.SplitBlocks("| A | B |").Single().Kind, Is.EqualTo(ReplyBlockKind.Text));
+        ReplyBlock growing = ReplyMarkdown.SplitBlocks("| A | B |\n|--|--|\n| 1 |").Single();
+        Assert.That(growing.Kind, Is.EqualTo(ReplyBlockKind.Table));
+        Assert.That(growing.TableRows.Single(), Is.EqualTo(new[] { "1", "" }));
+        // A bar in a sentence, and a rule under it, are not a table.
+        Assert.That(ReplyMarkdown.SplitBlocks("Use a | b here\n---").Single().Kind, Is.EqualTo(ReplyBlockKind.Text));
+    }
+
+    [Test]
+    public void ATableIsReadAloudRowByRow()
+    {
+        string speech = ReplySpeechText.CleanForSpeech("| Spec | iPhone 16e |\n|---|---|\n| Chip | A18 |");
+        Assert.That(speech, Is.EqualTo("Spec, iPhone 16e. Chip, A18."));
+    }
 }

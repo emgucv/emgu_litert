@@ -9,8 +9,8 @@ namespace Emgu.LiteRT.LM.Maui
 {
     /// <summary>
     /// Shows a chat reply: text with basic Markdown formatting (**bold**, *italic*, `inline code`, headings, bullet and
-    /// numbered lists, quotes, links), fenced code blocks as <see cref="CodeBlockView"/>s with a Copy button, and LaTeX
-    /// maths as Unicode text (x² + y² = r², not $x^2 + y^2 = r^2$; display maths centered). Set <see cref="Text"/> as the
+    /// numbered lists, quotes, links), fenced code blocks as <see cref="CodeBlockView"/>s with a Copy button, tables as a
+    /// grid (scrolled sideways when wider than the reply), and LaTeX maths as Unicode text (x² + y² = r², not $x^2 + y^2 = r^2$; display maths centered). Set <see cref="Text"/> as the
     /// reply streams: the views of earlier parts are kept and only the last one is updated.
     /// <para>
     /// Its look comes from templates and styles found by key (an app replaces one by defining a resource with the same
@@ -72,7 +72,11 @@ namespace Emgu.LiteRT.LM.Maui
             public View View;
             public Label Label;
             public CodeBlockView Code;
+            public Grid Table;
         }
+
+        // The widest a table's cell grows before its text wraps.
+        private const double MaxCellWidth = 220;
 
         private readonly List<Part> _shown = new List<Part>();
         private Layout _blocks;
@@ -140,12 +144,12 @@ namespace Emgu.LiteRT.LM.Maui
             set => SetValue(InlineCodeBackgroundColorProperty, value);
         }
 
-        /// <summary>True if the reply contains a code block (bindable: a chat may then let the reply use the full width).</summary>
+        /// <summary>True if the reply contains a code block or a table (bindable: a chat may then let the reply use the full width).</summary>
         public static readonly BindableProperty HasCodeProperty = BindableProperty.Create(
             nameof(HasCode), typeof(bool), typeof(ReplyView), false, BindingMode.OneWayToSource);
 
         /// <summary>
-        /// True if the reply contains a code block (a chat may then let the reply use the full width).
+        /// True if the reply contains a code block or a table (a chat may then let the reply use the full width).
         /// </summary>
         public bool HasCode
         {
@@ -210,7 +214,8 @@ namespace Emgu.LiteRT.LM.Maui
             }
             while (_shown.Count > blocks.Count)
                 RemoveLast();
-            bool hasCode = _shown.Exists(p => p.Block.Kind == ReplyBlockKind.Code);
+            // A table is as wide as a code block: the reply may use the full width for either.
+            bool hasCode = _shown.Exists(p => p.Block.Kind == ReplyBlockKind.Code || p.Block.Kind == ReplyBlockKind.Table);
             if (hasCode != HasCode)
                 SetValue(HasCodeProperty, hasCode);
         }
@@ -233,6 +238,10 @@ namespace Emgu.LiteRT.LM.Maui
                 case ReplyBlockKind.Math:
                     part.Label = NewLabel("ReplyMathStyle", FontSize + 2);
                     part.View = part.Label;
+                    break;
+                case ReplyBlockKind.Table:
+                    part.Table = new Grid { ColumnSpacing = 16, RowSpacing = 0 };
+                    part.View = new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = part.Table, Margin = new Thickness(0, 2) };
                     break;
                 default:
                     part.Label = NewLabel("ReplyParagraphStyle", FontSize);
@@ -265,10 +274,63 @@ namespace Emgu.LiteRT.LM.Maui
                 case ReplyBlockKind.Math:
                     part.Label.Text = MathText.ToUnicode(part.Block.Text);
                     break;
+                case ReplyBlockKind.Table:
+                    FillTable(part.Table, part.Block);
+                    break;
                 default:
                     part.Label.FormattedText = FormatMarkdown(part.Block.Text);
                     break;
             }
+        }
+
+        // A table as a grid: the header in bold over a line, the rows with a thin line between them, each cell's text
+        // wrapping at MaxCellWidth. Rebuilt as the table streams in (tables are small).
+        private void FillTable(Grid grid, ReplyBlock block)
+        {
+            grid.Children.Clear();
+            grid.ColumnDefinitions.Clear();
+            grid.RowDefinitions.Clear();
+            int columns = block.TableHeader.Count;
+            if (columns == 0)
+                return;
+            for (int c = 0; c < columns; c++)
+                grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            int row = 0;
+            void AddRow(IReadOnlyList<string> cells, bool header)
+            {
+                grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+                for (int c = 0; c < columns; c++)
+                {
+                    Label cell = NewLabel("ReplyParagraphStyle", FontSize);
+                    cell.MaximumWidthRequest = MaxCellWidth;
+                    cell.LineBreakMode = LineBreakMode.WordWrap;
+                    cell.Margin = new Thickness(0, 6);
+                    cell.HorizontalTextAlignment = block.TableAlignments[c] == ReplyTableAlignment.Right ? TextAlignment.End
+                        : block.TableAlignments[c] == ReplyTableAlignment.Center ? TextAlignment.Center : TextAlignment.Start;
+                    FormattedString text = new FormattedString();
+                    AddInline(text, c < cells.Count ? cells[c] : string.Empty, header ? FontAttributes.Bold : FontAttributes.None, 0, null);
+                    cell.FormattedText = text;
+                    grid.Add(cell, c, row);
+                }
+                row++;
+            }
+            void AddLine(double thickness)
+            {
+                grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+                BoxView line = new BoxView { HeightRequest = thickness, Color = QuoteMarkColor };
+                grid.Add(line, 0, row);
+                Grid.SetColumnSpan(line, columns);
+                row++;
+            }
+            AddRow(block.TableHeader, true);
+            AddLine(1.5);
+            for (int r = 0; r < block.TableRows.Count; r++)
+            {
+                if (r > 0)
+                    AddLine(0.5);
+                AddRow(block.TableRows[r], false);
+            }
+            SemanticProperties.SetDescription(grid, "Table: " + string.Join(", ", block.TableHeader) + "; " + block.TableRows.Count + " rows");
         }
 
         private FormattedString FormatMarkdown(string text)

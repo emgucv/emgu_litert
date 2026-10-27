@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Emgu.LiteRT.LM.Models;
 
@@ -19,25 +20,64 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>A fenced code block (```lang ... ```)</summary>
         Code,
         /// <summary>Display maths on lines of its own ($$ ... $$ or \[ ... \]), as LaTeX</summary>
-        Math
+        Math,
+        /// <summary>A table: a header row, a separator row (| --- | :---: |) and the rows, each cell still with inline Markdown</summary>
+        Table
     }
 
     /// <summary>
-    /// A block of a reply: Markdown text, a code block or display maths.
+    /// How a table's column is aligned, from its separator row: ":---" left (the default), ":---:" centered, "---:" right.
+    /// </summary>
+    public enum ReplyTableAlignment
+    {
+        /// <summary>Left (":---" or "---")</summary>
+        Left,
+        /// <summary>Centered (":---:")</summary>
+        Center,
+        /// <summary>Right ("---:")</summary>
+        Right
+    }
+
+    /// <summary>
+    /// A block of a reply: Markdown text, a code block, display maths or a table.
     /// </summary>
     public sealed class ReplyBlock
     {
+        private static readonly IReadOnlyList<string> NoCells = new string[0];
+        private static readonly IReadOnlyList<IReadOnlyList<string>> NoRows = new IReadOnlyList<string>[0];
+        private static readonly IReadOnlyList<ReplyTableAlignment> NoAlignments = new ReplyTableAlignment[0];
+
         internal ReplyBlock(ReplyBlockKind kind, string text, string language)
         {
             Kind = kind;
             Text = text;
             Language = language ?? string.Empty;
+            TableHeader = NoCells;
+            TableRows = NoRows;
+            TableAlignments = NoAlignments;
         }
+
+        internal ReplyBlock(string text, IReadOnlyList<string> header, IReadOnlyList<ReplyTableAlignment> alignments, IReadOnlyList<IReadOnlyList<string>> rows)
+            : this(ReplyBlockKind.Table, text, null)
+        {
+            TableHeader = header;
+            TableAlignments = alignments;
+            TableRows = rows;
+        }
+
+        /// <summary>A table's header cells (with inline Markdown); empty for other blocks.</summary>
+        public IReadOnlyList<string> TableHeader { get; }
+
+        /// <summary>A table's rows, each with as many cells as the header (missing ones empty, extra ones dropped); empty for other blocks.</summary>
+        public IReadOnlyList<IReadOnlyList<string>> TableRows { get; }
+
+        /// <summary>A table's columns' alignment, one per header cell; empty for other blocks.</summary>
+        public IReadOnlyList<ReplyTableAlignment> TableAlignments { get; }
 
         /// <summary>The kind of block.</summary>
         public ReplyBlockKind Kind { get; }
 
-        /// <summary>The Markdown text, the code, or the LaTeX of the maths (without its delimiters).</summary>
+        /// <summary>The Markdown text, the code, the LaTeX of the maths (without its delimiters), or a table's Markdown.</summary>
         public string Text { get; }
 
         /// <summary>A code block's language as written after the fence (e.g. "python"); empty if none, and for other blocks.</summary>
@@ -191,7 +231,7 @@ namespace Emgu.LiteRT.LM.Chat
                         blocks.Add(new ReplyBlock(ReplyBlockKind.Math, content.Trim(), null));
                 }
                 else if (content.Trim().Length > 0)
-                    blocks.Add(new ReplyBlock(ReplyBlockKind.Text, content.Trim('\n', '\r', ' '), null));
+                    AddText(blocks, lines);
                 lines.Clear();
             }
 
@@ -251,6 +291,88 @@ namespace Emgu.LiteRT.LM.Chat
             }
             Flush();
             return blocks;
+        }
+
+        // A table's separator row: "| --- | :---: | ---: |", the outer bars optional but at least one bar inside or outside.
+        private static readonly Regex TableSeparator = new Regex(@"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$");
+
+        // Text lines, with any tables in them as table blocks: a row with a bar, followed by a separator row, then the rows
+        // with bars that follow (a table still streaming grows row by row).
+        private static void AddText(List<ReplyBlock> blocks, List<string> lines)
+        {
+            int start = 0;
+            for (int i = 0; i + 1 < lines.Count; i++)
+            {
+                if (lines[i].IndexOf('|') < 0 || !TableSeparator.IsMatch(lines[i + 1]) || lines[i + 1].IndexOf('|') < 0)
+                    continue;
+                AddPlainText(blocks, lines, start, i);
+                IReadOnlyList<string> header = SplitCells(lines[i]);
+                List<ReplyTableAlignment> alignments = SplitCells(lines[i + 1]).Select(Alignment).ToList();
+                while (alignments.Count < header.Count)
+                    alignments.Add(ReplyTableAlignment.Left);
+                if (alignments.Count > header.Count)
+                    alignments.RemoveRange(header.Count, alignments.Count - header.Count);
+                var rows = new List<IReadOnlyList<string>>();
+                int end = i + 2;
+                for (; end < lines.Count && lines[end].Trim().Length > 0 && lines[end].IndexOf('|') >= 0; end++)
+                {
+                    List<string> cells = SplitCells(lines[end]).ToList();
+                    while (cells.Count < header.Count)
+                        cells.Add(string.Empty);
+                    if (cells.Count > header.Count)
+                        cells.RemoveRange(header.Count, cells.Count - header.Count);
+                    rows.Add(cells);
+                }
+                blocks.Add(new ReplyBlock(string.Join("\n", lines.GetRange(i, end - i)), header, alignments, rows));
+                start = end;
+                i = end - 1;
+            }
+            AddPlainText(blocks, lines, start, lines.Count);
+        }
+
+        private static void AddPlainText(List<ReplyBlock> blocks, List<string> lines, int from, int to)
+        {
+            if (to <= from)
+                return;
+            string content = string.Join("\n", lines.GetRange(from, to - from));
+            if (content.Trim().Length > 0)
+                blocks.Add(new ReplyBlock(ReplyBlockKind.Text, content.Trim('\n', '\r', ' '), null));
+        }
+
+        /// <summary>A table row's cells: split at the bars (not at an escaped \|), the outer bars and spaces removed.</summary>
+        /// <param name="row">The row as written, e.g. "| iPhone 16e | A18 |"</param>
+        public static IReadOnlyList<string> SplitCells(string row)
+        {
+            string text = (row ?? string.Empty).Trim();
+            if (text.StartsWith("|", StringComparison.Ordinal))
+                text = text.Substring(1);
+            if (text.EndsWith("|", StringComparison.Ordinal) && !text.EndsWith("\\|", StringComparison.Ordinal))
+                text = text.Substring(0, text.Length - 1);
+            var cells = new List<string>();
+            var cell = new System.Text.StringBuilder();
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '\\' && i + 1 < text.Length && text[i + 1] == '|')
+                {
+                    cell.Append('|');
+                    i++;
+                }
+                else if (text[i] == '|')
+                {
+                    cells.Add(cell.ToString().Trim());
+                    cell.Clear();
+                }
+                else
+                    cell.Append(text[i]);
+            }
+            cells.Add(cell.ToString().Trim());
+            return cells;
+        }
+
+        private static ReplyTableAlignment Alignment(string separatorCell)
+        {
+            bool left = separatorCell.StartsWith(":", StringComparison.Ordinal), right = separatorCell.EndsWith(":", StringComparison.Ordinal);
+            return left && right ? ReplyTableAlignment.Center : right ? ReplyTableAlignment.Right : ReplyTableAlignment.Left;
         }
 
         /// <summary>

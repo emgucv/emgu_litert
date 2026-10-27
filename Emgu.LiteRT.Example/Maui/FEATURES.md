@@ -58,6 +58,15 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   `ReplyMarkdown`) renders basic Markdown as `FormattedString` spans: headings, **bold**, *italic*, `inline code`, bullet and
   numbered lists, quotes, rules and links (a tap opens http/https links only). Underscores inside words, as in snake_case,
   aren't italics, and unclosed markup shows as typed while it streams.
+- Tables (since 2026-10-27): `ReplyMarkdown` makes a header row followed by a separator row (`|---|:---:|---:|`, any number
+  of dashes, a bar required) and the rows with bars after it a `ReplyBlockKind.Table` block (`TableHeader`, `TableRows`,
+  `TableAlignments`; a missing cell is empty, an escaped `\|` stays in its cell; a table still streaming grows row by row).
+  `ReplyView` draws it as a grid - the header in bold over a line, thin lines between rows, cells wrapping at 220 points,
+  inline Markdown in cells - in a horizontal `ScrollView`, and a reply with a table uses the full width like one with code.
+  Read aloud, a row is its cells ("Chip, A18.") and the separator row is skipped. Checked on Mac Catalyst: Gemma 4 E2B's
+  table of Mercury, Venus and Earth (three rows, wrapped cells) drew while streaming and in full - though its numbers came
+  from Wikipedia snippets and one was wrong (Mercury's diameter as 1,550 km). Not yet seen on a phone's width, where the
+  horizontal `ScrollView` is what to watch (see the code blocks below).
 - Code blocks are dark monospace panels with the language and a Copy button (`Clipboard`). A reply with code uses the full
   width instead of the 420-point bubble limit. The reply updates in place while streaming; code lines wrap, because a
   horizontal `ScrollView` around the code label was measured once and showed only the first line of streamed code.
