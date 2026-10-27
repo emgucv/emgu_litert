@@ -18,7 +18,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
     /// and the indexing's progress; indexing runs while the page is shown and no model is reloading, again when chats
     /// change. Nothing in a private chat.
     /// </summary>
-    public sealed class PastChatsFeature : ChatFeature, IStorageParticipant
+    public sealed class PastChatsFeature : ChatFeature, IStorageParticipant, ISearchModelParticipant
     {
         /// <summary>The switch's settings key.</summary>
         public const string SettingKey = "search_chats";
@@ -324,6 +324,19 @@ namespace Emgu.LiteRT.LM.Maui.Features
             if (_switch != null)
                 _switch.IsEnabled = enabled;
         }
+
+        // ---------- ISearchModelParticipant ----------
+
+        /// <summary>Before the search model is switched: the indexing stops.</summary>
+        public async Task PrepareSearchModelChangeAsync()
+        {
+            CancelIndexing();
+            await StopIndexingAsync();
+        }
+
+        /// <summary>The search model was switched: nothing to do now - the passages record their model, and another model's are indexed again.</summary>
+        /// <param name="otherModel">True for another model</param>
+        public Task SearchModelChangedAsync(bool otherModel) => Task.CompletedTask;
 
         // ---------- IStorageParticipant ----------
 

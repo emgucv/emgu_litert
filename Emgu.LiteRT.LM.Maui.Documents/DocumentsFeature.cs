@@ -44,7 +44,7 @@ namespace Emgu.LiteRT.LM.Maui.Documents
     /// (<see cref="IChatDocumentStore"/>), with the document each chat uses, restored when the chat is opened; a private
     /// chat's document is indexed in memory only.
     /// </summary>
-    public sealed class DocumentsFeature : ChatFeature, IStorageParticipant
+    public sealed class DocumentsFeature : ChatFeature, IStorageParticipant, ISearchModelParticipant
     {
         private sealed class DocumentState
         {
@@ -140,6 +140,29 @@ namespace Emgu.LiteRT.LM.Maui.Documents
         {
             services.Add(this);
             services.Add<IStorageParticipant>(this);
+        }
+
+        // ---------- ISearchModelParticipant ----------
+
+        /// <summary>Before the search model is switched: a document being read is waited for.</summary>
+        public async Task PrepareSearchModelChangeAsync()
+        {
+            Task<bool> ready = DocumentReady;
+            if (ready == null)
+                return;
+            try { await ready; }
+            catch (Exception) { }
+        }
+
+        /// <summary>The search model was switched: the chat's document is read again with it.</summary>
+        /// <param name="otherModel">True for another model</param>
+        public async Task SearchModelChangedAsync(bool otherModel)
+        {
+            string documentId = DocumentId;
+            if (documentId == null)
+                return;
+            RemoveDocument();
+            await RestoreDocumentAsync(documentId);
         }
 
         // ---------- IStorageParticipant ----------

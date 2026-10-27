@@ -1,7 +1,7 @@
 # MAUI demo features
 
 How the demo's chat features work, and what was measured or verified on which device. File names are the demo's
-(`Chat/`, `Chat/Features/`, `Services/`... - see [ARCHITECTURE.md](ARCHITECTURE.md)) unless a library is named. Open work
+(`Chat/`, `Services/`... - see [ARCHITECTURE.md](ARCHITECTURE.md)) unless a library is named. Open work
 is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/packaging.md](../../docs/packaging.md).
 
 ## Saved chats

@@ -50,7 +50,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         public ServerFeature Server;
         public ExportFeature Export;
         public StorageFeature Storage;
-        public ModelSettingsFeature ModelSettings;
+        public SearchModelFeature SearchModel;
         public TaskFeature Tasks;
         public ImageFeature Images;
         public TranslationFeature Translations;
@@ -87,7 +87,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         _parts = parts;
         _building = null;
         Chat.AttachmentSource = new DemoAttachmentSource(ShowMenuAsync, () => IsPrivate, () => _sessionVersion,
-            (bytes, name) => { if (!_parts.ModelSettings.SearchDownloadRequired) _parts.Documents.AttachDocument(bytes, name); }, SetStatus);
+            (bytes, name) => { if (!_parts.SearchModel.DownloadRequired) _parts.Documents.AttachDocument(bytes, name); }, SetStatus);
         Chat.PropertyChanged += (s, e) =>
         {
             if (e.PropertyName == nameof(ChatView.Conversation))
@@ -110,7 +110,7 @@ public sealed class LiteRtLmChatPage : ChatPage
             Mcp = new McpFeature(),
             VoiceMode = new VoiceModeFeature(),
             Export = new ExportFeature((id, stream, cancel) => ChatExporter.ExportAsync(SharedStore, id, stream, cancel)),
-            ModelSettings = new ModelSettingsFeature(),
+            SearchModel = new SearchModelFeature(SearchModelOptions()),
             Tasks = new TaskFeature(),
             Translations = new TranslationFeature(),
             DeviceActions = new DeviceActionsFeature(),
@@ -127,7 +127,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         // Pictures drawn with Z-Image-Turbo: the demo's model selector above the switch, and a Save As dialog.
         parts.Images = new ImageFeature(parts.Workload)
         {
-            ModelSelector = () => parts.ModelSettings.BuildImageModelSelector(),
+            ModelSelector = BuildImageModelSelector,
             PictureSaver = async (png, fileName) =>
             {
                 using var stream = new System.IO.MemoryStream(png, writable: false);
@@ -141,15 +141,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         };
         // What the library's searches share: the demo's search model and workload (the storage feature adds the
         // deleted-model notice and check).
-        parts.Search = new SearchServices
-        {
-            Choice = parts.ModelSettings,
-            Embedder = parts.ModelSettings.Embedder,
-            Workload = parts.Workload,
-            IndexModel = () => parts.ModelSettings.SearchModelFile,
-            DownloadRequired = () => parts.ModelSettings.SearchDownloadRequired,
-            SupportsImages = parts.ModelSettings.SupportsImages
-        };
+        parts.Search = parts.SearchModel.CreateServices(parts.Workload);
         parts.Storage = new StorageFeature(CreateStorageCatalog, parts.Search);
         parts.PastChats = new PastChatsFeature(SharedStore, parts.Search);
         parts.Documents = new DocumentsFeature(SharedStore, parts.Search);
@@ -169,7 +161,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         parts.Meetings.SyncBackgroundService = () => parts.Camera.SyncBackgroundServiceAsync();
         parts.Meetings.TranscriptAttacher = (bytes, name) =>
         {
-            if (!parts.ModelSettings.SearchDownloadRequired)
+            if (!parts.SearchModel.DownloadRequired)
                 parts.Documents.AttachDocument(bytes, name);
         };
         var options = new ChatPageOptions
@@ -177,7 +169,7 @@ public sealed class LiteRtLmChatPage : ChatPage
             Title = "LiteRT-LM Chat",
             History = SharedStore,
             AutoSave = false,
-            Settings = new ChatSettingsAdapter(),
+            Settings = MoveSearchModelSetting(new ChatSettingsAdapter()),
             ShowBackButton = true,
             ShowCpuThreads = true,
             ReplySpeaker = parts.Camera.ReplySpeaker,
@@ -196,7 +188,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         {
             new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new ClipboardFeature(),
-            parts.Camera, parts.Server, parts.Mcp, parts.ModelSettings, parts.Images, parts.Storage, parts.Export,
+            parts.Camera, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
             parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.Meetings, parts.Exercises
         })
@@ -210,7 +202,44 @@ public sealed class LiteRtLmChatPage : ChatPage
 
     private IIndexingWorkload Workload => (_parts ?? _building).Workload;
 
-    private SearchEmbedder Embedder => _parts.ModelSettings.Embedder;
+    private SearchEmbedder Embedder => _parts.SearchModel.Embedder;
+
+    // Settings > Embedding model: the library's two EmbeddingGemma 2 models on the CPU, and on Windows also on the GPU
+    // (WebGPU over Direct3D 12; a failed load offers the CPU).
+    private static List<SearchModelOption> SearchModelOptions()
+    {
+        var options = new List<SearchModelOption> { SearchModelOption.EmbeddingGemma2TextVision(), SearchModelOption.EmbeddingGemma2Multimodal() };
+#if WINDOWS_WEBGPU
+        const string gpuNote = " A compatible Direct3D 12 GPU is required.";
+        options.Add(new SearchModelOption("text_vision_gpu", "EmbeddingGemma 2 Text Vision 440M · GPU",
+            () => new EmbeddingGemma2TextVision { EnableWindowsWebGpu = true, VisionBackend = "gpu", AudioBackend = "gpu" },
+            options[0].Detail + " Text and vision embeddings use Windows GPU." + gpuNote) { Backend = "gpu", CpuFallback = "text_vision" });
+        options.Add(new SearchModelOption("multimodal_gpu", "EmbeddingGemma 2 Multimodal 740M · GPU",
+            () => new EmbeddingGemma2Multimodal { EnableWindowsWebGpu = true, VisionBackend = "gpu", AudioBackend = "gpu" },
+            options[1].Detail + " Text, vision and audio embeddings use Windows GPU." + gpuNote) { Backend = "gpu", CpuFallback = "multimodal" });
+#endif
+        return options;
+    }
+
+    // The demo kept the embedding model as "embedding_model" (1 Text Vision, 2 Multimodal) and "embedding_windows_gpu"
+    // before the library's SearchModelFeature: carried over once to its "search_model" key.
+    private static IChatPageSettings MoveSearchModelSetting(IChatPageSettings settings)
+    {
+        if (!settings.Contains(SearchModelFeature.SettingKey) && settings.Contains("embedding_model"))
+            settings.Set(SearchModelFeature.SettingKey, (settings.Get("embedding_model", 1) == 2 ? "multimodal" : "text_vision")
+                + (settings.Get("embedding_windows_gpu", false) ? "_gpu" : string.Empty));
+        return settings;
+    }
+
+    // The image-generation model's selector, above the image feature's switch (one choice today).
+    private static View BuildImageModelSelector()
+    {
+        var button = new Button { Text = "Z-Image-Turbo · CPU", HorizontalOptions = LayoutOptions.Fill };
+        button.Clicked += async (_, _) =>
+            await Application.Current.Windows[0].Page.DisplayActionSheetAsync("Image-generation model", "Cancel", null, "Z-Image-Turbo · CPU");
+        return new VerticalStackLayout { Spacing = 6, Children = { Theme.SectionTitle("Image-generation model"), button,
+            new Label { Text = "Z-Image-Turbo is the only available image model. 10.6 GB download, 256 × 256 images. GPU execution is not supported by this selector.", FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText } } };
+    }
 
     // What the storage page lists: the catalog's models, the two search models (downloadable again from the page), the
     // image model's folder, and the store's documents, indexes and attachments.

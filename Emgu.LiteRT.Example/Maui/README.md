@@ -196,8 +196,8 @@ photos (it takes a few times longer). iOS has no live camera yet: `LiveCamera` h
 The chat page is built on the reusable chat libraries:
 
 - `Emgu.LiteRT.LM.Maui`'s `ChatPage` (since 2026-10-26): the page itself - header, `ChatView`, chips, model and chat lists,
-  settings, private mode, downloads and reloads - which `Chat/LiteRtLmChatPage.cs` derives from, with every demo feature a
-  `ChatFeature` in `Chat/Features/` (`ARCHITECTURE.md` says how to add one); the demo's own message and reply templates are
+  settings, private mode, downloads and reloads - which `Chat/LiteRtLmChatPage.cs` derives from, with the library's
+  `ChatFeature`s (`ARCHITECTURE.md` says how to add one); the demo's own message and reply templates are
   in `ChatTemplates.xaml`.
 - `Emgu.LiteRT.LM.Chat`'s `ChatConversation`: sending, tools and compaction.
 - `Emgu.LiteRT.LM.Chat.Sqlite`'s `ChatHistoryStore` for saved chats, with its `SqliteAgentMemoryStore` and `SqliteAgentGoalStore` for the memories and goals.

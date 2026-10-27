@@ -23,7 +23,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
     /// platform (iOS and Mac Catalyst: NSPhotoLibraryUsageDescription in Info.plist; Android: the permissions this
     /// assembly declares).
     /// </summary>
-    public sealed class PhotoSearchFeature : ChatFeature, IStorageParticipant
+    public sealed class PhotoSearchFeature : ChatFeature, IStorageParticipant, ISearchModelParticipant
     {
         /// <summary>The switch's settings key.</summary>
         public const string SettingKey = "photo_search";
@@ -455,6 +455,25 @@ namespace Emgu.LiteRT.LM.Maui.Features
     public void SetSwitchEnabled(bool enabled)
     {
         if (_photoSwitch != null) _photoSwitch.IsEnabled = enabled;
+    }
+
+    // ---------- ISearchModelParticipant ----------
+
+    /// <summary>Before the search model is switched: the indexing stops.</summary>
+    public async Task PrepareSearchModelChangeAsync()
+    {
+        CancelIndexing();
+        await WaitForIndexingAsync();
+    }
+
+    /// <summary>The search model was switched: another model's photos are indexed again; a model without images turns the search off.</summary>
+    /// <param name="otherModel">True for another model</param>
+    public async Task SearchModelChangedAsync(bool otherModel)
+    {
+        if (otherModel)
+            await ClearIndexAsync();
+        if (!_search.SupportsImages && On)
+            SwitchOff();
     }
 
     // ---------- IStorageParticipant ----------
