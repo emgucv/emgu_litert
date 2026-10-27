@@ -108,7 +108,7 @@ public class UnitTestToolRouting
                 () => new AITool[] { AgentTools.SearchDocuments((request, document, token) => Task.FromResult("none")) }, () => ChatDocuments.Instructions),
             new ToolGroup(ChatSearchIndex.GroupName, ChatSearchIndex.GroupSummary, ChatSearchIndex.GroupKeywords,
                 () => new AITool[] { AgentTools.SearchChats(Unused) }, () => ChatSearchIndex.Instructions),
-            new ToolGroup(ChatToolGroups.WriteDocument, ChatToolGroups.WriteDocumentSummary, ChatToolGroups.WriteDocumentKeywords,
+            new ToolGroup(ChatWrittenDocuments.GroupName, ChatWrittenDocuments.GroupSummary, ChatWrittenDocuments.GroupKeywords,
                 () => new AITool[] { AgentTools.CreateDocument((document, token) =>
                 {
                     done?.Invoke("document:" + document.Format + ":" + (document.Data.Length > 200 ? "content" : "short"));
@@ -163,12 +163,12 @@ public class UnitTestToolRouting
             ("What was the restaurant you told me about?", new[] { ChatSearchIndex.GroupName }),
             ("Draw a red fox in the snow", new[] { ChatToolGroups.ImageGeneration }),
             ("Can you paint a lighthouse at sunset?", new[] { ChatToolGroups.ImageGeneration }),
-            ("Make me a packing list as a Word document", new[] { ChatToolGroups.WriteDocument }),
-            ("Write that up as a PDF", new[] { ChatToolGroups.WriteDocument }),
-            ("Can you export this as Markdown?", new[] { ChatToolGroups.WriteDocument }),
-            ("Take notes of my meeting", new[] { ChatToolGroups.WriteDocument }),
-            ("Record this lecture and transcribe it", new[] { ChatToolGroups.WriteDocument }),
-            ("Can you write the minutes of our team call?", new[] { ChatToolGroups.WriteDocument }),
+            ("Make me a packing list as a Word document", new[] { ChatWrittenDocuments.GroupName }),
+            ("Write that up as a PDF", new[] { ChatWrittenDocuments.GroupName }),
+            ("Can you export this as Markdown?", new[] { ChatWrittenDocuments.GroupName }),
+            ("Take notes of my meeting", new[] { ChatWrittenDocuments.GroupName }),
+            ("Record this lecture and transcribe it", new[] { ChatWrittenDocuments.GroupName }),
+            ("Can you write the minutes of our team call?", new[] { ChatWrittenDocuments.GroupName }),
             // Everyday messages need no group.
             ("Boil the eggs for 7 minutes", new string[0]),
             ("Who holds the world record for the marathon?", new string[0]),

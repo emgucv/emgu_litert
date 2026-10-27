@@ -637,8 +637,9 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Meeting notes
 
-- `record_meeting` (in the `write_document` tool group, so it adds no stub; `Emgu.LiteRT.LM.Agents`' `MeetingNotes.cs`, the
-  demo's `MeetingFeature.cs`) works on Android 13+, iOS and Mac Catalyst - wherever `SpeechRecognizer` works. The call lasts
+- `record_meeting` (in the `write_document` tool group, so it adds no stub; `Emgu.LiteRT.LM.Agents`' `MeetingNotes.cs`; since
+  2026-10-26 the library's `MeetingFeature` and `WrittenDocumentsFeature` in `Emgu.LiteRT.LM.Maui`, which the demo wires to its
+  camera feature's foreground service and its document attaching) works on Android 13+, iOS and Mac Catalyst - wherever `SpeechRecognizer` works. The call lasts
   as long as the recording.
 - Recording: `Emgu.LiteRT.LM.Maui`'s `MicrophoneSoundSource` (through `MicrophoneGate`, so the sound monitors pause) feeds `MeetingAudioChunker`, which
   cuts 30-50 s pieces at the quietest 200 ms. Each piece is written down by the platform's speech recognizer while the

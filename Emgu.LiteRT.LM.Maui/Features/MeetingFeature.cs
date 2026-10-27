@@ -2,46 +2,61 @@
 using System.Diagnostics;
 using System.Text;
 using Emgu.LiteRT.LM.Agents;
-using Emgu.LiteRT.LM.Maui;
-using Emgu.LiteRT.LM.Maui.Documents;
+using Emgu.LiteRT.LM.Chat;
 using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.Features;
 
-// Meeting notes (record_meeting): the tool call lasts as long as the recording. The microphone's samples (MicrophoneSoundSource, through
-// MicrophoneGate, so the sound monitors pause) are cut into 30-50 s pieces at quiet moments (MeetingAudioChunker), and each piece is
-// written down by the platform's speech recognizer (SpeechRecognizer: on the device where it can be) while the recording goes on, so the
-// card shows the transcript as it grows. Stop (the card, or the Android notification - a foreground service keeps recording with the
-// screen off) writes down the rest, then the model writes the notes in requests of its own (MeetingNotes: section summaries first when
-// the transcript is longer than the window), shown in the card; the notes and the transcript are saved as a Word document with the reply,
-// the transcript is attached to the chat as its document - so later questions get the passages they need - and the notes go back to the
-// model. Gemma 4 could listen to the audio itself, but at ~25 tokens a second an hour is ~90k tokens, far over its window.
-// Its tool comes with the written documents' group (WrittenDocumentsFeature).
-internal sealed class MeetingFeature : DemoFeature
+/// <summary>
+/// Meeting notes (record_meeting, <see cref="AgentTools.RecordMeeting"/>): the tool call lasts as long as the recording. The
+/// microphone's samples (<see cref="MicrophoneSoundSource"/>, through <see cref="MicrophoneGate"/>, so other listeners pause)
+/// are cut into 30-50 s pieces at quiet moments (<see cref="MeetingAudioChunker"/>), and each piece is written down by the
+/// platform's speech recognizer (<see cref="SpeechRecognizer"/>: on the device where it can be) while the recording goes on,
+/// so the card shows the transcript as it grows. Stop (the card, or <see cref="Stop"/> from elsewhere - e.g. an app's
+/// notification, with a foreground service it keeps running through <see cref="SyncBackgroundService"/>) writes down the
+/// rest, then the model writes the notes in requests of its own (<see cref="MeetingNotes"/>: section summaries first when
+/// the transcript is longer than the window), shown in the card; the notes and the transcript go to
+/// <see cref="WrittenDocumentsFeature"/> as a Word document, the transcript to <see cref="TranscriptAttacher"/> (an app
+/// attaches it to the chat as its document, so later questions get the passages they need), and the notes back to the
+/// model. The tool comes with <see cref="WrittenDocumentsFeature"/>'s group, which must be on the page too. Android 13+,
+/// iOS and Mac Catalyst (<see cref="Supported"/>).
+/// </summary>
+public sealed class MeetingFeature : ChatFeature
 {
-    public const string Instructions =
-        "To record a meeting, lecture or conversation and take notes of it, call record_meeting: it records until the user presses Stop, " +
-        "then returns the notes.";
+    /// <summary>The instructions that go with record_meeting.</summary>
+    public const string Instructions = ChatWrittenDocuments.MeetingInstructions;
 
     private static readonly TimeSpan MeetingLimit = TimeSpan.FromHours(3);
 
     private MeetingSession _meeting;
 
+    /// <inheritdoc/>
     public override string Name => "meetings";
 
+    /// <inheritdoc/>
     public override string Title => "Meeting notes";
 
+    /// <summary>Always on (nothing to switch).</summary>
     public override bool PersistEnabled => false;
 
-    // The meeting being recorded: its title ("" without one), or null.
+    /// <summary>The meeting being recorded: its title ("" without one), or null.</summary>
     public string ActiveTitle => _meeting?.Title;
 
-    // Ends the recording (the notes are then written, unless the chat is closing).
+    /// <summary>Called when a recording starts and when it ends: an app keeps a foreground service running meanwhile (Android); or null.</summary>
+    public Func<Task> SyncBackgroundService { get; set; }
+
+    /// <summary>Given the transcript (as a text file's bytes and name) when the notes are done: an app attaches it to the chat as its document; or null.</summary>
+    public Action<byte[], string> TranscriptAttacher { get; set; }
+
+    /// <summary>End the recording (the notes are then written, unless the chat is closing).</summary>
+    /// <param name="reason">Why, for the log ("the user pressed Stop in the notification")</param>
     public void Stop(string reason) => _meeting?.Ended.TrySetResult(reason);
 
+    /// <inheritdoc/>
     public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
 
+    /// <inheritdoc/>
     public override void OnDetached()
     {
         Stop("the chat was closed");
@@ -64,6 +79,7 @@ internal sealed class MeetingFeature : DemoFeature
         public VerticalStackLayout Content;
     }
 
+    /// <summary>Whether meetings can be recorded here: a speech recognizer on Android 13+, iOS or Mac Catalyst.</summary>
     public static bool Supported =>
 #if ANDROID || IOS || MACCATALYST
         SpeechRecognizer.IsSupported;
@@ -71,10 +87,12 @@ internal sealed class MeetingFeature : DemoFeature
         false;
 #endif
 
+    /// <summary>The record_meeting tool, where supported and not in a hands-free chat (the microphone is the chat's then).</summary>
+    /// <param name="handsFree">Whether the chat is hands-free</param>
     public IEnumerable<AITool> Tools(bool handsFree) =>
         Supported && !handsFree ? new[] { AgentTools.RecordMeeting(RecordMeetingAsync) } : Array.Empty<AITool>();
 
-    private Task SyncBackgroundServiceAsync() => Host.Services.Get<CameraFeature>()?.SyncBackgroundServiceAsync() ?? Task.CompletedTask;
+    private Task SyncBackgroundServiceAsync() => SyncBackgroundService?.Invoke() ?? Task.CompletedTask;
 
     private async Task<string> RecordMeetingAsync(string title, CancellationToken token)
     {
@@ -110,7 +128,6 @@ internal sealed class MeetingFeature : DemoFeature
             return "Microphone access was denied, so nothing could be recorded. Tell the user they can allow it in the system settings.";
         }
         _meeting = session;
-        UiStallWatchdog.Mark("record_meeting: started");
 #if IOS
         // Without a background audio mode, iOS stops the microphone when the screen locks.
         MainThread.BeginInvokeOnMainThread(() => DeviceDisplay.Current.KeepScreenOn = true);
@@ -121,7 +138,6 @@ internal sealed class MeetingFeature : DemoFeature
         string ending;
         using (token.Register(() => session.Ended.TrySetResult("the reply was stopped")))
             ending = await WatchMeetingAsync(session);
-        UiStallWatchdog.Mark("record_meeting: ended, " + ending);
 
         // Stop recording and write down the rest (also when the reply was stopped: the transcript is still saved).
         session.Stopping = true;
@@ -192,10 +208,13 @@ internal sealed class MeetingFeature : DemoFeature
                 + (problem != null ? "\n" + problem : notes == null ? "\nThe transcript was saved." : "");
             session.Preview.IsVisible = false;
             if (notes != null)
-                session.Content.Children.Add(new ReplyView { Text = notes, FontSize = 14, TextColor = Theme.PrimaryText, Margin = new Thickness(0, 6, 0, 0) });
+            {
+                var view = new ReplyView { Text = notes, FontSize = 14, Margin = new Thickness(0, 6, 0, 0) };
+                ChatResources.SetThemeColor(view, ReplyView.TextColorProperty, "ChatPrimaryText");
+                session.Content.Children.Add(view);
+            }
             // Questions about the meeting later get the transcript's passages they need, as for an attached document.
-            if (Host.Services.Get<ModelSettingsFeature>()?.SearchDownloadRequired != true)
-                Host.Services.Get<DocumentsFeature>()?.AttachDocument(Encoding.UTF8.GetBytes(transcriptText), transcriptName);
+            TranscriptAttacher?.Invoke(Encoding.UTF8.GetBytes(transcriptText), transcriptName);
             Host.SetStatus("Generating...");
         });
         return AgentTools.MeetingResultText(duration, words, notes, document.FileName, problem);
@@ -283,15 +302,16 @@ internal sealed class MeetingFeature : DemoFeature
 
     private void AddMeetingCard(MeetingSession session)
     {
-        session.Time = new Label { Text = "● 0:00", FontFamily = Theme.TitleFont, FontSize = 28, TextColor = Theme.PrimaryText };
-        session.Status = new Label
-        {
-            Text = "Recording. Make sure everyone knows they are being recorded. What is said is written down as it goes.",
-            FontFamily = Theme.BodyFont, FontSize = 13, TextColor = Theme.SecondaryText
-        };
-        session.Preview = new Label { FontFamily = Theme.BodyFont, FontSize = 13, TextColor = Theme.PrimaryText, IsVisible = false, LineBreakMode = LineBreakMode.WordWrap };
-        session.Pause = new Button { Text = "Pause", FontFamily = Theme.TitleFont, FontSize = 14, BackgroundColor = Colors.Transparent, TextColor = Theme.Accent,
-            BorderColor = Theme.Accent, BorderWidth = 1, CornerRadius = 12, Padding = new Thickness(16, 6), MinimumHeightRequest = 40 };
+        Color accent = ChatResources.FindColor("ChatAccent");
+        session.Time = new Label { Text = "● 0:00", FontSize = 28 };
+        ChatResources.ApplyStyle(session.Time, "ChatListTitleStyle");
+        session.Time.FontSize = 28;
+        session.Status = new Label { Text = "Recording. Make sure everyone knows they are being recorded. What is said is written down as it goes." };
+        ChatResources.ApplyStyle(session.Status, "ChatListDetailStyle");
+        session.Preview = new Label { IsVisible = false, LineBreakMode = LineBreakMode.WordWrap };
+        ChatResources.ApplyStyle(session.Preview, "ChatSectionTextStyle");
+        session.Pause = new Button { Text = "Pause", FontSize = 14, BackgroundColor = Colors.Transparent, TextColor = accent,
+            BorderColor = accent, BorderWidth = 1, CornerRadius = 12, Padding = new Thickness(16, 6), MinimumHeightRequest = 40 };
         session.Pause.Clicked += (_, _) =>
         {
             session.Paused = !session.Paused;
@@ -299,27 +319,31 @@ internal sealed class MeetingFeature : DemoFeature
             SemanticProperties.SetDescription(session.Pause, session.Paused ? "Resume recording" : "Pause recording");
         };
         SemanticProperties.SetDescription(session.Pause, "Pause recording");
-        session.Stop = new Button { Text = "Stop and write notes", FontFamily = Theme.TitleFont, FontSize = 14, BackgroundColor = Theme.Accent, TextColor = Colors.White,
+        session.Stop = new Button { Text = "Stop and write notes", FontSize = 14, BackgroundColor = accent, TextColor = Colors.White,
             CornerRadius = 12, Padding = new Thickness(16, 6), MinimumHeightRequest = 40 };
         session.Stop.Clicked += (_, _) => session.Ended.TrySetResult("the user pressed Stop");
-        string heading = "\U0001F399  " + (string.IsNullOrWhiteSpace(session.Title) ? "Meeting notes" : session.Title);
+        var heading = new Label { Text = "\U0001F399  " + (string.IsNullOrWhiteSpace(session.Title) ? "Meeting notes" : session.Title) };
+        ChatResources.ApplyStyle(heading, "ChatListTitleStyle");
         session.Content = new VerticalStackLayout
         {
             Spacing = 4,
             Children =
             {
-                new Label { Text = heading, FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText },
+                heading,
                 session.Time, session.Status, session.Preview,
                 new HorizontalStackLayout { Spacing = 8, Margin = new Thickness(0, 4, 0, 0), Children = { session.Stop, session.Pause } }
             }
         };
-        Host.AddCardToReply(new Border
+        var card = new Border
         {
-            BackgroundColor = Theme.CardBackground, Stroke = Theme.RowBorder, StrokeThickness = 1,
+            StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) },
             Padding = new Thickness(14, 12), Margin = new Thickness(6, 2), MaximumWidthRequest = 520, HorizontalOptions = LayoutOptions.Start,
             Content = session.Content
-        });
+        };
+        ChatResources.SetThemeColor(card, VisualElement.BackgroundColorProperty, "ChatSurface");
+        ChatResources.SetThemeColor(card, Border.StrokeProperty, "ChatRowBorder");
+        Host.AddCardToReply(card);
         Host.SetStatus("Recording the meeting…");
     }
 

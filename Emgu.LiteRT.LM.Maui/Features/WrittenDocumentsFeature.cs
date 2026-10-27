@@ -5,43 +5,63 @@
 using System.Globalization;
 using System.IO;
 using Emgu.LiteRT.LM.Agents;
-using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Chat;
 using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui.Features;
 
-// Documents the agent writes (create_document, Emgu.LiteRT.LM.Agents' DocumentWriter: Word, PDF or Markdown from the
-// model's Markdown): a card above the reply with Open and Share, saved with the reply as an attachment of kind
-// "document" (its file name in the media type, "...; name=Packing list.docx"), shown again when the chat is reopened and,
-// like the generated pictures, never given back to the model. A tool group of the router, with the meeting notes' tools
-// (they write a document too).
-internal sealed class WrittenDocumentsFeature : DemoFeature
+/// <summary>
+/// Documents the agent writes (create_document, Emgu.LiteRT.LM.Agents' <see cref="DocumentWriter"/>: Word, PDF or Markdown
+/// from the model's Markdown): a card above the reply with Open and Share. A page that saves the chats itself keeps them
+/// with the reply as attachments of kind <see cref="ChatWrittenDocuments.AttachmentKind"/> (<see cref="Take"/>; the file
+/// name in the media type, "...; name=Packing list.docx") and shows them again when the chat is reopened
+/// (<see cref="SavedCard"/>), never given back to the model. A tool group that comes when the message asks for a file,
+/// with <see cref="MeetingFeature"/>'s tool when that feature is on the page (its notes are a document too).
+/// </summary>
+public sealed class WrittenDocumentsFeature : ChatFeature
 {
-    public const string Kind = "document";
+    /// <summary>The kind of a reply's saved attachment that is a document it wrote.</summary>
+    public const string Kind = ChatWrittenDocuments.AttachmentKind;
+
     private readonly List<GeneratedDocument> _sendDocuments = new List<GeneratedDocument>();
+    private string _prompt = string.Empty;
 
-    public const string Instructions = "When the user asks for a document or a file (Word, PDF, Markdown), write the whole " +
-        "content into create_document's content in Markdown - not into your reply - then say in one short sentence that it is ready.";
-
+    /// <inheritdoc/>
     public override string Name => "written_documents";
 
+    /// <inheritdoc/>
     public override string Title => "Writing documents";
 
+    /// <summary>Always on (nothing to switch).</summary>
     public override bool PersistEnabled => false;
 
+    /// <inheritdoc/>
     public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
 
     private MeetingFeature Meetings => Host?.Services.Get<MeetingFeature>();
 
-    public override IEnumerable<ToolGroup> ToolGroups() => new[]
+    /// <inheritdoc/>
+    public override Task PrepareAsync(ChatMessageContext context)
     {
-        new ToolGroup(ChatToolGroups.WriteDocument, ChatToolGroups.WriteDocumentSummary, ChatToolGroups.WriteDocumentKeywords,
-            () => new AITool[] { AgentTools.CreateDocument(SaveAsync, () => Prompt) }.Concat(Meetings?.Tools(Host?.HandsFree == true) ?? Array.Empty<AITool>()),
-            () => JoinInstructions(Instructions, Meetings?.Tools(Host?.HandsFree == true).Any() == true ? MeetingFeature.Instructions : null))
-    };
+        _prompt = context?.Prompt ?? string.Empty;
+        return Task.CompletedTask;
+    }
 
-    // create_document's save: kept for the reply being written, with a card above it.
+    /// <inheritdoc/>
+    public override IEnumerable<ToolGroup> ToolGroups()
+    {
+        yield return new ToolGroup(ChatWrittenDocuments.GroupName, ChatWrittenDocuments.GroupSummary, ChatWrittenDocuments.GroupKeywords,
+            () => new AITool[] { AgentTools.CreateDocument(SaveAsync, () => _prompt) }.Concat(Meetings?.Tools(Host?.HandsFree == true) ?? Array.Empty<AITool>()),
+            () => Meetings?.Tools(Host?.HandsFree == true).Any() == true
+                ? ChatWrittenDocuments.Instructions + "\n\n" + ChatWrittenDocuments.MeetingInstructions
+                : ChatWrittenDocuments.Instructions);
+    }
+
+    /// <summary>create_document's save: the document is kept for the reply being written, with a card above it.</summary>
+    /// <param name="document">The document</param>
+    /// <param name="cancellationToken">Unused</param>
+    /// <returns>What the model is told</returns>
     public Task<string> SaveAsync(GeneratedDocument document, CancellationToken cancellationToken)
     {
         lock (_sendDocuments)
@@ -49,27 +69,37 @@ internal sealed class WrittenDocumentsFeature : DemoFeature
         return MainThread.InvokeOnMainThreadAsync(() =>
         {
             Host.AddCardToReply(CreateCard(document.FileName, document.MediaType, document.Format, document.Data));
-            UiStallWatchdog.Mark("create_document: " + document.FileName + ", " + document.Data.Length + " bytes");
             return AgentTools.DocumentCreatedResult(document);
         });
     }
 
-    // The documents written for the reply, to save with it.
+    /// <summary>The documents written for the reply, as attachments to save with it (kind, media type with the file name, bytes).</summary>
     public List<(string Kind, string MediaType, byte[] Data)> Take()
     {
         lock (_sendDocuments)
             return _sendDocuments.Select(d => (Kind, d.MediaType + "; name=" + d.FileName, d.Data)).ToList();
     }
 
+    /// <summary>Forget the documents written for the reply (before the next message).</summary>
     public void Clear()
     {
         lock (_sendDocuments)
             _sendDocuments.Clear();
     }
 
+    /// <inheritdoc/>
     public override void OnNewConversation() => Clear();
 
-    // A document a saved reply wrote, for above it again when the chat is reopened: its name and type from the media type.
+    /// <inheritdoc/>
+    public override void OnReplyCompleted(ChatExchangeEventArgs e)
+    {
+        // A page that saves the chats itself took them with the reply; the next reply starts afresh.
+        Clear();
+    }
+
+    /// <summary>A document a saved reply wrote, for above it again when the chat is reopened: its name and type from the media type.</summary>
+    /// <param name="mediaType">The saved attachment's media type, with the file name ("...; name=...")</param>
+    /// <param name="data">The file</param>
     public View SavedCard(string mediaType, byte[] data)
     {
         string type = mediaType, name = "Document";
@@ -92,16 +122,16 @@ internal sealed class WrittenDocumentsFeature : DemoFeature
     // The card above the reply bubble (or at the end of a restored transcript).
     private View CreateCard(string fileName, string mediaType, string format, byte[] data)
     {
+        Color accent = ChatResources.FindColor("ChatAccent");
         Button Action(string text, string description)
         {
             var button = new Button
             {
                 Text = text,
-                FontFamily = Theme.TitleFont,
                 FontSize = 14,
                 BackgroundColor = Colors.Transparent,
-                TextColor = Theme.Accent,
-                BorderColor = Theme.Accent,
+                TextColor = accent,
+                BorderColor = accent,
                 BorderWidth = 1,
                 CornerRadius = 12,
                 Padding = new Thickness(16, 6),
@@ -112,7 +142,8 @@ internal sealed class WrittenDocumentsFeature : DemoFeature
         }
         Button open = Action("Open", "Open " + fileName);
         Button share = Action("Share", "Share " + fileName);
-        Label status = new Label { FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText, IsVisible = false };
+        Label status = new Label { IsVisible = false };
+        ChatResources.ApplyStyle(status, "ChatListDetailStyle");
         open.Clicked += async (_, _) =>
         {
             try
@@ -140,21 +171,23 @@ internal sealed class WrittenDocumentsFeature : DemoFeature
                 status.IsVisible = true;
             }
         };
+        var title = new Label { Text = "\U0001F4C4  " + fileName };
+        ChatResources.ApplyStyle(title, "ChatListTitleStyle");
+        var detail = new Label { Text = format + " · " + SizeText(data.Length) };
+        ChatResources.ApplyStyle(detail, "ChatListDetailStyle");
         var content = new VerticalStackLayout
         {
             Spacing = 4,
             Children =
             {
-                new Label { Text = "\U0001F4C4  " + fileName, FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Theme.PrimaryText },
-                new Label { Text = format + " · " + SizeText(data.Length), FontFamily = Theme.BodyFont, FontSize = 13, TextColor = Theme.SecondaryText },
+                title,
+                detail,
                 new HorizontalStackLayout { Spacing = 10, Margin = new Thickness(0, 6, 0, 0), Children = { open, share } },
                 status
             }
         };
         var card = new Border
         {
-            BackgroundColor = Theme.CardBackground,
-            Stroke = Theme.RowBorder,
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) },
             Padding = new Thickness(14, 12),
@@ -163,6 +196,8 @@ internal sealed class WrittenDocumentsFeature : DemoFeature
             HorizontalOptions = LayoutOptions.Start,
             Content = content
         };
+        ChatResources.SetThemeColor(card, VisualElement.BackgroundColorProperty, "ChatSurface");
+        ChatResources.SetThemeColor(card, Border.StrokeProperty, "ChatRowBorder");
         SemanticProperties.SetDescription(card, "Document " + fileName + ", " + format);
         return card;
     }

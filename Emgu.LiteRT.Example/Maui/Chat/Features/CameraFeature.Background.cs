@@ -1,5 +1,6 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using Emgu.LiteRT.LM.Agents.Audio;
+using Emgu.LiteRT.LM.Maui.Features;
 
 namespace Maui.Demo.Lite;
 

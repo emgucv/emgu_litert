@@ -133,6 +133,13 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
         parts.PastChats = new PastChatsFeature(SharedStore, parts.Search);
         parts.Documents = new DocumentsFeature(SharedStore, parts.Search);
         parts.PhotoSearch = new PhotoSearchFeature(SharedStore, parts.Search);
+        // Meetings keep the camera feature's foreground service running (Android) and attach the transcript to the chat.
+        parts.Meetings.SyncBackgroundService = () => parts.Camera.SyncBackgroundServiceAsync();
+        parts.Meetings.TranscriptAttacher = (bytes, name) =>
+        {
+            if (!parts.ModelSettings.SearchDownloadRequired)
+                parts.Documents.AttachDocument(bytes, name);
+        };
         var options = new ChatPageOptions
         {
             Title = "LiteRT-LM Chat",
