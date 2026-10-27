@@ -1,5 +1,9 @@
-// Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+//  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+//----------------------------------------------------------------------------
+
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -8,16 +12,30 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Chat.Sqlite;
 
-// A portable Markdown transcript with relative links. No database, credentials, global memories or embeddings.
-internal static class ChatExporter
+/// <summary>
+/// Exports a saved chat as a ZIP: a portable Markdown transcript (chat.md, with the thinking, the voice messages'
+/// transcripts and the document excerpts given to the model) with relative links to its attachments (the attached and
+/// generated pictures and the recordings), and the saved content of its attached document (document/document.md and
+/// its images; the original file isn't kept by the store). No database, credentials, memories or embeddings.
+/// </summary>
+public static class ChatExporter
 {
-    public static async Task<int> ExportAsync(ChatStore store, int conversationId, Stream output, CancellationToken cancel = default)
+    /// <summary>Write the chat's ZIP to a stream (left open).</summary>
+    /// <param name="store">The saved chats</param>
+    /// <param name="chatId">The chat's id</param>
+    /// <param name="output">Where the ZIP goes</param>
+    /// <param name="cancel">Cancels it</param>
+    /// <returns>How many attachments and document images were missing (noted in the Markdown)</returns>
+    /// <exception cref="InvalidOperationException">The chat no longer exists</exception>
+    public static async Task<int> ExportAsync(ChatHistoryStore store, int chatId, Stream output, CancellationToken cancel = default)
     {
-        var chat = (await store.GetConversationsAsync()).FirstOrDefault(c => c.Id == conversationId)
+        if (store == null)
+            throw new ArgumentNullException(nameof(store));
+        ChatRecord chat = await store.GetChatAsync(chatId).ConfigureAwait(false)
             ?? throw new InvalidOperationException("This saved chat no longer exists.");
-        var messages = await store.GetMessagesAsync(conversationId);
+        List<ChatMessageRecord> messages = await store.GetMessagesAsync<ChatMessageRecord>(chatId).ConfigureAwait(false);
         cancel.ThrowIfCancellationRequested();
         using var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true);
         var markdown = new StringBuilder();
@@ -30,8 +48,8 @@ internal static class ChatExporter
         foreach (var message in messages)
         {
             cancel.ThrowIfCancellationRequested();
-            string role = message.Role == MessageRecord.UserRole ? "You"
-                : message.Role == MessageRecord.AssistantRole ? "Assistant" : "Tool step";
+            string role = message.Role == ChatMessageRecord.UserRole ? "You"
+                : message.Role == ChatMessageRecord.AssistantRole ? "Assistant" : "Tool step";
             markdown.AppendLine("## " + role + " · " + Date(message.Created)).AppendLine();
             if (!string.IsNullOrWhiteSpace(message.Thinking))
                 Details(markdown, "Thinking", message.Thinking);
@@ -41,7 +59,7 @@ internal static class ChatExporter
             if (!string.IsNullOrWhiteSpace(message.Context))
                 Details(markdown, "Document excerpts given to the model", message.Context);
             int number = 0;
-            var attachments = store.GetAttachments(message, includeMissing: true);
+            List<ChatSavedAttachment> attachments = store.GetAttachments(message, includeMissing: true);
             int references = (message.Attachments ?? string.Empty).Split('\n').Count(s => !string.IsNullOrWhiteSpace(s));
             if (references > attachments.Count)
             {
@@ -59,7 +77,7 @@ internal static class ChatExporter
                 {
                     using var input = File.OpenRead(attachment.Path);
                     using var target = archive.CreateEntry(path, CompressionLevel.Fastest).Open();
-                    await input.CopyToAsync(target, cancel);
+                    await input.CopyToAsync(target, 81920, cancel).ConfigureAwait(false);
                     bool image = attachment.MediaType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true;
                     markdown.AppendLine((image ? "!" : "") + "[" + label + "](" + path + ")").AppendLine();
                 }
@@ -72,10 +90,10 @@ internal static class ChatExporter
         }
         if (!string.IsNullOrEmpty(chat.DocumentId))
         {
-            var document = await store.GetDocumentAsync(chat.DocumentId);
+            DocumentRecord document = await store.GetDocumentAsync(chat.DocumentId).ConfigureAwait(false);
             if (document != null)
             {
-                var items = await store.GetDocumentItemsAsync(document.Id);
+                List<DocumentItemRecord> items = await store.GetDocumentItemsAsync(document.Id).ConfigureAwait(false);
                 var content = new StringBuilder("# " + Inline(document.Name)).AppendLine().AppendLine();
                 content.AppendLine("Saved document content only. The original document file was not retained by the app; this is not a copy of the original PDF.").AppendLine();
                 foreach (var item in items)
@@ -86,7 +104,7 @@ internal static class ChatExporter
                     {
                         string path = "image-" + item.Id.ToString(CultureInfo.InvariantCulture) + Extension(item.MediaType);
                         using var target = archive.CreateEntry("document/" + path, CompressionLevel.Fastest).Open();
-                        await target.WriteAsync(item.Data, cancel);
+                        await target.WriteAsync(item.Data, 0, item.Data.Length, cancel).ConfigureAwait(false);
                         content.AppendLine("![Document image](" + path + ")").AppendLine();
                     }
                     else if (item.IsImage)
@@ -96,7 +114,7 @@ internal static class ChatExporter
                     }
                     else content.AppendLine(item.Text ?? string.Empty).AppendLine();
                 }
-                await WriteTextAsync(archive, "document/document.md", content.ToString(), cancel);
+                await WriteTextAsync(archive, "document/document.md", content.ToString(), cancel).ConfigureAwait(false);
                 markdown.AppendLine("## Attached document").AppendLine();
                 markdown.AppendLine("[" + Inline(document.Name) + "](document/document.md) — saved extracted text and images; original file not retained.").AppendLine();
             }
@@ -106,7 +124,7 @@ internal static class ChatExporter
                 markdown.AppendLine("> The attached document is unavailable. Excerpts saved with messages are included above.").AppendLine();
             }
         }
-        await WriteTextAsync(archive, "chat.md", markdown.ToString(), cancel);
+        await WriteTextAsync(archive, "chat.md", markdown.ToString(), cancel).ConfigureAwait(false);
         return missing;
     }
 
@@ -114,7 +132,7 @@ internal static class ChatExporter
     {
         using var stream = archive.CreateEntry(path, CompressionLevel.Fastest).Open();
         byte[] bytes = new UTF8Encoding(false).GetBytes(text);
-        await stream.WriteAsync(bytes, cancel);
+        await stream.WriteAsync(bytes, 0, bytes.Length, cancel).ConfigureAwait(false);
     }
 
     // Keep metadata and user reasoning as text even if they contain Markdown delimiters or HTML.

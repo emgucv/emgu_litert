@@ -106,7 +106,7 @@ internal sealed class StorageFeature : DemoFeature
         models.Add(("EmbeddingGemma 2 Multimodal 740M", Path.GetFileName(multimodal.DefaultModelFile.LocalFile), true));
         using var image = new ZImageTurbo();
         return new StorageCatalog(Demo.Store, Path.GetDirectoryName(catalog[0].File.LocalFile), image.Folder,
-            Path.Combine(FileSystem.CacheDirectory, "sharing-root", "chat-exports"), models);
+            ExportFeature.ExportFolder, models);
     }
 
     public async Task OpenStorageAsync()

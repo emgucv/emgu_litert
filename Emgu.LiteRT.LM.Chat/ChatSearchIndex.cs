@@ -176,8 +176,8 @@ namespace Emgu.LiteRT.LM.Chat
             Action<int, int> progress, CancellationToken cancel)
         {
             IReadOnlyList<ChatSearchMessage> messages = await _store.GetSearchMessagesAsync().ConfigureAwait(false);
-            HashSet<int> indexed = (await _store.GetChatEmbeddingsAsync().ConfigureAwait(false)).Where(e => e.Model == model)
-                .Select(e => e.MessageId).ToHashSet();
+            var indexed = new HashSet<int>((await _store.GetChatEmbeddingsAsync().ConfigureAwait(false)).Where(e => e.Model == model)
+                .Select(e => e.MessageId));
             List<ChatSearchMessage> pending = messages.Where(m => !indexed.Contains(m.Id)).ToList();
             int done = messages.Count - pending.Count;
             progress?.Invoke(done, messages.Count);
@@ -240,7 +240,7 @@ namespace Emgu.LiteRT.LM.Chat
             }
             cancel.ThrowIfCancellationRequested();
             List<ChatSearchHit> found = matches.GroupBy(e => e.MessageId).Select(g => g.First()).Take(5).ToList();
-            HashSet<int> existing = (await _store.GetChatIdsAsync().ConfigureAwait(false)).ToHashSet();
+            var existing = new HashSet<int>(await _store.GetChatIdsAsync().ConfigureAwait(false));
             found.RemoveAll(e => !existing.Contains(e.ConversationId));
             return found;
         }

@@ -109,7 +109,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
             Mcp = new McpFeature(),
             VoiceMode = new VoiceModeFeature(),
             Transcripts = new TranscriptFeature(),
-            Export = new ExportFeature(),
+            Export = new ExportFeature((id, stream, cancel) => ChatExporter.ExportAsync(SharedStore, id, stream, cancel)),
             Storage = new StorageFeature(),
             ModelSettings = new ModelSettingsFeature(),
             Tasks = new TaskFeature(),
