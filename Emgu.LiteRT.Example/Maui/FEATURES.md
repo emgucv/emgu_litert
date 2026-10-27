@@ -469,9 +469,10 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Device actions
 
-- The agent gets `AgentTools.DeviceActions` - timers, alarms, calendar events, reminders and directions (`DeviceActions.cs`,
-  `DeviceActionsFeature.cs`, TODO item 24) - except in the voice chat. Each call shows a card above the reply with Confirm
-  and Cancel.
+- The agent gets `AgentTools.DeviceActions` - timers, alarms, calendar events, reminders and directions (the library's
+  `DeviceActionsFeature` and `DeviceActions` in `Emgu.LiteRT.LM.Maui` since phase C, 2026-10-26, with the group's constants
+  in `Emgu.LiteRT.LM.Chat`'s `ChatDeviceActions`; TODO item 24) - except in the voice chat. Each call shows a card above the
+  reply with Confirm and Cancel.
 - A cancelled action returns `DeviceActionCancelled`, which starts "CANCELLED - NOT done": with a gentler text, Gemma 4 E2B
   told the user the alarm was set.
 - Android does timers and alarms through `AlarmClock` intents (`EXTRA_SKIP_UI`; alarms within 24 hours), events through the

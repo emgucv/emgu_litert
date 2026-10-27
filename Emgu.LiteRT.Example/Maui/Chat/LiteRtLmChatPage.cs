@@ -459,7 +459,7 @@ public sealed class LiteRtLmChatPage : ChatPage, IDemoHost
     // The groups in use, for the context estimate before a send (LiteRtLmChatClient counts the real size): the camera
     // group's tools and instructions are ~1,100 tokens, the others ~150-500.
     private static int GroupTokens(IEnumerable<string> active) => active.Sum(name =>
-        name == ChatCamera.GroupName ? 1100 : name == ChatToolGroups.DeviceActions || name == ChatToolGroups.Goals ? 500
+        name == ChatCamera.GroupName ? 1100 : name == ChatDeviceActions.GroupName || name == ChatToolGroups.Goals ? 500
         : name.StartsWith("mcp_", StringComparison.Ordinal) ? 400 : name == ChatCamera.SoundGroupName ? 600 : 200);
 
     // ---------- The model ----------

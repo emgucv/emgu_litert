@@ -6,21 +6,31 @@ using System;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
 
-namespace Maui.Demo.Lite;
+namespace Emgu.LiteRT.LM.Maui;
 
 /// <summary>
 /// What a device action did: the text for the model (AgentTools.DeviceActionDone / DeviceActionFailed) and a short
 /// one for the confirmation card.
 /// </summary>
-internal sealed class DeviceActionOutcome
+public sealed class DeviceActionOutcome
 {
-    public bool Done;
-    public string ForModel;
-    public string ForUser;
+    /// <summary>True when it was done.</summary>
+    public bool Done { get; private set; }
 
+    /// <summary>What the model is told.</summary>
+    public string ForModel { get; private set; }
+
+    /// <summary>What the card says.</summary>
+    public string ForUser { get; private set; }
+
+    /// <summary>An action done.</summary>
+    /// <param name="forModel">What was done, for the model ("the timer is running in the clock app")</param>
+    /// <param name="forUser">What the card says ("Timer started")</param>
     public static DeviceActionOutcome Success(string forModel, string forUser) =>
         new DeviceActionOutcome { Done = true, ForModel = AgentTools.DeviceActionDone(forModel), ForUser = forUser };
 
+    /// <summary>An action that couldn't be done.</summary>
+    /// <param name="reason">Why, in words for the model and the user</param>
     public static DeviceActionOutcome Failure(string reason) =>
         new DeviceActionOutcome { ForModel = AgentTools.DeviceActionFailed(reason), ForUser = "Couldn't: " + reason };
 }
@@ -31,10 +41,11 @@ internal sealed class DeviceActionOutcome
 /// intent (it opens filled in; the user saves there), directions through Google Maps' URL; iOS / Mac Catalyst -
 /// events and reminders saved with EventKit (write-only calendar access, full reminders access), directions in
 /// Apple Maps; Windows - directions in Bing Maps. iOS has no public timer or alarm API, Android no standard
-/// reminders app.
+/// reminders app. <see cref="Features.DeviceActionsFeature"/> offers the tools and asks the user first.
 /// </summary>
-internal static class DeviceActions
+public static class DeviceActions
 {
+    /// <summary>The actions this platform can do.</summary>
     public static DeviceActionKinds Supported
     {
         get
@@ -49,7 +60,8 @@ internal static class DeviceActions
         }
     }
 
-    // Called on the UI thread.
+    /// <summary>Do a confirmed action (on the UI thread); never throws.</summary>
+    /// <param name="request">The action, as the tool read it</param>
     public static async Task<DeviceActionOutcome> PerformAsync(DeviceActionRequest request)
     {
         try
