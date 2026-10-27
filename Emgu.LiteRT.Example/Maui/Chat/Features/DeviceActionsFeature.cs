@@ -3,7 +3,6 @@
 //----------------------------------------------------------------------------
 
 using Emgu.LiteRT.LM.Agents;
-using Emgu.LiteRT.LM.Agents.Mcp;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Maui;
 using Microsoft.Extensions.AI;
@@ -76,7 +75,7 @@ internal sealed class DeviceActionsFeature : DemoFeature
         return MainThread.InvokeOnMainThreadAsync(async () =>
         {
             var choice = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            Card card = Card.Create(request, confirmed => choice.TrySetResult(confirmed));
+            ConfirmationCard card = ConfirmationCard.Create(request, confirmed => choice.TrySetResult(confirmed));
             Host.AddCardToReply(card.View);
             UiStallWatchdog.Mark("Device action: waiting for confirmation of " + request.ToolName);
             Host.SetStatus("Waiting for you to confirm...");
@@ -97,95 +96,5 @@ internal sealed class DeviceActionsFeature : DemoFeature
             Host.SetStatus("Generating...");
             return outcome.ForModel;
         });
-    }
-
-    // The card that asks before an action is done (also the tool servers' confirmation): what will be done, Confirm / Cancel, then the
-    // outcome.
-    internal sealed class Card
-    {
-        public Border View;
-        public HorizontalStackLayout Buttons;
-        public Label Result;
-
-        public void Finish(string text, bool done)
-        {
-            Buttons.IsVisible = false;
-            Result.Text = (done ? "✓ " : "") + text;
-            Result.TextColor = done ? Theme.Success : Theme.SecondaryText;
-            Result.IsVisible = true;
-        }
-
-        private static string Icon(DeviceActionRequest request) => request switch
-        {
-            TimerRequest => "⏲️",
-            AlarmRequest => "⏰",
-            CalendarEventRequest => "\U0001F4C5",
-            ReminderRequest => "✅",
-            McpCallRequest => "\U0001F50C",
-            DirectionsRequest => "\U0001F5FA️",
-            _ => "⚙️"
-        };
-
-        // The card, for above the reply bubble (like the step lines).
-        public static Card Create(DeviceActionRequest request, Action<bool> choose)
-        {
-            Card card = new Card();
-            VerticalStackLayout content = new VerticalStackLayout { Spacing = 4 };
-            content.Children.Add(new Label
-            {
-                Text = Icon(request) + "  " + request.Title,
-                FontFamily = Theme.TitleFont,
-                FontSize = 15,
-                TextColor = Theme.PrimaryText
-            });
-            foreach (string detail in request.Details)
-                content.Children.Add(new Label { Text = detail, FontFamily = Theme.BodyFont, FontSize = 14, TextColor = Theme.PrimaryText });
-
-            Button confirm = new Button
-            {
-                Text = request.ConfirmText,
-                FontFamily = Theme.TitleFont,
-                FontSize = 14,
-                BackgroundColor = Theme.Accent,
-                TextColor = Colors.White,
-                CornerRadius = 12,
-                Padding = new Thickness(16, 6),
-                MinimumHeightRequest = 40
-            };
-            Button cancel = new Button
-            {
-                Text = "Cancel",
-                FontFamily = Theme.TitleFont,
-                FontSize = 14,
-                BackgroundColor = Colors.Transparent,
-                TextColor = Theme.Accent,
-                BorderColor = Theme.Accent,
-                BorderWidth = 1,
-                CornerRadius = 12,
-                Padding = new Thickness(16, 6),
-                MinimumHeightRequest = 40
-            };
-            confirm.Clicked += (s, e) => choose(true);
-            cancel.Clicked += (s, e) => choose(false);
-            card.Buttons = new HorizontalStackLayout { Spacing = 10, Margin = new Thickness(0, 6, 0, 0), Children = { confirm, cancel } };
-            card.Result = new Label { FontFamily = Theme.BodyFont, FontSize = 13, IsVisible = false, Margin = new Thickness(0, 4, 0, 0) };
-            content.Children.Add(card.Buttons);
-            content.Children.Add(card.Result);
-
-            card.View = new Border
-            {
-                BackgroundColor = Theme.CardBackground,
-                Stroke = Theme.RowBorder,
-                StrokeThickness = 1,
-                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) },
-                Padding = new Thickness(14, 12),
-                Margin = new Thickness(6, 2),
-                MaximumWidthRequest = 420,
-                HorizontalOptions = LayoutOptions.Start,
-                Content = content
-            };
-            SemanticProperties.SetDescription(card.View, request.Title + ": " + string.Join(", ", request.Details));
-            return card;
-        }
     }
 }

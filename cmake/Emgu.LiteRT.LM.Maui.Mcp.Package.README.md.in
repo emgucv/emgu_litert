@@ -1,0 +1,18 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Maui.Mcp.dll`: `McpFeature`, a feature of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `ChatPage` for Model Context Protocol tool servers. Its settings section lists the servers the user added - an address (Streamable HTTP or SSE), or on Mac Catalyst and Windows a program to start - with an optional authorization kept in secure storage; the addresses are kept in the page's settings. Each connected server is a tool group of the chat's agent (`${EMGU_LITERT_LM_AGENTS_MCP_NUGET_ID}`'s `McpToolServer`), offered when a message mentions the server or its tools' subject, or when the model asks for it; the user can switch off tools a small model needn't see. A tool the server doesn't mark read-only asks the user first with a card above the reply, unless the user trusts the server. What a server returns is treated as that server's data, never as instructions.
+
+It is kept out of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}` so that package doesn't depend on the MCP SDK.
+
+## Adding it to a chat page
+
+```csharp
+using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Mcp;
+
+options.Features.Add(new McpFeature());
+```
+
+Nothing else: the user adds servers in the settings. What they ask a server and what it returns goes to that server, so the section says to add only servers they trust.

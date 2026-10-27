@@ -8,6 +8,7 @@ using Emgu.LiteRT.LM.Chat.Sqlite;
 using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.LM.Maui.Documents;
+using Emgu.LiteRT.LM.Maui.Mcp;
 using Emgu.LiteRT.LM.Maui.Features;
 using Emgu.LiteRT.LM.Models;
 using Microsoft.Extensions.AI;

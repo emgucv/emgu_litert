@@ -530,7 +530,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Tool servers (MCP)
 
-- Settings > "Tool servers (MCP)" (`McpFeature`, TODO item 28) adds Model Context Protocol servers: an address
+- Settings > "Tool servers (MCP)" (the library's `McpFeature` in `Emgu.LiteRT.LM.Maui.Mcp` since 2026-10-26; TODO item 28) adds Model Context Protocol servers: an address
   (Streamable HTTP or SSE) with an optional authorization header kept in `SecureStorage`, or, on Mac Catalyst and Windows, a
   program started with stdio. It uses the official `ModelContextProtocol.Core` 2.2.0 client (referenced by the demo and the
   test project, not by `Emgu.LiteRT.LM.Agents`).
