@@ -336,7 +336,9 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     `READ_MEDIA_VISUAL_USER_SELECTED`, and `READ_EXTERNAL_STORAGE` up to API 32.
   - iOS and Mac Catalyst: `NSPhotoLibraryUsageDescription` and PhotoKit, local images only.
   - Windows: the `picturesLibrary` capability and the Pictures folder (unbuilt and untested).
-- Indexing, in the background, of the most recent photos (1000 on desktops, 200 on phones; newest first; thumbnails at
+- Indexing, in the background, of the most recent photos (Settings > Search my photos > "Photos to index": 200, 1,000, 5,000 or
+  All, the "photos_to_index" setting since 2026-10-27 - by default 1000 on desktops, 200 on phones, `MaxIndexedPhotos`; a
+  smaller choice removes the older photos from the index; newest first; thumbnails at
   512 px from MediaStore's `LoadThumbnail`, `PHImageManager` or Emgu CV), with the shared search model:
   - At 140 vision tokens per image - EmbeddingGemma 2's default and higher-quality setting (`EmbeddingModel.EmbedImage(...,
     visionTokensPerImage)` chooses). 70 was 2.3 times faster on an M1's CPU (461 vs 1041 ms per photo) with the same 6/6

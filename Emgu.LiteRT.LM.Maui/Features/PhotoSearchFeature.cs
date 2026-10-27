@@ -31,6 +31,12 @@ namespace Emgu.LiteRT.LM.Maui.Features
         /// <summary>The "Index photos only while charging" settings key.</summary>
         public const string ChargingSettingKey = "photos_only_charging";
 
+        /// <summary>The "Photos to index" settings key: how many of the most recent photos, 0 for all; <see cref="MaxIndexedPhotos"/> when unset.</summary>
+        public const string PhotoLimitKey = "photos_to_index";
+
+        /// <summary>The choices of "Photos to index" (0: all the photos).</summary>
+        public static readonly IReadOnlyList<int> PhotoLimitChoices = new[] { 200, 1000, 5000, 0 };
+
         /// <summary>Whether the index was last built with the photos' locations readable (Android: ACCESS_MEDIA_LOCATION); once they are, their details are read again.</summary>
         public const string LocationsIndexedKey = "photo_locations_indexed";
 
@@ -48,8 +54,16 @@ namespace Emgu.LiteRT.LM.Maui.Features
             _search = search ?? throw new ArgumentNullException(nameof(search));
         }
 
-    /// <summary>How many of the most recent photos are indexed (each takes about 1 s on a Mac's CPU and several seconds on a phone's, in the background): 1,000 on a desktop, 200 elsewhere.</summary>
+    /// <summary>How many of the most recent photos are indexed until the user chooses in "Photos to index" (each takes about 1 s on a Mac's CPU and several seconds on a phone's, in the background): 1,000 on a desktop, 200 elsewhere; 0 for all.</summary>
     public int MaxIndexedPhotos { get; set; } = DeviceInfo.Idiom == DeviceIdiom.Desktop ? 1000 : 200;
+
+    // The user's choice in "Photos to index" (0: all), else the default.
+    private int PhotoLimit => Host?.Settings.Get(PhotoLimitKey, MaxIndexedPhotos) ?? MaxIndexedPhotos;
+
+    private static string PhotoLimitName(int limit) => limit <= 0 ? "All" : limit.ToString("N0", CultureInfo.InvariantCulture);
+
+    private readonly List<ToggleChip> _limitChips = new List<ToggleChip>();
+    private bool _updatingLimitChips;
 
     private string _photoPauseReason;
     // Why the last indexing pass stopped (an error), shown with the count until the next pass starts.
@@ -198,9 +212,8 @@ namespace Emgu.LiteRT.LM.Maui.Features
             Children =
             {
                 row,
-                ChatPage.Note(string.Format(CultureInfo.InvariantCulture,
-                    "Lets the assistant find photos by what is in them, and where, when and how they were taken (\"show me beach photos from Spain last summer\"). Your {0} most recent photos are indexed on this device in the background - the first time takes a while - and nothing leaves it: places are looked up in a list of towns in the app (GeoNames, CC BY 4.0). Turning this off deletes the index.",
-                    MaxIndexedPhotos))
+                ChatPage.Note("Lets the assistant find photos by what is in them, and where, when and how they were taken (\"show me beach photos from Spain last summer\"). Your most recent photos (as many as chosen below) are indexed on this device in the background - the first time takes a while - and nothing leaves it: places are looked up in a list of towns in the app (GeoNames, CC BY 4.0). Turning this off deletes the index."),
+                BuildPhotoLimitChoice()
             }
         };
         View notice = _search.CreateDownloadNotice?.Invoke();
@@ -267,6 +280,61 @@ namespace Emgu.LiteRT.LM.Maui.Features
             await _photoIndex.ClearAsync();
             UpdateStatus();
         }
+    }
+
+    // "Photos to index": chips acting as one choice (tapping the chosen one keeps it).
+    private View BuildPhotoLimitChoice()
+    {
+        var title = new Label { Text = "Photos to index" };
+        ChatResources.ApplyStyle(title, "ChatSectionTextStyle");
+        var chips = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
+        _limitChips.Clear();
+        foreach (int choice in PhotoLimitChoices)
+        {
+            int value = choice;
+            var chip = new ToggleChip(PhotoLimitName(value)) { Margin = new Thickness(0, 0, 6, 6) };
+            SemanticProperties.SetDescription(chip, value <= 0 ? "Index all your photos" : "Index your " + PhotoLimitName(value) + " most recent photos");
+            chip.Toggled += (_, e) => OnPhotoLimitToggled(value, e.Value);
+            _limitChips.Add(chip);
+            chips.Children.Add(chip);
+        }
+        SetLimitChips();
+        return new VerticalStackLayout
+        {
+            Spacing = 4,
+            Children =
+            {
+                title,
+                chips,
+                ChatPage.Note("A photo takes about a second on a computer and several on a phone, so All can take hours the first time on a phone with many photos; indexing goes on in the background while the chat is open, and only new photos after that. Fewer removes the older photos from the index.")
+            }
+        };
+    }
+
+    private void SetLimitChips()
+    {
+        _updatingLimitChips = true;
+        int limit = PhotoLimit;
+        // A limit that isn't one of the chips (an app's own MaxIndexedPhotos) shows none chosen.
+        for (int i = 0; i < _limitChips.Count; i++)
+            _limitChips[i].IsToggled = PhotoLimitChoices[i] == limit || (PhotoLimitChoices[i] == 0 && limit < 0);
+        _updatingLimitChips = false;
+    }
+
+    private void OnPhotoLimitToggled(int value, bool on)
+    {
+        if (_updatingLimitChips)
+            return;
+        if (!on || value == PhotoLimit)
+        {
+            SetLimitChips();
+            return;
+        }
+        Host.Settings.Set(PhotoLimitKey, value);
+        SetLimitChips();
+        // More photos are indexed, or the ones over the new limit removed, by a pass started now.
+        if (On && _visible)
+            RestartIndexing();
     }
 
     // The note and button for the photo locations: while the search is on and they can't be read.
@@ -339,7 +407,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
             await _photoIndex.IndexAsync(embedder, (image, token) => _search.Workload.RunEmbeddingAsync(Embedder,
                 () => embedder.EmbedImage(image, visionTokensPerImage: PhotoIndex.VisionTokens),
                 reason => MainThread.BeginInvokeOnMainThread(() => { _photoPauseReason = reason; UpdateStatus(); }),
-                token, _onlyWhileCharging), MaxIndexedPhotos, () => Host.IsReplying, cancel, WaitForPhotoWorkAsync, refreshDetails);
+                token, _onlyWhileCharging), PhotoLimit <= 0 ? int.MaxValue : PhotoLimit, () => Host.IsReplying, cancel, WaitForPhotoWorkAsync, refreshDetails);
             // The index now has the details as they can be read (with or without the locations).
             await MainThread.InvokeOnMainThreadAsync(() => Host.Settings.Set(LocationsIndexedKey, locations));
         }
