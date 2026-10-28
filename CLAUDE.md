@@ -45,7 +45,7 @@ Native libraries first, then the .NET projects: packages only include the native
 | Android | `platforms/android/bazel_build_tflite_android <arm64\|x86_64\|arm\|x86>` with `ANDROID_HOME` set | (the MAUI projects) |
 | Ubuntu / Debian ARM | `platforms/ubuntu/24.04/bazel_build_tflite`, `platforms/debian/{bookworm,trixie}/bazel_build_tflite` | CMake |
 
-The MAUI demo: `dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-<android|ios|maccatalyst|windows10.0.22621.0>`; `Emgu.LiteRT.Example/Maui/tools/deploy_android <serial>` installs and starts it on Android devices (with the models the Mac has), `tools/run_catalyst` runs the Catalyst build ad hoc. Step by step in `Emgu.LiteRT.Example/Maui/README.md`.
+The MAUI demo: `dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-<android|ios|maccatalyst|windows10.0.22621.0>`; `Emgu.LiteRT.Example/Maui/tools/deploy_android <serial>` installs and starts it on Android devices (with the models the Mac has), `tools/run_catalyst` builds, re-signs and runs the Catalyst build - with the identity of the gitignored `MacCatalyst.Signing.props` when it is in the keychain, so saved API keys survive rebuilds, else ad hoc. Step by step in `Emgu.LiteRT.Example/Maui/README.md`.
 
 Pitfalls:
 - Re-run CMake (`build_emgutf`, `build_emgu_litert.ps1`, or `cmake .` in `build/`) after pulling a new project or switching .NET SDKs: it generates each project's `Directory.Build.props` (the target framework). Without it: NU1201 "does not support any target frameworks".

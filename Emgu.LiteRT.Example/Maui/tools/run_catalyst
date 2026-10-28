@@ -1,37 +1,65 @@
 #!/bin/bash
-# Build the Mac Catalyst demo without a provisioning profile, make it launchable and start it.
+# Build the Mac Catalyst demo, make it launchable and start it.
 #
-# The default build signs with the team's identity and a provisioning profile (for the keychain entitlement); when that
-# identity has expired ("MacCatalyst code signing key ... not found in keychain") use this instead. It signs ad hoc with an
-# empty entitlements file, so the API keys are kept for the session only (see the csproj). On macOS 27 such an app was killed
-# at launch ("Code Signature Invalid", in dyld, while mapping a dependent library): the universal libLiteRt.dylib /
-# liblitert-lm.dylib in MonoBundle - their x86_64 slices are no longer valid after the SDK's install_name_tool step - so
-# this script copies the app to a folder on the internal disk, keeps only the arm64 slice of every universal dylib and
-# signs each dylib and the app ad hoc again.
+# With the gitignored MacCatalyst.Signing.props beside the csproj (CodesignKey, CodesignProvision) and its identity in the
+# keychain, the app is signed with that identity and keeps the provisioning profile's keychain entitlement, so the API keys
+# the app saves (Tavily, Twelve Data) stay in the keychain from one build to the next. Without them - or with ADHOC=1 - it
+# is signed ad hoc with an empty entitlements file, and the API keys are kept for the session only (see the csproj).
+#
+# On macOS 27 a build was once killed at launch ("Code Signature Invalid", in dyld, while mapping a dependent library): the
+# universal libLiteRt.dylib / liblitert-lm.dylib in MonoBundle - their x86_64 slices are no longer valid after the SDK's
+# install_name_tool step. So either way the app is copied to a folder on the internal disk, every universal dylib keeps only
+# its arm64 slice, and each dylib and the app are signed again (with the identity, the app's entitlements kept; or ad hoc).
 #
 #   run_catalyst [destination folder] [ENV=value ...]     (the app is started with the environment given, e.g. EMGU_LM_SELFTEST=1)
+#   ADHOC=1 run_catalyst ...                              (sign ad hoc even with signing settings)
 set -e
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../../.." && pwd)"
 dest="${1:-$HOME/emgu_litert_catalyst}"
 shift || true
-entitlements="$(mktemp -d)/empty.entitlements.plist"
-printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict/></plist>\n' > "$entitlements"
 cd "$root"
-dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false \
-    -p:CodesignKey=- -p:CodesignProvision= -p:CodesignEntitlements="$entitlements"
+
+# The signing identity of MacCatalyst.Signing.props, if it is in the keychain.
+identity=""
+props="$root/Emgu.LiteRT.Example/Maui/MacCatalyst.Signing.props"
+if [ -z "$ADHOC" ] && [ -f "$props" ]; then
+    key="$(sed -n 's/.*<CodesignKey[^>]*>\(.*\)<\/CodesignKey>.*/\1/p' "$props" | head -1)"
+    if [ -n "$key" ] && security find-identity -v -p codesigning | grep -qF "\"$key\""; then
+        identity="$key"
+    else
+        echo "Signing identity '$key' isn't in the keychain: signing ad hoc (API keys for this session only)."
+    fi
+fi
+
+if [ -n "$identity" ]; then
+    echo "Signing with $identity (API keys kept in the keychain)."
+    dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false
+else
+    entitlements="$(mktemp -d)/empty.entitlements.plist"
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict/></plist>\n' > "$entitlements"
+    dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false \
+        -p:CodesignKey=- -p:CodesignProvision= -p:CodesignEntitlements="$entitlements"
+fi
 src="$root/Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/Emgu LiteRT.app"
 app="$dest/Emgu LiteRT.app"
 mkdir -p "$dest"
 [ -e "$app" ] && mv "$app" "$app.old.$$" && rm -rf "$app.old.$$"
 ditto "$src" "$app"
+sign="-"
+[ -n "$identity" ] && sign="$identity"
 for f in "$app"/Contents/MonoBundle/*.dylib; do
     if lipo -info "$f" 2>/dev/null | grep -q "Architectures in the fat file"; then
         lipo "$f" -thin arm64 -output "$f.thin" && mv "$f.thin" "$f"
     fi
-    codesign --force -s - "$f" > /dev/null
+    codesign --force --timestamp=none -s "$sign" "$f" > /dev/null
 done
-codesign --force --deep -s - "$app" > /dev/null
+if [ -n "$identity" ]; then
+    # The app's entitlements (the keychain group) and its embedded provisioning profile are kept.
+    codesign --force --timestamp=none -s "$identity" --preserve-metadata=entitlements,requirements,flags "$app" > /dev/null
+else
+    codesign --force --deep -s - "$app" > /dev/null
+fi
 codesign --verify --deep --strict "$app"
 echo "Starting $app"
 # Started directly (not with `open`), so that the environment reaches the app.
