@@ -47,6 +47,22 @@ public class UnitTestStocks
     }
 
     [Test]
+    public void TodaysPriceSoFarIsNotTakenForYesterdaysClose()
+    {
+        using JsonDocument series = JsonDocument.Parse(@"{""meta"":{""symbol"":""INTC"",""interval"":""1day"",""currency"":""USD""},""values"":[
+            {""datetime"":""2026-10-28"",""close"":""93.49"",""high"":""94"",""low"":""93""},
+            {""datetime"":""2026-10-27"",""close"":""93.74"",""high"":""94"",""low"":""92""},
+            {""datetime"":""2026-10-26"",""close"":""93.70"",""high"":""94"",""low"":""92""}],""status"":""ok""}");
+        string text = AgentTools.FormatStockHistory(series.RootElement, "the past week", new DateTime(2026, 10, 28));
+        Assert.That(text, Does.Contain("93.49 USD (2026-10-28) is today's price so far - the day isn't over."));
+        Assert.That(text, Does.Contain("The last full day's close: 93.74 USD (2026-10-27, yesterday)."));
+        string tomorrow = AgentTools.FormatStockHistory(series.RootElement, "the past week", new DateTime(2026, 10, 29));
+        Assert.That(tomorrow, Does.Not.Contain("so far"));
+        Assert.That(tomorrow, Does.Contain("The last full day's close: 93.49 USD (2026-10-28, yesterday)."));
+        Assert.That(AgentTools.FormatStockHistory(series.RootElement, "the past week"), Does.Not.Contain("last full day"), "without today");
+    }
+
+    [Test]
     public void AnEmptyHistorySaysSo()
     {
         using JsonDocument series = JsonDocument.Parse(@"{""meta"":{""symbol"":""AAPL""},""values"":[],""status"":""ok""}");
@@ -128,5 +144,42 @@ public class UnitTestStocks
         Assert.That(AgentTools.BestStockListing(found.RootElement, "0r2v"), Is.EqualTo("0R2V"), "a ticker that matches comes first");
         using JsonDocument none = JsonDocument.Parse(@"{""data"":[],""status"":""ok""}");
         Assert.That(AgentTools.BestStockListing(none.RootElement, "nothing"), Is.Null);
+    }
+
+    // Twelve Data's search for "Intel" on 2026-10-28 (shortened): no INTC, and the only US listing another company's.
+    private const string IntelSearch = @"{""data"":[
+        {""symbol"":""INTELLECT"",""instrument_name"":""Intellect Design Arena Ltd."",""exchange"":""NSE"",""instrument_type"":""Common Stock"",""country"":""India""},
+        {""symbol"":""INTEL01"",""instrument_name"":""Intel Corporation ADR"",""exchange"":""SET"",""instrument_type"":""Depositary Receipt"",""country"":""Thailand""},
+        {""symbol"":""4INTC"",""instrument_name"":""INTEL"",""exchange"":""MTA"",""instrument_type"":""Common Stock"",""country"":""Italy""},
+        {""symbol"":""AIMV"",""instrument_name"":""AI Maverick Intel Inc."",""exchange"":""OTC"",""instrument_type"":""Common Stock"",""country"":""United States""}],
+        ""status"":""ok""}";
+
+    // ... and for "Ford": FORD is Forward Industries, and Ford Motor's US listing (F) isn't among them.
+    private const string FordSearch = @"{""data"":[
+        {""symbol"":""FORD"",""instrument_name"":""Forward Industries Inc."",""exchange"":""NASDAQ"",""instrument_type"":""Common Stock"",""country"":""United States""},
+        {""symbol"":""FORD"",""instrument_name"":""Ford Motor Co."",""exchange"":""VSE"",""instrument_type"":""Common Stock"",""country"":""Austria""},
+        {""symbol"":""FORDX"",""instrument_name"":""Fidelity International Growth Fund"",""exchange"":""NASDAQ"",""instrument_type"":""Mutual Fund"",""country"":""United States""},
+        {""symbol"":""FOVSY"",""instrument_name"":""Ford Otomotiv Sanayi A.S."",""exchange"":""OTC"",""instrument_type"":""American Depositary Receipt"",""country"":""United States""}],
+        ""status"":""ok""}";
+
+    [Test]
+    public void AnotherCompanysListingIsNeverTaken()
+    {
+        using JsonDocument intel = JsonDocument.Parse(IntelSearch);
+        Assert.That(AgentTools.BestStockListing(intel.RootElement, "Intel", listedOnly: true), Is.Null,
+            "no US exchange listing is named Intel: search again (\"Intel Corp\" finds INTC)");
+        Assert.That(AgentTools.BestStockListing(intel.RootElement, "Intel"), Is.EqualTo("4INTC"),
+            "else Intel's own stock elsewhere - not AI Maverick Intel, nor Intellect");
+
+        using JsonDocument ford = JsonDocument.Parse(FordSearch);
+        Assert.That(AgentTools.BestStockListing(ford.RootElement, "Ford", listedOnly: true), Is.Null, "\"Ford\" is a name, not Forward's ticker");
+        Assert.That(AgentTools.BestStockListing(ford.RootElement, "FORD", listedOnly: true), Is.EqualTo("FORD"), "written as a ticker");
+        Assert.That(AgentTools.BestStockListing(ford.RootElement, "Ford"), Is.EqualTo("FOVSY"), "a US listing of a company named Ford, as a last resort");
+
+        using JsonDocument intelCorp = JsonDocument.Parse(@"{""data"":[
+            {""symbol"":""0R24"",""instrument_name"":""Intel Corporation"",""exchange"":""LSE"",""instrument_type"":""Common Stock"",""country"":""United Kingdom""},
+            {""symbol"":""INTC"",""instrument_name"":""Intel Corporation"",""exchange"":""NASDAQ"",""instrument_type"":""Common Stock"",""country"":""United States""}],
+            ""status"":""ok""}");
+        Assert.That(AgentTools.BestStockListing(intelCorp.RootElement, "Intel", listedOnly: true), Is.EqualTo("INTC"));
     }
 }

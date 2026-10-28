@@ -185,14 +185,14 @@ public sealed class TaskFeature : ChatFeature
             }
             Host.SetStatus(_research ? "Planning the research..." : "Planning...");
             List<string> steps = _research
-                ? TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.ResearchPlanPrompt(_request), 400), TaskPlan.MaxResearchSteps)
+                ? TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.ResearchPlanPrompt(_request, ToolNames(options)), 400), TaskPlan.MaxResearchSteps)
                 : TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary), 400));
             bool run = false;
             TaskPlan plan = null;
             TaskCard card = null;
             if (steps.Count >= 2 || (_research && steps.Count >= 1))
             {
-                plan = new TaskPlan(steps, _research);
+                plan = new TaskPlan(steps, _research) { ToolNames = ToolNames(options) };
                 _feature._taskPlan = plan;
                 var decision = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _feature._taskDecision = decision;
@@ -249,6 +249,7 @@ public sealed class TaskFeature : ChatFeature
                 var callNames = new Dictionary<string, string>();
                 var searchPages = new List<(string Title, string Url)>();
                 var readPages = new List<string>();
+                var toolSources = new List<(string Title, string Url)>();
                 int toolCalls = 0;
                 bool capped = false;
                 IAsyncEnumerator<ChatResponseUpdate> stream = client.GetStreamingResponseAsync(stepMessages, options, stepStop.Token).GetAsyncEnumerator(stepStop.Token);
@@ -293,6 +294,8 @@ public sealed class TaskFeature : ChatFeature
                                 callNames[call.CallId ?? string.Empty] = call.Name;
                                 if (call.Name == "read_web_page" && call.Arguments != null && call.Arguments.TryGetValue("url", out object url) && url != null)
                                     readPages.Add(url.ToString());
+                                if (TaskPlan.ToolSource(call.Name) is (string Title, string Url) source && !toolSources.Contains(source))
+                                    toolSources.Add(source);
                                 if (++toolCalls > TaskPlan.MaxResearchToolCalls)
                                     stepStop.Cancel();
                             }
@@ -320,7 +323,8 @@ public sealed class TaskFeature : ChatFeature
                     var pages = readPages.Count > 0
                         ? readPages.Select(u => (searchPages.FirstOrDefault(p => string.Equals(p.Url, u, StringComparison.OrdinalIgnoreCase)).Title, u))
                         : searchPages.Take(2);
-                    plan.AddSources(step, pages.ToList());
+                    // A tool's own source (Twelve Data...) first: it answered without a page.
+                    plan.AddSources(step, toolSources.Concat(pages).ToList());
                 }
                 await MainThread.InvokeOnMainThreadAsync(card.Refresh);
             }
@@ -406,6 +410,9 @@ public sealed class TaskFeature : ChatFeature
                 return false;
             }
         }
+
+        private static List<string> ToolNames(ChatOptions options) =>
+            options?.Tools?.Select(t => t.Name).ToList() ?? new List<string>();
 
         private static ChatOptions CloneWithoutTools(ChatOptions options)
         {

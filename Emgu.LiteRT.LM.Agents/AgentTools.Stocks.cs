@@ -39,7 +39,7 @@ namespace Emgu.LiteRT.LM.Agents
             string key = CheckTwelveDataKey(apiKey);
             HttpClient client = http ?? DefaultHttpClient;
             return AIFunctionFactory.Create(
-                ([Description("The stock's ticker symbol (e.g. AAPL, MSFT, SHOP:TSX) or the company's name")] string symbol, CancellationToken cancellationToken) =>
+                ([Description("The stock's ticker symbol - give the ticker when you know it (e.g. INTC for Intel, MSFT for Microsoft, SHOP:TSX) - or else the company's name")] string symbol, CancellationToken cancellationToken) =>
                     StockQuoteAsync(client, key, symbol, chart, cancellationToken),
                 "get_stock_quote",
                 "Gets the latest price of a stock or ETF, with its change since the previous close, the day's range and the 52-week range. Use it for questions about a stock price or how a stock is doing today.");
@@ -57,7 +57,7 @@ namespace Emgu.LiteRT.LM.Agents
             string key = CheckTwelveDataKey(apiKey);
             HttpClient client = http ?? DefaultHttpClient;
             return AIFunctionFactory.Create(
-                ([Description("The stock's ticker symbol (e.g. AAPL, MSFT) or the company's name")] string symbol,
+                ([Description("The stock's ticker symbol - give the ticker when you know it (e.g. INTC for Intel, MSFT for Microsoft) - or else the company's name")] string symbol,
                  [Description("The period: \"1 week\", \"1 month\", \"3 months\", \"6 months\", \"1 year\", \"5 years\", \"10 years\" or \"year to date\"")] string period,
                  CancellationToken cancellationToken) => StockHistoryAsync(client, key, symbol, period, DateTime.Today, chart, cancellationToken),
                 "get_stock_history",
@@ -200,46 +200,83 @@ namespace Emgu.LiteRT.LM.Agents
                 StockChart plotted = chart != null ? HistoryChart(series.RootElement, range.Name) : null;
                 if (plotted != null)
                     chart(plotted);
-                return FormatStockHistory(series.RootElement, range.Name);
+                return FormatStockHistory(series.RootElement, range.Name, today);
             }
         }
 
-        // A ticker as given, or the best listing for a company name (a US listing first, as most questions mean those).
+        // A ticker as given, or the best listing for a company name. Twelve Data's search by a bare name often misses the
+        // company's main listing ("Intel" finds Intel's Thai receipts and an OTC "AI Maverick Intel", not INTC; "Intel Corp"
+        // finds INTC), so a name without a US listing is searched again with " Inc" and " Corp" before a listing elsewhere is
+        // taken - and a listing whose name doesn't start with the name asked for never is.
         private static async Task<(string Symbol, string Error)> ResolveStockSymbolAsync(HttpClient http, string key, string symbol, CancellationToken cancellationToken)
         {
             string text = (symbol ?? string.Empty).Trim();
             if (text.Length == 0)
                 return (null, "No stock was named.");
-            if (TickerPattern.IsMatch(text) && (text == text.ToUpperInvariant() || text.Length <= 4))
-                return (text.ToUpperInvariant(), null);
-            using (JsonDocument found = await GetTwelveDataAsync(http, key, "symbol_search?outputsize=10&symbol=" + Uri.EscapeDataString(text), cancellationToken).ConfigureAwait(false))
+            if (TickerPattern.IsMatch(text) && text == text.ToUpperInvariant())
+                return (text, null);
+            string elsewhere = null;
+            foreach (string query in new[] { text, text + " Inc", text + " Corp" })
             {
-                string failed = TwelveDataError(found.RootElement, text);
-                if (failed != null)
-                    return (null, failed);
-                string best = BestStockListing(found.RootElement, text);
-                return best != null ? (best, null) : (null, "No stock found for \"" + text + "\". Ask the user for its ticker symbol.");
+                using (JsonDocument found = await GetTwelveDataAsync(http, key, "symbol_search?outputsize=10&symbol=" + Uri.EscapeDataString(query), cancellationToken).ConfigureAwait(false))
+                {
+                    string failed = TwelveDataError(found.RootElement, text);
+                    if (failed != null)
+                        return (null, failed);
+                    string listed = BestStockListing(found.RootElement, text, listedOnly: true);
+                    if (listed != null)
+                        return (listed, null);
+                    elsewhere = elsewhere ?? BestStockListing(found.RootElement, text);
+                }
             }
+            return elsewhere != null ? (elsewhere, null)
+                : (null, "No stock found for \"" + text + "\". Call the tool again with its ticker symbol if you know it, or ask the user for it.");
         }
 
-        /// <summary>The best listing in a Twelve Data symbol_search response: a ticker matching the query, then a US stock or ETF, then the first.</summary>
+        /// <summary>
+        /// The best listing in a Twelve Data symbol_search response. Of the listings whose name starts with the query (a
+        /// company's name), a stock or ETF on a US exchange (NASDAQ, NYSE...) comes first - unless the query is written as a
+        /// ticker (upper case, or with digits), when the listing with that ticker does. Unless <paramref name="listedOnly"/>,
+        /// then: one over the counter in the US, a stock elsewhere, any of them, and last a listing with the query as its
+        /// ticker in another case.
+        /// </summary>
         /// <param name="response">The response's root element</param>
-        /// <param name="query">What was searched for</param>
+        /// <param name="query">What was asked for: a ticker or a company's name</param>
+        /// <param name="listedOnly">True for only a ticker as written or a listing on a US exchange</param>
         /// <returns>The symbol, or null when there was none</returns>
-        public static string BestStockListing(JsonElement response, string query)
+        public static string BestStockListing(JsonElement response, string query, bool listedOnly = false)
         {
             if (!response.TryGetProperty("data", out JsonElement data) || data.ValueKind != JsonValueKind.Array)
                 return null;
+            string asked = (query ?? string.Empty).Trim();
             var listings = data.EnumerateArray().Select(d => (
-                Symbol: Text(d, "symbol"), Type: Text(d, "instrument_type") ?? string.Empty, Country: Text(d, "country") ?? string.Empty))
+                Symbol: Text(d, "symbol"), Name: Text(d, "instrument_name") ?? string.Empty, Exchange: Text(d, "exchange") ?? string.Empty,
+                Type: Text(d, "instrument_type") ?? string.Empty, Country: Text(d, "country") ?? string.Empty))
                 .Where(l => !string.IsNullOrEmpty(l.Symbol)).ToList();
-            if (listings.Count == 0)
-                return null;
-            var exact = listings.FirstOrDefault(l => string.Equals(l.Symbol, query?.Trim(), StringComparison.OrdinalIgnoreCase));
-            if (exact.Symbol != null)
+            var exact = listings.FirstOrDefault(l => string.Equals(l.Symbol, asked, StringComparison.OrdinalIgnoreCase));
+            // "AAPL" or "0r2v" is a ticker; "Ford" is a name, though FORD is Forward Industries' ticker.
+            if (exact.Symbol != null && (asked == asked.ToUpperInvariant() || asked.Any(char.IsDigit)))
                 return exact.Symbol;
-            var us = listings.FirstOrDefault(l => l.Country == "United States" && (l.Type == "Common Stock" || l.Type == "ETF"));
-            return us.Symbol ?? listings[0].Symbol;
+            var named = listings.Where(l => NameStartsWith(l.Name, asked) && l.Type != "Warrant" && l.Type != "Mutual Fund").ToList();
+            var us = named.Where(l => l.Country == "United States").ToList();
+            var listed = us.FirstOrDefault(l => l.Exchange != "OTC" && (l.Type == "Common Stock" || l.Type == "ETF"));
+            if (listed.Symbol != null)
+                return listed.Symbol;
+            if (listedOnly)
+                return null;
+            if (us.Count > 0)
+                return us[0].Symbol;
+            var stock = named.FirstOrDefault(l => l.Type == "Common Stock");
+            return stock.Symbol ?? (named.Count > 0 ? named[0].Symbol : exact.Symbol);
+        }
+
+        // Whether a listing's name starts with the name asked for, as whole words: "Intel Corporation" and "INTEL" for "Intel",
+        // "Amazon.com Inc." for "Amazon"; not "Intellect Design Arena" nor "AI Maverick Intel".
+        private static bool NameStartsWith(string name, string asked)
+        {
+            if (asked.Length == 0 || !name.StartsWith(asked, StringComparison.OrdinalIgnoreCase))
+                return false;
+            return name.Length == asked.Length || !char.IsLetterOrDigit(name[asked.Length]);
         }
 
         /// <summary>A Twelve Data quote, in words for the model.</summary>
@@ -270,7 +307,8 @@ namespace Emgu.LiteRT.LM.Agents
         /// <summary>A Twelve Data time series, in words for the model: the change over the period, its high and low, and some of the closes.</summary>
         /// <param name="series">The /time_series response's root element</param>
         /// <param name="periodName">The period in words ("the past year")</param>
-        public static string FormatStockHistory(JsonElement series, string periodName)
+        /// <param name="today">Today, to tell daily bars' today's price so far from the last full day's close; or null</param>
+        public static string FormatStockHistory(JsonElement series, string periodName, DateTime? today = null)
         {
             if (!series.TryGetProperty("values", out JsonElement values) || values.ValueKind != JsonValueKind.Array || values.GetArrayLength() == 0)
                 return "No prices found for " + periodName + ".";
@@ -301,7 +339,21 @@ namespace Emgu.LiteRT.LM.Agents
             // Some closes along the way, evenly spread, the first and the last included.
             int listed = Math.Min(MaxListedCloses, bars.Count);
             var picks = Enumerable.Range(0, listed).Select(i => bars[listed == 1 ? 0 : (int)Math.Round(i * (bars.Count - 1) / (double)(listed - 1))]).Distinct();
-            text.Append(" Closes: ").Append(string.Join("; ", picks.Select(b => b.Date + " " + Money(b.Close)))).Append(". (Twelve Data.)");
+            text.Append(" Closes: ").Append(string.Join("; ", picks.Select(b => b.Date + " " + Money(b.Close)))).Append(".");
+            // Daily bars include today's while the market is open: a model asked for yesterday's close took that one ("to
+            // 93.49 (2026-10-28)") on 28 October - so say which is today's and which is the last full day's close.
+            if (today.HasValue && bar.Length == 0 && interval != null && interval.EndsWith("day", StringComparison.Ordinal))
+            {
+                string todayText = today.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                string yesterdayText = today.Value.AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                Func<string, string> named = date => date.StartsWith(yesterdayText, StringComparison.Ordinal) ? date + ", yesterday" : date;
+                int closed = last.Date.StartsWith(todayText, StringComparison.Ordinal) ? bars.Count - 2 : bars.Count - 1;
+                if (closed < bars.Count - 1)
+                    text.Append(" ").Append(Money(last.Close)).Append(unit).Append(" (").Append(last.Date).Append(") is today's price so far - the day isn't over.");
+                if (closed >= 0)
+                    text.Append(" The last full day's close: ").Append(Money(bars[closed].Close)).Append(unit).Append(" (").Append(named(bars[closed].Date)).Append(").");
+            }
+            text.Append(" (Twelve Data.)");
             return text.ToString();
         }
 

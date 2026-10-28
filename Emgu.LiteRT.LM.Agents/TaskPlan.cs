@@ -84,16 +84,50 @@ public sealed class TaskPlan
 
     private static readonly Regex SearchResultPage = new Regex(@"^Page: (?<title>.*) \((?<url>https?://[^\s)]+)\)\s*$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
 
+    /// <summary>
+    /// The source a tool that isn't a web page answered from, for the sources list: Twelve Data for the stock tools,
+    /// Open-Meteo for the weather, Frankfurter for exchange rates; null for others.
+    /// </summary>
+    public static (string Title, string Url)? ToolSource(string tool)
+    {
+        switch (tool)
+        {
+            case "get_stock_quote":
+            case "get_stock_history":
+                return ("Twelve Data (stock prices)", "https://twelvedata.com");
+            case "get_weather":
+                return ("Open-Meteo (weather)", "https://open-meteo.com");
+            case "convert_currency":
+                return ("Frankfurter (exchange rates)", "https://www.frankfurter.app");
+            default:
+                return null;
+        }
+    }
+
     /// <summary>The pages a search_web result lists ("Page: title (address)" lines), in its order.</summary>
     public static List<(string Title, string Url)> SearchResultPages(string result) =>
         SearchResultPage.Matches(result ?? string.Empty).Cast<Match>().Select(m => (m.Groups["title"].Value, m.Groups["url"].Value)).ToList();
 
+    /// <summary>The names of the tools the research's requests have (set from the message's options), for the prompts' hints.</summary>
+    public IReadOnlyCollection<string> ToolNames { get; set; } = new string[0];
+
+    private bool Has(string tool) => ToolNames.Contains(tool);
+
     /// <summary>What the model is asked to break a question into sub-questions to research.</summary>
-    public static string ResearchPlanPrompt(string question) =>
-        "You plan web research. Break the question below into 3 to " + MaxResearchSteps + " sub-questions - 4 is usually right - " +
-        "each one that a web search and reading one page can answer, together covering what the question needs (for a " +
-        "comparison: each item's specifications, then price and availability, then what reviews say). Write them in the " +
-        "language of the question. Reply with only the numbered list, one line per sub-question, nothing else.\n\nQuestion: " + question;
+    /// <param name="question">The user's question</param>
+    /// <param name="toolNames">The tools the research will have, or null</param>
+    public static string ResearchPlanPrompt(string question, IEnumerable<string> toolNames = null)
+    {
+        var tools = new HashSet<string>(toolNames ?? Enumerable.Empty<string>());
+        string direct = tools.Contains("get_stock_quote")
+            ? " Stock prices - today's or a past day's - come straight from a stock tool: one sub-question per stock is enough for them."
+            : string.Empty;
+        return "You plan web research. Break the question below into the facts to find - each sub-question asks for the fact " +
+            "itself (\"What was Intel's closing price yesterday?\"), never how or where to find it - from 1 to " + MaxResearchSteps +
+            ": 1 or 2 for a simple question (one price, one date, one fact), about 4 for a comparison (each item's " +
+            "specifications, then price and availability, then what reviews say)." + direct + " Write them in the language of " +
+            "the question. Reply with only the numbered list, one line per sub-question, nothing else.\n\nQuestion: " + question;
+    }
 
     private static readonly Regex ListLine = new Regex(@"^\s*(?:\d{1,2}\s*[.)]|[-*•])\s+(?<text>\S.*)$", RegexOptions.CultureInvariant);
 
@@ -179,10 +213,18 @@ public sealed class TaskPlan
         for (int i = 0; i < Steps.Count; i++)
             text.AppendLine((i + 1) + ". " + Steps[i].Text + (Steps[i].State == State.Skipped ? " (skipped)" : string.Empty));
         text.AppendLine("Now research part " + (index + 1) + ": " + Steps[index].Text);
-        text.Append("Search the web with search_web (add \"specs\", \"review\" or \"price\" where it fits), then read the most " +
-            "relevant page with read_web_page, saying in lookFor what you need. Use at most 2 searches and 2 page reads. Then reply " +
-            "with only your notes for this part: the facts, numbers and names you found, in at most 8 short sentences, in the " +
-            "language of the question. Write \"not found\" for what the pages don't give; never guess.");
+        // Tools that answer some parts directly, better than a web page.
+        if (Has("get_stock_quote"))
+            text.AppendLine("For a stock's price use get_stock_quote (today) or get_stock_history (a past day or period: for " +
+                "yesterday's close, period \"1 week\" and take that day's close) instead of searching the web.");
+        if (Has("get_weather"))
+            text.AppendLine("For the weather use get_weather instead of searching the web.");
+        if (Has("convert_currency"))
+            text.AppendLine("For exchange rates use convert_currency instead of searching the web.");
+        text.Append("Otherwise search the web with search_web (add \"specs\", \"review\" or \"price\" where it fits), then read " +
+            "the most relevant page with read_web_page, saying in lookFor what you need. Use at most 2 searches and 2 page reads. " +
+            "Then reply with only your notes for this part: the facts, numbers, dates and names you found, in at most 8 short " +
+            "sentences, in the language of the question. Write \"not found\" for what the tools don't give; never guess.");
         return text.ToString();
     }
 

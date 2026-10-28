@@ -89,7 +89,24 @@ public class UnitTestTaskPlan
     {
         string written = string.Join("\n", Enumerable.Range(1, 9).Select(i => i + ". Part " + i));
         Assert.That(TaskPlan.Parse(written, TaskPlan.MaxResearchSteps), Has.Count.EqualTo(6));
-        Assert.That(TaskPlan.ResearchPlanPrompt("Compare A and B"), Does.Contain("Question: Compare A and B").And.Contain("3 to 6"));
+        Assert.That(TaskPlan.ResearchPlanPrompt("Compare A and B"), Does.Contain("Question: Compare A and B").And.Contain("from 1 to 6"));
+        Assert.That(TaskPlan.ResearchPlanPrompt("x"), Does.Contain("never how or where to find it").And.Not.Contain("stock tool"));
+        Assert.That(TaskPlan.ResearchPlanPrompt("x", new[] { "search_web", "get_stock_quote" }), Does.Contain("one sub-question per stock"));
+    }
+
+    [Test]
+    public void ResearchStepsUseTheToolsThatAnswerDirectly()
+    {
+        var plan = new TaskPlan(new[] { "What was Intel's closing price yesterday?" }, research: true);
+        Assert.That(plan.StepPrompt("Intel yesterday", 0), Does.Not.Contain("get_stock_history"), "no stock tools, no hint");
+        plan.ToolNames = new[] { "search_web", "read_web_page", "get_stock_quote", "get_stock_history", "get_weather" };
+        string prompt = plan.StepPrompt("Intel yesterday", 0);
+        Assert.That(prompt, Does.Contain("get_stock_history (a past day or period").And.Contain("get_weather").And.Not.Contain("convert_currency"));
+        Assert.That(prompt, Does.Contain("Otherwise search the web"));
+        Assert.That(TaskPlan.ToolSource("get_stock_history"), Is.EqualTo(("Twelve Data (stock prices)", "https://twelvedata.com")));
+        Assert.That(TaskPlan.ToolSource("search_web"), Is.Null);
+        plan.AddSources(plan.Steps[0], new[] { TaskPlan.ToolSource("get_stock_history").Value });
+        Assert.That(plan.SourcesMarkdown(), Does.Contain("1. [Twelve Data (stock prices)](https://twelvedata.com)"));
     }
 
     [Test]

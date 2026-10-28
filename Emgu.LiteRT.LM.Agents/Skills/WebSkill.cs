@@ -83,7 +83,7 @@ namespace Emgu.LiteRT.LM.Agents.Skills
               + "saying in lookFor what to find; write the comparison as a Markdown table, and write \"not found\" for a detail the pages don't give rather than guess."
             : "General web search is unavailable because no Tavily API key is configured. Wikipedia, reading URLs the user supplies, weather and currency conversion are available without a key. For news or other requests needing general web search, explicitly tell the user: Add a Tavily API key in " + SettingsLocation + ", then retry. Do not merely say you lack internet or real-time access, and do not invent current facts.")
             + (HasStocks
-                ? " For stock prices use get_stock_quote, and for how a stock did over a period get_stock_history; give the numbers they return, with the date."
+                ? " For stock prices use get_stock_quote, and for a past day's price (e.g. yesterday's close, with period \"1 week\") or how a stock did over a period get_stock_history; give the numbers they return, with the date."
                 : " Stock prices need a Twelve Data API key: for a stock price, tell the user to add one in " + SettingsLocation + " (free at twelvedata.com), and do not guess prices."));
 
         /// <inheritdoc/>
