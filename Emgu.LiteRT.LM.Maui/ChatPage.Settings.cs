@@ -67,6 +67,12 @@ namespace Emgu.LiteRT.LM.Maui
         }
 
         // The chips: Think (for models that can think), then the features'.
+        private static IReadOnlyList<ChatChip> FeatureChips(ChatFeature feature)
+        {
+            try { return feature.BuildComposerChips()?.Where(c => c != null).ToList() ?? new List<ChatChip>(); }
+            catch (Exception) { return new List<ChatChip>(); }
+        }
+
         private void BuildChips()
         {
             _featureChips.Clear();
@@ -80,12 +86,8 @@ namespace Emgu.LiteRT.LM.Maui
             SemanticProperties.SetHint(_thinkChip, "Let the model think before it answers");
             chips.Children.Add(_thinkChip);
             foreach (ChatFeature feature in _features)
+            foreach (ChatChip chip in FeatureChips(feature))
             {
-                ChatChip chip;
-                try { chip = feature.BuildComposerChip(); }
-                catch (Exception) { chip = null; }
-                if (chip == null)
-                    continue;
                 var toggle = new ToggleChip(chip.Text) { Margin = new Thickness(0, 0, 6, 6), IsToggled = chip.IsOn() };
                 toggle.Toggled += (s, e) =>
                 {

@@ -22,12 +22,19 @@ namespace Emgu.LiteRT.LM.Maui.Features;
 /// card comes back, closed, when the chat is reopened); the model is given the conversation again with the next message. The chip is this feature's, shown for a model that can use tools and not hands-free; the page runs
 /// the message through the client of <see cref="CreateMessageClient"/> when the chip is on.
 /// </summary>
+/// <para>
+/// Research mode is the same machinery with the "🔎 Research" chip (shown with a Tavily key; it turns web search on): the
+/// question becomes 3 to 6 sub-questions (<see cref="TaskPlan.ResearchPlanPrompt"/>), each one is searched and a page read -
+/// at most <see cref="TaskPlan.MaxResearchToolCalls"/> tool calls - and its notes kept with the pages' addresses as numbered
+/// sources; the answer is written from the notes alone, citing [n], and the sources are listed after it.
+/// </para>
 public sealed class TaskFeature : ChatFeature
 {
     /// <summary>The kind of a reply's saved file that is its plan (JSON: the steps with their state and result, and how it ended).</summary>
     public const string PlanKind = "task_plan";
 
     private bool _planNext;
+    private bool _researchNext;
 
     /// <inheritdoc/>
     public override string Name => "plan";
@@ -43,10 +50,44 @@ public sealed class TaskFeature : ChatFeature
 
     /// <inheritdoc/>
     public override ChatChip BuildComposerChip() =>
-        new ChatChip("\U0001F4CB Plan", () => _planNext, on => _planNext = on)
+        new ChatChip("\U0001F4CB Plan", () => _planNext, on =>
+        {
+            _planNext = on;
+            if (on)
+                _researchNext = false;
+        })
         {
             IsVisible = () => Host?.Model?.CanUseTools == true && Host.HandsFree != true
         };
+
+    /// <summary>The Plan chip and, with a Tavily key, the Research chip (one at a time).</summary>
+    public override IEnumerable<ChatChip> BuildComposerChips()
+    {
+        yield return BuildComposerChip();
+        yield return new ChatChip("\U0001F50E Research", () => _researchNext, on =>
+        {
+            _researchNext = on;
+            if (!on)
+                return;
+            // Research searches the web: web search on, and not the plain plan at the same time.
+            _planNext = false;
+            Host?.Services.Get<WebFeature>()?.TurnOn();
+            Host?.SetStatus("Research: the next message is researched on the web in a few steps, with sources. It can take several minutes.");
+        })
+        {
+            IsVisible = () => Host?.Model?.CanUseTools == true && Host.HandsFree != true && Host.Services.Get<WebFeature>()?.HasSearchKey == true
+        };
+    }
+
+    /// <summary>Whether the message being sent is to be researched (the chip was on); the chip is off again afterwards.</summary>
+    public bool TakeResearch()
+    {
+        if (!_researchNext)
+            return false;
+        _researchNext = false;
+        Host?.RefreshChips();
+        return true;
+    }
 
     /// <summary>Whether the message being sent is to be planned (the chip was on); the chip is off again afterwards.</summary>
     public bool TakePlan()
@@ -75,15 +116,18 @@ public sealed class TaskFeature : ChatFeature
     /// <param name="request">The message, as prepared</param>
     public override IChatClient CreateMessageClient(ChatSendRequest request)
     {
-        if (!TakePlan() || Host?.Model?.CanUseTools != true || Host.HandsFree)
+        bool research = TakeResearch();
+        if (!(TakePlan() || research) || Host?.Model?.CanUseTools != true || Host.HandsFree)
             return null;
-        return CreateClient(request.Text ?? string.Empty, request.Attachments.ToList());
+        return CreateClient(request.Text ?? string.Empty, request.Attachments.ToList(), research);
     }
 
     /// <summary>The chat client of a message to plan and run step by step.</summary>
     /// <param name="request">The message's text</param>
     /// <param name="attachments">Its attachments (given to the first step)</param>
-    public IChatClient CreateClient(string request, IList<DataContent> attachments) => new TaskModeClient(this, request, attachments);
+    /// <param name="research">True for research mode (sub-questions searched on the web, with sources)</param>
+    public IChatClient CreateClient(string request, IList<DataContent> attachments, bool research = false) =>
+        new TaskModeClient(this, request, attachments, research);
 
     // Completed by the card's buttons: true to run the plan, false to just answer. (A test completes it.)
     private TaskCompletionSource<bool> _taskDecision;
@@ -107,12 +151,14 @@ public sealed class TaskFeature : ChatFeature
         private readonly TaskFeature _feature;
         private readonly string _request;
         private readonly IList<DataContent> _attachments;
+        private readonly bool _research;
 
-        public TaskModeClient(TaskFeature feature, string request, IList<DataContent> attachments)
+        public TaskModeClient(TaskFeature feature, string request, IList<DataContent> attachments, bool research)
         {
             _feature = feature;
             _request = request;
             _attachments = attachments;
+            _research = research;
         }
 
         private IChatPageHost Host => _feature.Host;
@@ -130,14 +176,23 @@ public sealed class TaskFeature : ChatFeature
             ChatOptions options = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken token = default)
         {
             IChatClient client = Host.ChatClient;
-            Host.SetStatus("Planning...");
-            List<string> steps = TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary), 400));
+            if (_research && options?.Tools?.Any(t => t.Name == "search_web") != true)
+            {
+                // No web search tool (no key, or web search off): say so rather than research from memory.
+                yield return new ChatResponseUpdate(ChatRole.Assistant,
+                    "Research needs web search: turn on \U0001F50E Web search and add a Tavily API key in the settings, then ask again.");
+                yield break;
+            }
+            Host.SetStatus(_research ? "Planning the research..." : "Planning...");
+            List<string> steps = _research
+                ? TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.ResearchPlanPrompt(_request), 400), TaskPlan.MaxResearchSteps)
+                : TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary), 400));
             bool run = false;
             TaskPlan plan = null;
             TaskCard card = null;
-            if (steps.Count >= 2)
+            if (steps.Count >= 2 || (_research && steps.Count >= 1))
             {
-                plan = new TaskPlan(steps);
+                plan = new TaskPlan(steps, _research);
                 _feature._taskPlan = plan;
                 var decision = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _feature._taskDecision = decision;
@@ -148,7 +203,7 @@ public sealed class TaskFeature : ChatFeature
                     return created;
                 });
                 _feature._taskCard = card;
-                Host.SetStatus("Review the plan, then run it.");
+                Host.SetStatus(_research ? "Review the research plan, then start it." : "Review the plan, then run it.");
                 using (token.Register(() => decision.TrySetCanceled(token)))
                     run = await decision.Task;
                 _feature._taskDecision = null;
@@ -166,6 +221,12 @@ public sealed class TaskFeature : ChatFeature
             using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
             card.Stop = stop.Cancel;
             await MainThread.InvokeOnMainThreadAsync(card.Begin);
+            // Research takes minutes a part on a phone: the screen stays on, or Android freezes the app in the background when
+            // it locks (and may close it - a Pixel Fold did, the research lost).
+            bool keptAwake = _research && await MainThread.InvokeOnMainThreadAsync(KeepScreenOn);
+            try
+            {
+            int toRun = plan.Steps.Count(st => st.State != TaskPlan.State.Skipped), runIndex = 0;
             for (int i = 0; i < plan.Steps.Count && !stop.IsCancellationRequested; i++)
             {
                 TaskPlan.Step step = plan.Steps[i];
@@ -173,7 +234,9 @@ public sealed class TaskFeature : ChatFeature
                     continue;
                 step.State = TaskPlan.State.Running;
                 await MainThread.InvokeOnMainThreadAsync(card.Refresh);
-                Host.SetStatus(string.Format("Step {0} of {1}: {2}", i + 1, plan.Steps.Count, step.Text));
+                runIndex++;
+                // Of the parts that run (skipped ones aren't counted).
+                Host.SetStatus(string.Format(_research ? "Researching {0} of {1}: {2}" : "Step {0} of {1}: {2}", runIndex, Math.Max(toRun, runIndex), step.Text));
                 // A request of its own: the task, the plan and the results so far are in the message.
                 var contents = new List<AIContent>();
                 if (i == 0)
@@ -181,7 +244,14 @@ public sealed class TaskFeature : ChatFeature
                 contents.Add(new TextContent(plan.StepPrompt(_request, i)));
                 var stepMessages = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, contents) };
                 var answer = new System.Text.StringBuilder();
-                IAsyncEnumerator<ChatResponseUpdate> stream = client.GetStreamingResponseAsync(stepMessages, options, stop.Token).GetAsyncEnumerator(stop.Token);
+                // Research: the step's searches and page reads, for its sources and its cap.
+                using var stepStop = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+                var callNames = new Dictionary<string, string>();
+                var searchPages = new List<(string Title, string Url)>();
+                var readPages = new List<string>();
+                int toolCalls = 0;
+                bool capped = false;
+                IAsyncEnumerator<ChatResponseUpdate> stream = client.GetStreamingResponseAsync(stepMessages, options, stepStop.Token).GetAsyncEnumerator(stepStop.Token);
                 try
                 {
                     while (true)
@@ -198,6 +268,12 @@ public sealed class TaskFeature : ChatFeature
                             step.State = TaskPlan.State.Skipped;
                             break;
                         }
+                        catch (OperationCanceledException) when (stepStop.IsCancellationRequested)
+                        {
+                            // Research: too many searches for one sub-question; its notes are what it found.
+                            capped = true;
+                            break;
+                        }
                         catch (Exception ex) when (!stop.IsCancellationRequested)
                         {
                             step.State = TaskPlan.State.Failed;
@@ -210,6 +286,20 @@ public sealed class TaskFeature : ChatFeature
                         var calls = update.Contents.Where(c => c is FunctionCallContent || c is FunctionResultContent).ToList();
                         if (calls.Count > 0)
                             yield return new ChatResponseUpdate(update.Role, calls);
+                        if (_research)
+                        {
+                            foreach (FunctionCallContent call in update.Contents.OfType<FunctionCallContent>())
+                            {
+                                callNames[call.CallId ?? string.Empty] = call.Name;
+                                if (call.Name == "read_web_page" && call.Arguments != null && call.Arguments.TryGetValue("url", out object url) && url != null)
+                                    readPages.Add(url.ToString());
+                                if (++toolCalls > TaskPlan.MaxResearchToolCalls)
+                                    stepStop.Cancel();
+                            }
+                            foreach (FunctionResultContent result in update.Contents.OfType<FunctionResultContent>())
+                                if (callNames.TryGetValue(result.CallId ?? string.Empty, out string name) && name == "search_web")
+                                    searchPages.AddRange(TaskPlan.SearchResultPages(result.Result?.ToString()));
+                        }
                     }
                 }
                 finally
@@ -218,8 +308,19 @@ public sealed class TaskFeature : ChatFeature
                 }
                 if (step.State == TaskPlan.State.Running)
                 {
-                    step.Result = TaskPlan.ShortResult(new ChatReply(answer.ToString()).Text);
+                    string notes = new ChatReply(answer.ToString()).Text;
+                    if (capped && string.IsNullOrWhiteSpace(notes))
+                        notes = "(stopped after " + TaskPlan.MaxResearchToolCalls + " searches and page reads without notes)";
+                    step.Result = plan.ShortResultFor(notes);
                     step.State = TaskPlan.State.Done;
+                }
+                if (_research)
+                {
+                    // The pages it read (titles from the search results when they were among them), else the search's top two.
+                    var pages = readPages.Count > 0
+                        ? readPages.Select(u => (searchPages.FirstOrDefault(p => string.Equals(p.Url, u, StringComparison.OrdinalIgnoreCase)).Title, u))
+                        : searchPages.Take(2);
+                    plan.AddSources(step, pages.ToList());
                 }
                 await MainThread.InvokeOnMainThreadAsync(card.Refresh);
             }
@@ -233,11 +334,85 @@ public sealed class TaskFeature : ChatFeature
                 yield break;
             }
             await MainThread.InvokeOnMainThreadAsync(() => card.Close("Done"));
-            // The final answer, from the results, in the reply.
-            Host.SetStatus("Writing the answer...");
+            // The final answer, from the results, in the reply - without tools for research (it writes from the notes).
+            Host.SetStatus(_research ? "Writing the report..." : "Writing the answer...");
             var final = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, plan.FinalPrompt(_request)) };
-            await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(final, options, token))
-                yield return update;
+            ChatOptions finalOptions = _research && options != null ? CloneWithoutTools(options) : options;
+            if (!_research)
+            {
+                await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(final, finalOptions, token))
+                    yield return update;
+            }
+            else
+            {
+                // The report line by line (a line is held until it ends), up to a sources section the model wrote itself.
+                var pending = new System.Text.StringBuilder();
+                bool dropping = false;
+                await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(final, finalOptions, token))
+                {
+                    string text = string.Concat(update.Contents.OfType<TextContent>().Select(t => t.Text));
+                    var other = update.Contents.Where(c => !(c is TextContent)).ToList();
+                    if (other.Count > 0)
+                        yield return new ChatResponseUpdate(update.Role, other);
+                    if (dropping || text.Length == 0)
+                        continue;
+                    pending.Append(text);
+                    string buffered = pending.ToString();
+                    int end = buffered.LastIndexOf('\n');
+                    if (end < 0)
+                        continue;
+                    var shown = new System.Text.StringBuilder();
+                    foreach (string line in buffered.Substring(0, end + 1).Split('\n').SkipLast(1))
+                    {
+                        if (TaskPlan.IsSourcesHeading(line))
+                        {
+                            dropping = true;
+                            break;
+                        }
+                        shown.Append(line).Append('\n');
+                    }
+                    pending.Clear();
+                    if (!dropping)
+                        pending.Append(buffered.Substring(end + 1));
+                    if (shown.Length > 0)
+                        yield return new ChatResponseUpdate(ChatRole.Assistant, shown.ToString());
+                }
+                if (!dropping && pending.Length > 0 && !TaskPlan.IsSourcesHeading(pending.ToString()))
+                    yield return new ChatResponseUpdate(ChatRole.Assistant, pending.ToString());
+            }
+            // The sources, as the pages' real addresses (not the model's).
+            if (_research && plan.Sources.Count > 0)
+                yield return new ChatResponseUpdate(ChatRole.Assistant, plan.SourcesMarkdown());
+            }
+            finally
+            {
+                if (keptAwake)
+                    await MainThread.InvokeOnMainThreadAsync(() => DeviceDisplay.Current.KeepScreenOn = false);
+            }
+        }
+
+        // The screen kept on for the research; false if it already was (someone else keeps it on) or can't be.
+        private static bool KeepScreenOn()
+        {
+            try
+            {
+                if (DeviceDisplay.Current.KeepScreenOn)
+                    return false;
+                DeviceDisplay.Current.KeepScreenOn = true;
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private static ChatOptions CloneWithoutTools(ChatOptions options)
+        {
+            ChatOptions clone = options.Clone();
+            clone.Tools = null;
+            clone.ToolMode = null;
+            return clone;
         }
 
         public object GetService(Type serviceType, object serviceKey = null) => null;
@@ -256,6 +431,8 @@ public sealed class TaskFeature : ChatFeature
         public Action<string> Close;
         // Stops the steps (set when they start).
         public Action Stop;
+        // After each refresh (the research estimate follows the skipped parts).
+        public Action Refreshed;
     }
 
     /// <inheritdoc/>
@@ -281,12 +458,14 @@ public sealed class TaskFeature : ChatFeature
     private sealed class SavedPlan
     {
         public string Outcome { get; set; }
+        public bool Research { get; set; }
         public List<SavedStep> Steps { get; set; }
     }
 
     private static byte[] SavePlan(TaskPlan plan, string outcome) => JsonSerializer.SerializeToUtf8Bytes(new SavedPlan
     {
         Outcome = outcome,
+        Research = plan.Research,
         Steps = plan.Steps.Select(s => new SavedStep { Text = s.Text, State = s.State.ToString(), Result = s.Result }).ToList()
     });
 
@@ -298,7 +477,7 @@ public sealed class TaskFeature : ChatFeature
             SavedPlan saved = JsonSerializer.Deserialize<SavedPlan>(data);
             if (saved?.Steps == null || saved.Steps.Count == 0)
                 return (null, null);
-            var plan = new TaskPlan(saved.Steps.Select(s => s.Text ?? string.Empty));
+            var plan = new TaskPlan(saved.Steps.Select(s => s.Text ?? string.Empty), saved.Research);
             for (int i = 0; i < saved.Steps.Count; i++)
             {
                 plan.Steps[i].Result = saved.Steps[i].Result;
@@ -345,7 +524,8 @@ public sealed class TaskFeature : ChatFeature
             Padding = new Thickness(14, 4),
             MinimumHeightRequest = 36
         };
-        Button runButton = MakeButton("Run plan", true), editButton = MakeButton("Edit", false), plainButton = MakeButton("Just answer", false), stopButton = MakeButton("Stop", false);
+        Button runButton = MakeButton(plan.Research ? "Start research" : "Run plan", true), editButton = MakeButton("Edit", false),
+            plainButton = MakeButton("Just answer", false), stopButton = MakeButton("Stop", false);
         stopButton.IsVisible = false;
         var buttons = new HorizontalStackLayout { Spacing = 8, Children = { runButton, editButton, plainButton, stopButton } };
 
@@ -406,6 +586,7 @@ public sealed class TaskFeature : ChatFeature
             }
             runButton.IsVisible = editButton.IsVisible = plainButton.IsVisible = !running && !finished && !editor.IsVisible;
             stopButton.IsVisible = running && !finished;
+            card.Refreshed?.Invoke();
         }
 
         runButton.Clicked += (_, _) =>
@@ -433,7 +614,7 @@ public sealed class TaskFeature : ChatFeature
                 runButton.IsVisible = plainButton.IsVisible = false;
                 return;
             }
-            List<string> edited = TaskPlan.FromLines(editor.Text);
+            List<string> edited = TaskPlan.FromLines(editor.Text).Take(plan.Research ? TaskPlan.MaxResearchSteps : TaskPlan.MaxSteps).ToList();
             if (edited.Count > 0)
             {
                 plan.Steps.Clear();
@@ -447,8 +628,18 @@ public sealed class TaskFeature : ChatFeature
         };
 
         var content = new VerticalStackLayout { Spacing = 8 };
-        content.Children.Add(new Label { Text = "\U0001F4CB  Plan", FontFamily = titleFont, FontSize = 15, TextColor = primaryText });
+        content.Children.Add(new Label { Text = plan.Research ? "\U0001F50E  Research" : "\U0001F4CB  Plan", FontFamily = titleFont, FontSize = 15, TextColor = primaryText });
         content.Children.Add(rows);
+        if (plan.Research)
+        {
+            // What it may cost, before it starts (searches at "advanced" depth, page reads).
+            var estimate = new Label { FontFamily = bodyFont, FontSize = 11, TextColor = secondaryText };
+            void Estimate() => estimate.Text = string.Format("Up to about {0} Tavily credits. Each part is a search and a page read; on a phone this can take several minutes a part.",
+                plan.Steps.Count(st => st.State != TaskPlan.State.Skipped) * TaskPlan.ResearchCreditsPerStep);
+            Estimate();
+            content.Children.Add(estimate);
+            card.Refreshed += Estimate;
+        }
         content.Children.Add(new Label { Text = "One step per line, in the order they run.", FontFamily = bodyFont, FontSize = 11, TextColor = secondaryText, IsVisible = false });
         content.Children.Add(editor);
         content.Children.Add(status);
@@ -465,7 +656,7 @@ public sealed class TaskFeature : ChatFeature
             MaximumWidthRequest = 420,
             Content = content
         };
-        SemanticProperties.SetDescription(card.View, "The plan for this task");
+        SemanticProperties.SetDescription(card.View, plan.Research ? "The research plan" : "The plan for this task");
         card.Refresh = Refresh;
         card.Begin = () =>
         {

@@ -595,6 +595,36 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 - Verified on Mac Catalyst with Gemma 4 E2B: a Paris weekend (weather, Wikipedia, a web page and a packing-list document in
   ~2.5 minutes), including skip, stop and a follow-up.
 
+## Research mode
+
+- The "🔎 Research" chip (since 2026-10-28; `TaskFeature`, the same step runner and card as task mode, `TaskPlan` with
+  `research: true`). It shows for a model with tools when a Tavily key is set (the web feature registers itself as a
+  service now, with `HasSearchKey` and `TurnOn`); turning it on turns web search on and the Plan chip off. A feature can
+  now declare several chips (`ChatFeature.BuildComposerChips`), re-checked with each `RefreshChips` - a chip view of its
+  own was shown or hidden only once, before the key had loaded.
+- The question becomes 3 to 6 sub-questions (`ResearchPlanPrompt`, 4 asked for), in a "Research" card with an estimate (up
+  to 5 Tavily credits a part, following the skipped parts) and "Start research", Edit, "Just answer".
+- Each part is a request of its own (`StepPrompt`): search, read the best page with `read_web_page` and `lookFor`, at most
+  2 of each by the prompt and 6 tool calls in all (`MaxResearchToolCalls`: the part is stopped beyond that), then up to 8
+  sentences of notes (1,200 characters kept, `ResearchNotesLength`), "not found" for gaps. Its sources are the pages it
+  read - titled from the search results - or the search's top two (`SearchResultPages`, `AddSources`: one number per
+  address across the parts).
+- The report is written without tools from the notes alone (`FinalPrompt`: each part's notes with its sources' numbers),
+  citing [n]; the sources follow it as Markdown links with the pages' real addresses (`SourcesMarkdown`, not the model's).
+  Stopped, the notes so far and the sources are the reply. The card is saved with the reply and comes back as "Research".
+  Without a search tool in the message's options, it says how to turn web search on rather than answer from memory.
+- The screen is kept on while the parts run (`DeviceDisplay.KeepScreenOn`, restored after): on the first run on the Pixel
+  Fold the phone locked after a few minutes, Android froze the app in the background, and at 04:33 closed it ("Async
+  binder space running out while frozen"); the exchange is saved only when the reply is complete, so the research was lost.
+  The progress counts only the parts that run ("Researching 2 of 4", not "of 6" with two skipped).
+- A sources section the model writes itself despite the prompt ("Sources:" and bare "[1]" lines, by Gemma 4 E2B) is dropped
+  from the report as it streams (`TaskPlan.IsSourcesHeading`; lines are held until they end), so only the real list follows.
+- Checked on the Pixel Fold (2026-10-28, Gemma 4 E2B on the GPU, "Compare the iPhone 16e and the iPhone 17e side by side in a
+  table", 4 parts): 12 minutes, the screen held on throughout; 4 searches and a page read; a report with a summary and a
+  9-row table citing [1], [2] and [6] ("not found" for the 17e's price), and 6 linked sources (CNET, Wikipedia, MacRumors...).
+  One cell was wrong: the 16e's charging as "7.5W MagSafe" (it has Qi at 7.5 W, no MagSafe). A part's notes can carry the
+  model's own planning ("3. **Synthesize the...") into the card. Not yet run on the Mac (its Tavily key lasts a session).
+
 ## Goals
 
 - The goals feature is the library's since 2026-10-26 (`Emgu.LiteRT.LM.Maui`'s `GoalsFeature` over `GoalsSkill`; the demo gives it a `SqliteAgentGoalStore` over its chat store, and `ExerciseFeature` adds the exercise counter to its group as the skill's extra tools, words and summary). Goals have streaks and a history (`GoalHistory.cs` in `Emgu.LiteRT.LM.Agents`, TODO item 25): per

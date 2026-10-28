@@ -33,12 +33,32 @@ namespace Emgu.LiteRT.LM.Maui.Features
         /// <summary>Create the feature.</summary>
         public WebFeature() : base(new WebSkill())
         {
-            _searchKey = new ApiKeyRow(KeyStorageName, "Tavily API key (required for web search)", key => Skill.TavilyApiKey = key);
+            _searchKey = new ApiKeyRow(KeyStorageName, "Tavily API key (required for web search)", key =>
+            {
+                Skill.TavilyApiKey = key;
+                MainThread.BeginInvokeOnMainThread(() => Host?.RefreshChips());
+            });
             _stockKey = new ApiKeyRow(StockKeyStorageName, "Twelve Data API key (for stock prices)", key => Skill.TwelveDataApiKey = key);
         }
 
         /// <inheritdoc/>
         public override bool PersistEnabled => false;
+
+        /// <inheritdoc/>
+        public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+        /// <summary>Whether a Tavily API key is set (general web search is available).</summary>
+        public bool HasSearchKey => !string.IsNullOrWhiteSpace(Skill.TavilyApiKey);
+
+        /// <summary>Turn web search on, as the chip does (e.g. for research mode, which needs it).</summary>
+        public void TurnOn()
+        {
+            if (Enabled)
+                return;
+            Enabled = true;
+            Host?.Settings.Set(Key, true);
+            Host?.RefreshChips();
+        }
 
         /// <inheritdoc/>
         public override void OnAttached(IChatPageHost host)
@@ -49,8 +69,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
             // A stock tool's prices: a chart above the reply, kept with it in the saved chat.
             Skill.StockChartReady = chart => MainThread.BeginInvokeOnMainThread(() =>
                 Host?.AddCardToReply(StockChartView.Create(chart), new ChatSavedFile(StockChartKind, "application/json", chart.ToJson())));
-            _ = _searchKey.LoadAsync();
-            _ = _stockKey.LoadAsync();
+            _ = LoadKeysAsync();
         }
 
         /// <inheritdoc/>
@@ -60,6 +79,13 @@ namespace Emgu.LiteRT.LM.Maui.Features
                 return null;
             StockChart chart = StockChart.FromJson(file.Data);
             return chart != null ? StockChartView.Create(chart) : null;
+        }
+
+        // The keys from secure storage; the chips follow (research needs the search key).
+        private async Task LoadKeysAsync()
+        {
+            await Task.WhenAll(_searchKey.LoadAsync(), _stockKey.LoadAsync());
+            MainThread.BeginInvokeOnMainThread(() => Host?.RefreshChips());
         }
 
         /// <inheritdoc/>

@@ -187,6 +187,17 @@ namespace Emgu.LiteRT.LM.Maui
         public virtual ChatChip BuildComposerChip() => null;
 
         /// <summary>
+        /// The feature's chips above the message box: by default its <see cref="BuildComposerChip"/>, if any. A feature with
+        /// more than one (task mode's Plan and Research) overrides this. Their <see cref="ChatChip.IsVisible"/> and on state
+        /// are read again whenever the page refreshes its chips (<see cref="IChatPageHost.RefreshChips"/>).
+        /// </summary>
+        public virtual IEnumerable<ChatChip> BuildComposerChips()
+        {
+            ChatChip chip = BuildComposerChip();
+            return chip != null ? new[] { chip } : Array.Empty<ChatChip>();
+        }
+
+        /// <summary>
         /// A view of the feature's own in the row above the message box, beside the chips (e.g. a document attached to
         /// the chat, with its progress), or null for none; the feature shows and hides it.
         /// </summary>
