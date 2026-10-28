@@ -75,8 +75,17 @@ namespace Emgu.LiteRT.LM.Maui
             public Grid Table;
         }
 
-        // The widest a table's cell's text grows before it wraps, and the space either side of it.
-        private const double MaxCellWidth = 220;
+        // The widest a table's cell's text grows before it wraps - narrower on a phone-sized screen, so a comparison's
+        // columns fit side by side (at 220 points only two did on a folded Pixel Fold) - and the space either side of it.
+        private static double MaxCellWidth
+        {
+            get
+            {
+                DisplayInfo display = DeviceDisplay.Current.MainDisplayInfo;
+                double width = display.Density > 0 ? Math.Min(display.Width, display.Height) / display.Density : 0;
+                return width > 0 && width < 600 ? 140 : 220;
+            }
+        }
         private const double CellPadding = 10;
 
         // A cell's length as shown, roughly: its text without the inline markup.

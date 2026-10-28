@@ -35,6 +35,9 @@ namespace Emgu.LiteRT.LM.Agents
         private const int SearchResults = 5;
         private const string SearchDepth = "advanced";
         private const int MaxSearchLength = 2500;
+        // read_web_page with Tavily: with what to look for, the page's 5 most relevant passages (about 800 characters each)
+        // at "advanced" depth, which reads tables too (2 credits per 5 pages); without it, the page's start.
+        private const int MaxPageLength = 4000;
         private const int TopArticleLength = 1100;
         private const int OtherArticleLength = 300;
 
@@ -752,9 +755,11 @@ namespace Emgu.LiteRT.LM.Agents
             string key = CheckKey(apiKey);
             HttpClient client = http ?? DefaultHttpClient;
             return AIFunctionFactory.Create(
-                ([Description("The address of the page")] string url, CancellationToken cancellationToken) => ReadWebPageAsync(client, key, url, cancellationToken),
+                ([Description("The address of the page")] string url,
+                 [Description("What to look for on the page, e.g. \"iPhone 17e and iPhone 16e specs: display, chip, battery, price\"")] string lookFor,
+                 CancellationToken cancellationToken) => ReadWebPageAsync(client, key, url, lookFor, cancellationToken),
                 "read_web_page",
-                "Returns the text of a web page.");
+                "Returns the text of a web page - with lookFor, the parts most about it, tables included. Read the best page a search found before answering in detail (e.g. a comparison).");
         }
 
         private static string CheckKey(string apiKey)
@@ -774,6 +779,20 @@ namespace Emgu.LiteRT.LM.Agents
         private static readonly System.Text.RegularExpressions.Regex WeekWords = new System.Text.RegularExpressions.Regex(
             @"\bthis week\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
+        // Words of a comparison or a product's specs: pages from the past year (older ones describe products before they came
+        // out, as "rumors").
+        private static readonly System.Text.RegularExpressions.Regex ComparisonWords = new System.Text.RegularExpressions.Regex(
+            @"\b(vs\.?|versus|compare|compared|comparison|specs|specifications|review|reviews)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// For an ordinary search (not news) whose query compares products or asks for specs ("iPhone 17e vs 16e", "Pixel 10
+        /// specs", "review"): "year", so pages from the past year come first; else null.
+        /// </summary>
+        /// <param name="query">The search's query, as the model wrote it</param>
+        public static string ComparisonTimeRange(string query) =>
+            !string.IsNullOrWhiteSpace(query) && NewsTimeRange(query) == null && ComparisonWords.IsMatch(query) ? "year" : null;
+
         /// <summary>
         /// How recent search_web's results should be, from the words of its query: null for an ordinary search; for a news
         /// question ("latest", "news", "recent", "update"...) Tavily's time range - "day" for today, yesterday or breaking
@@ -792,9 +811,10 @@ namespace Emgu.LiteRT.LM.Agents
         private static async Task<string> SearchWebAsync(HttpClient http, string apiKey, string query, CancellationToken cancellationToken)
         {
             string timeRange = NewsTimeRange(query);
-            string found = await SearchWebAsync(http, apiKey, query, timeRange, cancellationToken).ConfigureAwait(false);
-            // A news search that found nothing recent: once more as an ordinary search.
-            if (found == null && timeRange != null)
+            string recentPages = timeRange == null ? ComparisonTimeRange(query) : null;
+            string found = await SearchWebAsync(http, apiKey, query, timeRange, cancellationToken, recentPages).ConfigureAwait(false);
+            // A news or comparison search that found nothing recent: once more as an ordinary search.
+            if (found == null && (timeRange != null || recentPages != null))
                 found = await SearchWebAsync(http, apiKey, query, null, cancellationToken).ConfigureAwait(false);
             if (found == null)
                 return "No results found for \"" + query + "\".";
@@ -802,8 +822,9 @@ namespace Emgu.LiteRT.LM.Agents
             return "Today is " + DateTime.Now.ToString("d MMMM yyyy", CultureInfo.InvariantCulture) + ".\n\n" + found;
         }
 
-        // One Tavily search; null when it found nothing.
-        private static async Task<string> SearchWebAsync(HttpClient http, string apiKey, string query, string timeRange, CancellationToken cancellationToken)
+        // One Tavily search; null when it found nothing. timeRange makes it a news search; generalTimeRange limits an ordinary one.
+        private static async Task<string> SearchWebAsync(HttpClient http, string apiKey, string query, string timeRange, CancellationToken cancellationToken,
+            string generalTimeRange = null)
         {
             string body = WriteJson(writer =>
             {
@@ -814,6 +835,11 @@ namespace Emgu.LiteRT.LM.Agents
                 {
                     writer.WriteString("topic", "news");
                     writer.WriteString("time_range", timeRange);
+                }
+                else if (generalTimeRange != null)
+                {
+                    writer.WriteString("time_range", generalTimeRange);
+                    writer.WriteBoolean("include_published_date", true);
                 }
             });
             using (JsonDocument response = await PostTavilyAsync(http, apiKey, "search", body, cancellationToken).ConfigureAwait(false))
@@ -835,18 +861,25 @@ namespace Emgu.LiteRT.LM.Agents
             }
         }
 
-        private static async Task<string> ReadWebPageAsync(HttpClient http, string apiKey, string url, CancellationToken cancellationToken)
+        private static async Task<string> ReadWebPageAsync(HttpClient http, string apiKey, string url, string lookFor, CancellationToken cancellationToken)
         {
             string body = WriteJson(writer =>
             {
                 writer.WriteStartArray("urls");
                 writer.WriteStringValue(url ?? string.Empty);
                 writer.WriteEndArray();
+                writer.WriteString("extract_depth", "advanced");
+                if (!string.IsNullOrWhiteSpace(lookFor))
+                {
+                    // The passages most about it, rather than the page's start (often its menus).
+                    writer.WriteString("query", lookFor);
+                    writer.WriteNumber("chunks_per_source", 5);
+                }
             });
             using (JsonDocument response = await PostTavilyAsync(http, apiKey, "extract", body, cancellationToken).ConfigureAwait(false))
             {
                 foreach (JsonElement result in response.RootElement.GetProperty("results").EnumerateArray())
-                    return Shorten(result.GetProperty("raw_content").GetString(), MaxResultLength);
+                    return Shorten(result.GetProperty("raw_content").GetString(), MaxPageLength);
                 return "Could not read " + url + ".";
             }
         }

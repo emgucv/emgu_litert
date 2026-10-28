@@ -21,6 +21,22 @@ public class UnitTestWebSearch
         Assert.That(AgentTools.NewsTimeRange(query), Is.EqualTo(range));
     }
 
+    [TestCase("iPhone 16e vs iPhone 17e specs")]
+    [TestCase("compare Pixel 10 and Galaxy S26")]
+    [TestCase("MacBook Air M5 review")]
+    public void ComparisonsPreferThePastYear(string query)
+    {
+        Assert.That(AgentTools.NewsTimeRange(query), Is.Null);
+        Assert.That(AgentTools.ComparisonTimeRange(query), Is.EqualTo("year"));
+    }
+
+    [TestCase("latest iPhone 17e review", "month")]
+    public void NewsWordsWinOverComparisonWords(string query, string newsRange)
+    {
+        Assert.That(AgentTools.NewsTimeRange(query), Is.EqualTo(newsRange));
+        Assert.That(AgentTools.ComparisonTimeRange(query), Is.Null, "a news search already limits the time");
+    }
+
     [TestCase("how tall is the Eiffel Tower")]
     [TestCase("history of the Roman Empire")]
     [TestCase("best way to cook rice")]
@@ -30,5 +46,6 @@ public class UnitTestWebSearch
     public void OtherQuestionsAreOrdinarySearches(string query)
     {
         Assert.That(AgentTools.NewsTimeRange(query), Is.Null);
+        Assert.That(AgentTools.ComparisonTimeRange(query), Is.Null);
     }
 }

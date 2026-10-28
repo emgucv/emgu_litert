@@ -78,7 +78,9 @@ namespace Emgu.LiteRT.LM.Agents.Skills
 
         /// <inheritdoc/>
         public override Task<string> InstructionsAsync(ChatMessageContext context) => Task.FromResult((HasKey
-            ? "General web search is available through search_web. Use it for news and recent events, and cite the sources returned."
+            ? "General web search is available through search_web. Use it for news and recent events, and cite the sources returned. "
+              + "To compare products or give specs, search for them (e.g. \"iPhone 17e vs iPhone 16e specs\"), then read the best page with read_web_page, "
+              + "saying in lookFor what to find; write the comparison as a Markdown table, and write \"not found\" for a detail the pages don't give rather than guess."
             : "General web search is unavailable because no Tavily API key is configured. Wikipedia, reading URLs the user supplies, weather and currency conversion are available without a key. For news or other requests needing general web search, explicitly tell the user: Add a Tavily API key in " + SettingsLocation + ", then retry. Do not merely say you lack internet or real-time access, and do not invent current facts.")
             + (HasStocks
                 ? " For stock prices use get_stock_quote, and for how a stock did over a period get_stock_history; give the numbers they return, with the date."
