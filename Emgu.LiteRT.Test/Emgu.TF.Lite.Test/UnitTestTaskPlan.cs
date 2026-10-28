@@ -153,6 +153,17 @@ public class UnitTestTaskPlan
         Assert.That(TaskPlan.IsSourcesHeading(line), Is.EqualTo(heading));
     }
 
+    [TestCase("Sources: [1], [2]", true)]
+    [TestCase("**Sources:** [1]", true)]
+    [TestCase("References: [1] and [3].", true)]
+    [TestCase("Sources:", false)]
+    [TestCase("Sources: Twelve Data [1]", false)]
+    [TestCase("Intel closed at $93.74 [1].", false)]
+    public void ALineOnlyCitingTheSourcesIsRecognised(string line, bool citations)
+    {
+        Assert.That(TaskPlan.IsCitationsLine(line), Is.EqualTo(citations));
+    }
+
     [Test]
     public void ResearchStepsAskForSearchesAndNotesAndKeepMore()
     {

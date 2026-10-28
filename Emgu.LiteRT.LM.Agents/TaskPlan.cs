@@ -292,6 +292,15 @@ public sealed class TaskPlan
     /// </summary>
     public static bool IsSourcesHeading(string line) => line != null && SourcesHeading.IsMatch(line);
 
+    private static readonly Regex CitationsLine = new Regex(@"^\s*(\*\*|__)?\s*(sources|references)\s*:?\s*(\*\*|__)?\s*:?\s*(\[\d+\]\s*,?\s*(and\s+)?)+\.?\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Whether a line of the report only lists the sources by number ("Sources: [1], [2]"), which the model adds though told
+    /// not to: dropped, the report going on after it (the numbered list follows from <see cref="SourcesMarkdown"/>).
+    /// </summary>
+    public static bool IsCitationsLine(string line) => line != null && CitationsLine.IsMatch(line);
+
     /// <summary>A step's reply kept short for the later steps (research notes longer).</summary>
     public string ShortResultFor(string reply) => Shorten(reply, Research ? ResearchNotesLength : ResultLength);
 

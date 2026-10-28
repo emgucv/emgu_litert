@@ -602,8 +602,17 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   service now, with `HasSearchKey` and `TurnOn`); turning it on turns web search on and the Plan chip off. A feature can
   now declare several chips (`ChatFeature.BuildComposerChips`), re-checked with each `RefreshChips` - a chip view of its
   own was shown or hidden only once, before the key had loaded.
-- The question becomes 3 to 6 sub-questions (`ResearchPlanPrompt`, 4 asked for), in a "Research" card with an estimate (up
-  to 5 Tavily credits a part, following the skipped parts) and "Start research", Edit, "Just answer".
+- The question becomes 1 to 6 sub-questions (`ResearchPlanPrompt`: facts to find, never how or where to find them; 1 or 2
+  for a simple question, one per stock for prices), in a "Research" card with an estimate (up to 5 Tavily credits a part,
+  following the skipped parts) and "Start research", Edit, "Just answer".
+- A part uses the tools that answer directly before the web (`StepPrompt` with `TaskPlan.ToolNames`): the stock tools for
+  prices (yesterday's close from `get_stock_history` over "1 week"), `get_weather`, `convert_currency`; they are listed as
+  sources (`ToolSource`: Twelve Data, Open-Meteo, Frankfurter). Before this the plan for "Can you show me yesterday's intel
+  stock price" on the Mac was "how to find" questions answered from web searches. Twelve Data's name search then gave the
+  OTC penny stock "AI Maverick Intel" for "Intel" ($0.13) - it lists no INTC for the bare name - and today's price so far
+  as yesterday's close; the tools now ask for tickers, take only listings named like the company (NASDAQ/NYSE first,
+  searching again with " Inc"/" Corp"), and a daily history says which close is today's so far (2026-10-28: $93.74,
+  INTC's close of 27 October).
 - Each part is a request of its own (`StepPrompt`): search, read the best page with `read_web_page` and `lookFor`, at most
   2 of each by the prompt and 6 tool calls in all (`MaxResearchToolCalls`: the part is stopped beyond that), then up to 8
   sentences of notes (1,200 characters kept, `ResearchNotesLength`), "not found" for gaps. Its sources are the pages it
@@ -613,17 +622,27 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   citing [n]; the sources follow it as Markdown links with the pages' real addresses (`SourcesMarkdown`, not the model's).
   Stopped, the notes so far and the sources are the reply. The card is saved with the reply and comes back as "Research".
   Without a search tool in the message's options, it says how to turn web search on rather than answer from memory.
-- The screen is kept on while the parts run (`DeviceDisplay.KeepScreenOn`, restored after): on the first run on the Pixel
-  Fold the phone locked after a few minutes, Android froze the app in the background, and at 04:33 closed it ("Async
-  binder space running out while frozen"); the exchange is saved only when the reply is complete, so the research was lost.
-  The progress counts only the parts that run ("Researching 2 of 4", not "of 6" with two skipped).
+- Research goes on in the background (`BackgroundWork` in `Emgu.LiteRT.LM.Maui`): on Android a foreground service of type
+  data sync (`WorkForegroundService`) with a partial wake lock and a notification - "Researching", the part running ("1 of
+  2: ..."), "Writing the report...", a Stop button - and, when it ends while the app isn't on the screen, "The research is
+  done: tap to read the report."; on Mac Catalyst a user-initiated `NSProcessInfo` activity (no App Nap); on iOS only the
+  short background time iOS gives. Without it, on the first run on the Pixel Fold the phone locked after a few minutes,
+  Android froze the app, and at 04:33 closed it ("Async binder space running out while frozen"); the exchange is saved only
+  when the reply is complete, so the research was lost (the screen was then kept on while research ran, until the
+  service). Checked on the Fold (2026-10-28, Gemma 4 E2B on the GPU, "Compare the closing prices of Intel and AMD
+  yesterday", 2 parts): sent to the background with Home right after Start research, the process stayed up and the
+  notification moved through both parts and the report in 5 minutes - OpenCL kept working in the background - and the
+  complete report (both closes of 27 October, in a table) was there on return. The progress counts only the parts that
+  run ("Researching 2 of 4", not "of 6" with two skipped).
 - A sources section the model writes itself despite the prompt ("Sources:" and bare "[1]" lines, by Gemma 4 E2B) is dropped
-  from the report as it streams (`TaskPlan.IsSourcesHeading`; lines are held until they end), so only the real list follows.
+  from the report as it streams (`TaskPlan.IsSourcesHeading`; lines are held until they end), so only the real list follows;
+  so is a line that only cites them ("Sources: [1], [2]", `IsCitationsLine`), the report going on after it.
 - Checked on the Pixel Fold (2026-10-28, Gemma 4 E2B on the GPU, "Compare the iPhone 16e and the iPhone 17e side by side in a
   table", 4 parts): 12 minutes, the screen held on throughout; 4 searches and a page read; a report with a summary and a
   9-row table citing [1], [2] and [6] ("not found" for the 17e's price), and 6 linked sources (CNET, Wikipedia, MacRumors...).
   One cell was wrong: the 16e's charging as "7.5W MagSafe" (it has Qi at 7.5 W, no MagSafe). A part's notes can carry the
-  model's own planning ("3. **Synthesize the...") into the card. Not yet run on the Mac (its Tavily key lasts a session).
+  model's own planning ("3. **Synthesize the...") into the card. On the Mac (Catalyst, signed by `tools/run_catalyst` so the
+  keys stay), the Intel question above.
 
 ## Goals
 

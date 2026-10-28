@@ -221,9 +221,11 @@ public sealed class TaskFeature : ChatFeature
             using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
             card.Stop = stop.Cancel;
             await MainThread.InvokeOnMainThreadAsync(card.Begin);
-            // Research takes minutes a part on a phone: the screen stays on, or Android freezes the app in the background when
-            // it locks (and may close it - a Pixel Fold did, the research lost).
-            bool keptAwake = _research && await MainThread.InvokeOnMainThreadAsync(KeepScreenOn);
+            // Research takes minutes a part on a phone: it goes on in the background (on Android a foreground service with a
+            // notification; without one Android freezes the app soon after it leaves the screen, and may close it - a Pixel
+            // Fold did, the research lost).
+            BackgroundWork background = _research ? await BackgroundWork.BeginAsync("Researching", _request, stop.Cancel) : null;
+            bool finished = false;
             try
             {
             int toRun = plan.Steps.Count(st => st.State != TaskPlan.State.Skipped), runIndex = 0;
@@ -237,6 +239,7 @@ public sealed class TaskFeature : ChatFeature
                 runIndex++;
                 // Of the parts that run (skipped ones aren't counted).
                 Host.SetStatus(string.Format(_research ? "Researching {0} of {1}: {2}" : "Step {0} of {1}: {2}", runIndex, Math.Max(toRun, runIndex), step.Text));
+                background?.Update(string.Format("{0} of {1}: {2}", runIndex, Math.Max(toRun, runIndex), step.Text));
                 // A request of its own: the task, the plan and the results so far are in the message.
                 var contents = new List<AIContent>();
                 if (i == 0)
@@ -340,6 +343,7 @@ public sealed class TaskFeature : ChatFeature
             await MainThread.InvokeOnMainThreadAsync(() => card.Close("Done"));
             // The final answer, from the results, in the reply - without tools for research (it writes from the notes).
             Host.SetStatus(_research ? "Writing the report..." : "Writing the answer...");
+            background?.Update("Writing the report...");
             var final = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, plan.FinalPrompt(_request)) };
             ChatOptions finalOptions = _research && options != null ? CloneWithoutTools(options) : options;
             if (!_research)
@@ -373,6 +377,8 @@ public sealed class TaskFeature : ChatFeature
                             dropping = true;
                             break;
                         }
+                        if (TaskPlan.IsCitationsLine(line))
+                            continue;
                         shown.Append(line).Append('\n');
                     }
                     pending.Clear();
@@ -381,33 +387,20 @@ public sealed class TaskFeature : ChatFeature
                     if (shown.Length > 0)
                         yield return new ChatResponseUpdate(ChatRole.Assistant, shown.ToString());
                 }
-                if (!dropping && pending.Length > 0 && !TaskPlan.IsSourcesHeading(pending.ToString()))
+                if (!dropping && pending.Length > 0 && !TaskPlan.IsSourcesHeading(pending.ToString()) && !TaskPlan.IsCitationsLine(pending.ToString()))
                     yield return new ChatResponseUpdate(ChatRole.Assistant, pending.ToString());
             }
             // The sources, as the pages' real addresses (not the model's).
             if (_research && plan.Sources.Count > 0)
                 yield return new ChatResponseUpdate(ChatRole.Assistant, plan.SourcesMarkdown());
+            finished = true;
             }
             finally
             {
-                if (keptAwake)
-                    await MainThread.InvokeOnMainThreadAsync(() => DeviceDisplay.Current.KeepScreenOn = false);
-            }
-        }
-
-        // The screen kept on for the research; false if it already was (someone else keeps it on) or can't be.
-        private static bool KeepScreenOn()
-        {
-            try
-            {
-                if (DeviceDisplay.Current.KeepScreenOn)
-                    return false;
-                DeviceDisplay.Current.KeepScreenOn = true;
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
+                if (finished)
+                    background?.Finish("The research is done: tap to read the report.");
+                else
+                    background?.Dispose();
             }
         }
 
