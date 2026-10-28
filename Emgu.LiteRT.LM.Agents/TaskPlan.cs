@@ -213,6 +213,10 @@ public sealed class TaskPlan
         for (int i = 0; i < Steps.Count; i++)
             text.AppendLine((i + 1) + ". " + Steps[i].Text + (Steps[i].State == State.Skipped ? " (skipped)" : string.Empty));
         text.AppendLine("Now research part " + (index + 1) + ": " + Steps[index].Text);
+        // Gemma 4 E2B on the Fold, asked to compare Intel's and AMD's closes, fetched AMD's prices in Intel's part too, and
+        // again in AMD's own: a second chart and a second request.
+        if (Steps.Count(s => s.State != State.Skipped) > 1)
+            text.AppendLine("Research only this part: the other parts are researched separately, so don't look them up now.");
         // Tools that answer some parts directly, better than a web page.
         if (Has("get_stock_quote"))
             text.AppendLine("For a stock's price use get_stock_quote (today) or get_stock_history (a past day or period: for " +

@@ -107,6 +107,18 @@ public class UnitTestTaskPlan
         Assert.That(TaskPlan.ToolSource("search_web"), Is.Null);
         plan.AddSources(plan.Steps[0], new[] { TaskPlan.ToolSource("get_stock_history").Value });
         Assert.That(plan.SourcesMarkdown(), Does.Contain("1. [Twelve Data (stock prices)](https://twelvedata.com)"));
+        Assert.That(prompt, Does.Not.Contain("Research only this part"), "a single part");
+    }
+
+    [Test]
+    public void AResearchPartLooksUpOnlyItsOwnQuestion()
+    {
+        var plan = new TaskPlan(new[] { "What was Intel's closing price yesterday?", "What was AMD's closing price yesterday?" }, research: true);
+        Assert.That(plan.StepPrompt("Compare the closing prices of Intel and AMD yesterday", 0),
+            Does.Contain("Now research part 1: What was Intel's").And.Contain("Research only this part"));
+        plan.Steps[1].State = TaskPlan.State.Skipped;
+        Assert.That(plan.StepPrompt("Compare the closing prices of Intel and AMD yesterday", 0), Does.Not.Contain("Research only this part"),
+            "the other part skipped");
     }
 
     [Test]

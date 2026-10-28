@@ -612,7 +612,10 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   OTC penny stock "AI Maverick Intel" for "Intel" ($0.13) - it lists no INTC for the bare name - and today's price so far
   as yesterday's close; the tools now ask for tickers, take only listings named like the company (NASDAQ/NYSE first,
   searching again with " Inc"/" Corp"), and a daily history says which close is today's so far (2026-10-28: $93.74,
-  INTC's close of 27 October).
+  INTC's close of 27 October). A part researches only its own question ("Research only this part", when more than one runs): asked to
+  compare Intel's and AMD's closes, Gemma 4 E2B on the Fold fetched AMD's week in Intel's part too (seen with a trace of the
+  parts' tool calls, 1 run in 1), then again in AMD's own, and the reply showed two identical AMD charts; with the line, 3
+  runs of 3 made one call a part. The web feature also shows a chart only once per reply (by its data).
 - Each part is a request of its own (`StepPrompt`): search, read the best page with `read_web_page` and `lookFor`, at most
   2 of each by the prompt and 6 tool calls in all (`MaxResearchToolCalls`: the part is stopped beyond that), then up to 8
   sentences of notes (1,200 characters kept, `ResearchNotesLength`), "not found" for gaps. Its sources are the pages it

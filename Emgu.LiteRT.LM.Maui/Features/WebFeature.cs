@@ -60,15 +60,31 @@ namespace Emgu.LiteRT.LM.Maui.Features
             Host?.RefreshChips();
         }
 
+        // The charts shown above the reply (by their data), so the same one isn't shown twice.
+        private object _chartsReply;
+        private readonly HashSet<string> _chartsShown = new HashSet<string>();
+
         /// <inheritdoc/>
         public override void OnAttached(IChatPageHost host)
         {
             base.OnAttached(host);
             Enabled = host.Settings.Get(Key, false);
             Skill.SettingsLocation = host.SettingsLocation + " > Web search";
-            // A stock tool's prices: a chart above the reply, kept with it in the saved chat.
+            // A stock tool's prices: a chart above the reply, kept with it in the saved chat - once per reply: Gemma 4 E2B
+            // fetched AMD's week twice in one research part on the Fold, and the reply showed two identical charts.
             Skill.StockChartReady = chart => MainThread.BeginInvokeOnMainThread(() =>
-                Host?.AddCardToReply(StockChartView.Create(chart), new ChatSavedFile(StockChartKind, "application/json", chart.ToJson())));
+            {
+                byte[] json = chart.ToJson();
+                object reply = Host?.Conversation?.Messages.LastOrDefault();
+                string key = Convert.ToBase64String(json);
+                if (!ReferenceEquals(reply, _chartsReply))
+                {
+                    _chartsReply = reply;
+                    _chartsShown.Clear();
+                }
+                if (_chartsShown.Add(key))
+                    Host?.AddCardToReply(StockChartView.Create(chart), new ChatSavedFile(StockChartKind, "application/json", json));
+            });
             _ = LoadKeysAsync();
         }
 
