@@ -58,9 +58,10 @@ namespace Emgu.LiteRT.LM.Chat
                     "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", gpu: windows, summarize: true),
                 Gemma("Gemma4E2B", "Gemma 4 E2B", () => new Gemma4E2B(), Gemma4E2B.ModelFile, 2600,
                     "~2.6 GB download. Understands images and speech, and can think before answering.", gpu: android || mac || windows),
-                // E4B's GPU wasn't verified on Android.
+                // E4B on Android's GPU (the OpenCL plugin, as E2B): first tried on a Pixel Fold on 2026-10-27; a failed GPU
+                // load offers the CPU.
                 Gemma("Gemma4E4B", "Gemma 4 E4B", () => new Gemma4E4B(), Gemma4E4B.ModelFile, 3700,
-                    "~3.7 GB download. More capable than E2B, but slower and needs more memory.", gpu: mac || windows),
+                    "~3.7 GB download. More capable than E2B, but slower and needs more memory.", gpu: android || mac || windows),
             };
             // A large desktop model; on Windows its GPU image inference failed compatibility testing.
             if (mac || windows)

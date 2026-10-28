@@ -209,6 +209,12 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   engine fails at the LoadingEngine stage, `_gpuUnavailable` falls back to the CPU for the rest of the session. The app must
   declare `<uses-native-library android:name="libOpenCL.so" android:required="false" />` (Android 12+); our `libLiteRt.so`
   (`gpu_registry.cc`) dlopens the accelerator by name.
+- Gemma 4 E4B on Android's GPU too since 2026-10-27 (`ChatModelCatalog`; it had never been tried). On the Pixel Fold
+  (11.7 GB, 5.7 GB free): the first message 118 s including the GPU load, the next one 38 s with thinking and a tool call,
+  both right ("17 times 23" = 391, then back); the iPhone 16e/17e comparison 404 s (284 s thinking): it searched "iPhone 16e
+  vs iPhone 17e specs comparison", read MacRumors' buyer's guide with `read_web_page`, and wrote a 9-row table (A18 vs
+  A19, 128 vs 256 GB base, Qi 7.5 W vs MagSafe, C1 vs C1X...) without calling the 17e a rumour, where E2B on the GPU
+  had made one search and called it "hypothetical". Long chats, 16k/32k and memory pressure on E4B's GPU aren't measured.
 - fp32, because with the default fp16 Gemma 4 E2B doubled digits after a long conversation ("73342" for 7342) at every
   window size, while short chats were fine. fp32 fixed it at ~1.5 times the time. On the Pixel Fold a full 4k chat re-reads
   in 8 s (CPU 123 s), and follow-ups take ~1 s (CPU ~6 s). Details and the fp16/fp32 table are in

@@ -56,7 +56,7 @@ public class UnitTestChatModelCatalog
         ChatModelOption gemma = android.Single(o => o.Id == "Gemma4E2B");
         Assert.That(gemma.DisplayName, Is.EqualTo("Gemma 4 E2B"));
         Assert.That(gemma.Backends, Is.EqualTo(new[] { "cpu", "gpu" }));
-        Assert.That(android.Single(o => o.Id == "Gemma4E4B").Backends, Is.EqualTo(new[] { "cpu" }), "E4B's GPU wasn't verified on Android");
+        Assert.That(android.Single(o => o.Id == "Gemma4E4B").Backends, Is.EqualTo(new[] { "cpu", "gpu" }), "E4B on Android's GPU too");
         Assert.That(android.Single(o => o.Id == "Qwen3").Backends, Is.EqualTo(new[] { "cpu" }));
         Assert.That(mac.Single(o => o.Id == "Gemma4E4B").Backends, Is.EqualTo(new[] { "cpu", "gpu" }));
         Assert.That(ChatModelCatalog.For(ChatPlatform.iOS).All(o => o.Backends.SequenceEqual(new[] { "cpu" })), Is.True);
