@@ -117,7 +117,31 @@ public class UnitTestToolRouting
                 () => "When the user asks for a document or a file (Word, PDF, Markdown), write the whole content into create_document's content in Markdown - not into your reply - then say in one short sentence that it is ready."),
             new ToolGroup(ChatImageGeneration.GroupName, ChatImageGeneration.GroupSummary, ChatImageGeneration.GroupKeywords,
                 () => new AITool[] { AgentTools.GenerateImage(Unused) }, () => ChatImageGeneration.Instructions),
+            new ToolGroup(ChatPhotoEffects.GroupName, ChatPhotoEffects.GroupSummary, ChatPhotoEffects.GroupKeywords,
+                () => new AITool[] { AgentTools.BlurPhotoBackground((image, strength, token) => Task.FromResult("ok")) }, () => ChatPhotoEffects.Instructions),
         };
+    }
+
+    // blur_photo_background: which photo ("image-2", "2", or the last) and which strength the model meant.
+    [Test]
+    public async Task PhotoEffectsReadTheModelsArguments()
+    {
+        Assert.That(ChatPhotoEffects.ImageIndex("image-2", 3), Is.EqualTo(1));
+        Assert.That(ChatPhotoEffects.ImageIndex("2", 3), Is.EqualTo(1));
+        Assert.That(ChatPhotoEffects.ImageIndex("", 3), Is.EqualTo(2));
+        Assert.That(ChatPhotoEffects.ImageIndex("image-7", 3), Is.EqualTo(2));
+        Assert.That(ChatPhotoEffects.ImageIndex(null, 1), Is.EqualTo(0));
+        Assert.That(ChatPhotoEffects.NormalizeStrength("Strong"), Is.EqualTo("strong"));
+        Assert.That(ChatPhotoEffects.NormalizeStrength("a little"), Is.EqualTo("light"));
+        Assert.That(ChatPhotoEffects.NormalizeStrength("more"), Is.EqualTo("strong"));
+        Assert.That(ChatPhotoEffects.NormalizeStrength(null), Is.EqualTo("medium"));
+        Assert.That(ChatPhotoEffects.Strengths, Does.Contain(ChatPhotoEffects.NormalizeStrength("whatever")));
+        (string Image, string Strength) got = default;
+        AIFunction tool = AgentTools.BlurPhotoBackground((image, strength, token) => { got = (image, strength); return Task.FromResult("done"); });
+        Assert.That(tool.Name, Is.EqualTo("blur_photo_background"));
+        Assert.That((await tool.InvokeAsync(new AIFunctionArguments { ["strength"] = "strong" }))?.ToString(), Does.Contain("done"));
+        Assert.That(got, Is.EqualTo(("", "strong")));
+        Assert.That(AgentTools.PhotoBackgroundBlurredResult("light"), Does.Contain("(light blur)").And.Contain("one short sentence"));
     }
 
     [Test]
@@ -163,6 +187,9 @@ public class UnitTestToolRouting
             ("What was the restaurant you told me about?", new[] { ChatSearchIndex.GroupName }),
             ("Draw a red fox in the snow", new[] { ChatImageGeneration.GroupName }),
             ("Can you paint a lighthouse at sunset?", new[] { ChatImageGeneration.GroupName }),
+            ("Blur the background of this photo", new[] { ChatPhotoEffects.GroupName }),
+            ("Can you make it look like portrait mode?", new[] { ChatPhotoEffects.GroupName }),
+            ("Make the blur stronger", new[] { ChatPhotoEffects.GroupName }),
             ("Make me a packing list as a Word document", new[] { ChatWrittenDocuments.GroupName }),
             ("Write that up as a PDF", new[] { ChatWrittenDocuments.GroupName }),
             ("Can you export this as Markdown?", new[] { ChatWrittenDocuments.GroupName }),
@@ -173,6 +200,7 @@ public class UnitTestToolRouting
             ("Boil the eggs for 7 minutes", new string[0]),
             ("Who holds the world record for the marathon?", new string[0]),
             ("What's the weather in Paris?", new string[0]),
+            ("What was the background of the Cold War?", new string[0]),
             ("Look up the capital of France", new string[0]),
             ("How many people live in Tokyo?", new string[0]),
             ("What is 1234.5 times 678.9?", new string[0]),

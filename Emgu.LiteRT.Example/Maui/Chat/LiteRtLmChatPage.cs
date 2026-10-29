@@ -44,6 +44,7 @@ public sealed class LiteRtLmChatPage : ChatPage
     {
         public ChatPageOptions Options;
         public CameraFeature Camera;
+        public PhotoEffectsFeature PhotoEffects;
         public DocumentsFeature Documents;
         public McpFeature Mcp;
         public VoiceModeFeature VoiceMode;
@@ -107,6 +108,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         var parts = new Parts
         {
             Camera = new CameraFeature(new VisualDetectors(FileSystem.CacheDirectory, DetectorFactory.ValidationImage)),
+            PhotoEffects = new PhotoEffectsFeature(new DepthEstimator(FileSystem.CacheDirectory, DetectorFactory.ValidationImage)),
             Mcp = new McpFeature(),
             VoiceMode = new VoiceModeFeature(),
             Export = new ExportFeature((id, stream, cancel) => ChatExporter.ExportAsync(SharedStore, id, stream, cancel)),
@@ -157,6 +159,8 @@ public sealed class LiteRtLmChatPage : ChatPage
                 throw result.Exception ?? new System.IO.IOException("The snapshot could not be saved.");
             return null;
         };
+        // Blurred photos too.
+        parts.PhotoEffects.PhotoSaver = parts.Camera.SnapshotSaver;
         // Meetings keep the camera feature's foreground service running (Android) and attach the transcript to the chat.
         parts.Meetings.SyncBackgroundService = () => parts.Camera.SyncBackgroundServiceAsync();
         parts.Meetings.TranscriptAttacher = (bytes, name) =>
@@ -188,7 +192,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         {
             new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new ClipboardFeature(),
-            parts.Camera, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
+            parts.Camera, parts.PhotoEffects, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
             parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.Meetings, parts.Exercises
         })

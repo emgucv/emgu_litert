@@ -535,6 +535,38 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         /// <summary>
+        /// blur_photo_background: portrait mode for a photo the user attached - the app keeps the subject sharp and blurs
+        /// what is behind it (e.g. with Emgu.LiteRT.Models.CV's DepthEstimator and DepthEffects), shows the result to the
+        /// user and returns a short text for the model, which doesn't see the new photo.
+        /// </summary>
+        /// <param name="blur">The app's effect, given the image reference ("image-1", or empty for the latest photo) and the strength ("light", "medium" or "strong")</param>
+        public static AIFunction BlurPhotoBackground(Func<string, string, CancellationToken, Task<string>> blur)
+        {
+            if (blur == null)
+                throw new ArgumentNullException("blur");
+            return AIFunctionFactory.Create(
+                ([Description("Which attached photo, e.g. \"image-1\"; empty for the most recent one")] string image = null,
+                 [Description("How strongly to blur: \"light\", \"medium\" (the default) or \"strong\"")] string strength = null,
+                 CancellationToken cancellationToken = default(CancellationToken)) => blur(image ?? string.Empty, strength ?? string.Empty, cancellationToken),
+                "blur_photo_background",
+                "Blurs the background of a photo the user attached, keeping the person or object in front sharp (portrait mode), and shows the new photo to the user. Use it when the user asks to blur a photo's background, make it look like portrait mode, or make its subject stand out.");
+        }
+
+        /// <summary>
+        /// The blur_photo_background success result, after the app has shown the photo: what was done, written to the
+        /// user, and a short reply asked for. Gemma 4 E2B tends to answer with the result itself (a longer one with an
+        /// example reply word for word, a shorter "Done: ... shown to the user" up to its instruction), so its first
+        /// sentence is one the user can read.
+        /// </summary>
+        /// <param name="strength">The strength used ("light", "medium" or "strong")</param>
+        public static string PhotoBackgroundBlurredResult(string strength)
+        {
+            return string.Format(CultureInfo.InvariantCulture,
+                "Here is your photo with its background blurred ({0} blur) - I can make the blur lighter or stronger. Tell the user so in one short sentence.",
+                strength);
+        }
+
+        /// <summary>
         /// generate_image: draws a picture with an image generator the app provides (e.g. Emgu.LiteRT.Models'
         /// ZImageTurbo), given an English description the model writes. The generator should show the picture to the
         /// user and return a short text for the model, which doesn't see it - or, if the description is too long for it,

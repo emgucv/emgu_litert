@@ -23,6 +23,15 @@ using (var detector = new Emgu.LiteRT.Models.YoloXDetector(cacheDirectory: weigh
 }
 ```
 
+Depth from one photo: `DepthEstimator` runs Depth Anything V2 Small (Apache 2.0, a 27.7 MB download on first use; GPU at FP16 when it matches the CPU on `surfers.jpg` and is faster). `Estimate(Mat)` returns a float map the photo's size, 0 farthest to 1 nearest (relative, not metres), and `DepthEffects.BlurBackground(photo, depth)` gives the photo a portrait mode's look:
+
+```csharp
+using var depthEstimator = new Emgu.LiteRT.Models.DepthEstimator(cacheDirectory: weightsFolder);
+await depthEstimator.PrepareAsync(preferGpu: false, numThreads: 4, progress: null, CancellationToken.None);
+using Mat depth = depthEstimator.Estimate(image);
+using Mat portrait = Emgu.LiteRT.Models.DepthEffects.BlurBackground(image, depth);
+```
+
 For the Interpreter-based `Mobilenet` and `Inception` of `Emgu.TF.Lite.Models`, `InterpreterMatInput` adds `Recognize(Mat)` and `WriteInput(Mat)`:
 
 ```csharp

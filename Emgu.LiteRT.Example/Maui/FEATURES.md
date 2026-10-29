@@ -480,6 +480,24 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   style." and "Can you paint a lighthouse at sunset?" were drawn and answered ("Here is a lighthouse at sunset, dramatic
   lighting, painterly style."), saved, and shown again on reopening. Not yet tried on Android or Windows.
 
+## Photo effects
+
+- "Blur the background of this photo" (since 2026-10-28; `Emgu.LiteRT.LM.Maui.CV`'s `PhotoEffectsFeature`, the router's
+  `photo_effects` group - "blur", "bokeh", "portrait mode"...): the model calls `blur_photo_background` (an image reference
+  and "light", "medium" or "strong"); the feature takes the message's photo, or the latest one in the chat for a follow-up
+  ("make the blur stronger"), estimates its depth with Depth Anything V2 Small (`DepthEstimator`, a 27.7 MB download on
+  first use into the app's cache folder, GPU at FP16 when it passes its check) and blurs what is behind the subject
+  (`DepthEffects.BlurBackground`). The photo is shown above the reply (tap: large, with "Save photo..." - the demo's Save As
+  dialog, as for snapshots) and kept with the reply (saved file kind `edited_photo`, not given to the model).
+- Verified on Mac Catalyst with Gemma 4 12B (GPU): the yoga photo blurred in one call, then "Make the blur stronger" reused
+  it with "strong"; both photos saved with their replies and shown again when the chat is reopened. The first call took
+  ~85 s with the model's thinking and the depth model's download.
+- On the Pixel Fold with Gemma 4 E2B (GPU), the surfers sample: the depth model passed its GPU check (OpenCL, FP16), and
+  each blur took 0.5 s ("Background blurred in 0.5 s (GPU)" under the photo); the follow-up "Make the blur stronger" worked
+  too. E2B answers with the tool's result itself - word for word with a longer result that had an example reply - so
+  `AgentTools.PhotoBackgroundBlurredResult` starts with the sentence the user should read ("Here is your photo with its
+  background blurred (medium blur) - I can make the blur lighter or stronger.").
+
 ## Your own server
 
 - Settings > "Your own server" (the library's `ServerFeature`, in `Emgu.LiteRT.LM.Maui.OpenAI` since phase C, 2026-10-26; the
