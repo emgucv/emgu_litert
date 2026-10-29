@@ -37,8 +37,11 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       runs. Its PSNR against the reference is 17.9 dB (35.1 on the M1: other CPU kernels, same scene, different details), so the
       test's minimum is 15 dB on Windows.
 - [ ] Windows image generation inside the app: first-run cache preparation with Gemma resident and interactive image saving.
-- [ ] Recording a voice message live (`VoiceRecorder.cs`: AVAudioRecorder, Android AudioRecord, Windows MediaCapture) -
-      Android capture/model input passed; Mac Catalyst and Windows live capture remain pending.
+- [x] Recording a voice message live on Windows (2026-10-29): `VoiceRecorder` in the packaged app (the MAUI permission, then
+      MediaCapture) wrote a 16 kHz mono 16-bit WAV of the right length, and Gemma 4 E2B transcribed it (`UnitTestAudioFile`,
+      opt-in with `EMGU_AUDIO_FILE`): clear speech picked up by the StreamCam's microphone. It first recorded only zeros: the
+      one active input was NVIDIA Broadcast with no source behind it. Android capture/model input passed earlier
+      (Mac Catalyst is the next line).
 - [x] Windows PDF page renderer (`Emgu.LiteRT.LM.Maui`'s `PdfPageRenderer`, `Windows.Data.Pdf`), checked 2026-10-29 in a test
       harness on the EGL 1.5 spec (pages render, an out-of-range page gives null). Found: the renderer multiplies the
       destination size by the display scale (150% gave 1536 px for 1024), so the first page is measured and redrawn.

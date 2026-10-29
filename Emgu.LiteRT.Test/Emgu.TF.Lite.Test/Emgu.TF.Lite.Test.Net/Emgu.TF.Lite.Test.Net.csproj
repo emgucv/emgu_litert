@@ -73,6 +73,7 @@
     <Compile Include="..\UnitTestAgentRegression.cs" Link="UnitTestAgentRegression.cs" />
     <Compile Include="..\UnitTestCameraTools.cs" Link="UnitTestCameraTools.cs" />
     <Compile Include="..\UnitTestCameraHardware.cs" Link="UnitTestCameraHardware.cs" />
+    <Compile Include="..\UnitTestAudioFile.cs" Link="UnitTestAudioFile.cs" />
     <Compile Include="..\UnitTestLongChatBenchmark.cs" Link="UnitTestLongChatBenchmark.cs" />
     <Compile Include="..\UnitTestContextManagement.cs" Link="UnitTestContextManagement.cs" />
     <Compile Include="..\UnitTestVisualActions.cs" Link="UnitTestVisualActions.cs" />
