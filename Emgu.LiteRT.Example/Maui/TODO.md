@@ -643,7 +643,9 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [x] "Photos to index" in Settings > Search my photos (2026-10-27): 200, 1,000, 5,000 or All (the "photos_to_index" setting, 0 for all; `MaxIndexedPhotos` stays the default). Checked on Mac Catalyst: the chips, 1,000 chosen. The Mac's status said "0 photos indexed" with no error: check whether this build has Photos access (System Settings > Privacy & Security > Photos) - a library the app can't read gives no photos and no message.
 - [x] "Show me cat photos" showed eight photos of walls on the Pixel Fold, which has no cat photos (2026-10-27): a photo must now stand out against "a photo" (`ChatPhotos.SelectMatches`: a lift of 0.035, measured on 18 photos; `UnitTestPhotoMatches`). Checked on the Fold: none found. The threshold was measured with Text Vision only - check it with Multimodal, and on a real library with a few positives (e.g. "my car" where there is one).
 - [x] The Windows build of `ChatPromptEditor`: checked by hand 2026-10-29 - Enter sends, Shift+Enter adds a new line.
-- [ ] The search model's Windows GPU options (Settings > Embedding model, "Text Vision / Multimodal · GPU") chosen in the app: the models
-      themselves pass (`TestEmbeddingGemma2MultimodalGpuMatchesCpu`, 2026-10-29: GPU/CPU cosine 0.998-0.999 for three texts, an image
-      and the spoken sentence, which still matches its text best, 0.925 against 0.64-0.66; load 12 s); the choice, the re-index
-      after switching and the CPU fallback of a failed GPU load were not driven in the app.
+- [x] The search model's Windows GPU options in the app (2026-10-29): Text Vision GPU then Multimodal 740M · GPU chosen in Settings > Embedding model,
+      "ready" on the GPU, past chats re-indexed (16 messages) and all 45 photos of the Pictures folder re-embedded by the new model (140 vision
+      tokens). The models: `TestEmbeddingGemma2MultimodalGpuMatchesCpu` (GPU/CPU cosine 0.998-0.999 for texts, an image and a spoken sentence).
+      Found: the Windows photo loader (shell thumbnails) returned empty images for OneDrive's Pictures, so nothing was indexed and no message
+      said why - it decodes and re-encodes the file now; the index still skips a photo that can't be loaded without telling the user.
+- [ ] Not driven: the CPU fallback when a GPU search-model load fails, and a photo search question answered from the GPU-embedded index.

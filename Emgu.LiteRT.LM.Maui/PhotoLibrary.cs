@@ -463,17 +463,33 @@ internal static class PhotoLibrary
                 using Foundation.NSData jpeg = image?.AsJPEG(0.88f);
                 return jpeg?.ToArray();
 #elif WINDOWS
-                // The photo's id is its file path; the shell's thumbnail is a JPEG (PNG for transparent images) about maxSize pixels.
+                // The photo's id is its file path. The shell's thumbnails (StorageFile.GetThumbnailAsync) came back empty for
+                // OneDrive's Pictures folder, so the file is decoded, scaled to maxSize and encoded as a JPEG.
                 Windows.Storage.StorageFile file = Windows.Storage.StorageFile.GetFileFromPathAsync(id).AsTask().GetAwaiter().GetResult();
-                using Windows.Storage.FileProperties.StorageItemThumbnail thumbnail = file.GetThumbnailAsync(
-                    Windows.Storage.FileProperties.ThumbnailMode.PicturesView, (uint)maxSize,
-                    Windows.Storage.FileProperties.ThumbnailOptions.ResizeThumbnail).AsTask().GetAwaiter().GetResult();
-                if (thumbnail == null || thumbnail.Size == 0)
-                    return null;
-                byte[] bytes = new byte[thumbnail.Size];
-                using (Windows.Storage.Streams.DataReader reader = new Windows.Storage.Streams.DataReader(thumbnail.GetInputStreamAt(0)))
+                using Windows.Storage.Streams.IRandomAccessStreamWithContentType input = file.OpenReadAsync().AsTask().GetAwaiter().GetResult();
+                Windows.Graphics.Imaging.BitmapDecoder decoder = Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(input).AsTask().GetAwaiter().GetResult();
+                double scale = Math.Min(1.0, (double)maxSize / Math.Max(decoder.PixelWidth, decoder.PixelHeight));
+                Windows.Graphics.Imaging.BitmapTransform transform = new Windows.Graphics.Imaging.BitmapTransform
                 {
-                    reader.LoadAsync((uint)thumbnail.Size).AsTask().GetAwaiter().GetResult();
+                    ScaledWidth = (uint)Math.Max(1, Math.Round(decoder.PixelWidth * scale)),
+                    ScaledHeight = (uint)Math.Max(1, Math.Round(decoder.PixelHeight * scale)),
+                    InterpolationMode = Windows.Graphics.Imaging.BitmapInterpolationMode.Fant
+                };
+                Windows.Graphics.Imaging.PixelDataProvider pixels = decoder.GetPixelDataAsync(Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
+                    Windows.Graphics.Imaging.BitmapAlphaMode.Ignore, transform, Windows.Graphics.Imaging.ExifOrientationMode.RespectExifOrientation,
+                    Windows.Graphics.Imaging.ColorManagementMode.DoNotColorManage).AsTask().GetAwaiter().GetResult();
+                // A photo turned by its EXIF orientation comes out with its width and height swapped.
+                bool swapped = decoder.OrientedPixelWidth != decoder.PixelWidth;
+                using Windows.Storage.Streams.InMemoryRandomAccessStream output = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                Windows.Graphics.Imaging.BitmapEncoder encoder = Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(
+                    Windows.Graphics.Imaging.BitmapEncoder.JpegEncoderId, output).AsTask().GetAwaiter().GetResult();
+                encoder.SetPixelData(Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, Windows.Graphics.Imaging.BitmapAlphaMode.Ignore,
+                    swapped ? transform.ScaledHeight : transform.ScaledWidth, swapped ? transform.ScaledWidth : transform.ScaledHeight, 96, 96, pixels.DetachPixelData());
+                encoder.FlushAsync().AsTask().GetAwaiter().GetResult();
+                byte[] bytes = new byte[output.Size];
+                using (Windows.Storage.Streams.DataReader reader = new Windows.Storage.Streams.DataReader(output.GetInputStreamAt(0)))
+                {
+                    reader.LoadAsync((uint)output.Size).AsTask().GetAwaiter().GetResult();
                     reader.ReadBytes(bytes);
                 }
                 return bytes;
