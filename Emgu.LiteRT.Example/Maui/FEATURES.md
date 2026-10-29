@@ -812,9 +812,17 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   model where there is no recognizer (Android before 13, or none installed); or "Recognizer, then chat model" - the
   recognizer while recording, and the model again over every piece after Stop (their audio kept in temporary files until
   then). For the model, pieces are 15-28 s (Gemma's audio clips are at most 30 s), each written down in a request of its
-  own with `MeetingTranscription.Prompt`; pieces without speech (`MeetingAudioChunk.HasSpeech`: loud parts above -40 dBFS
-  and 4x the quiet ones) aren't sent - Gemma 4 E2B answered room noise with "I'm sorry, but I cannot transcribe the speech
-  in the recording", which `MeetingTranscription.Clean` now also drops.
+  own with `MeetingTranscription.Prompt`; pieces without speech (`MeetingAudioChunk.HasSpeech`: loud parts 4x the quiet
+  ones and above -50 dBFS) aren't sent - Gemma 4 E2B answered room noise with "I'm sorry, but I cannot transcribe the
+  speech in the recording", which `MeetingTranscription.Clean` now also drops. The floor was -40 dBFS until 2026-10-29:
+  a Pixel Fold across a room from a Mac's speakers recorded the speech at -40 to -44 dBFS (4-9x its quiet parts; the room
+  before anyone spoke -50 to -56 dBFS, 1.7-3x), so with "Chat model" the whole meeting was taken for silence, though
+  Gemma 4 E2B on the Mac wrote that recording down with 12% of the words wrong.
+  - Noise removal before writing down, tried on the Mac (2026-10-29) and not taken: CMGAN-LiteRT (litert-community, MIT,
+    GPU-only - XNNPACK declines it; FP16 on the Mac's GPU garbled some chunks, FP32 was fine) and DTLN (MIT, two stateful
+    models) both raised the noisy synthetic pieces from 15.0 to 21 dB SI-SNR, but Gemma's errors there stayed 3.2-4.4%
+    (3.8% without), and on the Fold recording they rose from 12% to 56% (DTLN) and 289% (CMGAN: invented text). Neither
+    helped the Fold recording's speakers either.
   - Measured on the synthetic meeting's 10 turns (158 words, clean and with room noise at ~15 dB SNR, a temporary self-test
     in the demo): Gemma 4 E2B 0% and 2.5% of words wrong on both devices; Apple's recognizer 0.6%/5.7% (Mac), Google's
     3.2%/4.4% (Pixel Fold). Speed: Gemma 5-6x real time on the M1's GPU but 0.3x on the Fold's (8 s, then 22 s per 6 s

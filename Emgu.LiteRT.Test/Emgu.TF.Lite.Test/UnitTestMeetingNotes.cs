@@ -320,6 +320,13 @@ public class UnitTestMeetingNotes
         Assert.That(new MeetingAudioChunk(TimeSpan.Zero, syllables, Rate).HasSpeech, Is.True);
         Assert.That(new MeetingAudioChunk(TimeSpan.Zero, syllables.Select(x => x * 0.01f).ToArray(), Rate).HasSpeech, Is.False, "too quiet");
         Assert.That(new MeetingAudioChunk(TimeSpan.Zero, new float[100], Rate).HasSpeech, Is.False);
+        // A phone across a room from the speakers (a Pixel Fold): speech at about -44 dBFS over the room's -58 dBFS is
+        // speech; the room alone, a little louder or not, isn't.
+        float[] room = Enumerable.Range(0, Rate * 3).Select(_ => (float)((random.NextDouble() - 0.5) * 0.0045)).ToArray();
+        float[] farSpeech = syllables.Select((x, i) => x * 0.03f + room[i]).ToArray();
+        Assert.That(new MeetingAudioChunk(TimeSpan.Zero, farSpeech, Rate).HasSpeech, Is.True, "far, quiet speech");
+        Assert.That(new MeetingAudioChunk(TimeSpan.Zero, room, Rate).HasSpeech, Is.False, "the room alone");
+        Assert.That(new MeetingAudioChunk(TimeSpan.Zero, room.Select(x => x * 4).ToArray(), Rate).HasSpeech, Is.False, "a louder room");
     }
 
     // The meeting's recording, written as it goes: a valid WAV once closed, the same bytes as a piece's ToWav.

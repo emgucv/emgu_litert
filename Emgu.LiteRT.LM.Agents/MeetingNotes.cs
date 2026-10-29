@@ -199,9 +199,13 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         /// <summary>
-        /// Whether someone seems to speak in it: its loud parts (the 95th percentile of its 20 ms frames) above -40 dBFS and at
-        /// least 4 times its quiet parts (the 10th) - speech comes and goes, a room's steady noise doesn't. For a language model,
-        /// which answered a piece of room noise with "I'm sorry, but I cannot transcribe the speech in the recording".
+        /// Whether someone seems to speak in it: its loud parts (the 95th percentile of its 20 ms frames) at least 4 times its
+        /// quiet parts (the 10th) - speech comes and goes, a room's steady noise doesn't - and above -50 dBFS, where
+        /// <see cref="IsSilent"/> begins. For a language model, which answered a piece of room noise with "I'm sorry, but I
+        /// cannot transcribe the speech in the recording". (The floor was -40 dBFS: a Pixel Fold across a room from the
+        /// speakers recorded speech at -40 to -44 dBFS, 4-9 times its quiet parts, and the room before anyone spoke at -50 to
+        /// -56 dBFS, 1.7-3 times - the whole meeting was taken for silence, though Gemma 4 E2B wrote it down with 12% of the
+        /// words wrong.)
         /// </summary>
         public bool HasSpeech
         {
@@ -220,7 +224,7 @@ namespace Emgu.LiteRT.LM.Agents
                 }
                 Array.Sort(rms);
                 double loud = rms[(int)(0.95 * (frames - 1))], quiet = rms[(int)(0.1 * (frames - 1))];
-                return loud >= 0.01 && loud >= 4 * quiet;
+                return loud >= 0.00316 && loud >= 4 * quiet;  // -50 dBFS
             }
         }
 
