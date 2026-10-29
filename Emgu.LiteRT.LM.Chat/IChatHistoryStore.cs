@@ -90,5 +90,14 @@ namespace Emgu.LiteRT.LM.Chat
         /// </summary>
         /// <param name="message">The message</param>
         Task SaveMessageChangesAsync(ChatMessageItem message);
+
+        /// <summary>
+        /// Keep more files with a reply already saved (e.g. meeting notes written again later), after the ones it has;
+        /// nothing for a reply the store didn't save or load, or in a private chat.
+        /// </summary>
+        /// <param name="reply">The saved reply</param>
+        /// <param name="files">The files</param>
+        /// <returns>True if they were saved</returns>
+        Task<bool> AddSavedFilesAsync(ChatMessageItem reply, IEnumerable<ChatSavedFile> files);
     }
 }

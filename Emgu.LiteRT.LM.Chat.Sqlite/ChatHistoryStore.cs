@@ -323,6 +323,47 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 OnChatsChanged();
         }
 
+        /// <summary>
+        /// Keep more files of the app's own kinds with a reply already saved (e.g. meeting notes written again later), after
+        /// the ones it has; they are in its <see cref="ChatMessageItem.SavedFiles"/> when the chat is opened again. Nothing for
+        /// a reply this store didn't save or load, or while <see cref="IsPrivate"/>.
+        /// </summary>
+        /// <param name="reply">The saved reply</param>
+        /// <param name="files">The files</param>
+        /// <returns>True if they were saved</returns>
+        public async Task<bool> AddSavedFilesAsync(ChatMessageItem reply, IEnumerable<ChatSavedFile> files)
+        {
+            if (reply == null)
+                throw new ArgumentNullException(nameof(reply));
+            int id = GetMessageId(reply);
+            List<ChatSavedFile> list = files?.Where(f => f?.Data != null).ToList() ?? new List<ChatSavedFile>();
+            if (id <= 0 || IsPrivate || list.Count == 0)
+                return false;
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            ChatMessageRecord record = await db.FindAsync<ChatMessageRecord>(id).ConfigureAwait(false);
+            if (record == null)
+                return false;
+            var saved = new List<string>();
+            if (!string.IsNullOrEmpty(record.Attachments))
+                saved.AddRange(record.Attachments.Split('\n'));
+            string folder = Path.Combine(AttachmentFolder, record.ConversationId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Directory.CreateDirectory(folder);
+            int index = saved.Count;
+            foreach (ChatSavedFile file in list)
+            {
+                string name;
+                // After the reply's own files: the next number no file has.
+                do
+                    name = string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}_{1}{2}", id, index++, Extension(file.MediaType));
+                while (File.Exists(Path.Combine(folder, name)));
+                await WriteFileAsync(Path.Combine(folder, name), file.Data).ConfigureAwait(false);
+                saved.Add(string.Join("|", file.Kind, file.MediaType, name));
+            }
+            record.Attachments = string.Join("\n", saved);
+            await db.UpdateAsync(record).ConfigureAwait(false);
+            return true;
+        }
+
         /// <summary>Record a saved message's language (null for unknown); nothing while <see cref="IsPrivate"/>.</summary>
         /// <param name="messageId">The message's id</param>
         /// <param name="language">A two-letter code, or null</param>

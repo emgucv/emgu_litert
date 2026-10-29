@@ -128,6 +128,10 @@ public sealed class MeetingFeature : ChatFeature
         public volatile bool Paused, Stopping;
         public int Failures;
         public Label Time, Status, Preview;
+        // The reply the meeting's tool call ended in (once it is done), its heading and length: for notes written again.
+        public ChatMessageItem Reply;
+        public string Heading;
+        public TimeSpan Duration;
         public Button Pause, Stop;
         public VerticalStackLayout Content;
     }
@@ -257,6 +261,10 @@ public sealed class MeetingFeature : ChatFeature
             catch (Exception ex) { Debug.WriteLine("The meeting's recording couldn't be started: " + ex.Message); }
         }
         var source = new MicrophoneSoundSource();
+        // A call took the microphone (iOS, Mac): no samples meanwhile, so the gap isn't in the recording or its time.
+        source.Interrupted += () => MainThread.BeginInvokeOnMainThread(() =>
+            session.Status.Text = "Paused: something else is using the microphone. It goes on by itself afterwards.");
+        source.Resumed += () => MainThread.BeginInvokeOnMainThread(() => session.Status.Text = "Recording again.");
         source.Samples += samples =>
         {
             if (session.Paused || session.Stopping) return;
@@ -291,8 +299,9 @@ public sealed class MeetingFeature : ChatFeature
         }
         _meeting = session;
 #if IOS
-        // Without a background audio mode, iOS stops the microphone when the screen locks.
-        MainThread.BeginInvokeOnMainThread(() => DeviceDisplay.Current.KeepScreenOn = true);
+        // Without the audio background mode (UIBackgroundModes in Info.plist), iOS stops the microphone when the screen locks.
+        if (!MicrophoneSoundSource.CanRecordInBackground)
+            MainThread.BeginInvokeOnMainThread(() => DeviceDisplay.Current.KeepScreenOn = true);
 #endif
         await SyncBackgroundServiceAsync();
         Task transcribing = TranscribeMeetingAsync(session);
@@ -326,10 +335,13 @@ public sealed class MeetingFeature : ChatFeature
         // "the meeting", or its title.
         string named = string.IsNullOrWhiteSpace(session.Title) ? "the meeting" : "“" + session.Title.Trim() + "”";
         _workDone = "The transcript of " + named + " was saved.";
+        _finishing = session;
+        session.Heading = heading;
         _meeting = null;
         _ = SyncBackgroundServiceAsync();
 #if IOS
-        MainThread.BeginInvokeOnMainThread(() => DeviceDisplay.Current.KeepScreenOn = false);
+        if (!MicrophoneSoundSource.CanRecordInBackground)
+            MainThread.BeginInvokeOnMainThread(() => DeviceDisplay.Current.KeepScreenOn = false);
 #endif
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
@@ -354,6 +366,7 @@ public sealed class MeetingFeature : ChatFeature
         _work?.Update("Saving the recording…");
         await KeepRecordingAsync(session);
 
+        session.Duration = duration;
         int words = session.Transcript.WordCount;
         int speakers = session.Voiceprint != null ? session.Transcript.LabelSpeakers() : 0;
         if (session.Transcript.IsEmpty)
@@ -378,15 +391,16 @@ public sealed class MeetingFeature : ChatFeature
                     _work?.Update(text);
                     MainThread.BeginInvokeOnMainThread(() => session.Status.Text = text);
                 });
-                notes = await MeetingNotes.WriteAsync(session.Transcript, session.Title, duration,
-                    (prompt, maxTokens, _) => Host.AskModelOnceAsync(prompt, maxTokens), Host.TokenCounter, maxPrompt, progress, token);
+                notes = await ModelStepAsync(session, "write the notes", () => MeetingNotes.WriteAsync(session.Transcript, session.Title, duration,
+                    (prompt, maxTokens, cancel) => Host.AskModelOnceAsync(prompt, maxTokens, cancel), Host.TokenCounter, maxPrompt, progress, token), token);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            // Stopped (LiteRT-LM's own cancellation comes as another exception): the transcript is saved, as said below.
+            catch (Exception ex) when (ex is not OperationCanceledException && !token.IsCancellationRequested)
             {
                 problem = "The notes couldn't be written (" + ex.Message + "); the transcript was saved.";
                 Debug.WriteLine("Meeting notes failed: " + ex);
             }
-            catch (OperationCanceledException) { }
+            catch (Exception ex) when (ex is OperationCanceledException || token.IsCancellationRequested) { }
         }
         if (unwritten > TimeSpan.Zero)
             problem = (problem != null ? problem + " " : "") + MeetingNotes.FormatTime(unwritten)
@@ -405,17 +419,16 @@ public sealed class MeetingFeature : ChatFeature
                 + (session.VoiceprintProblem != null ? "\nSpeakers weren't told apart: " + session.VoiceprintProblem : "")
                 + (problem != null ? "\n" + problem : notes == null ? "\nThe transcript was saved." : "");
             session.Preview.IsVisible = false;
-            if (notes != null)
-            {
-                var view = new ReplyView { Text = notes, FontSize = 14, Margin = new Thickness(0, 6, 0, 0) };
-                ChatResources.SetThemeColor(view, ReplyView.TextColorProperty, "ChatPrimaryText");
-                session.Content.Children.Add(view);
-            }
+            if (notes != null) ShowNotes(session, notes);
+            else session.Content.Children.Add(WriteNotesAgainLink(session));
             // Questions about the meeting later get the transcript's passages they need, as for an attached document.
             TranscriptAttacher?.Invoke(Encoding.UTF8.GetBytes(transcriptText), transcriptName);
             Host.SetStatus("Generating...");
         });
         if (notes != null) _workDone = "The notes of " + named + " are ready.";
+        // The reply is the model's too: it starts with the app in front where the model needs it.
+        try { await WhenInFrontAsync(session, "write the reply", token); }
+        catch (OperationCanceledException) { }
         _work?.Update("Writing the reply…");
         return AgentTools.MeetingResultText(duration, words, notes, document.FileName, problem);
 #else
@@ -437,7 +450,135 @@ public sealed class MeetingFeature : ChatFeature
     }
 
     /// <inheritdoc/>
-    public override void OnReplyCompleted(ChatExchangeEventArgs e) => EndBackgroundWork(_workDone);
+    public override void OnReplyCompleted(ChatExchangeEventArgs e)
+    {
+        // The meeting's reply, for notes written again later ("Write the notes again").
+        MeetingSession finishing = _finishing;
+        _finishing = null;
+        if (finishing != null) finishing.Reply = e.Reply;
+        EndBackgroundWork(_workDone);
+    }
+
+    // The meeting whose reply is being written after Stop.
+    private MeetingSession _finishing;
+
+    private static void ShowNotes(MeetingSession session, string notes)
+    {
+        var view = new ReplyView { Text = notes, FontSize = 14, Margin = new Thickness(0, 6, 0, 0) };
+        ChatResources.SetThemeColor(view, ReplyView.TextColorProperty, "ChatPrimaryText");
+        session.Content.Children.Add(view);
+    }
+
+    // When the notes weren't written (they failed or the reply was stopped): writes them from the transcript, shows them in
+    // the card and keeps them as a Word document with the meeting's reply, saved at once. On the card shown when the
+    // meeting ended (a reopened chat has its documents and recording, not this card).
+    private View WriteNotesAgainLink(MeetingSession session)
+    {
+        Label link = null;
+        bool writing = false;
+        link = ChatPage.Link("Write the notes again", async () =>
+        {
+            if (writing) return;
+            if (Host.IsBusy) { session.Status.Text = "Wait for the reply to finish, then write the notes again."; return; }
+            writing = true;
+            link.IsVisible = false;
+            session.Status.Text = "Writing the notes…";
+            try
+            {
+                int maxPrompt = Host.ContextWindow - MeetingNotes.NotesTokens - 300;
+                var progress = new Progress<string>(text => MainThread.BeginInvokeOnMainThread(() => session.Status.Text = text));
+                string notes = await ModelStepAsync(session, "write the notes", () => MeetingNotes.WriteAsync(session.Transcript, session.Title,
+                    session.Duration, (prompt, maxTokens, cancel) => Host.AskModelOnceAsync(prompt, maxTokens, cancel), Host.TokenCounter, maxPrompt, progress,
+                    CancellationToken.None), CancellationToken.None);
+                ShowNotes(session, notes);
+                session.Status.Text = MeetingNotes.FormatTime(session.Duration) + " · " + session.Transcript.WordCount + " words written down · the notes were written again.";
+                GeneratedDocument document = DocumentWriter.Create(session.Heading,
+                    MeetingNotes.DocumentMarkdown(session.Heading, session.Started, session.Duration, notes, session.Transcript), "word");
+                if (session.Reply != null)
+                    await Host.Services.Get<WrittenDocumentsFeature>().SaveToReplyAsync(document, session.Reply);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Writing the meeting notes again failed: " + ex);
+                session.Status.Text = "The notes couldn't be written (" + ex.Message + ").";
+                link.IsVisible = true;
+            }
+            finally { writing = false; }
+        });
+        link.Margin = new Thickness(0, 6, 0, 0);
+        return link;
+    }
+
+    // iOS refuses GPU (Metal) work from an app in the background, and the model runs there: its steps wait for the app to be
+    // in front, and one that failed while the app was away runs again when it's back. Elsewhere the model runs in the
+    // background (Android with the work's foreground service, a Mac always).
+    private static bool ModelNeedsFront =>
+#if IOS
+        true;
+#else
+        false;
+#endif
+
+    private readonly object _frontLock = new();
+    private volatile bool _away;
+    private int _awayCount;
+    private TaskCompletionSource<bool> _inFront = CompletedFront();
+
+    private static TaskCompletionSource<bool> CompletedFront()
+    {
+        var front = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        front.SetResult(true);
+        return front;
+    }
+
+    /// <inheritdoc/>
+    public override void OnAppStopped()
+    {
+        lock (_frontLock)
+        {
+            if (_away) return;
+            _away = true;
+            _awayCount++;
+            _inFront = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+    }
+
+    /// <inheritdoc/>
+    public override void OnAppResumed()
+    {
+        lock (_frontLock)
+        {
+            _away = false;
+            _inFront.TrySetResult(true);
+        }
+    }
+
+    // Waits, where the model needs it, until the app is in front, saying so on the card and in the work's notification.
+    private async Task WhenInFrontAsync(MeetingSession session, string toDo, CancellationToken token)
+    {
+        if (!ModelNeedsFront || !_away) return;
+        string waiting = "Waiting for the app to be opened to " + toDo + "…";
+        _work?.Update(waiting);
+        MainThread.BeginInvokeOnMainThread(() => { if (session.Status != null) session.Status.Text = waiting; });
+        Task front;
+        lock (_frontLock) front = _inFront.Task;
+        await front.WaitAsync(token);
+    }
+
+    // A step of the model's: with the app in front where the model needs it, and once more if it failed while the app was
+    // away (iOS stopped its GPU work).
+    private async Task<T> ModelStepAsync<T>(MeetingSession session, string toDo, Func<Task<T>> step, CancellationToken token)
+    {
+        await WhenInFrontAsync(session, toDo, token);
+        int away = _awayCount;
+        try { return await step(); }
+        catch (Exception ex) when (ModelNeedsFront && ex is not OperationCanceledException && (_away || _awayCount != away))
+        {
+            Debug.WriteLine("A meeting step failed while the app was away, again when it's back: " + ex.Message);
+            await WhenInFrontAsync(session, toDo, token);
+            return await step();
+        }
+    }
 
     private static void QueueMeetingChunk(MeetingSession session, MeetingAudioChunk chunk)
     {
@@ -469,6 +610,13 @@ public sealed class MeetingFeature : ChatFeature
                 }
                 foreach (MeetingAudioChunk piece in behind) SetAside(session, piece);
                 if (chunk.IsSilent) continue;
+                // The model can't run while the app is away (iOS): the piece waits for after Stop, as a skipped one.
+                if (ModelNeedsFront && _away && !session.Stopping && session.Transcriber == MeetingTranscriber.Model)
+                {
+                    SetAside(session, chunk);
+                    ShowMeetingProgress(session);
+                    continue;
+                }
                 string text = null;
                 for (int attempt = 0; attempt < 2 && text == null; attempt++)
                 {
@@ -476,7 +624,7 @@ public sealed class MeetingFeature : ChatFeature
                     {
                         byte[] wav = chunk.ToWav();
                         if (session.Transcriber == MeetingTranscriber.Model)
-                            text = chunk.HasSpeech ? await TranscribeWithModelAsync(wav, CancellationToken.None) : string.Empty;
+                            text = chunk.HasSpeech ? await ModelStepAsync(session, "write down the meeting", () => TranscribeWithModelAsync(wav, CancellationToken.None), CancellationToken.None) : string.Empty;
                         else
                         {
                             text = await SpeechRecognizer.TranscribeAsync(wav);
@@ -743,7 +891,7 @@ public sealed class MeetingFeature : ChatFeature
                 try
                 {
                     byte[] wav = chunk.ToWav();
-                    text = model ? chunk.HasSpeech ? await TranscribeWithModelAsync(wav, token) : string.Empty
+                    text = model ? chunk.HasSpeech ? await ModelStepAsync(session, "write down the skipped parts", () => TranscribeWithModelAsync(wav, token), token) : string.Empty
                         : await SpeechRecognizer.TranscribeAsync(wav);
                 }
                 catch (OperationCanceledException) { break; }
@@ -773,7 +921,8 @@ public sealed class MeetingFeature : ChatFeature
             MainThread.BeginInvokeOnMainThread(() => session.Status.Text = progress);
             Host.SetStatus(progress);
             _work?.Update(progress);
-            try { session.Transcript.Replace(pieces[i].Start, await TranscribeWithModelAsync(File.ReadAllBytes(pieces[i].Path), token)); }
+            string path = pieces[i].Path;
+            try { session.Transcript.Replace(pieces[i].Start, await ModelStepAsync(session, "write the transcript down again", () => TranscribeWithModelAsync(File.ReadAllBytes(path), token), token)); }
             catch (OperationCanceledException) { break; }
             catch (Exception ex) { Debug.WriteLine("Writing a meeting piece down again failed: " + ex.Message); }
         }
@@ -823,7 +972,7 @@ public sealed class MeetingFeature : ChatFeature
             session.Preview.IsVisible = tail.Length > 0;
             session.Status.Text = words + " words written down" + (session.Stopping ? pending > 0 ? " · finishing the last " + (pending + 1) + " pieces…" : ""
                 : pending > 1 ? " · " + pending + " pieces waiting" : "")
-                + (skipped > TimeSpan.Zero ? "\nSkipped " + MeetingNotes.FormatTime(skipped) + " to keep up - written down after Stop" : "");
+                + (skipped > TimeSpan.Zero ? "\nSkipped " + MeetingNotes.FormatTime(skipped) + " live - written down after Stop" : "");
         });
     }
 

@@ -159,6 +159,33 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
+        public async Task AddsFilesToAReplyAlreadySaved()
+        {
+            // Meeting notes written again after the reply was saved: their document goes after the reply's own files.
+            int chatId = await _store.CreateChatAsync("Record this meeting", null);
+            var message = new ChatMessageItem(ChatMessageRole.User, "Record this meeting");
+            ChatMessageItem reply = Reply("The transcript was saved.");
+            reply.SavedFiles.Add(new ChatSavedFile("meeting_recording", "audio/mp4", new byte[] { 7, 7 }));
+            await _store.SaveExchangeAsync(chatId, message, reply);
+
+            byte[] docx = { 0x50, 0x4B, 3, 4 };
+            Assert.That(await _store.AddSavedFilesAsync(reply,
+                new[] { new ChatSavedFile("written_document", "application/vnd.openxmlformats-officedocument.wordprocessingml.document; name=Notes.docx", docx) }), Is.True);
+            ChatHistory history = await _store.LoadAsync(chatId);
+            Assert.That(history.Messages[1].SavedFiles.Select(f => f.Kind), Is.EqualTo(new[] { "meeting_recording", "written_document" }));
+            Assert.That(history.Messages[1].SavedFiles[0].Data, Is.EqualTo(new byte[] { 7, 7 }));
+            Assert.That(history.Messages[1].SavedFiles[1].Data, Is.EqualTo(docx));
+
+            // Not a reply this store saved, nothing to add, or a private chat: nothing.
+            Assert.That(await _store.AddSavedFilesAsync(Reply("Never saved."), new[] { new ChatSavedFile("x", "text/plain", new byte[] { 1 }) }), Is.False);
+            Assert.That(await _store.AddSavedFilesAsync(reply, new ChatSavedFile[0]), Is.False);
+            _store.IsPrivate = true;
+            Assert.That(await _store.AddSavedFilesAsync(reply, new[] { new ChatSavedFile("x", "text/plain", new byte[] { 1 }) }), Is.False);
+            _store.IsPrivate = false;
+            Assert.That((await _store.LoadAsync(chatId)).Messages[1].SavedFiles, Has.Count.EqualTo(2));
+        }
+
+        [Test]
         public async Task KeepsAnAppsOwnFilesWithAReplyAndDeletesAChatWithItsFiles()
         {
             int chatId = await _store.CreateChatAsync("Draw a fox", null);

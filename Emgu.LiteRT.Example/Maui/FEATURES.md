@@ -845,8 +845,26 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   app away Android froze it. `WorkForegroundService`'s notification id moved from 1402 (also the monitoring service's) to
   1404, and it asks for the notification permission only when it isn't granted. Pixel Fold, "Stop and write notes" then
   Home: the work's service ran with the launcher in front and finished in 110 s, the chat saved with its reply. Stop from
-  the meeting's notification with the app away isn't tried yet. iOS gets only its short background time (and Metal can't
-  run in the background), so there the notes still need the app in front.
+  the meeting's notification with the app away isn't tried yet.
+- On iOS (since 2026-10-29): the demo's Info.plist has `UIBackgroundModes` audio, so a meeting goes on recording with
+  another app in front or the screen locked (`MicrophoneSoundSource.CanRecordInBackground`; the screen is kept on only
+  without it), and after a call or a route change the microphone starts again by itself ("Paused: something else is using
+  the microphone…", then "Recording again."). iOS doesn't let an app in the background use the GPU and suspends it ~30 s
+  after it leaves the screen, so the model's steps wait for the app (`ModelStepAsync`: "Waiting for the app to be opened
+  to write the notes…") and go on by themselves when it is back; one that failed while the app was away runs once more.
+  While away, "Chat model" sets its pieces aside, written down after Stop; the reply starts with the app in front too.
+  When the notes weren't written, the card has "Write the notes again": they are written, shown, and kept as a Word
+  document with the meeting's reply, saved at once (`IChatPageHost.AddCardToSavedReplyAsync`,
+  `ChatHistoryStore.AddSavedFilesAsync`; on the card shown when the meeting ended, not a reopened chat's). The notes'
+  model calls now get the reply's cancellation (stopping the reply didn't stop notes being written), and a stopped notes
+  step says the transcript was saved rather than "CANCELLED: Task cancelled". Verified in the iPhone simulator (iOS 27.1,
+  Gemma 4 E2B on the CPU, the synthetic meeting played from the Mac; the simulator needed the Mac's microphone permission,
+  without which `AVAudioEngine.inputNode` aborted the app): with the app sent away (`simctl launch` of Settings) the
+  recording went on (1:16) with Gemma's pieces set aside; Stop while away showed "Waiting for the app to be opened…";
+  back in front it wrote down the 13 pieces, the notes and the reply by itself (156 words of 158, 3 speakers, 51 s);
+  with the reply stopped while the notes were written, "Write the notes again" wrote them in 8 s and the chat's reply
+  kept the new document (`9_2.docx` after `9_0.m4a` and `9_1.docx`). Not on a real iPhone: there the GPU's refusal and
+  the suspension are real, which the simulator doesn't reproduce. One simulator run labelled 9 speakers for 3.
 - The recording (since 2026-10-29; Settings > "Keep meeting recordings", on by default): the microphone's samples also go
   to a temporary WAV as they arrive (`Emgu.LiteRT.LM.Agents`' `WavFileWriter`, paused stretches left out), encoded at Stop
   to AAC in an .m4a (`Emgu.LiteRT.LM.Maui`'s `AudioEncoder`: AVAudioFile on iOS and Mac Catalyst, MediaCodec and

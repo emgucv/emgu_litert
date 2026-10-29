@@ -172,6 +172,16 @@ namespace Emgu.LiteRT.LM.Maui
         Task SaveMessageChangesAsync(ChatMessageItem message);
 
         /// <summary>
+        /// Show a card above a reply that may already be saved and keep a file with it, saved at once through the page's
+        /// history store (e.g. meeting notes written again later); the file is kept in memory only in a private chat or
+        /// without a store. On the UI thread.
+        /// </summary>
+        /// <param name="reply">The reply</param>
+        /// <param name="card">The card, or null</param>
+        /// <param name="file">The file</param>
+        Task AddCardToSavedReplyAsync(ChatMessageItem reply, View card, ChatSavedFile file);
+
+        /// <summary>
         /// Show a card above the reply being written (or the latest reply) and keep a file with it: the chats' store
         /// saves the file with the reply (<see cref="ChatMessageItem.SavedFiles"/>), and when the chat is opened again
         /// the feature is asked for the card (<see cref="ChatFeature.RestoreSavedFile"/>). On the UI thread.

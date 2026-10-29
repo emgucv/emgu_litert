@@ -65,5 +65,9 @@
 	<string>With "Search my photos" on, the LiteRT-LM chat indexes your photos on this device so it can find them by what is in them. The photos and their index stay on the device.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>With "Share my location" on, the LiteRT-LM chat tells the on-device language model which town you are in, for questions such as the local weather.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 </dict>
 </plist>

@@ -22,6 +22,14 @@ namespace Emgu.LiteRT.LM.Maui
         /// <inheritdoc/>
         public event Action<float[]> Samples;
 
+#pragma warning disable CS0067 // raised only on iOS and Mac Catalyst
+        /// <summary>Raised when something else took the microphone (a call, on iOS and Mac Catalyst): no samples until <see cref="Resumed"/>.</summary>
+        public event Action Interrupted;
+
+        /// <summary>Raised when the microphone was started again after <see cref="Interrupted"/> or a change of audio route.</summary>
+        public event Action Resumed;
+#pragma warning restore CS0067
+
         /// <summary>Whether this platform has it: Android, iOS and Mac Catalyst.</summary>
         public static bool IsSupported =>
 #if ANDROID || IOS || MACCATALYST
@@ -31,6 +39,9 @@ namespace Emgu.LiteRT.LM.Maui
 #endif
 
 #if ANDROID
+        /// <summary>Whether the app may record with its screen off or another app in front: on Android with a foreground service of the microphone type.</summary>
+        public static bool CanRecordInBackground => true;
+
         private Android.Media.AudioRecord _record;
         private volatile bool _reading;
         private Task _loop;
@@ -76,6 +87,56 @@ namespace Emgu.LiteRT.LM.Maui
         }
 #elif IOS || MACCATALYST
         private AVFoundation.AVAudioEngine _engine;
+        private Foundation.NSObject _interruptionObserver, _configurationObserver;
+
+        // A call or another app's audio interrupts the session and stops the engine; a route change (headphones) stops it too.
+        // It is started again when the interruption ends (with ShouldResume) or right after the route change.
+        private void ObserveInterruptions()
+        {
+            _interruptionObserver = AVFoundation.AVAudioSession.Notifications.ObserveInterruption((_, args) =>
+            {
+                if (_engine == null) return;
+                if (args.InterruptionType == AVFoundation.AVAudioSessionInterruptionType.Began) Interrupted?.Invoke();
+                else if (args.Option == AVFoundation.AVAudioSessionInterruptionOptions.ShouldResume) Restart();
+            });
+            _configurationObserver = Foundation.NSNotificationCenter.DefaultCenter.AddObserver(
+                AVFoundation.AVAudioEngine.ConfigurationChangeNotification, _ => { if (_engine != null && !_engine.Running) Restart(); }, _engine);
+        }
+
+        private void Restart()
+        {
+            AVFoundation.AVAudioEngine engine = _engine;
+            if (engine == null) return;
+            AVFoundation.AVAudioSession.SharedInstance().SetActive(true, out Foundation.NSError _);
+            engine.Prepare();
+            if (engine.StartAndReturnError(out Foundation.NSError _)) Resumed?.Invoke();
+            else Interrupted?.Invoke();
+        }
+
+        private void StopObserving()
+        {
+            _interruptionObserver?.Dispose();
+            _interruptionObserver = null;
+            if (_configurationObserver != null) Foundation.NSNotificationCenter.DefaultCenter.RemoveObserver(_configurationObserver);
+            _configurationObserver = null;
+        }
+
+        /// <summary>
+        /// Whether the app may record with its screen off or another app in front: its Info.plist's <c>UIBackgroundModes</c>
+        /// has <c>audio</c> (iOS; a Mac app always may). Without it iOS stops the microphone when the app leaves the screen.
+        /// </summary>
+        public static bool CanRecordInBackground
+        {
+            get
+            {
+#if MACCATALYST
+                return true;
+#else
+                return Foundation.NSBundle.MainBundle.ObjectForInfoDictionary("UIBackgroundModes") is Foundation.NSArray modes
+                    && Enumerable.Range(0, (int)modes.Count).Any(i => modes.GetItem<Foundation.NSString>((nuint)i)?.ToString() == "audio");
+#endif
+            }
+        }
 
         /// <inheritdoc/>
         public async Task<bool> StartAsync()
@@ -106,12 +167,14 @@ namespace Emgu.LiteRT.LM.Maui
                 _engine.Dispose(); _engine = null;
                 throw new InvalidOperationException(error?.LocalizedDescription ?? "Could not start the microphone.");
             }
+            ObserveInterruptions();
             return true;
         }
 
         /// <inheritdoc/>
         public Task StopAsync()
         {
+            StopObserving();
             if (_engine != null)
             {
                 _engine.InputNode.RemoveTapOnBus(0);
@@ -122,6 +185,9 @@ namespace Emgu.LiteRT.LM.Maui
             return Task.CompletedTask;
         }
 #else
+        /// <summary>Whether the app may record in the background: not where there is no microphone source.</summary>
+        public static bool CanRecordInBackground => false;
+
         /// <inheritdoc/>
         public Task<bool> StartAsync() => throw new PlatformNotSupportedException("Listening through the microphone isn't supported on this platform yet.");
 

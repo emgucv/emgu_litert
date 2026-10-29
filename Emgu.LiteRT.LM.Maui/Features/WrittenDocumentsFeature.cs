@@ -72,6 +72,17 @@ public sealed class WrittenDocumentsFeature : ChatFeature
         });
     }
 
+    /// <summary>
+    /// Show a document's card above a reply that may already be saved (e.g. meeting notes written again later) and keep the
+    /// document with it, saved at once (<see cref="IChatPageHost.AddCardToSavedReplyAsync"/>).
+    /// </summary>
+    /// <param name="document">The document</param>
+    /// <param name="reply">The reply</param>
+    public Task SaveToReplyAsync(GeneratedDocument document, ChatMessageItem reply) =>
+        MainThread.InvokeOnMainThreadAsync(() => Host.AddCardToSavedReplyAsync(reply,
+            CreateCard(document.FileName, document.MediaType, document.Format, document.Data),
+            new ChatSavedFile(Kind, document.MediaType + "; name=" + document.FileName, document.Data)));
+
     /// <inheritdoc/>
     public override View RestoreSavedFile(ChatSavedFile file) => file.Kind == Kind ? SavedCard(file.MediaType, file.Data) : null;
 
