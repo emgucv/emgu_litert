@@ -90,6 +90,9 @@ internal sealed class PhotoIndex
     // The photos found to index in the last run.
     public int Total { get; private set; }
 
+    // The photos of the last run that couldn't be loaded (the library gave no image), so they are not in the index.
+    public int UnreadableCount { get; private set; }
+
     public bool IsIndexing { get; private set; }
 
     /// <summary>
@@ -163,6 +166,7 @@ internal sealed class PhotoIndex
         CancellationToken cancellationToken, Func<CancellationToken, Task> waitForWork = null, bool refreshDetails = false)
     {
         IsIndexing = true;
+        UnreadableCount = 0;
         Changed?.Invoke();
         try
         {
@@ -205,7 +209,11 @@ internal sealed class PhotoIndex
                 {
                     byte[] image = await PhotoLibrary.LoadImageAsync(photo.Id, EmbedImageSize);
                     if (image == null)
+                    {
+                        UnreadableCount++;
+                        Changed?.Invoke();
                         continue;
+                    }
                     embedding = ToBytes(await embedImage(image, cancellationToken));
                 }
                 ChatPhotoEmbedding updated = new ChatPhotoEmbedding

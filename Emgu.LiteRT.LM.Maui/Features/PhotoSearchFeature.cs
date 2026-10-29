@@ -448,9 +448,13 @@ namespace Emgu.LiteRT.LM.Maui.Features
             _photoStatus.Text = $"Photo indexing paused: {_photoPauseReason}. {_photoIndex.Count} photos indexed.";
             return;
         }
+        // Photos the library gave no image for were skipped: said, so "0 photos indexed" doesn't look like nothing was found.
+        string unreadable = _photoIndex.UnreadableCount > 0
+            ? string.Format(CultureInfo.InvariantCulture, "; {0} couldn't be read", _photoIndex.UnreadableCount)
+            : string.Empty;
         _photoStatus.Text = _photoIndex.IsIndexing && _photoIndex.Total > 0
-            ? string.Format(CultureInfo.InvariantCulture, "Indexing photos: {0} of {1}", _photoIndex.Count, _photoIndex.Total)
-            : string.Format(CultureInfo.InvariantCulture, "{0} photos indexed, {1} with a place", _photoIndex.Count, _photoIndex.WithPlaceCount);
+            ? string.Format(CultureInfo.InvariantCulture, "Indexing photos: {0} of {1}", _photoIndex.Count, _photoIndex.Total) + unreadable
+            : string.Format(CultureInfo.InvariantCulture, "{0} photos indexed, {1} with a place", _photoIndex.Count, _photoIndex.WithPlaceCount) + unreadable;
     }
 
     /// <summary>The find_photos tool: search the index, show the matches above the reply, and tell the model what was found.</summary>
