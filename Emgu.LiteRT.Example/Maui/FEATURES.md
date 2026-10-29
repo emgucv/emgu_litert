@@ -807,6 +807,22 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   Open questions. They show in the card.
 - The notes and the timed transcript are saved as a Word document with the reply, the transcript is attached as the chat's
   document for later questions, and the notes go back to the model.
+- What writes it down (since 2026-10-28; Settings > "Meeting transcripts", `Emgu.LiteRT.LM.Agents`' `MeetingTranscription`):
+  Automatic (the default) is the chat model where it takes audio on a desktop and the speech recognizer on a phone; the
+  model where there is no recognizer (Android before 13, or none installed); or "Recognizer, then chat model" - the
+  recognizer while recording, and the model again over every piece after Stop (their audio kept in temporary files until
+  then). For the model, pieces are 15-28 s (Gemma's audio clips are at most 30 s), each written down in a request of its
+  own with `MeetingTranscription.Prompt`; pieces without speech (`MeetingAudioChunk.HasSpeech`: loud parts above -40 dBFS
+  and 4x the quiet ones) aren't sent - Gemma 4 E2B answered room noise with "I'm sorry, but I cannot transcribe the speech
+  in the recording", which `MeetingTranscription.Clean` now also drops.
+  - Measured on the synthetic meeting's 10 turns (158 words, clean and with room noise at ~15 dB SNR, a temporary self-test
+    in the demo): Gemma 4 E2B 0% and 2.5% of words wrong on both devices; Apple's recognizer 0.6%/5.7% (Mac), Google's
+    3.2%/4.4% (Pixel Fold). Speed: Gemma 5-6x real time on the M1's GPU but 0.3x on the Fold's (8 s, then 22 s per 6 s
+    clip as it warmed up); the recognizers ~20x (Mac) and ~0.9x (Fold).
+  - Through the Mac's speakers and microphone with Gemma 4 E2B: 152-153 words written down live (Apple's recognizer:
+    67-89), nearly every word right ("data" for "date", "dude" for "did").
+  - Windows has no microphone source for meetings yet (`MicrophoneSoundSource`), so meetings stay Android, iOS and Mac.
+    "Recognizer, then chat model" isn't yet tried on a phone.
 - Speaker labels (since 2026-10-28; the feature's `Voiceprint`, which the demo sets to `Emgu.LiteRT.Models`'
   `SpeakerVoiceprints`, downloaded at the first meeting, 13.4 MB): the recording is also cut at each pause once a piece is
   2 s long (people take turns at pauses), each written-down piece gets its voice's fingerprint, and after Stop the pieces
@@ -819,7 +835,12 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   speakers for 3 - a piece that was mostly the silence before the playback had the room's fingerprint, and a 3 s piece of
   a split turn made a speaker of its own; since fingerprints are taken from the speech frames only, speakers are counted
   in seconds of speech (`MeetingAudioChunk.VoicedSeconds`) and need 5 of them, the second try (2:44 of silence first) had
-  3 speakers with every line right, and the notes named "Speaker 3" for the action item she took. The recognizer lost
+  3 speakers with every line right, and the notes named "Speaker 3" for the action item she took. With Gemma writing
+  it down (pieces cut at sentence pauses too, 1-5 s of speech each), two similar voices were merged: one voice's pieces
+  were only 0.48-0.75 alike, as alike as the two voices (0.40-0.52), so none grouped, and each joined the other voice as
+  a "speaker" with too little speech. Since then `SpeakerClustering.ClusterSequence` first makes pieces in a row that
+  sound alike (at least 0.6) one turn with an averaged, steadier fingerprint, and a speaker with too little speech joins
+  another only if it is at least 0.5 alike; the same recording then had every line right. The recognizer lost
   words through the speakers and one whole turn. Not yet tried with real people. Speaker changes without a pause, and a
   turn of under 2 s, go with the piece around them.
 - Tested by `UnitTestMeetingNotes`; not yet tried with a real meeting.

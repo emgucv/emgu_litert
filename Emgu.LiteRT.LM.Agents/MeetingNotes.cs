@@ -198,6 +198,32 @@ namespace Emgu.LiteRT.LM.Agents
             }
         }
 
+        /// <summary>
+        /// Whether someone seems to speak in it: its loud parts (the 95th percentile of its 20 ms frames) above -40 dBFS and at
+        /// least 4 times its quiet parts (the 10th) - speech comes and goes, a room's steady noise doesn't. For a language model,
+        /// which answered a piece of room noise with "I'm sorry, but I cannot transcribe the speech in the recording".
+        /// </summary>
+        public bool HasSpeech
+        {
+            get
+            {
+                int frame = Math.Max(1, SampleRate / 50);
+                int frames = Samples.Length / frame;
+                if (frames < 10) return false;
+                var rms = new double[frames];
+                for (int f = 0; f < frames; f++)
+                {
+                    double sum = 0;
+                    for (int i = f * frame; i < (f + 1) * frame; i++)
+                        sum += Samples[i] * Samples[i];
+                    rms[f] = Math.Sqrt(sum / frame);
+                }
+                Array.Sort(rms);
+                double loud = rms[(int)(0.95 * (frames - 1))], quiet = rms[(int)(0.1 * (frames - 1))];
+                return loud >= 0.01 && loud >= 4 * quiet;
+            }
+        }
+
         /// <summary>Whether it is all near silence (nothing to write down): its loudest 100 ms below -50 dBFS.</summary>
         public bool IsSilent
         {
@@ -284,6 +310,28 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         /// <summary>
+        /// Write a piece down again (e.g. the model's better version after the recording): the piece that starts at that time
+        /// gets the new text, keeping its voice; without one, it is added. Empty text changes nothing.
+        /// </summary>
+        /// <param name="start">Where the piece starts</param>
+        /// <param name="text">What was said</param>
+        public void Replace(TimeSpan start, string text)
+        {
+            text = Regex.Replace(text ?? string.Empty, @"\s+", " ").Trim();
+            if (text.Length == 0) return;
+            lock (_segments)
+            {
+                Segment segment = _segments.FirstOrDefault(s => s.Start == start);
+                if (segment != null)
+                {
+                    segment.Text = text;
+                    return;
+                }
+            }
+            Add(start, text);
+        }
+
+        /// <summary>
         /// Group the pieces by voice (<see cref="SpeakerClustering"/>) and label them; pieces without a fingerprint stay
         /// unlabelled. Returns the number of speakers (labels are only shown for two or more).
         /// </summary>
@@ -293,8 +341,8 @@ namespace Emgu.LiteRT.LM.Agents
             lock (_segments)
             {
                 List<Segment> printed = _segments.Where(s => s.Voiceprint != null).ToList();
-                int[] labels = SpeakerClustering.Cluster(printed.Select(s => s.Voiceprint).ToList(), threshold,
-                    printed.Select(s => s.Seconds).ToList());
+                int[] labels = SpeakerClustering.ClusterSequence(printed.Select(s => s.Voiceprint).ToList(),
+                    printed.Select(s => s.Seconds).ToList(), threshold);
                 for (int i = 0; i < printed.Count; i++)
                     printed[i].Speaker = labels[i];
                 _speakers = labels.Length == 0 ? 0 : labels.Max() + 1;

@@ -19,11 +19,16 @@ namespace Emgu.LiteRT.LM.Maui.Features;
 /// the transcript is longer than the window), shown in the card; the notes and the transcript go to
 /// <see cref="WrittenDocumentsFeature"/> as a Word document, the transcript to <see cref="TranscriptAttacher"/> (an app
 /// attaches it to the chat as its document, so later questions get the passages they need), and the notes back to the
-/// model. The tool comes with <see cref="WrittenDocumentsFeature"/>'s group, which must be on the page too. Android 13+,
-/// iOS and Mac Catalyst (<see cref="Supported"/>). With <see cref="Voiceprint"/> the speakers are labelled: pieces also end
+/// model. The tool comes with <see cref="WrittenDocumentsFeature"/>'s group, which must be on the page too. Android,
+/// iOS and Mac Catalyst (<see cref="CanRecord"/>). With <see cref="Voiceprint"/> the speakers are labelled: pieces also end
 /// at pauses once 2 s long (people take turns at pauses), each written-down piece gets its voice's fingerprint, and after
 /// Stop they are grouped by voice (<see cref="MeetingTranscript.LabelSpeakers"/>) - "Speaker 1", "Speaker 2"... in the
-/// transcript, the notes' prompts and the document.
+/// transcript, the notes' prompts and the document. What writes the pieces down is Settings > "Meeting transcripts"
+/// (<see cref="MeetingTranscription"/>): automatically the chat's model where it takes audio on a desktop (Gemma 4: fewer
+/// mistakes than the recognizers, and 5x real time on an M1) and the recognizer on a phone (Gemma 4 E2B took 0.3x real
+/// time on a Pixel Fold); the model where there is no recognizer; or the recognizer while recording and the model over
+/// every piece after Stop. For the model the pieces are 15-28 s (its audio clips are at most 30 s), each written down
+/// in a request of its own.
 /// </summary>
 public sealed class MeetingFeature : ChatFeature
 {
@@ -83,6 +88,10 @@ public sealed class MeetingFeature : ChatFeature
         public MeetingAudioChunker Chunker = new MeetingAudioChunker(16000, 30, 50);
         public Func<float[], CancellationToken, Task<float[]>> Voiceprint;
         public string VoiceprintProblem;
+        public MeetingTranscriber Transcriber;
+        // RecognizerThenModel: each written-down piece's audio, kept for the model after Stop (temporary WAV files).
+        public string PieceFolder;
+        public readonly List<(TimeSpan Start, string Path)> KeptPieces = new();
         public readonly MeetingTranscript Transcript = new MeetingTranscript();
         public readonly TaskCompletionSource<string> Ended = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public readonly Queue<MeetingAudioChunk> Pending = new();
@@ -94,31 +103,116 @@ public sealed class MeetingFeature : ChatFeature
         public VerticalStackLayout Content;
     }
 
-    /// <summary>Whether meetings can be recorded here: a speech recognizer on Android 13+, iOS or Mac Catalyst.</summary>
-    public static bool Supported =>
+    /// <summary>
+    /// Whether a meeting can be recorded now: a microphone source on this platform (Android, iOS, Mac Catalyst) and either
+    /// the speech recognizer or a chat model that takes audio.
+    /// </summary>
+    public bool CanRecord =>
 #if ANDROID || IOS || MACCATALYST
-        SpeechRecognizer.IsSupported;
+        Transcriber != null;
 #else
         false;
 #endif
 
-    /// <summary>The record_meeting tool, where supported and not in a hands-free chat (the microphone is the chat's then).</summary>
+    /// <summary>What writes the pieces down now (the setting, what this device has, the chat's model), or null if nothing can.</summary>
+    public MeetingTranscriber? Transcriber => MeetingTranscription.Choose(Choice, SpeechRecognizer.IsSupported, ModelHearsAudio, IsDesktop);
+
+    // The user's choice in the settings (null: automatic).
+    private MeetingTranscriber? Choice => MeetingTranscription.FromSetting(Host?.Settings.Get(MeetingTranscription.SettingKey, string.Empty));
+
+    private bool ModelHearsAudio => Host?.Model?.AcceptsAudio == true;
+
+    private static bool IsDesktop =>
+#if MACCATALYST || WINDOWS
+        true;
+#else
+        false;
+#endif
+
+    private readonly List<(MeetingTranscriber? Value, ToggleChip Chip)> _transcriberChips = new();
+    private Label _transcriberNote;
+    private bool _updatingChips;
+
+    /// <summary>Settings > "Meeting transcripts": automatic, the speech recognizer, the chat's model, or both (where meetings can be recorded).</summary>
+    public override View BuildSettingsSection()
+    {
+#if ANDROID || IOS || MACCATALYST
+        var chips = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
+        _transcriberChips.Clear();
+        foreach ((MeetingTranscriber? value, string text) in new (MeetingTranscriber?, string)[]
+        {
+            (null, "Automatic"), (MeetingTranscriber.Recognizer, "Speech recognizer"), (MeetingTranscriber.Model, "Chat model"),
+            (MeetingTranscriber.RecognizerThenModel, "Recognizer, then chat model")
+        })
+        {
+            var chip = new ToggleChip(text) { Margin = new Thickness(0, 0, 6, 6), IsToggled = value == Choice };
+            MeetingTranscriber? captured = value;
+            chip.Toggled += (_, e) => OnTranscriberChipToggled(captured, e.Value);
+            _transcriberChips.Add((value, chip));
+            chips.Children.Add(chip);
+        }
+        _transcriberNote = ChatPage.Note(string.Empty);
+        UpdateTranscriberNote();
+        return new VerticalStackLayout { Spacing = 6, Children = { ChatPage.SectionTitle("Meeting transcripts"), chips, _transcriberNote } };
+#else
+        return null;
+#endif
+    }
+
+    /// <inheritdoc/>
+    public override void OnModelChanged(ChatModelOption model) => MainThread.BeginInvokeOnMainThread(UpdateTranscriberNote);
+
+    // The chips act as one choice: tapping the chosen one keeps it.
+    private void OnTranscriberChipToggled(MeetingTranscriber? value, bool on)
+    {
+        if (_updatingChips) return;
+        if (on) Host.Settings.Set(MeetingTranscription.SettingKey, MeetingTranscription.ToSetting(value));
+        _updatingChips = true;
+        foreach (var (chipValue, chip) in _transcriberChips) chip.IsToggled = chipValue == Choice;
+        _updatingChips = false;
+        UpdateTranscriberNote();
+    }
+
+    // What the choice means here, now: the model's name, and what is used instead when this device can't.
+    private void UpdateTranscriberNote()
+    {
+        if (_transcriberNote == null) return;
+        string model = Host?.Model?.DisplayName ?? "the chat model";
+        MeetingTranscriber? used = Transcriber;
+        string now = used == MeetingTranscriber.Model ? model + " writes down what is said as it records - more accurate than the speech recognizer, but slow on a phone (Gemma 4 E2B took 3 s per second of speech on a Pixel Fold) and the chat waits meanwhile."
+            : used == MeetingTranscriber.RecognizerThenModel ? "The speech recognizer writes it down as it records, then " + model + " again after Stop for a better transcript (on a phone that takes about 3 s per second of speech)."
+            : used == MeetingTranscriber.Recognizer ? "The device's speech recognizer writes down what is said as it records."
+            : "Meetings can't be written down here: there is no speech recognizer and the chat model doesn't take audio.";
+        if (used != null && Choice != null && used != Choice)
+            now += ModelHearsAudio ? " (No speech recognizer here.)" : " (" + model + " doesn't take audio.)";
+        _transcriberNote.Text = now;
+    }
+
+    /// <summary>The record_meeting tool, where a meeting can be recorded and not in a hands-free chat (the microphone is the chat's then).</summary>
     /// <param name="handsFree">Whether the chat is hands-free</param>
     public IEnumerable<AITool> Tools(bool handsFree) =>
-        Supported && !handsFree ? new[] { AgentTools.RecordMeeting(RecordMeetingAsync) } : Array.Empty<AITool>();
+        CanRecord && !handsFree ? new[] { AgentTools.RecordMeeting(RecordMeetingAsync) } : Array.Empty<AITool>();
 
     private Task SyncBackgroundServiceAsync() => SyncBackgroundService?.Invoke() ?? Task.CompletedTask;
 
     private async Task<string> RecordMeetingAsync(string title, CancellationToken token)
     {
 #if ANDROID || IOS || MACCATALYST
-        if (!Supported)
-            return "Writing down speech needs Android 13 or later with a speech recognizer, an iPhone, iPad or a Mac. Tell the user.";
+        MeetingTranscriber? transcriber = Transcriber;
+        if (transcriber == null)
+            return "Writing down speech needs a speech recognizer (Android 13 or later, an iPhone, iPad or a Mac) or a chat model that hears audio (Gemma 4). Tell the user.";
         if (_meeting != null)
             return "A meeting is already being recorded. Tell the user.";
-        var session = new MeetingSession { Title = title ?? "", Started = DateTime.Now, Voiceprint = Voiceprint };
-        if (session.Voiceprint != null)
-            session.Chunker = new MeetingAudioChunker(16000, 30, 50, TurnSeconds);
+        var session = new MeetingSession { Title = title ?? "", Started = DateTime.Now, Voiceprint = Voiceprint, Transcriber = transcriber.Value };
+        // The model takes clips of at most 30 s; after Stop it writes down the same pieces again.
+        bool modelPieces = session.Transcriber != MeetingTranscriber.Recognizer;
+        session.Chunker = new MeetingAudioChunker(16000, modelPieces ? MeetingTranscription.ModelMinSeconds : 30,
+            modelPieces ? MeetingTranscription.ModelMaxSeconds : 50, session.Voiceprint != null ? TurnSeconds : 0);
+        if (session.Transcriber == MeetingTranscriber.RecognizerThenModel)
+        {
+            session.PieceFolder = System.IO.Path.Combine(FileSystem.CacheDirectory, "meeting-pieces", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(session.PieceFolder);
+        }
         await MainThread.InvokeOnMainThreadAsync(() => AddMeetingCard(session));
 
         var source = new MicrophoneSoundSource();
@@ -183,6 +277,8 @@ public sealed class MeetingFeature : ChatFeature
         });
         Host.SetStatus("Writing down the last part of the meeting...");
         await transcribing;
+        if (session.Transcriber == MeetingTranscriber.RecognizerThenModel)
+            await RewriteWithModelAsync(session, token);
 
         string heading = string.IsNullOrWhiteSpace(session.Title) ? "Meeting notes " + session.Started.ToString("yyyy-MM-dd HH.mm") : session.Title;
         int words = session.Transcript.WordCount;
@@ -268,7 +364,18 @@ public sealed class MeetingFeature : ChatFeature
                 string text = null;
                 for (int attempt = 0; attempt < 2 && text == null; attempt++)
                 {
-                    try { text = await SpeechRecognizer.TranscribeAsync(chunk.ToWav()); }
+                    try
+                    {
+                        byte[] wav = chunk.ToWav();
+                        if (session.Transcriber == MeetingTranscriber.Model)
+                            text = chunk.HasSpeech ? await TranscribeWithModelAsync(wav, CancellationToken.None) : string.Empty;
+                        else
+                        {
+                            text = await SpeechRecognizer.TranscribeAsync(wav);
+                            if (session.PieceFolder != null && chunk.HasSpeech)
+                                KeepPiece(session, chunk, wav);
+                        }
+                    }
                     catch (Exception ex)
                     {
                         Debug.WriteLine("Writing down a meeting piece failed: " + ex.Message);
@@ -288,6 +395,56 @@ public sealed class MeetingFeature : ChatFeature
             bool done;
             lock (session.Pending) done = session.Stopping && session.Pending.Count == 0;
             if (done) return;
+        }
+    }
+
+    // A piece written down by the chat's model, in a request of its own (as the notes are written): its audio and the
+    // instruction, no tools, no thinking.
+    private async Task<string> TranscribeWithModelAsync(byte[] wav, CancellationToken token)
+    {
+        var message = new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, new List<AIContent>
+        {
+            new DataContent(wav, "audio/wav"),
+            new TextContent(MeetingTranscription.Prompt)
+        });
+        ChatResponse response = await Host.ChatClient.GetResponseAsync(new[] { message },
+            new ChatOptions { MaxOutputTokens = 400, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } }, token);
+        return MeetingTranscription.Clean(new Emgu.LiteRT.LM.Models.ChatReply(response.Text ?? string.Empty).Text);
+    }
+
+    private static void KeepPiece(MeetingSession session, MeetingAudioChunk chunk, byte[] wav)
+    {
+        try
+        {
+            string path = System.IO.Path.Combine(session.PieceFolder, session.KeptPieces.Count.ToString("D5") + ".wav");
+            File.WriteAllBytes(path, wav);
+            lock (session.KeptPieces) session.KeptPieces.Add((chunk.Start, path));
+        }
+        catch (Exception ex) { Debug.WriteLine("Keeping a meeting piece failed: " + ex.Message); }
+    }
+
+    // After Stop, the model writes every kept piece down again (its version replaces the recognizer's), unless the reply
+    // was stopped; the pieces' files are deleted either way.
+    private async Task RewriteWithModelAsync(MeetingSession session, CancellationToken token)
+    {
+        List<(TimeSpan Start, string Path)> pieces;
+        lock (session.KeptPieces) pieces = session.KeptPieces.ToList();
+        try
+        {
+            string model = Host.Model?.DisplayName ?? "the model";
+            for (int i = 0; i < pieces.Count && !token.IsCancellationRequested; i++)
+            {
+                string progress = "Writing the transcript down again with " + model + ": " + (i + 1) + " of " + pieces.Count + "…";
+                MainThread.BeginInvokeOnMainThread(() => session.Status.Text = progress);
+                Host.SetStatus(progress);
+                try { session.Transcript.Replace(pieces[i].Start, await TranscribeWithModelAsync(File.ReadAllBytes(pieces[i].Path), token)); }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex) { Debug.WriteLine("Writing a meeting piece down again failed: " + ex.Message); }
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(session.PieceFolder, true); } catch (Exception) { }
         }
     }
 
@@ -331,7 +488,8 @@ public sealed class MeetingFeature : ChatFeature
         {
             session.Preview.Text = tail;
             session.Preview.IsVisible = tail.Length > 0;
-            session.Status.Text = words + " words written down" + (session.Stopping ? pending > 0 ? " · finishing the last " + (pending + 1) + " pieces…" : "" : "");
+            session.Status.Text = words + " words written down" + (session.Stopping ? pending > 0 ? " · finishing the last " + (pending + 1) + " pieces…" : ""
+                : pending > 1 ? " · " + pending + " pieces waiting" : "");
         });
     }
 
@@ -341,7 +499,9 @@ public sealed class MeetingFeature : ChatFeature
         session.Time = new Label { Text = "● 0:00", FontSize = 28 };
         ChatResources.ApplyStyle(session.Time, "ChatListTitleStyle");
         session.Time.FontSize = 28;
-        session.Status = new Label { Text = "Recording. Make sure everyone knows they are being recorded. What is said is written down as it goes." };
+        string writer = session.Transcriber == MeetingTranscriber.Model ? " by " + (Host.Model?.DisplayName ?? "the model")
+            : session.Transcriber == MeetingTranscriber.RecognizerThenModel ? ", and again by " + (Host.Model?.DisplayName ?? "the model") + " after Stop" : "";
+        session.Status = new Label { Text = "Recording. Make sure everyone knows they are being recorded. What is said is written down as it goes" + writer + "." };
         ChatResources.ApplyStyle(session.Status, "ChatListDetailStyle");
         session.Preview = new Label { IsVisible = false, LineBreakMode = LineBreakMode.WordWrap };
         ChatResources.ApplyStyle(session.Preview, "ChatSectionTextStyle");
