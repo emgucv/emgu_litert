@@ -171,6 +171,33 @@ namespace Emgu.LiteRT.LM.Agents
         /// <summary>Its length</summary>
         public TimeSpan Duration => TimeSpan.FromSeconds(Samples.Length / (double)SampleRate);
 
+        /// <summary>
+        /// How much of it is speech, in seconds: its 20 ms frames at least a tenth as loud as its loud parts (the 95th
+        /// percentile) and above -50 dBFS. A speaker's share of a meeting is counted in these, not in pieces' lengths: a
+        /// piece can be mostly the silence before someone spoke.
+        /// </summary>
+        public double VoicedSeconds
+        {
+            get
+            {
+                int frame = Math.Max(1, SampleRate / 50);
+                int frames = Samples.Length / frame;
+                if (frames == 0) return 0;
+                var rms = new double[frames];
+                for (int f = 0; f < frames; f++)
+                {
+                    double sum = 0;
+                    for (int i = f * frame; i < (f + 1) * frame; i++)
+                        sum += Samples[i] * Samples[i];
+                    rms[f] = Math.Sqrt(sum / frame);
+                }
+                double[] sorted = (double[])rms.Clone();
+                Array.Sort(sorted);
+                double floor = Math.Max(0.00316, 0.1 * sorted[(int)(0.95 * (frames - 1))]);
+                return rms.Count(r => r >= floor) * frame / (double)SampleRate;
+            }
+        }
+
         /// <summary>Whether it is all near silence (nothing to write down): its loudest 100 ms below -50 dBFS.</summary>
         public bool IsSilent
         {

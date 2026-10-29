@@ -133,14 +133,18 @@ namespace Emgu.LiteRT.Models
         }
 
         /// <summary>
-        /// The fingerprint of 16 kHz mono speech in -1..1 (length 1), or null for less than <see cref="MinSeconds"/>. Longer
-        /// than 5 s: the average of up to <see cref="MaxStretches"/> 5 s stretches spread over it.
+        /// The fingerprint of 16 kHz mono speech in -1..1 (length 1), from its speech only - its 20 ms frames at least a
+        /// tenth as loud as its loud parts and above -50 dBFS, so the silence or room noise around the words doesn't count -
+        /// or null for less than <see cref="MinSeconds"/> of speech. More than 5 s of it: the average of up to
+        /// <see cref="MaxStretches"/> 5 s stretches spread over it.
         /// </summary>
-        /// <param name="samples">The speech</param>
+        /// <param name="samples">The recording</param>
         public float[] Voiceprint(float[] samples)
         {
             if (!Imported) throw new InvalidOperationException("Prepare the voice model first.");
-            if (samples == null || samples.Length < MinSeconds * SpeakerEmbedder.SampleRate) return null;
+            if (samples == null) return null;
+            samples = Speech(samples);
+            if (samples.Length < MinSeconds * SpeakerEmbedder.SampleRate) return null;
             int stretch = SpeakerEmbedder.InputSamples;
             if (samples.Length <= stretch)
                 return _model.Embed(samples, 0, samples.Length);
@@ -153,6 +157,32 @@ namespace Emgu.LiteRT.Models
                 for (int i = 0; i < sum.Length; i++) sum[i] += e[i];
             }
             return SpeakerEmbedder.Normalize(sum);
+        }
+
+        // The frames with speech in them, joined. (A piece that started before anyone spoke gave a fingerprint of the room,
+        // which made a speaker of its own.)
+        internal static float[] Speech(float[] samples)
+        {
+            const int frame = SpeakerEmbedder.SampleRate / 50;
+            int frames = samples.Length / frame;
+            if (frames == 0) return new float[0];
+            var rms = new double[frames];
+            for (int f = 0; f < frames; f++)
+            {
+                double sum = 0;
+                for (int i = f * frame; i < (f + 1) * frame; i++)
+                    sum += samples[i] * samples[i];
+                rms[f] = Math.Sqrt(sum / frame);
+            }
+            double[] sorted = (double[])rms.Clone();
+            Array.Sort(sorted);
+            double floor = Math.Max(0.00316, 0.1 * sorted[(int)(0.95 * (frames - 1))]);
+            var speech = new System.Collections.Generic.List<float>(samples.Length);
+            for (int f = 0; f < frames; f++)
+                if (rms[f] >= floor)
+                    for (int i = f * frame; i < (f + 1) * frame; i++)
+                        speech.Add(samples[i]);
+            return speech.ToArray();
         }
 
         /// <inheritdoc/>

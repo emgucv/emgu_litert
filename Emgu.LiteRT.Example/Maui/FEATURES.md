@@ -813,9 +813,15 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   are grouped by voice - "[0:09] Speaker 2: ..." in the transcript (a speaker's pieces in a row are one line), the
   document and what the model writes the notes from, with a note that the voices were told apart automatically and names
   are only known when said. One voice: no labels. If the voice model fails, the card says so and the transcript has no labels.
-  Verified end to end except the speech recognizer on a synthetic three-voice meeting (`UnitTestSpeakerVoiceprints`);
-  not yet with the microphone or a real meeting. Speaker changes without a pause, and a turn of under 2 s, go with the
-  piece around them.
+  Verified end to end except the speech recognizer on a synthetic three-voice meeting (`UnitTestSpeakerVoiceprints`, with
+  room noise, a late start and a turn split in two), and on Mac Catalyst with the microphone: the same meeting played
+  through the Mac's speakers, recorded by the meeting card (Gemma 4 12B writing the notes). The first try found 5
+  speakers for 3 - a piece that was mostly the silence before the playback had the room's fingerprint, and a 3 s piece of
+  a split turn made a speaker of its own; since fingerprints are taken from the speech frames only, speakers are counted
+  in seconds of speech (`MeetingAudioChunk.VoicedSeconds`) and need 5 of them, the second try (2:44 of silence first) had
+  3 speakers with every line right, and the notes named "Speaker 3" for the action item she took. The recognizer lost
+  words through the speakers and one whole turn. Not yet tried with real people. Speaker changes without a pause, and a
+  turn of under 2 s, go with the piece around them.
 - Tested by `UnitTestMeetingNotes`; not yet tried with a real meeting.
 
 ## The TF Lite pages, the live camera and the About page

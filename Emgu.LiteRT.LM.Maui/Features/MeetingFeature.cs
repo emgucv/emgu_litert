@@ -282,7 +282,7 @@ public sealed class MeetingFeature : ChatFeature
                         }
                     }
                 }
-                session.Transcript.Add(chunk.Start, text, await VoiceprintOfAsync(session, chunk, text), chunk.Duration.TotalSeconds);
+                session.Transcript.Add(chunk.Start, text, await VoiceprintOfAsync(session, chunk, text), chunk.VoicedSeconds);
                 ShowMeetingProgress(session);
             }
             bool done;

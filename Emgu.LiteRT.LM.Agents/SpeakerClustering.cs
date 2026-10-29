@@ -16,8 +16,12 @@ namespace Emgu.LiteRT.LM.Agents
         /// <summary>pyannote/speaker-diarization-3.1's threshold.</summary>
         public const double DefaultThreshold = 0.7045654963945799;
 
-        /// <summary>The least speech a speaker has, in seconds, when the lengths are given.</summary>
-        public const double MinSpeakerSeconds = 3;
+        /// <summary>
+        /// The least speech a speaker has, in seconds, when the lengths are given: a voice heard for less (a 3 s piece of a
+        /// long turn split at a pause made a fifth "speaker" of a three-voice meeting played through a Mac's speakers)
+        /// joins the nearest speaker.
+        /// </summary>
+        public const double MinSpeakerSeconds = 5;
 
         /// <summary>
         /// The speaker of each embedding, numbered 0, 1, 2... in the order each speaker first appears.

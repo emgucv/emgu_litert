@@ -51,11 +51,14 @@ public class UnitTestSpeakerVoiceprints
         ("Samantha", "I think we should also mention it in the release notes, just so people know what changed."),
         ("Karen", "Agreed. I can write that section today and send it around this afternoon."),
         ("Daniel", "Perfect. Then the last thing is the marketing budget. We still need a decision on the video ads."),
-        ("Samantha", "My vote is to start small, maybe two weeks, and see how many installs we get before spending more."),
+        // One turn in two pieces (a pause in the middle), as a microphone recording split it.
+        ("Samantha", "My vote is to start small, maybe two weeks."),
+        ("Samantha", "And see how many installs we get before spending more."),
         ("Karen", "Same here. Let's review the numbers at our next meeting on Thursday."),
     };
 
-    // The meeting at 16 kHz with a faint hiss, 350 ms between turns; and who speaks from which sample.
+    // The meeting at 16 kHz with room noise (-45 dBFS), 5 s of it before anyone speaks (a recording started early: that
+    // piece's fingerprint was the room's, a speaker of its own), 350 ms between turns; and who speaks from which sample.
     private static (float[] Audio, List<(int Start, string Voice)> Turns) Meeting()
     {
         if (!File.Exists("/usr/bin/say"))
@@ -65,6 +68,7 @@ public class UnitTestSpeakerVoiceprints
         var audio = new List<float>();
         var turns = new List<(int, string)>();
         var random = new Random(7);
+        audio.AddRange(new float[16000 * 5]);
         for (int i = 0; i < Turns.Length; i++)
         {
             string aiff = Path.Combine(dir, i + ".aiff"), wav = Path.Combine(dir, i + ".wav");
@@ -80,7 +84,7 @@ public class UnitTestSpeakerVoiceprints
             for (int k = 0; k < 16000 * 35 / 100; k++) audio.Add(0);
         }
         float[] result = audio.ToArray();
-        for (int k = 0; k < result.Length; k++) result[k] += (float)((random.NextDouble() - 0.5) * 0.004);
+        for (int k = 0; k < result.Length; k++) result[k] += (float)((random.NextDouble() - 0.5) * 0.02);
         return (result, turns);
     }
 
@@ -110,16 +114,16 @@ public class UnitTestSpeakerVoiceprints
             chunks.AddRange(chunker.Add(audio.Skip(at).Take(Math.Min(1600, audio.Length - at)).ToArray()));
         MeetingAudioChunk last = chunker.Flush();
         if (last != null) chunks.Add(last);
-        Assert.That(chunks.Count, Is.EqualTo(Turns.Length), "a piece per turn");
+        Assert.That(chunks.Count, Is.GreaterThanOrEqualTo(Turns.Length), "a piece per turn at least");
 
         var transcript = new MeetingTranscript();
         var truth = new List<string>();
         foreach (MeetingAudioChunk chunk in chunks)
         {
             int middle = (int)(chunk.Start.TotalSeconds * 16000) + chunk.Samples.Length / 2;
-            string voice = turns.Last(t => t.Start <= middle).Voice;
+            string voice = turns.LastOrDefault(t => t.Start <= middle).Voice ?? turns[0].Voice;
             truth.Add(voice);
-            transcript.Add(chunk.Start, voice, voices.Voiceprint(chunk.Samples), chunk.Duration.TotalSeconds);
+            transcript.Add(chunk.Start, voice, voices.Voiceprint(chunk.Samples), chunk.VoicedSeconds);
         }
         Assert.That(transcript.LabelSpeakers(), Is.EqualTo(3));
         var labelled = transcript.LabelledSegments;
