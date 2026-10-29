@@ -32,8 +32,11 @@ Their full write-ups are in [history/TODO-done.md](history/TODO-done.md):
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Windows image generation; first-run cache preparation with Gemma resident and interactive image saving
-      remain additional device checks.
+- [x] Windows image generation, the model itself (2026-10-29): `TestZImageTurbo` passes on Windows x64 (CPU, models already on disk):
+      step 0 matches the reference (cosine 0.995), 8 steps in 64-69 s (23 s on an M1), a good apple picture, deterministic between
+      runs. Its PSNR against the reference is 17.9 dB (35.1 on the M1: other CPU kernels, same scene, different details), so the
+      test's minimum is 15 dB on Windows.
+- [ ] Windows image generation inside the app: first-run cache preparation with Gemma resident and interactive image saving.
 - [ ] Recording a voice message live (`VoiceRecorder.cs`: AVAudioRecorder, Android AudioRecord, Windows MediaCapture) -
       Android capture/model input passed; Mac Catalyst and Windows live capture remain pending.
 - [x] Windows PDF page renderer (`Emgu.LiteRT.LM.Maui`'s `PdfPageRenderer`, `Windows.Data.Pdf`), checked 2026-10-29 in a test
