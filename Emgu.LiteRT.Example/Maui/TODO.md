@@ -168,13 +168,16 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] iOS / Mac Catalyst: EventKit events and reminders, Apple Maps (built, not run; the first use asks for access).
 - [ ] Alarms more than 24 hours ahead (a calendar event is suggested instead); timers/alarms on iOS (no public API).
 
-## 25. Goals and check-ins — goals implemented and verified on Android; check-ins pending
+## 25. Goals and check-ins — goals, reminders and end dates implemented; verified on Android
 
-Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
+Done so far: see [history/TODO-done.md](history/TODO-done.md), same number (the reminders and the end dates since
+2026-10-29). Still open:
 
 - [ ] Gemma 4 E4B.
-- [ ] Check-ins: a reminder (device actions, item 24 - only iOS/Mac Catalyst have reminders) or a scheduled task
-      (item 30) asks how it went; e.g. a local notification on the evening of a day a goal is behind.
+- [ ] Reminders on a real iPhone and the Mac, Snooze, and after a phone restart (only the Pixel Fold's first reminder
+      was seen).
+- [ ] A "Done" on the reminder itself: the goal database is the app's, out of a notification receiver's reach; for
+      now tapping it opens the app.
 
 ## 26. Agent tool: clipboard (`read_clipboard`) — implemented
 

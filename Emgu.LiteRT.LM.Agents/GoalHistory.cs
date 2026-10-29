@@ -70,6 +70,10 @@ namespace Emgu.LiteRT.LM.Agents
             var history = new GoalHistory { PeriodName = goal.Period == GoalPeriod.Day ? "day" : goal.Period == GoalPeriod.Week ? "week" : "month" };
             if (goal.Target == null || goal.Period == GoalPeriod.None)
                 return history;
+            // A goal set for a while ends with its last period: none goes on after it.
+            bool over = goal.IsOver(now);
+            if (over)
+                now = goal.Ends.Value.AddTicks(-1);
             List<GoalProgress> entries = (progress ?? Enumerable.Empty<GoalProgress>()).Where(p => p.When <= now).ToList();
             DateTime first = goal.Created;
             if (entries.Count > 0 && entries.Min(p => p.When) < first)
@@ -82,7 +86,7 @@ namespace Emgu.LiteRT.LM.Agents
             {
                 DateTime end = Next(s, goal.Period);
                 double amount = entries.Where(p => p.When >= s && p.When < end).Sum(p => p.Amount);
-                periods.Add(new GoalPeriodResult { Start = s, End = end, Amount = amount, Met = amount >= goal.Target.Value, IsCurrent = s == current });
+                periods.Add(new GoalPeriodResult { Start = s, End = end, Amount = amount, Met = amount >= goal.Target.Value, IsCurrent = s == current && !over });
             }
             int run = 0, best = 0;
             foreach (GoalPeriodResult period in periods)

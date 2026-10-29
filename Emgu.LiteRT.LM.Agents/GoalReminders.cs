@@ -13,7 +13,8 @@ namespace Emgu.LiteRT.LM.Agents
     /// <summary>
     /// A goal's reminder, the habit trackers' way: at a time of day the user picks, only while the goal is still open - a
     /// daily goal every day it isn't done yet, a weekly or monthly one on the period's last day if it is still short, a goal
-    /// without a period every day nothing was logged (until its target is reached) - with the target, what is left and the
+    /// without a period every day nothing was logged (until its target is reached), none after a goal set for a while is
+    /// over (<see cref="AgentGoal.Ends"/>) - with the target, what is left and the
     /// streak in its text. An app schedules the next one (<see cref="NextDue"/>) and schedules again when progress is
     /// logged, so a reminder for a goal already done doesn't come.
     /// </summary>
@@ -40,6 +41,9 @@ namespace Emgu.LiteRT.LM.Agents
             for (int day = 0; day < 370; day++)
             {
                 DateTime date = now.Date.AddDays(day);
+                // A goal set for a while reminds until its last day.
+                if (goal.Ends is DateTime ends && date >= ends)
+                    return null;
                 DateTime due = date + time;
                 if (due <= now || !RemindsOn(goal, date))
                     continue;

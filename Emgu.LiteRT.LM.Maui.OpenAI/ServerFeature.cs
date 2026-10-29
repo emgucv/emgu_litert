@@ -274,20 +274,31 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             _serverStatus.Text = "Could not connect: " + ex.Message;
             return;
         }
-        string[] names = models.Where(m => !m.IsEmbedding).Select(m => m.Id).ToArray();
-        if (names.Length == 0)
+        List<ServerModelInfo> chat = models.Where(m => !m.IsEmbedding).ToList();
+        if (chat.Count == 0)
         {
             _serverStatus.Text = "The server has no chat models.";
             return;
         }
-        string picked = await Host.Page.DisplayActionSheetAsync("Model on your server", "Cancel", null, names);
-        if (picked == null || !names.Contains(picked) || picked == _serverModel || Host.IsBusy)
+        // The page's sheet, a row per model with what the server says of it.
+        string picked = await Host.ChooseAsync("Model on your server", chat.Select(m => new ChatChoice(m.Id, m.Id, ModelDetail(m))), _serverModel);
+        if (picked == null || !chat.Any(m => m.Id == picked) || picked == _serverModel || Host.IsBusy)
             return;
         SetServerModel(picked);
         // A chat belongs to a model: another model starts a new chat.
         if (IsSelected)
             Host.StartNewChat();
         Reconnect();
+    }
+
+    // "Loaded · images · 8K context" - what LM Studio's own API says of the model; null when the server says nothing.
+    private static string ModelDetail(ServerModelInfo model)
+    {
+        var parts = new List<string>();
+        if (model.Loaded) parts.Add("loaded");
+        if (model.Vision == true) parts.Add("images");
+        if (model.ContextTokens is int tokens) parts.Add((tokens >= 1000 ? (tokens / 1000) + "K" : tokens.ToString()) + " context");
+        return parts.Count == 0 ? null : string.Join(" · ", parts);
     }
 
     private void SetServerModel(string id)

@@ -556,7 +556,9 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   the conversation so far (`MessageCreateParams.CacheControl` through `RawRepresentationFactory`). No audio: voice
   messages are written down by the speech recognizer, and meetings use it too. The model picker is the page's sheet, a
   row per model with what it takes ("1M context · images · released 2026-09 · claude-sonnet-5-5"): the system's action
-  sheet stacked the twenty-odd models as plain buttons on Mac Catalyst. The chosen model's name is kept
+  sheet stacked the twenty-odd models as plain buttons on Mac Catalyst. The list is the library's `ChatChoices.ChooseAsync`
+  (`Emgu.LiteRT.LM.Maui`), which the server's model ("loaded · images · 8K context", from LM Studio's API) and the search
+  model (its note as the line) use too since the same day. The chosen model's name is kept
   ("claude_model_name") for the button before the list is fetched.
   - Verified on Mac Catalyst (2026-10-29, Claude Sonnet 5.5): the calculator tool (1234 × 5678 = 7,006,652); a word problem
     with "Thought for 2 s" shown and the right answer; Think off accepted; the weather tool (Vancouver, with a 3-day
@@ -721,7 +723,13 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - Pixel Fold (2026-10-29, Gemma 4 E2B): "Remind me to do my jumping jacks at 2:02 pm" called `set_goal_reminder`; the
     alarm was armed for 14:02 (Android's window +2m49s) and the notification "30 jumping jacks a day for 30 days - 30
     jumping jacks to go today" came at 14:02:51 with the launcher in front; the next was armed for 14:02 the day after.
-    Not tried: Snooze, a restart, iOS and the Mac. A goal "for 30 days" isn't read as ending: its reminders go on.
+    Not tried: Snooze, a restart, iOS and the Mac.
+- End dates (since 2026-10-29): a goal "for 30 days", "for the next two weeks" or "for a month" ends
+  (`AgentGoal.Ends`: midnight after its last day, from its words and the day it was set - nothing more is stored, so the
+  goals saved before have it too). Its history and streak stop with the last day (no period goes on afterwards), its
+  reminders stop, the duration isn't read as the target ("30 jumping jacks a day for 30 days" is 30 jumping jacks a
+  day), add_goal says "until 30 October" and the status "until 30 October", then "finished on 30 October (reached 3 of
+  30 days)".
 
 ## Tool servers (MCP)
 

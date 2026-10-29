@@ -212,7 +212,7 @@ public sealed class ClaudeFeature : ChatFeature, IRemoteChatModel
             return;
         }
         // The page's sheet, a row per model: the system's action sheet stacked a long list of plain buttons on Mac Catalyst.
-        string picked = await Host.ShowSheetAsync("Claude model", ModelList(models), "Cancel");
+        string picked = await Host.ChooseAsync("Claude model", models.Select(m => new ChatChoice(m.ID, m.DisplayName, ModelDetail(m))), _model);
         ModelInfo chosen = models.FirstOrDefault(m => m.ID == picked);
         if (chosen == null || chosen.ID == _model || Host.IsBusy)
             return;
@@ -221,28 +221,6 @@ public sealed class ClaudeFeature : ChatFeature, IRemoteChatModel
         if (IsSelected)
             Host.StartNewChat();
         Reconnect();
-    }
-
-    // A row per model, newest first: its name (the chosen one ticked) and what it takes; a tap closes the sheet with its id.
-    private View ModelList(List<ModelInfo> models)
-    {
-        var list = new VerticalStackLayout { Spacing = 2 };
-        foreach (ModelInfo model in models)
-        {
-            var title = new Label { Text = (model.ID == _model ? "✓ " : "") + model.DisplayName };
-            ChatResources.ApplyStyle(title, "ChatListTitleStyle");
-            var detail = new Label { Text = ModelDetail(model) };
-            ChatResources.ApplyStyle(detail, "ChatListDetailStyle");
-            var row = new Border { Content = new VerticalStackLayout { Spacing = 2, Children = { title, detail } } };
-            ChatResources.ApplyStyle(row, "ChatListRowStyle");
-            string id = model.ID;
-            var tap = new TapGestureRecognizer();
-            tap.Tapped += (s, e) => Host.DismissSheet(id);
-            row.GestureRecognizers.Add(tap);
-            SemanticProperties.SetDescription(row, model.DisplayName);
-            list.Children.Add(row);
-        }
-        return list;
     }
 
     // "1M context · images · released 2026-08" (what the model list says of it).

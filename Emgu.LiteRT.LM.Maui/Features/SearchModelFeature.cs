@@ -221,8 +221,8 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
             Host.SetStatus("Hang on - still busy.");
             return;
         }
-        string chosen = await Host.Page.DisplayActionSheetAsync(Title, "Cancel", null, _options.Select(o => o.Name).ToArray());
-        int index = _options.FindIndex(o => o.Name == chosen);
+        string chosen = await Host.ChooseAsync(Title, _options.Select(o => new ChatChoice(o.Key, o.Name, o.Detail)), Selected.Key);
+        int index = _options.FindIndex(o => o.Key == chosen);
         if (index < 0 || index == _selected || Host.IsBusy)
             return;
         await Host.RunReloadAsync(() => SwitchAsync(index));

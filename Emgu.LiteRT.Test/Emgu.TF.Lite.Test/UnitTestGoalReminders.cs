@@ -116,4 +116,43 @@ public class UnitTestGoalReminders
         Assert.That(reply, Does.StartWith("No goal matches"));
         Assert.That(set.Count, Is.EqualTo(2));
     }
+
+    // A goal set for a while ("for 30 days") ends: its history, streak and reminders stop, and its status says so.
+    [Test]
+    public void AGoalSetForAWhileEnds()
+    {
+        DateTime set = new DateTime(2026, 10, 1, 9, 0, 0);
+        AgentGoal goal = AgentGoal.FromText("30 jumping jacks a day for 30 days", set);
+        Assert.That(goal.Target, Is.EqualTo(30), "the duration isn't the target");
+        Assert.That(goal.Unit, Is.EqualTo("jumping jacks"));
+        Assert.That(goal.Period, Is.EqualTo(GoalPeriod.Day));
+        Assert.That(goal.Ends, Is.EqualTo(new DateTime(2026, 10, 31)), "1 October and the 29 days after it");
+        Assert.That(GoalParser.EndOf("Run three times a week for the next two weeks", set), Is.EqualTo(new DateTime(2026, 10, 15)));
+        Assert.That(GoalParser.EndOf("Read 4 books a month for a month", set), Is.EqualTo(new DateTime(2026, 11, 1)));
+        Assert.That(GoalParser.EndOf("Run for 30 minutes a day", set), Is.Null);
+        Assert.That(AgentGoal.FromText("Run for 30 minutes a day", set).Ends, Is.Null);
+
+        // Reminders up to the last day only.
+        Assert.That(GoalReminders.NextDue(goal, SixPm, null, new DateTime(2026, 10, 30, 12, 0, 0)), Is.EqualTo(new DateTime(2026, 10, 30, 18, 0, 0)));
+        Assert.That(GoalReminders.NextDue(goal, SixPm, null, new DateTime(2026, 10, 30, 19, 0, 0)), Is.Null);
+        Assert.That(GoalReminders.NextDue(goal, SixPm, null, new DateTime(2026, 11, 5)), Is.Null);
+
+        // Done on the last 3 days; looked at a week later: no period goes on, the streak is the last days'.
+        var progress = Enumerable.Range(28, 3).Select(d => new GoalProgress("g", 30, new DateTime(2026, 10, d, 8, 0, 0))).ToList();
+        GoalHistory history = GoalHistory.Compute(goal, progress, new DateTime(2026, 11, 7), 40);
+        Assert.That(history.Periods.Count, Is.EqualTo(30));
+        Assert.That(history.Periods.Any(p => p.IsCurrent), Is.False);
+        Assert.That(history.Periods.Last().Start, Is.EqualTo(new DateTime(2026, 10, 30)));
+        Assert.That(history.CurrentStreak, Is.EqualTo(3));
+        Assert.That(history.PeriodsMet, Is.EqualTo(3));
+
+        var store = new InMemoryAgentGoalStore();
+        string id = store.AddGoalAsync(goal).GetAwaiter().GetResult();
+        foreach (GoalProgress p in progress) store.AddProgressAsync(new GoalProgress(id, p.Amount, p.When)).GetAwaiter().GetResult();
+        AgentGoal saved = store.GetGoalsAsync().GetAwaiter().GetResult().Single();
+        Assert.That(AgentTools.GoalStatusAsync(store, saved, new DateTime(2026, 10, 29, 20, 0, 0)).GetAwaiter().GetResult(), Does.Contain("until 30 October"));
+        string over = AgentTools.GoalStatusAsync(store, saved, new DateTime(2026, 11, 7)).GetAwaiter().GetResult();
+        Assert.That(over, Does.Contain("finished on 30 October (reached 3 of 30 days)"));
+        Assert.That(over, Does.Not.Contain("today"));
+    }
 }

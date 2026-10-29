@@ -73,6 +73,17 @@ namespace Emgu.LiteRT.LM.Agents
         public DateTime Created { get; }
 
         /// <summary>
+        /// When the goal is over - midnight after its last day - for one set for a while ("30 jumping jacks a day for 30
+        /// days": 30 days from the day it was set), or null for one that goes on. Read from its words each time, so a goal
+        /// saved before end dates were read has one too.
+        /// </summary>
+        public DateTime? Ends => GoalParser.EndOf(Text, Created);
+
+        /// <summary>Whether the goal is over at a time (<see cref="Ends"/>).</summary>
+        /// <param name="now">The time (local)</param>
+        public bool IsOver(DateTime now) => Ends is DateTime end && now >= end;
+
+        /// <summary>
         /// A goal set now from the user's words, with its target, unit and period read by GoalParser.
         /// </summary>
         /// <param name="text">The goal, e.g. "Read 20 pages a day"</param>
@@ -277,6 +288,11 @@ namespace Emgu.LiteRT.LM.Agents
             @"\b(?:(?:a|an|per|each|every)\s+(day|night|morning|evening|week|month)|(daily|nightly|weekly|monthly|everyday|weekdays))\b",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+        // How long a goal is for: "for 30 days", "for the next two weeks", "for a month".
+        private static readonly Regex DurationPattern = new Regex(
+            @"\bfor\s+(?:the\s+next\s+)?(\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|hundred)\s+(day|week|month)s?\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
         private static readonly Regex AmountPattern = new Regex(
             // The unit is one word, hyphenated words ("sit-ups"), or an exercise of two words ("jumping jacks", "push ups", "high knees").
             @"(?<![\w.])(\d+(?:[.,]\d+)*|once|twice|thrice|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|hundred)(?:x\b|(?!\w)(?:\s+(?:more\s+)?((?:jumping|star)\s+(?:jacks?|jumps?)\b|high\s+knees?\b|knee\s+(?:raises?|lifts?)\b|(?:push|sit|pull|chin)\s+ups?\b|\p{L}+(?:-\p{L}+)*))?)",
@@ -320,6 +336,8 @@ namespace Emgu.LiteRT.LM.Agents
             }
             // The period's words aren't the target's unit.
             string rest = periodMatch.Success ? text.Remove(periodMatch.Index, periodMatch.Length).Insert(periodMatch.Index, " , ") : text;
+            // Nor is how long it is for ("for 30 days").
+            rest = DurationPattern.Replace(rest, " , ");
             foreach (Match match in AmountPattern.Matches(rest))
             {
                 if (!TryNumber(match.Groups[1].Value, out double number) || number <= 0)
@@ -336,6 +354,30 @@ namespace Emgu.LiteRT.LM.Agents
                 return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// When a goal set for a while is over: "for 30 days" - midnight 30 days after the day it was set (that day counts as
+        /// the first), "for two weeks", "for a month"; null when its words say no such thing.
+        /// </summary>
+        /// <param name="text">The goal in the user's words</param>
+        /// <param name="created">When it was set (local time)</param>
+        public static DateTime? EndOf(String text, DateTime created)
+        {
+            Match match = DurationPattern.Match(text ?? String.Empty);
+            if (!match.Success)
+                return null;
+            string count = match.Groups[1].Value.ToLowerInvariant();
+            double number = count == "a" || count == "an" ? 1 : TryNumber(count, out double n) ? n : 0;
+            if (number < 1 || number > 3650)
+                return null;
+            int units = (int)number;
+            switch (match.Groups[2].Value.ToLowerInvariant())
+            {
+                case "week": return created.Date.AddDays(7 * units);
+                case "month": return created.Date.AddMonths(units);
+                default: return created.Date.AddDays(units);
+            }
         }
 
         /// <summary>
@@ -562,7 +604,11 @@ namespace Emgu.LiteRT.LM.Agents
             DateTime start = goal.PeriodStart(now);
             double done = all.Where(p => p.When >= start).Sum(p => p.Amount);
             string text = goal.Text;
-            if (goal.Target != null)
+            if (goal.Target != null && goal.IsOver(now))
+            {
+                // Over: how it went comes below, not this period's progress.
+            }
+            else if (goal.Target != null)
             {
                 string period = goal.Period == GoalPeriod.Day ? " today" : goal.Period == GoalPeriod.Week ? " this week"
                     : goal.Period == GoalPeriod.Month ? " this month" : " so far";
@@ -575,9 +621,20 @@ namespace Emgu.LiteRT.LM.Agents
                 text += " - logged " + all.Count.ToString(CultureInfo.InvariantCulture) + (all.Count == 1 ? " time" : " times");
             }
             // A streak worth mentioning (two periods or more in a row) - so "how long is my streak" can be answered.
-            string streak = GoalHistory.Compute(goal, all, now).StreakText;
+            GoalHistory history = GoalHistory.Compute(goal, all, now);
+            string streak = history.StreakText;
             if (streak != null)
                 text += ", " + streak.Replace(" streak", "-streak").Replace("(best: ", "(best ");
+            // A goal set for a while: when it ends, or that it is over and how it went.
+            if (goal.Ends is DateTime ends)
+            {
+                if (goal.IsOver(now))
+                    text += ", finished on " + ends.AddDays(-1).ToString("d MMMM", CultureInfo.InvariantCulture)
+                        + (history.PeriodsFinished > 0 ? " (reached " + history.PeriodsMet.ToString(CultureInfo.InvariantCulture) + " of "
+                            + history.PeriodsFinished.ToString(CultureInfo.InvariantCulture) + " " + history.PeriodName + "s)" : "");
+                else
+                    text += ", until " + ends.AddDays(-1).ToString("d MMMM", CultureInfo.InvariantCulture);
+            }
             if (all.Count > 0)
                 text += goal.Target != null ? ", last: " + DayText(all.Last().When, now) : " (last: " + DayText(all.Last().When, now) + ")";
             else
@@ -606,6 +663,7 @@ namespace Emgu.LiteRT.LM.Agents
                 return "Already a goal: " + await GoalStatusAsync(store, existing, now).ConfigureAwait(false) + GoalReplyInstruction;
             await store.AddGoalAsync(goal).ConfigureAwait(false);
             return "Saved the goal: " + goal.Text + (goal.TargetText != null ? " (target: " + goal.TargetText + ")" : " (no number to count)")
+                + (goal.Ends is DateTime ends ? ", until " + ends.AddDays(-1).ToString("d MMMM", CultureInfo.InvariantCulture) : "")
                 + GoalReplyInstruction;
         }
 

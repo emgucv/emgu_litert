@@ -588,8 +588,17 @@ anything happens (the model can get a date or time wrong).
       day" saved, "35 pages last night" logged yesterday; "How am I doing" called `get_goals` and answered. 44-52 s per
       message on the GPU (the CPU took 356 s for one, reading ~4k tokens of tools).
 - [ ] Gemma 4 E4B.
-- [ ] Check-ins: a reminder (device actions, item 24 - only iOS/Mac Catalyst have reminders) or a scheduled task
-      (item 30) asks how it went; e.g. a local notification on the evening of a day a goal is behind.
+- [x] Check-ins as reminders (2026-10-29): a goal gets a time of day ("remind me at 7 pm" through `set_goal_reminder`,
+      or "Remind me…" under it in Settings > Your goals) and a local notification comes only while the goal is still
+      open - a daily goal each day it isn't done, a weekly one on Sunday and a monthly one on its last day if short -
+      with what is left and the streak to keep (`GoalReminders` in `Emgu.LiteRT.LM.Agents`, `ReminderNotifications`
+      in `Emgu.LiteRT.LM.Maui`: an inexact Android alarm with "Snooze 1 h", restored after a restart; scheduled
+      `UNUserNotificationCenter` requests on iOS and Mac Catalyst). Verified on the Pixel Fold: the reminder came at
+      14:02:51 for 14:02 with the launcher in front and the next day's was armed. See FEATURES.md, Goals.
+- [x] End dates (2026-10-29): "30 jumping jacks a day for 30 days", "for the next two weeks", "for a month" end the
+      goal (`AgentGoal.Ends`, read from its words and the day it was set, so goals saved earlier get one too): its
+      history and streak stop at the last day, its reminders stop, and its status says "until 30 October", then
+      "finished on 30 October (reached 3 of 30 days)". `UnitTestGoalReminders`.
 - [x] Streaks and history (`GoalHistory.cs` in `Emgu.LiteRT.LM.Agents`): the periods since the goal was set (or its first progress, also before it was
       set) with what was logged in each and whether the target was reached, and the streak - periods in a row that reached it; the period still going
       on never breaks a streak and adds to it once reached; the best streak is kept. Settings > Your goals shows, per goal with a target and a
