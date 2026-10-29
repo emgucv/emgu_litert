@@ -18,25 +18,41 @@ namespace Emgu.LiteRT.LM.Agents
 {
     /// <summary>
     /// Cuts a long recording into pieces a speech recognizer can take (<see cref="MinSeconds"/> to <see cref="MaxSeconds"/> long), as the
-    /// samples arrive. Each piece ends at the quietest moment between the two lengths, so a word is rarely cut in half.
+    /// samples arrive. Each piece ends at the quietest moment between the two lengths, so a word is rarely cut in half. With
+    /// <see cref="PauseSeconds"/>, a piece also ends at the first pause (300 ms quieter than the speech around it) once it is that
+    /// long: people take turns at pauses, so each piece is mostly one speaker's, for labelling speakers by voice.
     /// </summary>
     public sealed class MeetingAudioChunker
     {
         private readonly List<float> _buffer = new List<float>();
         private long _bufferStart;      // the buffer's first sample, counted from the start of the recording
+        // Pause cutting: the next 20 ms frame to look at (in the buffer), the quiet frames in a row so far, and the speech's
+        // level (a peak that fades by half in about 15 s).
+        private int _scanned, _quietFrames;
+        private double _speechLevel;
 
         /// <summary>Create a chunker</summary>
         /// <param name="sampleRate">The samples per second</param>
         /// <param name="minSeconds">The shortest piece</param>
         /// <param name="maxSeconds">The longest piece</param>
-        public MeetingAudioChunker(int sampleRate = 16000, double minSeconds = 30, double maxSeconds = 50)
+        /// <param name="pauseSeconds">If more than 0, a piece at least this long also ends at a pause</param>
+        public MeetingAudioChunker(int sampleRate = 16000, double minSeconds = 30, double maxSeconds = 50, double pauseSeconds = 0)
         {
             if (sampleRate <= 0) throw new ArgumentOutOfRangeException(nameof(sampleRate));
             if (minSeconds <= 0 || maxSeconds < minSeconds) throw new ArgumentOutOfRangeException(nameof(maxSeconds));
+            if (pauseSeconds < 0 || pauseSeconds > minSeconds) throw new ArgumentOutOfRangeException(nameof(pauseSeconds));
             SampleRate = sampleRate;
             MinSeconds = minSeconds;
             MaxSeconds = maxSeconds;
+            PauseSeconds = pauseSeconds;
         }
+
+        /// <summary>The shortest piece that ends at a pause, in seconds (0: pieces end only between MinSeconds and MaxSeconds)</summary>
+        public double PauseSeconds { get; }
+
+        // A pause: 300 ms of 20 ms frames below an eighth of the speech's level, kept between -60 and -40 dBFS (so a quiet voice
+        // far from the microphone still has pauses, and a noisy room's hum isn't speech).
+        private const int PauseFrames = 15;
 
         /// <summary>The samples per second</summary>
         public int SampleRate { get; }
@@ -56,10 +72,38 @@ namespace Emgu.LiteRT.LM.Agents
             var chunks = new List<MeetingAudioChunk>();
             if (samples == null || samples.Length == 0) return chunks;
             _buffer.AddRange(samples);
+            if (PauseSeconds > 0)
+                CutAtPauses(chunks);
             int max = (int)(MaxSeconds * SampleRate);
             while (_buffer.Count >= max)
                 chunks.Add(Take(QuietestCut()));
             return chunks;
+        }
+
+        // Ends pieces at pauses, looking at the frames added since the last call.
+        private void CutAtPauses(List<MeetingAudioChunk> chunks)
+        {
+            int frame = SampleRate / 50;
+            int min = (int)(PauseSeconds * SampleRate);
+            double fade = Math.Pow(0.5, 1.0 / (15 * 50));
+            while (_scanned + frame <= _buffer.Count)
+            {
+                double sum = 0;
+                for (int i = _scanned; i < _scanned + frame; i++)
+                    sum += _buffer[i] * _buffer[i];
+                double rms = Math.Sqrt(sum / frame);
+                _speechLevel = Math.Max(rms, _speechLevel * fade);
+                bool quiet = rms < Math.Min(0.01, Math.Max(0.001, _speechLevel / 8));
+                _quietFrames = quiet ? _quietFrames + 1 : 0;
+                _scanned += frame;
+                if (_quietFrames == PauseFrames)
+                {
+                    // The cut: the middle of the pause so far.
+                    int cut = _scanned - PauseFrames * frame / 2;
+                    if (cut >= min)
+                        chunks.Add(Take(cut));
+                }
+            }
         }
 
         /// <summary>The rest, as a last piece (null if there is less than half a second).</summary>
@@ -69,6 +113,7 @@ namespace Emgu.LiteRT.LM.Agents
             {
                 _bufferStart += _buffer.Count;
                 _buffer.Clear();
+                _scanned = 0;
                 return null;
             }
             return Take(_buffer.Count);
@@ -99,6 +144,7 @@ namespace Emgu.LiteRT.LM.Agents
         {
             float[] samples = _buffer.GetRange(0, count).ToArray();
             _buffer.RemoveRange(0, count);
+            _scanned = Math.Max(0, _scanned - count);
             var chunk = new MeetingAudioChunk(TimeSpan.FromSeconds(_bufferStart / (double)SampleRate), samples, SampleRate);
             _bufferStart += count;
             return chunk;
@@ -172,15 +218,33 @@ namespace Emgu.LiteRT.LM.Agents
     }
 
     /// <summary>
-    /// What was said in a meeting, piece by piece as a speech recognizer wrote it down, with the time each piece starts.
-    /// Thread-safe.
+    /// What was said in a meeting, piece by piece as a speech recognizer wrote it down, with the time each piece starts - and,
+    /// when the pieces came with voice fingerprints (<see cref="Add(TimeSpan, string, float[], double)"/>), who said it after
+    /// <see cref="LabelSpeakers"/>: "Speaker 1", "Speaker 2"... in the order they first spoke. Thread-safe.
     /// </summary>
     public sealed class MeetingTranscript
     {
-        private readonly List<(TimeSpan Start, string Text)> _segments = new List<(TimeSpan, string)>();
+        private sealed class Segment
+        {
+            public TimeSpan Start;
+            public string Text;
+            public float[] Voiceprint;
+            public double Seconds;
+            public int Speaker = -1;
+        }
+
+        private readonly List<Segment> _segments = new List<Segment>();
+        private int _speakers;
 
         /// <summary>Add what was said from a time on (empty text is ignored). Pieces may come out of order; they are kept in order.</summary>
-        public void Add(TimeSpan start, string text)
+        public void Add(TimeSpan start, string text) => Add(start, text, null, 0);
+
+        /// <summary>Add what was said from a time on, with the speaker's voice fingerprint (length 1) and how long the piece is.</summary>
+        /// <param name="start">Where the piece starts</param>
+        /// <param name="text">What was said (empty text is ignored)</param>
+        /// <param name="voiceprint">The voice's fingerprint, or null</param>
+        /// <param name="seconds">The piece's length</param>
+        public void Add(TimeSpan start, string text, float[] voiceprint, double seconds)
         {
             text = Regex.Replace(text ?? string.Empty, @"\s+", " ").Trim();
             if (text.Length == 0) return;
@@ -188,14 +252,49 @@ namespace Emgu.LiteRT.LM.Agents
             {
                 int at = _segments.Count;
                 while (at > 0 && _segments[at - 1].Start > start) at--;
-                _segments.Insert(at, (start, text));
+                _segments.Insert(at, new Segment { Start = start, Text = text, Voiceprint = voiceprint, Seconds = seconds });
             }
+        }
+
+        /// <summary>
+        /// Group the pieces by voice (<see cref="SpeakerClustering"/>) and label them; pieces without a fingerprint stay
+        /// unlabelled. Returns the number of speakers (labels are only shown for two or more).
+        /// </summary>
+        /// <param name="threshold">How far apart two voices' fingerprints may be and still be one speaker</param>
+        public int LabelSpeakers(double threshold = SpeakerClustering.DefaultThreshold)
+        {
+            lock (_segments)
+            {
+                List<Segment> printed = _segments.Where(s => s.Voiceprint != null).ToList();
+                int[] labels = SpeakerClustering.Cluster(printed.Select(s => s.Voiceprint).ToList(), threshold,
+                    printed.Select(s => s.Seconds).ToList());
+                for (int i = 0; i < printed.Count; i++)
+                    printed[i].Speaker = labels[i];
+                _speakers = labels.Length == 0 ? 0 : labels.Max() + 1;
+                return _speakers;
+            }
+        }
+
+        /// <summary>The number of speakers <see cref="LabelSpeakers"/> found (0 before it)</summary>
+        public int SpeakerCount
+        {
+            get { lock (_segments) return _speakers; }
         }
 
         /// <summary>The pieces, in order</summary>
         public IList<(TimeSpan Start, string Text)> Segments
         {
-            get { lock (_segments) return _segments.ToList(); }
+            get { lock (_segments) return _segments.Select(s => (s.Start, s.Text)).ToList(); }
+        }
+
+        /// <summary>The pieces in order, with their speaker's label ("Speaker 1"...; null when not labelled or only one speaker)</summary>
+        public IList<(TimeSpan Start, string Speaker, string Text)> LabelledSegments
+        {
+            get
+            {
+                lock (_segments)
+                    return _segments.Select(s => (s.Start, _speakers > 1 && s.Speaker >= 0 ? "Speaker " + (s.Speaker + 1) : null, s.Text)).ToList();
+            }
         }
 
         /// <summary>The number of words written down</summary>
@@ -210,12 +309,44 @@ namespace Emgu.LiteRT.LM.Agents
             get { lock (_segments) return _segments.Count == 0; }
         }
 
-        /// <summary>The transcript with a [m:ss] time before each piece, or the plain text.</summary>
+        /// <summary>
+        /// The transcript with a [m:ss] time before each piece (and its speaker, when labelled), or the plain text. A speaker's
+        /// pieces in a row are one line.
+        /// </summary>
         public string Text(bool withTimes = true)
         {
-            var segments = Segments;
-            return string.Join(withTimes ? "\n" : " ", segments.Select(s => withTimes ? "[" + MeetingNotes.FormatTime(s.Start) + "] " + s.Text : s.Text));
+            if (!withTimes) return string.Join(" ", Segments.Select(s => s.Text));
+            return string.Join("\n", Lines().Select(l => l.Line));
         }
+
+        // A line per piece - or, with speakers, per turn: the time, the speaker and what they said.
+        private List<(TimeSpan Start, string Line)> Lines()
+        {
+            var lines = new List<(TimeSpan, string)>();
+            string speaker = null;
+            TimeSpan start = TimeSpan.Zero;
+            var said = new StringBuilder();
+            foreach (var segment in LabelledSegments)
+            {
+                if (said.Length > 0 && (segment.Speaker == null || segment.Speaker != speaker))
+                {
+                    lines.Add((start, Line(start, speaker, said.ToString())));
+                    said.Clear();
+                }
+                if (said.Length == 0)
+                {
+                    start = segment.Start;
+                    speaker = segment.Speaker;
+                }
+                else said.Append(' ');
+                said.Append(segment.Text);
+            }
+            if (said.Length > 0) lines.Add((start, Line(start, speaker, said.ToString())));
+            return lines;
+        }
+
+        private static string Line(TimeSpan start, string speaker, string text) =>
+            "[" + MeetingNotes.FormatTime(start) + "] " + (speaker == null ? "" : speaker + ": ") + text;
 
         /// <summary>The end of the transcript, at most a number of characters (starting at a word), for showing as it grows.</summary>
         public string Tail(int maxLength)
@@ -227,7 +358,7 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         /// <summary>
-        /// The transcript in sections of at most a number of tokens each, split between pieces (a piece longer than that is a section of
+        /// The transcript in sections of at most a number of tokens each, split between lines (a line longer than that is a section of
         /// its own), each with the time it starts.
         /// </summary>
         public IList<(TimeSpan Start, string Text)> Sections(int maxTokens, Func<string, int> countTokens)
@@ -237,19 +368,18 @@ namespace Emgu.LiteRT.LM.Agents
             var current = new StringBuilder();
             TimeSpan start = TimeSpan.Zero;
             int tokens = 0;
-            foreach (var segment in Segments)
+            foreach (var line in Lines())
             {
-                string line = "[" + MeetingNotes.FormatTime(segment.Start) + "] " + segment.Text;
-                int lineTokens = countTokens(line) + 1;
+                int lineTokens = countTokens(line.Line) + 1;
                 if (current.Length > 0 && tokens + lineTokens > maxTokens)
                 {
                     sections.Add((start, current.ToString()));
                     current.Clear();
                     tokens = 0;
                 }
-                if (current.Length == 0) start = segment.Start;
+                if (current.Length == 0) start = line.Start;
                 else current.Append('\n');
-                current.Append(line);
+                current.Append(line.Line);
                 tokens += lineTokens;
             }
             if (current.Length > 0) sections.Add((start, current.ToString()));
@@ -275,13 +405,18 @@ namespace Emgu.LiteRT.LM.Agents
             ? ((int)time.TotalHours).ToString(CultureInfo.InvariantCulture) + ":" + time.Minutes.ToString("00", CultureInfo.InvariantCulture) + ":" + time.Seconds.ToString("00", CultureInfo.InvariantCulture)
             : ((int)time.TotalMinutes).ToString(CultureInfo.InvariantCulture) + ":" + time.Seconds.ToString("00", CultureInfo.InvariantCulture);
 
-        private const string TranscriptCaveat = "It was written down automatically by speech recognition, so some words may be wrong, " +
-            "and it doesn't say who is speaking.";
+        // What the model is told about the transcript: without speakers, that it doesn't say who spoke; with them, that they
+        // are told apart by voice only (the labels can be wrong, and the names are only known if someone says them).
+        private static string TranscriptCaveat(bool speakers) => speakers
+            ? "It was written down automatically by speech recognition, so some words may be wrong. The speakers were told apart " +
+              "by their voices (Speaker 1, Speaker 2...), which can be wrong for alike voices; their names are only known if " +
+              "someone says them - use a name only then."
+            : "It was written down automatically by speech recognition, so some words may be wrong, and it doesn't say who is speaking.";
 
         /// <summary>The request to summarize one section of a long transcript.</summary>
-        public static string SectionPrompt(string title, string section, int index, int count)
+        public static string SectionPrompt(string title, string section, int index, int count, bool speakers = false)
         {
-            return "Below is part " + (index + 1) + " of " + count + " of the transcript of a meeting" + TitlePart(title) + ". " + TranscriptCaveat +
+            return "Below is part " + (index + 1) + " of " + count + " of the transcript of a meeting" + TitlePart(title) + ". " + TranscriptCaveat(speakers) +
                 "\nSummarize this part in at most 8 short bullet points. Keep every decision, action item (who will do what, by when), " +
                 "number, date and name that is mentioned. Use only what the transcript says. Write in the language of the transcript. " +
                 "Write only the bullet points.\n\nTranscript:\n" + section;
@@ -296,10 +431,10 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         /// <summary>The request to write the notes, from the whole transcript or from section summaries.</summary>
-        public static string NotesPrompt(string title, TimeSpan duration, string transcript, IList<string> summaries)
+        public static string NotesPrompt(string title, TimeSpan duration, string transcript, IList<string> summaries, bool speakers = false)
         {
             string source = summaries == null
-                ? "Below is the transcript of a meeting" + TitlePart(title) + " that lasted " + Minutes(duration) + ". " + TranscriptCaveat
+                ? "Below is the transcript of a meeting" + TitlePart(title) + " that lasted " + Minutes(duration) + ". " + TranscriptCaveat(speakers)
                 : "Below are summaries of the parts of a meeting" + TitlePart(title) + " that lasted " + Minutes(duration) + ", in order. " +
                   "They were made from a transcript written down by speech recognition.";
             return source + "\nWrite meeting notes in Markdown with these sections:\n" +
@@ -344,11 +479,12 @@ namespace Emgu.LiteRT.LM.Agents
             maxPromptTokens = Math.Max(400, maxPromptTokens);
             // The instructions around the text take about 250 tokens.
             int textTokens = maxPromptTokens - 250;
+            bool speakers = transcript.SpeakerCount > 1;
             IList<(TimeSpan Start, string Text)> sections = transcript.Sections(textTokens, countTokens);
             if (sections.Count == 1)
             {
                 progress?.Report("Writing the notes…");
-                return Clean(await ask(NotesPrompt(title, duration, sections[0].Text, null), NotesTokens, cancellationToken).ConfigureAwait(false));
+                return Clean(await ask(NotesPrompt(title, duration, sections[0].Text, null, speakers), NotesTokens, cancellationToken).ConfigureAwait(false));
             }
 
             var summaries = new List<string>();
@@ -356,7 +492,7 @@ namespace Emgu.LiteRT.LM.Agents
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 progress?.Report("Summarizing part " + (i + 1) + " of " + sections.Count + "…");
-                string summary = Clean(await ask(SectionPrompt(title, sections[i].Text, i, sections.Count), SectionSummaryTokens, cancellationToken).ConfigureAwait(false));
+                string summary = Clean(await ask(SectionPrompt(title, sections[i].Text, i, sections.Count, speakers), SectionSummaryTokens, cancellationToken).ConfigureAwait(false));
                 summaries.Add("(from " + FormatTime(sections[i].Start) + ")\n" + summary);
             }
             // Summaries that together are still too long are combined a few at a time, until they fit.
@@ -411,9 +547,18 @@ namespace Emgu.LiteRT.LM.Agents
             if (!string.IsNullOrWhiteSpace(notes))
                 text.Append(Regex.Replace(notes.Trim(), @"^# .*\n+", "")).Append("\n\n");
             text.Append("## Transcript\n\n");
-            text.Append("*Written down automatically by speech recognition; some words may be wrong.*\n\n");
-            foreach (var segment in transcript.Segments)
-                text.Append("**").Append(FormatTime(segment.Start)).Append("** ").Append(segment.Text).Append("\n\n");
+            text.Append(transcript.SpeakerCount > 1
+                ? "*Written down automatically by speech recognition; some words may be wrong. Speakers were told apart by voice.*\n\n"
+                : "*Written down automatically by speech recognition; some words may be wrong.*\n\n");
+            // The lines: "[m:ss] Speaker 1: text" as "**m:ss** **Speaker 1:** text".
+            foreach (string line in transcript.Text().Split('\n'))
+            {
+                Match parts = Regex.Match(line, @"^\[([0-9:]+)\] (?:(Speaker \d+): )?(.*)$");
+                if (!parts.Success) continue;
+                text.Append("**").Append(parts.Groups[1].Value).Append("** ");
+                if (parts.Groups[2].Success) text.Append("**").Append(parts.Groups[2].Value).Append(":** ");
+                text.Append(parts.Groups[3].Value).Append("\n\n");
+            }
             return text.ToString();
         }
     }

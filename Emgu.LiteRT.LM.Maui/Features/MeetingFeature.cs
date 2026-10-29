@@ -20,7 +20,10 @@ namespace Emgu.LiteRT.LM.Maui.Features;
 /// <see cref="WrittenDocumentsFeature"/> as a Word document, the transcript to <see cref="TranscriptAttacher"/> (an app
 /// attaches it to the chat as its document, so later questions get the passages they need), and the notes back to the
 /// model. The tool comes with <see cref="WrittenDocumentsFeature"/>'s group, which must be on the page too. Android 13+,
-/// iOS and Mac Catalyst (<see cref="Supported"/>).
+/// iOS and Mac Catalyst (<see cref="Supported"/>). With <see cref="Voiceprint"/> the speakers are labelled: pieces also end
+/// at pauses once 2 s long (people take turns at pauses), each written-down piece gets its voice's fingerprint, and after
+/// Stop they are grouped by voice (<see cref="MeetingTranscript.LabelSpeakers"/>) - "Speaker 1", "Speaker 2"... in the
+/// transcript, the notes' prompts and the document.
 /// </summary>
 public sealed class MeetingFeature : ChatFeature
 {
@@ -49,6 +52,16 @@ public sealed class MeetingFeature : ChatFeature
     /// <summary>Given the transcript (as a text file's bytes and name) when the notes are done: an app attaches it to the chat as its document; or null.</summary>
     public Action<byte[], string> TranscriptAttacher { get; set; }
 
+    /// <summary>
+    /// The fingerprint of a piece's voice (16 kHz mono samples to a length-1 vector, or null for too little speech), for
+    /// labelling speakers - e.g. Emgu.LiteRT.Models' SpeakerVoiceprints, prepared on its first call; or null for no labels.
+    /// Called off the UI thread, one piece at a time.
+    /// </summary>
+    public Func<float[], CancellationToken, Task<float[]>> Voiceprint { get; set; }
+
+    /// <summary>The shortest piece that ends at a pause when speakers are labelled, in seconds.</summary>
+    public const double TurnSeconds = 2;
+
     /// <summary>End the recording (the notes are then written, unless the chat is closing).</summary>
     /// <param name="reason">Why, for the log ("the user pressed Stop in the notification")</param>
     public void Stop(string reason) => _meeting?.Ended.TrySetResult(reason);
@@ -67,7 +80,9 @@ public sealed class MeetingFeature : ChatFeature
     {
         public string Title = "";
         public DateTime Started;
-        public readonly MeetingAudioChunker Chunker = new MeetingAudioChunker(16000, 30, 50);
+        public MeetingAudioChunker Chunker = new MeetingAudioChunker(16000, 30, 50);
+        public Func<float[], CancellationToken, Task<float[]>> Voiceprint;
+        public string VoiceprintProblem;
         public readonly MeetingTranscript Transcript = new MeetingTranscript();
         public readonly TaskCompletionSource<string> Ended = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public readonly Queue<MeetingAudioChunk> Pending = new();
@@ -101,7 +116,9 @@ public sealed class MeetingFeature : ChatFeature
             return "Writing down speech needs Android 13 or later with a speech recognizer, an iPhone, iPad or a Mac. Tell the user.";
         if (_meeting != null)
             return "A meeting is already being recorded. Tell the user.";
-        var session = new MeetingSession { Title = title ?? "", Started = DateTime.Now };
+        var session = new MeetingSession { Title = title ?? "", Started = DateTime.Now, Voiceprint = Voiceprint };
+        if (session.Voiceprint != null)
+            session.Chunker = new MeetingAudioChunker(16000, 30, 50, TurnSeconds);
         await MainThread.InvokeOnMainThreadAsync(() => AddMeetingCard(session));
 
         var source = new MicrophoneSoundSource();
@@ -169,6 +186,7 @@ public sealed class MeetingFeature : ChatFeature
 
         string heading = string.IsNullOrWhiteSpace(session.Title) ? "Meeting notes " + session.Started.ToString("yyyy-MM-dd HH.mm") : session.Title;
         int words = session.Transcript.WordCount;
+        int speakers = session.Voiceprint != null ? session.Transcript.LabelSpeakers() : 0;
         if (session.Transcript.IsEmpty)
         {
             await MainThread.InvokeOnMainThreadAsync(() => EndMeetingCard(session, "Nothing was heard in " + MeetingNotes.FormatTime(duration) + "."));
@@ -205,6 +223,8 @@ public sealed class MeetingFeature : ChatFeature
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
             session.Status.Text = MeetingNotes.FormatTime(duration) + " · " + words + " words written down"
+                + (speakers > 1 ? " · " + speakers + " speakers" : "")
+                + (session.VoiceprintProblem != null ? "\nSpeakers weren't told apart: " + session.VoiceprintProblem : "")
                 + (problem != null ? "\n" + problem : notes == null ? "\nThe transcript was saved." : "");
             session.Preview.IsVisible = false;
             if (notes != null)
@@ -262,12 +282,27 @@ public sealed class MeetingFeature : ChatFeature
                         }
                     }
                 }
-                session.Transcript.Add(chunk.Start, text);
+                session.Transcript.Add(chunk.Start, text, await VoiceprintOfAsync(session, chunk, text), chunk.Duration.TotalSeconds);
                 ShowMeetingProgress(session);
             }
             bool done;
             lock (session.Pending) done = session.Stopping && session.Pending.Count == 0;
             if (done) return;
+        }
+    }
+
+    // A written-down piece's voice fingerprint, when speakers are labelled; after a failure (e.g. the model couldn't be
+    // downloaded) no more are asked for, and the card says why.
+    private static async Task<float[]> VoiceprintOfAsync(MeetingSession session, MeetingAudioChunk chunk, string text)
+    {
+        if (session.Voiceprint == null || session.VoiceprintProblem != null || string.IsNullOrWhiteSpace(text))
+            return null;
+        try { return await Task.Run(() => session.Voiceprint(chunk.Samples, CancellationToken.None)); }
+        catch (Exception ex)
+        {
+            Debug.WriteLine("A meeting piece's voiceprint failed: " + ex);
+            session.VoiceprintProblem = ex.Message;
+            return null;
         }
     }
 

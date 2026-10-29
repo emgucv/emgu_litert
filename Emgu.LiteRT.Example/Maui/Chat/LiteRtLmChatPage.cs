@@ -168,6 +168,19 @@ public sealed class LiteRtLmChatPage : ChatPage
             if (!parts.SearchModel.DownloadRequired)
                 parts.Documents.AttachDocument(bytes, name);
         };
+        // Speakers told apart by voice (WeSpeaker, 13 MB, downloaded at the first meeting).
+        var voices = new SpeakerVoiceprints(FileSystem.CacheDirectory);
+        var voicesBusy = new SemaphoreSlim(1, 1);
+        parts.Meetings.Voiceprint = async (samples, token) =>
+        {
+            await voicesBusy.WaitAsync(token);
+            try
+            {
+                await voices.PrepareAsync(CocoDetector.CanTryGpu, 2, null, token);
+                return voices.Voiceprint(samples);
+            }
+            finally { voicesBusy.Release(); }
+        };
         var options = new ChatPageOptions
         {
             Title = "LiteRT-LM Chat",

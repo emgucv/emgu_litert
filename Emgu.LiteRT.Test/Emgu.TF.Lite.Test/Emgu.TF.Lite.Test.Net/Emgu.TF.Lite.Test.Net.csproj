@@ -24,6 +24,7 @@
     <Compile Include="..\UnitTestDFine.cs" Link="UnitTestDFine.cs" />
     <Compile Include="..\UnitTestPicoDet.cs" Link="UnitTestPicoDet.cs" />
     <Compile Include="..\UnitTestDepthAnything.cs" Link="UnitTestDepthAnything.cs" />
+    <Compile Include="..\UnitTestSpeakerVoiceprints.cs" Link="UnitTestSpeakerVoiceprints.cs" />
     <Compile Include="..\UnitTestMcp.cs" Link="UnitTestMcp.cs" />
     <Compile Include="..\UnitTestClipboardTool.cs" Link="UnitTestClipboardTool.cs" />
     <Compile Include="..\UnitTestPngMetadata.cs" Link="UnitTestPngMetadata.cs" />

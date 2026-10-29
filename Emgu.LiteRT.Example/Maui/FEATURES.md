@@ -806,7 +806,16 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   fits, else from section summaries - combined again if still too long - with Summary, Key points, Decisions, Action items and
   Open questions. They show in the card.
 - The notes and the timed transcript are saved as a Word document with the reply, the transcript is attached as the chat's
-  document for later questions, and the notes go back to the model. There are no speaker labels.
+  document for later questions, and the notes go back to the model.
+- Speaker labels (since 2026-10-28; the feature's `Voiceprint`, which the demo sets to `Emgu.LiteRT.Models`'
+  `SpeakerVoiceprints`, downloaded at the first meeting, 13.4 MB): the recording is also cut at each pause once a piece is
+  2 s long (people take turns at pauses), each written-down piece gets its voice's fingerprint, and after Stop the pieces
+  are grouped by voice - "[0:09] Speaker 2: ..." in the transcript (a speaker's pieces in a row are one line), the
+  document and what the model writes the notes from, with a note that the voices were told apart automatically and names
+  are only known when said. One voice: no labels. If the voice model fails, the card says so and the transcript has no labels.
+  Verified end to end except the speech recognizer on a synthetic three-voice meeting (`UnitTestSpeakerVoiceprints`);
+  not yet with the microphone or a real meeting. Speaker changes without a pause, and a turn of under 2 s, go with the
+  piece around them.
 - Tested by `UnitTestMeetingNotes`; not yet tried with a real meeting.
 
 ## The TF Lite pages, the live camera and the About page

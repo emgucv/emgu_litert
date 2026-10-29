@@ -182,6 +182,16 @@ def curated():
         fetch("https://emgu-public.s3.amazonaws.com/dfine/dfine_license.txt"),
         copyright="The D-FINE Authors", url="https://github.com/Peterande/D-FINE",
         used_for="Optional object detector (Mac Catalyst); converted by Emgu to LiteRT; trained on COCO (CC BY 4.0 annotations)")
+    add(model, "Depth Anything V2 Small", "Apache-2.0", APACHE,
+        copyright="Depth Anything authors (TikTok / HKU)", url=hf + "depth-anything/Depth-Anything-V2-Small-hf",
+        used_for="Photo effects (blur_photo_background): depth from one photo; LiteRT conversion: " + hf + "litert-community/depth-anything-v2-small")
+    add(model, "WeSpeaker ResNet34 speaker embedding (pyannote/wespeaker-voxceleb-resnet34-LM)", "CC BY 4.0",
+        "The speaker-embedding weights are from WeSpeaker (https://github.com/wenet-e2e/wespeaker), as published by pyannote\n"
+        "(https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM), licensed under the Creative Commons Attribution 4.0\n"
+        "License: https://creativecommons.org/licenses/by/4.0/\n\nTrained on VoxCeleb. Converted to LiteRT (FP16) by litert-community,\n"
+        "following pyannote's speaker-diarization-3.1 recipe (MIT, Copyright (c) 2020 CNRS); the clustering threshold is pyannote's.",
+        copyright="WeSpeaker authors; pyannote (Hervé Bredin)", url="https://github.com/wenet-e2e/wespeaker",
+        used_for="Meeting notes: telling speakers apart by voice; LiteRT conversion: " + hf + "litert-community/Speaker-Diarization-LiteRT")
     add(model, "MobileNet, Inception and COCO SSD MobileNet", "Apache-2.0", APACHE, copyright="The TensorFlow Authors",
         url="https://github.com/tensorflow/models", used_for="Image classification and object detection demos")
 

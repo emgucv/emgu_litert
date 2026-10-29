@@ -161,6 +161,81 @@ public class UnitTestMeetingNotes
         Assert.That(AgentTools.RecordMeeting((title, token) => Task.FromResult(title)).Name, Is.EqualTo("record_meeting"));
     }
 
+    // Speaker labels: with pauseSeconds, a piece also ends at a pause once long enough; not at a shorter one, and the
+    // 30-50 s rule still holds for a long turn.
+    [Test]
+    public void WithSpeakersPiecesEndAtPauses()
+    {
+        var chunker = new MeetingAudioChunker(Rate, 30, 50, pauseSeconds: 2);
+        var audio = new List<float>();
+        audio.AddRange(Speech(1.2));            // too short to end at the next pause
+        audio.AddRange(new float[Rate * 2 / 5]); // 400 ms pause
+        audio.AddRange(Speech(3));
+        audio.AddRange(new float[Rate / 2]);     // 500 ms pause: the cut
+        audio.AddRange(Speech(60));              // one long turn
+        var chunks = new List<MeetingAudioChunk>();
+        float[] all = audio.ToArray();
+        for (int at = 0; at < all.Length; at += Rate / 10)
+            chunks.AddRange(chunker.Add(all.Skip(at).Take(Math.Min(Rate / 10, all.Length - at)).ToArray()));
+        Assert.That(chunks.Count, Is.EqualTo(2));
+        Assert.That(chunks[0].Duration.TotalSeconds, Is.EqualTo(1.2 + 0.4 + 3 + 0.15).Within(0.05), "at the second pause, 150 ms in");
+        Assert.That(chunks[1].Duration.TotalSeconds, Is.InRange(30, 50), "a long turn is still cut at 50 s at most");
+        Assert.That((chunks[1].Start + chunks[1].Duration).TotalSeconds, Is.LessThan(all.Length / (double)Rate));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MeetingAudioChunker(Rate, 30, 50, pauseSeconds: 40));
+    }
+
+    // A unit vector near one of three "voices".
+    private static float[] Voice(int voice, int variant)
+    {
+        var v = new float[16];
+        v[voice] = 1;
+        v[8 + variant % 8] = 0.25f;
+        double length = Math.Sqrt(v.Sum(x => x * x));
+        return v.Select(x => (float)(x / length)).ToArray();
+    }
+
+    [Test]
+    public void ClustersVoicesAndFoldsTinySpeakers()
+    {
+        var prints = new List<float[]> { Voice(0, 0), Voice(1, 1), Voice(0, 2), Voice(2, 3), Voice(1, 4), Voice(0, 5) };
+        Assert.That(SpeakerClustering.Cluster(prints), Is.EqualTo(new[] { 0, 1, 0, 2, 1, 0 }));
+        // Voice 2 spoke for 1 s only: it joins the nearest speaker with enough speech.
+        int[] folded = SpeakerClustering.Cluster(prints, seconds: new double[] { 5, 5, 5, 1, 5, 5 });
+        Assert.That(folded.Distinct().Count(), Is.EqualTo(2));
+        Assert.That(folded[0], Is.EqualTo(0));
+        Assert.That(folded[1], Is.EqualTo(1));
+        Assert.That(SpeakerClustering.Cluster(new List<float[]>()), Is.Empty);
+        Assert.That(SpeakerClustering.Cluster(new List<float[]> { Voice(0, 0) }), Is.EqualTo(new[] { 0 }));
+    }
+
+    [Test]
+    public void TheTranscriptSaysWhoSpoke()
+    {
+        var transcript = new MeetingTranscript();
+        transcript.Add(TimeSpan.Zero, "Good morning.", Voice(0, 0), 4);
+        transcript.Add(TimeSpan.FromSeconds(4), "Let's start with the budget.", Voice(0, 1), 5);
+        transcript.Add(TimeSpan.FromSeconds(9), "Sam will send it by Friday.", Voice(1, 2), 6);
+        transcript.Add(TimeSpan.FromSeconds(15), "Thanks.", Voice(0, 3), 3);
+        Assert.That(transcript.Text(), Does.Not.Contain("Speaker"), "no labels before LabelSpeakers");
+        Assert.That(transcript.LabelSpeakers(), Is.EqualTo(2));
+        Assert.That(transcript.Text(), Is.EqualTo(
+            "[0:00] Speaker 1: Good morning. Let's start with the budget.\n[0:09] Speaker 2: Sam will send it by Friday.\n[0:15] Speaker 1: Thanks."));
+        Assert.That(transcript.Text(false), Does.Not.Contain("Speaker"));
+        Assert.That(transcript.Sections(1000, t => t.Split(' ').Length).Single().Text, Does.Contain("Speaker 2: Sam"));
+        string markdown = MeetingNotes.DocumentMarkdown("Budget", new DateTime(2026, 10, 24, 14, 30, 0), TimeSpan.FromSeconds(18), null, transcript);
+        Assert.That(markdown, Does.Contain("**0:09** **Speaker 2:** Sam will send it by Friday.").And.Contain("told apart by voice"));
+        Assert.That(MeetingNotes.NotesPrompt("Budget", TimeSpan.FromSeconds(18), transcript.Text(), null, speakers: true),
+            Does.Contain("told apart by their voices").And.Not.Contain("doesn't say who is speaking"));
+        Assert.That(MeetingNotes.NotesPrompt("Budget", TimeSpan.FromSeconds(18), "x", null), Does.Contain("doesn't say who is speaking"));
+
+        // One voice: no labels.
+        var alone = new MeetingTranscript();
+        alone.Add(TimeSpan.Zero, "Hello.", Voice(0, 0), 4);
+        alone.Add(TimeSpan.FromSeconds(5), "Bye.", Voice(0, 1), 4);
+        Assert.That(alone.LabelSpeakers(), Is.EqualTo(1));
+        Assert.That(alone.Text(), Is.EqualTo("[0:00] Hello.\n[0:05] Bye."));
+    }
+
     private sealed class SynchronousProgress : IProgress<string>
     {
         private readonly Action<string> _report;

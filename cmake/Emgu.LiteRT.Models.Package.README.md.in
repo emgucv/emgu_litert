@@ -30,6 +30,16 @@ using (var zimage = new Emgu.LiteRT.Models.ZImageTurbo())
 }
 ```
 
+`SpeakerVoiceprints` tells speakers apart: a voice fingerprint of 16 kHz mono speech from [WeSpeaker](https://github.com/wenet-e2e/wespeaker)'s ResNet34 (the weights are CC-BY-4.0: credit WeSpeaker and pyannote), downloaded on first use (13.4 MB) and on the GPU when it matches the CPU. Fingerprints of one voice are close; `${EMGU_LITERT_LM_AGENTS_NUGET_ID}`'s `SpeakerClustering` groups them. `SpeakerEmbedder` is the model itself and `KaldiFbank` its input features.
+
+```csharp
+using (var voices = new Emgu.LiteRT.Models.SpeakerVoiceprints(cacheFolder))
+{
+    await voices.PrepareAsync(preferGpu: false, numThreads: 2, progress: null, CancellationToken.None);
+    float[] print = voices.Voiceprint(speech16kHz);   // 256 values, length 1; null under 0.8 s
+}
+```
+
 `PngMetadata` adds and reads text chunks (iTXt, UTF-8) in a PNG, e.g. to keep a generated image's prompt and seed in the file.
 
 For online documentation please visit
