@@ -835,7 +835,14 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   recognizer it kept up (nothing waiting at 2:04) and didn't skip. The same "Chat model" run showed Gemma echoing its
   prompt into short pieces through the phone's microphone ("...how many installs we can transcribe the speech in this
   recording exactly, word for word..."); `MeetingTranscription.Clean` now cuts those sentences out (a second run: none).
-  Speaker counts through the phone's microphone varied for the same 3 voices (3, 4 and 5 in three runs).
+  Speaker counts through the phone's microphone varied for the same 3 voices (3, 4 and 5 in three runs), and a later run
+  gave 18 for 18 pieces. Its recording, pulled from the Fold and fingerprinted on the Mac's CPU, gave 18 too (so not the
+  GPU): it was at -44 dBFS against the original's -17.5, cut at many short pauses into 20 pieces (11 for the original) of
+  1-1.5 s of speech, and the same voice's pieces were 0.45-0.66 alike (0.85-0.89 in the original), under the 0.70 that
+  joins them. Since then a grouping that doesn't look like speakers - 4 or more, more than half as many as the pieces, most
+  heard for under 5 s (`SpeakerClustering.IsPlausible`) - isn't labelled: `MeetingTranscript.SpeakersUnclear`, and the
+  card says "Speakers couldn't be told apart: the recording was too quiet or too noisy." Longer pieces for the
+  fingerprints of a quiet recording, tuned on a real one, could recover some of it.
 - In the background (since 2026-10-29): what comes after Stop - the last and skipped pieces, the recording's encoding,
   the notes and the model's reply - runs as `BackgroundWork` ("Writing the meeting notes"), begun at Stop while the
   microphone's foreground service still runs and ended with the reply (`OnReplyCompleted`, when the chat is saved). On

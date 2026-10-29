@@ -25,6 +25,27 @@ namespace Emgu.LiteRT.LM.Agents
         public const double MinSpeakerSeconds = 5;
 
         /// <summary>
+        /// Whether a grouping looks like real speakers rather than a recording too quiet or noisy to tell voices apart: not when
+        /// it has 4 or more speakers that are more than half as many as the pieces, most of them heard for less than
+        /// <paramref name="minSpeakerSeconds"/>. A Pixel Fold across a room from a Mac's speakers (-44 dBFS, pieces of 1-1.5 s of
+        /// speech) put the same voice's pieces at 0.45-0.66 apart and made 18 speakers of 18 pieces from 3 voices.
+        /// </summary>
+        /// <param name="labels">Each piece's speaker (<see cref="ClusterSequence"/>)</param>
+        /// <param name="seconds">How much speech each piece has</param>
+        /// <param name="minSpeakerSeconds">The least speech a speaker has</param>
+        public static bool IsPlausible(IReadOnlyList<int> labels, IReadOnlyList<double> seconds, double minSpeakerSeconds = MinSpeakerSeconds)
+        {
+            if (labels == null) throw new ArgumentNullException(nameof(labels));
+            if (labels.Count == 0) return true;
+            int speakers = labels.Max() + 1;
+            if (speakers < 4 || 2 * speakers <= labels.Count) return true;
+            var heard = new double[speakers];
+            for (int i = 0; i < labels.Count; i++)
+                heard[labels[i]] += seconds != null && i < seconds.Count ? seconds[i] : 0;
+            return 2 * heard.Count(s => s < minSpeakerSeconds) <= speakers;
+        }
+
+        /// <summary>
         /// The speaker of each embedding, numbered 0, 1, 2... in the order each speaker first appears.
         /// </summary>
         /// <param name="embeddings">Length-1 embeddings, all the same length</param>

@@ -350,7 +350,9 @@ namespace Emgu.LiteRT.LM.Agents
 
         /// <summary>
         /// Group the pieces by voice (<see cref="SpeakerClustering"/>) and label them; pieces without a fingerprint stay
-        /// unlabelled. Returns the number of speakers (labels are only shown for two or more).
+        /// unlabelled. Returns the number of speakers (labels are only shown for two or more). When the grouping doesn't look
+        /// like real speakers (<see cref="SpeakerClustering.IsPlausible"/>: e.g. nearly every piece a speaker of its own, from
+        /// a recording too quiet or noisy), nothing is labelled, it returns 0 and <see cref="SpeakersUnclear"/> is true.
         /// </summary>
         /// <param name="threshold">How far apart two voices' fingerprints may be and still be one speaker</param>
         public int LabelSpeakers(double threshold = SpeakerClustering.DefaultThreshold)
@@ -358,14 +360,21 @@ namespace Emgu.LiteRT.LM.Agents
             lock (_segments)
             {
                 List<Segment> printed = _segments.Where(s => s.Voiceprint != null).ToList();
-                int[] labels = SpeakerClustering.ClusterSequence(printed.Select(s => s.Voiceprint).ToList(),
-                    printed.Select(s => s.Seconds).ToList(), threshold);
+                List<double> seconds = printed.Select(s => s.Seconds).ToList();
+                int[] labels = SpeakerClustering.ClusterSequence(printed.Select(s => s.Voiceprint).ToList(), seconds, threshold);
+                SpeakersUnclear = !SpeakerClustering.IsPlausible(labels, seconds);
                 for (int i = 0; i < printed.Count; i++)
-                    printed[i].Speaker = labels[i];
-                _speakers = labels.Length == 0 ? 0 : labels.Max() + 1;
+                    printed[i].Speaker = SpeakersUnclear ? -1 : labels[i];
+                _speakers = labels.Length == 0 || SpeakersUnclear ? 0 : labels.Max() + 1;
                 return _speakers;
             }
         }
+
+        /// <summary>
+        /// True when <see cref="LabelSpeakers"/> found the voices couldn't be told apart (the recording too quiet or noisy),
+        /// so the pieces aren't labelled.
+        /// </summary>
+        public bool SpeakersUnclear { get; private set; }
 
         /// <summary>The number of speakers <see cref="LabelSpeakers"/> found (0 before it)</summary>
         public int SpeakerCount

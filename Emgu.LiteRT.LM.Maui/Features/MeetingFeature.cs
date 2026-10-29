@@ -416,7 +416,8 @@ public sealed class MeetingFeature : ChatFeature
         {
             session.Status.Text = MeetingNotes.FormatTime(duration) + " · " + words + " words written down"
                 + (speakers > 1 ? " · " + speakers + " speakers" : "")
-                + (session.VoiceprintProblem != null ? "\nSpeakers weren't told apart: " + session.VoiceprintProblem : "")
+                + (session.VoiceprintProblem != null ? "\nSpeakers weren't told apart: " + session.VoiceprintProblem
+                    : session.Transcript.SpeakersUnclear ? "\nSpeakers couldn't be told apart: the recording was too quiet or too noisy." : "")
                 + (problem != null ? "\n" + problem : notes == null ? "\nThe transcript was saved." : "");
             session.Preview.IsVisible = false;
             if (notes != null) ShowNotes(session, notes);

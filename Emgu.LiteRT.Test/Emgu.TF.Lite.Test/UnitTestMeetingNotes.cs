@@ -217,6 +217,28 @@ public class UnitTestMeetingNotes
         Assert.That(SpeakerClustering.Cluster(new List<float[]> { Voice(0, 0) }), Is.EqualTo(new[] { 0 }));
     }
 
+    // Nearly every piece a speaker of its own, most heard for a second or two, isn't speakers but a recording too quiet to
+    // tell voices apart (a Pixel Fold across a room: 18 speakers for 3 voices); a real meeting's grouping is kept.
+    [Test]
+    public void SpeakersThatCantBeToldApartArentLabelled()
+    {
+        Assert.That(SpeakerClustering.IsPlausible(new[] { 0, 1, 0, 2, 1, 0, 2, 1, 0, 2, 1 }, Enumerable.Repeat(4.0, 11).ToList()), Is.True, "3 voices");
+        int[] each = Enumerable.Range(0, 18).ToArray();
+        Assert.That(SpeakerClustering.IsPlausible(each, Enumerable.Repeat(1.5, 18).ToList()), Is.False, "18 of 18");
+        Assert.That(SpeakerClustering.IsPlausible(each, Enumerable.Repeat(6.0, 18).ToList()), Is.True, "each heard long enough: a panel");
+        Assert.That(SpeakerClustering.IsPlausible(new[] { 0, 1, 2 }, new double[] { 1, 1, 1 }), Is.True, "fewer than 4");
+        Assert.That(SpeakerClustering.IsPlausible(new[] { 0, 1, 2, 3, 0, 1, 2, 3, 0, 1 }, Enumerable.Repeat(1.0, 10).ToList()), Is.True, "not half the pieces");
+        Assert.That(SpeakerClustering.IsPlausible(new int[0], new double[0]), Is.True);
+
+        var transcript = new MeetingTranscript();
+        for (int i = 0; i < 8; i++)
+            transcript.Add(TimeSpan.FromSeconds(3 * i), "piece " + i, Voice(i, i), 1.2);
+        Assert.That(transcript.LabelSpeakers(), Is.EqualTo(0));
+        Assert.That(transcript.SpeakersUnclear, Is.True);
+        Assert.That(transcript.LabelledSegments.All(s => s.Speaker == null), Is.True);
+        Assert.That(transcript.Text(), Does.Not.Contain("Speaker"));
+    }
+
     [Test]
     public void TheTranscriptSaysWhoSpoke()
     {
