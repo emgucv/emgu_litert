@@ -425,6 +425,64 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // The same for EmbeddingGemma 2 Multimodal 740M (485 MB download), which the demo's "Multimodal GPU" choice also gives
+        // the audio encoder on the GPU: a spoken sentence should still match its text best.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestEmbeddingGemma2MultimodalGpuMatchesCpu()
+        {
+            RequireLiteRtLm();
+            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                Skip("The embedding models' GPU is only enabled on Windows");
+            if (!System.IO.File.Exists(System.IO.Path.Combine(AppContext.BaseDirectory, "libLiteRtWebGpuAccelerator.dll")))
+                Skip("No LiteRT WebGPU accelerator next to libLiteRt (run TestLiteRtMobilenetGpu with EMGU_LITERT_WEBGPU_DIR first)");
+
+            String[] texts = { "How do I change my password?", "a red apple", "Have a wonderful day!" };
+            float[][] cpuText;
+            float[] cpuImage, cpuAudio;
+            using (EmbeddingGemma2Multimodal cpu = new EmbeddingGemma2Multimodal())
+            {
+                await cpu.Init();
+                cpuText = cpu.Embed(texts);
+                cpuImage = cpu.EmbedImageFile("apple.jpg");
+                cpuAudio = cpu.EmbedAudioFile("have_a_wonderful_day.wav");
+            }
+            using (EmbeddingGemma2Multimodal gpu = new EmbeddingGemma2Multimodal { EnableWindowsWebGpu = true, VisionBackend = "gpu", AudioBackend = "gpu" })
+            {
+                System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+                await gpu.Init(backend: "gpu");
+                Console.WriteLine("GPU load {0:F1} s", sw.Elapsed.TotalSeconds);
+                float[][] gpuText = gpu.Embed(texts);
+                float[] gpuImage = gpu.EmbedImageFile("apple.jpg");
+                float[] gpuAudio = gpu.EmbedAudioFile("have_a_wonderful_day.wav");
+                for (int i = 0; i < texts.Length; i++)
+                {
+                    float cosine = EmbeddingModel.CosineSimilarity(cpuText[i], gpuText[i]);
+                    Console.WriteLine("Text {0}: GPU/CPU cosine {1:F5}", i, cosine);
+                    if (cosine < 0.99f)
+                        throw new Exception("GPU text embedding differs from the CPU's: " + texts[i]);
+                }
+                float imageCosine = EmbeddingModel.CosineSimilarity(cpuImage, gpuImage);
+                float audioCosine = EmbeddingModel.CosineSimilarity(cpuAudio, gpuAudio);
+                Console.WriteLine("Image: GPU/CPU cosine {0:F5}; audio: {1:F5}", imageCosine, audioCosine);
+                if (imageCosine < 0.99f)
+                    throw new Exception("GPU image embedding differs from the CPU's");
+                if (audioCosine < 0.99f)
+                    throw new Exception("GPU audio embedding differs from the CPU's");
+                float spoken = EmbeddingModel.CosineSimilarity(gpuAudio, gpuText[2]);
+                Console.WriteLine("Audio vs its text {0:F3}, vs the others {1:F3} / {2:F3}", spoken,
+                    EmbeddingModel.CosineSimilarity(gpuAudio, gpuText[0]), EmbeddingModel.CosineSimilarity(gpuAudio, gpuText[1]));
+                if (spoken <= EmbeddingModel.CosineSimilarity(gpuAudio, gpuText[0]) || spoken <= EmbeddingModel.CosineSimilarity(gpuAudio, gpuText[1]))
+                    throw new Exception("The GPU audio embedding doesn't match its text best");
+            }
+        }
+
         // EmbeddingGemma 2 Text 270M through the EmbeddingEngine: sizes, normalization, batch vs single, and semantic
         // search - each question's best match should be the document that answers it (165 MB download).
 #if !TEST_MODELS
