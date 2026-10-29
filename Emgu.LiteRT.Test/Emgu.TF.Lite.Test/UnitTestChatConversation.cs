@@ -435,6 +435,33 @@ public class UnitTestChatConversation
         Assert.ThrowsAsync<ArgumentException>(() => conversation.RegenerateAsync(reply));
     }
 
+    // A step line says what the tool is doing while it runs, and what it did once it has.
+    [Test]
+    public async Task FinishedStepsReadAsDone()
+    {
+        FakeChatClient client = new FakeChatClient();
+        ChatConversation conversation = Conversation(client);
+        conversation.DescribeToolCall = call => "Recording the meeting";
+        client.Reply(new FunctionCallContent("c1", "record_meeting"), new FunctionResultContent("c1", "Notes"), new TextContent("Here are the notes."));
+        ChatMessageItem reply = await conversation.SendAsync("Record this meeting");
+        ChatToolStep step = reply.Steps.Single();
+        Assert.That(step.Text, Is.EqualTo("Recorded the meeting"));
+        Assert.That(step.Description, Is.EqualTo("Recording the meeting"), "saved as described");
+        Assert.That(new ChatToolStep("Reading report.pdf", isRunning: true).Text, Is.EqualTo("Reading report.pdf..."));
+        Assert.That(new ChatToolStep("Reading report.pdf").Text, Is.EqualTo("Read report.pdf"), "a reopened chat's step");
+        Assert.That(new ChatToolStep("Writing “Plan”") { Error = "no space" }.Text, Is.EqualTo("Writing “Plan” - failed: no space"));
+
+        Assert.That(ChatToolStep.Done("Setting up a camera alert for person"), Is.EqualTo("Set up a camera alert for person"));
+        Assert.That(ChatToolStep.Done("Calling search on GitHub (emgu)"), Is.EqualTo("Called search on GitHub (emgu)"));
+        Assert.That(ChatToolStep.Done("Remembering: likes tea"), Is.EqualTo("Remembered: likes tea"));
+        Assert.That(ChatToolStep.Done("Setting a timer for 5 minutes - done"), Is.EqualTo("Set a timer for 5 minutes - done"));
+        Assert.That(ChatToolStep.Done("Setting a timer for 5 minutes - cancelled"), Is.EqualTo("Setting a timer for 5 minutes - cancelled"));
+        Assert.That(ChatToolStep.Done("Opening the camera - failed"), Is.EqualTo("Opening the camera - failed"));
+        Assert.That(ChatToolStep.Done("Looked in the calendar"), Is.EqualTo("Looked in the calendar"));
+        Assert.That(ChatToolStep.Done("Settings changed"), Is.EqualTo("Settings changed"));
+        Assert.That(ChatToolStep.Done(""), Is.EqualTo(""));
+    }
+
     [Test]
     public async Task KeepsAVoiceMessagesTranscriptFromTheModel()
     {

@@ -119,8 +119,43 @@ namespace Emgu.LiteRT.LM.Chat
             }
         }
 
-        /// <summary>The step line to show: the description, with "..." while the tool runs, or why it failed.</summary>
-        public string Text => _description + (_isRunning ? "..." : _error != null ? " - failed: " + _error : string.Empty);
+        /// <summary>
+        /// The step line to show: the description with "..." while the tool runs, said as done once it has
+        /// ("Recording the meeting" - "Recorded the meeting"), or why it failed.
+        /// </summary>
+        public string Text => _isRunning ? _description + "..." : _error != null ? _description + " - failed: " + _error : Done(_description);
+
+        // What the step lines start with ("Checking the weather", "Calling search on GitHub"), said as done.
+        private static readonly Dictionary<string, string> DoneWords = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Adding"] = "Added", ["Analyzing"] = "Analyzed", ["Asking"] = "Asked", ["Blurring"] = "Blurred",
+            ["Calculating"] = "Calculated", ["Calling"] = "Called", ["Capturing"] = "Captured", ["Checking"] = "Checked",
+            ["Converting"] = "Converted", ["Counting"] = "Counted", ["Creating"] = "Created", ["Detecting"] = "Detected",
+            ["Drawing"] = "Drew", ["Fetching"] = "Fetched", ["Finding"] = "Found", ["Forgetting"] = "Forgot",
+            ["Getting"] = "Got", ["Listing"] = "Listed", ["Loading"] = "Loaded", ["Logging"] = "Logged",
+            ["Looking"] = "Looked", ["Making"] = "Made", ["Measuring"] = "Measured", ["Opening"] = "Opened",
+            ["Playing"] = "Played", ["Reading"] = "Read", ["Recording"] = "Recorded", ["Remembering"] = "Remembered",
+            ["Removing"] = "Removed", ["Running"] = "Ran", ["Saving"] = "Saved", ["Searching"] = "Searched",
+            ["Sending"] = "Sent", ["Setting"] = "Set", ["Starting"] = "Started", ["Stopping"] = "Stopped",
+            ["Taking"] = "Took", ["Translating"] = "Translated", ["Updating"] = "Updated", ["Using"] = "Used",
+            ["Writing"] = "Wrote",
+        };
+
+        /// <summary>
+        /// A step's description said as done: its first word in the past tense ("Searching the web for ..." - "Searched the
+        /// web for ..."). Unchanged when it starts with another word, or ends with an outcome that isn't done
+        /// (" - cancelled", " - failed").
+        /// </summary>
+        /// <param name="description">The step's description</param>
+        public static string Done(string description)
+        {
+            if (string.IsNullOrEmpty(description)
+                || description.EndsWith(" - cancelled", StringComparison.Ordinal) || description.EndsWith(" - failed", StringComparison.Ordinal))
+                return description ?? string.Empty;
+            int end = 0;
+            while (end < description.Length && char.IsLetter(description[end])) end++;
+            return DoneWords.TryGetValue(description.Substring(0, end), out string done) ? done + description.Substring(end) : description;
+        }
 
         /// <summary>The tool's result, once it has arrived.</summary>
         public FunctionResultContent Result { get; internal set; }

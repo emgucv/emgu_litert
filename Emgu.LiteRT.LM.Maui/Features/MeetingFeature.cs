@@ -530,7 +530,7 @@ public sealed class MeetingFeature : ChatFeature
     private View RecordingView(string path, byte[] bytes, string name, string mediaType, TimeSpan? length)
     {
         Color accent = ChatResources.FindColor("ChatAccent");
-        var title = new Label { Text = "\U0001F50A  Recording" + (length.HasValue ? " · " + MeetingNotes.FormatTime(length.Value) : "") + " · " + SizeText(bytes.Length) };
+        var title = new Label { Text = "\U0001F50A  Meeting audio" +(length.HasValue ? " · " + MeetingNotes.FormatTime(length.Value) : "") + " · " + SizeText(bytes.Length) };
         ChatResources.ApplyStyle(title, "ChatListDetailStyle");
         var play = new Button { Text = "Play", FontSize = 14, BackgroundColor = Colors.Transparent, TextColor = accent, BorderColor = accent,
             BorderWidth = 1, CornerRadius = 12, Padding = new Thickness(16, 6), MinimumHeightRequest = 40, VerticalOptions = LayoutOptions.Center };
