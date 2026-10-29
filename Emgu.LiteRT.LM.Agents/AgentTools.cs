@@ -484,7 +484,7 @@ namespace Emgu.LiteRT.LM.Agents
                 ([Description("What to look for, in the user's words, e.g. \"beach photos from Spain last summer\", \"selfies\", \"photos from Paris\"")] string request,
                  CancellationToken cancellationToken) => search(request ?? string.Empty, cancellationToken),
                 "find_photos",
-                "Finds the user's own photos on this device - by what is in them, where and when they were taken, or their kind (selfie, screenshot...) - and shows them to the user. Use it whenever the user asks to find, show or look for their photos or pictures.");
+                "Finds the user's own photos, pictures and screenshots saved on this device - by what is in them, where and when they were taken, or their kind (selfie, screenshot...) - and shows them to the user. Use it whenever the user asks to find, show or look for their photos, pictures, images or screenshots (\"show me a screenshot of a web page\" means one they have saved).");
         }
 
         /// <summary>Open a visible live camera preview using the app's camera service.</summary>

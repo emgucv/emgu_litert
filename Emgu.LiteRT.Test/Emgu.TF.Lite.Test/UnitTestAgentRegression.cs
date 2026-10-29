@@ -36,6 +36,7 @@ public class UnitTestAgentRegression
         new("weather", "What's the weather in Paris right now?", "get_weather", "place", "Paris"),
         new("draw-cat", "Draw a cat.", "generate_image", "prompt", "cat"),
         new("beach-photos", "Show me my beach photos.", "find_photos", "request", "beach"),
+        new("screenshot-photos", "Show me a screenshot of a web page.", "find_photos", "request", "screenshot"),
         new("remember", "Remember I'm vegetarian.", "remember", "fact", "vegetarian"),
         new("units", "How many kilometres is 26.2 miles?", "convert_units", "from", null),
         new("past-chat", "Search my saved chats: what travel arrangements did we decide for Paris?", "search_chats", "request", "Paris"),
