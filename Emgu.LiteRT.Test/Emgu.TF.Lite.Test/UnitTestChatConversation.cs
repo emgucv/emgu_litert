@@ -129,6 +129,37 @@ public class UnitTestChatConversation
     }
 
     [Test]
+    public async Task ARepliesCopyIsOfferedOnlyOnceItIsWritten()
+    {
+        FakeChatClient client = new FakeChatClient();
+        client.Reply(new TextContent("Hello"), new TextContent(" there."));
+        ChatConversation conversation = Conversation(client);
+        List<string> whileTyping = new();
+        List<bool> changes = new();
+        conversation.Messages.CollectionChanged += (s, e) =>
+        {
+            foreach (ChatMessageItem item in e.NewItems?.OfType<ChatMessageItem>() ?? Enumerable.Empty<ChatMessageItem>())
+                if (item.Role == ChatMessageRole.Assistant)
+                    item.PropertyChanged += (o, p) =>
+                    {
+                        if (p.PropertyName == nameof(ChatMessageItem.Text))
+                            whileTyping.Add(item.Text + ":" + item.CanCopy);
+                        if (p.PropertyName == nameof(ChatMessageItem.CanCopy))
+                            changes.Add(item.CanCopy);
+                    };
+        };
+
+        ChatMessageItem reply = await conversation.SendAsync("Hi");
+
+        // Not while the answer is being written, then once, when it is complete.
+        Assert.That(whileTyping, Is.EqualTo(new[] { "Hello:False", "Hello there.:False" }));
+        Assert.That(reply.CanCopy, Is.True);
+        Assert.That(changes.Last(), Is.True);
+        // A reply without an answer has nothing to copy.
+        Assert.That(new ChatMessageItem(ChatMessageRole.Assistant, string.Empty).CanCopy, Is.False);
+    }
+
+    [Test]
     public async Task ShowsToolStepsAndSendsTheReplyBackAsItWas()
     {
         FakeChatClient client = new FakeChatClient();

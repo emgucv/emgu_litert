@@ -474,6 +474,15 @@
                            TextColor="{StaticResource ChatDanger}" />
                 </VerticalStackLayout>
             </Border>
+            <!-- Copies the reply's answer (ChatView.CopyMessageCommand), once it is written. -->
+            <Label Text="Copy" IsVisible="{Binding CanCopy}" HorizontalOptions="Start" Margin="8,-2,0,0" FontSize="12"
+                   FontFamily="{StaticResource ChatBodyFont}" SemanticProperties.Description="Copy this reply"
+                   TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type chat:ChatView}}, Path=CopyMessageCommand, x:DataType=chat:ChatView}"
+                                          CommandParameter="{Binding .}" />
+                </Label.GestureRecognizers>
+            </Label>
         </VerticalStackLayout>
     </DataTemplate>
 

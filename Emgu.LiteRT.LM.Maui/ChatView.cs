@@ -316,7 +316,8 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>
         /// Copies a message's text (the command's parameter, a <see cref="ChatMessageItem"/>) to the clipboard and says so in
-        /// the status line; the default user message template's "Copy" under the bubble runs it when tapped.
+        /// the status line; the default templates' "Copy" under a user message's bubble and under a finished reply
+        /// (<see cref="ChatMessageItem.CanCopy"/>: the answer, without the thinking) run it when tapped.
         /// </summary>
         public System.Windows.Input.ICommand CopyMessageCommand => _copyMessageCommand ??= new Command<ChatMessageItem>(async message =>
         {

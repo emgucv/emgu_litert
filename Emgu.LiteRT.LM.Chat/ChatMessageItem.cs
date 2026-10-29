@@ -231,6 +231,7 @@ namespace Emgu.LiteRT.LM.Chat
                     {
                         Raise(nameof(HasAnswer));
                         Raise(nameof(HasText));
+                        Raise(nameof(CanCopy));
                         Raise(nameof(IsFinishedWithoutAnswer));
                     }
                 }
@@ -312,6 +313,9 @@ namespace Emgu.LiteRT.LM.Chat
 
         /// <summary>True if the message has text (a user message may have only attachments).</summary>
         public bool HasText => _text.Length > 0;
+
+        /// <summary>True if the text can be copied: a reply with an answer that is no longer being written (a template shows its Copy then).</summary>
+        public bool CanCopy => _text.Length > 0 && _state != ChatMessageState.Streaming;
 
         /// <summary>True if the message has attachments.</summary>
         public bool HasAttachments => Attachments.Count > 0;
@@ -427,6 +431,7 @@ namespace Emgu.LiteRT.LM.Chat
                     Raise(nameof(IsStreaming));
                     Raise(nameof(IsInterrupted));
                     Raise(nameof(IsFailed));
+                    Raise(nameof(CanCopy));
                     Raise(nameof(IsFinishedWithoutAnswer));
                 }
             }
