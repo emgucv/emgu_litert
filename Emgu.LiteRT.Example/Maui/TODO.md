@@ -648,4 +648,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       tokens). The models: `TestEmbeddingGemma2MultimodalGpuMatchesCpu` (GPU/CPU cosine 0.998-0.999 for texts, an image and a spoken sentence).
       Found: the Windows photo loader (shell thumbnails) returned empty images for OneDrive's Pictures, so nothing was indexed and no message
       said why - it decodes and re-encodes the file now; the index still skips a photo that can't be loaded without telling the user.
-- [ ] Not driven: the CPU fallback when a GPU search-model load fails, and a photo search question answered from the GPU-embedded index.
+- [x] A photo question answered from the GPU-embedded index (2026-10-29): "Show me a screenshot of a web page" first got "I can't take screenshots" (no tool
+      call; `find_photos` only said "photos or pictures"), fixed in its description (regression scenario `screenshot-photos`), then showed the
+      Pictures folder's screenshots.
+- [ ] Not driven: the CPU fallback when a GPU search-model load fails.
