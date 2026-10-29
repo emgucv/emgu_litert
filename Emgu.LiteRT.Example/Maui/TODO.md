@@ -36,7 +36,11 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       step 0 matches the reference (cosine 0.995), 8 steps in 64-69 s (23 s on an M1), a good apple picture, deterministic between
       runs. Its PSNR against the reference is 17.9 dB (35.1 on the M1: other CPU kernels, same scene, different details), so the
       test's minimum is 15 dB on Windows.
-- [ ] Windows image generation inside the app: first-run cache preparation with Gemma resident and interactive image saving.
+- [x] Windows image generation inside the app (2026-10-29, driven through UI Automation, the Save and reopen steps by hand): with Gemma 4 E2B on the CPU and
+      the 10.6 GB model and its caches already on disk, "Draw a red fox sitting in fresh snow, in watercolor style." called `generate_image` and drew
+      a good picture in 87 s (the stages and steps show: encoding, step 1-8 of 8, decoding), answered "Here is a red fox sitting in fresh snow...",
+      saved it with the chat (kind `generated`), enlarged it, saved it as a file and showed it again on reopening the chat. Not run: the very first
+      picture on a machine without the caches (about 9 GB are written then).
 - [x] Recording a voice message live on Windows (2026-10-29): `VoiceRecorder` in the packaged app (the MAUI permission, then
       MediaCapture) wrote a 16 kHz mono 16-bit WAV of the right length, and Gemma 4 E2B transcribed it (`UnitTestAudioFile`,
       opt-in with `EMGU_AUDIO_FILE`): clear speech picked up by the StreamCam's microphone. It first recorded only zeros: the
