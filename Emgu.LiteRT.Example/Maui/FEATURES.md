@@ -830,8 +830,12 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   kind `meeting_recording`, never given to the model; the chat store now names `audio/mp4` files `.m4a`). The card plays
   it (`AudioClipPlayer`: Play/Pause, progress and time), Save... (the demo's Save As dialog) and Share; a reopened chat
   shows the same player, both from one copy in the cache named by the content. Verified on Mac Catalyst: a 1:25 meeting
-  became a 360 KB AAC .m4a that played in the card and again after reopening the chat, stored as `<id>_0.m4a`. Not yet
-  tried on Android. (A 10 s clip cut off mid-sentence got 3 speakers for 2: the second voice's two 1-2 s fragments were
+  became a 360 KB AAC .m4a that played in the card and again after reopening the chat, stored as `<id>_0.m4a`. On the
+  Pixel Fold (2026-10-29, Gemma 4 E2B, the synthetic meeting played aloud from a Mac): 1:40 became a 405 KB .m4a (AAC
+  mono 16 kHz, 32 kbit/s, 100.9 s by `afinfo`), the temporary WAV was gone, it played to the end, played again from the
+  start, and played after reopening the chat. Both cards show the saved file's length from its header
+  (`AudioFileLength`: the WAV's data size or the .m4a's movie header), so a reopened one shows it before it plays.
+  (A 10 s clip cut off mid-sentence got 3 speakers for 2: the second voice's two 1-2 s fragments were
   too unlike each other to be one turn and too unlike the first voice to join it - a few seconds from someone can still
   come out as a speaker of their own.)
 - Speaker labels (since 2026-10-28; the feature's `Voiceprint`, which the demo sets to `Emgu.LiteRT.Models`'

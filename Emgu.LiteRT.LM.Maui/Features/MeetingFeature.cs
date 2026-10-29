@@ -479,7 +479,7 @@ public sealed class MeetingFeature : ChatFeature
             + " recording", mediaType == "audio/mp4" ? ".m4a" : ".wav");
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
-            session.Content.Children.Add(RecordingView(path, bytes, name, mediaType, recording.Duration));
+            session.Content.Children.Add(RecordingView(path, bytes, name, mediaType, AudioFileLength.Of(bytes, mediaType) ?? recording.Duration));
             // Kept with the reply (shown again when the chat is reopened, never given to the model).
             Host.AddCardToReply(null, new ChatSavedFile(RecordingKind, mediaType, bytes));
         });
@@ -516,7 +516,7 @@ public sealed class MeetingFeature : ChatFeature
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) },
             Padding = new Thickness(14, 10), Margin = new Thickness(6, 2), MaximumWidthRequest = 520, HorizontalOptions = LayoutOptions.Start,
-            Content = RecordingView(path, file.Data, "Meeting recording" + extension, file.MediaType, null)
+            Content = RecordingView(path, file.Data, "Meeting recording" + extension, file.MediaType, AudioFileLength.Of(file.Data, file.MediaType))
         };
         ChatResources.SetThemeColor(card, VisualElement.BackgroundColorProperty, "ChatSurface");
         ChatResources.SetThemeColor(card, Border.StrokeProperty, "ChatRowBorder");

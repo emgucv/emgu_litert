@@ -311,6 +311,37 @@ public class UnitTestMeetingNotes
         System.IO.File.Delete(path);
     }
 
+    // A saved recording's length from its header (a reopened chat's card shows it before playing).
+    [Test]
+    public void TellsARecordingsLength()
+    {
+        byte[] wav = new MeetingAudioChunk(TimeSpan.Zero, Speech(1.5), Rate).ToWav();
+        Assert.That(AudioFileLength.Of(wav, "audio/wav")?.TotalSeconds, Is.EqualTo(1.5).Within(1e-6));
+        Assert.That(AudioFileLength.Of(wav.Take(44 + Rate).ToArray(), "audio/wav")?.TotalSeconds, Is.EqualTo(0.5).Within(1e-6), "cut short");
+
+        // ftyp, then moov > (trak, mvhd): version 0 with 32-bit times, version 1 with 64-bit ones.
+        static byte[] Box(string type, params byte[][] content)
+        {
+            byte[] body = content.SelectMany(x => x).ToArray();
+            int size = 8 + body.Length;
+            return new[] { (byte)(size >> 24), (byte)(size >> 16), (byte)(size >> 8), (byte)size }
+                .Concat(System.Text.Encoding.ASCII.GetBytes(type)).Concat(body).ToArray();
+        }
+        static byte[] BigEndian(long value, int count) => Enumerable.Range(0, count).Select(i => (byte)(value >> (8 * (count - 1 - i)))).ToArray();
+        byte[] ftyp = Box("ftyp", System.Text.Encoding.ASCII.GetBytes("M4A "), new byte[4]);
+        byte[] trak = Box("trak", new byte[20]);
+        byte[] v0 = Box("mvhd", new byte[] { 0, 0, 0, 0 }, new byte[8], BigEndian(16000, 4), BigEndian(1614784, 4), new byte[80]);
+        byte[] v1 = Box("mvhd", new byte[] { 1, 0, 0, 0 }, new byte[16], BigEndian(1000, 4), BigEndian(100924, 8), new byte[80]);
+        Assert.That(AudioFileLength.Of(ftyp.Concat(Box("moov", trak, v0)).ToArray(), "audio/mp4")?.TotalSeconds, Is.EqualTo(100.924).Within(1e-6));
+        Assert.That(AudioFileLength.Of(ftyp.Concat(Box("moov", v1)).ToArray(), "audio/mp4")?.TotalSeconds, Is.EqualTo(100.924).Within(1e-6));
+
+        Assert.That(AudioFileLength.Of(ftyp, "audio/mp4"), Is.Null, "no moov");
+        Assert.That(AudioFileLength.Of(ftyp.Concat(Box("moov", v0)).Take(60).ToArray(), "audio/mp4"), Is.Null, "cut short");
+        Assert.That(AudioFileLength.Of(new byte[] { 1, 2, 3 }, "audio/wav"), Is.Null);
+        Assert.That(AudioFileLength.Of(wav, "audio/mpeg"), Is.Null);
+        Assert.That(AudioFileLength.Of(null, "audio/wav"), Is.Null);
+    }
+
     [Test]
     public void APieceCanBeWrittenDownAgain()
     {
