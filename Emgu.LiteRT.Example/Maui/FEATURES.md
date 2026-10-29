@@ -823,6 +823,17 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     67-89), nearly every word right ("data" for "date", "dude" for "did").
   - Windows has no microphone source for meetings yet (`MicrophoneSoundSource`), so meetings stay Android, iOS and Mac.
     "Recognizer, then chat model" isn't yet tried on a phone.
+- The recording (since 2026-10-29; Settings > "Keep meeting recordings", on by default): the microphone's samples also go
+  to a temporary WAV as they arrive (`Emgu.LiteRT.LM.Agents`' `WavFileWriter`, paused stretches left out), encoded at Stop
+  to AAC in an .m4a (`Emgu.LiteRT.LM.Maui`'s `AudioEncoder`: AVAudioFile on iOS and Mac Catalyst, MediaCodec and
+  MediaMuxer on Android, 32 kbit/s, ~14 MB an hour; the WAV is kept where that fails) and kept with the reply (saved file
+  kind `meeting_recording`, never given to the model; the chat store now names `audio/mp4` files `.m4a`). The card plays
+  it (`AudioClipPlayer`: Play/Pause, progress and time), Save... (the demo's Save As dialog) and Share; a reopened chat
+  shows the same player, both from one copy in the cache named by the content. Verified on Mac Catalyst: a 1:25 meeting
+  became a 360 KB AAC .m4a that played in the card and again after reopening the chat, stored as `<id>_0.m4a`. Not yet
+  tried on Android. (A 10 s clip cut off mid-sentence got 3 speakers for 2: the second voice's two 1-2 s fragments were
+  too unlike each other to be one turn and too unlike the first voice to join it - a few seconds from someone can still
+  come out as a speaker of their own.)
 - Speaker labels (since 2026-10-28; the feature's `Voiceprint`, which the demo sets to `Emgu.LiteRT.Models`'
   `SpeakerVoiceprints`, downloaded at the first meeting, 13.4 MB): the recording is also cut at each pause once a piece is
   2 s long (people take turns at pauses), each written-down piece gets its voice's fingerprint, and after Stop the pieces

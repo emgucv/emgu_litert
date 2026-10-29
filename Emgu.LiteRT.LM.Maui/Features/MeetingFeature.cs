@@ -28,7 +28,11 @@ namespace Emgu.LiteRT.LM.Maui.Features;
 /// mistakes than the recognizers, and 5x real time on an M1) and the recognizer on a phone (Gemma 4 E2B took 0.3x real
 /// time on a Pixel Fold); the model where there is no recognizer; or the recognizer while recording and the model over
 /// every piece after Stop. For the model the pieces are 15-28 s (its audio clips are at most 30 s), each written down
-/// in a request of its own.
+/// in a request of its own. With Settings > "Keep meeting recordings" (on by default) the recording itself is written to a
+/// temporary WAV as it goes (paused stretches left out), encoded to AAC (.m4a, <see cref="AudioEncoder"/>; the WAV where
+/// that isn't supported) at Stop and kept with the reply (<see cref="ChatMessageItem.SavedFiles"/>, kind
+/// <see cref="RecordingKind"/>, never given to the model): the card plays it (<see cref="AudioClipPlayer"/>), saves it
+/// (<see cref="RecordingSaver"/>) and shares it, also when the chat is reopened.
 /// </summary>
 public sealed class MeetingFeature : ChatFeature
 {
@@ -64,6 +68,20 @@ public sealed class MeetingFeature : ChatFeature
     /// </summary>
     public Func<float[], CancellationToken, Task<float[]>> Voiceprint { get; set; }
 
+    /// <summary>The kind of a reply's saved file that is a meeting's recording.</summary>
+    public const string RecordingKind = "meeting_recording";
+
+    /// <summary>The settings key of "Keep meeting recordings" (on by default).</summary>
+    public const string KeepRecordingKey = "meeting_keep_recording";
+
+    /// <summary>
+    /// Saves a recording where the user chooses (a Save As dialog, e.g. CommunityToolkit.Maui's FileSaver): given the file's
+    /// bytes and name, returns what to tell the user, or null when they cancelled. Without it the card has only Share.
+    /// </summary>
+    public Func<byte[], string, Task<string>> RecordingSaver { get; set; }
+
+    private bool KeepRecording => Host?.Settings.Get(KeepRecordingKey, true) ?? true;
+
     /// <summary>The shortest piece that ends at a pause when speakers are labelled, in seconds.</summary>
     public const double TurnSeconds = 2;
 
@@ -89,6 +107,8 @@ public sealed class MeetingFeature : ChatFeature
         public Func<float[], CancellationToken, Task<float[]>> Voiceprint;
         public string VoiceprintProblem;
         public MeetingTranscriber Transcriber;
+        // The recording itself, as it goes (null when not kept, or after it failed).
+        public WavFileWriter Recording;
         // RecognizerThenModel: each written-down piece's audio, kept for the model after Stop (temporary WAV files).
         public string PieceFolder;
         public readonly List<(TimeSpan Start, string Path)> KeptPieces = new();
@@ -153,7 +173,10 @@ public sealed class MeetingFeature : ChatFeature
         }
         _transcriberNote = ChatPage.Note(string.Empty);
         UpdateTranscriberNote();
-        return new VerticalStackLayout { Spacing = 6, Children = { ChatPage.SectionTitle("Meeting transcripts"), chips, _transcriberNote } };
+        View keep = ChatPage.SwitchRow("Keep meeting recordings",
+            "The recording is kept with the meeting's notes in the chat (about 14 MB an hour), to play, save or share.",
+            KeepRecording, on => Host.Settings.Set(KeepRecordingKey, on));
+        return new VerticalStackLayout { Spacing = 6, Children = { ChatPage.SectionTitle("Meeting transcripts"), chips, _transcriberNote, keep } };
 #else
         return null;
 #endif
@@ -215,12 +238,32 @@ public sealed class MeetingFeature : ChatFeature
         }
         await MainThread.InvokeOnMainThreadAsync(() => AddMeetingCard(session));
 
+        if (KeepRecording)
+        {
+            try
+            {
+                string folder = System.IO.Path.Combine(FileSystem.CacheDirectory, "meeting-recordings");
+                Directory.CreateDirectory(folder);
+                session.Recording = new WavFileWriter(System.IO.Path.Combine(folder, Guid.NewGuid().ToString("N") + ".wav"));
+            }
+            catch (Exception ex) { Debug.WriteLine("The meeting's recording couldn't be started: " + ex.Message); }
+        }
         var source = new MicrophoneSoundSource();
         source.Samples += samples =>
         {
             if (session.Paused || session.Stopping) return;
             IList<MeetingAudioChunk> chunks;
-            lock (session.Chunker) chunks = session.Chunker.Add(samples);
+            lock (session.Chunker)
+            {
+                chunks = session.Chunker.Add(samples);
+                try { session.Recording?.Write(samples); }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("Writing the meeting's recording failed: " + ex.Message);
+                    session.Recording.Close();
+                    session.Recording = null;
+                }
+            }
             foreach (MeetingAudioChunk chunk in chunks) QueueMeetingChunk(session, chunk);
         };
         await MicrophoneGate.EnterAsync();
@@ -260,6 +303,7 @@ public sealed class MeetingFeature : ChatFeature
         {
             last = session.Chunker.Flush();
             duration = session.Chunker.Recorded;
+            session.Recording?.Close();
         }
         if (last != null) QueueMeetingChunk(session, last);
         session.PendingSignal.Release();
@@ -279,6 +323,7 @@ public sealed class MeetingFeature : ChatFeature
         await transcribing;
         if (session.Transcriber == MeetingTranscriber.RecognizerThenModel)
             await RewriteWithModelAsync(session, token);
+        await KeepRecordingAsync(session);
 
         string heading = string.IsNullOrWhiteSpace(session.Title) ? "Meeting notes " + session.Started.ToString("yyyy-MM-dd HH.mm") : session.Title;
         int words = session.Transcript.WordCount;
@@ -397,6 +442,178 @@ public sealed class MeetingFeature : ChatFeature
             if (done) return;
         }
     }
+
+    // The recording, encoded and kept with the reply, with a player in the card. A recording that can't be encoded is kept
+    // as the WAV; one that fails altogether is dropped (the transcript is what matters). The temporary WAV goes either way.
+    private async Task KeepRecordingAsync(MeetingSession session)
+    {
+        WavFileWriter recording = session.Recording;
+        if (recording == null || recording.Duration < TimeSpan.FromSeconds(1)) { DeleteQuietly(recording?.Path); return; }
+        MainThread.BeginInvokeOnMainThread(() => session.Status.Text = "Saving the recording…");
+        string path = recording.Path, mediaType = "audio/wav";
+        if (AudioEncoder.IsSupported)
+        {
+            string m4a = System.IO.Path.ChangeExtension(recording.Path, ".m4a");
+            try
+            {
+                await AudioEncoder.ToM4aAsync(recording.Path, m4a);
+                path = m4a;
+                mediaType = "audio/mp4";
+            }
+            catch (Exception ex) { Debug.WriteLine("Encoding the meeting's recording failed: " + ex.Message); DeleteQuietly(m4a); }
+        }
+        byte[] bytes;
+        try { bytes = await File.ReadAllBytesAsync(path); }
+        catch (Exception ex) { Debug.WriteLine("Reading the meeting's recording failed: " + ex.Message); return; }
+        finally { if (path != recording.Path) DeleteQuietly(recording.Path); }
+        // The player's file is the one a reopened chat uses (named by the content): one copy in the cache, not two.
+        string playable = RecordingCachePath(bytes, mediaType);
+        try
+        {
+            if (File.Exists(playable)) DeleteQuietly(path);
+            else File.Move(path, playable);
+            path = playable;
+        }
+        catch (Exception ex) { Debug.WriteLine("Moving the meeting's recording failed: " + ex.Message); }
+        string name = DocumentWriter.FileName((string.IsNullOrWhiteSpace(session.Title) ? "Meeting " + session.Started.ToString("yyyy-MM-dd HH.mm") : session.Title)
+            + " recording", mediaType == "audio/mp4" ? ".m4a" : ".wav");
+        await MainThread.InvokeOnMainThreadAsync(() =>
+        {
+            session.Content.Children.Add(RecordingView(path, bytes, name, mediaType, recording.Duration));
+            // Kept with the reply (shown again when the chat is reopened, never given to the model).
+            Host.AddCardToReply(null, new ChatSavedFile(RecordingKind, mediaType, bytes));
+        });
+    }
+
+    // Where a recording's player file is: the cache's meeting-recordings folder, named by the recording's content.
+    private static string RecordingCachePath(byte[] bytes, string mediaType) =>
+        System.IO.Path.Combine(FileSystem.CacheDirectory, "meeting-recordings",
+            Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(bytes)) + (mediaType == "audio/wav" ? ".wav" : ".m4a"));
+
+    private static void DeleteQuietly(string path)
+    {
+        try { if (path != null && File.Exists(path)) File.Delete(path); } catch (Exception) { }
+    }
+
+    /// <inheritdoc/>
+    public override View RestoreSavedFile(ChatSavedFile file)
+    {
+        if (file.Kind != RecordingKind) return null;
+        // The player needs a file: the saved recording, written once to the cache by its content.
+        string extension = file.MediaType == "audio/wav" ? ".wav" : ".m4a";
+        string path = RecordingCachePath(file.Data, file.MediaType);
+        try
+        {
+            if (!File.Exists(path))
+            {
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+                File.WriteAllBytes(path, file.Data);
+            }
+        }
+        catch (Exception ex) { return ChatPage.Note("The meeting's recording couldn't be opened: " + ex.Message); }
+        var card = new Border
+        {
+            StrokeThickness = 1,
+            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) },
+            Padding = new Thickness(14, 10), Margin = new Thickness(6, 2), MaximumWidthRequest = 520, HorizontalOptions = LayoutOptions.Start,
+            Content = RecordingView(path, file.Data, "Meeting recording" + extension, file.MediaType, null)
+        };
+        ChatResources.SetThemeColor(card, VisualElement.BackgroundColorProperty, "ChatSurface");
+        ChatResources.SetThemeColor(card, Border.StrokeProperty, "ChatRowBorder");
+        return card;
+    }
+
+    // The recording playing in the chat now (one at a time).
+    private static Action _stopPlayingRecording;
+
+    // A recording's player: Play/Pause, its progress and time, Save (with a saver) and Share.
+    private View RecordingView(string path, byte[] bytes, string name, string mediaType, TimeSpan? length)
+    {
+        Color accent = ChatResources.FindColor("ChatAccent");
+        var title = new Label { Text = "\U0001F50A  Recording" + (length.HasValue ? " · " + MeetingNotes.FormatTime(length.Value) : "") + " · " + SizeText(bytes.Length) };
+        ChatResources.ApplyStyle(title, "ChatListDetailStyle");
+        var play = new Button { Text = "Play", FontSize = 14, BackgroundColor = Colors.Transparent, TextColor = accent, BorderColor = accent,
+            BorderWidth = 1, CornerRadius = 12, Padding = new Thickness(16, 6), MinimumHeightRequest = 40, VerticalOptions = LayoutOptions.Center };
+        var progress = new ProgressBar { WidthRequest = 150, ProgressColor = accent, VerticalOptions = LayoutOptions.Center };
+        var time = new Label { Text = "", VerticalOptions = LayoutOptions.Center };
+        ChatResources.ApplyStyle(time, "ChatListDetailStyle");
+        var status = new Label { IsVisible = false };
+        ChatResources.ApplyStyle(status, "ChatListDetailStyle");
+        AudioClipPlayer player = null;
+        IDispatcherTimer timer = Application.Current.Dispatcher.CreateTimer();
+        timer.Interval = TimeSpan.FromMilliseconds(250);
+        void Stop()
+        {
+            if (_stopPlayingRecording == Stop) _stopPlayingRecording = null;
+            timer.Stop();
+            player?.Dispose();
+            player = null;
+            play.Text = "Play";
+        }
+        void Tick()
+        {
+            if (player == null) return;
+            double at = player.Position, total = Math.Max(0.1, player.Duration);
+            progress.Progress = Math.Clamp(at / total, 0, 1);
+            time.Text = MeetingNotes.FormatTime(TimeSpan.FromSeconds(at)) + " / " + MeetingNotes.FormatTime(TimeSpan.FromSeconds(total));
+        }
+        timer.Tick += (_, _) => Tick();
+        play.Clicked += (_, _) =>
+        {
+            try
+            {
+                if (player == null)
+                {
+                    _stopPlayingRecording?.Invoke();
+                    player = AudioClipPlayer.Open(path);
+                    player.Completed += () => { Tick(); progress.Progress = 1; Stop(); };
+                    _stopPlayingRecording = Stop;
+                }
+                if (player.IsPlaying) { player.Pause(); play.Text = "Play"; timer.Stop(); }
+                else { player.Play(); play.Text = "Pause"; timer.Start(); }
+                status.IsVisible = false;
+            }
+            catch (Exception ex)
+            {
+                Stop();
+                status.Text = "Couldn't play the recording: " + ex.Message;
+                status.IsVisible = true;
+            }
+        };
+        SemanticProperties.SetDescription(play, "Play the meeting's recording");
+        var actions = new HorizontalStackLayout { Spacing = 16 };
+        if (RecordingSaver != null)
+            actions.Children.Add(ChatPage.Link("Save…", async () =>
+            {
+                try
+                {
+                    string saved = await RecordingSaver(bytes, name);
+                    if (saved != null) { status.Text = saved; status.IsVisible = true; }
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex) { status.Text = "Couldn't save the recording: " + ex.Message; status.IsVisible = true; }
+            }));
+        actions.Children.Add(ChatPage.Link("Share", async () =>
+        {
+            try { await Share.Default.RequestAsync(new ShareFileRequest("Meeting recording", new ShareFile(path, mediaType))); }
+            catch (Exception ex) { status.Text = "Couldn't share the recording: " + ex.Message; status.IsVisible = true; }
+        }));
+        return new VerticalStackLayout
+        {
+            Spacing = 6,
+            Margin = new Thickness(0, 8, 0, 0),
+            Children =
+            {
+                title,
+                new HorizontalStackLayout { Spacing = 10, Children = { play, progress, time } },
+                actions, status
+            }
+        };
+    }
+
+    private static string SizeText(long bytes) => bytes < 1024 * 1024
+        ? (bytes / 1024.0).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " KB"
+        : (bytes / 1048576.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " MB";
 
     // A piece written down by the chat's model, in a request of its own (as the notes are written): its audio and the
     // instruction, no tools, no thinking.

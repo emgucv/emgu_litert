@@ -161,6 +161,17 @@ public sealed class LiteRtLmChatPage : ChatPage
         };
         // Blurred photos too.
         parts.PhotoEffects.PhotoSaver = parts.Camera.SnapshotSaver;
+        // And meeting recordings.
+        parts.Meetings.RecordingSaver = async (bytes, fileName) =>
+        {
+            using var stream = new System.IO.MemoryStream(bytes, writable: false);
+            var result = await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream);
+            if (result.IsSuccessful)
+                return "Saved to " + result.FilePath;
+            if (!PictureGallery.SaveWasCancelled(result.Exception))
+                throw result.Exception ?? new System.IO.IOException("The recording could not be saved.");
+            return null;
+        };
         // Meetings keep the camera feature's foreground service running (Android) and attach the transcript to the chat.
         parts.Meetings.SyncBackgroundService = () => parts.Camera.SyncBackgroundServiceAsync();
         parts.Meetings.TranscriptAttacher = (bytes, name) =>

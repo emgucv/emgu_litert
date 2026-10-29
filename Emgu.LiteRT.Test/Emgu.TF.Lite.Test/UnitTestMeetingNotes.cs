@@ -290,6 +290,27 @@ public class UnitTestMeetingNotes
         Assert.That(new MeetingAudioChunk(TimeSpan.Zero, new float[100], Rate).HasSpeech, Is.False);
     }
 
+    // The meeting's recording, written as it goes: a valid WAV once closed, the same bytes as a piece's ToWav.
+    [Test]
+    public void WritesTheRecordingAsItGoes()
+    {
+        string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Emgu.LiteRT.Tests", "recording.wav");
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+        float[] audio = Speech(1.5);
+        using (var writer = new WavFileWriter(path, Rate))
+        {
+            for (int at = 0; at < audio.Length; at += Rate / 10)
+                writer.Write(audio.Skip(at).Take(Math.Min(Rate / 10, audio.Length - at)).ToArray());
+            writer.Write(new float[0]);
+            Assert.That(writer.Duration.TotalSeconds, Is.EqualTo(1.5).Within(1e-6));
+            writer.Close();
+            Assert.Throws<ObjectDisposedException>(() => writer.Write(new float[1]));
+        }
+        byte[] file = System.IO.File.ReadAllBytes(path);
+        Assert.That(file, Is.EqualTo(new MeetingAudioChunk(TimeSpan.Zero, audio, Rate).ToWav()));
+        System.IO.File.Delete(path);
+    }
+
     [Test]
     public void APieceCanBeWrittenDownAgain()
     {
