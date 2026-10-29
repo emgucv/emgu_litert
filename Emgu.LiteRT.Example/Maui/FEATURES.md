@@ -822,7 +822,8 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     GPU-only - XNNPACK declines it; FP16 on the Mac's GPU garbled some chunks, FP32 was fine) and DTLN (MIT, two stateful
     models) both raised the noisy synthetic pieces from 15.0 to 21 dB SI-SNR, but Gemma's errors there stayed 3.2-4.4%
     (3.8% without), and on the Fold recording they rose from 12% to 56% (DTLN) and 289% (CMGAN: invented text). Neither
-    helped the Fold recording's speakers either.
+    helped the Fold recording's speakers either. Both are in `Emgu.LiteRT.Models` (`CmganDenoiser`, `DtlnDenoiser`;
+    MODELS.md) for apps that want cleaner audio to listen to; the demo doesn't use them.
   - Measured on the synthetic meeting's 10 turns (158 words, clean and with room noise at ~15 dB SNR, a temporary self-test
     in the demo): Gemma 4 E2B 0% and 2.5% of words wrong on both devices; Apple's recognizer 0.6%/5.7% (Mac), Google's
     3.2%/4.4% (Pixel Fold). Speed: Gemma 5-6x real time on the M1's GPU but 0.3x on the Fold's (8 s, then 22 s per 6 s

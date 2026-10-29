@@ -32,6 +32,8 @@ using (var zimage = new Emgu.LiteRT.Models.ZImageTurbo())
 
 `SpeakerVoiceprints` tells speakers apart: a voice fingerprint of 16 kHz mono speech from [WeSpeaker](https://github.com/wenet-e2e/wespeaker)'s ResNet34 (the weights are CC-BY-4.0: credit WeSpeaker and pyannote), downloaded on first use (13.4 MB) and on the GPU when it matches the CPU. Fingerprints of one voice are close; `${EMGU_LITERT_LM_AGENTS_NUGET_ID}`'s `SpeakerClustering` groups them. `SpeakerEmbedder` is the model itself and `KaldiFbank` its input features.
 
+`CmganDenoiser` and `DtlnDenoiser` remove background noise from 16 kHz mono speech: [CMGAN](https://huggingface.co/litert-community/CMGAN-LiteRT) on the GPU in 2 s chunks (4.2 MB, MIT), [DTLN](https://github.com/breizhn/DTLN) on the CPU as audio arrives (`Process`, 24 ms behind; 4 MB, MIT); `DownloadAsync` gets the models, `Denoise` cleans a whole recording. They make speech nicer to listen to; they did not help speech recognition (a language model made more mistakes on a cleaned distant recording), so use them for playback, not before transcribing.
+
 ```csharp
 using (var voices = new Emgu.LiteRT.Models.SpeakerVoiceprints(cacheFolder))
 {
