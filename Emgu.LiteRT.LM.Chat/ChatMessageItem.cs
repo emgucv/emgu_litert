@@ -137,7 +137,7 @@ namespace Emgu.LiteRT.LM.Chat
             ["Playing"] = "Played", ["Reading"] = "Read", ["Recording"] = "Recorded", ["Remembering"] = "Remembered",
             ["Removing"] = "Removed", ["Running"] = "Ran", ["Saving"] = "Saved", ["Searching"] = "Searched",
             ["Sending"] = "Sent", ["Setting"] = "Set", ["Starting"] = "Started", ["Stopping"] = "Stopped",
-            ["Taking"] = "Took", ["Translating"] = "Translated", ["Updating"] = "Updated", ["Using"] = "Used",
+            ["Taking"] = "Took", ["Translating"] = "Translated", ["Turning"] = "Turned", ["Updating"] = "Updated", ["Using"] = "Used",
             ["Writing"] = "Wrote",
         };
 

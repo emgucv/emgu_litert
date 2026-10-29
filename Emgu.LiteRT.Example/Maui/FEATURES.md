@@ -704,6 +704,24 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   (the current period never breaks it), and the best streak.
 - Settings > Your goals shows a strip of the latest 12 periods and the streak, with Edit, Undo last (`IAgentGoalStore.DeleteLastProgressAsync`) and Delete, and `GoalStatusAsync` (so `get_goals` and the
   message instructions) adds "2-week-streak" from two periods in a row.
+- Reminders (since 2026-10-29), the habit trackers' way (Meta Muse's Goals tab checks in too): a goal gets a time of day
+  ("Remind me…" under it in Settings > Your goals, or "remind me to do my jumping jacks at 7 pm" through
+  `set_goal_reminder`), kept in the page's settings ("goal_reminder_<id>"). `GoalReminders` (`Emgu.LiteRT.LM.Agents`)
+  says when the next is due - a daily goal every day it isn't done yet, a weekly one on Sunday and a monthly one on its
+  last day if still short, a goal without a period every day nothing was logged until its target - and its text ("30
+  jumping jacks to go today · keep your 4-day streak"). `GoalsFeature` schedules the next one with
+  `ReminderNotifications` (`Emgu.LiteRT.LM.Maui`) and again after each reply, Edit, Undo, Delete and when the app comes
+  to the front, so a goal already done doesn't remind; meanwhile a reminder comes again by itself (the whole target as
+  its text) while the app isn't opened. Android: an inexact alarm (`SetAndAllowWhileIdle`, no exact-alarm permission)
+  wakes `ReminderReceiver` (not exported), which posts it on the "Reminders" channel with "Snooze 1 h" (tapping opens
+  the app) and arms the next; `ReminderRestoreReceiver` arms them again after a restart, a new time or time zone or an
+  update (each at its time of day; missed ones aren't shown late). iOS and Mac Catalyst: `UNUserNotificationCenter`
+  requests for the next one and the six after it, shown while the app is in front too. No "Done" on the notification
+  (the goal database is the app's, not reachable from a receiver): tapping opens the app, where "I did them" logs it.
+  - Pixel Fold (2026-10-29, Gemma 4 E2B): "Remind me to do my jumping jacks at 2:02 pm" called `set_goal_reminder`; the
+    alarm was armed for 14:02 (Android's window +2m49s) and the notification "30 jumping jacks a day for 30 days - 30
+    jumping jacks to go today" came at 14:02:51 with the launcher in front; the next was armed for 14:02 the day after.
+    Not tried: Snooze, a restart, iOS and the Mac. A goal "for 30 days" isn't read as ending: its reminders go on.
 
 ## Tool servers (MCP)
 

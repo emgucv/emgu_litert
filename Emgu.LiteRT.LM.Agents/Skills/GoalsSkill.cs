@@ -25,7 +25,8 @@ namespace Emgu.LiteRT.LM.Agents.Skills
         private static readonly string[] Keywords =
         {
             "goal", "habit", "target", "streak", "progress", "i want to", "i'd like to", "every day", "a day$", "a week$",
-            "per week$", "per day$", "each week$", "times a week", "how am i doing", "on track", "keep track", "track my"
+            "per week$", "per day$", "each week$", "times a week", "how am i doing", "on track", "keep track", "track my",
+            "remind me"
         };
 
         private readonly int _maxLength;
@@ -55,6 +56,12 @@ namespace Emgu.LiteRT.LM.Agents.Skills
         /// with the goals' tools rather than as a group of their own, which would add a stub to every message.
         /// </summary>
         public Func<IEnumerable<AITool>> ExtraTools { get; set; }
+
+        /// <summary>
+        /// Keeps a goal's reminder time (null: off) and schedules the notification, returning when it is next due; with it,
+        /// the group has set_goal_reminder (<see cref="AgentTools.GoalReminder"/>). Null for no reminders.
+        /// </summary>
+        public Func<AgentGoal, TimeSpan?, Task<DateTime?>> SetReminder { get; set; }
 
         /// <summary>The instructions for <see cref="ExtraTools"/>, or null.</summary>
         public Func<string> ExtraInstructions { get; set; }
@@ -97,6 +104,8 @@ namespace Emgu.LiteRT.LM.Agents.Skills
                     if (!_on)
                         return Array.Empty<AITool>();
                     IEnumerable<AITool> tools = AgentTools.Goals(Store, _now).Cast<AITool>();
+                    if (SetReminder != null)
+                        tools = tools.Concat(new AITool[] { AgentTools.GoalReminder(Store, SetReminder) });
                     return ExtraTools != null ? tools.Concat(ExtraTools()) : tools;
                 },
                 () =>

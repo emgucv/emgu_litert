@@ -1010,6 +1010,10 @@ namespace Emgu.LiteRT.LM.Agents
                 case "record_meeting": return "Recording " + (Argument("title").Length > 0 ? "“" + Argument("title") + "”" : "the meeting");
                 case string stub when stub.StartsWith("use_", StringComparison.Ordinal): return "Getting more tools";
                 case "remove_goal": return "Removing the goal: " + Argument("goal");
+                case "set_goal_reminder":
+                    string at = Argument("time");
+                    return at.Trim().ToLowerInvariant() == "off" ? "Turning off the reminder for \u201C" + Argument("goal") + "\u201D"
+                        : "Setting a reminder for \u201C" + Argument("goal") + "\u201D at " + at;
                 case "search_wikipedia": return "Searching Wikipedia for “" + Argument("query") + "”";
                 case "search_web": return "Searching the web for “" + Argument("query") + "”";
                 case "get_stock_quote": return "Getting the price of " + Argument("symbol");

@@ -468,6 +468,58 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         /// <summary>
+        /// set_goal_reminder: a reminder for one of the user's goals at a time of day ("remind me to do my jumping jacks at 7
+        /// pm"), or off; it comes only while the goal is still open (<see cref="GoalReminders"/>). The app keeps the time and
+        /// schedules the notification.
+        /// </summary>
+        /// <param name="store">Where the goals are kept</param>
+        /// <param name="setReminder">Keeps a goal's reminder time (null: off) and schedules it; returns when it is next due, or null</param>
+        /// <returns>The tool</returns>
+        public static AIFunction GoalReminder(IAgentGoalStore store, Func<AgentGoal, TimeSpan?, Task<DateTime?>> setReminder)
+        {
+            if (store == null)
+                throw new ArgumentNullException(nameof(store));
+            if (setReminder == null)
+                throw new ArgumentNullException(nameof(setReminder));
+            return AIFunctionFactory.Create(
+                ([Description("Words from the goal, e.g. \"jumping jacks\", \"read\"")] string goal,
+                    [Description("The time of day, e.g. \"7 pm\", \"19:30\"; \"off\" to stop the reminder")] string time,
+                    CancellationToken cancellationToken) => SetGoalReminderAsync(store, setReminder, goal, time),
+                "set_goal_reminder",
+                "Sets a daily reminder (a notification) for one of the user's goals at a time of day, or turns it off. It only comes " +
+                "while the goal isn't done yet for the day (for a weekly or monthly goal: on the period's last day). Use it when the " +
+                "user asks to be reminded of a goal.");
+        }
+
+        private static async Task<string> SetGoalReminderAsync(IAgentGoalStore store, Func<AgentGoal, TimeSpan?, Task<DateTime?>> setReminder,
+            string text, string time)
+        {
+            AgentGoal goal = await FindGoalAsync(store, text).ConfigureAwait(false);
+            if (goal == null)
+            {
+                IList<AgentGoal> goals = await store.GetGoalsAsync().ConfigureAwait(false);
+                return goals.Count == 0
+                    ? "The user has no goals yet: a reminder needs a goal. Ask whether they want to set one (add_goal)."
+                    : "No goal matches \"" + text + "\". The user's goals: " + string.Join("; ", goals.Select(g => g.Text)) + ".";
+            }
+            string words = (time ?? string.Empty).Trim().ToLowerInvariant();
+            if (words == "off" || words == "none" || words == "stop" || words == "no")
+            {
+                await setReminder(goal, null).ConfigureAwait(false);
+                return "Turned off the reminder for \"" + goal.Text + "\"." + GoalReplyInstruction;
+            }
+            if (!GoalReminders.TryParseTime(time, out TimeSpan at))
+                return "Couldn't read \"" + time + "\" as a time of day: pass e.g. \"7 pm\" or \"19:30\".";
+            DateTime? next;
+            try { next = await setReminder(goal, at).ConfigureAwait(false); }
+            catch (Exception ex) { return "The reminder couldn't be set: " + ex.Message + ". Tell the user."; }
+            string when = GoalReminders.FormatTime(at, CultureInfo.InvariantCulture);
+            return "Set a reminder for \"" + goal.Text + "\" at " + when + (goal.Period == GoalPeriod.Week ? " on Sundays" : goal.Period == GoalPeriod.Month ? " on the month's last day" : " every day")
+                + ", only while it isn't done yet" + (next != null ? "; the next one: " + DayText(next.Value.Date, DateTime.Now) + " at " + when : "") + "."
+                + GoalReplyInstruction;
+        }
+
+        /// <summary>
         /// The user's goals with their progress in the current period, as instructions for the agent (e.g.
         /// ChatOptions.Instructions), or null if there are none.
         /// </summary>
