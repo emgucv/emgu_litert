@@ -655,4 +655,8 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [x] A photo question answered from the GPU-embedded index (2026-10-29): "Show me a screenshot of a web page" first got "I can't take screenshots" (no tool
       call; `find_photos` only said "photos or pictures"), fixed in its description (regression scenario `screenshot-photos`), then showed the
       Pictures folder's screenshots.
-- [ ] Not driven: the CPU fallback when a GPU search-model load fails.
+- [x] The CPU fallback when a GPU search-model load fails (2026-10-29, driven through UI Automation with `libLiteRtWebGpuAccelerator.dll` moved aside):
+      "GPU embedding model could not load - litert_lm_embedding_engine_create failed ... Run this model on CPU instead?" appeared; "Run on CPU"
+      chose "Multimodal 740M · CPU", kept the embeddings (45 photos, 26 messages) and carried on; choosing the GPU option again after putting the
+      DLL back loaded it. Not run: the dialog's Cancel.
+- [x] Photos the library can't load are counted in the status ("; 1 couldn't be read", checked with a corrupt PNG, removed afterwards).
