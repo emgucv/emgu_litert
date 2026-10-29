@@ -220,6 +220,10 @@ namespace Emgu.LiteRT.LM.Maui
                 if (e.PropertyName == nameof(ChatView.Conversation))
                     OnConversationChanged();
             };
+            // The view's first conversation, made before this: a remote model chosen at start keeps it (its model stays
+            // null, so no new one comes), and without this it had none of the page's settings - its tool steps were
+            // "Calling get_weather", no feature heard of them, and it didn't compact as the page does.
+            OnConversationChanged();
             BuildSettingsView();
             BuildChips();
             UpdatePrivateState();

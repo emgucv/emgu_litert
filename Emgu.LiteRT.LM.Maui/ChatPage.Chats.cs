@@ -37,12 +37,16 @@ namespace Emgu.LiteRT.LM.Maui
             set => _rereadNext = value;
         }
 
+        // The conversation OnConversationChanged last took up (its handlers are added once).
+        private ChatConversation _handledConversation;
+
         // A new conversation (a new chat, or another model): the model's sizes, how it compacts, and saving it.
         private void OnConversationChanged()
         {
             ChatConversation conversation = _chatView.Conversation;
-            if (conversation == null)
+            if (conversation == null || ReferenceEquals(conversation, _handledConversation))
                 return;
+            _handledConversation = conversation;
             ConfigureConversation(conversation, _model, _chatView.Model);
             conversation.BeforeStreaming = OnBeforeStreamingAsync;
             conversation.Compacted += OnConversationCompacted;

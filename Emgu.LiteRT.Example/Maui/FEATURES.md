@@ -565,7 +565,14 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     forecast); the tulips sample image described; the chat saved as a "Claude" chat. Caching, from the usage of three
     messages in a row (a temporary log): 4,597 input tokens with 4,593 written to the cache, then 4,765 with 4,593 read
     from it, then 4,956 with 4,761 read - about 96% of each later request read at a tenth of the price. Not tried on
-    Android or iOS yet (it builds for both). The key needs the account's workspace: a personal key not scoped to one
+    iOS yet (it builds).
+  - Pixel Fold (2026-10-29, the user's key): the calculator, the word problem with its thinking, the weather tool with
+    Think on and off. It found a bug of the base `ChatPage`: the view's first conversation is made before the page
+    listens for new ones, and a remote model chosen at start keeps it (its model stays null), so it never had the
+    page's settings - its steps read "Called get_weather" (the conversation's default description), and the features'
+    step callbacks, the reread status and the compaction settings were missing too. The page now takes up the
+    conversation it finds when it starts listening (once per conversation), and a model chosen without a new
+    conversation configures the one there; then "Checked the weather in Ottawa". The key needs the account's workspace: a personal key not scoped to one
     would also need the `anthropic-workspace-id` header, which isn't asked for yet.
 
 ## Device actions

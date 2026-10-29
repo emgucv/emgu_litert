@@ -135,7 +135,11 @@ namespace Emgu.LiteRT.LM.Maui
             _modelInstance = option.IsRemote ? null : NewInstance(option);
             // A new conversation for the model (OnConversationChanged) and its load card; a remote model's conversation
             // runs over the client alone.
+            ChatConversation before = Conversation;
             _chatView.Model = _modelInstance;
+            // No new conversation (a remote model after none, or after another remote one): this one takes the model's settings.
+            if (Conversation != null && ReferenceEquals(Conversation, before))
+                ConfigureConversation(Conversation, option, _modelInstance);
             ApplyModelCapabilities();
             if (previous != null)
                 _ = Task.Run(() => previous.Dispose());
