@@ -28,7 +28,10 @@ namespace Emgu.LiteRT.LM.Maui.Features;
 /// mistakes than the recognizers, and 5x real time on an M1) and the recognizer on a phone (Gemma 4 E2B took 0.3x real
 /// time on a Pixel Fold); the model where there is no recognizer; or the recognizer while recording and the model over
 /// every piece after Stop. For the model the pieces are 15-28 s (its audio clips are at most 30 s), each written down
-/// in a request of its own. With Settings > "Keep meeting recordings" (on by default) the recording itself is written to a
+/// in a request of its own. When more than a minute of pieces waits (<see cref="MeetingTranscription.PiecesToSkip"/>: the
+/// recognizer runs at ~0.9x real time on a Pixel Fold), the live transcript skips ahead to the latest piece; the skipped
+/// ones wait in temporary WAV files and are written down after Stop, by the recognizer or, when the model writes the
+/// meeting down, the model, and go back into the transcript in their place. With Settings > "Keep meeting recordings" (on by default) the recording itself is written to a
 /// temporary WAV as it goes (paused stretches left out), encoded to AAC (.m4a, <see cref="AudioEncoder"/>; the WAV where
 /// that isn't supported) at Stop and kept with the reply (<see cref="ChatMessageItem.SavedFiles"/>, kind
 /// <see cref="RecordingKind"/>, never given to the model): the card plays it (<see cref="AudioClipPlayer"/>), saves it
@@ -109,9 +112,12 @@ public sealed class MeetingFeature : ChatFeature
         public MeetingTranscriber Transcriber;
         // The recording itself, as it goes (null when not kept, or after it failed).
         public WavFileWriter Recording;
-        // RecognizerThenModel: each written-down piece's audio, kept for the model after Stop (temporary WAV files).
+        // Temporary WAV files: RecognizerThenModel's written-down pieces, kept for the model after Stop, and the pieces set
+        // aside while the live transcript was too far behind, written down after Stop (created when first needed).
         public string PieceFolder;
         public readonly List<(TimeSpan Start, string Path)> KeptPieces = new();
+        public readonly List<(TimeSpan Start, string Path)> Skipped = new();
+        public TimeSpan SkippedTime;
         public readonly MeetingTranscript Transcript = new MeetingTranscript();
         public readonly TaskCompletionSource<string> Ended = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public readonly Queue<MeetingAudioChunk> Pending = new();
@@ -206,6 +212,9 @@ public sealed class MeetingFeature : ChatFeature
             : used == MeetingTranscriber.RecognizerThenModel ? "The speech recognizer writes it down as it records, then " + model + " again after Stop for a better transcript (on a phone that takes about 3 s per second of speech)."
             : used == MeetingTranscriber.Recognizer ? "The device's speech recognizer writes down what is said as it records."
             : "Meetings can't be written down here: there is no speech recognizer and the chat model doesn't take audio.";
+        if (used != null)
+            now += " When it falls more than a minute behind, it skips ahead to what is being said and writes down what it skipped after Stop"
+                + (used == MeetingTranscriber.Recognizer ? "." : " with " + model + ".");
         if (used != null && Choice != null && used != Choice)
             now += ModelHearsAudio ? " (No speech recognizer here.)" : " (" + model + " doesn't take audio.)";
         _transcriberNote.Text = now;
@@ -231,11 +240,7 @@ public sealed class MeetingFeature : ChatFeature
         bool modelPieces = session.Transcriber != MeetingTranscriber.Recognizer;
         session.Chunker = new MeetingAudioChunker(16000, modelPieces ? MeetingTranscription.ModelMinSeconds : 30,
             modelPieces ? MeetingTranscription.ModelMaxSeconds : 50, session.Voiceprint != null ? TurnSeconds : 0);
-        if (session.Transcriber == MeetingTranscriber.RecognizerThenModel)
-        {
-            session.PieceFolder = System.IO.Path.Combine(FileSystem.CacheDirectory, "meeting-pieces", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(session.PieceFolder);
-        }
+        session.PieceFolder = System.IO.Path.Combine(FileSystem.CacheDirectory, "meeting-pieces", Guid.NewGuid().ToString("N"));
         await MainThread.InvokeOnMainThreadAsync(() => AddMeetingCard(session));
 
         if (KeepRecording)
@@ -321,8 +326,17 @@ public sealed class MeetingFeature : ChatFeature
         });
         Host.SetStatus("Writing down the last part of the meeting...");
         await transcribing;
-        if (session.Transcriber == MeetingTranscriber.RecognizerThenModel)
-            await RewriteWithModelAsync(session, token);
+        TimeSpan unwritten;
+        try
+        {
+            unwritten = await WriteDownSkippedAsync(session, token);
+            if (session.Transcriber == MeetingTranscriber.RecognizerThenModel)
+                await RewriteWithModelAsync(session, token);
+        }
+        finally
+        {
+            try { if (Directory.Exists(session.PieceFolder)) Directory.Delete(session.PieceFolder, true); } catch (Exception) { }
+        }
         await KeepRecordingAsync(session);
 
         string heading = string.IsNullOrWhiteSpace(session.Title) ? "Meeting notes " + session.Started.ToString("yyyy-MM-dd HH.mm") : session.Title;
@@ -354,6 +368,9 @@ public sealed class MeetingFeature : ChatFeature
             }
             catch (OperationCanceledException) { }
         }
+        if (unwritten > TimeSpan.Zero)
+            problem = (problem != null ? problem + " " : "") + MeetingNotes.FormatTime(unwritten)
+                + " of the meeting, skipped while recording to keep up, wasn't written down.";
 
         GeneratedDocument document = DocumentWriter.Create(heading,
             MeetingNotes.DocumentMarkdown(heading, session.Started, duration, notes, session.Transcript), "word");
@@ -400,11 +417,20 @@ public sealed class MeetingFeature : ChatFeature
             while (true)
             {
                 MeetingAudioChunk chunk;
+                var behind = new List<MeetingAudioChunk>();
                 lock (session.Pending)
                 {
                     if (session.Pending.Count == 0) break;
+                    // Too far behind while recording: the oldest pieces wait on disk for after Stop, so what is written
+                    // down live is what is being said now.
+                    if (!session.Stopping)
+                    {
+                        int skip = MeetingTranscription.PiecesToSkip(session.Pending.Select(p => p.Duration.TotalSeconds).ToList());
+                        for (int i = 0; i < skip; i++) behind.Add(session.Pending.Dequeue());
+                    }
                     chunk = session.Pending.Dequeue();
                 }
+                foreach (MeetingAudioChunk piece in behind) SetAside(session, piece);
                 if (chunk.IsSilent) continue;
                 string text = null;
                 for (int attempt = 0; attempt < 2 && text == null; attempt++)
@@ -417,7 +443,7 @@ public sealed class MeetingFeature : ChatFeature
                         else
                         {
                             text = await SpeechRecognizer.TranscribeAsync(wav);
-                            if (session.PieceFolder != null && chunk.HasSpeech)
+                            if (session.Transcriber == MeetingTranscriber.RecognizerThenModel && chunk.HasSpeech)
                                 KeepPiece(session, chunk, wav);
                         }
                     }
@@ -633,35 +659,84 @@ public sealed class MeetingFeature : ChatFeature
     {
         try
         {
-            string path = System.IO.Path.Combine(session.PieceFolder, session.KeptPieces.Count.ToString("D5") + ".wav");
+            Directory.CreateDirectory(session.PieceFolder);
+            string path = System.IO.Path.Combine(session.PieceFolder, "kept" + session.KeptPieces.Count.ToString("D5") + ".wav");
             File.WriteAllBytes(path, wav);
             lock (session.KeptPieces) session.KeptPieces.Add((chunk.Start, path));
         }
         catch (Exception ex) { Debug.WriteLine("Keeping a meeting piece failed: " + ex.Message); }
     }
 
+    // A piece the live transcript skipped, on disk until after Stop (near silence is dropped, as live).
+    private static void SetAside(MeetingSession session, MeetingAudioChunk chunk)
+    {
+        if (chunk.IsSilent) return;
+        session.SkippedTime += chunk.Duration;
+        try
+        {
+            Directory.CreateDirectory(session.PieceFolder);
+            string path = System.IO.Path.Combine(session.PieceFolder, "skipped" + session.Skipped.Count.ToString("D5") + ".wav");
+            File.WriteAllBytes(path, chunk.ToWav());
+            session.Skipped.Add((chunk.Start, path));
+        }
+        catch (Exception ex) { Debug.WriteLine("Setting a meeting piece aside failed: " + ex.Message); }
+    }
+
+    // After Stop, the pieces skipped while recording are written down - by the recognizer, or the model when it writes
+    // down the meeting (Model, RecognizerThenModel) - and go into the transcript in their place. Returns how much wasn't
+    // (the reply was stopped).
+    private async Task<TimeSpan> WriteDownSkippedAsync(MeetingSession session, CancellationToken token)
+    {
+        var pieces = session.Skipped;
+        bool model = session.Transcriber != MeetingTranscriber.Recognizer;
+        TimeSpan unwritten = TimeSpan.Zero;
+        for (int i = 0; i < pieces.Count; i++)
+        {
+            MeetingAudioChunk chunk;
+            try { chunk = MeetingAudioChunk.FromWav(pieces[i].Start, File.ReadAllBytes(pieces[i].Path)); }
+            catch (Exception ex) { Debug.WriteLine("Reading a skipped meeting piece failed: " + ex.Message); continue; }
+            if (token.IsCancellationRequested) { unwritten += chunk.Duration; continue; }
+            string progress = "Writing down the parts skipped while recording: " + (i + 1) + " of " + pieces.Count + "…";
+            MainThread.BeginInvokeOnMainThread(() => session.Status.Text = progress);
+            Host.SetStatus(progress);
+            string text = null;
+            for (int attempt = 0; attempt < 2 && text == null && !token.IsCancellationRequested; attempt++)
+            {
+                try
+                {
+                    byte[] wav = chunk.ToWav();
+                    text = model ? chunk.HasSpeech ? await TranscribeWithModelAsync(wav, token) : string.Empty
+                        : await SpeechRecognizer.TranscribeAsync(wav);
+                }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("Writing down a skipped meeting piece failed: " + ex.Message);
+                    if (attempt == 0) await Task.Delay(3000);
+                    else session.Failures++;
+                }
+            }
+            if (text == null) { if (token.IsCancellationRequested) unwritten += chunk.Duration; continue; }
+            session.Transcript.Add(chunk.Start, text, await VoiceprintOfAsync(session, chunk, text), chunk.VoicedSeconds);
+        }
+        return unwritten;
+    }
+
     // After Stop, the model writes every kept piece down again (its version replaces the recognizer's), unless the reply
-    // was stopped; the pieces' files are deleted either way.
+    // was stopped (the caller deletes the pieces' files either way).
     private async Task RewriteWithModelAsync(MeetingSession session, CancellationToken token)
     {
         List<(TimeSpan Start, string Path)> pieces;
         lock (session.KeptPieces) pieces = session.KeptPieces.ToList();
-        try
+        string model = Host.Model?.DisplayName ?? "the model";
+        for (int i = 0; i < pieces.Count && !token.IsCancellationRequested; i++)
         {
-            string model = Host.Model?.DisplayName ?? "the model";
-            for (int i = 0; i < pieces.Count && !token.IsCancellationRequested; i++)
-            {
-                string progress = "Writing the transcript down again with " + model + ": " + (i + 1) + " of " + pieces.Count + "…";
-                MainThread.BeginInvokeOnMainThread(() => session.Status.Text = progress);
-                Host.SetStatus(progress);
-                try { session.Transcript.Replace(pieces[i].Start, await TranscribeWithModelAsync(File.ReadAllBytes(pieces[i].Path), token)); }
-                catch (OperationCanceledException) { break; }
-                catch (Exception ex) { Debug.WriteLine("Writing a meeting piece down again failed: " + ex.Message); }
-            }
-        }
-        finally
-        {
-            try { Directory.Delete(session.PieceFolder, true); } catch (Exception) { }
+            string progress = "Writing the transcript down again with " + model + ": " + (i + 1) + " of " + pieces.Count + "…";
+            MainThread.BeginInvokeOnMainThread(() => session.Status.Text = progress);
+            Host.SetStatus(progress);
+            try { session.Transcript.Replace(pieces[i].Start, await TranscribeWithModelAsync(File.ReadAllBytes(pieces[i].Path), token)); }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex) { Debug.WriteLine("Writing a meeting piece down again failed: " + ex.Message); }
         }
     }
 
@@ -701,12 +776,14 @@ public sealed class MeetingFeature : ChatFeature
         int pending;
         lock (session.Pending) pending = session.Pending.Count;
         int words = session.Transcript.WordCount;
+        TimeSpan skipped = session.SkippedTime;
         MainThread.BeginInvokeOnMainThread(() =>
         {
             session.Preview.Text = tail;
             session.Preview.IsVisible = tail.Length > 0;
             session.Status.Text = words + " words written down" + (session.Stopping ? pending > 0 ? " · finishing the last " + (pending + 1) + " pieces…" : ""
-                : pending > 1 ? " · " + pending + " pieces waiting" : "");
+                : pending > 1 ? " · " + pending + " pieces waiting" : "")
+                + (skipped > TimeSpan.Zero ? "\nSkipped " + MeetingNotes.FormatTime(skipped) + " to keep up - written down after Stop" : "");
         });
     }
 

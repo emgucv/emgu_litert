@@ -3,6 +3,8 @@
 //----------------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Emgu.LiteRT.LM.Agents
@@ -32,6 +34,29 @@ namespace Emgu.LiteRT.LM.Agents
 
         /// <summary>The shortest piece cut at the quietest moment for the model, in seconds.</summary>
         public const double ModelMinSeconds = 15;
+
+        /// <summary>
+        /// How far the live transcript may fall behind, in seconds of waiting audio, before it skips ahead to the latest
+        /// speech (the skipped pieces are written down after Stop). Google's recognizer runs at ~0.9x real time on a Pixel
+        /// Fold and Gemma 4 E2B at ~0.3x, so on a phone the wait would otherwise keep growing.
+        /// </summary>
+        public const double MaxLiveDelaySeconds = 60;
+
+        /// <summary>
+        /// How many of the oldest waiting pieces to set aside so the rest wait at most <paramref name="maxDelay"/> seconds;
+        /// the newest is always written down live. 0 when it isn't behind.
+        /// </summary>
+        /// <param name="waitingSeconds">The waiting pieces' lengths, oldest first</param>
+        /// <param name="maxDelay">The longest wait, in seconds</param>
+        public static int PiecesToSkip(IReadOnlyList<double> waitingSeconds, double maxDelay = MaxLiveDelaySeconds)
+        {
+            if (waitingSeconds == null || waitingSeconds.Count < 2) return 0;
+            double waiting = waitingSeconds.Sum();
+            int skip = 0;
+            while (skip < waitingSeconds.Count - 1 && waiting > maxDelay)
+                waiting -= waitingSeconds[skip++];
+            return skip;
+        }
 
         /// <summary>The settings key of the choice (absent: automatic).</summary>
         public const string SettingKey = "meeting_transcriber";
@@ -75,7 +100,17 @@ namespace Emgu.LiteRT.LM.Agents
             @"|\b(?:cannot|can't|can not|unable|not able|no speech|doesn't contain|does not contain)\b.*\b(?:transcri\w*|audio|recording)\b",
             RegexOptions.IgnoreCase);
 
-        private static readonly Regex Label = new Regex(@"^\s*(?:transcript(?:ion)?|here is the transcript(?:ion)?)\s*:\s*", RegexOptions.IgnoreCase);
+        // The prompt's own sentences echoed into a piece's words, mostly short or quiet ones through a phone's microphone
+        // ("...see how many installs we can transcribe the speech in this recording exactly, word for word, in the language
+        // that is spoken."), and "Sure, I can do that. Please provide the recording." - cut out, the words around them kept.
+        private static readonly Regex Echo = new Regex(
+            @"transcribe\W+the\W+speech\W+in\W+this\W+recording[^.!?]*[.!?]?" +
+            @"|reply\W+with\W+only\W+the\W+words\W+that\W+are\W+spoken[.!?]?" +
+            @"|if\W+nobody\W+speaks\W+reply\W+with\W+nothing[.!?]?" +
+            @"|(?:sure\W+i\W+can\W+do\W+that[.!?]?\s*)?please\W+provide\W+the\W+(?:recording|audio)[^.!?]*[.!?]?",
+            RegexOptions.IgnoreCase);
+
+        private static readonly Regex Label =new Regex(@"^\s*(?:transcript(?:ion)?|here is the transcript(?:ion)?)\s*:\s*", RegexOptions.IgnoreCase);
 
         /// <summary>
         /// The model's answer as transcript text: without a "Transcript:" label or quotes around it, and empty when it says
@@ -88,6 +123,7 @@ namespace Emgu.LiteRT.LM.Agents
             text = Label.Replace(text, string.Empty).Trim();
             if (text.Length >= 2 && (text[0] == '"' && text[text.Length - 1] == '"' || text[0] == '“' && text[text.Length - 1] == '”'))
                 text = text.Substring(1, text.Length - 2).Trim();
+            text = Regex.Replace(Echo.Replace(text, " "), @"\s+", " ").Trim();
             return Nothing.IsMatch(text) || AboutTheRecording.IsMatch(text) ? string.Empty : text;
         }
     }

@@ -268,6 +268,23 @@ namespace Emgu.LiteRT.LM.Agents
                 return wav.ToArray();
             }
         }
+
+        /// <summary>A piece from a WAV file as <see cref="ToWav"/> writes it (a piece set aside on disk until later).</summary>
+        /// <param name="start">Where it starts in the recording</param>
+        /// <param name="wav">The file: mono 16-bit PCM with a 44-byte header</param>
+        /// <exception cref="ArgumentException">It isn't that kind of WAV file</exception>
+        public static MeetingAudioChunk FromWav(TimeSpan start, byte[] wav)
+        {
+            if (wav == null || wav.Length < 44 || Encoding.ASCII.GetString(wav, 0, 4) != "RIFF" || Encoding.ASCII.GetString(wav, 8, 4) != "WAVE"
+                || BitConverter.ToInt16(wav, 20) != 1 || BitConverter.ToInt16(wav, 22) != 1 || BitConverter.ToInt16(wav, 34) != 16
+                || Encoding.ASCII.GetString(wav, 36, 4) != "data")
+                throw new ArgumentException("Expected a mono 16-bit PCM WAV file.", nameof(wav));
+            int count = (int)Math.Min(BitConverter.ToUInt32(wav, 40), (uint)(wav.Length - 44)) / 2;
+            var samples = new float[count];
+            for (int i = 0; i < count; i++)
+                samples[i] = BitConverter.ToInt16(wav, 44 + 2 * i) / 32767f;
+            return new MeetingAudioChunk(start, samples, BitConverter.ToInt32(wav, 24));
+        }
     }
 
     /// <summary>

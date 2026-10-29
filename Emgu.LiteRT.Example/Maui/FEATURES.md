@@ -823,6 +823,19 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     67-89), nearly every word right ("data" for "date", "dude" for "did").
   - Windows has no microphone source for meetings yet (`MicrophoneSoundSource`), so meetings stay Android, iOS and Mac.
     "Recognizer, then chat model" isn't yet tried on a phone.
+- Skipping ahead (since 2026-10-29): on a phone the live transcript fell behind the conversation (Google's recognizer
+  ~0.9x real time on the Fold, plus each piece's voiceprint; Gemma 0.3x). Once more than a minute of pieces waits
+  (`MeetingTranscription.PiecesToSkip`, `MaxLiveDelaySeconds`), the oldest are set aside as temporary WAVs and the live
+  transcript goes on with the newest; after Stop the skipped pieces are written down by what writes the meeting down
+  (the recognizer, or the model for "Chat model" and "Recognizer, then chat model"; `MeetingAudioChunk.FromWav`) and go
+  back in their place, so the notes cover the whole meeting. The card says "Skipped 0:05 to keep up - written down after
+  Stop", then "Writing down the parts skipped while recording: n of m…"; a stopped reply leaves them out and says so.
+  Pixel Fold, the synthetic meeting played twice from a Mac (2:38): with "Chat model" it skipped 3 pieces (7 waiting),
+  wrote them down in ~15 s after Stop, and the transcript had 323 words for the 316 spoken, 3 speakers; with the
+  recognizer it kept up (nothing waiting at 2:04) and didn't skip. The same "Chat model" run showed Gemma echoing its
+  prompt into short pieces through the phone's microphone ("...how many installs we can transcribe the speech in this
+  recording exactly, word for word..."); `MeetingTranscription.Clean` now cuts those sentences out (a second run: none).
+  Speaker counts through the phone's microphone varied for the same 3 voices (3, 4 and 5 in three runs).
 - The recording (since 2026-10-29; Settings > "Keep meeting recordings", on by default): the microphone's samples also go
   to a temporary WAV as they arrive (`Emgu.LiteRT.LM.Agents`' `WavFileWriter`, paused stretches left out), encoded at Stop
   to AAC in an .m4a (`Emgu.LiteRT.LM.Maui`'s `AudioEncoder`: AVAudioFile on iOS and Mac Catalyst, MediaCodec and

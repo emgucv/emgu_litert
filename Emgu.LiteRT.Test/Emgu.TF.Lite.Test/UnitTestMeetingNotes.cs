@@ -274,6 +274,16 @@ public class UnitTestMeetingNotes
         Assert.That(MeetingTranscription.Clean("I'm sorry, but I cannot transcribe the speech in the recording. Please provide the audio."), Is.Empty);
         Assert.That(MeetingTranscription.Clean("I'm sorry, I can't make it on Friday."), Is.EqualTo("I'm sorry, I can't make it on Friday."));
         Assert.That(MeetingTranscription.Clean("We need the recording of the demo by Friday."), Is.Not.Empty);
+        // The prompt echoed into short pieces through the Pixel Fold's microphone: cut out, the speech kept.
+        Assert.That(MeetingTranscription.Clean("Maybe two weeks and see how many installs we can transcribe the speech in this recording exactly, word for word, in the language that is spoken."),
+            Is.EqualTo("Maybe two weeks and see how many installs we can"));
+        Assert.That(MeetingTranscription.Clean("I'm for spending more. SameTranscribe the speech in this recording exactly, word for word, in the language that is spoken. Reply with only the words that are spoken. If nobody speaks, reply with nothing."),
+            Is.EqualTo("I'm for spending more. Same"));
+        Assert.That(MeetingTranscription.Clean("I can write and transcribe the speech in this recording exactly, word for word, in the language that is spoken. Sure, I can do that. Please provide the recording."),
+            Is.EqualTo("I can write and"));
+        Assert.That(MeetingTranscription.Clean("Sure, I can do that. Please provide the audio file."), Is.Empty);
+        Assert.That(MeetingTranscription.Clean("Sure, I can do that. I'll send it tonight."), Is.EqualTo("Sure, I can do that. I'll send it tonight."));
+        Assert.That(MeetingTranscription.Clean("Please reply with only the numbers you have."), Is.EqualTo("Please reply with only the numbers you have."));
     }
 
     // Speech comes and goes; a room's steady noise, or quiet, isn't speech.
@@ -309,6 +319,48 @@ public class UnitTestMeetingNotes
         byte[] file = System.IO.File.ReadAllBytes(path);
         Assert.That(file, Is.EqualTo(new MeetingAudioChunk(TimeSpan.Zero, audio, Rate).ToWav()));
         System.IO.File.Delete(path);
+    }
+
+    // The live transcript skips ahead once more than a minute of audio waits; the newest piece is always written down.
+    [Test]
+    public void SkipsAheadWhenFarBehind()
+    {
+        Assert.That(MeetingTranscription.PiecesToSkip(new double[0]), Is.EqualTo(0));
+        Assert.That(MeetingTranscription.PiecesToSkip(new double[] { 90 }), Is.EqualTo(0), "one piece, however long");
+        Assert.That(MeetingTranscription.PiecesToSkip(new double[] { 30, 25 }), Is.EqualTo(0));
+        Assert.That(MeetingTranscription.PiecesToSkip(new double[] { 40, 40, 40 }), Is.EqualTo(2));
+        Assert.That(MeetingTranscription.PiecesToSkip(new double[] { 40, 30 }), Is.EqualTo(1));
+        Assert.That(MeetingTranscription.PiecesToSkip(Enumerable.Repeat(1.0, 100).ToArray()), Is.EqualTo(40));
+        Assert.That(MeetingTranscription.PiecesToSkip(new double[] { 20, 20, 20 }, maxDelay: 30), Is.EqualTo(2));
+    }
+
+    // A piece set aside on disk comes back the same.
+    [Test]
+    public void APieceComesBackFromItsWav()
+    {
+        float[] audio = Speech(1.2);
+        var piece = new MeetingAudioChunk(TimeSpan.FromSeconds(75), audio, Rate);
+        MeetingAudioChunk back = MeetingAudioChunk.FromWav(piece.Start, piece.ToWav());
+        Assert.That(back.Start, Is.EqualTo(TimeSpan.FromSeconds(75)));
+        Assert.That(back.SampleRate, Is.EqualTo(Rate));
+        Assert.That(back.Samples.Length, Is.EqualTo(audio.Length));
+        Assert.That(back.Samples.Zip(audio, (a, b) => Math.Abs(a - b)).Max(), Is.LessThan(1.5 / 32767));
+        Assert.That(back.ToWav(), Is.EqualTo(piece.ToWav()));
+        Assert.Throws<ArgumentException>(() => MeetingAudioChunk.FromWav(TimeSpan.Zero, new byte[10]));
+        byte[] stereo = piece.ToWav();
+        stereo[22] = 2;
+        Assert.Throws<ArgumentException>(() => MeetingAudioChunk.FromWav(TimeSpan.Zero, stereo));
+    }
+
+    // Pieces written down after Stop (skipped live) go back in their place.
+    [Test]
+    public void PiecesWrittenDownLaterGoInTheirPlace()
+    {
+        var transcript = new MeetingTranscript();
+        transcript.Add(TimeSpan.Zero, "first");
+        transcript.Add(TimeSpan.FromSeconds(80), "third");
+        transcript.Add(TimeSpan.FromSeconds(40), "second");
+        Assert.That(transcript.Segments.Select(s => s.Text), Is.EqualTo(new[] { "first", "second", "third" }));
     }
 
     // A saved recording's length from its header (a reopened chat's card shows it before playing).
