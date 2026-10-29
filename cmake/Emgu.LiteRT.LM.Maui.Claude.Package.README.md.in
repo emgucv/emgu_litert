@@ -1,0 +1,20 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Maui.Claude.dll`: `ClaudeFeature`, a feature of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `ChatPage` for Anthropic's Claude models through the Claude API, in place of a model on the device, with the user's API key. It is the remote "Claude" option of the page's model list (`ClaudeFeature.Option`, a `ChatModelOption` the app adds to its models), chatting through the same agent, with the same tools, saved chats and compaction, over the official Claude SDK for C# (`Anthropic`) and its `IChatClient`. Its settings section takes an API key from the Claude Console, kept in secure storage, and one of the models the key can use (the Models API also gives each model's context window, longest reply, whether it takes images and the kinds of thinking it accepts). The Think chip asks for Claude's thinking, shown in the chat; each request asks the API to cache the conversation so far, so long chats cost less per message. Claude doesn't take audio, so voice messages are written down by the device's speech recognizer first.
+
+It is kept out of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}` so that package doesn't depend on Anthropic's SDK.
+
+## Adding it to a chat page
+
+```csharp
+using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.LM.Maui.Claude;
+
+var claude = new ClaudeFeature();
+options.Models.Add(claude.Option);
+options.Features.Add(claude);
+```
+
+The user adds an API key in the settings and picks "Claude" in the model list. What they use is billed to their Anthropic account, and their messages, pictures and the tools' results go to Anthropic, so the section says so.

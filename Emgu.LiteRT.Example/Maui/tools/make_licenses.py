@@ -230,6 +230,11 @@ def curated():
     add(data, "Tavily", "Tavily terms of service",
         "With a Tavily API key of the user's own, web search and page reading go through Tavily (https://tavily.com),\n"
         "under Tavily's terms of service.", url="https://tavily.com", used_for="search_web and read_web_page (optional)")
+    add(data, "Claude API (Anthropic)", "Anthropic's commercial terms of service",
+        "With an API key of the user's own from the Claude Console, the \"Claude\" model option chats through Anthropic's\n"
+        "Claude API (https://platform.claude.com), under Anthropic's commercial terms of service and usage policies; the\n"
+        "Claude SDK for C# (Anthropic) is listed with the other .NET packages.", url="https://www.anthropic.com/legal/commercial-terms",
+        used_for="The Claude model option (optional)")
 
     media = "Sample media"
     # Matched by content (Git blob hash) with OpenCV's repositories.

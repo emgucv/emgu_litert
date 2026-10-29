@@ -541,6 +541,31 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   stream") when Google Maps, opened by `open_directions`, came to the front, and the reply was lost. (The retry itself hasn't
   been seen to run.)
 
+## Claude
+
+- Settings > "Claude" (`ClaudeFeature`, the `Emgu.LiteRT.LM.Maui.Claude` package, since 2026-10-29; its remote option, id
+  "Claude", comes before "Your own server" at the end of the model list) chats with Anthropic's Claude through the Claude API
+  with an API key of the user's own from the Claude Console (kept in `SecureStorage`; usage is billed to their account),
+  over the official Claude SDK for C# (`Anthropic` 13.3.0, Apache-2.0) and its `IChatClient` (`AsIChatClient`). The model
+  list (`client.Models.List`, newest first, retired ones left out) gives each model's context window (`MaxInputTokens` -
+  1M for the 4.6 and later models, 200K before: the conversation isn't compacted early), its longest reply (a reply asks
+  for at most 16,000 tokens), whether it takes images, and which thinking it accepts: adaptive thinking for the models
+  that have it, extended otherwise; "no thinking" (the Think chip off, summaries, one-off questions) becomes the lowest
+  effort for a model that can't stop thinking, and temperature/top_p are never sent (current models refuse them). The
+  thinking comes back as text (`ReasoningOutput.Summary`) and shows as a local model's. Each request asks the API to cache
+  the conversation so far (`MessageCreateParams.CacheControl` through `RawRepresentationFactory`). No audio: voice
+  messages are written down by the speech recognizer, and meetings use it too. The model picker is the page's sheet, a
+  row per model with what it takes ("1M context · images · released 2026-09 · claude-sonnet-5-5"): the system's action
+  sheet stacked the twenty-odd models as plain buttons on Mac Catalyst. The chosen model's name is kept
+  ("claude_model_name") for the button before the list is fetched.
+  - Verified on Mac Catalyst (2026-10-29, Claude Sonnet 5.5): the calculator tool (1234 × 5678 = 7,006,652); a word problem
+    with "Thought for 2 s" shown and the right answer; Think off accepted; the weather tool (Vancouver, with a 3-day
+    forecast); the tulips sample image described; the chat saved as a "Claude" chat. Caching, from the usage of three
+    messages in a row (a temporary log): 4,597 input tokens with 4,593 written to the cache, then 4,765 with 4,593 read
+    from it, then 4,956 with 4,761 read - about 96% of each later request read at a tenth of the price. Not tried on
+    Android or iOS yet (it builds for both). The key needs the account's workspace: a personal key not scoped to one
+    would also need the `anthropic-workspace-id` header, which isn't asked for yet.
+
 ## Device actions
 
 - The agent gets `AgentTools.DeviceActions` - timers, alarms, calendar events, reminders and directions (the library's

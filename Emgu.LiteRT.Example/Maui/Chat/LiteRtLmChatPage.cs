@@ -10,6 +10,7 @@ using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.LM.Maui.Documents;
 using Emgu.LiteRT.LM.Maui.Mcp;
 using Emgu.LiteRT.LM.Maui.OpenAI;
+using Emgu.LiteRT.LM.Maui.Claude;
 using Emgu.LiteRT.LM.Maui.Images;
 using Emgu.LiteRT.LM.Maui.CV;
 using Emgu.LiteRT.LM.Agents.CV;
@@ -49,6 +50,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         public McpFeature Mcp;
         public VoiceModeFeature VoiceMode;
         public ServerFeature Server;
+        public ClaudeFeature Claude;
         public ExportFeature Export;
         public StorageFeature Storage;
         public SearchModelFeature SearchModel;
@@ -122,7 +124,10 @@ public sealed class LiteRtLmChatPage : ChatPage
             Exercises = new ExerciseFeature(),
             Memory = new MemoryFeature(Memories)
         };
-        // The user's own server: its remote option goes last in the model list ("Server", the id saved chats have).
+        // Claude through the Claude API with the user's key, then the user's own server: the remote options go last in the
+        // model list ("Claude" and "Server", the ids saved chats have).
+        parts.Claude = new ClaudeFeature();
+        models.Add(parts.Claude.Option);
         parts.Server = new ServerFeature();
         models.Add(parts.Server.Option);
         parts.Workload = new DeviceIndexingWorkload();
@@ -216,7 +221,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         {
             new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new ClipboardFeature(),
-            parts.Camera, parts.PhotoEffects, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
+            parts.Camera, parts.PhotoEffects, parts.Claude, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
             parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.Meetings, parts.Exercises
         })
