@@ -15,6 +15,8 @@ namespace Emgu.LiteRT.LM.Maui
         /// <returns>The builder</returns>
         public static MauiAppBuilder UseLiteRtChat(this MauiAppBuilder builder)
         {
+            // Text the user can select (Windows).
+            SelectableLabel.MapSelection();
 #if MACCATALYST
             builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<ChatPromptEditor, ChatPromptEditorHandler>());
 #elif ANDROID

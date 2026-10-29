@@ -404,17 +404,17 @@
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="18" />
                 </Border.StrokeShape>
-                <Label Text="{Binding Text}" TextColor="White" FontSize="15" FontFamily="{StaticResource ChatBodyFont}" />
+                <chat:SelectableLabel Text="{Binding Text}" TextColor="White" FontSize="15" FontFamily="{StaticResource ChatBodyFont}" />
             </Border>
-            <!-- Copies the message's text (ChatView.CopyMessageCommand). -->
-            <Label Text="Copy" IsVisible="{Binding HasText}" HorizontalOptions="End" Margin="0,-4,8,0" FontSize="12"
-                   FontFamily="{StaticResource ChatBodyFont}" SemanticProperties.Description="Copy this message"
-                   TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}">
-                <Label.GestureRecognizers>
+            <!-- Copies the whole message (ChatView.CopyMessageCommand): a small icon; the text itself can be selected on Windows. -->
+            <Path Data="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+                  Fill="{AppThemeBinding Light=#8A8FA3, Dark=#9AA0B4}" Aspect="Uniform" WidthRequest="14" HeightRequest="14"
+                  IsVisible="{Binding HasText}" HorizontalOptions="End" Margin="0,2,10,0" SemanticProperties.Description="Copy this message">
+                <Path.GestureRecognizers>
                     <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type chat:ChatView}}, Path=CopyMessageCommand, x:DataType=chat:ChatView}"
                                           CommandParameter="{Binding .}" />
-                </Label.GestureRecognizers>
-            </Label>
+                </Path.GestureRecognizers>
+            </Path>
             <VerticalStackLayout BindableLayout.ItemsSource="{Binding Decorations}" IsVisible="{Binding HasDecorations}" Spacing="6" HorizontalOptions="End">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="x:Object">
@@ -474,15 +474,15 @@
                            TextColor="{StaticResource ChatDanger}" />
                 </VerticalStackLayout>
             </Border>
-            <!-- Copies the reply's answer (ChatView.CopyMessageCommand), once it is written. -->
-            <Label Text="Copy" IsVisible="{Binding CanCopy}" HorizontalOptions="Start" Margin="8,-2,0,0" FontSize="12"
-                   FontFamily="{StaticResource ChatBodyFont}" SemanticProperties.Description="Copy this reply"
-                   TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}">
-                <Label.GestureRecognizers>
+            <!-- Copies the reply's answer (ChatView.CopyMessageCommand), once it is written: a small icon; the text itself can be selected on Windows. -->
+            <Path Data="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+                  Fill="{AppThemeBinding Light=#8A8FA3, Dark=#9AA0B4}" Aspect="Uniform" WidthRequest="14" HeightRequest="14"
+                  IsVisible="{Binding CanCopy}" HorizontalOptions="Start" Margin="10,2,0,0" SemanticProperties.Description="Copy this reply">
+                <Path.GestureRecognizers>
                     <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type chat:ChatView}}, Path=CopyMessageCommand, x:DataType=chat:ChatView}"
                                           CommandParameter="{Binding .}" />
-                </Label.GestureRecognizers>
-            </Label>
+                </Path.GestureRecognizers>
+            </Path>
         </VerticalStackLayout>
     </DataTemplate>
 

@@ -267,7 +267,7 @@ namespace Emgu.LiteRT.LM.Maui
 
         private Label NewLabel(string styleKey, double fontSize)
         {
-            Label label = new Label { Style = ChatResources.Find<Style>(styleKey) };
+            Label label = new SelectableLabel { Style = ChatResources.Find<Style>(styleKey) };
             label.FontSize = fontSize;
             if (TextColor != null)
                 label.TextColor = TextColor;
