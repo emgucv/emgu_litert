@@ -594,6 +594,13 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   reply written by a per-message client).
 - Verified on Mac Catalyst with Gemma 4 E2B: a Paris weekend (weather, Wikipedia, a web page and a packing-list document in
   ~2.5 minutes), including skip, stop and a follow-up.
+- Attachments (since 2026-10-28): the planner sees them, and with them a page of numbered questions is planned as a step
+  per question (`PlanPrompt(..., attachments: true)`); every step and the final answer get them again
+  (`TaskPlan.WithAttachments`; research still gives them to its first part only). Before, only the first step had them:
+  with a photo of a five-question geometry worksheet (cylinders, prisms, paper tubes), Gemma 4 12B on the Mac's GPU planned
+  by process ("extract the text", "measure", "calculate"...), the later steps worked from the earlier ones' 700-character
+  results, and the answer had questions 10 and 11, half of 12 and called 13 and 14 "not found". After: the plan was "Solve
+  question 10" ... "Solve question 14", and all five were answered correctly (24 minutes).
 
 ## Research mode
 

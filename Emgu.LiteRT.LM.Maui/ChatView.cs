@@ -891,6 +891,11 @@ namespace Emgu.LiteRT.LM.Maui
                 layout.Add(view);
             }
             layout.IsVisible = PendingAttachments.Count > 0;
+            // The template's row holds the chips in a horizontal ScrollView, measured while they were hidden: on Mac Catalyst
+            // it kept its zero height when they appeared, so an attached picture never showed. Showing and hiding the
+            // ScrollView itself makes the message box measure the row again.
+            if (layout.Parent is ScrollView scroll)
+                scroll.IsVisible = layout.IsVisible;
         }
 
         private void UpdateBusy()

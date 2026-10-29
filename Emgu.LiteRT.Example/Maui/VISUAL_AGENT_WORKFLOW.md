@@ -191,7 +191,7 @@ is reported independently and does not cancel audio siblings.
 ## Thinking and context capacity
 
 The chat client budgets each model/tool round using the loaded context size, native cache occupancy and estimated
-rendered input costs. With Thinking on, reasoning has a per-round budget (at most 256 tokens, smaller near the
+rendered input costs. With Thinking on, reasoning has a per-round budget (at most 1,024 tokens - 256 before 2026-10-28 -, smaller near the
 limit). It can rebuild the cache between tool calls to omit completed thinking while retaining the current request
 and all tool calls/results. Older completed exchanges can be removed when needed. This does not rerun actions.
 Creation results return concise facts rather than repeating the full UI snapshot, leaving room for acknowledgement.

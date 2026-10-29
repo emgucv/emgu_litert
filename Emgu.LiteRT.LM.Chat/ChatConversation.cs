@@ -368,8 +368,11 @@ namespace Emgu.LiteRT.LM.Chat
             {
                 try
                 {
-                    await StreamReplyAsync(message, reply, requestOptions, client, cancellationToken);
+                    bool cutOff = await StreamReplyAsync(message, reply, requestOptions, client, cancellationToken);
                     reply.State = ChatMessageState.Done;
+                    // Ended by the length limit, not by the model: said under the reply, or it looks finished mid-sentence.
+                    if (cutOff)
+                        AddNotice(null, CutOffNotice);
                     break;
                 }
                 catch (Exception) when (cancellationToken.IsCancellationRequested)
@@ -565,8 +568,13 @@ namespace Emgu.LiteRT.LM.Chat
             return new ChatMessage(item.Role == ChatMessageRole.User ? ChatRole.User : ChatRole.Assistant, contents);
         }
 
-        // Stream the reply into its item. Continues on the caller's context, so the item changes there.
-        private async Task StreamReplyAsync(ChatMessageItem message, ChatMessageItem reply, ChatOptions options,
+        /// <summary>The notice under a reply that the length limit ended (its last update's finish reason was Length).</summary>
+        public static string CutOffNotice { get; set; } =
+            "The reply was cut off: it reached the length limit. Ask to continue for the rest, or choose a larger context window in Settings.";
+
+        // Stream the reply into its item. Continues on the caller's context, so the item changes there. True when the
+        // length limit ended it.
+        private async Task<bool> StreamReplyAsync(ChatMessageItem message, ChatMessageItem reply, ChatOptions options,
             IChatClient client, CancellationToken cancellationToken)
         {
             List<ChatMessage> request = RequestMessages(message);
@@ -575,9 +583,12 @@ namespace Emgu.LiteRT.LM.Chat
             StringBuilder answer = new StringBuilder();
             Dictionary<string, ChatToolStep> steps = new Dictionary<string, ChatToolStep>();
             DateTime? thinkingStarted = null;
+            ChatFinishReason? finish = null;
             await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(request, options, cancellationToken))
             {
                 updates.Add(update);
+                if (update.FinishReason != null)
+                    finish = update.FinishReason;
                 foreach (AIContent content in update.Contents)
                 {
                     switch (content)
@@ -626,6 +637,7 @@ namespace Emgu.LiteRT.LM.Chat
             foreach (ChatToolStep step in reply.Steps)
                 step.IsRunning = false;
             reply.ModelMessages = updates.ToChatResponse().Messages;
+            return finish == ChatFinishReason.Length;
         }
 
         // ---------- Context window ----------

@@ -38,6 +38,9 @@ public sealed class TaskPlan
     // Research mode (the prompts, the notes' length, the sources).
     public bool Research { get; }
 
+    // The request came with attachments (pictures, a page...), given again with every step and the final answer.
+    public bool WithAttachments { get; set; }
+
     public sealed class Source
     {
         public string Title;
@@ -169,12 +172,23 @@ public sealed class TaskPlan
             .Select(l => Clean(Regex.Replace(l, @"^\s*(?:\d{1,2}\s*[.)]|[-*•])\s*", string.Empty)))
             .Where(l => l.Length > 0).Take(MaxSteps).ToList();
 
-    /// <summary>What the model is asked to write the plan: the tools it will have, then the request.</summary>
-    public static string PlanPrompt(string request, string tools) =>
+    /// <summary>
+    /// What the model is asked to write the plan: the tools it will have, then the request. With attachments (sent with
+    /// this prompt), a page of numbered questions becomes a step per question: a step's result is short, so steps by
+    /// process ("read the page", "calculate") lost questions - a 12B model planning a five-question worksheet that way
+    /// answered three.
+    /// </summary>
+    public static string PlanPrompt(string request, string tools, bool attachments = false) =>
         "You plan tasks for an assistant. Break the request below into 3 to 7 short steps, each one concrete action the " +
         "assistant can do with its tools (" + tools + ") or by writing, whose result the next steps or the answer need. " +
         "Put research and checks first, and last the step that produces what the user asked for (the document, the list, the " +
-        "recommendation). Write the steps in the language of the request. Reply with only the numbered list, one line per " +
+        "recommendation). " +
+        (attachments
+            ? "The request comes with the attachments above, and every step will see them. If they hold several numbered " +
+              "questions or exercises, make each step one of them, in their order (\"Solve question 10\"), up to " + MaxSteps +
+              " steps, and nothing else. "
+            : string.Empty) +
+        "Write the steps in the language of the request. Reply with only the numbered list, one line per " +
         "step, nothing else.\n\nRequest: " + request;
 
     /// <summary>The message for the step at this index (0-based): the task, the plan, the results so far and the step.</summary>
@@ -196,6 +210,8 @@ public sealed class TaskPlan
                 if (Steps[i].State == State.Done && !string.IsNullOrWhiteSpace(Steps[i].Result))
                     text.AppendLine("Step " + (i + 1) + ": " + Steps[i].Result);
         }
+        if (WithAttachments)
+            text.AppendLine("The user's attachments are above: look at them for what this step needs.");
         text.AppendLine("Now do step " + (index + 1) + ": " + Steps[index].Text);
         text.Append("Use your tools when they help. Then reply with only the result of this step - the facts, numbers or names " +
             "the next steps need - in at most 5 short sentences, in the language of the task. If the step is to create a " +
@@ -248,8 +264,8 @@ public sealed class TaskPlan
             text.AppendLine((i + 1) + ". " + step.Text + " - " + result);
         }
         text.Append("Now write the final answer for the user: complete and well organised, in the language of the request. " +
-            "Use only these results, and say so where a step was skipped or failed. Don't call tools unless something " +
-            "essential is missing.");
+            (WithAttachments ? "Use only these results and the user's attachments above" : "Use only these results") +
+            ", and say so where a step was skipped or failed. Don't call tools unless something essential is missing.");
         return text.ToString();
     }
 

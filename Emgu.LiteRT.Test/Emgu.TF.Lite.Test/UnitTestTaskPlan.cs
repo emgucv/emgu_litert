@@ -82,6 +82,20 @@ public class UnitTestTaskPlan
         Assert.That(TaskPlan.PlanPrompt("req", "weather, search"), Does.Contain("Request: req").And.Contain("(weather, search)"));
     }
 
+    // A worksheet photo: a step per question, and every step and the answer told to look at the attachments again.
+    [Test]
+    public void AnAttachedPageIsPlannedAStepPerQuestion()
+    {
+        Assert.That(TaskPlan.PlanPrompt("Solve these", "calculate"), Does.Not.Contain("attachments"));
+        Assert.That(TaskPlan.PlanPrompt("Solve these", "calculate", true), Does.Contain("make each step one of them"));
+        var plan = new TaskPlan(new[] { "Solve question 10", "Solve question 11" });
+        Assert.That(plan.StepPrompt("Solve these", 1), Does.Not.Contain("attachments"));
+        Assert.That(plan.FinalPrompt("Solve these"), Does.Not.Contain("attachments"));
+        plan.WithAttachments = true;
+        Assert.That(plan.StepPrompt("Solve these", 1), Does.Contain("The user's attachments are above"));
+        Assert.That(plan.FinalPrompt("Solve these"), Does.Contain("the user's attachments above"));
+    }
+
     // Research mode: sub-questions, notes with numbered sources, the answer citing them and the sources after it.
 
     [Test]

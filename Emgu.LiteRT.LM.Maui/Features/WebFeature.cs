@@ -75,7 +75,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
             Skill.StockChartReady = chart => MainThread.BeginInvokeOnMainThread(() =>
             {
                 byte[] json = chart.ToJson();
-                object reply = Host?.Conversation?.Messages.LastOrDefault();
+                object reply = Host?.Conversation?.Messages.LastOrDefault(m => m.Role == ChatMessageRole.Assistant);
                 string key = Convert.ToBase64String(json);
                 if (!ReferenceEquals(reply, _chartsReply))
                 {

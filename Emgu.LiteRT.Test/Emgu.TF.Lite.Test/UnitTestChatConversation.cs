@@ -158,6 +158,31 @@ public class UnitTestChatConversation
         Assert.That(second[4].Text, Is.EqualTo("Thanks"));
     }
 
+    private static async IAsyncEnumerable<ChatResponseUpdate> Ending(string text, ChatFinishReason finish)
+    {
+        await Task.Yield();
+        yield return new ChatResponseUpdate(ChatRole.Assistant, text) { MessageId = "a" };
+        yield return new ChatResponseUpdate { Role = ChatRole.Assistant, MessageId = "a", FinishReason = finish };
+    }
+
+    [Test]
+    public async Task AReplyTheLengthLimitEndedSaysSo()
+    {
+        FakeChatClient client = new FakeChatClient();
+        client.Replies.Enqueue(_ => Ending("V = π · 9² · 2 = 162π. SA = 2π · 9 · 2 +", ChatFinishReason.Length));
+        client.Replies.Enqueue(_ => Ending("Done.", ChatFinishReason.Stop));
+        ChatConversation conversation = Conversation(client);
+
+        ChatMessageItem reply = await conversation.SendAsync("Solve question 10");
+        Assert.That(reply.State, Is.EqualTo(ChatMessageState.Done));
+        ChatMessageItem notice = conversation.Messages.Last();
+        Assert.That((notice.Role, notice.Text), Is.EqualTo((ChatMessageRole.Notice, ChatConversation.CutOffNotice)));
+
+        await conversation.SendAsync("Thanks");
+        Assert.That(conversation.Messages.Count(m => m.Role == ChatMessageRole.Notice), Is.EqualTo(1), "a reply that ended itself has none");
+        Assert.That(client.Requests.Last().Messages.Any(m => m.Text.Contains("cut off")), Is.False, "the notice isn't given to the model");
+    }
+
     [Test]
     public async Task CancellingKeepsThePartialReply()
     {

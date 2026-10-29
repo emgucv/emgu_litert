@@ -73,8 +73,20 @@ namespace Emgu.LiteRT.LM.Extensions.AI
         /// Old completed exchanges may be removed; the latest user request and all its tool calls/results are retained.
         /// Configure before use. Off by default for compatibility.</summary>
         public bool EnableContextManagement { get; set; }
-        /// <summary>Maximum reasoning tokens per round when context management is enabled. Thinking stays enabled.</summary>
-        public int MaxThinkingTokens { get; set; } = 256;
+        /// <summary>
+        /// The longest reply, thinking included, when the request's <see cref="ChatOptions.MaxOutputTokens"/> isn't set and
+        /// context management is enabled; it is also kept within the room left in the context window. 4096 by default: it
+        /// was 1024, which cut worked answers with formulas off mid-sentence (a cylinder question's steps, ~1,600 characters
+        /// of LaTeX, from Gemma 4 E2B and 12B). A reply that reaches it ends with <see cref="ChatFinishReason.Length"/>.
+        /// </summary>
+        public int DefaultMaxOutputTokens { get; set; } = 4096;
+        /// <summary>
+        /// Maximum reasoning tokens per round when context management is enabled, and at most a third of the round's output
+        /// budget. Thinking stays enabled. 1024 by default: it was 256 (for tool rounds in a 4k window on a phone), which cut
+        /// Gemma 4 12B's thinking off mid-formula on a worksheet question; the model then went on thinking in the answer
+        /// ("Actually, I'll just do the math...") until the length limit.
+        /// </summary>
+        public int MaxThinkingTokens { get; set; } = 1024;
         /// <summary>Raised at native send boundaries; contains counts only. Observers must marshal UI work.</summary>
         public event Action<LiteRtLmContextInfo> ContextChanged;
 
@@ -197,7 +209,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                     if (inputEstimate == 0)
                         inputEstimate = CachedTokens(conversation) + turns.Skip(conversation.MessageKeys.Count).Sum(EstimateMessageTokens);
                     int available = ContextCapacity - inputEstimate - 64;
-                    outputBudget = Math.Min(maxOutputTokens > 0 ? maxOutputTokens : 1024, available);
+                    outputBudget = Math.Min(maxOutputTokens > 0 ? maxOutputTokens : DefaultMaxOutputTokens, available);
                     if (outputBudget <= 0) throw new LiteRtLmContextException("Too little space remains to answer. Start a new chat or choose a larger context window in Settings.");
                     thinkingBudget = enableThinking == true ? Math.Max(1, Math.Min(MaxThinkingTokens, outputBudget / 3)) : 0;
                 }

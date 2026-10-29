@@ -124,7 +124,7 @@ public sealed class TaskFeature : ChatFeature
 
     /// <summary>The chat client of a message to plan and run step by step.</summary>
     /// <param name="request">The message's text</param>
-    /// <param name="attachments">Its attachments (given to the first step)</param>
+    /// <param name="attachments">Its attachments (given to the planner, every step and the answer; in research to the first part)</param>
     /// <param name="research">True for research mode (sub-questions searched on the web, with sources)</param>
     public IChatClient CreateClient(string request, IList<DataContent> attachments, bool research = false) =>
         new TaskModeClient(this, request, attachments, research);
@@ -157,7 +157,7 @@ public sealed class TaskFeature : ChatFeature
         {
             _feature = feature;
             _request = request;
-            _attachments = attachments;
+            _attachments = attachments ?? new List<DataContent>();
             _research = research;
         }
 
@@ -186,13 +186,16 @@ public sealed class TaskFeature : ChatFeature
             Host.SetStatus(_research ? "Planning the research..." : "Planning...");
             List<string> steps = _research
                 ? TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.ResearchPlanPrompt(_request, ToolNames(options)), 400), TaskPlan.MaxResearchSteps)
-                : TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary), 400));
+                : TaskPlan.Parse(await PlanWithAttachmentsAsync(client, token));
             bool run = false;
             TaskPlan plan = null;
             TaskCard card = null;
             if (steps.Count >= 2 || (_research && steps.Count >= 1))
             {
-                plan = new TaskPlan(steps, _research) { ToolNames = ToolNames(options) };
+                // A task's steps (and its final answer) all see the attachments: a step's result is short, and a later
+                // step that only had the earlier ones' results lost what the picture showed. Research gives them to the
+                // first part only (its parts are web searches).
+                plan = new TaskPlan(steps, _research) { ToolNames = ToolNames(options), WithAttachments = !_research && _attachments.Count > 0 };
                 _feature._taskPlan = plan;
                 var decision = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _feature._taskDecision = decision;
@@ -242,7 +245,7 @@ public sealed class TaskFeature : ChatFeature
                 background?.Update(string.Format("{0} of {1}: {2}", runIndex, Math.Max(toRun, runIndex), step.Text));
                 // A request of its own: the task, the plan and the results so far are in the message.
                 var contents = new List<AIContent>();
-                if (i == 0)
+                if (i == 0 || plan.WithAttachments)
                     contents.AddRange(_attachments);
                 contents.Add(new TextContent(plan.StepPrompt(_request, i)));
                 var stepMessages = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, contents) };
@@ -344,7 +347,11 @@ public sealed class TaskFeature : ChatFeature
             // The final answer, from the results, in the reply - without tools for research (it writes from the notes).
             Host.SetStatus(_research ? "Writing the report..." : "Writing the answer...");
             background?.Update("Writing the report...");
-            var final = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, plan.FinalPrompt(_request)) };
+            var finalContents = new List<AIContent>();
+            if (plan.WithAttachments)
+                finalContents.AddRange(_attachments);
+            finalContents.Add(new TextContent(plan.FinalPrompt(_request)));
+            var final = new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, finalContents) };
             ChatOptions finalOptions = _research && options != null ? CloneWithoutTools(options) : options;
             if (!_research)
             {
@@ -356,8 +363,10 @@ public sealed class TaskFeature : ChatFeature
                 // The report line by line (a line is held until it ends), up to a sources section the model wrote itself.
                 var pending = new System.Text.StringBuilder();
                 bool dropping = false;
+                ChatFinishReason? finish = null;
                 await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(final, finalOptions, token))
                 {
+                    finish = update.FinishReason ?? finish;
                     string text = string.Concat(update.Contents.OfType<TextContent>().Select(t => t.Text));
                     var other = update.Contents.Where(c => !(c is TextContent)).ToList();
                     if (other.Count > 0)
@@ -389,6 +398,9 @@ public sealed class TaskFeature : ChatFeature
                 }
                 if (!dropping && pending.Length > 0 && !TaskPlan.IsSourcesHeading(pending.ToString()) && !TaskPlan.IsCitationsLine(pending.ToString()))
                     yield return new ChatResponseUpdate(ChatRole.Assistant, pending.ToString());
+                // A report the length limit ended says so (the conversation adds the notice).
+                if (finish == ChatFinishReason.Length)
+                    yield return new ChatResponseUpdate { Role = ChatRole.Assistant, FinishReason = finish };
             }
             // The sources, as the pages' real addresses (not the model's).
             if (_research && plan.Sources.Count > 0)
@@ -402,6 +414,18 @@ public sealed class TaskFeature : ChatFeature
                 else
                     background?.Dispose();
             }
+        }
+
+        // The plan, asked once outside the conversation; with attachments the planner sees them too (a page of numbered
+        // questions is planned as a step per question).
+        private async Task<string> PlanWithAttachmentsAsync(IChatClient client, CancellationToken token)
+        {
+            if (_attachments.Count == 0)
+                return await Host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary), 400, token);
+            var contents = new List<AIContent>(_attachments) { new TextContent(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary, true)) };
+            ChatResponse response = await client.GetResponseAsync(new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, contents) },
+                new ChatOptions { MaxOutputTokens = 400, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } }, token);
+            return new ChatReply(response.Text ?? string.Empty).Text.Trim();
         }
 
         private static List<string> ToolNames(ChatOptions options) =>

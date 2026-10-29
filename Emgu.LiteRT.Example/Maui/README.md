@@ -273,7 +273,7 @@ See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HIS
   and the last few lines of it; once the answer starts, the thinking collapses to "Thought for N s" - tap it to read
   it all, formatted like the answer (code blocks, maths). Tool rounds now budget thinking and output against the
   loaded context capacity. When needed, completed thinking is removed by rebuilding the context between tool calls;
-  the current request and its tool results stay intact. Thinking remains on, bounded to at most 256 tokens per round
+  the current request and its tool results stay intact. Thinking remains on, bounded to at most 1,024 tokens per round (256 before 2026-10-28)
   and reduced further when space is tight. This can add prompt-processing time on small windows. Requests that
   cannot fit report guidance instead of a silent empty reply; completed actions are not automatically replayed.
   General web search (including news) requires a Tavily API

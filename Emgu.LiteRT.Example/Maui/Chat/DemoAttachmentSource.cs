@@ -65,6 +65,8 @@ internal sealed class DemoAttachmentSource : IChatAttachmentSource
         if (kinds.HasFlag(ChatAttachmentKinds.Image))
         {
             rows.Add(("IMAGE", Theme.GlyphImage, "Photo Library", "library"));
+            // A picture that isn't in the photo library - a scan or a download on a desktop.
+            rows.Add((null, Theme.GlyphImage, "Image File", "imagefile"));
             if (MediaPicker.Default.IsCaptureSupported)
                 rows.Add((null, Theme.GlyphCamera, "Take Photo", "camera"));
             foreach (string sample in SampleImages)
@@ -91,6 +93,12 @@ internal sealed class DemoAttachmentSource : IChatAttachmentSource
             else if (action == "library")
             {
                 FileResult file = (await MediaPicker.Default.PickPhotosAsync())?.FirstOrDefault();
+                if (file != null)
+                    AddImage(picked, await ReadAllBytesAsync(file, sessionVersion, privateRead), file.FileName);
+            }
+            else if (action == "imagefile")
+            {
+                FileResult file = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Choose an image", FileTypes = FilePickerFileType.Images });
                 if (file != null)
                     AddImage(picked, await ReadAllBytesAsync(file, sessionVersion, privateRead), file.FileName);
             }
