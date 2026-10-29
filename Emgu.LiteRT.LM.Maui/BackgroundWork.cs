@@ -167,7 +167,9 @@ public sealed class WorkForegroundService : Service
     private const string ChannelId = "background_work";
     private const string DoneChannelId = "background_work_done";
     private const string StopAction = "com.emgu.litert.STOP_WORK";
-    private const int NotificationId = 1402;
+    // Not 1402, Emgu.LiteRT.LM.Maui.CV's monitoring service's: a meeting's work starts while that one still runs, and its
+    // notification going would take this one's with it.
+    private const int NotificationId = 1404;
     private const int DoneNotificationId = 1403;
     private static WorkForegroundService _instance;
     private static TaskCompletionSource<bool> _starting;
@@ -184,6 +186,8 @@ public sealed class WorkForegroundService : Service
             {
                 if (_notificationPermissionRequested) return;
                 _notificationPermissionRequested = true;
+                // Asked only when not yet granted: work begun from a notification (a meeting's Stop) has no screen to ask on.
+                if (await Permissions.CheckStatusAsync<Permissions.PostNotifications>() == PermissionStatus.Granted) return;
                 // Denial doesn't prevent a foreground service; Android still lists it in Active apps.
                 await Permissions.RequestAsync<Permissions.PostNotifications>();
             });

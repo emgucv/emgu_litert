@@ -31,7 +31,9 @@ namespace Emgu.LiteRT.LM.Maui.Features;
 /// in a request of its own. When more than a minute of pieces waits (<see cref="MeetingTranscription.PiecesToSkip"/>: the
 /// recognizer runs at ~0.9x real time on a Pixel Fold), the live transcript skips ahead to the latest piece; the skipped
 /// ones wait in temporary WAV files and are written down after Stop, by the recognizer or, when the model writes the
-/// meeting down, the model, and go back into the transcript in their place. With Settings > "Keep meeting recordings" (on by default) the recording itself is written to a
+/// meeting down, the model, and go back into the transcript in their place. What comes after Stop - the last and skipped
+/// pieces, the notes and the reply - goes on with the app in the background (<see cref="BackgroundWork"/>: on Android a
+/// foreground service with its progress, a Stop button that stops the reply, and a notification when it's done). With Settings > "Keep meeting recordings" (on by default) the recording itself is written to a
 /// temporary WAV as it goes (paused stretches left out), encoded to AAC (.m4a, <see cref="AudioEncoder"/>; the WAV where
 /// that isn't supported) at Stop and kept with the reply (<see cref="ChatMessageItem.SavedFiles"/>, kind
 /// <see cref="RecordingKind"/>, never given to the model): the card plays it (<see cref="AudioClipPlayer"/>), saves it
@@ -99,6 +101,7 @@ public sealed class MeetingFeature : ChatFeature
     public override void OnDetached()
     {
         Stop("the chat was closed");
+        EndBackgroundWork(null);
         base.OnDetached();
     }
 
@@ -312,6 +315,17 @@ public sealed class MeetingFeature : ChatFeature
         }
         if (last != null) QueueMeetingChunk(session, last);
         session.PendingSignal.Release();
+        // What comes after Stop takes minutes on a phone (the last and skipped pieces, the notes, then the reply): it goes on
+        // with the app in the background (BackgroundWork: on Android a foreground service with a notification and a Stop
+        // button, begun while the microphone's still runs). Its Stop stops the reply, which leaves out what isn't done yet;
+        // the work ends with the reply (OnReplyCompleted), which is when the chat is saved.
+        string heading = string.IsNullOrWhiteSpace(session.Title) ? "Meeting notes " + session.Started.ToString("yyyy-MM-dd HH.mm") : session.Title;
+        EndBackgroundWork(null);
+        _work = await BackgroundWork.BeginAsync("Writing the meeting notes", "Writing down the last part…",
+            () => MainThread.BeginInvokeOnMainThread(() => Host?.StopReply()));
+        // "the meeting", or its title.
+        string named = string.IsNullOrWhiteSpace(session.Title) ? "the meeting" : "“" + session.Title.Trim() + "”";
+        _workDone = "The transcript of " + named + " was saved.";
         _meeting = null;
         _ = SyncBackgroundServiceAsync();
 #if IOS
@@ -337,14 +351,15 @@ public sealed class MeetingFeature : ChatFeature
         {
             try { if (Directory.Exists(session.PieceFolder)) Directory.Delete(session.PieceFolder, true); } catch (Exception) { }
         }
+        _work?.Update("Saving the recording…");
         await KeepRecordingAsync(session);
 
-        string heading = string.IsNullOrWhiteSpace(session.Title) ? "Meeting notes " + session.Started.ToString("yyyy-MM-dd HH.mm") : session.Title;
         int words = session.Transcript.WordCount;
         int speakers = session.Voiceprint != null ? session.Transcript.LabelSpeakers() : 0;
         if (session.Transcript.IsEmpty)
         {
             await MainThread.InvokeOnMainThreadAsync(() => EndMeetingCard(session, "Nothing was heard in " + MeetingNotes.FormatTime(duration) + "."));
+            _workDone = "Nothing was heard in " + named + ".";
             return AgentTools.MeetingResultText(duration, 0, null, null,
                 session.Failures > 0 ? "Speech recognition failed, so nothing was written down." : "No speech was heard.");
         }
@@ -356,8 +371,13 @@ public sealed class MeetingFeature : ChatFeature
             try
             {
                 Host.SetStatus("Writing the meeting notes...");
+                _work?.Update("Writing the notes…");
                 int maxPrompt = Host.ContextWindow - MeetingNotes.NotesTokens - 300;
-                var progress = new Progress<string>(text => MainThread.BeginInvokeOnMainThread(() => session.Status.Text = text));
+                var progress = new Progress<string>(text =>
+                {
+                    _work?.Update(text);
+                    MainThread.BeginInvokeOnMainThread(() => session.Status.Text = text);
+                });
                 notes = await MeetingNotes.WriteAsync(session.Transcript, session.Title, duration,
                     (prompt, maxTokens, _) => Host.AskModelOnceAsync(prompt, maxTokens), Host.TokenCounter, maxPrompt, progress, token);
             }
@@ -395,12 +415,29 @@ public sealed class MeetingFeature : ChatFeature
             TranscriptAttacher?.Invoke(Encoding.UTF8.GetBytes(transcriptText), transcriptName);
             Host.SetStatus("Generating...");
         });
+        if (notes != null) _workDone = "The notes of " + named + " are ready.";
+        _work?.Update("Writing the reply…");
         return AgentTools.MeetingResultText(duration, words, notes, document.FileName, problem);
 #else
         await Task.CompletedTask;
         return "Recording meetings isn't available on this device. Tell the user.";
 #endif
     }
+
+    // The work after Stop going on in the background, until the reply is done; what to tell the user then.
+    private BackgroundWork _work;
+    private string _workDone;
+
+    private void EndBackgroundWork(string done)
+    {
+        BackgroundWork work = _work;
+        _work = null;
+        if (done != null) work?.Finish(done);
+        else work?.Dispose();
+    }
+
+    /// <inheritdoc/>
+    public override void OnReplyCompleted(ChatExchangeEventArgs e) => EndBackgroundWork(_workDone);
 
     private static void QueueMeetingChunk(MeetingSession session, MeetingAudioChunk chunk)
     {
@@ -699,6 +736,7 @@ public sealed class MeetingFeature : ChatFeature
             string progress = "Writing down the parts skipped while recording: " + (i + 1) + " of " + pieces.Count + "…";
             MainThread.BeginInvokeOnMainThread(() => session.Status.Text = progress);
             Host.SetStatus(progress);
+            _work?.Update(progress);
             string text = null;
             for (int attempt = 0; attempt < 2 && text == null && !token.IsCancellationRequested; attempt++)
             {
@@ -734,6 +772,7 @@ public sealed class MeetingFeature : ChatFeature
             string progress = "Writing the transcript down again with " + model + ": " + (i + 1) + " of " + pieces.Count + "…";
             MainThread.BeginInvokeOnMainThread(() => session.Status.Text = progress);
             Host.SetStatus(progress);
+            _work?.Update(progress);
             try { session.Transcript.Replace(pieces[i].Start, await TranscribeWithModelAsync(File.ReadAllBytes(pieces[i].Path), token)); }
             catch (OperationCanceledException) { break; }
             catch (Exception ex) { Debug.WriteLine("Writing a meeting piece down again failed: " + ex.Message); }
@@ -777,6 +816,7 @@ public sealed class MeetingFeature : ChatFeature
         lock (session.Pending) pending = session.Pending.Count;
         int words = session.Transcript.WordCount;
         TimeSpan skipped = session.SkippedTime;
+        if (session.Stopping) _work?.Update(pending > 0 ? "Writing down the last " + (pending + 1) + " pieces…" : "Writing down the last part…");
         MainThread.BeginInvokeOnMainThread(() =>
         {
             session.Preview.Text = tail;

@@ -836,6 +836,17 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   prompt into short pieces through the phone's microphone ("...how many installs we can transcribe the speech in this
   recording exactly, word for word..."); `MeetingTranscription.Clean` now cuts those sentences out (a second run: none).
   Speaker counts through the phone's microphone varied for the same 3 voices (3, 4 and 5 in three runs).
+- In the background (since 2026-10-29): what comes after Stop - the last and skipped pieces, the recording's encoding,
+  the notes and the model's reply - runs as `BackgroundWork` ("Writing the meeting notes"), begun at Stop while the
+  microphone's foreground service still runs and ended with the reply (`OnReplyCompleted`, when the chat is saved). On
+  Android its notification shows the progress ("Writing down the last 7 pieces…", "Saving the recording…", "Writing the
+  notes…", "Writing the reply…"), its Stop stops the reply, and with the app away it ends with "The notes of the meeting
+  are ready." (tapping it opens the app). Before, the microphone's service and its wake lock stopped at Stop, and with the
+  app away Android froze it. `WorkForegroundService`'s notification id moved from 1402 (also the monitoring service's) to
+  1404, and it asks for the notification permission only when it isn't granted. Pixel Fold, "Stop and write notes" then
+  Home: the work's service ran with the launcher in front and finished in 110 s, the chat saved with its reply. Stop from
+  the meeting's notification with the app away isn't tried yet. iOS gets only its short background time (and Metal can't
+  run in the background), so there the notes still need the app in front.
 - The recording (since 2026-10-29; Settings > "Keep meeting recordings", on by default): the microphone's samples also go
   to a temporary WAV as they arrive (`Emgu.LiteRT.LM.Agents`' `WavFileWriter`, paused stretches left out), encoded at Stop
   to AAC in an .m4a (`Emgu.LiteRT.LM.Maui`'s `AudioEncoder`: AVAudioFile on iOS and Mac Catalyst, MediaCodec and
