@@ -181,7 +181,7 @@ namespace Emgu.LiteRT.LM.Maui
 #elif IOS || MACCATALYST
                 return checked((long)Foundation.NSFileManager.DefaultManager.GetFileSystemAttributes(FileSystem.AppDataDirectory).FreeSize);
 #else
-                return new DriveInfo(Path.GetPathRoot(FileSystem.AppDataDirectory)).AvailableFreeSpace;
+                return new DriveInfo(System.IO.Path.GetPathRoot(FileSystem.AppDataDirectory)).AvailableFreeSpace;
 #endif
             }
             catch (Exception) { return null; }

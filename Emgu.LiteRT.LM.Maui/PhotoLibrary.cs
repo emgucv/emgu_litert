@@ -462,14 +462,23 @@ internal static class PhotoLibrary
                     Photos.PHImageContentMode.AspectFit, options, (img, info) => image = img);
                 using Foundation.NSData jpeg = image?.AsJPEG(0.88f);
                 return jpeg?.ToArray();
-#else
-                Emgu.CV.Mat mat = ImageUtil.Decode(File.ReadAllBytes(id));
-                if (mat == null)
+#elif WINDOWS
+                // The photo's id is its file path; the shell's thumbnail is a JPEG (PNG for transparent images) about maxSize pixels.
+                Windows.Storage.StorageFile file = Windows.Storage.StorageFile.GetFileFromPathAsync(id).AsTask().GetAwaiter().GetResult();
+                using Windows.Storage.FileProperties.StorageItemThumbnail thumbnail = file.GetThumbnailAsync(
+                    Windows.Storage.FileProperties.ThumbnailMode.PicturesView, (uint)maxSize,
+                    Windows.Storage.FileProperties.ThumbnailOptions.ResizeThumbnail).AsTask().GetAwaiter().GetResult();
+                if (thumbnail == null || thumbnail.Size == 0)
                     return null;
-                using Emgu.CV.Mat small = ImageUtil.Downscale(mat, maxSize);
-                using Emgu.CV.Util.VectorOfByte buffer = new Emgu.CV.Util.VectorOfByte();
-                Emgu.CV.CvInvoke.Imencode(".jpg", small, buffer);
-                return buffer.ToArray();
+                byte[] bytes = new byte[thumbnail.Size];
+                using (Windows.Storage.Streams.DataReader reader = new Windows.Storage.Streams.DataReader(thumbnail.GetInputStreamAt(0)))
+                {
+                    reader.LoadAsync((uint)thumbnail.Size).AsTask().GetAwaiter().GetResult();
+                    reader.ReadBytes(bytes);
+                }
+                return bytes;
+#else
+                return null;
 #endif
             }
             catch (Exception)

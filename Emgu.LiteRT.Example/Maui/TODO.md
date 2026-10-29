@@ -36,8 +36,11 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       remain additional device checks.
 - [ ] Recording a voice message live (`VoiceRecorder.cs`: AVAudioRecorder, Android AudioRecord, Windows MediaCapture) -
       Android capture/model input passed; Mac Catalyst and Windows live capture remain pending.
-- [ ] Windows: the PDF page renderer (`Emgu.LiteRT.LM.Maui`'s `PdfPageRenderer`, `Windows.Data.Pdf`) and the photo library (`StorageFile`
-      details).
+- [x] Windows PDF page renderer (`Emgu.LiteRT.LM.Maui`'s `PdfPageRenderer`, `Windows.Data.Pdf`), checked 2026-10-29 in a test
+      harness on the EGL 1.5 spec (pages render, an out-of-range page gives null). Found: the renderer multiplies the
+      destination size by the display scale (150% gave 1536 px for 1024), so the first page is measured and redrawn.
+- [ ] Windows: the photo library (`StorageFile` details; its thumbnails now use `StorageFile.GetThumbnailAsync` - the library's
+      Windows build had broken on Emgu CV and an ambiguous `Path`, fixed 2026-10-29).
 - [ ] Photo search on a real phone's library (only the emulator's test photos so far), on a phone whose owner agrees
       to have their photos indexed for the test.
 - [ ] Mac live recording reached the OS microphone permission request; no completed capture is claimed.

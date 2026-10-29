@@ -107,6 +107,8 @@ public sealed class PdfPageRenderer : IPdfPageRenderer
 #elif WINDOWS
     private readonly byte[] _pdf;
     private Windows.Data.Pdf.PdfDocument _document;
+    private double _outputScale = 1;
+    private bool _outputScaleKnown;
 
     /// <summary>Opens the document.</summary>
     /// <param name="pdf">The PDF file</param>
@@ -135,14 +137,31 @@ public sealed class PdfPageRenderer : IPdfPageRenderer
             return null;
         using Windows.Data.Pdf.PdfPage page = _document.GetPage((uint)pageIndex);
         double scale = maxSize / Math.Max(page.Size.Width, page.Size.Height);
-        Windows.Data.Pdf.PdfPageRenderOptions options = new Windows.Data.Pdf.PdfPageRenderOptions
-        {
-            DestinationWidth = (uint)Math.Max(1, page.Size.Width * scale),
-            DestinationHeight = (uint)Math.Max(1, page.Size.Height * scale),
-            BitmapEncoderId = Windows.Graphics.Imaging.BitmapEncoder.JpegEncoderId
-        };
         using Windows.Storage.Streams.InMemoryRandomAccessStream output = new Windows.Storage.Streams.InMemoryRandomAccessStream();
-        await page.RenderToStreamAsync(output, options);
+        // The renderer multiplies the destination size by the display's scale (150% gave a 1536 px image for 1024), so
+        // the first page is measured and, if it came out the wrong size, drawn again with the correction.
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            Windows.Data.Pdf.PdfPageRenderOptions options = new Windows.Data.Pdf.PdfPageRenderOptions
+            {
+                DestinationWidth = (uint)Math.Max(1, page.Size.Width * scale / _outputScale),
+                DestinationHeight = (uint)Math.Max(1, page.Size.Height * scale / _outputScale),
+                BitmapEncoderId = Windows.Graphics.Imaging.BitmapEncoder.JpegEncoderId
+            };
+            output.Seek(0);
+            output.Size = 0;
+            await page.RenderToStreamAsync(output, options);
+            if (_outputScaleKnown)
+                break;
+            output.Seek(0);
+            Windows.Graphics.Imaging.BitmapDecoder decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(output);
+            double expected = Math.Max(1, Math.Max(page.Size.Width, page.Size.Height) * scale / _outputScale);
+            double actual = Math.Max(decoder.PixelWidth, decoder.PixelHeight);
+            _outputScaleKnown = true;
+            if (Math.Abs(actual - expected) <= 1)
+                break;
+            _outputScale *= actual / expected;
+        }
         byte[] bytes = new byte[output.Size];
         using (Windows.Storage.Streams.DataReader reader = new Windows.Storage.Streams.DataReader(output.GetInputStreamAt(0)))
         {
