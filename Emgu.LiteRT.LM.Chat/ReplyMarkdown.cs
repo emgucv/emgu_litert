@@ -456,6 +456,31 @@ namespace Emgu.LiteRT.LM.Chat
         }
 
         /// <summary>
+        /// A text for a plain label (a plan step's result...): maths converted to Unicode text, and without the Markdown
+        /// markers (code fences, **, `, #). Maths a cut left open at the end ("$162\pi \approx…") is converted too when it
+        /// looks like LaTeX (a backslash, ^, _ or {), so a price ("costs $5") stays as it is.
+        /// </summary>
+        /// <param name="text">The text</param>
+        /// <returns>The plain text</returns>
+        public static string PlainText(string text)
+        {
+            string plain = WithMath(text).Replace("\r", "");
+            Match open = OpenMathAtEnd.Match(plain);
+            if (open.Success)
+            {
+                string maths = open.Groups[1].Value;
+                bool cut = maths.EndsWith("…");
+                plain = plain.Substring(0, open.Index) + MathText.ToUnicode(cut ? maths.Substring(0, maths.Length - 1) : maths).TrimEnd() +
+                    (cut ? "…" : string.Empty);
+            }
+            plain = Regex.Replace(plain, @"^\s*```.*$\n?", string.Empty, RegexOptions.Multiline);
+            return Regex.Replace(plain, @"\*\*|__|`|^#{1,6}\s+", string.Empty, RegexOptions.Multiline).Trim();
+        }
+
+        // Inline maths opened but not closed, to the end of the text, with LaTeX in it.
+        private static readonly Regex OpenMathAtEnd = new Regex(@"(?<![\\$\w])\$(?![\s$])((?=[^$\n]*[\\^_{])[^$\n]*)$");
+
+        /// <summary>
         /// The end of a text that is still being streamed (e.g. the model's thinking), for a short preview: from a word
         /// boundary, with maths converted and without the Markdown markers (code fences, **, `, #) that a tail cut out
         /// of formatted text can't be laid out with. Longer texts start with "…".
@@ -465,8 +490,7 @@ namespace Emgu.LiteRT.LM.Chat
         /// <returns>The preview</returns>
         public static string Preview(string text, int maxLength = 180)
         {
-            string preview = Regex.Replace(WithMath(text).Replace("\r", ""), @"^\s*```.*$\n?", string.Empty, RegexOptions.Multiline);
-            preview = Regex.Replace(preview, @"\*\*|__|`|^#{1,6}\s+", string.Empty, RegexOptions.Multiline).Trim();
+            string preview = PlainText(text);
             if (preview.Length <= maxLength)
                 return preview;
             string tail = preview.Substring(preview.Length - maxLength);

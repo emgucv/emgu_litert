@@ -108,6 +108,19 @@ public class UnitTestReplyMarkdown
         Assert.That(ReplyMarkdown.WithMath(null), Is.EqualTo(string.Empty));
     }
 
+    // A plan step's result in the task card (Gemma 4 12B on a worksheet), cut short inside maths at the end.
+    [Test]
+    public void PlainTextConvertsMathEvenWhenCutShort()
+    {
+        string result = ReplyMarkdown.PlainText("For cylinder A, the radius is 9 cm, giving a volume of $162\\pi \\approx 508.94\\text{ cm}^3$ " +
+            "and a **surface area** of $198\\pi \\approx 622.04\\text{ cm}^2$. For cylinder B, $200\\pi \\approx 628.32\\text{ cm}…");
+        TestContext.WriteLine(result);
+        Assert.That(result, Does.Not.Contain("$").And.Not.Contain("\\").And.Not.Contain("**"));
+        Assert.That(result, Does.Contain("162π ≈ 508.94").And.Contain("cm³").And.EndWith("…"));
+        Assert.That(ReplyMarkdown.PlainText("It costs $5 now"), Is.EqualTo("It costs $5 now"));
+        Assert.That(ReplyMarkdown.PlainText("From $5 to $10…"), Is.EqualTo("From $5 to $10…"));
+    }
+
     [Test]
     public void PreviewsTheEndWithoutMarkup()
     {

@@ -188,13 +188,15 @@ namespace Emgu.LiteRT.LM.Models
                 case "textrm":
                 case "textit":
                 case "textbf":
+                case "mbox":
+                    return ReadRawArgument(s, ref i).Replace("\\", string.Empty);
                 case "mathrm":
                 case "mathit":
                 case "mathbf":
                 case "boldsymbol":
                 case "operatorname":
-                case "mbox":
-                    return ReadRawArgument(s, ref i).Replace("\\", string.Empty);
+                    // A font for maths: its argument is maths too ("\mathbf{508.94 \text{ cm}^3}" is 508.94 cm³).
+                    return ReadArgument(s, ref i);
                 case "mathbb":
                     {
                         string letter = ReadRawArgument(s, ref i);

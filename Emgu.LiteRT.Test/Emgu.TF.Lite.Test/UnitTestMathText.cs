@@ -40,6 +40,10 @@ public class UnitTestMathText
         Assert.That(MathText.ToUnicode(@"O(n \log n)"), Is.EqualTo("O(n log n)"));
         Assert.That(MathText.ToUnicode(@"\text{area} = \pi r^2"), Is.EqualTo("area = π r²"));
         Assert.That(MathText.ToUnicode(@"\left( x \right)"), Is.EqualTo("(x)"));
+        // A maths font's argument is maths (Gemma 4 12B's worksheet answer); \text's stays text.
+        Assert.That(MathText.ToUnicode(@"\text{Volume} \approx \mathbf{1078.5 \text{ cm}^3}"), Is.EqualTo("Volume ≈ 1078.5 cm³"));
+        Assert.That(MathText.ToUnicode(@"\mathrm{d}x + \operatorname{sin} x + \boldsymbol{v}"), Is.EqualTo("dx + sin x + v"));
+        Assert.That(MathText.ToUnicode(@"\text{a^2 is a}"), Is.EqualTo("a^2 is a"));
         Assert.That(MathText.ToUnicode(""), Is.EqualTo(""));
         Assert.That(MathText.ToUnicode(null), Is.EqualTo(""));
     }

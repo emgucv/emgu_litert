@@ -584,7 +584,8 @@ public sealed class TaskFeature : ChatFeature
                 if (!string.IsNullOrWhiteSpace(step.Result))
                     text.Children.Add(new Label
                     {
-                        Text = step.Result,
+                        // The model's Markdown and LaTeX ("$162\pi \approx 508.94\text{ cm}^3$") as plain text (162π ≈ 508.94 cm³).
+                        Text = ReplyMarkdown.PlainText(step.Result),
                         FontFamily = bodyFont,
                         FontSize = 12,
                         FontAttributes = FontAttributes.Italic,
