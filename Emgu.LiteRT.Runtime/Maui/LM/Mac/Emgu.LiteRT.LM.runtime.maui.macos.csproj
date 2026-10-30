@@ -30,6 +30,17 @@
       <PackagePath>runtimes\maccatalyst-arm64\native</PackagePath>
     </None>
   </ItemGroup>
+  <!-- libasrextern.dylib: Emgu's C API over LiteRT-LM's speech recognition (Emgu.LiteRT.LM's AsrEngine), built next to
+       liblitert-lm.dylib and loaded the same way. Optional. -->
+  <ItemGroup Condition="Exists('$(EmguLiteRtLmMacBinaryDir)\libasrextern.dylib')">
+    <None Include="$(EmguLiteRtLmMacBinaryDir)\libasrextern.dylib">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Pack>True</Pack>
+      <PackagePath>runtimes\maccatalyst-arm64\native</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Depends on Emgu.LiteRT.runtime.maui.macos, not the other way around - same direction as the Android and iOS

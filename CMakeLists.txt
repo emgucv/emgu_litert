@@ -968,6 +968,11 @@ IF (HAVE_WINDESKTOP_LITE)
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libGemmaModelConstraintProvider.dll\" target=\"runtimes\\win-x64\\native\" />
 	")
   ENDIF()
+  IF(HAVE_WINDOWS_LITERT_LM AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/libasrextern.dll")
+    SET(EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libasrextern.dll\" target=\"runtimes\\win-x64\\native\" />
+	")
+  ENDIF()
   ENDIF()
   IF( HAVE_WINDESKTOP_X86_LITE )
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x86/native/libLiteRt.dll")
@@ -1032,6 +1037,11 @@ IF(HAVE_OSX_LITE)
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\liblitert-lm.dylib\" target=\"runtimes\\osx\\native\" />
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libGemmaModelConstraintProvider.dylib\" target=\"runtimes\\osx\\native\" />")
   ENDIF()
+  # libasrextern.dylib: Emgu's C API over LiteRT-LM's speech recognition (Emgu.LiteRT.LM's AsrEngine). Optional.
+  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libasrextern.dylib")
+    SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libasrextern.dylib\" target=\"runtimes\\osx\\native\" />")
+  ENDIF()
   SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
@@ -1057,15 +1067,15 @@ IF(HAVE_OSX_LITE)
 ENDIF()
 
 IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
-  # liblitert-lm.so/libGemmaModelConstraintProvider.so (when present) are excluded from this package's
+  # liblitert-lm.so/libGemmaModelConstraintProvider.so/libasrextern.so (when present) are excluded from this package's
   # *.so glob - they ship in ${EMGU_LITERT_LM_UBUNTU_NUGET_ID} instead, see below.
   IF (HAVE_UBUNTU_X86_64_LITE)
     SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
-      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\runtimes\\ubuntu-x64\\native\" />")
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libasrextern.so\" target=\"runtimes\\runtimes\\ubuntu-x64\\native\" />")
   ENDIF()
   IF (HAVE_UBUNTU_ARM64_LITE)
     SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
-      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\runtimes\\ubuntu-arm64\\native\" />")
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libasrextern.so\" target=\"runtimes\\runtimes\\ubuntu-arm64\\native\" />")
   ENDIF()
   SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
@@ -1086,10 +1096,18 @@ IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-x64/native/liblitert-
     <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so\" target=\"runtimes\\ubuntu-x64\\native\" />
     <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\ubuntu-x64\\native\" />")
 ENDIF()
+IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-x64/native/libasrextern.so")
+  SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libasrextern.so\" target=\"runtimes\\ubuntu-x64\\native\" />")
+ENDIF()
 IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-arm64/native/liblitert-lm.so")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so\" target=\"runtimes\\ubuntu-arm64\\native\" />
     <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\ubuntu-arm64\\native\" />")
+ENDIF()
+IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-arm64/native/libasrextern.so")
+  SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libasrextern.so\" target=\"runtimes\\ubuntu-arm64\\native\" />")
 ENDIF()
 IF(NOT "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}" STREQUAL "")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}

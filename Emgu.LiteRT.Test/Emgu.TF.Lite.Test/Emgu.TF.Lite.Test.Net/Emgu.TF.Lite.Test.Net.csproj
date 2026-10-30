@@ -46,6 +46,7 @@
     <Compile Include="..\UnitTestGoalHistory.cs" Link="UnitTestGoalHistory.cs" />
     <Compile Include="..\UnitTestGoalReminders.cs" Link="UnitTestGoalReminders.cs" />
     <Compile Include="..\UnitTestVideoMoments.cs" Link="UnitTestVideoMoments.cs" />
+    <Compile Include="..\UnitTestSpeechToText.cs" Link="UnitTestSpeechToText.cs" />
     <Compile Include="..\UnitTestHandTracker.cs" Link="UnitTestHandTracker.cs" />
     <Compile Include="..\UnitTestPoseTracker.cs" Link="UnitTestPoseTracker.cs" />
     <Compile Include="..\UnitTestFaceTracker.cs" Link="UnitTestFaceTracker.cs" />

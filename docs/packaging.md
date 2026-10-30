@@ -13,6 +13,7 @@ The NuGet packages, the native runtime packages and their add-ons, and versionin
 ## LiteRT-LM native libraries
 
 - `liblitert-lm` (+ `libGemmaModelConstraintProvider`) is packaged, when present, in `Emgu.LiteRT.runtime.macos` (top-level `CMakeLists.txt`), `Emgu.LiteRT.Runtime/Mac`'s `.projitems`, the MAUI Android runtime (`arm64-v8a`/`x86_64`), and - on Windows, where it's built separately by `bazel_build_litert.ps1` rather than bundled with `libLiteRt.dll`/`tfliteextern.dll` - its own `Emgu.LiteRT.LM.runtime.windows` nuget package (depending on `Emgu.LiteRT.runtime.windows` for `libLiteRt.dll`), built only when `lib/runtimes/win-x64/native/liblitert-lm.dll` exists (`HAVE_WINDOWS_LITERT_LM`).
+- `libasrextern` (speech recognition, Emgu.LiteRT.LM's `AsrEngine`) goes next to `liblitert-lm` wherever that is packaged, each guarded on its own file existing: `Emgu.LiteRT.runtime.macos` and `Emgu.LiteRT.Runtime/Mac`'s `.projitems` (`libasrextern.dylib`), `Emgu.LiteRT.LM.runtime.maui.android` (`libasrextern.so`, arm64-v8a/x86_64), `Emgu.LiteRT.LM.runtime.maui.ios` (`asrextern.xcframework`), `Emgu.LiteRT.LM.runtime.maui.macos` (Mac Catalyst, the macOS dylib), `Emgu.LiteRT.LM.runtime.windows` and `Emgu.LiteRT.LM.runtime.ubuntu` (excluded from the base Ubuntu package's `*.so` glob). Parakeet's weights it runs are CC-BY-4.0 (downloaded by the app, not packaged).
 
 ## The LiteRT-LM add-ons for iOS and Mac Catalyst
 

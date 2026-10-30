@@ -57,6 +57,10 @@ cp -f litertextern/tfliteextern/tfliteextern.cc $WORKSPACE_DIR/tfliteextern/tfli
 cp -f litertextern/tfliteextern/tfliteextern.h $WORKSPACE_DIR/tfliteextern/tfliteextern.h
 cp -f litertextern/imgproc/imgproc.cc $WORKSPACE_DIR/tfliteextern/imgproc.cc
 cp -f litertextern/imgproc/imgproc.h $WORKSPACE_DIR/tfliteextern/imgproc.h
+# asrextern, our C API over LiteRT-LM's speech recognition (omni/asr), staged the same way; its labels are LiteRT-LM's.
+mkdir -p $WORKSPACE_DIR/asrextern
+cp -f litertextern/asrextern/bazel/BUILD $WORKSPACE_DIR/asrextern/BUILD || exit 1
+cp -f litertextern/asrextern/asrextern.cc litertextern/asrextern/asrextern.h $WORKSPACE_DIR/asrextern/ || exit 1
 
 # liblitert-lm.so (LiteRT-LM's C API) needs LiteRT-LM's prebuilt libGemmaModelConstraintProvider.so
 # (prebuilt/linux_<arch>, Git LFS).
@@ -79,8 +83,10 @@ cd $WORKSPACE_DIR
 # isn't part of Bazel's output folder name, so --platform_suffix keeps the two builds from overwriting each
 # other's outputs. Bazel's bazel-bin symlink follows the most recent build, so copy its output right after.
 bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS --define=litert_runtime_link_mode=dynamic \
-    --platform_suffix=-litert_lm_dynamic "${@:1}" //c:litert-lm || exit 1
+    --platform_suffix=-litert_lm_dynamic "${@:1}" //c:litert-lm //asrextern:asrextern || exit 1
 cp -f bazel-bin/c/liblitert-lm.so ../lib/$OUT_FOLDER/liblitert-lm.so || exit 1
+# libasrextern.so (speech recognition) is built the same way, so it also links against libLiteRt.so.
+cp -f bazel-bin/asrextern/libasrextern.so ../lib/$OUT_FOLDER/libasrextern.so || exit 1
 cp -f $GEMMA_PREBUILT ../lib/$OUT_FOLDER/libGemmaModelConstraintProvider.so || exit 1
 
 bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS "${@:1}" //tfliteextern:litert_runtime_so //tfliteextern:tfliteextern_so || exit 1
@@ -100,7 +106,7 @@ cd ..
 cp -f $WORKSPACE_DIR/bazel-bin/tfliteextern/libLiteRt.so lib/$OUT_FOLDER/libLiteRt.so
 cp -f $WORKSPACE_DIR/bazel-bin/tfliteextern/libtfliteextern.so lib/$OUT_FOLDER/libtfliteextern.so
 # Strip debug info; --strip-unneeded keeps the dynamic symbol table, so the exported functions are unaffected.
-for LIB in libLiteRt libtfliteextern liblitert-lm libGemmaModelConstraintProvider; do
+for LIB in libLiteRt libtfliteextern liblitert-lm libGemmaModelConstraintProvider libasrextern; do
     chmod u+w lib/$OUT_FOLDER/$LIB.so
     strip --strip-unneeded lib/$OUT_FOLDER/$LIB.so || exit 1
 done

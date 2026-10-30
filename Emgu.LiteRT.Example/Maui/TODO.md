@@ -682,3 +682,8 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
   - the GPU (the embedding GPU crash);
   - several videos in one chat;
   - telling "no moment matches" apart from a weak best match (photo search's lift against a baseline).
+- [ ] On-device speech recognition with Parakeet-TDT-0.6B-v3 (`Emgu.LiteRT.LM.Models`' `ParakeetTdt06BV3`, wrapped 2026-10-30; see `docs/litert-lm.md`, "Speech recognition"). The model works on the Mac (real-time factor 0.07-0.10) and a Galaxy S10 (0.37-0.46), but the app doesn't use it yet:
+  - let `SpeechRecognizer.TranscribeAsync` (voice messages, voice chat) and `MeetingTranscription.Choose` use it - a setting ("System" / "On-device Parakeet"), and the only choice on Windows, which has no recognizer today;
+  - the 614 MB download, its storage row, and the CC-BY-4.0 credit to NVIDIA in the app;
+  - live partial text while speaking (`AsrSession`), and the languages it doesn't have (Chinese, Japanese...: the platform recognizer, or Qwen3-ASR later);
+  - check the iOS and Windows builds of `libasrextern`.

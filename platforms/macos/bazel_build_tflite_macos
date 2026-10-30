@@ -56,6 +56,10 @@ cp -f litertextern/tfliteextern/tfliteextern.cc $WORKSPACE_DIR/tfliteextern/tfli
 cp -f litertextern/tfliteextern/tfliteextern.h $WORKSPACE_DIR/tfliteextern/tfliteextern.h
 cp -f litertextern/imgproc/imgproc.cc $WORKSPACE_DIR/tfliteextern/imgproc.cc
 cp -f litertextern/imgproc/imgproc.h $WORKSPACE_DIR/tfliteextern/imgproc.h
+# asrextern, our C API over LiteRT-LM's speech recognition (omni/asr), staged the same way; its labels are LiteRT-LM's.
+mkdir -p $WORKSPACE_DIR/asrextern
+cp -f litertextern/asrextern/bazel/BUILD $WORKSPACE_DIR/asrextern/BUILD || exit 1
+cp -f litertextern/asrextern/asrextern.cc litertextern/asrextern/asrextern.h $WORKSPACE_DIR/asrextern/ || exit 1
 
 cd $WORKSPACE_DIR
 
@@ -122,9 +126,11 @@ if [ "$BUILD_LITERT_LM" = "1" ]; then
     # The define can't apply to the tfliteextern build: in dynamic mode LiteRT's C API libraries resolve to headers
     # only, so libLiteRt.dylib would be built empty. It also isn't part of Bazel's output folder name, so
     # --platform_suffix keeps this build's outputs apart instead of the two builds overwriting each other's.
-    bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS $BAZEL_XCODE_OPTS --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic $BAZEL_OPTIONS //c:litert-lm || exit 1
+    bazel --output_user_root="$BAZEL_OUTPUT_USER_ROOT" build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS $BAZEL_XCODE_OPTS --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic $BAZEL_OPTIONS //c:litert-lm //asrextern:asrextern || exit 1
     cd ..
     copy_dylib c/liblitert-lm.dylib lib/runtimes/osx/native/liblitert-lm-$BAZEL_CPU.dylib
+    # libasrextern.dylib (speech recognition) is built the same way, so it also links against @rpath/libLiteRt.dylib.
+    copy_dylib asrextern/libasrextern.dylib lib/runtimes/osx/native/libasrextern-$BAZEL_CPU.dylib
     rm -f lib/runtimes/osx/native/libGemmaModelConstraintProvider.dylib lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib
     cp -f $WORKSPACE_DIR/$GEMMA_PREBUILT lib/runtimes/osx/native/libGemmaModelConstraintProvider.dylib || exit 1
     cp -f $WORKSPACE_DIR/$METAL_PREBUILT lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib || exit 1
@@ -155,8 +161,8 @@ done
 #make fat binary
 cd lib/runtimes/osx/native
 # Older builds left read-only fat binaries, which lipo refuses to overwrite - remove them first.
-# liblitert-lm.dylib only ever has the arm64 slice (see above).
-for LIB in libtfliteextern libLiteRt liblitert-lm; do
+# liblitert-lm.dylib and libasrextern.dylib only ever have the arm64 slice (see above).
+for LIB in libtfliteextern libLiteRt liblitert-lm libasrextern; do
     if ls $LIB-*.dylib >/dev/null 2>&1; then
         rm -f $LIB.dylib
         lipo -create -output $LIB.dylib $LIB-*.dylib || exit 1

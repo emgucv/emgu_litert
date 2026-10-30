@@ -286,6 +286,12 @@ Copy-Item "litertextern\tfliteextern\tfliteextern.cc" (Join-Path $TfliteexternSt
 Copy-Item "litertextern\tfliteextern\tfliteextern.h" (Join-Path $TfliteexternStageDir "tfliteextern.h") -Force
 Copy-Item "litertextern\imgproc\imgproc.cc" (Join-Path $TfliteexternStageDir "imgproc.cc") -Force
 Copy-Item "litertextern\imgproc\imgproc.h" (Join-Path $TfliteexternStageDir "imgproc.h") -Force
+# asrextern, our C API over LiteRT-LM's speech recognition (omni/asr), staged the same way; its labels are LiteRT-LM's.
+$AsrexternStageDir = Join-Path $WorkspaceDir "asrextern"
+if (-not (Test-Path $AsrexternStageDir)) { New-Item -ItemType Directory -Path $AsrexternStageDir | Out-Null }
+Copy-Item "litertextern\asrextern\bazel\BUILD" (Join-Path $AsrexternStageDir "BUILD") -Force
+Copy-Item "litertextern\asrextern\asrextern.cc" (Join-Path $AsrexternStageDir "asrextern.cc") -Force
+Copy-Item "litertextern\asrextern\asrextern.h" (Join-Path $AsrexternStageDir "asrextern.h") -Force
 
 Set-Location $WorkspaceDir
 
@@ -339,7 +345,7 @@ if ($BuildLitertLm) {
     # under the same (short) output_base - same approach as bazel_build_tflite_macos and
     # platforms/android/bazel_build_tflite_android. Uses $LitertLmBazelArgs (a separate, short
     # output_base/root - see above), not $CommonBazelArgs.
-    & $BazelCommand @LitertLmBazelArgs "//c:litert-lm" "--define=litert_runtime_link_mode=dynamic" "--platform_suffix=-litert_lm_dynamic" "--verbose_failures"
+    & $BazelCommand @LitertLmBazelArgs "//c:litert-lm" "//asrextern:asrextern" "--define=litert_runtime_link_mode=dynamic" "--platform_suffix=-litert_lm_dynamic" "--verbose_failures"
     Set-Location ".."
 
     # Bazel's Windows shared-library naming doesn't auto-prepend "lib" the way Linux/macOS do (see
@@ -349,6 +355,10 @@ if ($BuildLitertLm) {
     # every platform (Emgu.LiteRT.LM P/Invokes this one name regardless of OS).
     Copy-Item (Join-Path $WorkspaceDir "bazel-bin\c\litert-lm.dll") "$NativeOutDir\liblitert-lm.dll" -Force
     Copy-Item $GemmaPrebuilt "$NativeOutDir\libGemmaModelConstraintProvider.dll" -Force
+    # asrextern.dll (speech recognition, built the same way against libLiteRt.dll) is renamed the same way, for
+    # DllImport("libasrextern"). Not built on Windows yet: the omni/asr dependencies may need fixes there.
+    $AsrexternDll = Join-Path $WorkspaceDir "bazel-bin\asrextern\asrextern.dll"
+    if (Test-Path $AsrexternDll) { Copy-Item $AsrexternDll "$NativeOutDir\libasrextern.dll" -Force }
 }
 # Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
 # dll. The top level CMakeLists.txt reads it to version the Emgu.TF.Lite, Emgu.LiteRT.Tflite.Models and Emgu.TF.Lite.runtime.windows nuget packages.
