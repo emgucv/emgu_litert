@@ -666,3 +666,17 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [x] Photos the library can't load are counted in the status ("; 1 couldn't be read", checked with a corrupt PNG, removed afterwards).
 
 - [ ] Places search (`search_places`, 2026-10-29; see `docs/agents.md`): built and unit-tested, checked on Windows with OpenStreetMap and a named town. Still to check: the device-position path ("nearest ..." with Share my location on) on the Fold and an iPhone, Google Places with a real key (the request is written from Google's documentation, never sent), Apple Maps on iOS and Mac Catalyst (`AppleMapsPlaceSearch`, written without a Mac: it has not been compiled).
+- [ ] Video moments (`VideoMomentsFeature`, 2026-10-29; see FEATURES.md, "Video moments"). It was checked in the iOS simulator with a synthetic 30 s video. Still to check:
+  - Mac Catalyst, and the Pixel Fold: how fast the CPU watches there, and the background work;
+  - Windows (its `VideoSource` and `InlineVideoView` code hasn't been compiled);
+  - picking from the photo library;
+  - a real video of a few minutes, with real sounds;
+  - reopening a chat with its cards;
+  - a search model switched while watching.
+
+  Later:
+  - saving a moment as a clip (a frame-accurate cut);
+  - videos longer than 5 minutes;
+  - the GPU (the embedding GPU crash);
+  - several videos in one chat;
+  - telling "no moment matches" apart from a weak best match (photo search's lift against a baseline).

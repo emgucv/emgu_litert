@@ -487,6 +487,23 @@ namespace Emgu.LiteRT.LM.Agents
                 "Finds the user's own photos, pictures and screenshots saved on this device - by what is in them, where and when they were taken, or their kind (selfie, screenshot...) - and shows them to the user. Use it whenever the user asks to find, show or look for their photos, pictures, images or screenshots (\"show me a screenshot of a web page\" means one they have saved).");
         }
 
+        /// <summary>
+        /// find_video_moment: finds the moments of the video the user attached that match a description ("the dog jumping
+        /// into the pool", "someone laughing"), with a search the app provides. The search should show the moments to the
+        /// user and return a short text about them (their times) for the model, which doesn't see the video.
+        /// </summary>
+        /// <param name="search">The app's video search, given the description</param>
+        public static AIFunction FindVideoMoment(Func<string, CancellationToken, Task<string>> search)
+        {
+            if (search == null)
+                throw new ArgumentNullException("search");
+            return AIFunctionFactory.Create(
+                ([Description("What happens in the moment to find, in the user's words, e.g. \"the dog jumps into the pool\", \"someone blowing out candles\", \"people laughing\"")] string request,
+                 CancellationToken cancellationToken) => search(request ?? string.Empty, cancellationToken),
+                "find_video_moment",
+                "Finds the moments of the video the user attached that match a description - by what is seen or heard in them - and shows them to the user, who can play the video from each. Use it whenever the user asks when or where something happens in the video, or to find or show a part of it.");
+        }
+
         /// <summary>Open a visible live camera preview using the app's camera service.</summary>
         public static AIFunction OpenCamera(Func<CancellationToken, Task<string>> open)
         {
@@ -1008,6 +1025,7 @@ namespace Emgu.LiteRT.LM.Agents
                 case "analyze_visual_image": return "Detecting objects in the attached image";
                 case "find_photos": return "Looking for \u201C" + Argument("request") + "\u201D";
                 case "search_chats": return "Searching past chats for \u201C" + Argument("request") + "\u201D";
+                case "find_video_moment": return "Searching the video for \u201C" + Argument("request") + "\u201D";
                 case "search_documents": return "Searching your documents for “" + Argument("request") + "”";
                 case "search_places":
                     string area = Argument("near");

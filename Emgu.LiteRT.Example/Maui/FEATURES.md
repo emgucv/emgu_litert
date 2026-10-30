@@ -438,6 +438,45 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     photos from Spain last summer") cover the parts.
   - Not tried on a real phone's library yet.
 
+## Video moments
+
+"+" > Video Library / Video File attaches a video to the chat to search it: "when does the dog jump in?" finds the moments and shows them. This is the library's `VideoMomentsFeature` over `Emgu.LiteRT.LM.Models`' `VideoMomentIndex`, the way Google AI Edge Gallery's Video Moment Finder does it (see `docs/litert-lm.md`).
+- **Attaching:**
+  - The demo's `DemoAttachmentSource` hands the picked file's path to `AttachVideoAsync`. It doesn't read it into memory: a picker that gives only a stream is copied to the cache first.
+  - The feature copies the video into `AppDataDirectory/video_moments/<sha1>.<ext>`, named by its content, so the same video is copied and watched once. A private chat's copy goes in the cache instead and is deleted with the chat.
+  - Videos up to 5 minutes (`ChatVideos.MaxDurationMs`); a longer one is refused in the status line.
+  - The chip above the message box shows "Watching the video... 40%", then the length and "seen and heard" or "seen". Its ✕ removes the video.
+  - A saved chat remembers its video (the setting `video_chat_<id>` = file|name) and gets it back when reopened.
+- **Watching:**
+  - `VideoSource` (`Emgu.LiteRT.LM.Maui`) reads frames and sound with each platform's own decoders:
+    - Android: `MediaMetadataRetriever.GetScaledFrameAtTime` for frames; `MediaExtractor` + `MediaCodec` for the sound, mixed to mono and averaged to 16 kHz with `BoxResampler`.
+    - iOS and Mac Catalyst: `AVAssetImageGenerator` (a key frame within 0.5 s) for frames; `AVAssetReader` for the sound, which outputs 16 kHz mono PCM itself.
+    - Windows: `MediaComposition.GetThumbnailAsync` for frames; `MediaTranscoder` to a 16 kHz WAV for the sound.
+  - Frames are 512 px JPEGs. The sound is read only when the search model hears (Multimodal 740M); with Text Vision it's frames only.
+  - Each 2 s window is embedded through the shared `SearchEmbedder` with `IIndexingWorkload.RunEmbeddingAsync`: the gate is taken for one window at a time, and indexing pauses while the device is hot or its battery is low.
+  - The work is `BackgroundWork` ("Watching the video", with Stop), so it goes on with the app in the background on Android. The index is saved next to the copy as `<sha1>.<search model file>.vmi`; another search model watches the video again.
+- **Searching:**
+  - `find_video_moment` comes with every message while a video is attached, with its instructions, and not otherwise. A routing group's stub would cost every chat's messages: it put the per-message tool budget over its limit (`EveryMessageCarriesLittle`).
+  - With the first message after attaching, the model is told the video's name and length (`ChatVideos.Context`).
+  - The tool ranks the windows (the best 5, merged into moments) and keeps the moments within 0.04 of the best, at most 4 (`ChatVideos.CountShown`).
+  - It shows them in a card: a 320 px frame of each with a play mark and "01:04–01:08". The model gets their times and is told it can't see the video (`ChatVideos.Reply`).
+  - While the video is still being watched, the windows done so far are searched and the reply says how much.
+  - The card is saved with the reply as a `ChatSavedFile` ("video_moments", JSON with the thumbnails) and restored with the chat.
+- **Playing:** tapping a moment opens the sheet with `InlineVideoView` playing from it, with Pause/Play and "From 01:04 again". `InlineVideoView` now has a handler on every platform:
+  - Android: VideoView;
+  - iOS and Mac Catalyst: AVPlayer in an AVPlayerLayer;
+  - Windows: MediaPlayerElement.
+  
+  If the copy was deleted (Settings > Storage > "Searched videos"), the sheet says so.
+- **Checked in the iOS simulator** (iPhone Duo, iOS 27.1, 2026-10-29), with a synthetic 30 s video: six 5 s scenes of the test pictures (tulips, dog, space shuttle, surfers, Grace Hopper, apples), with "have a wonderful day" spoken at 20 s and LiteRT-LM's speech sample at 25 s. A temporary self-test attached it and searched.
+  - Multimodal 740M watched it, seen and heard, in 19.6 s. Searches took 90-250 ms.
+  - Each query's first moment was its scene: "tulip flowers" 00:00-00:06, "a dog" 00:04-00:10, "a space shuttle launch" 00:08-00:16, "people surfing on waves" 00:14-00:20, "a woman in a military uniform" 00:18-00:26, "a red apple" 00:24-00:30.
+  - "Someone saying have a wonderful day" found 00:20-00:22, where it is said.
+  - Before `CountShown` every search also showed one or two other scenes. After it, only "a dog" did (the apples, 00:24-00:28).
+  - Opened again, the saved index loaded in 0.8 s.
+  - The sheet played the copy from 00:05 to the end.
+- **Not checked yet:** Mac Catalyst, Android (the Pixel Fold), Windows (built only on the Mac for Catalyst, iOS and Android; the Windows code isn't compiled here), picking from the photo library, a real video, a video longer than a minute, and a chat reopened with its cards.
+
 ## Image generation
 
 - Settings > "Image generation" (off by default; the library's `ImageFeature` in `Emgu.LiteRT.LM.Maui.Images` since

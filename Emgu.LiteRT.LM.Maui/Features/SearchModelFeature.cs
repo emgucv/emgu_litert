@@ -56,7 +56,7 @@ public sealed class SearchModelOption
     /// <summary>EmbeddingGemma 2 Multimodal 740M on the CPU: text, image and audio embeddings (485 MB).</summary>
     public static SearchModelOption EmbeddingGemma2Multimodal() =>
         new SearchModelOption("multimodal", "EmbeddingGemma 2 Multimodal 740M · CPU", () => new EmbeddingGemma2Multimodal(),
-            "485 MB download. Text, images and audio embeddings. Document and photo search currently use text and images.");
+            "485 MB download. Text, images and audio embeddings. Document and photo search use text and images; video search also hears the sound.");
 }
 
 /// <summary>

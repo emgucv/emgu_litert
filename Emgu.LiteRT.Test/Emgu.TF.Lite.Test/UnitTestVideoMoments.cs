@@ -3,13 +3,21 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Models;
+using Emgu.LiteRT.Util;
+using Microsoft.Extensions.AI;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
 
 // VideoMomentIndex without a model: windows and their frame times, the sound split per frame, the token budget, merging
-// the best windows into moments, and saving an index.
+// the best windows into moments, building through the app's runEmbedding, and saving an index; and the chat's
+// find_video_moment tool and its texts.
 [TestFixture]
 public class UnitTestVideoMoments
 {
@@ -91,5 +99,106 @@ public class UnitTestVideoMoments
         Assert.That(System.Text.Encoding.ASCII.GetString(wav, 0, 4), Is.EqualTo("RIFF"));
         Assert.That(BitConverter.ToInt32(wav, 24), Is.EqualTo(16000));
         Assert.That(BitConverter.ToInt16(wav, 48), Is.EqualTo(300));
+    }
+
+    // An embedding model that never loads: BuildAsync's runEmbedding below returns the vectors instead.
+    private sealed class NoModel : EmbeddingModel
+    {
+        public override DownloadableFile DefaultModelFile => null;
+        public override bool SupportsImages => true;
+    }
+
+    [Test]
+    public async Task BuildsThroughTheAppsEmbedding()
+    {
+        // 5 s: three windows, each embedded once through runEmbedding (the app's gate), with progress after each.
+        var asked = new List<long>();
+        var progress = new List<double>();
+        int runs = 0;
+        var index = new VideoMomentIndex();
+        using var model = new NoModel();
+        await index.BuildAsync(model, 5000,
+            (ms, token) => { asked.Add(ms); return Task.FromResult(new byte[] { 1 }); },
+            null,
+            (embed, token) => { runs++; return Task.FromResult(new float[] { runs, 0 }); },
+            new SynchronousProgress(progress.Add));
+        Assert.That(runs, Is.EqualTo(3));
+        Assert.That(asked, Is.EqualTo(new long[] { 0, 2000, 2000, 4000, 4000, 5000 }));
+        Assert.That(progress.Last(), Is.EqualTo(1.0));
+        Assert.That(index.IsBuilt, Is.True);
+        Assert.That(index.IndexedWindows, Is.EqualTo(3));
+        Assert.That(index.WithAudio, Is.False, "no sound given");
+        Assert.That(index.Windows[2].Embedding, Is.EqualTo(new float[] { 3, 0 }));
+
+        // Saved and loaded with its embeddings.
+        using var saved = new MemoryStream();
+        index.Save(saved);
+        saved.Position = 0;
+        VideoMomentIndex loaded = VideoMomentIndex.Load(saved);
+        Assert.That(loaded.IsBuilt, Is.True);
+        Assert.That(loaded.DurationMs, Is.EqualTo(5000));
+        Assert.That(loaded.Windows.Select(w => w.Embedding[0]), Is.EqualTo(new float[] { 1, 2, 3 }));
+
+        // A window without any frame stops the build.
+        Assert.ThrowsAsync<InvalidDataException>(() => new VideoMomentIndex().BuildAsync(model, 2000,
+            (ms, token) => Task.FromResult<byte[]>(null), null, (embed, token) => Task.FromResult(new float[1])));
+    }
+
+    // Progress<T> reports on the synchronization context later; this one reports at once.
+    private sealed class SynchronousProgress : IProgress<double>
+    {
+        private readonly Action<double> _report;
+        public SynchronousProgress(Action<double> report) => _report = report;
+        public void Report(double value) => _report(value);
+    }
+
+    [Test]
+    public async Task TheToolFindsMomentsAndSaysTheirTimes()
+    {
+        string asked = null;
+        AIFunction tool = AgentTools.FindVideoMoment((request, token) => { asked = request; return Task.FromResult("found"); });
+        Assert.That(tool.Name, Is.EqualTo("find_video_moment"));
+        Assert.That((await tool.InvokeAsync(new AIFunctionArguments { ["request"] = "the dog jumps in" }))?.ToString(), Does.Contain("found"));
+        Assert.That(asked, Is.EqualTo("the dog jumps in"));
+        var call = new FunctionCallContent("1", "find_video_moment", new Dictionary<string, object> { ["request"] = "the dog jumps in" });
+        Assert.That(AgentTools.Describe(call), Is.EqualTo("Searching the video for \u201Cthe dog jumps in\u201D"));
+
+        var moments = new List<ChatVideoMoment>
+        {
+            new ChatVideoMoment { StartMs = 64000, EndMs = 68000, Score = 0.75f },
+            new ChatVideoMoment { StartMs = 2000, EndMs = 4000, Score = 0.7f }
+        };
+        string reply = ChatVideos.Reply("the dog jumps in", moments, 1);
+        Assert.That(reply, Does.StartWith("Found 2 moments for \u201Cthe dog jumps in\u201D, best first: 01:04-01:08, 00:02-00:04."));
+        Assert.That(reply, Does.Contain("you can't see the video"));
+        Assert.That(ChatVideos.Reply("fireworks", moments.Take(1).ToList(), 0.4), Does.Contain("1 moment").And.Contain("only the first 40% of the video"));
+        Assert.That(ChatVideos.Reply("fireworks", new ChatVideoMoment[0], 1), Is.EqualTo("No moment of the video matches \u201Cfireworks\u201D."));
+        Assert.That(ChatVideos.Context("party.mp4", 151000, 1), Is.EqualTo("The user attached the video \u201Cparty.mp4\u201D (02:31); find_video_moment finds when something happens in it."));
+        Assert.That(ChatVideos.Context("party.mp4", 151000, 0.25), Does.Contain("still being watched (25% done)"));
+
+        // Only moments close to the best are shown, at most 4.
+        Assert.That(ChatVideos.CountShown(new[] { 0.75f, 0.68f, 0.66f }), Is.EqualTo(1));
+        Assert.That(ChatVideos.CountShown(new[] { 0.75f, 0.73f, 0.70f }), Is.EqualTo(2));
+        Assert.That(ChatVideos.CountShown(new[] { 0.75f, 0.75f, 0.75f, 0.75f, 0.75f }), Is.EqualTo(4));
+        Assert.That(ChatVideos.CountShown(new float[0]), Is.EqualTo(0));
+    }
+
+    [Test]
+    public void TheMomentsAreSavedWithTheReply()
+    {
+        var saved = new ChatVideoMoments
+        {
+            VideoName = "party.mp4",
+            VideoFile = "0a1b.mp4",
+            Request = "cake",
+            Moments = { new ChatVideoMoment { StartMs = 2000, EndMs = 6000, Score = 0.7f, Thumbnail = new byte[] { 0xFF, 0xD8, 1 } } }
+        };
+        ChatVideoMoments loaded = ChatVideoMoments.FromJson(saved.ToJson());
+        Assert.That(loaded.VideoName, Is.EqualTo("party.mp4"));
+        Assert.That(loaded.VideoFile, Is.EqualTo("0a1b.mp4"));
+        Assert.That(loaded.Moments.Single().ToString(), Is.EqualTo("00:02-00:06"));
+        Assert.That(loaded.Moments.Single().Thumbnail, Is.EqualTo(new byte[] { 0xFF, 0xD8, 1 }));
+        Assert.That(ChatVideoMoments.FromJson(System.Text.Encoding.UTF8.GetBytes("not json")), Is.Null);
+        Assert.That(ChatVideoMoments.FromJson(null), Is.Null);
     }
 }

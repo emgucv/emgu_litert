@@ -15,7 +15,7 @@ public static class MauiProgram
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
-			// The chat controls' handlers: ChatPromptEditor's on Mac Catalyst (Enter sends), InlineVideoView's on Android.
+			// The chat controls' handlers: ChatPromptEditor's on Mac Catalyst (Enter sends), InlineVideoView's.
 			.UseLiteRtChat()
 			.ConfigureFonts(fonts =>
 			{

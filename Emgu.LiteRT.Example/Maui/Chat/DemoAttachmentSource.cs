@@ -6,8 +6,8 @@ using Microsoft.Extensions.AI;
 namespace Maui.Demo.Lite;
 
 // The demo's "+" menu for Emgu.LiteRT.LM.Maui's ChatView (IChatAttachmentSource): a document (PDF, Word, text - attached
-// to the chat, not the message: DocumentsFeature), a photo from the library or the camera, the sample images, an audio
-// file or the sample recording. Images are decoded here (any format the platform's picker returns that OpenCV reads),
+// to the chat, not the message: DocumentsFeature), a video to search (also the chat's: VideoMomentsFeature), a photo
+// from the library or the camera, the sample images, an audio file or the sample recording. Images are decoded here (any format the platform's picker returns that OpenCV reads),
 // downscaled and re-encoded as JPEG, which LiteRT-LM's image decoder (stb) reads. In a private chat the picker's
 // temporary copies are deleted after reading.
 internal sealed class DemoAttachmentSource : IChatAttachmentSource
@@ -42,15 +42,18 @@ internal sealed class DemoAttachmentSource : IChatAttachmentSource
     private readonly Func<bool> _isPrivate;
     private readonly Func<int> _sessionVersion;
     private readonly Action<byte[], string> _attachDocument;
+    private readonly Func<string, string, Task> _attachVideo;
     private readonly Action<string> _setStatus;
 
     public DemoAttachmentSource(Func<string, IReadOnlyList<(string Section, string Glyph, string Text, string Value)>, Task<string>> showMenu,
-        Func<bool> isPrivate, Func<int> sessionVersion, Action<byte[], string> attachDocument, Action<string> setStatus)
+        Func<bool> isPrivate, Func<int> sessionVersion, Action<byte[], string> attachDocument, Func<string, string, Task> attachVideo,
+        Action<string> setStatus)
     {
         _showMenu = showMenu;
         _isPrivate = isPrivate;
         _sessionVersion = sessionVersion;
         _attachDocument = attachDocument;
+        _attachVideo = attachVideo;
         _setStatus = setStatus;
     }
 
@@ -62,6 +65,12 @@ internal sealed class DemoAttachmentSource : IChatAttachmentSource
 
         var rows = new List<(string Section, string Glyph, string Text, string Value)>();
         rows.Add(("DOCUMENT (PDF, WORD, TEXT)", Theme.GlyphText, "Document", "document"));
+        if (_attachVideo != null && VideoSource.IsSupported)
+        {
+            // Searched for moments, not sent to the model.
+            rows.Add(("VIDEO TO SEARCH (UP TO 5 MINUTES)", Theme.GlyphPlay, "Video Library", "videolibrary"));
+            rows.Add((null, Theme.GlyphPlay, "Video File", "videofile"));
+        }
         if (kinds.HasFlag(ChatAttachmentKinds.Image))
         {
             rows.Add(("IMAGE", Theme.GlyphImage, "Photo Library", "library"));
@@ -89,6 +98,14 @@ internal sealed class DemoAttachmentSource : IChatAttachmentSource
                 FileResult file = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Choose a document", FileTypes = DocumentFileTypes });
                 if (file != null)
                     _attachDocument(await ReadAllBytesAsync(file, sessionVersion, privateRead), file.FileName);
+            }
+            else if (action == "videolibrary" || action == "videofile")
+            {
+                FileResult file = action == "videolibrary"
+                    ? (await MediaPicker.Default.PickVideosAsync())?.FirstOrDefault()
+                    : await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Choose a video", FileTypes = FilePickerFileType.Videos });
+                if (file != null)
+                    await AttachVideoAsync(file, sessionVersion, privateRead);
             }
             else if (action == "library")
             {
@@ -132,6 +149,36 @@ internal sealed class DemoAttachmentSource : IChatAttachmentSource
             _setStatus("Could not attach the file: " + ex.Message);
         }
         return picked;
+    }
+
+    // The video goes to the chat from a file: the picker's own copy, or one made here when the picker gives a stream only.
+    // The feature copies it into the app's folder; the picker's copy is deleted afterwards in a private chat, and a copy
+    // made here always.
+    private async Task AttachVideoAsync(FileResult file, int sessionVersion, bool privateRead)
+    {
+        string path = file.FullPath;
+        string madeHere = null;
+        try
+        {
+            if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
+            {
+                madeHere = System.IO.Path.Combine(FileSystem.CacheDirectory, "picked_video_" + Guid.NewGuid().ToString("N") + System.IO.Path.GetExtension(file.FileName));
+                using (System.IO.Stream stream = await file.OpenReadAsync())
+                using (System.IO.FileStream copy = System.IO.File.Create(madeHere))
+                    await stream.CopyToAsync(copy);
+                path = madeHere;
+            }
+            if (sessionVersion != _sessionVersion()) throw new OperationCanceledException();
+            await _attachVideo(path, file.FileName);
+        }
+        finally
+        {
+            if (madeHere != null)
+                try { System.IO.File.Delete(madeHere); } catch (Exception) { }
+            else if (privateRead)
+                try { StorageFiles.DeleteTemporaryFile(FileSystem.CacheDirectory, file.FullPath); }
+                catch (Exception ex) { _setStatus("Could not remove a temporary picker copy: " + ex.Message); }
+        }
     }
 
     private async Task<byte[]> ReadAllBytesAsync(FileResult file, int sessionVersion, bool privateRead)

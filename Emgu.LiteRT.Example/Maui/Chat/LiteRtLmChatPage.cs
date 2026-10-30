@@ -62,6 +62,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         public GoalsFeature Goals;
         public PastChatsFeature PastChats;
         public PhotoSearchFeature PhotoSearch;
+        public VideoMomentsFeature Videos;
         public MeetingFeature Meetings;
         public ExerciseFeature Exercises;
         public MemoryFeature Memory;
@@ -90,7 +91,8 @@ public sealed class LiteRtLmChatPage : ChatPage
         _parts = parts;
         _building = null;
         Chat.AttachmentSource = new DemoAttachmentSource(ShowMenuAsync, () => IsPrivate, () => _sessionVersion,
-            (bytes, name) => { if (!_parts.SearchModel.DownloadRequired) _parts.Documents.AttachDocument(bytes, name); }, SetStatus);
+            (bytes, name) => { if (!_parts.SearchModel.DownloadRequired) _parts.Documents.AttachDocument(bytes, name); },
+            (path, name) => _parts.Videos.AttachVideoAsync(path, name), SetStatus);
         Chat.PropertyChanged += (s, e) =>
         {
             if (e.PropertyName == nameof(ChatView.Conversation))
@@ -153,6 +155,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         parts.PastChats = new PastChatsFeature(SharedStore, parts.Search);
         parts.Documents = new DocumentsFeature(SharedStore, parts.Search);
         parts.PhotoSearch = new PhotoSearchFeature(SharedStore, parts.Search);
+        parts.Videos = new VideoMomentsFeature(parts.Search);
         // Snapshots the user keeps go through a Save As dialog, as the generated pictures do.
         parts.Camera.SnapshotSaver = async (jpeg, fileName) =>
         {
@@ -223,7 +226,7 @@ public sealed class LiteRtLmChatPage : ChatPage
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new PlacesFeature(), new ClipboardFeature(),
             parts.Camera, parts.PhotoEffects, parts.Claude, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
-            parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.Meetings, parts.Exercises
+            parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.Videos, parts.Meetings, parts.Exercises
         })
             options.Features.Add(feature);
         parts.Options = options;
@@ -275,7 +278,7 @@ public sealed class LiteRtLmChatPage : ChatPage
     }
 
     // What the storage page lists: the catalog's models, the two search models (downloadable again from the page), the
-    // image model's folder, and the store's documents, indexes and attachments.
+    // image model's folder, the searched videos' folder, and the store's documents, indexes and attachments.
     private static StorageCatalog CreateStorageCatalog()
     {
         IList<ChatModelOption> catalog = ChatModelCatalog.For(ChatDevicePlatform.Current);
@@ -286,7 +289,11 @@ public sealed class LiteRtLmChatPage : ChatPage
         models.Add(new StorageModel("EmbeddingGemma 2 Multimodal 740M", System.IO.Path.GetFileName(multimodal.DefaultModelFile.LocalFile), isSearch: true) { Download = multimodal.DefaultModelFile });
         using var image = new ZImageTurbo();
         return new StorageCatalog(SharedStore, System.IO.Path.GetDirectoryName(catalog[0].ModelFile.LocalFile), ExportFeature.ExportFolder, models,
-            new[] { new StorageFolder(ImageFeature.StorageKey, "Z-Image-Turbo", image.Folder, "Image model, host tensors, and prepared weight caches. Deleting turns image generation off.") });
+            new[]
+            {
+                new StorageFolder(ImageFeature.StorageKey, "Z-Image-Turbo", image.Folder, "Image model, host tensors, and prepared weight caches. Deleting turns image generation off."),
+                new StorageFolder(VideoMomentsFeature.StorageKey, "Searched videos", VideoMomentsFeature.Folder, "Copies of the videos attached to chats, and what was seen in them. Deleting removes them from the chats; their moments can't be played any more.")
+            });
     }
 
     // ---------- Lifecycle ----------
@@ -327,6 +334,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         if (!IsPrivate)
             _ = Chat.CancelRecordingAsync();
         _parts.Documents.RemoveDocument();
+        _parts.Videos.RemoveVideo();
         _parts.PhotoSearch.CancelIndexing();
         _parts.PastChats.CancelIndexing();
         _parts.Storage.CancelRestore();
@@ -344,6 +352,7 @@ public sealed class LiteRtLmChatPage : ChatPage
             }
             try { await PendingReload; } catch (Exception) { }
             await _parts.PastChats.StopIndexingAsync();
+            await _parts.Videos.RemoveVideoAsync();
             await ShutdownModelAsync();
             await Embedder.ReleaseAsync();
             await _parts.Images.ReleaseModelAsync();
@@ -789,8 +798,10 @@ public sealed class LiteRtLmChatPage : ChatPage
         // Cancel every producer before awaiting the shared embedding load.
         Task<bool> documentReady = _parts.Documents.DocumentReady;
         _parts.Documents.RemoveDocument();
+        Task videoGone = _parts.Videos.RemoveVideoAsync();
         _parts.PastChats.CancelIndexing();
         _parts.PhotoSearch.CancelIndexing();
+        await videoGone;
         await _parts.PastChats.StopIndexingAsync();
         await _parts.PhotoSearch.WaitForIndexingAsync();
         if (documentReady != null) { try { await documentReady; } catch (OperationCanceledException) { } }

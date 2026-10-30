@@ -9,7 +9,7 @@ namespace Emgu.LiteRT.LM.Maui
     {
         /// <summary>
         /// Register the handlers the chat controls need: <see cref="ChatPromptEditor"/>'s on Mac Catalyst (Enter sends) and
-        /// <c>InlineVideoView</c>'s on Android. Call it in MauiProgram: <c>builder.UseMauiApp&lt;App&gt;().UseLiteRtChat()</c>.
+        /// <c>InlineVideoView</c>'s. Call it in MauiProgram: <c>builder.UseMauiApp&lt;App&gt;().UseLiteRtChat()</c>.
         /// </summary>
         /// <param name="builder">The app builder</param>
         /// <returns>The builder</returns>
@@ -19,7 +19,8 @@ namespace Emgu.LiteRT.LM.Maui
             SelectableLabel.MapSelection();
 #if MACCATALYST
             builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<ChatPromptEditor, ChatPromptEditorHandler>());
-#elif ANDROID
+#endif
+#if ANDROID || IOS || MACCATALYST || WINDOWS
             builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<InlineVideoView, InlineVideoHandler>());
 #endif
             return builder;

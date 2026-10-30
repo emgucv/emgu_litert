@@ -148,6 +148,14 @@ namespace Emgu.LiteRT.LM.Models
         public long DurationMs { get; private set; }
 
         /// <summary>
+        /// The number of windows embedded so far (Search already finds them while the rest are indexed)
+        /// </summary>
+        public int IndexedWindows
+        {
+            get { return _windows.Count(w => w.Embedding != null); }
+        }
+
+        /// <summary>
         /// True once every window is embedded
         /// </summary>
         public bool IsBuilt
@@ -166,11 +174,34 @@ namespace Emgu.LiteRT.LM.Models
         /// when there's none; null to index the frames only</param>
         /// <param name="progress">Reports the share of windows done, from 0 to 1, or null</param>
         /// <param name="cancellationToken">Stops between windows</param>
-        public async Task BuildAsync(EmbeddingModel model, long durationMs,
+        public Task BuildAsync(EmbeddingModel model, long durationMs,
             Func<long, CancellationToken, Task<byte[]>> frameAt,
             Func<long, long, CancellationToken, Task<short[]>> audioBetween = null,
             IProgress<double> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
+            return BuildAsync(model, durationMs, frameAt, audioBetween, (embed, cancel) => Task.Run(embed, cancel), progress, cancellationToken);
+        }
+
+        /// <summary>
+        /// Index a video, each window's model run made by runEmbedding - e.g. to take a model shared with other searches
+        /// for one window at a time, or to wait while the device is hot.
+        /// </summary>
+        /// <param name="model">An initialized embedding model that SupportsImages, e.g. EmbeddingGemma2Multimodal</param>
+        /// <param name="durationMs">The video's length, in milliseconds</param>
+        /// <param name="frameAt">The frame nearest a time (milliseconds) as an encoded image, or null if there's none</param>
+        /// <param name="audioBetween">The sound from one time to another as 16 kHz mono samples, or null; null to index
+        /// the frames only</param>
+        /// <param name="runEmbedding">Runs a window's embedding (a synchronous model run, to be called off the UI thread)
+        /// and returns its result</param>
+        /// <param name="progress">Reports the share of windows done, from 0 to 1, or null</param>
+        /// <param name="cancellationToken">Stops between windows</param>
+        public async Task BuildAsync(EmbeddingModel model, long durationMs,
+            Func<long, CancellationToken, Task<byte[]>> frameAt,
+            Func<long, long, CancellationToken, Task<short[]>> audioBetween,
+            Func<Func<float[]>, CancellationToken, Task<float[]>> runEmbedding,
+            IProgress<double> progress = null, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (runEmbedding == null) throw new ArgumentNullException(nameof(runEmbedding));
             if (model == null) throw new ArgumentNullException(nameof(model));
             if (frameAt == null) throw new ArgumentNullException(nameof(frameAt));
             if (!model.SupportsImages)
@@ -206,14 +237,14 @@ namespace Emgu.LiteRT.LM.Models
                 }
                 try
                 {
-                    window.Embedding = await Task.Run(() => EmbedWindow(model, frames, times, sound), cancellationToken).ConfigureAwait(false);
+                    window.Embedding = await runEmbedding(() => EmbedWindow(model, frames, times, sound), cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception) when (WithAudio && done == 0 && !cancellationToken.IsCancellationRequested)
+                catch (Exception e) when (WithAudio && done == 0 && !(e is OperationCanceledException) && !cancellationToken.IsCancellationRequested)
                 {
                     // The model said it embeds audio but the engine refused it (e.g. an audio encoder that can't run on the
                     // backend): index this video's frames only, so all its windows stay in one embedding space.
                     WithAudio = false;
-                    window.Embedding = await Task.Run(() => EmbedWindow(model, frames, times, null), cancellationToken).ConfigureAwait(false);
+                    window.Embedding = await runEmbedding(() => EmbedWindow(model, frames, times, null), cancellationToken).ConfigureAwait(false);
                 }
                 done++;
                 if (progress != null)
