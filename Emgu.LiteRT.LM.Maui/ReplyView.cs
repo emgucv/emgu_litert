@@ -441,7 +441,7 @@ namespace Emgu.LiteRT.LM.Maui
 
         private Span LinkSpan(ReplyRun run, FontAttributes attributes, double fontSize)
         {
-            Span link = new Span
+            ReplyLinkSpan link = new ReplyLinkSpan
             {
                 Text = run.Text,
                 TextColor = LinkColor,
@@ -450,8 +450,7 @@ namespace Emgu.LiteRT.LM.Maui
             };
             if (fontSize > 0)
                 link.FontSize = fontSize;
-            TapGestureRecognizer tap = new TapGestureRecognizer();
-            tap.Tapped += async (s, e) =>
+            async Task Open()
             {
                 ReplyLinkTappedEventArgs args = new ReplyLinkTappedEventArgs(run.Url);
                 LinkTapped?.Invoke(this, args);
@@ -465,8 +464,13 @@ namespace Emgu.LiteRT.LM.Maui
                 catch (Exception)
                 {
                 }
-            };
+            }
+            TapGestureRecognizer tap = new TapGestureRecognizer();
+            tap.Tapped += async (s, e) => await Open();
             link.GestureRecognizers.Add(tap);
+            // Windows: the text of a reply can be selected (SelectableLabel), which swallows a span's tap, so the span becomes a
+            // hyperlink there that calls this.
+            link.Activate = () => _ = Open();
             return link;
         }
 
@@ -479,6 +483,12 @@ namespace Emgu.LiteRT.LM.Maui
                 span.TextColor = color;
             return span;
         }
+    }
+
+    // A link's span, with what to do when it is activated: Windows' selectable text turns it into a hyperlink (SelectableLabel).
+    internal sealed class ReplyLinkSpan : Span
+    {
+        public Action Activate { get; set; }
     }
 
     /// <summary>
