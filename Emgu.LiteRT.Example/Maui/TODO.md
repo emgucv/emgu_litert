@@ -66,7 +66,11 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Windows taskbar and Start menu visual check on a Windows machine.
+- [x] Windows taskbar and Start menu visual check (2026-10-29, Windows 11, 150% scaling): the taskbar button and the Start search result (list and the large preview) show
+      the icon - a blue square with a white chat bubble and a sparkle, legible at the taskbar's size, but a hard-edged square beside the neighbouring
+      rounded icons. It first showed a grey placeholder: the demo is run by registering the build output folder (`Add-AppxPackage -Register`), which
+      never gets the icons MAUI generates into `obj/.../resizetizer/r/` (`appicon*.png`) - copy them to the folder's root, like `Resources/Raw`, then
+      register again. A real MSIX package has them.
 
 ## 9. Update to the next LiteRT-LM release
 
@@ -661,4 +665,4 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       DLL back loaded it. Not run: the dialog's Cancel.
 - [x] Photos the library can't load are counted in the status ("; 1 couldn't be read", checked with a corrupt PNG, removed afterwards).
 
-- [ ] Places search (`search_places`, 2026-10-29; see `docs/agents.md`): built and unit-tested, checked on Windows with OpenStreetMap and a named town. Still to check: the device-position path ("nearest ..." with Share my location on) on the Fold and an iPhone, Google Places with a real key (the request is written from Google's documentation, never sent), Apple Maps on iOS and Mac Catalyst (`AppleMapsPlaceSearch`, written without a Mac: it has not been compiled), and the answer for the Vancouver/Ottawa case that started it (Claude searched "near Ottawa" with the device in Richmond Hill: where did Ottawa come from - a memory?).
+- [ ] Places search (`search_places`, 2026-10-29; see `docs/agents.md`): built and unit-tested, checked on Windows with OpenStreetMap and a named town. Still to check: the device-position path ("nearest ..." with Share my location on) on the Fold and an iPhone, Google Places with a real key (the request is written from Google's documentation, never sent), Apple Maps on iOS and Mac Catalyst (`AppleMapsPlaceSearch`, written without a Mac: it has not been compiled).
