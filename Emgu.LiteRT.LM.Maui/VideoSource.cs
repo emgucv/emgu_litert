@@ -135,7 +135,7 @@ namespace Emgu.LiteRT.LM.Maui
 #endif
         }
 
-        /// <summary>The frame nearest a time (a key frame within about half a second), as a JPEG at most maxSize pixels on its longer side; null if there's none.</summary>
+        /// <summary>The frame nearest a time (on Android the frame at that time, not its key frame, which can be seconds away; within about half a second elsewhere), as a JPEG at most maxSize pixels on its longer side; null if there's none.</summary>
         /// <param name="ms">The time, in milliseconds</param>
         /// <param name="maxSize">The longest side, in pixels</param>
         public async Task<byte[]> FrameAtAsync(long ms, int maxSize = 512)
@@ -148,8 +148,8 @@ namespace Emgu.LiteRT.LM.Maui
                 lock (_retrieverLock)
                 {
                     frame = OperatingSystem.IsAndroidVersionAtLeast(27)
-                        ? _retriever.GetScaledFrameAtTime(ms * 1000, Android.Media.Option.ClosestSync, maxSize, maxSize)
-                        : _retriever.GetFrameAtTime(ms * 1000, Android.Media.Option.ClosestSync);
+                        ? _retriever.GetScaledFrameAtTime(ms * 1000, Android.Media.Option.Closest, maxSize, maxSize)
+                        : _retriever.GetFrameAtTime(ms * 1000, Android.Media.Option.Closest);
                 }
                 if (frame == null)
                     return null;

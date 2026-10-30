@@ -449,7 +449,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - A saved chat remembers its video (the setting `video_chat_<id>` = file|name) and gets it back when reopened.
 - **Watching:**
   - `VideoSource` (`Emgu.LiteRT.LM.Maui`) reads frames and sound with each platform's own decoders:
-    - Android: `MediaMetadataRetriever.GetScaledFrameAtTime` for frames; `MediaExtractor` + `MediaCodec` for the sound, mixed to mono and averaged to 16 kHz with `BoxResampler`.
+    - Android: `MediaMetadataRetriever.GetScaledFrameAtTime` with `Option.Closest` for frames (the frame at that time; `ClosestSync`'s key frame was seconds away in the test video, so on the S10 the shuttle and the surfers were both found at 00:10-00:20); `MediaExtractor` + `MediaCodec` for the sound, mixed to mono and averaged to 16 kHz with `BoxResampler`.
     - iOS and Mac Catalyst: `AVAssetImageGenerator` (a key frame within 0.5 s) for frames; `AVAssetReader` for the sound, which outputs 16 kHz mono PCM itself.
     - Windows: `MediaComposition.GetThumbnailAsync` for frames; `MediaTranscoder` to a 16 kHz WAV for the sound.
   - Frames are 512 px JPEGs. The sound is read only when the search model hears (Multimodal 740M); with Text Vision it's frames only.
@@ -480,7 +480,16 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - Text Vision 440M watched the frames only in 16.0 s. The six scenes were found the same way (surfers at 00:12-00:20). "Someone saying have a wonderful day" can't be heard, so it showed three weak moments, the best 00:20-00:26 (Grace Hopper).
   - Searches took 120-220 ms. Each model keeps its own index beside the video's copy (`<sha1>.<model file>.vmi`).
   - The sheet played the copy from 00:05.
-- **Not checked yet:** Android (the Pixel Fold), Windows (built only on the Mac for Catalyst, iOS and Android; the Windows code isn't compiled here), picking from the photo library, a real video, a video longer than a minute, and a chat reopened with its cards.
+- **Checked on the Galaxy S10** (SM-G973W, Android 12, 2026-10-30) with the same video and self-test, on the CPU.
+  - Multimodal 740M watched it, seen and heard, in 227 s, and found what the Mac did: each scene, and "have a wonderful day" at 00:20-00:22. "A dog" showed only its scene.
+  - Text Vision 440M watched the frames only in 144 s. The six scenes were found ("a dog" at 00:04-00:14), and the speech query showed three weak moments.
+  - So a 5-minute video takes about 25 min (Text Vision) to 40 min (Multimodal) on this phone. Searches took 0.9-1.8 s.
+  - The sheet played the copy from 00:05.
+- **Checked on the Galaxy Z Fold 3** (SM-F926W, Android 15, 2026-10-30), the same way.
+  - Text Vision 440M watched the video in 239 s and Multimodal 740M in 335 s, the phone reaching thermal status 3 (severe) both times. Both found what the S10 did, and Multimodal found "have a wonderful day" at 00:20-00:22. "A dog" also showed the apples.
+  - The notification read "Watching the video... 6%" while it watched. The sheet played the copy from 00:05 to the end.
+  - Searches took about 7 s while photo search was indexing the phone's photos: each search waits for the shared search model, which a photo batch holds for several seconds. With photo search off they took 0.7-1.0 s.
+- **Not checked yet:** the Pixel Fold, Windows (built only on the Mac for Catalyst, iOS and Android; the Windows code isn't compiled here), picking from the photo library, a real video, a video longer than a minute, and a chat reopened with its cards.
 
 ## Image generation
 
