@@ -235,10 +235,11 @@ namespace Emgu.LiteRT.LM.Models
         /// </summary>
         /// <param name="inputs">The inputs: text, image or audio</param>
         /// <param name="outputSize">The number of values, for models that allow shorter embeddings; 0 for all</param>
+        /// <param name="visionTokensPerImage">The vision tokens to use per image, 0 for the model's default (see EmbedImage)</param>
         /// <returns>The embedding</returns>
-        public float[] Embed(InputData[] inputs, int outputSize = 0)
+        public float[] Embed(InputData[] inputs, int outputSize = 0, int visionTokensPerImage = 0)
         {
-            using (EmbeddingOptions options = CreateOptions(outputSize))
+            using (EmbeddingOptions options = CreateOptions(outputSize, visionTokensPerImage))
                 return CheckEngine().ComputeEmbedding(inputs, options);
         }
 

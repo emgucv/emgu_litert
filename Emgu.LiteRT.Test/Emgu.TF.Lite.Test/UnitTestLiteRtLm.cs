@@ -375,6 +375,107 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // VideoMomentIndex with EmbeddingGemma 2 740M: a 20 s "video" of five 4 s scenes (the test pictures, with the
+        // spoken "have a wonderful day" over the last), indexed frames only and with its sound; a query finds its scene.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestVideoMomentIndex()
+        {
+            RequireLiteRtLm();
+            String[] scenes = { "tulips.jpg", "dog416.png", "space_shuttle.jpg", "surfers.jpg", "grace_hopper.jpg" };
+            byte[][] pictures = scenes.Select(System.IO.File.ReadAllBytes).ToArray();
+            const long SceneMs = 4000;
+            long durationMs = SceneMs * scenes.Length;
+            // 16 kHz sound: silence, the speech (24 kHz, resampled) at the start of the last scene.
+            short[] speech = Resample(ReadWavSamples("have_a_wonderful_day.wav", out int rate), rate, 16000);
+            short[] sound = new short[durationMs * 16];
+            Array.Copy(speech, 0, sound, (int)(SceneMs * 4 * 16), Math.Min(speech.Length, (int)(SceneMs * 16)));
+            Func<long, CancellationToken, Task<byte[]>> frameAt = (t, c) =>
+                Task.FromResult(pictures[(int)Math.Min(scenes.Length - 1, t / SceneMs)]);
+            Func<long, long, CancellationToken, Task<short[]>> audioBetween = (from, to, c) =>
+                Task.FromResult(sound.Skip((int)(from * 16)).Take((int)((to - from) * 16)).ToArray());
+            (String Query, int Scene)[] queries =
+            {
+                ("tulip flowers", 0), ("a dog", 1), ("a space shuttle launch", 2), ("people surfing on waves", 3),
+                ("a woman in a military uniform", 4)
+            };
+            using (EmbeddingGemma2Multimodal model = new EmbeddingGemma2Multimodal())
+            {
+                await model.Init();
+                foreach (bool withSound in new[] { false, true })
+                {
+                    VideoMomentIndex index = new VideoMomentIndex();
+                    System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
+                    await index.BuildAsync(model, durationMs, frameAt, withSound ? audioBetween : null);
+                    Console.WriteLine("{0}: {1} windows in {2:F1} s, with sound: {3}", withSound ? "Frames and sound" : "Frames only",
+                        index.Windows.Count, watch.Elapsed.TotalSeconds, index.WithAudio);
+                    Assert.That(index.IsBuilt, Is.True);
+                    Assert.That(index.WithAudio, Is.EqualTo(withSound));
+                    foreach ((String query, int scene) in queries)
+                    {
+                        IReadOnlyList<VideoMoment> moments = index.Search(model, query, 2);
+                        Console.WriteLine("  {0}: {1}", query, String.Join(", ", moments.Select(m => String.Format("{0} ({1:F3})", m, m.Score))));
+                        // The best moment covers the middle of the scene (a window's last frame, at its end, is the next
+                        // scene's first, so the window before a scene matches it in part too).
+                        long middle = scene * SceneMs + SceneMs / 2;
+                        Assert.That(moments[0].StartMs, Is.LessThanOrEqualTo(middle), query);
+                        Assert.That(moments[0].EndMs, Is.GreaterThanOrEqualTo(middle), query);
+                    }
+                    String spoken = "someone saying have a wonderful day";
+                    Console.WriteLine("  {0}: {1}", spoken, String.Join(", ", index.Search(model, spoken, 2).Select(m => String.Format("{0} ({1:F3})", m, m.Score))));
+
+                    using (System.IO.MemoryStream saved = new System.IO.MemoryStream())
+                    {
+                        index.Save(saved);
+                        saved.Position = 0;
+                        VideoMomentIndex loaded = VideoMomentIndex.Load(saved);
+                        Assert.That(loaded.Search(model, "a dog", 2)[0].ToString(), Is.EqualTo(index.Search(model, "a dog", 2)[0].ToString()));
+                        Assert.That(loaded.WithAudio, Is.EqualTo(index.WithAudio));
+                    }
+                }
+            }
+        }
+
+        // The 16-bit samples of a mono WAV file and its sample rate.
+        private static short[] ReadWavSamples(String file, out int sampleRate)
+        {
+            byte[] wav = System.IO.File.ReadAllBytes(file);
+            sampleRate = BitConverter.ToInt32(wav, 24);
+            int position = 12;
+            while (position + 8 <= wav.Length)
+            {
+                String id = Encoding.ASCII.GetString(wav, position, 4);
+                int size = BitConverter.ToInt32(wav, position + 4);
+                if (id == "data")
+                {
+                    short[] samples = new short[Math.Min(size, wav.Length - position - 8) / 2];
+                    Buffer.BlockCopy(wav, position + 8, samples, 0, samples.Length * 2);
+                    return samples;
+                }
+                position += 8 + size + (size & 1);
+            }
+            throw new Exception("No data in " + file);
+        }
+
+        private static short[] Resample(short[] samples, int from, int to)
+        {
+            short[] result = new short[(long)samples.Length * to / from];
+            for (int i = 0; i < result.Length; i++)
+            {
+                double x = (double)i * from / to;
+                int j = Math.Min((int)x, samples.Length - 1);
+                int k = Math.Min(j + 1, samples.Length - 1);
+                result[i] = (short)(samples[j] + (samples[k] - samples[j]) * (x - j));
+            }
+            return result;
+        }
+
         // Windows only: EmbeddingGemma 2 Text Vision 440M on the Direct3D 12 GPU (the source-built WebGPU bundle next to
         // libLiteRt, see TestLiteRtMobilenetGpu) must give the CPU's embeddings for text and an image.
 #if !TEST_MODELS

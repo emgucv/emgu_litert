@@ -20,6 +20,15 @@
 - `EmbeddingModel.Init` therefore refuses "gpu" (main, vision or audio backend) with `NotSupportedException`, until LiteRT-LM pins a LiteRT with that change (then rebuild and drop the check).
 - `DocumentIndex` (`Emgu.LiteRT.LM.Models/DocumentIndex.cs`, no PDF dependency) is the retrieval part of document questions: `AddText(text, location)` splits text into passages (`SplitText`: at most `MaxPassageLength` 700 characters at paragraph/sentence ends - not after abbreviations such as "e.g."; a short line without closing punctuation before a capitalised line, or a list marker, starts a paragraph, since PDF text lacks empty lines; whole sentences of up to `PassageOverlap` 120 characters repeated; over-long runs cut at spaces), `AddImage(bytes, mediaType, location, isPage)`, `Build(embeddingModel, progress, cancellationToken)` (passages in batches of 8, then images one at a time; needs `SupportsImages` if images were added) and `Search(model, query)` (every passage and image with its cosine similarity, best first).
 - Tested by `TestDocumentSplitText` (no model) and `TestDocumentIndex` (4 pages and 2 photos, each question finds its page and "flowers" the tulips).
+- `VideoMomentIndex` (`Emgu.LiteRT.LM.Models/VideoMomentIndex.cs`) finds the moments of a video a text describes, the way Google AI Edge Gallery's Video Moment Finder does (`Android/.../customtasks/videomomentfinder`).
+  - **Indexing:** `Split` cuts the video into `WindowMs` 2000 windows, with `OverlapMs` 0 and steps of at least a second. Each window has `FramesPerWindow` 2 frame times, spread from its start to its end inclusive. `BuildAsync(model, durationMs, frameAt, audioBetween)` takes each frame (and the window's 16 kHz sound) from the app's callbacks. It embeds a whole window as one `Embed(InputData[], 0, VisionTokensPerFrame 70)` request.
+  - **The request layout:** with sound it is the model's timed one: `"00:00" <audio> "00:00" <frame> "00:01" <audio> ...`. The sound is split into one slice per frame (`SplitAudio`) and sent as WAV. Frames alone go without times.
+  - **When the sound is left out:** if `EstimateTokens` would go over `MaxInputTokens` 1024. If the first window's audio fails, the whole video is indexed frames only, so its windows stay in one embedding space (`WithAudio`).
+  - **Search:** `Search(model, query, topK 5)` embeds the query (`EmbedQuery`). `Rank` keeps the best `topK` windows, merges any within 0.5 s of each other into `VideoMoment`s and lists the best first. `Save`/`Load` keep an index.
+  - **Tested by** `UnitTestVideoMoments` (no model) and `TestVideoMomentIndex`: a 20 s video of five 4 s test-picture scenes, with "have a wonderful day" spoken over the last.
+    - On the M1's CPU, 10 windows take 10.0 s frames only and 10.6 s with sound, and each query's best moment covers its scene.
+    - With sound, "someone saying have a wonderful day" ranks the spoken window first (0.750, against 0.640 frames only).
+    - A window's last frame is the next scene's first, so the window before a scene partly matches it ("a dog": 00:02-00:06).
 
 ## Emgu.LiteRT.LM.Models: language models and Chat
 
