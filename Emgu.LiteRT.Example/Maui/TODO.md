@@ -686,4 +686,4 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
   - let `SpeechRecognizer.TranscribeAsync` (voice messages, voice chat) and `MeetingTranscription.Choose` use it - a setting ("System" / "On-device Parakeet"), and the only choice on Windows, which has no recognizer today;
   - the 614 MB download, its storage row, and the CC-BY-4.0 credit to NVIDIA in the app;
   - live partial text while speaking (`AsrSession`), and the languages it doesn't have (Chinese, Japanese...: the platform recognizer, or Qwen3-ASR later);
-  - check the iOS and Windows builds of `libasrextern`.
+  - check the Windows and Ubuntu builds of `libasrextern` (macOS, Android and the iOS simulator work).
