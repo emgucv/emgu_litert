@@ -475,7 +475,12 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - Before `CountShown` every search also showed one or two other scenes. After it, only "a dog" did (the apples, 00:24-00:28).
   - Opened again, the saved index loaded in 0.8 s.
   - The sheet played the copy from 00:05 to the end.
-- **Not checked yet:** Mac Catalyst, Android (the Pixel Fold), Windows (built only on the Mac for Catalyst, iOS and Android; the Windows code isn't compiled here), picking from the photo library, a real video, a video longer than a minute, and a chat reopened with its cards.
+- **Checked on Mac Catalyst** (M-series Mac, macOS 27, 2026-10-30) with the same video and self-test, on the CPU.
+  - Multimodal 740M watched it in 17.7 s and found the same moments as in the simulator, including "have a wonderful day" at 00:20-00:22. "A dog" again also showed the apples.
+  - Text Vision 440M watched the frames only in 16.0 s. The six scenes were found the same way (surfers at 00:12-00:20). "Someone saying have a wonderful day" can't be heard, so it showed three weak moments, the best 00:20-00:26 (Grace Hopper).
+  - Searches took 120-220 ms. Each model keeps its own index beside the video's copy (`<sha1>.<model file>.vmi`).
+  - The sheet played the copy from 00:05.
+- **Not checked yet:** Android (the Pixel Fold), Windows (built only on the Mac for Catalyst, iOS and Android; the Windows code isn't compiled here), picking from the photo library, a real video, a video longer than a minute, and a chat reopened with its cards.
 
 ## Image generation
 
