@@ -531,7 +531,7 @@ namespace Emgu.LiteRT.LM.Agents
                  [Description("A town or area to search in - only when the user names one in this message; empty to search near the user")] string near = null,
                  CancellationToken cancellationToken = default(CancellationToken)) => search(query ?? string.Empty, near ?? string.Empty, cancellationToken),
                 "search_places",
-                "Finds places - shops, restaurants, services - near the user, or in a town they name, closest first, with address, distance and, where known, opening hours, rating and phone. Use it for \"nearest\", \"near me\" and \"where can I buy\" questions. It knows where the user is: don't ask for or guess a town.");
+                "Finds places - shops, restaurants, services - near the user, or in a town they name, closest first, with address, distance and, where known, opening hours, rating and phone. Use it for \"nearest\", \"near me\" and \"where can I buy\" questions. It knows where the user is: don't ask for or guess a town. Each place has a Google Maps link: make its name a Markdown link to it.");
         }
 
         /// <summary>

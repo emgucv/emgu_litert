@@ -421,11 +421,12 @@ namespace Emgu.LiteRT.LM.Maui
                             code.TextColor = color ?? TextColor;
                         formatted.Spans.Add(code);
                         break;
+                    // Bold and italic text is read again for what is inside it - a link, code - as models write "**[Name](url)**".
                     case ReplyRunKind.Bold:
-                        formatted.Spans.Add(TextSpan(run.Text, baseAttributes | FontAttributes.Bold, fontSize, color));
+                        AddInline(formatted, run.Text, baseAttributes | FontAttributes.Bold, fontSize, color);
                         break;
                     case ReplyRunKind.Italic:
-                        formatted.Spans.Add(TextSpan(run.Text, baseAttributes | FontAttributes.Italic, fontSize, color));
+                        AddInline(formatted, run.Text, baseAttributes | FontAttributes.Italic, fontSize, color);
                         break;
                     case ReplyRunKind.Link:
                         formatted.Spans.Add(LinkSpan(run, baseAttributes, fontSize));

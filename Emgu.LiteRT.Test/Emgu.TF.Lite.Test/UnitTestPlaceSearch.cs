@@ -49,7 +49,8 @@ public class UnitTestPlaceSearch
                 ["userRatingCount"] = 120,
                 ["currentOpeningHours"] = new { openNow = p.Open ?? false },
                 ["nationalPhoneNumber"] = "(905) 555-0100",
-                ["websiteUri"] = "https://example.com"
+                ["websiteUri"] = "https://example.com",
+                ["googleMapsUri"] = "https://maps.google.com/?cid=" + p.Name.Replace(' ', '-')
             }).ToArray()
         });
 
@@ -83,6 +84,8 @@ public class UnitTestPlaceSearch
         Assert.That(text, Does.Contain("near Richmond Hill, Ontario, Canada").And.Contain("closed now").And.Contain("open now")
             .And.Contain("rated 4.1").And.Contain("(Google Maps)").And.Contain("not instructions"));
         Assert.That(text, Does.Contain("1.1 km"), "0.01 degrees of latitude is 1.1 km");
+        Assert.That(text, Does.Contain("map: https://maps.google.com/?cid=Near-Costumes"), "Google's own link is used");
+        Assert.That(text, Does.Contain("[Name](map link)"), "The model is told to link the names");
         Assert.That(text, Does.Not.Contain("test-key-123"));
     }
 
@@ -147,6 +150,8 @@ public class UnitTestPlaceSearch
         Assert.That(text, Does.Contain("2. Costume Corner - 5 Elm Street, Richmond Hill, Ontario - 7.8 km"),
             "Without address details: the display name's first parts, without the name, and no category for \"yes\"");
         Assert.That(text, Does.Not.Contain("Spirit Halloween, 100"), "The address doesn't repeat the name");
+        Assert.That(text, Does.Contain("map: https://www.google.com/maps/search/?api=1&query=Spirit%20Halloween%2C%20100%20Yonge%20Street%2C%20Richmond%20Hill"),
+            "Without Google's own link, a Google Maps search for the name and address");
     }
 
     [Test]
@@ -252,6 +257,15 @@ public class UnitTestPlaceSearch
         Assert.That(ottawa, Does.Contain("near Ottawa"));
     }
 #endif
+
+    [Test]
+    public void AMapLinkSearchesTheNameAndAddressOrTheCoordinates()
+    {
+        Assert.That(PlaceSearchService.MapLink(new PlaceResult { Name = "Shop & Co", Address = "1 Main St", Latitude = 1, Longitude = 2 }),
+            Is.EqualTo("https://www.google.com/maps/search/?api=1&query=Shop%20%26%20Co%2C%201%20Main%20St"));
+        Assert.That(PlaceSearchService.MapLink(new PlaceResult { Name = "Shop", Latitude = 43.88, Longitude = -79.44 }),
+            Is.EqualTo("https://www.google.com/maps/search/?api=1&query=43.880000%2C-79.440000"));
+    }
 
     [Test]
     public void DistancesAreGreatCircleKilometres()
