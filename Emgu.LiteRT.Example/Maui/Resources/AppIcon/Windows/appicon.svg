@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <!-- Windows only (see Maui.Demo.Lite.csproj): the taskbar and Start menu show the icon as it is, so its corners are rounded
+         like the other apps'. The other platforms use ../appicon.svg, a full square - iOS, Mac Catalyst and Android round it themselves. -->
+    <rect width="512" height="512" rx="112" fill="#3D7BF7" />
+</svg>
