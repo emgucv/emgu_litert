@@ -220,7 +220,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         foreach (ChatFeature feature in new ChatFeature[]
         {
             new VoiceLanguageFeature(),
-            new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new ClipboardFeature(),
+            new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new PlacesFeature(), new ClipboardFeature(),
             parts.Camera, parts.PhotoEffects, parts.Claude, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
             parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.Meetings, parts.Exercises

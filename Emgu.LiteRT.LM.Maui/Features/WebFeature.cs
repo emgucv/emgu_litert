@@ -135,7 +135,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
         }
 
         // An API key's entry, Save button and status line, kept in the platform's secure storage.
-        private sealed class ApiKeyRow
+        internal sealed class ApiKeyRow
         {
             private readonly string _storageName;
             private readonly string _placeholder;

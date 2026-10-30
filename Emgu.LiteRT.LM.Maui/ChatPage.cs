@@ -126,7 +126,7 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>
         /// The built-in features: the core tools (date and time, calculator, units), memories about the user (with a
         /// store), the web (weather, Wikipedia, currency, reading pages; web search with a Tavily key), the user's
-        /// location (off until they allow it), the clipboard (only for a message about it) and goals (with a store).
+        /// location (off until they allow it) and places near them (with Web search on), the clipboard (only for a message about it) and goals (with a store).
         /// </summary>
         /// <param name="memory">Where memories are kept (e.g. Emgu.LiteRT.LM.Chat.Sqlite's SqliteAgentMemoryStore), or null for no memories</param>
         /// <param name="goals">Where goals are kept (SqliteAgentGoalStore), or null for no goals</param>
@@ -137,6 +137,7 @@ namespace Emgu.LiteRT.LM.Maui
                 features.Add(new MemoryFeature(memory));
             features.Add(new WebFeature());
             features.Add(new LocationFeature());
+            features.Add(new PlacesFeature());
             features.Add(new ClipboardFeature());
             if (goals != null)
                 features.Add(new GoalsFeature(goals));

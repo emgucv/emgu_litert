@@ -517,6 +517,24 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         /// <summary>
+        /// search_places: finds shops, restaurants and other places near the user, or in a town they name, with a search the
+        /// app provides (see <see cref="PlaceSearchService"/>, which turns the query and the position into text for the
+        /// model: the closest places with their addresses and distances).
+        /// </summary>
+        /// <param name="search">The app's place search, given what to look for and a town the user named (empty for near the user)</param>
+        public static AIFunction SearchPlaces(Func<string, string, CancellationToken, Task<string>> search)
+        {
+            if (search == null)
+                throw new ArgumentNullException("search");
+            return AIFunctionFactory.Create(
+                ([Description("What to look for, e.g. \"Halloween store\", \"pharmacy\", \"ramen restaurant\"")] string query,
+                 [Description("A town or area to search in - only when the user names one in this message; empty to search near the user")] string near = null,
+                 CancellationToken cancellationToken = default(CancellationToken)) => search(query ?? string.Empty, near ?? string.Empty, cancellationToken),
+                "search_places",
+                "Finds places - shops, restaurants, services - near the user, or in a town they name, closest first, with address, distance and, where known, opening hours, rating and phone. Use it for \"nearest\", \"near me\" and \"where can I buy\" questions. It knows where the user is: don't ask for or guess a town.");
+        }
+
+        /// <summary>
         /// search_documents: searches the documents the user attached to chats before, with a search the app provides.
         /// It should return the best passages with each document's name and page, as quoted data for the model.
         /// </summary>
@@ -991,6 +1009,9 @@ namespace Emgu.LiteRT.LM.Agents
                 case "find_photos": return "Looking for \u201C" + Argument("request") + "\u201D";
                 case "search_chats": return "Searching past chats for \u201C" + Argument("request") + "\u201D";
                 case "search_documents": return "Searching your documents for “" + Argument("request") + "”";
+                case "search_places":
+                    string area = Argument("near");
+                    return "Looking for “" + Argument("query") + "” " + (area.Length > 0 ? "in " + area : "near you");
                 case "generate_image": return "Drawing \u201C" + Argument("prompt") + "\u201D";
                 case "get_weather":
                     string place = Argument("place");

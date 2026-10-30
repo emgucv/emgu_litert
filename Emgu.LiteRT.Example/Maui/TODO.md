@@ -660,3 +660,5 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       chose "Multimodal 740M · CPU", kept the embeddings (45 photos, 26 messages) and carried on; choosing the GPU option again after putting the
       DLL back loaded it. Not run: the dialog's Cancel.
 - [x] Photos the library can't load are counted in the status ("; 1 couldn't be read", checked with a corrupt PNG, removed afterwards).
+
+- [ ] Places search (`search_places`, 2026-10-29; see `docs/agents.md`): built and unit-tested, checked on Windows with OpenStreetMap and a named town. Still to check: the device-position path ("nearest ..." with Share my location on) on the Fold and an iPhone, Google Places with a real key (the request is written from Google's documentation, never sent), Apple Maps on iOS and Mac Catalyst (`AppleMapsPlaceSearch`, written without a Mac: it has not been compiled), and the answer for the Vancouver/Ottawa case that started it (Claude searched "near Ottawa" with the device in Richmond Hill: where did Ottawa come from - a memory?).
