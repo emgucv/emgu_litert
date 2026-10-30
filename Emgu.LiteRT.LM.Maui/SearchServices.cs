@@ -21,7 +21,8 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>
         /// One embedding for a background index: waits while the device is too busy, then embeds holding the model's
-        /// gate - not held while waiting, so a paused index doesn't block an interactive search.
+        /// gate - not held while waiting, so a paused index doesn't block an interactive search, and taken after any
+        /// search waiting (<see cref="SearchEmbedder.EnterBackgroundAsync"/>).
         /// </summary>
         /// <typeparam name="T">What the embedding returns</typeparam>
         /// <param name="embedder">The model's embedder</param>
@@ -47,14 +48,13 @@ namespace Emgu.LiteRT.LM.Maui
             while (true)
             {
                 await WaitAsync(paused, cancel, onlyWhileCharging);
-                await embedder.Gate.WaitAsync(cancel);
-                try
+                // After any search waiting, and not while the app holds background work (e.g. the chat model replying).
+                using (await embedder.EnterBackgroundAsync(cancel))
                 {
                     if (_policy.PauseReason(await DeviceWorkload.ReadAsync(), onlyWhileCharging) != null)
                         continue;
                     return await Task.Run(embed, cancel);
                 }
-                finally { embedder.Gate.Release(); }
             }
         }
     }

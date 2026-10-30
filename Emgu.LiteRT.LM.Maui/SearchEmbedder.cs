@@ -2,6 +2,7 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
+using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Models;
 
 namespace Emgu.LiteRT.LM.Maui
@@ -84,8 +85,25 @@ namespace Emgu.LiteRT.LM.Maui
             _choice = choice ?? throw new ArgumentNullException(nameof(choice));
         }
 
-        /// <summary>Held while embedding: the searches share the model.</summary>
-        public SemaphoreSlim Gate { get; } = new SemaphoreSlim(1, 1);
+        /// <summary>
+        /// One embedding at a time, searches first: searches take it with <see cref="EnterSearchAsync"/>, background
+        /// indexes with <see cref="EnterBackgroundAsync"/> (through <see cref="IIndexingWorkload.RunEmbeddingAsync"/>).
+        /// </summary>
+        public SearchFirstGate Searches { get; } = new SearchFirstGate();
+
+        /// <summary>
+        /// The semaphore under <see cref="Searches"/>, held while embedding: taking it directly excludes everything else
+        /// without going before the searches (e.g. to release the model).
+        /// </summary>
+        public SemaphoreSlim Gate => Searches.Semaphore;
+
+        /// <summary>Take the model for a search, before any background index waiting. Dispose the result.</summary>
+        /// <param name="cancel">Stops waiting</param>
+        public Task<IDisposable> EnterSearchAsync(CancellationToken cancel = default) => Searches.EnterSearchAsync(cancel);
+
+        /// <summary>Take the model for one background embedding, after the searches. Dispose the result.</summary>
+        /// <param name="cancel">Stops waiting</param>
+        public Task<IDisposable> EnterBackgroundAsync(CancellationToken cancel = default) => Searches.EnterBackgroundAsync(cancel);
 
         /// <summary>The loaded model, or null.</summary>
         public EmbeddingModel Model { get; private set; }

@@ -250,6 +250,64 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         public DateTime Created { get; set; }
     }
 
+    /// <summary>An indexed library video, for "Search my videos" (the "VideoEntry" table; <see cref="IVideoIndexStore"/>).</summary>
+    [Table("VideoEntry")]
+    public class VideoEntryRecord
+    {
+        /// <summary>The video's id in the platform's library</summary>
+        [PrimaryKey]
+        public string VideoId { get; set; }
+
+        /// <summary>The search model's file it was embedded with</summary>
+        public string EmbeddingModel { get; set; }
+
+        /// <summary>The video's version (changes when it is edited)</summary>
+        public long Version { get; set; }
+
+        /// <summary>The index's settings version it was indexed with</summary>
+        public int SettingsVersion { get; set; }
+
+        /// <summary>When it was taken (UTC)</summary>
+        public DateTime Taken { get; set; }
+
+        /// <summary>Its length, in milliseconds</summary>
+        public long DurationMs { get; set; }
+
+        /// <summary>How much of it was indexed, in milliseconds</summary>
+        public long IndexedMs { get; set; }
+
+        /// <summary>Its name</summary>
+        public string Name { get; set; }
+
+        /// <summary>Whether its sound was embedded</summary>
+        public bool WithAudio { get; set; }
+
+        /// <summary>A small JPEG of it</summary>
+        public byte[] Thumbnail { get; set; }
+    }
+
+    /// <summary>One indexed window of a library video (the "VideoWindow" table).</summary>
+    [Table("VideoWindow")]
+    public class VideoWindowRecord
+    {
+        /// <summary>The row's id</summary>
+        [PrimaryKey, AutoIncrement]
+        public long Id { get; set; }
+
+        /// <summary>The video's id</summary>
+        [Indexed]
+        public string VideoId { get; set; }
+
+        /// <summary>Where the window starts, in milliseconds</summary>
+        public long StartMs { get; set; }
+
+        /// <summary>Where it ends</summary>
+        public long EndMs { get; set; }
+
+        /// <summary>The embedding, as the floats' bytes</summary>
+        public byte[] Embedding { get; set; }
+    }
+
     /// <summary>A photo's embedding and details, for the photo search (the "PhotoEmbedding" table; <see cref="IPhotoIndexStore"/>).</summary>
     [Table("PhotoEmbedding")]
     public class PhotoEmbeddingRecord

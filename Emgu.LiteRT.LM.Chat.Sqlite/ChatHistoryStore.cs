@@ -30,7 +30,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
     /// <see cref="GetMessageId"/> need nothing else. With <see cref="IsPrivate"/> on, nothing is saved.
     /// </para>
     /// </summary>
-    public partial class ChatHistoryStore : IChatHistoryStore, IChatSearchStore, IChatDocumentStore, IPhotoIndexStore
+    public partial class ChatHistoryStore : IChatHistoryStore, IChatSearchStore, IChatDocumentStore, IPhotoIndexStore, IVideoIndexStore
     {
         /// <summary>The version of the tables this store reads and writes (kept in the database, for migrations).</summary>
         public const int SchemaVersion = 1;
@@ -94,6 +94,8 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
             await connection.CreateTableAsync<DocumentRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<DocumentItemRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<PhotoEmbeddingRecord>().ConfigureAwait(false);
+            await connection.CreateTableAsync<VideoEntryRecord>().ConfigureAwait(false);
+            await connection.CreateTableAsync<VideoWindowRecord>().ConfigureAwait(false);
             await connection.CreateTableAsync<SchemaVersionRecord>().ConfigureAwait(false);
             if (await connection.FindAsync<SchemaVersionRecord>(SchemaName).ConfigureAwait(false) == null)
                 await connection.InsertAsync(new SchemaVersionRecord { Name = SchemaName, Version = SchemaVersion }).ConfigureAwait(false);
@@ -944,6 +946,73 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         {
             SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
             await db.DeleteAllAsync<PhotoEmbeddingRecord>().ConfigureAwait(false);
+        }
+
+        // ---------- "Search my videos"' index (IVideoIndexStore) ----------
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<ChatVideoEntry>> GetVideoEntriesAsync()
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            return (await db.Table<VideoEntryRecord>().ToListAsync().ConfigureAwait(false)).Select(r => new ChatVideoEntry
+            {
+                VideoId = r.VideoId, EmbeddingModel = r.EmbeddingModel, Version = r.Version, SettingsVersion = r.SettingsVersion,
+                Taken = DateTime.SpecifyKind(r.Taken, DateTimeKind.Utc), DurationMs = r.DurationMs, IndexedMs = r.IndexedMs,
+                Name = r.Name, WithAudio = r.WithAudio, Thumbnail = r.Thumbnail
+            }).ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<ChatVideoWindow>> GetVideoWindowsAsync()
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            return (await db.Table<VideoWindowRecord>().ToListAsync().ConfigureAwait(false)).Select(r => new ChatVideoWindow
+            {
+                VideoId = r.VideoId, StartMs = r.StartMs, EndMs = r.EndMs, Embedding = r.Embedding
+            }).ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task SaveVideoAsync(ChatVideoEntry entry, IReadOnlyList<ChatVideoWindow> windows)
+        {
+            if (entry == null)
+                throw new ArgumentNullException(nameof(entry));
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            await db.RunInTransactionAsync(connection =>
+            {
+                connection.Execute("DELETE FROM VideoWindow WHERE VideoId = ?", entry.VideoId);
+                connection.InsertOrReplace(new VideoEntryRecord
+                {
+                    VideoId = entry.VideoId, EmbeddingModel = entry.EmbeddingModel, Version = entry.Version,
+                    SettingsVersion = entry.SettingsVersion, Taken = entry.Taken, DurationMs = entry.DurationMs,
+                    IndexedMs = entry.IndexedMs, Name = entry.Name, WithAudio = entry.WithAudio, Thumbnail = entry.Thumbnail
+                });
+                foreach (ChatVideoWindow w in windows ?? new List<ChatVideoWindow>())
+                    connection.Insert(new VideoWindowRecord { VideoId = entry.VideoId, StartMs = w.StartMs, EndMs = w.EndMs, Embedding = w.Embedding });
+            }).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public async Task DeleteVideosAsync(IEnumerable<string> videoIds)
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            List<string> ids = videoIds.ToList();
+            await db.RunInTransactionAsync(connection =>
+            {
+                foreach (string id in ids)
+                {
+                    connection.Execute("DELETE FROM VideoWindow WHERE VideoId = ?", id);
+                    connection.Delete<VideoEntryRecord>(id);
+                }
+            }).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public async Task ClearVideoIndexAsync()
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            await db.DeleteAllAsync<VideoWindowRecord>().ConfigureAwait(false);
+            await db.DeleteAllAsync<VideoEntryRecord>().ConfigureAwait(false);
         }
 
         // ---------- Helpers ----------

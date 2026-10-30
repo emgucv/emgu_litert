@@ -31,7 +31,9 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>The database file itself (not deletable here).</summary>
         Database,
         /// <summary>The ZIPs made for sharing chats.</summary>
-        Exports
+        Exports,
+        /// <summary>"Search my videos"' index, in the database.</summary>
+        VideoIndex
     }
 
     /// <summary>One thing the app keeps on the device, with its size.</summary>
@@ -213,6 +215,11 @@ namespace Emgu.LiteRT.LM.Chat
             });
             result.Entries.Add(new StorageEntry
             {
+                Kind = StorageKind.VideoIndex, Name = "Video search index", InDatabase = true,
+                Bytes = await _store.GetVideoIndexBytesAsync().ConfigureAwait(false), Detail = "Deletes embeddings and turns video search off. Your videos are kept."
+            });
+            result.Entries.Add(new StorageEntry
+            {
                 Kind = StorageKind.ChatIndex, Name = "Past-chat search index", InDatabase = true,
                 Bytes = await _store.GetChatIndexBytesAsync().ConfigureAwait(false), Detail = "Deletes embeddings and turns past-chat search off. Saved conversations are kept."
             });
@@ -259,6 +266,7 @@ namespace Emgu.LiteRT.LM.Chat
                     return;
                 case StorageKind.Document: await _store.DeleteDocumentAsync(entry.Key).ConfigureAwait(false); break;
                 case StorageKind.PhotoIndex: await _store.ClearPhotoEmbeddingsAsync().ConfigureAwait(false); break;
+                case StorageKind.VideoIndex: await _store.ClearVideoIndexAsync().ConfigureAwait(false); break;
                 case StorageKind.ChatIndex: await _store.ClearChatEmbeddingsAsync().ConfigureAwait(false); break;
                 case StorageKind.Attachments: await _store.DeleteAllAttachmentsAsync().ConfigureAwait(false); break;
                 default: throw new InvalidOperationException("This storage item cannot be deleted here.");

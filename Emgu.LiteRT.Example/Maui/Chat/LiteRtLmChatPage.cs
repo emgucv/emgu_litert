@@ -63,6 +63,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         public PastChatsFeature PastChats;
         public PhotoSearchFeature PhotoSearch;
         public VideoMomentsFeature Videos;
+        public VideoSearchFeature VideoSearch;
         public MeetingFeature Meetings;
         public ExerciseFeature Exercises;
         public MemoryFeature Memory;
@@ -156,6 +157,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         parts.Documents = new DocumentsFeature(SharedStore, parts.Search);
         parts.PhotoSearch = new PhotoSearchFeature(SharedStore, parts.Search);
         parts.Videos = new VideoMomentsFeature(parts.Search);
+        parts.VideoSearch = new VideoSearchFeature(SharedStore, parts.Search);
         // Snapshots the user keeps go through a Save As dialog, as the generated pictures do.
         parts.Camera.SnapshotSaver = async (jpeg, fileName) =>
         {
@@ -226,7 +228,7 @@ public sealed class LiteRtLmChatPage : ChatPage
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new PlacesFeature(), new ClipboardFeature(),
             parts.Camera, parts.PhotoEffects, parts.Claude, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
-            parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.Videos, parts.Meetings, parts.Exercises
+            parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.VideoSearch, parts.Videos, parts.Meetings, parts.Exercises
         })
             options.Features.Add(feature);
         parts.Options = options;
@@ -336,6 +338,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         _parts.Documents.RemoveDocument();
         _parts.Videos.RemoveVideo();
         _parts.PhotoSearch.CancelIndexing();
+        _parts.VideoSearch.CancelIndexing();
         _parts.PastChats.CancelIndexing();
         _parts.Storage.CancelRestore();
         _ = CloseAsync();
@@ -801,9 +804,11 @@ public sealed class LiteRtLmChatPage : ChatPage
         Task videoGone = _parts.Videos.RemoveVideoAsync();
         _parts.PastChats.CancelIndexing();
         _parts.PhotoSearch.CancelIndexing();
+        _parts.VideoSearch.CancelIndexing();
         await videoGone;
         await _parts.PastChats.StopIndexingAsync();
         await _parts.PhotoSearch.WaitForIndexingAsync();
+        await _parts.VideoSearch.WaitForIndexingAsync();
         if (documentReady != null) { try { await documentReady; } catch (OperationCanceledException) { } }
         await _parts.Documents.FinishPrivateDocumentsAsync();
         Chat.ReplySpeaker?.Stop();

@@ -86,6 +86,9 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>The tool group's summary, for the planner.</summary>
         public const string GroupSummary = "find and show the user's own photos and pictures on this device";
 
+        /// <summary>The group's summary when it has find_videos too ("Search my videos" on the page).</summary>
+        public const string MediaGroupSummary = "find and show the user's own photos, pictures and videos on this device";
+
         /// <summary>The words that bring the tool group.</summary>
         public static readonly string[] GroupKeywords =
         {

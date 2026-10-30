@@ -637,9 +637,8 @@ namespace Emgu.LiteRT.LM.Maui.Documents
             {
                 EmbeddingModel embedder = await Embedder.EnsureAsync(null, cancel);
                 float[] query;
-                await Embedder.Gate.WaitAsync(cancel);
-                try { query = await Task.Run(() => embedder.EmbedQuery(request), cancel); }
-                finally { Embedder.Gate.Release(); }
+                using (await Embedder.EnterSearchAsync(cancel))
+                    query = await Task.Run(() => embedder.EmbedQuery(request), cancel);
                 found = DocumentLibrarySearch.Rank(passages, query, Host.ContextWindow >= 8192 ? 3200 : 1600);
             }
             if (found.Count == 0)
@@ -672,15 +671,8 @@ namespace Emgu.LiteRT.LM.Maui.Documents
             DocumentIndex index = state.Index;
             EmbeddingModel embedder = Embedder.Model;
             DocumentSearchResult result;
-            await Embedder.Gate.WaitAsync();
-            try
-            {
+            using (await Embedder.EnterSearchAsync())
                 result = await Task.Run(() => index.Search(embedder, prompt));
-            }
-            finally
-            {
-                Embedder.Gate.Release();
-            }
 
             var context = new ChatDocumentContext();
             // About 400 tokens of excerpts with a 4k window, 800 with 8k.

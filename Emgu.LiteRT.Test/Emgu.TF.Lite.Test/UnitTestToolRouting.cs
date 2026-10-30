@@ -102,8 +102,10 @@ public class UnitTestToolRouting
                 ExtraKeywords = new[] { "jumping jack", "jumping-jack", "star jump", "squat", "high knee", "knee raise", "exercise", "workout", "work out", "reps", "count my" },
                 ExtraSummary = "count jumping jacks, squats or high knees with the camera"
             }.ToolGroups().Single(),
-            new ToolGroup(ChatPhotos.GroupName, ChatPhotos.GroupSummary, ChatPhotos.GroupKeywords,
-                () => new AITool[] { AgentTools.FindPhotos(Unused) }, () => ChatPhotos.Instructions),
+            // Photos and videos, as the demo has them (VideoSearchFeature's find_videos in PhotoSearchFeature's group).
+            new ToolGroup(ChatPhotos.GroupName, ChatPhotos.MediaGroupSummary, ChatPhotos.GroupKeywords.Concat(ChatVideoLibrary.GroupKeywords),
+                () => new AITool[] { AgentTools.FindPhotos(Unused), AgentTools.FindVideos(Unused) },
+                () => ChatPhotos.Instructions + " " + ChatVideoLibrary.Instructions),
             new ToolGroup(ChatDocuments.GroupName, ChatDocuments.GroupSummary, ChatDocuments.GroupKeywords,
                 () => new AITool[] { AgentTools.SearchDocuments((request, document, token) => Task.FromResult("none")) }, () => ChatDocuments.Instructions),
             new ToolGroup(ChatSearchIndex.GroupName, ChatSearchIndex.GroupSummary, ChatSearchIndex.GroupKeywords,
@@ -182,6 +184,8 @@ public class UnitTestToolRouting
             ("Let's do high knees for a minute", new[] { GoalsSkill.GroupName }),
             ("Show me my photos from Paris", new[] { ChatPhotos.GroupName }),
             ("Find my selfies from last summer", new[] { ChatPhotos.GroupName }),
+            ("Find the video of the dog at the beach", new[] { ChatPhotos.GroupName }),
+            ("Play the clip where we sing happy birthday", new[] { ChatPhotos.GroupName }),
             ("What does my rental contract say about pets?", new[] { ChatDocuments.GroupName }),
             ("What did we talk about last time?", new[] { ChatSearchIndex.GroupName }),
             ("What was the restaurant you told me about?", new[] { ChatSearchIndex.GroupName }),

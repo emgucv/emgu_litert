@@ -29,6 +29,7 @@
     - On the M1's CPU, 10 windows take 10.0 s frames only and 10.6 s with sound, and each query's best moment covers its scene.
     - With sound, "someone saying have a wonderful day" ranks the spoken window first (0.750, against 0.640 frames only).
     - A window's last frame is the next scene's first, so the window before a scene partly matches it ("a dog": 00:02-00:06).
+  - **Sparse windows** (2026-10-30): `StrideMs` sets how far apart windows start (0: `WindowMs` - `OverlapMs`), e.g. a 2 s window of one frame every 10 s, and `MaxWindows` keeps only the first windows; file version 2 saves both (version 1 files still load). `Emgu.LiteRT.LM.Chat`'s `VideoLibraryIndex` ("Search my videos") indexes a device's videos this way, about a minute of work per minute of video on a Galaxy S10 instead of 7.5.
 
 ## Speech recognition: AsrEngine and Parakeet-TDT-0.6B-v3
 

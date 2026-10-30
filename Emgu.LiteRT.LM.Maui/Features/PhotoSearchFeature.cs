@@ -118,9 +118,19 @@ namespace Emgu.LiteRT.LM.Maui.Features
     /// <inheritdoc/>
     public override IEnumerable<ToolGroup> ToolGroups()
     {
-        yield return new ToolGroup(ChatPhotos.GroupName, ChatPhotos.GroupSummary, ChatPhotos.GroupKeywords,
-            () => new AITool[] { AgentTools.FindPhotos(FindAsync) },
-            () => ChatPhotos.Instructions);
+        // With "Search my videos" on the page too, find_videos is in this group (one stub for both: a group of its own
+        // would make every message longer).
+        VideoSearchFeature videos = Host?.Services.Get<VideoSearchFeature>();
+        if (videos == null)
+        {
+            yield return new ToolGroup(ChatPhotos.GroupName, ChatPhotos.GroupSummary, ChatPhotos.GroupKeywords,
+                () => new AITool[] { AgentTools.FindPhotos(FindAsync) },
+                () => ChatPhotos.Instructions);
+            yield break;
+        }
+        yield return new ToolGroup(ChatPhotos.GroupName, ChatPhotos.MediaGroupSummary, ChatPhotos.GroupKeywords.Concat(ChatVideoLibrary.GroupKeywords),
+            () => new AITool[] { AgentTools.FindPhotos(FindAsync) }.Concat(videos.Tools()),
+            () => ChatPhotos.Instructions + " " + ChatVideoLibrary.Instructions);
     }
 
     // The page shown: photos added since the app last ran are indexed; shown again or the app back: those taken meanwhile.
@@ -472,7 +482,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
                 : "No photos are indexed yet.";
         // What, where, when, kind and camera, from the request; places and cameras as the indexed photos name them.
         PhotoQuery query = PhotoRequest.Parse(request, DateTime.Now, _photoIndex.KnownPlaces(), _photoIndex.KnownCameras());
-        (List<(IndexedPhoto Photo, float Score)> found, int matching) = await _photoIndex.SearchAsync(Embedder.Model, Embedder.Gate, query, cancel);
+        (List<(IndexedPhoto Photo, float Score)> found, int matching) = await _photoIndex.SearchAsync(Embedder.Model, Embedder.EnterSearchAsync, query, cancel);
         // Photos deleted since the last indexing pass: forgotten, and the search run again, since the scores of the
         // rest count relative to the best one.
         for (int attempt = 0; attempt < 3 && found.Count > 0; attempt++)
@@ -484,7 +494,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
             if (gone.Count == 0)
                 break;
             await _photoIndex.RemoveAsync(gone);
-            (found, matching) = await _photoIndex.SearchAsync(Embedder.Model, Embedder.Gate, query, cancel);
+            (found, matching) = await _photoIndex.SearchAsync(Embedder.Model, Embedder.EnterSearchAsync, query, cancel);
         }
         if (found.Count == 0)
         {

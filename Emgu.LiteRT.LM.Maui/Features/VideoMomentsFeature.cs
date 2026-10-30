@@ -470,15 +470,8 @@ public sealed class VideoMomentsFeature : ChatFeature, IStorageParticipant, ISea
         double share = (double)indexed / Math.Max(1, index.Windows.Count);
         EmbeddingModel model = await Embedder.EnsureAsync(null, cancel);
         IReadOnlyList<VideoMoment> found;
-        await Embedder.Gate.WaitAsync(cancel);
-        try
-        {
+        using (await Embedder.EnterSearchAsync(cancel))
             found = await Task.Run(() => index.Search(model, request ?? string.Empty, 5), cancel);
-        }
-        finally
-        {
-            Embedder.Gate.Release();
-        }
         var moments = new List<ChatVideoMoment>();
         foreach (VideoMoment moment in found.Take(ChatVideos.CountShown(found.Select(m => m.Score).ToList())))
         {

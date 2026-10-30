@@ -256,7 +256,7 @@ internal sealed class PhotoIndex
     /// had the query's details, before the description.
     /// </summary>
     public async Task<(List<(IndexedPhoto Photo, float Score)> Found, int Matching)> SearchAsync(EmbeddingModel embedder,
-        SemaphoreSlim gate, PhotoQuery query, CancellationToken cancellationToken)
+        Func<CancellationToken, Task<IDisposable>> enterSearch, PhotoQuery query, CancellationToken cancellationToken)
     {
         await LoadAsync();
         List<IndexedPhoto> candidates;
@@ -268,15 +268,10 @@ internal sealed class PhotoIndex
             return (candidates.OrderByDescending(e => e.Taken).Take(MaxListed).Select(e => (e, 0f)).ToList(), candidates.Count);
 
         float[] text, baseline;
-        await gate.WaitAsync(cancellationToken);
-        try
+        using (await enterSearch(cancellationToken))
         {
             text = await Task.Run(() => embedder.EmbedQuery(query.Description), cancellationToken);
             baseline = await Task.Run(() => embedder.EmbedQuery(ChatPhotos.BaselineQuery), cancellationToken);
-        }
-        finally
-        {
-            gate.Release();
         }
         float[] scores = candidates.Select(e => EmbeddingModel.CosineSimilarity(text, e.Embedding)).ToArray();
         float[] baselineScores = candidates.Select(e => EmbeddingModel.CosineSimilarity(baseline, e.Embedding)).ToArray();

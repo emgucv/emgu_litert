@@ -146,6 +146,9 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
         _selected = Math.Max(0, _options.FindIndex(o => o.Key == key));
         if (_services != null)
             _services.SupportsImages = Selected.SupportsImages;
+        // No background embedding starts while the chat model replies: the two would share the CPU, and the reply's
+        // searches go first anyway.
+        Embedder.Searches.HoldBackground = () => host.IsReplying;
     }
 
     // ---------- ISearchModelChoice ----------

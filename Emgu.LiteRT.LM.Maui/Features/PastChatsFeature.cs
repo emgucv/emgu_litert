@@ -249,9 +249,8 @@ namespace Emgu.LiteRT.LM.Maui.Features
                 async (text, token) =>
                 {
                     var embedder = await _search.Embedder.EnsureAsync(null, token);
-                    await _search.Embedder.Gate.WaitAsync(token);
-                    try { return await Task.Run(() => embedder.EmbedQuery(text), token); }
-                    finally { _search.Embedder.Gate.Release(); }
+                    using (await _search.Embedder.EnterSearchAsync(token))
+                        return await Task.Run(() => embedder.EmbedQuery(text), token);
                 }, cancel);
             if (!On)
                 return "Past-chat search was turned off. Discard the search results.";

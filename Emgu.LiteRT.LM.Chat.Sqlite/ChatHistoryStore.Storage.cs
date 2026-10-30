@@ -32,6 +32,17 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
         }
 
         /// <inheritdoc/>
+        public async Task<long> GetVideoIndexBytesAsync()
+        {
+            SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);
+            long windows = await db.ExecuteScalarAsync<long>(
+                "SELECT COALESCE(SUM(COALESCE(length(Embedding),0) + COALESCE(length(CAST(VideoId AS BLOB)),0) + 16),0) FROM VideoWindow").ConfigureAwait(false);
+            long entries = await db.ExecuteScalarAsync<long>(
+                "SELECT COALESCE(SUM(COALESCE(length(Thumbnail),0) + COALESCE(length(CAST(VideoId AS BLOB)),0) + COALESCE(length(CAST(Name AS BLOB)),0)),0) FROM VideoEntry").ConfigureAwait(false);
+            return windows + entries;
+        }
+
+        /// <inheritdoc/>
         public async Task<long> GetChatIndexBytesAsync()
         {
             SQLiteAsyncConnection db = await GetConnectionAsync().ConfigureAwait(false);

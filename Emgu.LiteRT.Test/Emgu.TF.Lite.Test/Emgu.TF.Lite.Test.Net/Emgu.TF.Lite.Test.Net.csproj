@@ -47,6 +47,8 @@
     <Compile Include="..\UnitTestGoalReminders.cs" Link="UnitTestGoalReminders.cs" />
     <Compile Include="..\UnitTestVideoMoments.cs" Link="UnitTestVideoMoments.cs" />
     <Compile Include="..\UnitTestSpeechToText.cs" Link="UnitTestSpeechToText.cs" />
+    <Compile Include="..\UnitTestSearchFirstGate.cs" Link="UnitTestSearchFirstGate.cs" />
+    <Compile Include="..\UnitTestVideoLibrary.cs" Link="UnitTestVideoLibrary.cs" />
     <Compile Include="..\UnitTestHandTracker.cs" Link="UnitTestHandTracker.cs" />
     <Compile Include="..\UnitTestPoseTracker.cs" Link="UnitTestPoseTracker.cs" />
     <Compile Include="..\UnitTestFaceTracker.cs" Link="UnitTestFaceTracker.cs" />

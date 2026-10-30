@@ -668,7 +668,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] Places search (`search_places`, 2026-10-29; see `docs/agents.md`): built and unit-tested, checked on Windows with OpenStreetMap and a named town. Still to check: the device-position path ("nearest ..." with Share my location on) on the Fold and an iPhone, Google Places with a real key (the request is written from Google's documentation, never sent), Apple Maps on iOS and Mac Catalyst (`AppleMapsPlaceSearch`, written without a Mac: it has not been compiled).
 - [ ] Video moments (`VideoMomentsFeature`, 2026-10-29; see FEATURES.md, "Video moments"). It was checked in the iOS simulator, on Mac Catalyst, the Galaxy S10 and the Galaxy Z Fold 3 with a synthetic 30 s video. Still to check:
   - the Pixel Fold;
-  - a search waits about 7 s behind photo indexing (Z Fold 3), which holds the shared search model for a whole batch: let a search go before the next batch (for every search, not only videos);
+  - a search waited about 7 s behind photo indexing (Z Fold 3): searches now go first (`SearchFirstGate`, 2026-10-30; 1.8 s during video indexing on the S10) - measure again on the Z Fold 3;
   - the S10 takes 25-40 min for a 5-minute video: a shorter limit or fewer frames on slow phones?
   - Windows (its `VideoSource` and `InlineVideoView` code hasn't been compiled);
   - picking from the photo library;
@@ -687,3 +687,12 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
   - the 614 MB download, its storage row, and the CC-BY-4.0 credit to NVIDIA in the app;
   - live partial text while speaking (`AsrSession`), and the languages it doesn't have (Chinese, Japanese...: the platform recognizer, or Qwen3-ASR later);
   - check the Windows and Ubuntu builds of `libasrextern` (macOS, Android and the iOS simulator work).
+- [ ] Search my videos (`VideoSearchFeature`, 2026-10-30; see FEATURES.md, "Search my videos"). Checked in the iOS simulator and on a Galaxy S10 with four synthetic clips. Still to check:
+  - a real library: the thresholds (lift 0.02 over "a video") come from four synthetic clips; videos with talking, music, dark or busy scenes;
+  - Mac Catalyst (with the user's OK: it reads the Mac's Photos library), Windows (not compiled here), the Z Fold 3 / Pixel Fold;
+  - many videos: the in-memory index (60 windows x 768 floats per video), the first pass's time, and the "Videos to index" defaults;
+  - iCloud-only videos (skipped) and edited ones.
+
+  Later:
+  - past the first 10 minutes of a long video;
+  - the photo cards saved with replies too, like the video cards.

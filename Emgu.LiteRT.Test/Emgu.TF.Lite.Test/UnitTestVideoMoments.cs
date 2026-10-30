@@ -39,6 +39,63 @@ public class UnitTestVideoMoments
     }
 
     [Test]
+    public void CutsSparseWindowsForALibrary()
+    {
+        // A 2 s window of one frame (its middle) every 10 s of a 35 s video; the last ends with the video.
+        List<VideoWindow> windows = VideoMomentIndex.Split(35000, 2000, 1, 0, 10000);
+        Assert.That(windows.Select(w => (w.StartMs, w.EndMs)), Is.EqualTo(new[] { (0L, 2000L), (10000L, 12000L), (20000L, 22000L), (30000L, 32000L) }));
+        Assert.That(windows.Select(w => w.FrameTimesMs.Single()), Is.EqualTo(new long[] { 1000, 11000, 21000, 31000 }));
+        Assert.That(VideoMomentIndex.Split(31000, 2000, 1, 0, 10000).Last().EndMs, Is.EqualTo(31000));
+    }
+
+    [Test]
+    public async Task IndexesOnlyTheFirstWindowsOfALongVideo()
+    {
+        // MaxWindows: the first 3 sparse windows of a 2-minute video, saved and loaded with the stride (file version 2).
+        using var model = new NoModel();
+        var index = new VideoMomentIndex { FramesPerWindow = 1, StrideMs = 10000, MaxWindows = 3, IncludeAudio = false };
+        await index.BuildAsync(model, 120000, (ms, ct) => Task.FromResult(new byte[] { 1 }), null,
+            (embed, ct) => Task.FromResult(new float[] { 1, 0 }));
+        Assert.That(index.Windows.Select(w => w.StartMs), Is.EqualTo(new long[] { 0, 10000, 20000 }));
+        using var saved = new MemoryStream();
+        index.Save(saved);
+        saved.Position = 0;
+        VideoMomentIndex loaded = VideoMomentIndex.Load(saved);
+        Assert.That((loaded.StrideMs, loaded.MaxWindows, loaded.FramesPerWindow, loaded.Windows.Count), Is.EqualTo((10000, 3, 1, 3)));
+    }
+
+    [Test]
+    public void LoadsAVersion1Index()
+    {
+        // Written as version 1 did (no stride): one 2 s window with 2 frames and a 2-float embedding.
+        using var saved = new MemoryStream();
+        using (var writer = new BinaryWriter(saved, System.Text.Encoding.UTF8, true))
+        {
+            writer.Write(System.Text.Encoding.ASCII.GetBytes("EVMI"));
+            writer.Write(1);
+            writer.Write(2000L);
+            writer.Write(2000);
+            writer.Write(2);
+            writer.Write(0);
+            writer.Write(70);
+            writer.Write(true);
+            writer.Write(1);
+            writer.Write(0L);
+            writer.Write(2000L);
+            writer.Write(2);
+            writer.Write(0L);
+            writer.Write(2000L);
+            writer.Write(2);
+            writer.Write(0.6f);
+            writer.Write(0.8f);
+        }
+        saved.Position = 0;
+        VideoMomentIndex loaded = VideoMomentIndex.Load(saved);
+        Assert.That((loaded.StrideMs, loaded.VisionTokensPerFrame, loaded.WithAudio, loaded.Windows.Count), Is.EqualTo((0, 70, true, 1)));
+        Assert.That(loaded.Windows[0].Embedding, Is.EqualTo(new[] { 0.6f, 0.8f }));
+    }
+
+    [Test]
     public void SplitsTheSoundPerFrame()
     {
         // 2 s at 16 kHz into 2 slices of a second each.

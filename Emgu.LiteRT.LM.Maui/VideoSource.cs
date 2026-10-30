@@ -22,7 +22,7 @@ namespace Emgu.LiteRT.LM.Maui
         private readonly Android.Media.MediaMetadataRetriever _retriever;
         private readonly object _retrieverLock = new object();
 #elif IOS || MACCATALYST
-        private readonly AVFoundation.AVUrlAsset _asset;
+        private readonly AVFoundation.AVAsset _asset;
         private readonly AVFoundation.AVAssetImageGenerator _generator;
 #elif WINDOWS
         private readonly Windows.Media.Editing.MediaComposition _composition;
@@ -49,7 +49,7 @@ namespace Emgu.LiteRT.LM.Maui
             _retriever = retriever;
         }
 #elif IOS || MACCATALYST
-        private VideoSource(string path, AVFoundation.AVUrlAsset asset)
+        private VideoSource(string path, AVFoundation.AVAsset asset)
         {
             _path = path;
             _asset = asset;
@@ -69,8 +69,8 @@ namespace Emgu.LiteRT.LM.Maui
         }
 #endif
 
-        /// <summary>Open a video file and read its length.</summary>
-        /// <param name="path">The file</param>
+        /// <summary>Open a video file (or, on Android, a content:// URI such as a MediaStore video's) and read its length.</summary>
+        /// <param name="path">The file, or a content:// URI on Android</param>
         /// <exception cref="PlatformNotSupportedException">Where <see cref="IsSupported"/> is false</exception>
         /// <exception cref="IOException">The file isn't a video this platform can read</exception>
         public static async Task<VideoSource> OpenAsync(string path)
@@ -81,7 +81,10 @@ namespace Emgu.LiteRT.LM.Maui
                 var retriever = new Android.Media.MediaMetadataRetriever();
                 try
                 {
-                    retriever.SetDataSource(path);
+                    if (IsContentUri(path))
+                        retriever.SetDataSource(Android.App.Application.Context, Android.Net.Uri.Parse(path));
+                    else
+                        retriever.SetDataSource(path);
                     if (retriever.ExtractMetadata(Android.Media.MetadataKey.HasVideo) != "yes")
                         throw new IOException("It has no video.");
                     var source = new VideoSource(path, retriever)
@@ -103,15 +106,7 @@ namespace Emgu.LiteRT.LM.Maui
                 }
             });
 #elif IOS || MACCATALYST
-            var asset = AVFoundation.AVUrlAsset.Create(Foundation.NSUrl.FromFilename(path));
-            await asset.LoadValuesTaskAsync(new[] { "duration", "tracks" });
-            if (asset.TracksWithMediaType(AVFoundation.AVMediaTypes.Video.GetConstant()).Length == 0)
-                throw new IOException("It has no video.");
-            return new VideoSource(path, asset)
-            {
-                DurationMs = (long)(asset.Duration.Seconds * 1000),
-                HasAudio = asset.TracksWithMediaType(AVFoundation.AVMediaTypes.Audio.GetConstant()).Length > 0
-            };
+            return await OpenAsync(AVFoundation.AVUrlAsset.Create(Foundation.NSUrl.FromFilename(path)), path);
 #elif WINDOWS
             try
             {
@@ -134,6 +129,26 @@ namespace Emgu.LiteRT.LM.Maui
             throw new PlatformNotSupportedException("Reading videos isn't supported on this platform.");
 #endif
         }
+
+#if ANDROID
+        private static bool IsContentUri(string path) => path != null && path.StartsWith("content://", StringComparison.OrdinalIgnoreCase);
+#elif IOS || MACCATALYST
+        /// <summary>Open a video the app already has as an AVAsset (e.g. from the Photos library) and read its length.</summary>
+        /// <param name="asset">The video</param>
+        /// <param name="name">What to call it in errors</param>
+        /// <exception cref="IOException">It has no video track</exception>
+        public static async Task<VideoSource> OpenAsync(AVFoundation.AVAsset asset, string name)
+        {
+            await asset.LoadValuesTaskAsync(new[] { "duration", "tracks" });
+            if (asset.TracksWithMediaType(AVFoundation.AVMediaTypes.Video.GetConstant()).Length == 0)
+                throw new IOException("It has no video.");
+            return new VideoSource(name, asset)
+            {
+                DurationMs = (long)(asset.Duration.Seconds * 1000),
+                HasAudio = asset.TracksWithMediaType(AVFoundation.AVMediaTypes.Audio.GetConstant()).Length > 0
+            };
+        }
+#endif
 
         /// <summary>The frame nearest a time (on Android the frame at that time, not its key frame, which can be seconds away; within about half a second elsewhere), as a JPEG at most maxSize pixels on its longer side; null if there's none.</summary>
         /// <param name="ms">The time, in milliseconds</param>
@@ -220,16 +235,17 @@ namespace Emgu.LiteRT.LM.Maui
         }
 
         /// <summary>
-        /// The whole sound track as 16 kHz mono samples (5 minutes are 9.6 MB), decoded off the UI thread; an empty array
+        /// The sound track as 16 kHz mono samples (5 minutes are 9.6 MB), decoded off the UI thread; an empty array
         /// without one.
         /// </summary>
         /// <param name="token">Stops it</param>
-        public Task<short[]> ReadAudioAsync(CancellationToken token = default)
+        /// <param name="untilMs">Stop reading after this time (on Android, iOS and Mac Catalyst), or 0 for the whole track</param>
+        public Task<short[]> ReadAudioAsync(CancellationToken token = default, long untilMs = 0)
         {
             if (!HasAudio)
                 return Task.FromResult(new short[0]);
 #if ANDROID || IOS || MACCATALYST
-            return Task.Run(() => DecodeAudio(token), token);
+            return Task.Run(() => DecodeAudio(token, untilMs > 0 ? untilMs : long.MaxValue), token);
 #elif WINDOWS
             return TranscodeAudioAsync(token);
 #else
@@ -240,14 +256,18 @@ namespace Emgu.LiteRT.LM.Maui
 #if ANDROID
         // The first audio track decoded with MediaCodec (16-bit PCM, any rate and channels), mixed to mono and averaged
         // down to 16 kHz.
-        private short[] DecodeAudio(CancellationToken token)
+        private short[] DecodeAudio(CancellationToken token, long untilMs)
         {
             var extractor = new Android.Media.MediaExtractor();
             Android.Media.MediaCodec codec = null;
-            var samples = new List<short>((int)Math.Min(int.MaxValue, DurationMs * SampleRate / 1000 + SampleRate));
+            long untilSamples = untilMs == long.MaxValue ? long.MaxValue : untilMs * SampleRate / 1000;
+            var samples = new List<short>((int)Math.Min(int.MaxValue, Math.Min(DurationMs, untilMs) * SampleRate / 1000 + SampleRate));
             try
             {
-                extractor.SetDataSource(_path);
+                if (IsContentUri(_path))
+                    extractor.SetDataSource(Android.App.Application.Context, Android.Net.Uri.Parse(_path), null);
+                else
+                    extractor.SetDataSource(_path);
                 int track = -1;
                 Android.Media.MediaFormat format = null;
                 for (int i = 0; i < extractor.TrackCount && track < 0; i++)
@@ -270,7 +290,7 @@ namespace Emgu.LiteRT.LM.Maui
                 var info = new Android.Media.MediaCodec.BufferInfo();
                 byte[] bytes = new byte[0];
                 bool inputDone = false, outputDone = false;
-                while (!outputDone)
+                while (!outputDone && samples.Count < untilSamples)
                 {
                     token.ThrowIfCancellationRequested();
                     if (!inputDone)
@@ -347,7 +367,7 @@ namespace Emgu.LiteRT.LM.Maui
         }
 #elif IOS || MACCATALYST
         // The first audio track read with AVAssetReader, which converts it to 16 kHz mono 16-bit PCM itself.
-        private short[] DecodeAudio(CancellationToken token)
+        private short[] DecodeAudio(CancellationToken token, long untilMs)
         {
             AVFoundation.AVAssetTrack track = _asset.TracksWithMediaType(AVFoundation.AVMediaTypes.Audio.GetConstant()).FirstOrDefault();
             if (track == null)
@@ -367,9 +387,11 @@ namespace Emgu.LiteRT.LM.Maui
             };
             using var output = new AVFoundation.AVAssetReaderTrackOutput(track, settings);
             reader.AddOutput(output);
+            if (untilMs != long.MaxValue)
+                reader.TimeRange = new CoreMedia.CMTimeRange { Start = CoreMedia.CMTime.Zero, Duration = CoreMedia.CMTime.FromSeconds(untilMs / 1000.0, 600) };
             if (!reader.StartReading())
                 throw new IOException("The video's sound couldn't be read: " + reader.Error?.LocalizedDescription);
-            var samples = new List<short>((int)Math.Min(int.MaxValue, DurationMs * SampleRate / 1000 + SampleRate));
+            var samples = new List<short>((int)Math.Min(int.MaxValue, Math.Min(DurationMs, untilMs) * SampleRate / 1000 + SampleRate));
             while (true)
             {
                 if (token.IsCancellationRequested)

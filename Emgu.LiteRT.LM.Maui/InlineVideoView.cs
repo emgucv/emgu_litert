@@ -126,7 +126,11 @@ namespace Emgu.LiteRT.LM.Maui
         {
             if (Video == null) return;
             if (string.IsNullOrEmpty(path)) { Video.StopPlayback(); return; }
-            Video.SetVideoPath(path);
+            // A file, or a library video's content:// URI (VideoLibrary).
+            if (path.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
+                Video.SetVideoURI(Android.Net.Uri.Parse(path));
+            else
+                Video.SetVideoPath(path);
         }
     }
 #elif IOS || MACCATALYST
@@ -179,17 +183,23 @@ namespace Emgu.LiteRT.LM.Maui
                 view.PlayerLayer.Player = null;
             if (string.IsNullOrEmpty(path))
                 return;
-            var asset = AVUrlAsset.Create(NSUrl.FromFilename(path));
-            try
+            // A file, or a Photos library video ("phasset:" + its id, from VideoLibrary).
+            AVAsset asset = path.StartsWith(VideoLibrary.PhotoKitPrefix, StringComparison.Ordinal)
+                ? await VideoLibrary.RequestAssetAsync(path)
+                : AVUrlAsset.Create(NSUrl.FromFilename(path));
+            if (asset != null)
             {
-                await asset.LoadValuesTaskAsync(new[] { "duration", "tracks" });
-            }
-            catch (Exception)
-            {
+                try
+                {
+                    await asset.LoadValuesTaskAsync(new[] { "duration", "tracks" });
+                }
+                catch (Exception)
+                {
+                }
             }
             if (loading != _loading)
                 return;
-            AVAssetTrack track = asset.TracksWithMediaType(AVMediaTypes.Video.GetConstant()).FirstOrDefault();
+            AVAssetTrack track = asset?.TracksWithMediaType(AVMediaTypes.Video.GetConstant()).FirstOrDefault();
             if (track == null)
             {
                 VirtualView?.RaiseFailed("The video couldn't be played.");

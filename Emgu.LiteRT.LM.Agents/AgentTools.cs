@@ -504,6 +504,22 @@ namespace Emgu.LiteRT.LM.Agents
                 "Finds the moments of the video the user attached that match a description - by what is seen or heard in them - and shows them to the user, who can play the video from each. Use it whenever the user asks when or where something happens in the video, or to find or show a part of it.");
         }
 
+        /// <summary>
+        /// find_videos: finds the user's own videos on the device that match a description (what is seen or heard in
+        /// them, and when they were taken) with a search the app provides, which shows them to the user.
+        /// </summary>
+        /// <param name="search">Searches the videos with the request in the user's words and returns what to tell the model</param>
+        public static AIFunction FindVideos(Func<string, CancellationToken, Task<string>> search)
+        {
+            if (search == null)
+                throw new ArgumentNullException("search");
+            return AIFunctionFactory.Create(
+                ([Description("What to look for, in the user's words, e.g. \"the video of the kids singing happy birthday\", \"clips of the dog at the beach last summer\"")] string request,
+                 CancellationToken cancellationToken) => search(request ?? string.Empty, cancellationToken),
+                "find_videos",
+                "Finds the user's own videos and clips saved on this device - by what is seen or heard in them and when they were taken - and shows them to the user, who can play each from its best moment. Use it whenever the user asks to find, show or play their videos, clips or recordings.");
+        }
+
         /// <summary>Open a visible live camera preview using the app's camera service.</summary>
         public static AIFunction OpenCamera(Func<CancellationToken, Task<string>> open)
         {
@@ -1026,6 +1042,7 @@ namespace Emgu.LiteRT.LM.Agents
                 case "find_photos": return "Looking for \u201C" + Argument("request") + "\u201D";
                 case "search_chats": return "Searching past chats for \u201C" + Argument("request") + "\u201D";
                 case "find_video_moment": return "Searching the video for \u201C" + Argument("request") + "\u201D";
+                case "find_videos": return "Looking for videos of \u201C" + Argument("request") + "\u201D";
                 case "search_documents": return "Searching your documents for “" + Argument("request") + "”";
                 case "search_places":
                     string area = Argument("near");

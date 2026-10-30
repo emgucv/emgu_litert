@@ -41,6 +41,12 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>What the past chats' search index takes, roughly.</summary>
         Task<long> GetChatIndexBytesAsync();
 
+        /// <summary>What "Search my videos"' index takes, roughly.</summary>
+        Task<long> GetVideoIndexBytesAsync();
+
+        /// <summary>Delete "Search my videos"' index.</summary>
+        Task ClearVideoIndexAsync();
+
         /// <summary>Delete a document and detach it from the chats that had it (their text and saved excerpts stay).</summary>
         /// <param name="id">The document's id</param>
         Task DeleteDocumentAsync(string id);

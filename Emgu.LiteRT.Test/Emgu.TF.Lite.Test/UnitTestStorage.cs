@@ -79,6 +79,8 @@ namespace Emgu.TF.Lite.Test
             await _store.SaveDocumentAsync(new DocumentRecord { Id = "d1", Name = "report.pdf" }, new[] {
                 new DocumentItemRecord { DocumentId = "d1", Text = "Saved document", Data = new byte[60], Embedding = new byte[80] } });
             await _store.SavePhotoEmbeddingAsync(new PhotoEmbeddingRecord { PhotoId = "p1", Embedding = new byte[100] });
+            await _store.SaveVideoAsync(new ChatVideoEntry { VideoId = "v1", Thumbnail = new byte[50] },
+                new[] { new ChatVideoWindow { VideoId = "v1", Embedding = new byte[120] }, new ChatVideoWindow { VideoId = "v1", StartMs = 10000, Embedding = new byte[120] } });
             await _store.SaveChatEmbeddingsAsync((await _store.GetMessagesAsync<ChatMessageRecord>(chat))[0].Id,
                 new List<ChatSearchPassage> { new ChatSearchPassage { Id = "e1", MessageId = (await _store.GetMessagesAsync<ChatMessageRecord>(chat))[0].Id, Text = "excerpt", Embedding = new byte[80] } });
             var snapshot = await _catalog.ReadAsync();
@@ -86,6 +88,7 @@ namespace Emgu.TF.Lite.Test
             Assert.That(snapshot.DiskBytes, Is.EqualTo(database + 100 + 50 + 200 + 30 + 40));
             Assert.That(snapshot.Entries.Single(e => e.Kind == StorageKind.Document).Bytes, Is.GreaterThanOrEqualTo(140));
             Assert.That(snapshot.Entries.Single(e => e.Kind == StorageKind.PhotoIndex).Bytes, Is.GreaterThanOrEqualTo(100));
+            Assert.That(snapshot.Entries.Single(e => e.Kind == StorageKind.VideoIndex).Bytes, Is.GreaterThanOrEqualTo(290));
             Assert.That(snapshot.Entries.Single(e => e.Kind == StorageKind.ChatIndex).Bytes, Is.GreaterThanOrEqualTo(80));
             Assert.That(snapshot.Entries.Single(e => e.Key == "embedding-b.litertlm").CanDownload, Is.True);
             Assert.That(snapshot.Entries.Any(e => e.Key == "old.litertlm"), Is.True);
@@ -135,12 +138,15 @@ namespace Emgu.TF.Lite.Test
             int chat = await _store.CreateChatAsync("Keep", "ChatA");
             int message = await _store.AddMessageAsync(chat, ChatMessageRecord.UserRole, "Keep text", null);
             await _store.SavePhotoEmbeddingAsync(new PhotoEmbeddingRecord { PhotoId = "p", Embedding = new byte[64] });
+            await _store.SaveVideoAsync(new ChatVideoEntry { VideoId = "v" }, new[] { new ChatVideoWindow { VideoId = "v", Embedding = new byte[64] } });
             await _store.SaveChatEmbeddingsAsync(message, new List<ChatSearchPassage> {
                 new ChatSearchPassage { Id = "e", MessageId = message, Text = "Keep text", Embedding = new byte[64] } });
-            foreach (StorageKind kind in new[] { StorageKind.PhotoIndex, StorageKind.ChatIndex })
+            foreach (StorageKind kind in new[] { StorageKind.PhotoIndex, StorageKind.ChatIndex, StorageKind.VideoIndex })
                 await _catalog.DeleteAsync((await _catalog.ReadAsync()).Entries.Single(e => e.Kind == kind));
             Assert.That(await _store.GetPhotoEmbeddingsAsync(), Is.Empty);
             Assert.That(await _store.GetChatEmbeddingsAsync(), Is.Empty);
+            Assert.That(await _store.GetVideoEntriesAsync(), Is.Empty);
+            Assert.That(await _store.GetVideoWindowsAsync(), Is.Empty);
             Assert.That(await _store.GetMessagesAsync<ChatMessageRecord>(chat), Has.Count.EqualTo(1));
             FileWithSize(Path.Combine(_image, "host", "weights.bin"), 20);
             FileWithSize(Path.Combine(_image, "cache", "compiled.xnnpack_cache"), 30);

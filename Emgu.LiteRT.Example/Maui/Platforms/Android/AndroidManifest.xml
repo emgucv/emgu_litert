@@ -29,6 +29,8 @@
 	     device): READ_MEDIA_IMAGES on Android 13+, READ_MEDIA_VISUAL_USER_SELECTED when the user allows only some photos
 	     (Android 14+), READ_EXTERNAL_STORAGE before Android 13 -->
 	<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+	<!-- "Search my videos" (find_videos indexes the newest videos on the device): READ_MEDIA_VIDEO on Android 13+ -->
+	<uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 	<uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
 	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 	<!-- Photo search: where photos were taken (Android 10+ removes their GPS position for apps without it). Optional. -->

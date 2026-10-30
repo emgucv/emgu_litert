@@ -114,6 +114,18 @@ namespace Emgu.LiteRT.LM.Models
         public int OverlapMs { get; set; }
 
         /// <summary>
+        /// How far apart windows start, in milliseconds; 0 (the default) for <see cref="WindowMs"/> minus
+        /// <see cref="OverlapMs"/>. Longer than the window to index a video sparsely, e.g. a 2 s window every 10 s to
+        /// search a whole video library.
+        /// </summary>
+        public int StrideMs { get; set; }
+
+        /// <summary>
+        /// The most windows indexed, from the start of the video; 0 (the default) for all.
+        /// </summary>
+        public int MaxWindows { get; set; }
+
+        /// <summary>
         /// Whether to embed the sound with the frames, when the model embeds audio and the app gives it: true by default
         /// </summary>
         public bool IncludeAudio { get; set; } = true;
@@ -207,7 +219,8 @@ namespace Emgu.LiteRT.LM.Models
             if (!model.SupportsImages)
                 throw new NotSupportedException(String.Format("{0} can't embed images", model.GetType().Name));
             _windows.Clear();
-            _windows.AddRange(Split(durationMs, WindowMs, FramesPerWindow, OverlapMs));
+            List<VideoWindow> split = Split(durationMs, WindowMs, FramesPerWindow, OverlapMs, StrideMs);
+            _windows.AddRange(MaxWindows > 0 && split.Count > MaxWindows ? split.GetRange(0, MaxWindows) : split);
             DurationMs = durationMs;
             float sliceSeconds = WindowMs / 1000f / Math.Max(1, FramesPerWindow);
             WithAudio = IncludeAudio && audioBetween != null && model.SupportsAudio
@@ -336,16 +349,17 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         /// <summary>
-        /// Cut a video into windows of windowMs, each overlapping the one before by overlapMs (at least a second apart),
-        /// with framesPerWindow frame times spread from its start to its end (the middle for one frame). The last
-        /// window ends with the video.
+        /// Cut a video into windows of windowMs, each overlapping the one before by overlapMs (at least a second apart) -
+        /// or, with strideMs, starting strideMs apart (sparse windows when it is longer than the window) - with
+        /// framesPerWindow frame times spread from its start to its end (the middle for one frame). The last window
+        /// ends with the video.
         /// </summary>
-        public static List<VideoWindow> Split(long durationMs, int windowMs = 2000, int framesPerWindow = 2, int overlapMs = 0)
+        public static List<VideoWindow> Split(long durationMs, int windowMs = 2000, int framesPerWindow = 2, int overlapMs = 0, int strideMs = 0)
         {
             if (windowMs <= 0) throw new ArgumentOutOfRangeException(nameof(windowMs));
             if (framesPerWindow <= 0) throw new ArgumentOutOfRangeException(nameof(framesPerWindow));
             List<VideoWindow> windows = new List<VideoWindow>();
-            long step = Math.Max(1000L, windowMs - (long)overlapMs);
+            long step = Math.Max(1000L, strideMs > 0 ? strideMs : windowMs - (long)overlapMs);
             for (long start = 0; start < durationMs; start += step)
             {
                 long end = Math.Min(start + windowMs, durationMs);
@@ -427,7 +441,8 @@ namespace Emgu.LiteRT.LM.Models
             }
         }
 
-        private const int FileVersion = 1;
+        // 2 added StrideMs and MaxWindows.
+        private const int FileVersion = 2;
 
         /// <summary>
         /// Save the index (its settings, windows and embeddings), to search the video again without indexing it.
@@ -442,6 +457,8 @@ namespace Emgu.LiteRT.LM.Models
                 writer.Write(WindowMs);
                 writer.Write(FramesPerWindow);
                 writer.Write(OverlapMs);
+                writer.Write(StrideMs);
+                writer.Write(MaxWindows);
                 writer.Write(VisionTokensPerFrame);
                 writer.Write(WithAudio);
                 writer.Write(_windows.Count);
@@ -470,17 +487,22 @@ namespace Emgu.LiteRT.LM.Models
                 if (Encoding.ASCII.GetString(reader.ReadBytes(4)) != "EVMI")
                     throw new InvalidDataException("Not a video moment index");
                 int version = reader.ReadInt32();
-                if (version != FileVersion)
+                if (version < 1 || version > FileVersion)
                     throw new InvalidDataException(String.Format("Unknown video moment index version {0}", version));
                 VideoMomentIndex index = new VideoMomentIndex
                 {
                     DurationMs = reader.ReadInt64(),
                     WindowMs = reader.ReadInt32(),
                     FramesPerWindow = reader.ReadInt32(),
-                    OverlapMs = reader.ReadInt32(),
-                    VisionTokensPerFrame = reader.ReadInt32(),
-                    WithAudio = reader.ReadBoolean()
+                    OverlapMs = reader.ReadInt32()
                 };
+                if (version >= 2)
+                {
+                    index.StrideMs = reader.ReadInt32();
+                    index.MaxWindows = reader.ReadInt32();
+                }
+                index.VisionTokensPerFrame = reader.ReadInt32();
+                index.WithAudio = reader.ReadBoolean();
                 int count = reader.ReadInt32();
                 for (int i = 0; i < count; i++)
                 {
