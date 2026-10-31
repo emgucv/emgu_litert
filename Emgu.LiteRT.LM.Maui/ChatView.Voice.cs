@@ -223,7 +223,9 @@ namespace Emgu.LiteRT.LM.Maui
                 SetStatus("Writing down what you said...");
                 try
                 {
-                    words = (await SpeechRecognizer.TranscribeAsync(wav))?.Trim();
+                    // Parakeet tells the words as it goes, and its download or loading the first time.
+                    words = (await SpeechRecognizer.TranscribeAsync(wav, new Progress<string>(text => SetStatus("Writing down: " + text)),
+                        new Progress<string>(SetStatus), CancellationToken.None))?.Trim();
                 }
                 catch (Exception ex)
                 {

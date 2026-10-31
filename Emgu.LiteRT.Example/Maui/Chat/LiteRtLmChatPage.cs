@@ -224,7 +224,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         // conversation memory and developer mode.
         foreach (ChatFeature feature in new ChatFeature[]
         {
-            new VoiceLanguageFeature(),
+            new SpeechEngineFeature(), new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new PlacesFeature(), new ClipboardFeature(),
             parts.Camera, parts.PhotoEffects, parts.Claude, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
@@ -280,7 +280,7 @@ public sealed class LiteRtLmChatPage : ChatPage
     }
 
     // What the storage page lists: the catalog's models, the two search models (downloadable again from the page), the
-    // image model's folder, the searched videos' folder, and the store's documents, indexes and attachments.
+    // speech model, the image model's folder, the searched videos' folder, and the store's documents, indexes and attachments.
     private static StorageCatalog CreateStorageCatalog()
     {
         IList<ChatModelOption> catalog = ChatModelCatalog.For(ChatDevicePlatform.Current);
@@ -289,6 +289,11 @@ public sealed class LiteRtLmChatPage : ChatPage
         using var multimodal = new EmbeddingGemma2Multimodal();
         models.Add(new StorageModel("EmbeddingGemma 2 Text Vision 440M", System.IO.Path.GetFileName(vision.DefaultModelFile.LocalFile), isSearch: true) { Download = vision.DefaultModelFile });
         models.Add(new StorageModel("EmbeddingGemma 2 Multimodal 740M", System.IO.Path.GetFileName(multimodal.DefaultModelFile.LocalFile), isSearch: true) { Download = multimodal.DefaultModelFile });
+        ParakeetSpeech speech = ParakeetSpeech.Default;
+        if (ParakeetSpeech.IsAvailable)
+            models.Add(StorageModel.Speech(ParakeetSpeech.Name, System.IO.Path.GetFileName(speech.ModelFile.LocalFile),
+                new[] { System.IO.Path.GetFileName(speech.TokenizerFile.LocalFile) },
+                "Speech recognition model and its tokenizer. Deleting goes back to the device's speech recognizer."));
         using var image = new ZImageTurbo();
         return new StorageCatalog(SharedStore, System.IO.Path.GetDirectoryName(catalog[0].ModelFile.LocalFile), ExportFeature.ExportFolder, models,
             new[]

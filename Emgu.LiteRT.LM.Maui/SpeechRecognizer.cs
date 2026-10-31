@@ -10,7 +10,8 @@ namespace Emgu.LiteRT.LM.Maui
     /// Turns a voice recording (<see cref="VoiceRecorder"/>'s 16 kHz mono WAV) into text with the platform's speech
     /// recognizer - on the device where it can be - so models that don't take audio (a server's model, small text models)
     /// can be talked to: Android's SpeechRecognizer fed the recording (Android 13+), and Apple's Speech framework on iOS
-    /// and Mac Catalyst. Not on Windows.
+    /// and Mac Catalyst. Or with NVIDIA's Parakeet on the device (<see cref="ParakeetSpeech"/>) when it is the
+    /// <see cref="Engine"/> and has the language (<see cref="SpeechEngines.Choose"/>) - the only one on Windows.
     /// <para>
     /// iOS and Mac Catalyst ask the user the first time, which needs <c>NSSpeechRecognitionUsageDescription</c> in
     /// Info.plist. On Android the on-device recognizer is used when it has the language; otherwise the normal one, which
@@ -36,8 +37,21 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>The language recognized: <see cref="Language"/>, else the device's, as a plain language-region tag.</summary>
         public static string LanguageTag => VoiceLanguages.Resolve(Language, System.Globalization.CultureInfo.CurrentUICulture.Name);
 
-        /// <summary>True if this device can write down a recording (Android 13+ with a recognizer, iOS, Mac Catalyst).</summary>
-        public static bool IsSupported
+        /// <summary>
+        /// What writes down recordings when it can (<see cref="SpeechEngines.Choose"/>): the setting
+        /// (<see cref="SpeechEngines.SettingKey"/>); by default the platform's recognizer, or Parakeet where there is none.
+        /// </summary>
+        public static SpeechEngine Engine { get; set; } = SpeechEngines.Parse(null, SystemSupported);
+
+        /// <summary>True if this device can write down a recording: with its own recognizer, or with Parakeet.</summary>
+        public static bool IsSupported => SystemSupported || ParakeetSpeech.IsAvailable;
+
+        /// <summary>What writes down the next recording, or null when nothing can (Parakeet doesn't have the language and there's no other).</summary>
+        public static SpeechEngine? CurrentEngine =>
+            SpeechEngines.Choose(Engine, SystemSupported, ParakeetSpeech.IsAvailable, Language, System.Globalization.CultureInfo.CurrentUICulture.Name);
+
+        /// <summary>True if the platform's own recognizer can write down a recording (Android 13+ with a recognizer, iOS, Mac Catalyst).</summary>
+        public static bool SystemSupported
         {
             get
             {
@@ -63,7 +77,58 @@ namespace Emgu.LiteRT.LM.Maui
         /// <param name="token">Stops recognizing</param>
         /// <exception cref="PlatformNotSupportedException">Where <see cref="IsSupported"/> is false</exception>
         /// <exception cref="InvalidOperationException">The language can't be recognized, or recognition failed</exception>
-        public static async Task<string> TranscribeAsync(byte[] wav, CancellationToken token = default)
+        public static Task<string> TranscribeAsync(byte[] wav, CancellationToken token = default) => TranscribeAsync(wav, null, null, token);
+
+        /// <summary>
+        /// The words in the recording, or an empty string if none were recognised; with Parakeet, the text so far as it goes.
+        /// </summary>
+        /// <param name="wav">A 16 kHz mono 16-bit WAV recording, as <see cref="VoiceRecorder.StopAsync"/> returns</param>
+        /// <param name="partial">Told the text so far (Parakeet, every 5 s of the recording), or null</param>
+        /// <param name="stage">Told Parakeet's download and loading, or null</param>
+        /// <param name="token">Stops recognizing</param>
+        public static async Task<string> TranscribeAsync(byte[] wav, IProgress<string> partial, IProgress<string> stage, CancellationToken token)
+        {
+            if (UseParakeet())
+            {
+                float[] samples = SpeechEngines.WavSamples(wav, out int rate);
+                return await ParakeetSpeech.Default.TranscribeAsync(samples, rate, partial, stage, token);
+            }
+            return await TranscribeSystemAsync(wav, token);
+        }
+
+        /// <summary>
+        /// The words in some audio (a meeting's piece), or an empty string if none were recognised; with Parakeet, the
+        /// text so far as it goes.
+        /// </summary>
+        /// <param name="samples">Mono samples in [-1, 1]</param>
+        /// <param name="sampleRate">Their sample rate</param>
+        /// <param name="partial">Told the text so far (Parakeet, every 5 s of the audio), or null</param>
+        /// <param name="stage">Told Parakeet's download and loading, or null</param>
+        /// <param name="token">Stops recognizing</param>
+        public static async Task<string> TranscribeAsync(float[] samples, int sampleRate, IProgress<string> partial, IProgress<string> stage, CancellationToken token)
+        {
+            if (UseParakeet())
+                return await ParakeetSpeech.Default.TranscribeAsync(samples, sampleRate, partial, stage, token);
+            return await TranscribeSystemAsync(new Emgu.LiteRT.LM.Agents.MeetingAudioChunk(TimeSpan.Zero, samples, sampleRate).ToWav(), token);
+        }
+
+        // Parakeet when it is the engine for this language; while it still downloads, the platform's recognizer writes down
+        // the recording when there is one (the download goes on), else it waits for Parakeet.
+        private static bool UseParakeet()
+        {
+            SpeechEngine? engine = CurrentEngine;
+            if (engine == null)
+                throw new InvalidOperationException("Parakeet, the speech recognizer here, doesn't know " + VoiceLanguages.NameOf(LanguageTag) + "." + Hint);
+            if (engine != SpeechEngine.Parakeet)
+                return false;
+            if (ParakeetSpeech.Default.IsDownloaded || ParakeetSpeech.Default.IsLoaded || !SystemSupported)
+                return true;
+            _ = ParakeetSpeech.Default.EnsureAsync(null, CancellationToken.None).ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            return false;
+        }
+
+        // The platform's recognizer.
+        private static async Task<string> TranscribeSystemAsync(byte[] wav, CancellationToken token)
         {
 #if ANDROID
             if (!OperatingSystem.IsAndroidVersionAtLeast(33))

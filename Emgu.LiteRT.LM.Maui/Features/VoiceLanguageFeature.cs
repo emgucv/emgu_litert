@@ -62,7 +62,7 @@ public sealed class VoiceLanguageFeature : ChatFeature
             {
                 title,
                 picker,
-                ChatPage.Note("The language of your voice messages, for the speech recognizer that writes them down - the words models that can't hear audio (Qwen, your own server) are given, and the transcript under a voice message. By default it listens in the device's language, so choose yours when it differs. The phone may need to download that language for offline use.")
+                ChatPage.Note("The language of your voice messages, for the speech recognizer that writes them down - the words models that can't hear audio (Qwen, your own server) are given, and the transcript under a voice message. By default it listens in the device's language, so choose yours when it differs. The phone may need to download that language for offline use. Parakeet (Settings > Speech recognition) finds the language itself; this decides when another language goes to the device's recognizer instead.")
             }
         };
     }

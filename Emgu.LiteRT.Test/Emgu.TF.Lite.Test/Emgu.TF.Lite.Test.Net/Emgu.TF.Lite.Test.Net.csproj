@@ -49,6 +49,7 @@
     <Compile Include="..\UnitTestSpeechToText.cs" Link="UnitTestSpeechToText.cs" />
     <Compile Include="..\UnitTestSearchFirstGate.cs" Link="UnitTestSearchFirstGate.cs" />
     <Compile Include="..\UnitTestVideoLibrary.cs" Link="UnitTestVideoLibrary.cs" />
+    <Compile Include="..\UnitTestSpeechEngines.cs" Link="UnitTestSpeechEngines.cs" />
     <Compile Include="..\UnitTestHandTracker.cs" Link="UnitTestHandTracker.cs" />
     <Compile Include="..\UnitTestPoseTracker.cs" Link="UnitTestPoseTracker.cs" />
     <Compile Include="..\UnitTestFaceTracker.cs" Link="UnitTestFaceTracker.cs" />

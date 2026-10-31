@@ -192,6 +192,13 @@ def curated():
         "following pyannote's speaker-diarization-3.1 recipe (MIT, Copyright (c) 2020 CNRS); the clustering threshold is pyannote's.",
         copyright="WeSpeaker authors; pyannote (Hervé Bredin)", url="https://github.com/wenet-e2e/wespeaker",
         used_for="Meeting notes: telling speakers apart by voice; LiteRT conversion: " + hf + "litert-community/Speaker-Diarization-LiteRT")
+    add(model, "Parakeet-TDT-0.6B-v3", "CC BY 4.0",
+        "The speech recognition weights are NVIDIA's Parakeet-TDT-0.6B-v3 (https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3),\n"
+        "licensed under the Creative Commons Attribution 4.0 License: https://creativecommons.org/licenses/by/4.0/\n\n"
+        "Converted to LiteRT (int8) by litert-community; the tokenizer is NVIDIA's.",
+        copyright="NVIDIA Corporation", url=hf + "nvidia/parakeet-tdt-0.6b-v3",
+        used_for="Speech recognition on the device (Settings > Speech recognition): voice messages, the voice chat and meeting notes; "
+        "LiteRT conversion: " + hf + "litert-community/parakeet-tdt-0.6b-v3")
     add(model, "MobileNet, Inception and COCO SSD MobileNet", "Apache-2.0", APACHE, copyright="The TensorFlow Authors",
         url="https://github.com/tensorflow/models", used_for="Image classification and object detection demos")
 

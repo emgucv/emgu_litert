@@ -510,8 +510,9 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 - **Checked** with four synthetic 30 s clips made from the test pictures (a dog; the space shuttle with "have a wonderful day" spoken at 10 s; surfers then tulips; Grace Hopper with LiteRT-LM's spoken question), EmbeddingGemma 2 Multimodal 740M, a temporary self-test, 2026-10-30:
   - iOS simulator (iPhone Duo, iOS 27.1; the clips added with `simctl addmedia`): indexed in 12 s; searches 120-170 ms. "find the video of my dog", "a space shuttle", "the clip where someone says have a wonderful day" (the shuttle clip, at 00:10, by its sound), "tulip flowers" (00:20), "people surfing", "a woman in a military uniform" each showed only their clip; "a cat playing the piano" nothing. The sheet played the Photos video; "Find the exact moment" exported it in 0.3 s, watched it in 18.9 s and found "have a wonderful day" at 00:10-00:12.
   - Galaxy S10 (the clips pushed to Movies/EmguTest and media-scanned, "Videos to index" 4): about 31 s per clip (a minute of work per minute of video), the notification as above; a search during indexing took 1.8 s; the same seven results, 1.4-2.4 s each (two wordings and the moment's frame); playback from the content URI; "Find the exact moment" in 0.6 s, watched in 193 s, 00:10-00:12.
+  - Pixel Fold (Android 17, the same setup with `READ_MEDIA_VIDEO` granted, on battery, photo search on too): about 18 s per clip, 77 s for the four; a search during indexing took 1.5 s (with only one clip indexed, not the dog's, so nothing was shown, as it should be); the same seven results, 1.2-1.9 s each - the dog, the shuttle and Grace Hopper at 00:00 rather than later (their windows score alike: each clip shows one still picture); "Find the exact moment" attached in 0.2 s, watched in 135 s (no index yet, unlike the S10), 00:10-00:12.
   - Before the two wordings, "a woman in a military uniform" missed: the photo parser made it "woman military uniform", 0.022-0.033 above the baseline, against 0.053-0.064 as said.
-- **Not checked yet:** a real library (the thresholds come from four synthetic clips), Mac Catalyst (it would read the Mac's Photos library), Windows (not compiled here), the Z Fold 3 and Pixel Fold, iCloud-only videos, and a video edited after indexing.
+- **Not checked yet:** a real library (the thresholds come from four synthetic clips), Mac Catalyst (it would read the Mac's Photos library), Windows (not compiled here), the Z Fold 3, iCloud-only videos, and a video edited after indexing.
 
 ## Image generation
 
@@ -706,6 +707,26 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   (`CheckRecognitionSupport`; the on-device recognizer lists only installed languages, Mandarin as `cmn-Hans-CN`), requests the
   language pack, and falls back to the normal recognizer meanwhile. Verified on a Pixel Fold with Chinese and Japanese
   recordings.
+
+## Speech recognition with Parakeet
+
+Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31; `SpeechEngines` in `Emgu.LiteRT.LM.Chat`, `ParakeetSpeech` in `Emgu.LiteRT.LM.Maui`) chooses what writes down voice messages, the voice chat's words for models that can't hear, and meetings: the device's recognizer, or NVIDIA's Parakeet-TDT-0.6B-v3 on the device (`Emgu.LiteRT.LM.Models`' `ParakeetTdt06BV3`; see `docs/litert-lm.md`, "Speech recognition").
+- **Choosing** (`SpeechEngines.Choose`): Parakeet when it is chosen, or when there is no recognizer of the device's (Android before 13, Windows), and it has the language spoken - the Voice language, else the device's. It has 25 European languages and finds which is spoken; for the others (Chinese, Japanese...) the device's recognizer writes the recording down, and without one the error says to choose another language. By default the device's recognizer where there is one (no surprise download), else Parakeet. The section is shown where `libasrextern` is in the app (`AsrInvoke.IsAvailable`: Android arm64, iOS, Mac Catalyst; not Windows or Android's x86_64 emulator yet).
+- **Downloading and loading** (`ParakeetSpeech`): choosing it downloads the model (614 MB) and its tokenizer through `BackgroundDownloads`, with the progress in the section; a voice message before that goes to the device's recognizer while the download goes on (with no other recognizer it waits for it). It loads on the CPU (`CpuThreadSettings.Count` threads), writes down one recording at a time, and is freed 2 minutes after its last one, except during a meeting (`KeepLoaded`). The section credits NVIDIA (CC-BY-4.0, linking the model card), and so do About > Open-source licences. Storage lists "Parakeet-TDT-0.6B-v3" (the model and tokenizer, `StorageKind.SpeechModel`); deleting it frees the model and goes back to the device's recognizer.
+- **Live text:** Parakeet reports its text every 5 s window. A voice message in Text mode shows "Writing down: ..." in the status; a meeting cuts 15-28 s pieces (the model's, not the recognizer's 30-50 s) and the card shows the piece being written down after the transcript so far.
+- **Checked** with the synthetic meeting's ten turns (macOS voices, clean and with room noise at about 15 dB SNR), English and French clips, and the whole 56 s meeting cut by `MeetingAudioChunker`, in a temporary self-test (2026-10-31):
+
+  | | Load | Voice messages (160 s) | Clean | Room noise | Meeting (56 s, 3 pieces) |
+  |---|---|---|---|---|---|
+  | Mac Catalyst | 3.9 s | 9.7 s (16x real time) | 0% WER | 15.2% | 3.5 s |
+  | Galaxy S10 (Android 12) | 11.1 s | 61.6 s (2.6x) | 0% | 15.8% | 24.0 s |
+  | iOS simulator | 15.6 s with the download | 10.0 s | | | 3.8 s |
+
+  - Against the same turns: Apple's recognizer on the Mac 0.6% clean / 5.7% with noise, Google's on a Pixel Fold 3.2% / 4.4% at 0.9x real time, Gemma 4 E2B 0% / 2.5%. Parakeet is the fastest on a phone and perfect on clean speech, but worse in noise: it misheard words ("the new hour", "the frame right there") and in one noisy turn made up a phrase - so the device's recognizer stays the default where there is one.
+  - The S10 has no recognizer of its own (Android 12), so Parakeet is its only one: voice messages in Text mode and meeting notes now work there.
+  - English and French were recognised without a language setting; Japanese went to the device's recognizer (none on the S10: the error); each meeting piece showed 5-7 partial texts; the model was freed after its idle time.
+  - The iOS simulator downloaded both files through `BackgroundDownloads` (the only run that downloaded; the Mac's and S10's were already there).
+- **Not checked yet:** a recording from a real microphone, a meeting through the card (the self-test fed the pieces itself), deleting the model on the Storage page in the app (only `StorageCatalog`'s test), memory with Gemma 4 E2B loaded beside Parakeet on a phone, the Pixel Fold and Z Fold 3, and Windows (`libasrextern` isn't built for it).
 
 ## Task mode
 
@@ -929,7 +950,7 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 
 - `record_meeting` (in the `write_document` tool group, so it adds no stub; `Emgu.LiteRT.LM.Agents`' `MeetingNotes.cs`; since
   2026-10-26 the library's `MeetingFeature` and `WrittenDocumentsFeature` in `Emgu.LiteRT.LM.Maui`, which the demo wires to its
-  camera feature's foreground service and its document attaching) works on Android 13+, iOS and Mac Catalyst - wherever `SpeechRecognizer` works. The call lasts
+  camera feature's foreground service and its document attaching) works on Android 13+, iOS and Mac Catalyst - wherever `SpeechRecognizer` works, and on older Android with Parakeet (see "Speech recognition with Parakeet"). The call lasts
   as long as the recording.
 - Recording: `Emgu.LiteRT.LM.Maui`'s `MicrophoneSoundSource` (through `MicrophoneGate`, so the sound monitors pause) feeds `MeetingAudioChunker`, which
   cuts 30-50 s pieces at the quietest 200 ms. Each piece is written down by the platform's speech recognizer while the

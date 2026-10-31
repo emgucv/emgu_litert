@@ -682,14 +682,15 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
   - the GPU (the embedding GPU crash);
   - several videos in one chat;
   - telling "no moment matches" apart from a weak best match (photo search's lift against a baseline).
-- [ ] On-device speech recognition with Parakeet-TDT-0.6B-v3 (`Emgu.LiteRT.LM.Models`' `ParakeetTdt06BV3`, wrapped 2026-10-30; see `docs/litert-lm.md`, "Speech recognition"). The model works on the Mac (real-time factor 0.07-0.10) and a Galaxy S10 (0.37-0.46), but the app doesn't use it yet:
-  - let `SpeechRecognizer.TranscribeAsync` (voice messages, voice chat) and `MeetingTranscription.Choose` use it - a setting ("System" / "On-device Parakeet"), and the only choice on Windows, which has no recognizer today;
-  - the 614 MB download, its storage row, and the CC-BY-4.0 credit to NVIDIA in the app;
-  - live partial text while speaking (`AsrSession`), and the languages it doesn't have (Chinese, Japanese...: the platform recognizer, or Qwen3-ASR later);
-  - check the Windows and Ubuntu builds of `libasrextern` (macOS, Android and the iOS simulator work).
-- [ ] Search my videos (`VideoSearchFeature`, 2026-10-30; see FEATURES.md, "Search my videos"). Checked in the iOS simulator and on a Galaxy S10 with four synthetic clips. Still to check:
+- [ ] Speech recognition with Parakeet (Settings > Speech recognition, `SpeechEngineFeature`, 2026-10-31; see FEATURES.md, "Speech recognition with Parakeet"). Voice messages, the voice chat and meetings use it when chosen, or where the device has no recognizer (the Galaxy S10's Android 12); checked on Mac Catalyst, the S10 and the iOS simulator with synthetic speech. Still to do:
+  - noise: 15-16% of words wrong with room noise (Apple's recognizer 5.7%, Google's 4.4%), and one made-up phrase - try a noise filter first, or say in the setting that it is for quiet rooms;
+  - a real microphone, a meeting through the card, deleting the model on the Storage page, memory beside Gemma 4 E2B on a phone, the Pixel Fold and Z Fold 3;
+  - Windows and Ubuntu builds of `libasrextern` (then Parakeet is Windows' only recognizer; the code is there);
+  - text while speaking: `AsrSession` fed from the microphone as it records, instead of after the recording;
+  - the languages Parakeet doesn't have (Chinese, Japanese...) go to the device's recognizer: Qwen3-ASR later.
+- [ ] Search my videos (`VideoSearchFeature`, 2026-10-30; see FEATURES.md, "Search my videos"). Checked in the iOS simulator, on a Galaxy S10 and on the Pixel Fold with four synthetic clips. Still to check:
   - a real library: the thresholds (lift 0.02 over "a video") come from four synthetic clips; videos with talking, music, dark or busy scenes;
-  - Mac Catalyst (with the user's OK: it reads the Mac's Photos library), Windows (not compiled here), the Z Fold 3 / Pixel Fold;
+  - Mac Catalyst (with the user's OK: it reads the Mac's Photos library), Windows (not compiled here), the Z Fold 3;
   - many videos: the in-memory index (60 windows x 768 floats per video), the first pass's time, and the "Videos to index" defaults;
   - iCloud-only videos (skipped) and edited ones.
 

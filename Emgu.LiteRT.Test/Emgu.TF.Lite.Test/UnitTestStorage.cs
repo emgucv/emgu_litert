@@ -67,6 +67,30 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
+        public async Task SpeechModelIsOneRowWithItsTokenizerAndDeletesBoth()
+        {
+            var catalog = new StorageCatalog(_store, _models, _exports, new[]
+            {
+                new StorageModel("Chat A", "a.litertlm"),
+                StorageModel.Speech("Parakeet", "speech.tflite", new[] { "speech_tokenizer.json" }, "Speech model.")
+            });
+            string[] owned = { "speech.tflite", "speech.tflite.sha256ok", "speech.tflite.part", "speech_tokenizer.json", "speech_tokenizer.json.sha256ok" };
+            string[] unrelated = { "a.litertlm", "other.tflite", "tokenizer.json" };
+            foreach (string file in owned.Concat(unrelated)) FileWithSize(Path.Combine(_models, file), 10);
+            StorageSnapshot snapshot = await catalog.ReadAsync();
+            StorageEntry speech = snapshot.Entries.Single(e => e.Kind == StorageKind.SpeechModel);
+            Assert.That((speech.Key, speech.Name, speech.Bytes, speech.Detail), Is.EqualTo(("speech.tflite", "Parakeet", owned.Length * 10L, "Speech model.")));
+            // Not also listed as a chat model.
+            Assert.That(snapshot.Entries.Count(e => e.Key == "speech.tflite"), Is.EqualTo(1));
+            await catalog.DeleteAsync(speech);
+            foreach (string file in owned) Assert.That(File.Exists(Path.Combine(_models, file)), Is.False, file);
+            foreach (string file in unrelated) Assert.That(File.Exists(Path.Combine(_models, file)), Is.True, file);
+            // Only a speech model's own files: a chat model's row can't delete a .tflite.
+            Assert.ThrowsAsync<InvalidOperationException>(() => catalog.DeleteAsync(new StorageEntry { Kind = StorageKind.ChatModel, Key = "other.tflite" }));
+            Assert.ThrowsAsync<InvalidOperationException>(() => catalog.DeleteAsync(new StorageEntry { Kind = StorageKind.SpeechModel, Key = "other.tflite" }));
+        }
+
+        [Test]
         public async Task TotalsCountDatabaseOnceAndIncludeImageAttachmentsExportsAndLegacyModels()
         {
             FileWithSize(Path.Combine(_models, "a.litertlm"), 100);

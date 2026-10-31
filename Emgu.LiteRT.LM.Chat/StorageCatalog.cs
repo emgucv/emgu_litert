@@ -33,7 +33,9 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>The ZIPs made for sharing chats.</summary>
         Exports,
         /// <summary>"Search my videos"' index, in the database.</summary>
-        VideoIndex
+        VideoIndex,
+        /// <summary>A speech recognition model's files (e.g. Parakeet's model and tokenizer).</summary>
+        SpeechModel
     }
 
     /// <summary>One thing the app keeps on the device, with its size.</summary>
@@ -87,6 +89,23 @@ namespace Emgu.LiteRT.LM.Chat
             File = file ?? throw new ArgumentNullException(nameof(file));
             IsSearch = isSearch;
         }
+
+        /// <summary>Describe a speech recognition model: a .tflite file and the files that go with it, deleted together.</summary>
+        /// <param name="name">Its name, shown</param>
+        /// <param name="file">Its model file's name in the models' folder (a .tflite)</param>
+        /// <param name="companions">The other files' names in the models' folder (its tokenizer)</param>
+        /// <param name="detail">What deleting it does, shown</param>
+        public static StorageModel Speech(string name, string file, IEnumerable<string> companions, string detail) =>
+            new StorageModel(name, file) { IsSpeech = true, Companions = (companions ?? Enumerable.Empty<string>()).ToList(), Detail = detail };
+
+        /// <summary>True for a speech recognition model (<see cref="Speech"/>).</summary>
+        public bool IsSpeech { get; private set; }
+
+        /// <summary>The other files deleted with it (a speech model's tokenizer).</summary>
+        public IReadOnlyList<string> Companions { get; private set; } = new string[0];
+
+        /// <summary>What deleting it does, shown; null for the usual text.</summary>
+        public string Detail { get; private set; }
 
         /// <summary>Its name, shown.</summary>
         public string Name { get; }
@@ -172,7 +191,7 @@ namespace Emgu.LiteRT.LM.Chat
         public async Task<StorageSnapshot> ReadAsync()
         {
             var result = new StorageSnapshot();
-            var models = _models.Select(m => (m.Name, m.File, m.IsSearch)).ToList();
+            var models = _models.Where(m => !m.IsSpeech).Select(m => (m.Name, m.File, m.IsSearch)).ToList();
             if (Directory.Exists(ModelRoot))
             {
                 // Include older downloads and caches left behind by models no longer in the picker.
@@ -200,6 +219,13 @@ namespace Emgu.LiteRT.LM.Chat
                     Detail = "Model, partial downloads, and its CPU/GPU caches. Download again to use after deletion."
                 });
             }
+            foreach (StorageModel model in _models.Where(m => m.IsSpeech))
+                result.Entries.Add(new StorageEntry
+                {
+                    Kind = StorageKind.SpeechModel, Key = model.File, Name = model.Name,
+                    Bytes = SpeechFiles(model).Sum(StorageFiles.Size),
+                    Detail = model.Detail ?? "Speech recognition model and its tokenizer. Downloaded again when it is used."
+                });
             foreach (StorageFolder folder in _folders)
                 result.Entries.Add(new StorageEntry { Kind = StorageKind.Folder, Key = folder.Key, Name = folder.Name, Bytes = StorageFiles.Size(folder.Path), Detail = folder.Detail });
             foreach (ChatDocumentStorage document in await _store.GetDocumentStorageAsync().ConfigureAwait(false))
@@ -256,6 +282,15 @@ namespace Emgu.LiteRT.LM.Chat
                     ValidateModelName(entry.Key);
                     StorageFiles.DeleteModel(ModelRoot, Path.Combine(ModelRoot, entry.Key));
                     return;
+                case StorageKind.SpeechModel:
+                    StorageModel speech = _models.FirstOrDefault(m => m.IsSpeech && m.File == entry.Key)
+                        ?? throw new InvalidOperationException("Unknown speech model.");
+                    foreach (string file in new[] { speech.File }.Concat(speech.Companions))
+                    {
+                        ValidateModelName(file, speech: true);
+                        StorageFiles.DeleteModel(ModelRoot, Path.Combine(ModelRoot, file));
+                    }
+                    return;
                 case StorageKind.Folder:
                     StorageFolder folder = _folders.FirstOrDefault(f => f.Key == entry.Key)
                         ?? throw new InvalidOperationException("Unknown storage folder.");
@@ -274,10 +309,24 @@ namespace Emgu.LiteRT.LM.Chat
             await _store.CompactAsync().ConfigureAwait(false);
         }
 
-        private static void ValidateModelName(string name)
+        // A speech model's files, each with its partial download and marker.
+        private List<string> SpeechFiles(StorageModel model)
         {
+            var files = new List<string>();
+            foreach (string file in new[] { model.File }.Concat(model.Companions))
+            {
+                ValidateModelName(file, speech: true);
+                files.AddRange(StorageFiles.ModelFiles(Path.Combine(ModelRoot, file)));
+            }
+            return files;
+        }
+
+        // A file name right in the models' folder: a .litertlm, or for a speech model a .tflite or its tokenizer's .json.
+        private static void ValidateModelName(string name, bool speech = false)
+        {
+            string[] extensions = speech ? new[] { ".tflite", ".json" } : new[] { ".litertlm" };
             if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(new[] { '/', '\\', ':' }) >= 0
-                || !name.EndsWith(".litertlm", StringComparison.OrdinalIgnoreCase))
+                || !extensions.Any(e => name.EndsWith(e, StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidOperationException("Invalid model file name.");
         }
     }

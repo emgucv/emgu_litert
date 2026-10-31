@@ -43,6 +43,8 @@
 - Measured on a Galaxy S10 (Snapdragon 855, Android 12, CPU, the demo with a temporary self-test, 2026-10-30): loads in 4.1 s; real-time factor 0.37-0.46 (the 34 s English sample in 12.8 s, 11.4 s of French in 4.8 s, 2.1 s in 1.0 s), with the Mac's texts (the 5.8 s sample ended "tombs." instead of "tomb?").
 - Checked in the iOS simulator (iPhone Duo, iOS 27.1, arm64 on the Mac, the same self-test, 2026-10-30): `asrextern.framework` loads next to `LiteRt.framework`; the model loads in 1.6 s and transcribes at a real-time factor of 0.08-0.09, with the Mac's texts word for word.
 - Tested by `UnitTestSpeechToText` (Native, ignored without `-p:TestModels=true`: a short clip, audio across windows without repeats, a session fed in 100 ms pieces matching `TranscribeAsync`, and `Reset`) and `UnitTestSpeechToTextHelpers` (resampling, joining pieces, the seam lowercasing; model-free).
+- `AsrInvoke.IsAvailable` loads `libasrextern` once and tells whether it is in the app (it is called with a null engine, which the C API answers with 0), for apps that offer speech recognition only where it was built.
+- Word error rate on a synthetic three-voice meeting (macOS voices, ten turns, 2026-10-31, through the chat's `SpeechRecognizer`): no words wrong on clean speech, but 15-16% with room noise at about 15 dB SNR (Apple's recognizer 5.7%, Google's 4.4%, Gemma 4 E2B 2.5%), and in one noisy turn it made up a phrase. The chat uses it as an option, not the default (the demo's `FEATURES.md`, "Speech recognition with Parakeet").
 - The 0.19 nightlies moved this code (`omni/asr` to `omni/speech2text`, with a model registry): the C shim needs porting with the LiteRT-LM upgrade.
 
 ## Emgu.LiteRT.LM.Models: language models and Chat

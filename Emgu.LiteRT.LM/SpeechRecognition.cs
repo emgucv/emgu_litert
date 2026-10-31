@@ -62,6 +62,32 @@ namespace Emgu.LiteRT.LM
         [DllImport(AsrLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
         internal static extern void asrextern_free_string(IntPtr text);
 
+        private static bool? _isAvailable;
+
+        /// <summary>
+        /// True if libasrextern is in the app and loads (it isn't built for every platform yet: not for Windows, nor
+        /// Android's x86_64 emulator). The first check loads it.
+        /// </summary>
+        public static bool IsAvailable
+        {
+            get
+            {
+                if (_isAvailable == null)
+                {
+                    try
+                    {
+                        asrextern_engine_get_sample_rate(IntPtr.Zero);
+                        _isAvailable = true;
+                    }
+                    catch (Exception ex) when (ex is DllNotFoundException || ex is EntryPointNotFoundException || ex is BadImageFormatException)
+                    {
+                        _isAvailable = false;
+                    }
+                }
+                return _isAvailable.Value;
+            }
+        }
+
         /// <summary>A string libasrextern returned, freed; null for a null pointer.</summary>
         internal static String TakeString(IntPtr text)
         {
