@@ -31,7 +31,7 @@ public sealed class SpeechEngineFeature : ChatFeature, IStorageParticipant
     public override bool PersistEnabled => false;
 
     /// <inheritdoc/>
-    public override void RegisterServices(ChatFeatureServices services) => services.Add<IStorageParticipant>(this);
+    public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
 
     /// <inheritdoc/>
     public override void OnAttached(IChatPageHost host)

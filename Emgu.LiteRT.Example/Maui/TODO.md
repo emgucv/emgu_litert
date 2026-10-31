@@ -682,9 +682,9 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
   - the GPU (the embedding GPU crash);
   - several videos in one chat;
   - telling "no moment matches" apart from a weak best match (photo search's lift against a baseline).
-- [ ] Speech recognition with Parakeet (Settings > Speech recognition, `SpeechEngineFeature`, 2026-10-31; see FEATURES.md, "Speech recognition with Parakeet"). Voice messages, the voice chat and meetings use it when chosen, or where the device has no recognizer (the Galaxy S10's Android 12); checked on Mac Catalyst, the S10 and the iOS simulator with synthetic speech. Still to do:
+- [ ] Speech recognition with Parakeet (Settings > Speech recognition, `SpeechEngineFeature`, 2026-10-31; see FEATURES.md, "Speech recognition with Parakeet"). Voice messages, the voice chat and meetings use it when chosen, or where the device has no recognizer (the Galaxy S10's Android 12); checked on Mac Catalyst, the S10 and the iOS simulator with synthetic speech, and on the S10 beside Gemma 4 E2B with a meeting through the card and the Storage page's delete (2026-11-01). Still to do:
   - noise: 15-16% of words wrong with room noise (Apple's recognizer 5.7%, Google's 4.4%), and one made-up phrase - try a noise filter first, or say in the setting that it is for quiet rooms;
-  - a real microphone, a meeting through the card, deleting the model on the Storage page, memory beside Gemma 4 E2B on a phone, the Pixel Fold and Z Fold 3;
+  - a real microphone, the Pixel Fold and Z Fold 3;
   - Windows and Ubuntu builds of `libasrextern` (then Parakeet is Windows' only recognizer; the code is there);
   - text while speaking: `AsrSession` fed from the microphone as it records, instead of after the recording;
   - the languages Parakeet doesn't have (Chinese, Japanese...) go to the device's recognizer: Qwen3-ASR later.

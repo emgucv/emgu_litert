@@ -9,8 +9,9 @@ namespace Emgu.LiteRT.LM.Maui
     /// <summary>
     /// A feature with a stake in what the storage feature (<see cref="Features.StorageFeature"/>) deletes or downloads
     /// again - an index it builds, a document it is reading, a model it holds. The storage feature finds them in the
-    /// page's services (<see cref="ChatFeatureServices.GetAll{T}"/>; register with
-    /// <c>services.Add&lt;IStorageParticipant&gt;(this)</c> too when the feature registers itself by its own type).
+    /// page's services (<see cref="ChatFeatureServices.GetAll{T}"/>), so register the feature by its own type
+    /// (<c>services.Add(this)</c>): the services keep one per type, so a feature added only as
+    /// <c>services.Add&lt;IStorageParticipant&gt;(this)</c> is replaced by the next one added that way.
     /// </summary>
     public interface IStorageParticipant
     {

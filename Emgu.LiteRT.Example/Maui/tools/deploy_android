@@ -101,9 +101,12 @@ copy_models() {
     fi
     "${adb[@]}" shell run-as $APP_ID mv "files/LiteRT-LM/$name.copying" "files/LiteRT-LM/$name"
     # The verified-hash marker records the size and modification time, so give the copy the original's time.
-    local mtime
+    # Android's touch takes no fraction after "@": a UTC date keeps the nanoseconds (/bin/date: macOS's, not GNU's).
+    local mtime stamp
     mtime=$(/usr/bin/stat -L -f %Fm "$src")
-    if "${adb[@]}" shell run-as $APP_ID touch -m -d "@$mtime" "files/LiteRT-LM/$name" && [ -f "$src.sha256ok" ]; then
+    stamp="$(/bin/date -u -r "${mtime%.*}" +%Y-%m-%dT%H:%M:%S)"
+    [ "$mtime" != "${mtime%.*}" ] && stamp="$stamp.${mtime#*.}"
+    if "${adb[@]}" shell run-as $APP_ID touch -m -d "${stamp}Z" "files/LiteRT-LM/$name" && [ -f "$src.sha256ok" ]; then
       "${adb[@]}" exec-in run-as $APP_ID sh -c "cat > 'files/LiteRT-LM/$name.sha256ok'" < "$src.sha256ok"
     fi
   done

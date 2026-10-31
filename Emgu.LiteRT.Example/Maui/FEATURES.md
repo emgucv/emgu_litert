@@ -726,7 +726,12 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   - The S10 has no recognizer of its own (Android 12), so Parakeet is its only one: voice messages in Text mode and meeting notes now work there.
   - English and French were recognised without a language setting; Japanese went to the device's recognizer (none on the S10: the error); each meeting piece showed 5-7 partial texts; the model was freed after its idle time.
   - The iOS simulator downloaded both files through `BackgroundDownloads` (the only run that downloaded; the Mac's and S10's were already there).
-- **Not checked yet:** a recording from a real microphone, a meeting through the card (the self-test fed the pieces itself), deleting the model on the Storage page in the app (only `StorageCatalog`'s test), memory with Gemma 4 E2B loaded beside Parakeet on a phone, the Pixel Fold and Z Fold 3, and Windows (`libasrextern` isn't built for it).
+- **On the Galaxy S10 with Gemma 4 E2B** (GPU), in a second temporary self-test (2026-11-01):
+  - Memory: Gemma 4 E2B loaded took the app from 1.36 GB to 3.27 GB PSS, Parakeet beside it to 4.09 GB, with 0.8 GB left available of 7.6 GB. Both kept working (Gemma's answers in 1.5-2.5 s, Parakeet's 7 s clip in 5.1 s with its load). Android didn't stop the app; when Parakeet loaded again after the download, it closed 13 cached background apps.
+  - A meeting through the card (`record_meeting` from the main thread, the synthetic meeting fed in real time by a `ClipSoundSource` in place of the microphone): the card's preview grew every 2-7 s, a few seconds behind the speech, ending with 156 words and 3 speakers. Parakeet stayed loaded through it (`KeepLoaded`) and was freed after Stop. Gemma wrote the notes in 34 s; their summary matched the meeting.
+  - Deleting the model on the Storage page (its delete path, without the confirmation) freed the loaded model and deleted both files; the row showed 0 MB. With no other recognizer, the next voice message downloaded it again (614 MB in 48 s over Wi-Fi), loaded it and wrote the message down, in 57 s in all.
+  - That test found that deleting didn't free the model: `SpeechEngineFeature` was registered only as `IStorageParticipant`, and the page's services keep one service per type, so another feature's registration replaced it. It now registers by its own type, like the other participants.
+- **Not checked yet:** a recording from a real microphone, the Pixel Fold and Z Fold 3, and Windows (`libasrextern` isn't built for it).
 
 ## Task mode
 
