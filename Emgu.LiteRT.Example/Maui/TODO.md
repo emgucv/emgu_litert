@@ -98,6 +98,10 @@ the next release:
       list (`litert_windows_exports.def`) and the C API wrappers against header changes.
 - [ ] Re-run the model tests, check every model file in the demo still loads and answers correctly (some community files
       broke with v0.18.0), and the agent regression test (item 7).
+- [ ] Parakeet's dropped text: v0.18.0's Levenshtein merger drops 2-3 s at some window seams (22.8% of a clean 56 s
+      meeting in one session, 45.6% of the Pixel Fold's recording of it). LiteRT-LM fixed it in b34761f3 and b2f2d9d9
+      (2026-10-02/13, in the 0.19.0 nightlies) - check the release has them, then score Parakeet again with the same
+      recordings and decide on `SpeechToTextModel.OverlapRatio` (docs/litert-lm.md, "The Levenshtein merger drops text").
 
 ## 11. GPU for the embedding models — Windows completed; Apple/Android pending
 
@@ -683,7 +687,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
   - several videos in one chat;
   - telling "no moment matches" apart from a weak best match (photo search's lift against a baseline).
 - [ ] Speech recognition with Parakeet (Settings > Speech recognition, `SpeechEngineFeature`, 2026-10-31; see FEATURES.md, "Speech recognition with Parakeet"). Voice messages, the voice chat and meetings use it when chosen, or where the device has no recognizer (the Galaxy S10's Android 12); checked on Mac Catalyst, the S10 and the iOS simulator with synthetic speech, and on the S10 beside Gemma 4 E2B with a meeting through the card and the Storage page's delete (2026-11-01). Still to do:
-  - noise: 15-16% of words wrong with room noise (Apple's recognizer 5.7%, Google's 4.4%), and one made-up phrase - try a noise filter first, or say in the setting that it is for quiet rooms;
+  - noise and long recordings: 15-16% of words wrong with room noise (Apple's recognizer 5.7%, Google's 4.4%) is mostly text LiteRT-LM v0.18.0's merger drops at window seams, which also loses words on long clean recordings; fixed upstream, so it waits for the LiteRT-LM update (item 9). Noise removal didn't help (docs/litert-lm.md, "The Levenshtein merger drops text");
   - a real microphone, the Pixel Fold and Z Fold 3;
   - Windows and Ubuntu builds of `libasrextern` (then Parakeet is Windows' only recognizer; the code is there);
   - text while speaking: `AsrSession` fed from the microphone as it records, instead of after the recording;

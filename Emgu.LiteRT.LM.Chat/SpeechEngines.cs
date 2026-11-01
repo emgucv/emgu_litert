@@ -101,7 +101,11 @@ public static class SpeechEngines
             if (size < 0) break;
             if (id == "fmt " && pos + 24 <= wav.Length)
             {
-                if (BitConverter.ToInt16(wav, pos + 8) != 1)
+                // PCM, or WAVE_FORMAT_EXTENSIBLE (0xFFFE, as macOS's afconvert and Windows write) whose sub-format is PCM.
+                ushort format = BitConverter.ToUInt16(wav, pos + 8);
+                if (format == 0xFFFE && size >= 40 && pos + 34 <= wav.Length)
+                    format = BitConverter.ToUInt16(wav, pos + 32);
+                if (format != 1)
                     throw new InvalidDataException("The recording isn't PCM.");
                 channels = BitConverter.ToInt16(wav, pos + 10);
                 sampleRate = BitConverter.ToInt32(wav, pos + 12);

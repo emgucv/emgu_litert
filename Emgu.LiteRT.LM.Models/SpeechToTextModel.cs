@@ -53,6 +53,9 @@ namespace Emgu.LiteRT.LM.Models
         /// </summary>
         public String TextMerger { get; set; }
 
+        /// <summary>How much of each window the next one overlaps (0 to 1), set before Init.</summary>
+        public float OverlapRatio { get; set; } = 0.4f;
+
         /// <summary>The engine, once initialized.</summary>
         public AsrEngine Engine
         {
@@ -114,7 +117,7 @@ namespace Emgu.LiteRT.LM.Models
             cancellationToken.ThrowIfCancellationRequested();
             String modelPath = ModelFile.LocalFile;
             String tokenizerPath = TokenizerFile == null ? null : TokenizerFile.LocalFile;
-            AsrEngine engine = await Task.Run(() => new AsrEngine(ModelName, modelPath, tokenizerPath, "cpu", numThreads, 0.4f, TextMerger)).ConfigureAwait(false);
+            AsrEngine engine = await Task.Run(() => new AsrEngine(ModelName, modelPath, tokenizerPath, "cpu", numThreads, OverlapRatio, TextMerger)).ConfigureAwait(false);
             if (_engine != null)
                 _engine.Dispose();
             _engine = engine;

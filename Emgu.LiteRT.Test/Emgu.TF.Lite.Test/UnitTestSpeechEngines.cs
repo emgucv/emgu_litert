@@ -97,4 +97,40 @@ public class UnitTestSpeechEngines
         Assert.Throws<InvalidDataException>(() => SpeechEngines.WavSamples(new byte[] { 1, 2, 3 }, out _));
         Assert.Throws<InvalidDataException>(() => SpeechEngines.WavSamples(Wav(1, new short[0]).Take(36).ToArray(), out _));
     }
+
+    // A WAVE_FORMAT_EXTENSIBLE file (as macOS's afconvert writes) with the given sub-format.
+    private static byte[] Extensible(short[] samples, ushort subFormat)
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+        writer.Write(Encoding.ASCII.GetBytes("RIFF"));
+        writer.Write(0);
+        writer.Write(Encoding.ASCII.GetBytes("WAVEfmt "));
+        writer.Write(40);
+        writer.Write((ushort)0xFFFE);
+        writer.Write((short)1);
+        writer.Write(16000);
+        writer.Write(16000 * 2);
+        writer.Write((short)2);
+        writer.Write((short)16);
+        writer.Write((short)22);
+        writer.Write((short)16);
+        writer.Write(4);
+        writer.Write(subFormat);
+        writer.Write(new byte[] { 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xAA, 0, 0x38, 0x9B, 0x71 });
+        writer.Write(Encoding.ASCII.GetBytes("data"));
+        writer.Write(samples.Length * 2);
+        foreach (short sample in samples) writer.Write(sample);
+        writer.Flush();
+        return stream.ToArray();
+    }
+
+    [Test]
+    public void ReadsAnExtensiblePcmRecording()
+    {
+        Assert.That(SpeechEngines.WavSamples(Extensible(new short[] { 16384, -16384 }, 1), out int rate), Is.EqualTo(new[] { 0.5f, -0.5f }));
+        Assert.That(rate, Is.EqualTo(16000));
+        // Floats (sub-format 3) aren't read.
+        Assert.Throws<InvalidDataException>(() => SpeechEngines.WavSamples(Extensible(new short[] { 0 }, 3), out _));
+    }
 }
