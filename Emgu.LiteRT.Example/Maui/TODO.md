@@ -726,3 +726,14 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [x] Bonsai at 512 x 512 (2026-11-01): Emgu's repackaging with a GPU-friendly VAE decoder (`tools/export_flux2_vae_decoder.py`, `MODELS.md`), on Emgu's public S3; `BonsaiImage4B512`, offered on Mac Catalyst (CPU and GPU); 66 s / 25 s on an M1.
 - [ ] Bonsai 512 on phones: on the Pixel Fold's GPU (2026-11-01) it loads in 159 s and draws in 201 s, but at 7.0 GB PSS (about 5 GB of GPU memory) Android closed the other apps and then killed the demo (in the background) before a second picture. To offer it on 12 GB phones: try with the demo in front, release the chat model while drawing, and limit it to phones with 12 GB or more.
 - [ ] Maybe: prune caches of an older copy of the model file (their names carry the file's time and size) when it is downloaded again.
+
+## 57. Kokoro text to speech through LiteRT-LM's omni engine
+
+`libomniextern` speaks with LiteRT-LM's Kokoro 82M (2026-11-01): `TextToSpeechEngine`, `TextToSpeechModel` with `Kokoro82M`, the chat's `ChatVoice` (read-aloud, the voice chat, alerts, exercise counts) and Settings > Voice (`VoiceFeature`: the choice, a voice per language, "Try it"), one Storage row. Measured on an M1 and a Galaxy S10 (`docs/litert-lm.md`, `FEATURES.md` "Voice").
+
+- [x] Mac: the 9 languages, the 54 voices, Parakeet hearing Kokoro word for word, packing sentences (`UnitTestTextToSpeech`, `TEST_MODELS`); macOS, iOS and Android natives rebuilt.
+- [x] Galaxy S10: Settings > Voice and "Try it" through the UI; about 2.2 s a run on its GPU; three sentences said in 15.6 s for 12.8 s of speech.
+- [ ] On a phone: a hands-free voice-chat turn with Kokoro (the microphone pausing and resuming around its playback), a camera alert's `speak_text`, and memory beside Gemma 4 E2B on the GPU.
+- [ ] Shorter pauses: play the pieces gaplessly (AudioTrack, AVAudioEngine, AudioGraph) instead of a WAV file and a player each; start the first sound sooner by cutting the first sentence at a comma.
+- [ ] Mac Catalyst through the UI (the section, "Try it", a reply read aloud); iOS on a device (the CPU file there).
+- [ ] Next omni models: Qwen3-ASR 0.6B (Chinese, Japanese and the other languages Parakeet lacks), then maybe Moonshine or Whisper tiny for older phones.

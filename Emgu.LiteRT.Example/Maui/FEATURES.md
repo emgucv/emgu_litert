@@ -126,9 +126,35 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     `MessageRecord` derive from the library's records, and its `AddMessageAsync` takes a language as its last parameter and
     hides the library's. Verified with the existing saved chats on Mac Catalyst and a Galaxy S10.
 
+## Voice (Kokoro on the device)
+
+- Settings > Voice (2026-11-01; the library's `VoiceFeature`, shown where `libomniextern` is in the app - not Windows
+  yet): "This device's" or "Kokoro (on device, 295 MB)". Everything the app says goes through `ChatVoice`
+  (`Emgu.LiteRT.LM.Maui/TextSpeakers.cs`): read-aloud replies and the voice chat (`TextToSpeechReplySpeaker.SpeakAsync`),
+  the camera and sound monitors' alerts (their `AlertVoice` is one), and the exercise counts (`ChatVoice.SpeakTextAsync`).
+  With Kokoro chosen and downloaded, a text in one of its 9 languages and dialects (`VoiceEngines.KokoroLanguage`: English
+  is British on a device in the UK, Ireland, Australia or New Zealand) is said by Kokoro, the others by the device's
+  voices, and a Kokoro failure falls back to them.
+- `KokoroSpeech` (like `ParakeetSpeech`): downloaded in the background when chosen, the GPU file on Android and Mac
+  Catalyst (OpenCL, Metal; falling back to the CPU if the GPU can't load it) and the CPU file elsewhere, freed after 2
+  minutes unused. `KokoroTextSpeaker` cuts a text into pieces (`VoiceEngines.SpeechPieces`: the first sentence alone,
+  then sentences together up to about 120 characters, since every Kokoro run costs about the same), writes each to a WAV
+  file and plays it with `AudioFilePlayer`, making the next piece while one plays.
+- The section has a voice per language (the language list, then that language's voices from the model, e.g. "Heart
+  (female)"; the `kokoro_voice_<language>` settings) and "Try it" (a sample sentence in that language), and the credit
+  line. Storage lists "Kokoro (voices)" (`StorageModel.Voice` with its cache folder); deleting it goes back to the
+  device's voices.
+- On a Galaxy S10 (2026-11-01, driven by uiautomator and a temporary self-test): the section, Kokoro chosen with the file
+  copied from the Mac, "Try it" heard (the first time 7 s to the first sound - loading and compiling for the GPU -
+  then about 2.8 s). Kokoro on its GPU (Adreno 640, OpenCL): loaded in 2.3-2.8 s, about 2.2 s a run whatever its
+  length (so "Hello." costs as much as a 5.6 s sentence: RTF 1.6 and 0.4), a new language's engine 4.8 s, PSS about
+  0.5-0.6 GB. Three sentences (12.8 s of speech) were said in 18.8 s with a piece per sentence and 15.6 s with the
+  pieces - about 2.3 s before the first sound, then about 0.5 s at each join. Not yet tried there: a hands-free
+  voice-chat turn, a camera alert's `speak_text` and memory beside Gemma 4 E2B.
+
 ## Reading replies aloud
 
-- "Read replies aloud" uses MAUI's TextToSpeech through `Emgu.LiteRT.LM.Maui`'s `TextToSpeechReplySpeaker` (the demo's
+- "Read replies aloud" uses `Emgu.LiteRT.LM.Maui`'s `TextToSpeechReplySpeaker`, which speaks through `ChatVoice` (the device's voices, MAUI's TextToSpeech, or Kokoro - see "Voice") (the demo's
   own `ReplySpeech.cs` was a copy of it, removed on 2026-10-25; the monitors' spoken alerts use one too). It picks a voice for the reply's language -
   detected from the writing system most of its letters use (Han → zh, kana → ja, Hangul → ko, Cyrillic, Arabic...),
   preferring the device's own region - because the default voice read e.g. Chinese with an English voice. It strips

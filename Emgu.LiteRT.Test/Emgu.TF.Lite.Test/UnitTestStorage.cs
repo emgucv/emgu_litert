@@ -94,6 +94,28 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
+        public async Task TheVoiceModelIsItsOwnRowWithItsCacheFolder()
+        {
+            var catalog = new StorageCatalog(_store, _models, _exports, new[]
+            {
+                StorageModel.Voice("Kokoro", "kokoro.litertlm", null, "kokoro-gpu-cache"),
+                StorageModel.Image("Bonsai", "bonsai.litertlm", null, "bonsai-flux2-cache")
+            });
+            string[] voice = { "kokoro.litertlm", "kokoro.litertlm.sha256ok", "kokoro-gpu-cache/kokoro_acoustic_1_2.xnnpack_cache" };
+            foreach (string file in voice.Concat(new[] { "bonsai.litertlm" })) FileWithSize(Path.Combine(_models, file), 10);
+            StorageSnapshot snapshot = await catalog.ReadAsync();
+            StorageEntry row = snapshot.Entries.Single(e => e.Kind == StorageKind.VoiceModel);
+            Assert.That((row.Key, row.Bytes), Is.EqualTo(("kokoro.litertlm", 30L)));
+            Assert.That(row.Detail, Does.Contain("Voice model"));
+            Assert.That(snapshot.Entries.Count(e => e.Key == "kokoro.litertlm"), Is.EqualTo(1));
+            // An image row can't delete the voice model.
+            Assert.ThrowsAsync<InvalidOperationException>(() => catalog.DeleteAsync(new StorageEntry { Kind = StorageKind.ImageModel, Key = "kokoro.litertlm" }));
+            await catalog.DeleteAsync(row);
+            foreach (string file in voice) Assert.That(File.Exists(Path.Combine(_models, file)), Is.False, file);
+            Assert.That(File.Exists(Path.Combine(_models, "bonsai.litertlm")), Is.True);
+        }
+
+        [Test]
         public async Task EachImageModelIsItsOwnRowAndDeletingOneKeepsTheOthers()
         {
             var catalog = new StorageCatalog(_store, _models, _exports, new[]

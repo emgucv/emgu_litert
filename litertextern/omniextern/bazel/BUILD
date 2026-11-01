@@ -5,7 +5,8 @@
 #
 # Built like LiteRT-LM's //c:litert-lm (a linkshared cc_binary, hidden visibility, only the OMNIEXTERN_EXPORT functions
 # exported) and with the same --define=litert_runtime_link_mode=dynamic, so it links against our libLiteRt. Each model
-# it can load is an alwayslink dependency that registers itself with OmniRegistry: Parakeet TDT for speech, Bonsai-Image (bonsai-flux2) and FLUX.2-klein for images.
+# it can load is an alwayslink dependency that registers itself with OmniRegistry: Parakeet TDT for speech, Bonsai-Image (bonsai-flux2) and FLUX.2-klein for images,
+# Kokoro for text to speech.
 
 package(default_visibility = ["//visibility:public"])
 
@@ -36,8 +37,12 @@ cc_binary(
         "//omni/speech2text:parakeet_tdt",
         "//omni/text2image:bonsai_flux2",
         "//omni/text2image:flux2_klein",
+        "//omni/text2speech:kokoro",
+        "//omni/text2speech:tts_session",
+        "//omni:omni_registry",
         "//runtime/proto:speech2text_session_config_cc_proto",
         "//runtime/proto:text2image_session_config_cc_proto",
+        "//runtime/proto:text2speech_session_config_cc_proto",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",

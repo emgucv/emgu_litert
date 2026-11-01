@@ -37,7 +37,9 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>A speech recognition model's files (e.g. Parakeet's model and tokenizer).</summary>
         SpeechModel,
         /// <summary>An image model's file and caches (e.g. Bonsai Image's .litertlm).</summary>
-        ImageModel
+        ImageModel,
+        /// <summary>A text-to-speech model's file and caches (e.g. Kokoro's .litertlm).</summary>
+        VoiceModel
     }
 
     /// <summary>One thing the app keeps on the device, with its size.</summary>
@@ -120,7 +122,18 @@ namespace Emgu.LiteRT.LM.Chat
         public static StorageModel Image(string name, string file, string detail, string cacheFolder = null) =>
             new StorageModel(name, file) { IsImage = true, Detail = detail, CacheFolder = cacheFolder };
 
-        /// <summary>An image model's caches' folder in the models' folder, or null.</summary>
+        /// <summary>
+        /// Describe a text-to-speech model on LiteRT-LM (a .litertlm in the models' folder, with its caches in a folder of
+        /// their own beside it), its own row rather than a chat model's.
+        /// </summary>
+        /// <param name="name">Its name, shown</param>
+        /// <param name="file">Its model file's name in the models' folder (a .litertlm)</param>
+        /// <param name="detail">What deleting it does, shown</param>
+        /// <param name="cacheFolder">Its caches' folder's name in the models' folder, deleted with it, or null</param>
+        public static StorageModel Voice(string name, string file, string detail, string cacheFolder = null) =>
+            new StorageModel(name, file) { IsVoice = true, Detail = detail, CacheFolder = cacheFolder };
+
+        /// <summary>An image or voice model's caches' folder in the models' folder, or null.</summary>
         public string CacheFolder { get; private set; }
 
         /// <summary>True for a speech recognition model (<see cref="Speech"/>).</summary>
@@ -129,8 +142,13 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>True for an image model (<see cref="Image"/>).</summary>
         public bool IsImage { get; private set; }
 
-        // A speech or image model: its own row, with its companions and caches, never listed as a chat model.
-        internal bool HasOwnRow => IsSpeech || IsImage;
+        /// <summary>True for a text-to-speech model (<see cref="Voice"/>).</summary>
+        public bool IsVoice { get; private set; }
+
+        // A speech, image or voice model: its own row, with its companions and caches, never listed as a chat model.
+        internal bool HasOwnRow => IsSpeech || IsImage || IsVoice;
+
+        internal StorageKind OwnKind => IsImage ? StorageKind.ImageModel : IsVoice ? StorageKind.VoiceModel : StorageKind.SpeechModel;
 
         /// <summary>The other files deleted with it (a speech model's tokenizer or older files).</summary>
         public IReadOnlyList<string> Companions { get; private set; } = new string[0];
@@ -258,9 +276,10 @@ namespace Emgu.LiteRT.LM.Chat
             foreach (StorageModel model in _models.Where(m => m.HasOwnRow))
                 result.Entries.Add(new StorageEntry
                 {
-                    Kind = model.IsImage ? StorageKind.ImageModel : StorageKind.SpeechModel, Key = model.File, Name = model.Name,
+                    Kind = model.OwnKind, Key = model.File, Name = model.Name,
                     Bytes = SpeechFiles(model).Sum(StorageFiles.Size) + (CacheFolderPath(model) is string caches ? StorageFiles.Size(caches) : 0),
                     Detail = model.Detail ?? (model.IsImage ? "Image model and its caches. Downloaded again when it is chosen."
+                        : model.IsVoice ? "Voice model and its caches. Downloaded again when it is chosen."
                         : "Speech recognition model. Downloaded again when it is used.")
                 });
             foreach (StorageFolder folder in _folders)
@@ -321,9 +340,9 @@ namespace Emgu.LiteRT.LM.Chat
                     return;
                 case StorageKind.SpeechModel:
                 case StorageKind.ImageModel:
-                    StorageModel speech = _models.FirstOrDefault(m => m.HasOwnRow && m.File == entry.Key
-                            && m.IsImage == (entry.Kind == StorageKind.ImageModel))
-                        ?? throw new InvalidOperationException("Unknown speech or image model.");
+                case StorageKind.VoiceModel:
+                    StorageModel speech = _models.FirstOrDefault(m => m.HasOwnRow && m.File == entry.Key && m.OwnKind == entry.Kind)
+                        ?? throw new InvalidOperationException("Unknown speech, image or voice model.");
                     foreach (string file in new[] { speech.File }.Concat(speech.Companions))
                     {
                         ValidateModelName(file, speech: true);

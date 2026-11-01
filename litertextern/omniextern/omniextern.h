@@ -4,8 +4,9 @@
 
 // A small C API over LiteRT-LM's OmniEngine (omni/, C++ only), for P/Invoke. It covers speech recognition
 // (omni/speech2text): an engine loads a model (e.g. Parakeet-TDT-0.6B-v3 from its .litertlm), a session takes mono
-// audio pushed in pieces and returns the text; and text to image (omni/text2image): an image engine loads a model
-// (Bonsai-Image-ternary-4B or FLUX.2-klein-4B from its .litertlm) and draws a picture for a prompt.
+// audio pushed in pieces and returns the text; text to image (omni/text2image): an image engine loads a model
+// (Bonsai-Image-ternary-4B or FLUX.2-klein-4B from its .litertlm) and draws a picture for a prompt; and text to speech
+// (omni/text2speech): a TTS engine loads a model (Kokoro 82M) and speaks text in one of its voices.
 //
 // Errors: every function that can fail returns a status code (0 on success; otherwise the same values as absl's status
 // codes and LiteRT-LM's LiteRtLmStatusCode) and records a message for the calling thread, read with
@@ -28,6 +29,7 @@ extern "C" {
 typedef struct OmniExternEngine OmniExternEngine;
 typedef struct OmniExternSession OmniExternSession;
 typedef struct OmniExternImageEngine OmniExternImageEngine;
+typedef struct OmniExternTtsEngine OmniExternTtsEngine;
 
 // The status codes (absl::StatusCode's values).
 #define OMNIEXTERN_STATUS_OK 0
@@ -99,6 +101,34 @@ OMNIEXTERN_EXPORT int omniextern_image_generate(OmniExternImageEngine* engine, c
                                                 int* out_height, int* out_channels);
 
 OMNIEXTERN_EXPORT void omniextern_free_buffer(void* buffer);
+
+// Creates a text-to-speech engine for a model LiteRT-LM registers ("kokoro") from its local .litertlm: nothing is
+// downloaded. backend is "cpu", "gpu" or "npu" (Kokoro's GPU file runs its vocoder on the GPU); num_threads <= 0 for the
+// default; language is BCP-47 ("en-US", "fr", "zh"...) and voice a voice of that language ("af_heart"), either null for
+// the model's default; cache_dir is the folder for the compiled-model caches, null for the model file's folder. The
+// language and voice are fixed for the engine (a voice of another language is INVALID_ARGUMENT).
+OMNIEXTERN_EXPORT int omniextern_tts_engine_create(const char* model_name, const char* model_path, const char* backend,
+                                                   int num_threads, const char* language, const char* voice,
+                                                   const char* cache_dir, OmniExternTtsEngine** out_engine);
+OMNIEXTERN_EXPORT void omniextern_tts_engine_delete(OmniExternTtsEngine* engine);
+
+// The model's voices, one per line (*out_names, free with omniextern_free_string): those of language (BCP-47), or all of
+// them for a null or empty language.
+OMNIEXTERN_EXPORT int omniextern_tts_engine_get_voices(OmniExternTtsEngine* engine, const char* language,
+                                                       char** out_names);
+
+// The languages the model speaks, BCP-47, one per line (*out_names, free with omniextern_free_string).
+OMNIEXTERN_EXPORT int omniextern_tts_engine_get_languages(OmniExternTtsEngine* engine, char** out_names);
+
+// The model's default voice for language (BCP-47), in *out_voice (free with omniextern_free_string).
+OMNIEXTERN_EXPORT int omniextern_tts_engine_get_default_voice(OmniExternTtsEngine* engine, const char* language,
+                                                              char** out_voice);
+
+// Speaks text (UTF-8) in the engine's language and voice. Blocks until the audio is done (longer text is cut at its
+// sentences and clauses inside). *out_pcm is mono float samples in [-1, 1] (*out_count of them at *out_sample_rate Hz,
+// 24000 for Kokoro), malloc'd: free it with omniextern_free_buffer. One call at a time per engine.
+OMNIEXTERN_EXPORT int omniextern_tts_synthesize(OmniExternTtsEngine* engine, const char* text, float** out_pcm,
+                                                int* out_count, int* out_sample_rate);
 
 #ifdef __cplusplus
 }

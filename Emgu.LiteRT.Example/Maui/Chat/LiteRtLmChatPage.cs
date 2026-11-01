@@ -224,7 +224,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         // conversation memory and developer mode.
         foreach (ChatFeature feature in new ChatFeature[]
         {
-            new SpeechEngineFeature(), new VoiceLanguageFeature(),
+            new SpeechEngineFeature(), new VoiceFeature(), new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new PlacesFeature(), new ClipboardFeature(),
             parts.Camera, parts.PhotoEffects, parts.Claude, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
@@ -339,6 +339,9 @@ public sealed class LiteRtLmChatPage : ChatPage
                 new[] { ParakeetTdt06BV3.RegisteredName }));
         if (Emgu.LiteRT.LM.OmniInvoke.IsAvailable)
         {
+            using Kokoro82M kokoro = KokoroSpeech.CreateModel();
+            models.Add(StorageModel.Voice("Kokoro (voices)", System.IO.Path.GetFileName(kokoro.ModelFile.LocalFile),
+                "Voice model and its caches. Deleting goes back to the device's voices.", kokoro.CacheFolderName));
             using var bonsai = new BonsaiImage4B();
             using var klein = new Flux2Klein4B();
             using var bonsai512 = new BonsaiImage4B512();

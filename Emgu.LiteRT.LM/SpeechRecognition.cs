@@ -9,7 +9,7 @@ namespace Emgu.LiteRT.LM
 {
     /// <summary>
     /// P/Invoke entry points into libomniextern, Emgu's C API over LiteRT-LM's OmniEngine (omni/, which LiteRT-LM only
-    /// has in C++): speech recognition and text to image. It is built from litertextern/omniextern in LiteRT-LM's Bazel workspace
+    /// has in C++): speech recognition, text to image and text to speech. It is built from litertextern/omniextern in LiteRT-LM's Bazel workspace
     /// and links against libLiteRt, like liblitert-lm. Its functions return a status (LiteRtLmStatusCode's values) and
     /// record a message for the calling thread, as LiteRT-LM's C API does; nothing is thrown across it.
     /// </summary>
@@ -78,6 +78,26 @@ namespace Emgu.LiteRT.LM
 
         [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
         internal static extern void omniextern_free_buffer(IntPtr buffer);
+
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern LiteRtLmStatusCode omniextern_tts_engine_create(byte[] modelName, byte[] modelPath,
+            byte[] backend, int numThreads, byte[] language, byte[] voice, byte[] cacheDir, out IntPtr engine);
+
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern void omniextern_tts_engine_delete(IntPtr engine);
+
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern LiteRtLmStatusCode omniextern_tts_engine_get_voices(IntPtr engine, byte[] language, out IntPtr names);
+
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern LiteRtLmStatusCode omniextern_tts_engine_get_languages(IntPtr engine, out IntPtr names);
+
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern LiteRtLmStatusCode omniextern_tts_engine_get_default_voice(IntPtr engine, byte[] language, out IntPtr voice);
+
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern LiteRtLmStatusCode omniextern_tts_synthesize(IntPtr engine, byte[] text, out IntPtr pcm,
+            out int count, out int sampleRate);
 
         private static bool? _isAvailable;
 

@@ -3,7 +3,6 @@
 //----------------------------------------------------------------------------
 
 using System.ComponentModel;
-using System.Globalization;
 using Emgu.LiteRT.LM.Agents.Audio;
 using Emgu.LiteRT.LM.Chat;
 
@@ -33,14 +32,13 @@ namespace Emgu.LiteRT.LM.Maui
     }
 
     /// <summary>
-    /// The default <see cref="IReplySpeaker"/>: MAUI's TextToSpeech reads a reply sentence by sentence while it is written
+    /// The default <see cref="IReplySpeaker"/>: <see cref="ChatVoice"/> (the device's voices, or Kokoro) reads a reply sentence by sentence while it is written
     /// (<see cref="SpeechSegmenter"/>: the answer only - no thinking, code or tables), its Markdown, links and emoji removed
     /// (<see cref="ReplySpeechText.CleanForSpeech"/>), with a voice for its language (<see cref="DetectLanguage"/>, by default
     /// <see cref="TextLanguage.DetectAsync"/>), preferring the device's region. Use it from the UI thread.
     /// </summary>
     public class TextToSpeechReplySpeaker : IReplySpeaker
     {
-        private static IReadOnlyList<Locale> _locales;
         private Reader _reader;
 
         /// <summary>
@@ -73,7 +71,7 @@ namespace Emgu.LiteRT.LM.Maui
         }
 
         /// <summary>
-        /// Speak a text now, with a voice for its language.
+        /// Speak a text now, with the chosen voice for its language (<see cref="ChatVoice"/>: the device's, or Kokoro).
         /// </summary>
         /// <param name="text">The text, as written (Markdown is removed)</param>
         /// <param name="cancellationToken">Stops speaking</param>
@@ -82,9 +80,9 @@ namespace Emgu.LiteRT.LM.Maui
             string speech = ReplySpeechText.CleanForSpeech(text);
             if (speech.Length == 0)
                 return;
-            Locale locale = await ChooseLocaleAsync(await DetectLanguage(speech));
+            string language = await DetectLanguage(speech);
             cancellationToken.ThrowIfCancellationRequested();
-            await TextToSpeech.Default.SpeakAsync(speech, new SpeechOptions { Locale = locale }, cancellationToken);
+            await ChatVoice.SpeakAsync(speech, language, cancellationToken);
         }
 
         // Reads one reply: the segmenter cuts the text into sentences, which are spoken in order, everything that arrived
@@ -176,70 +174,6 @@ namespace Emgu.LiteRT.LM.Maui
                 }
                 if (_finished)
                     _done.TrySetResult(true);
-            }
-        }
-
-        // A voice for the language, preferring the device's own region (e.g. zh-TW on a Taiwanese device); null for the
-        // device's default voice.
-        private static async Task<Locale> ChooseLocaleAsync(string language)
-        {
-            CultureInfo ui = CultureInfo.CurrentUICulture;
-            if (language == null)
-            {
-                // Latin text: the default voice, unless the device's own language uses another script (e.g. a Chinese
-                // device reading an English reply), then an English voice.
-                if (ReplySpeechText.DetectScriptLanguage(ui.NativeName) == null)
-                    return null;
-                language = "en";
-            }
-            IReadOnlyList<Locale> locales = await GetLocalesAsync();
-            List<Locale> matches = locales.Where(l => SameLanguage(l.Language, language)).ToList();
-            if (matches.Count == 0)
-                return null;
-            string region = RegionOf(ui);
-            Locale sameRegion = SameLanguage(ui.TwoLetterISOLanguageName, language)
-                ? matches.FirstOrDefault(l => string.Equals(l.Country, region, StringComparison.OrdinalIgnoreCase))
-                : null;
-            if (sameRegion != null)
-                return sameRegion;
-            // Otherwise the main variant: zh-CN, en-US.
-            string preferred = language == "zh" ? "CN" : language == "en" ? "US" : null;
-            return matches.FirstOrDefault(l => preferred != null && string.Equals(l.Country, preferred, StringComparison.OrdinalIgnoreCase))
-                ?? matches[0];
-        }
-
-        private static async Task<IReadOnlyList<Locale>> GetLocalesAsync()
-        {
-            if (_locales == null)
-            {
-                try
-                {
-                    _locales = (await TextToSpeech.Default.GetLocalesAsync()).ToList();
-                }
-                catch (Exception)
-                {
-                    _locales = Array.Empty<Locale>();
-                }
-            }
-            return _locales;
-        }
-
-        // Locale.Language is a two-letter code on most platforms but may include the region (e.g. "zh-CN").
-        private static bool SameLanguage(string code, string language) =>
-            !string.IsNullOrEmpty(code)
-            && (string.Equals(code, language, StringComparison.OrdinalIgnoreCase)
-                || code.StartsWith(language + "-", StringComparison.OrdinalIgnoreCase)
-                || code.StartsWith(language + "_", StringComparison.OrdinalIgnoreCase));
-
-        private static string RegionOf(CultureInfo culture)
-        {
-            try
-            {
-                return new RegionInfo(culture.Name).TwoLetterISORegionName;
-            }
-            catch (Exception)
-            {
-                return null;
             }
         }
     }

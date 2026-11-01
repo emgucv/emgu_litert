@@ -287,7 +287,7 @@ public sealed class ExerciseFeature : CvFeature, IDisposable
         cts.CancelAfter(limit);
         CameraFeature camera = Camera;
         camera?.BeginSoundMute();
-        try { await MainThread.InvokeOnMainThreadAsync(() => TextToSpeech.Default.SpeakAsync(text, cancelToken: cts.Token)); }
+        try { await MainThread.InvokeOnMainThreadAsync(() => ChatVoice.SpeakTextAsync(text, cts.Token)); }
         catch (Exception) when (!token.IsCancellationRequested) { }
         finally { camera?.EndSoundMute(); }
     }

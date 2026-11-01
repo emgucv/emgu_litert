@@ -4,6 +4,7 @@
 
 #include "omniextern/omniextern.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
@@ -17,9 +18,12 @@
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/match.h"  // from @com_google_absl
 #include "omni/omni_engine.h"
+#include "omni/omni_registry.h"
 #include "omni/omni_session.h"
+#include "omni/text2speech/tts_session.h"
 #include "runtime/proto/speech2text_session_config.pb.h"
 #include "runtime/proto/text2image_session_config.pb.h"
+#include "runtime/proto/text2speech_session_config.pb.h"
 
 namespace {
 
@@ -28,6 +32,7 @@ using ::litert::omni::OmniSession;
 using ::litert::omni::PushInputSource;
 using ::litert::lm::proto::Speech2TextSessionConfig;
 using ::litert::lm::proto::Text2ImageSessionConfig;
+using ::litert::lm::proto::Text2SpeechSessionConfig;
 
 // The sample rate the app pushes; the session resamples to the model's.
 constexpr int kInputSampleRateHz = 16000;
@@ -94,6 +99,12 @@ struct OmniExternEngine {
 
 struct OmniExternImageEngine {
   std::unique_ptr<OmniEngine> engine;
+};
+
+// The session factory itself rather than an OmniEngine (which hides it): it lists the voices and languages.
+struct OmniExternTtsEngine {
+  std::unique_ptr<litert::omni::OmniSessionFactory> factory;
+  litert::omni::tts::TtsSessionFactory* tts = nullptr;  // the same object
 };
 
 struct OmniExternSession {
@@ -340,5 +351,149 @@ int omniextern_image_generate(OmniExternImageEngine* engine, const char* prompt,
 }
 
 void omniextern_free_buffer(void* buffer) { std::free(buffer); }
+
+int omniextern_tts_engine_create(const char* model_name, const char* model_path, const char* backend,
+                                 int num_threads, const char* language, const char* voice, const char* cache_dir,
+                                 OmniExternTtsEngine** out_engine) {
+  if (out_engine != nullptr) *out_engine = nullptr;
+  if (model_name == nullptr || model_path == nullptr || out_engine == nullptr) {
+    return Fail(absl::StatusCode::kInvalidArgument, "model_name, model_path and out_engine are required.");
+  }
+  return Guard([&]() -> int {
+    OmniEngine::Settings settings = MakeSettings(model_path, backend, num_threads);
+    if (cache_dir != nullptr && cache_dir[0] != '\0') {
+      settings.cache_dir = cache_dir;
+    }
+    Text2SpeechSessionConfig session_config;
+    if (language != nullptr && language[0] != '\0') {
+      session_config.set_language(language);
+    }
+    if (voice != nullptr && voice[0] != '\0') {
+      session_config.set_voice(voice);
+    }
+    // Cut only at line breaks: every acoustic run costs about the same (Kokoro's frames are a fixed size, about 10 s of
+    // speech), so a run per sentence - LiteRT-LM's default - spends a whole run on "Hello."; the caller groups short
+    // sentences into one text, and Kokoro still splits a text too long for one run by itself.
+    session_config.mutable_text_chunk_config()->add_delimiters("\n");
+    auto factory = litert::omni::OmniRegistry::Get().CreateSessionFactory(model_name, settings, &session_config);
+    if (!factory.ok()) {
+      return Fail(factory.status());
+    }
+    auto* tts = dynamic_cast<litert::omni::tts::TtsSessionFactory*>(factory->get());
+    if (tts == nullptr) {
+      return Fail(absl::StatusCode::kInvalidArgument, std::string(model_name) + " isn't a text-to-speech model.");
+    }
+    // A voice of another language is only noticed when a session is made: check it now, with the message LiteRT-LM gives.
+    auto check = (*factory)->Create(std::make_unique<PushInputSource>());
+    if (!check.ok()) {
+      return Fail(check.status());
+    }
+    *out_engine = new OmniExternTtsEngine{std::move(*factory), tts};
+    return OMNIEXTERN_STATUS_OK;
+  });
+}
+
+void omniextern_tts_engine_delete(OmniExternTtsEngine* engine) { delete engine; }
+
+namespace {
+
+char* JoinLines(const std::vector<std::string>& lines) {
+  std::string text;
+  for (const std::string& line : lines) {
+    if (!text.empty()) text += '\n';
+    text += line;
+  }
+  return CopyString(text);
+}
+
+}  // namespace
+
+int omniextern_tts_engine_get_voices(OmniExternTtsEngine* engine, const char* language, char** out_names) {
+  if (out_names != nullptr) *out_names = nullptr;
+  if (engine == nullptr || out_names == nullptr) {
+    return Fail(absl::StatusCode::kInvalidArgument, "engine and out_names are required.");
+  }
+  return Guard([&]() -> int {
+    *out_names = JoinLines(language == nullptr || language[0] == '\0' ? engine->tts->GetAvailableVoices()
+                                                                      : engine->tts->GetAvailableVoices(language));
+    return OMNIEXTERN_STATUS_OK;
+  });
+}
+
+int omniextern_tts_engine_get_languages(OmniExternTtsEngine* engine, char** out_names) {
+  if (out_names != nullptr) *out_names = nullptr;
+  if (engine == nullptr || out_names == nullptr) {
+    return Fail(absl::StatusCode::kInvalidArgument, "engine and out_names are required.");
+  }
+  return Guard([&]() -> int {
+    *out_names = JoinLines(engine->tts->GetAvailableLanguages());
+    return OMNIEXTERN_STATUS_OK;
+  });
+}
+
+int omniextern_tts_engine_get_default_voice(OmniExternTtsEngine* engine, const char* language, char** out_voice) {
+  if (out_voice != nullptr) *out_voice = nullptr;
+  if (engine == nullptr || language == nullptr || out_voice == nullptr) {
+    return Fail(absl::StatusCode::kInvalidArgument, "engine, language and out_voice are required.");
+  }
+  return Guard([&]() -> int {
+    *out_voice = CopyString(engine->tts->GetDefaultVoice(language));
+    return OMNIEXTERN_STATUS_OK;
+  });
+}
+
+int omniextern_tts_synthesize(OmniExternTtsEngine* engine, const char* text, float** out_pcm, int* out_count,
+                              int* out_sample_rate) {
+  if (out_pcm != nullptr) *out_pcm = nullptr;
+  if (out_count != nullptr) *out_count = 0;
+  if (engine == nullptr || text == nullptr || out_pcm == nullptr || out_count == nullptr || out_sample_rate == nullptr) {
+    return Fail(absl::StatusCode::kInvalidArgument, "engine, text and the out parameters are required.");
+  }
+  return Guard([&]() -> int {
+    auto input = std::make_unique<PushInputSource>();
+    PushInputSource* raw_input = input.get();
+    auto session = engine->factory->Create(std::move(input));
+    if (!session.ok()) {
+      return Fail(session.status());
+    }
+    absl::Status status = raw_input->PushInput(OmniSession::TextInput{.text = text});
+    if (!status.ok()) {
+      return Fail(status);
+    }
+    raw_input->Finish();
+    // The sentences' audio as it is made, then what Flush still holds.
+    std::vector<float> pcm;
+    int sample_rate = 24000;
+    auto append = [&](const OmniSession::Output& output) {
+      if (const auto* audio = std::get_if<litert::omni::AudioOutput>(&output)) {
+        pcm.insert(pcm.end(), audio->pcm_samples.begin(), audio->pcm_samples.end());
+        if (audio->sample_rate_hz > 0) sample_rate = audio->sample_rate_hz;
+      }
+    };
+    while (true) {
+      absl::StatusOr<OmniSession::Output> output = (*session)->ProcessNext();
+      if (!output.ok()) {
+        if (absl::IsNotFound(output.status()) || absl::IsOutOfRange(output.status())) break;
+        return Fail(output.status());
+      }
+      if (std::holds_alternative<litert::omni::EndOfOutput>(*output)) break;
+      append(*output);
+    }
+    absl::StatusOr<OmniSession::Output> last = (*session)->Flush();
+    if (!last.ok() && !absl::IsOutOfRange(last.status()) && !absl::IsNotFound(last.status())) {
+      return Fail(last.status());
+    }
+    if (last.ok()) append(*last);
+    auto* buffer = static_cast<float*>(std::malloc(std::max<size_t>(1, pcm.size()) * sizeof(float)));
+    if (buffer == nullptr) {
+      return Fail(absl::StatusCode::kResourceExhausted, "Out of memory for the audio.");
+    }
+    if (!pcm.empty()) std::memcpy(buffer, pcm.data(), pcm.size() * sizeof(float));
+    *out_pcm = buffer;
+    *out_count = static_cast<int>(pcm.size());
+    *out_sample_rate = sample_rate;
+    return OMNIEXTERN_STATUS_OK;
+  });
+}
 
 }  // extern "C"

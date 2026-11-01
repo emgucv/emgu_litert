@@ -152,6 +152,7 @@ def curated():
         ("Z-Image-Turbo", "litert-community/Z-Image-Turbo-LiteRT", "Tongyi-MAI/Z-Image-Turbo", "Alibaba Tongyi-MAI"),
         ("Bonsai Image 4B", "litert-community/Bonsai-Image-ternary-4B", "prism-ml/bonsai-image-ternary-4B-unpacked", "PrismML"),
         ("FLUX.2-klein 4B", "litert-community/FLUX.2-klein-4B-LiteRT", "black-forest-labs/FLUX.2-klein-4B", "Black Forest Labs"),
+        ("Kokoro 82M", "litert-community/Kokoro-82M", "hexgrad/Kokoro-82M", "hexgrad"),
     ]:
         add(model, name, "Apache-2.0", APACHE, copyright=by, url=hf + base,
             used_for="LiteRT conversion: " + hf + repo)
@@ -395,6 +396,9 @@ NATIVE_NAMES = {
     "zlib": ("zlib", "https://zlib.net"), "minizip": ("minizip", "https://zlib.net"), "skia": ("Skia", "https://skia.org"),
     "slinky": ("Slinky", "https://github.com/dsharlet/slinky"), "opencl_headers": ("OpenCL headers", "https://github.com/KhronosGroup/OpenCL-Headers"),
     "vulkan_headers": ("Vulkan headers", "https://github.com/KhronosGroup/Vulkan-Headers"),
+    "cppjieba": ("CppJieba", "https://github.com/yanyiwu/cppjieba"),
+    "dawn": ("Dawn (WebGPU)", "https://dawn.googlesource.com/dawn"),
+    "ml_drift": ("ML Drift", "https://github.com/google-ai-edge/ml-drift"),
 }
 
 # Licence names where the text alone is ambiguous ("BSD") or lists several (Eigen); and which files to show.
@@ -405,6 +409,7 @@ NATIVE_LICENSES = {
     "kissfft": "BSD-3-Clause", "KleidiAI": "Apache-2.0 and BSD-3-Clause", "farmhash_archive": "MIT", "FP16": "MIT", "FXdiv": "MIT",
     "eigen_archive": "MPL-2.0 (some files BSD-3-Clause, Apache-2.0 or MINPACK)", "miniaudio": "Public domain (Unlicense) or MIT-0",
     "stb": "MIT or public domain", "nlohmann_json": "MIT", "slinky": "MIT", "zlib": "zlib", "minizip": "zlib",
+    "cppjieba": "MIT",
 }
 # Eigen also ships the GPL/LGPL texts of modules this build doesn't use.
 NATIVE_FILES = {"eigen_archive": ["COPYING.README", "COPYING.MPL2", "COPYING.BSD", "COPYING.APACHE", "COPYING.MINPACK"]}
@@ -445,7 +450,8 @@ def bazel_repositories():
     """The external repositories the native libraries are built from, by `bazel query` in the LiteRT-LM workspace."""
     cached = os.path.join(CACHE, "bazel_repos.txt")
     if not os.path.exists(cached):
-        query = "deps(//c:litert-lm) union deps(//tfliteextern:litert_runtime_so) union deps(//tfliteextern:tfliteextern_so)"
+        query = ("deps(//c:litert-lm) union deps(//tfliteextern:litert_runtime_so) union deps(//tfliteextern:tfliteextern_so)"
+                 " union deps(//omniextern:omniextern)")
         out = subprocess.run(["bazel", "--output_user_root=" + os.path.join(REPO, "bazel_output"), "query", query, "--output=package",
                               "--noimplicit_deps", "--notool_deps"], cwd=os.path.join(REPO, "LiteRT-LM"), capture_output=True, text=True).stdout
         repos = sorted({line.split("//")[0][1:] for line in out.splitlines() if line.startswith("@")})
