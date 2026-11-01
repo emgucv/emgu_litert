@@ -64,8 +64,8 @@ namespace Emgu.LiteRT.LM.Models
             get { return Path.Combine(Path.GetDirectoryName(ModelFile.LocalFile), CacheFolderName); }
         }
 
-        /// <summary>The name of <see cref="CacheFolder"/> in the models' folder.</summary>
-        public String CacheFolderName
+        /// <summary>The name of <see cref="CacheFolder"/> in the models' folder: "&lt;model name&gt;-cache" by default.</summary>
+        public virtual String CacheFolderName
         {
             get { return ModelName + "-cache"; }
         }
@@ -273,6 +273,70 @@ namespace Emgu.LiteRT.LM.Models
         public override int ImageSize
         {
             get { return 256; }
+        }
+    }
+
+    /// <summary>
+    /// Bonsai Image 4B for 512 x 512 pictures: litert-community's .litertlm repackaged by Emgu with the 512 graphs - the
+    /// diffusion transformer from litert-community/Bonsai-Image-ternary-4B (dit_gpu_int4b32.tflite) and a VAE decoder
+    /// exported by Emgu with GroupNorm written for GPU delegates (Emgu.LiteRT.Models/tools/export_flux2_vae_decoder.py),
+    /// so it runs on the CPU and the GPU. Apache-2.0 (the notice is beside the file on Emgu's public S3). One 4.3 GB
+    /// .litertlm, downloaded on Init. On an M1 (2026-11-01): 66 s a picture on the CPU (6.0 GB at the peak), 25 s on
+    /// the GPU (Metal, 2.3 GB); the first load writes the caches (23-24 s).
+    /// </summary>
+    public class BonsaiImage4B512 : TextToImageModel
+    {
+        /// <summary>The model file's size in bytes.</summary>
+        public const long FileSize = 4267950124;
+
+        /// <summary>The model file, on Emgu's public S3.</summary>
+        public static DownloadableFile DefaultModelFile
+        {
+            get
+            {
+                return new DownloadableFile(
+                    "https://emgu-public.s3.amazonaws.com/bonsai/bonsai-flux2-4b-512.litertlm",
+                    LanguageModel.DefaultLocalSubfolder,
+                    "0bd495cf0a034ff8e06d692cca17036d4d8ab459cb7fa5d6b1d9552cf00fbdba");
+            }
+        }
+
+        private readonly DownloadableFile _modelFile = DefaultModelFile;
+
+        /// <inheritdoc/>
+        public override String ModelName
+        {
+            get { return BonsaiImage4B.RegisteredName; }
+        }
+
+        /// <inheritdoc/>
+        public override String DisplayName
+        {
+            get { return "Bonsai Image 4B 512"; }
+        }
+
+        /// <summary>"bonsai-flux2-512-cache": the 256 model, with the same registered name, keeps its own.</summary>
+        public override String CacheFolderName
+        {
+            get { return ModelName + "-512-cache"; }
+        }
+
+        /// <inheritdoc/>
+        public override DownloadableFile ModelFile
+        {
+            get { return _modelFile; }
+        }
+
+        /// <inheritdoc/>
+        public override long DownloadSize
+        {
+            get { return FileSize; }
+        }
+
+        /// <inheritdoc/>
+        public override int ImageSize
+        {
+            get { return 512; }
         }
     }
 

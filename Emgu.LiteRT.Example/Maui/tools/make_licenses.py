@@ -155,6 +155,11 @@ def curated():
     ]:
         add(model, name, "Apache-2.0", APACHE, copyright=by, url=hf + base,
             used_for="LiteRT conversion: " + hf + repo)
+    add(model, "Bonsai Image 4B 512", "Apache-2.0", fetch("https://emgu-public.s3.amazonaws.com/bonsai/bonsai512_notice.txt") + "\n\n" +
+        fetch("https://emgu-public.s3.amazonaws.com/bonsai/bonsai512_license.txt"),
+        copyright="Prism ML, Inc.; Black Forest Labs; Alibaba Cloud", url=hf + "prism-ml/bonsai-image-ternary-4B-unpacked",
+        used_for="512 x 512 pictures (Mac): litert-community's Bonsai Image .litertlm repackaged by Emgu with the 512 graphs "
+        "and a VAE decoder exported for GPUs. Created using Bonsai Image by Prism ML.")
     add(model, "YOLOX-Nano", "Apache-2.0", fetch("https://emgu-public.s3.amazonaws.com/yolox/yolox_notice.txt") + "\n\n" +
         fetch("https://emgu-public.s3.amazonaws.com/yolox/yolox_license.txt"),
         copyright="Megvii, Inc. and its affiliates", url="https://github.com/Megvii-BaseDetection/YOLOX",

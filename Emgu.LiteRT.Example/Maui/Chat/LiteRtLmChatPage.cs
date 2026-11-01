@@ -279,7 +279,8 @@ public sealed class LiteRtLmChatPage : ChatPage
 
     // Settings > Image model: LiteRT-LM's Bonsai Image 4B (the default) and FLUX.2-klein 4B where libomniextern is in the
     // app (not on Windows yet), on the CPU and - where the app has LiteRT's GPU plugin (Mac Catalyst's Metal, Android's
-    // OpenCL) - on the GPU, then Z-Image-Turbo. A model's CPU and GPU choices share its file.
+    // OpenCL) - on the GPU, Bonsai at 512 x 512 on Mac Catalyst, then Z-Image-Turbo. A model's CPU and GPU choices share
+    // its file.
     private static List<ImageModelOption> ImageModelOptions()
     {
         var options = new List<ImageModelOption>();
@@ -295,6 +296,16 @@ public sealed class LiteRtLmChatPage : ChatPage
             options.Add(new ImageModelOption("bonsai_gpu", "Bonsai Image 4B · GPU",
                 "The same model on the GPU: about 11 s a picture on a Mac. The first load compiles the GPU programs (about 30 s); a GPU without enough memory (an 8 GB phone's) falls back to the CPU.", bonsai,
                 () => new OmniImageModel(new BonsaiImage4B(), "gpu", caches)));
+#endif
+#if MACCATALYST
+            // 512 x 512 on computers only: on a phone's CPU a picture would take a quarter of an hour.
+            string bonsai512 = System.IO.Path.GetFileName(BonsaiImage4B512.DefaultModelFile.LocalFile);
+            options.Add(new ImageModelOption("bonsai_512_gpu", "Bonsai Image 4B 512 · GPU",
+                "512 x 512, 4 steps; a 4.3 GB download (Emgu's repackaging). About 25 s a picture on a Mac's GPU; the first load compiles the GPU programs (about 25 s).", bonsai512,
+                () => new OmniImageModel(new BonsaiImage4B512(), "gpu", caches)));
+            options.Add(new ImageModelOption("bonsai_512", "Bonsai Image 4B 512 · CPU",
+                "The same model on the CPU: about 65 s a picture on a Mac.", bonsai512,
+                () => new OmniImageModel(new BonsaiImage4B512(), "cpu", caches)));
 #endif
             options.Add(new ImageModelOption("flux2_klein", "FLUX.2-klein 4B · CPU",
                 "256 x 256, 4 steps; a 4.7 GB download. About 25 s a picture on a computer, minutes on a phone.", klein,
@@ -330,7 +341,8 @@ public sealed class LiteRtLmChatPage : ChatPage
         {
             using var bonsai = new BonsaiImage4B();
             using var klein = new Flux2Klein4B();
-            foreach (TextToImageModel model in new TextToImageModel[] { bonsai, klein })
+            using var bonsai512 = new BonsaiImage4B512();
+            foreach (TextToImageModel model in new TextToImageModel[] { bonsai, bonsai512, klein })
                 models.Add(StorageModel.Image(model.DisplayName, System.IO.Path.GetFileName(model.ModelFile.LocalFile),
                     "Image model and its CPU/GPU caches. Deleting the chosen one turns image generation off.", model.CacheFolderName));
         }

@@ -525,7 +525,9 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   FLUX.2-klein 4B through `OmniImageModel` (`Emgu.LiteRT.LM.Models`' `TextToImageModel`, `libomniextern`), each on the CPU
   and - on Mac Catalyst and Android - the GPU, where `libomniextern` is in the app (not Windows yet), then Z-Image-Turbo.
   Both omni models draw 256 x 256 in 4 steps from one 4.3-4.7 GB file plus a cache folder of ~3.6 GB per backend; on an
-  M1 Bonsai takes 24 s on the CPU and 11 s on Metal (`Emgu.LiteRT.Models/MODELS.md`). They draw a picture in one call,
+  M1 Bonsai takes 24 s on the CPU and 11 s on Metal (`Emgu.LiteRT.Models/MODELS.md`). On Mac Catalyst the demo also
+  offers "Bonsai Image 4B 512" (GPU and CPU): Emgu's repackaging for 512 x 512 from its public S3, 25 s on Metal and 66 s
+  on the CPU. They draw a picture in one call,
   so the tile shows "Drawing the picture (12 s)" instead of the steps, and Stop leaves the picture to finish in the
   background (thrown away). Switching models lets the old one go and asks before downloading the new one; each model is
   its own Storage row (`StorageModel.Image` with its cache folder; Z-Image-Turbo's folder as before), and deleting the

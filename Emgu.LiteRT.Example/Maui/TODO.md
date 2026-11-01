@@ -723,4 +723,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [x] Regenerate `Resources/Raw/licenses.json.gz` with `tools/make_licenses.py` (Bonsai Image and FLUX.2-klein added to its list; 2026-11-01).
 - [ ] Windows: `libomniextern` isn't built there yet, so the demo offers Z-Image-Turbo only.
 - [ ] iOS on a device (8 GB iPhones are the floor by the model card); the simulator build links.
+- [x] Bonsai at 512 x 512 (2026-11-01): Emgu's repackaging with a GPU-friendly VAE decoder (`tools/export_flux2_vae_decoder.py`, `MODELS.md`), on Emgu's public S3; `BonsaiImage4B512`, offered on Mac Catalyst (CPU and GPU); 66 s / 25 s on an M1.
+- [ ] Bonsai 512 on phones: on the Pixel Fold's GPU (2026-11-01) it loads in 159 s and draws in 201 s, but at 7.0 GB PSS (about 5 GB of GPU memory) Android closed the other apps and then killed the demo (in the background) before a second picture. To offer it on 12 GB phones: try with the demo in front, release the chat model while drawing, and limit it to phones with 12 GB or more.
 - [ ] Maybe: prune caches of an older copy of the model file (their names carry the file's time and size) when it is downloaded again.

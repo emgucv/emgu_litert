@@ -29,10 +29,16 @@ public class UnitTestTextToImageArguments
     public void DescribesTheModels()
     {
         using var bonsai = new BonsaiImage4B();
+        using var bonsai512 = new BonsaiImage4B512();
         using var klein = new Flux2Klein4B();
         Assert.That(bonsai.ModelName, Is.EqualTo("bonsai-flux2"));
         Assert.That(klein.ModelName, Is.EqualTo("flux2-klein"));
-        foreach (TextToImageModel model in new TextToImageModel[] { bonsai, klein })
+        Assert.That((bonsai.ImageSize, bonsai512.ImageSize, klein.ImageSize), Is.EqualTo((256, 512, 256)));
+        // The 512 file has the same registered name as the 256 one: its caches go in a folder of their own.
+        Assert.That(bonsai512.ModelName, Is.EqualTo(bonsai.ModelName));
+        Assert.That(bonsai512.CacheFolderName, Is.Not.EqualTo(bonsai.CacheFolderName));
+        Assert.That(bonsai512.ModelFile.LocalFile, Is.Not.EqualTo(bonsai.ModelFile.LocalFile));
+        foreach (TextToImageModel model in new TextToImageModel[] { bonsai, bonsai512, klein })
         {
             Assert.That(model.ImageSize % 16, Is.EqualTo(0));
             Assert.That(model.DefaultSteps, Is.EqualTo(4));
@@ -89,7 +95,7 @@ public class UnitTestTextToImage
         var watch = Stopwatch.StartNew();
         TextToImageResult first = await model.GenerateAsync(Prompt, 42);
         TestContext.Progress.WriteLine($"First picture in {watch.Elapsed.TotalSeconds:F1} s");
-        CheckPicture(model, first, model.ModelName + "_fox");
+        CheckPicture(model, first, $"{model.ModelName}_{model.ImageSize}_fox");
         watch.Restart();
         TextToImageResult again = await model.GenerateAsync(Prompt, 42);
         TestContext.Progress.WriteLine($"Again in {watch.Elapsed.TotalSeconds:F1} s");
@@ -117,6 +123,16 @@ public class UnitTestTextToImage
 #endif
     [Test]
     public Task Flux2KleinDrawsTheSamePictureForTheSameSeed() => DrawsTheSamePictureForTheSameSeed<Flux2Klein4B>();
+
+#if !TEST_MODELS
+#if VS_TEST
+    [Ignore()]
+#else
+    [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+    [Test]
+    public Task Bonsai512DrawsTheSamePictureForTheSameSeed() => DrawsTheSamePictureForTheSameSeed<BonsaiImage4B512>();
 
 #if !TEST_MODELS
 #if VS_TEST
