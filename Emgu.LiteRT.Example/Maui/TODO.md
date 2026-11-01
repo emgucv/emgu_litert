@@ -98,10 +98,10 @@ Still to do:
 - [ ] Windows: build with `bazel_build_litert.ps1 64` and `cmake_build_litert.ps1`, regenerate `litert_windows_exports.def`,
       check `omniextern` builds with MSVC; rebase `bazel_build_windows_gpu.ps1`'s pins and `gpu_source_patches/`.
 - [ ] The agent regression test (item 7) with v0.19.0.
-- [ ] The demo: offer the GPU search models on Apple and Android too (only `WINDOWS_WEBGPU` builds list them).
+- [x] The demo: offer the GPU search models on Mac Catalyst and Android too (item 11, 2026-11-01).
 - [ ] Ubuntu/Debian natives (CI builds them).
 
-## 11. GPU for the embedding models — Windows, Mac (Metal), a Galaxy S10 and the Pixel Fold (OpenCL) checked; the demo offers it on Windows only
+## 11. GPU for the embedding models — Windows, Mac (Metal), a Galaxy S10 and the Pixel Fold (OpenCL) checked; the demo offers it on Windows, Mac Catalyst and Android
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
@@ -109,9 +109,11 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       no longer refuses the GPU.
 - [x] CPU/GPU embeddings on a Mac (Metal: text, image and audio, cosine above 0.99, search unchanged, ~3x faster), a Galaxy
       S10 and the Pixel Fold (OpenCL: text, cosine above 0.997, 3-5x faster); docs/litert-lm.md.
-- [ ] Offer the GPU search models in the demo on Apple and Android (only `WINDOWS_WEBGPU` builds list them), and check images,
-      audio and search on a phone's GPU.
-- [ ] Verify simultaneous chat/search GPU memory use and indexing performance on phones.
+- [x] Offer the GPU search models in the demo on Mac Catalyst and Android (2026-11-01), and check images, audio and search on
+      a phone's GPU: on the S10, image cosines 0.9896-0.9983, audio 0.9982, 4/4 searches; docs/litert-lm.md.
+- [x] Simultaneous chat/search GPU memory and indexing speed on the S10 (2026-11-01): Gemma 4 E2B and the 740M model both on
+      the GPU, PSS 4.1 GB with 1.1 GB left, no kill; 4 photos in 6.2 s (CPU 29.0 s), a 20 s video in 15.8 s (CPU 72.5 s).
+- [ ] The same on the Pixel Fold (it was off adb), and the GPU options in the Catalyst demo's list; iOS untried.
 
 ## 12. Pixel Fold freeze — rendering stalls fixed; original ANR unconfirmed
 

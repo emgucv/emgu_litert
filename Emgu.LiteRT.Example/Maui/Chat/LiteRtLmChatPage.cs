@@ -242,19 +242,27 @@ public sealed class LiteRtLmChatPage : ChatPage
 
     private SearchEmbedder Embedder => _parts.SearchModel.Embedder;
 
-    // Settings > Embedding model: the library's two EmbeddingGemma 2 models on the CPU, and on Windows also on the GPU
-    // (WebGPU over Direct3D 12; a failed load offers the CPU).
+    // Settings > Embedding model: the library's two EmbeddingGemma 2 models on the CPU, and also on the GPU where the app
+    // has LiteRT's GPU plugin - Windows (WebGPU over Direct3D 12), Mac Catalyst (Metal) and Android (OpenCL; since
+    // LiteRT-LM v0.19.0, whose LiteRT fixed the plugins' crash on these models). iOS has no GPU plugin. A failed GPU load
+    // offers the CPU.
     private static List<SearchModelOption> SearchModelOptions()
     {
         var options = new List<SearchModelOption> { SearchModelOption.EmbeddingGemma2TextVision(), SearchModelOption.EmbeddingGemma2Multimodal() };
+#if WINDOWS_WEBGPU || MACCATALYST || ANDROID
 #if WINDOWS_WEBGPU
-        const string gpuNote = " A compatible Direct3D 12 GPU is required.";
+        const string gpu = "Windows GPU", gpuNote = " A compatible Direct3D 12 GPU is required.";
+#elif MACCATALYST
+        const string gpu = "the Mac's GPU (Metal)", gpuNote = " The first load compiles the GPU programs (about 20 s), later ones take seconds.";
+#else
+        const string gpu = "the phone's GPU (OpenCL)", gpuNote = " The first load compiles the GPU programs (about 20 s), later ones take seconds.";
+#endif
         options.Add(new SearchModelOption("text_vision_gpu", "EmbeddingGemma 2 Text Vision 440M · GPU",
             () => new EmbeddingGemma2TextVision { VisionBackend = "gpu", AudioBackend = "gpu" },
-            options[0].Detail + " Text and vision embeddings use Windows GPU." + gpuNote) { Backend = "gpu", CpuFallback = "text_vision" });
+            options[0].Detail + " Text and vision embeddings use " + gpu + "." + gpuNote) { Backend = "gpu", CpuFallback = "text_vision" });
         options.Add(new SearchModelOption("multimodal_gpu", "EmbeddingGemma 2 Multimodal 740M · GPU",
             () => new EmbeddingGemma2Multimodal { VisionBackend = "gpu", AudioBackend = "gpu" },
-            options[1].Detail + " Text, vision and audio embeddings use Windows GPU." + gpuNote) { Backend = "gpu", CpuFallback = "multimodal" });
+            options[1].Detail + " Text, vision and audio embeddings use " + gpu + "." + gpuNote) { Backend = "gpu", CpuFallback = "multimodal" });
 #endif
         return options;
     }

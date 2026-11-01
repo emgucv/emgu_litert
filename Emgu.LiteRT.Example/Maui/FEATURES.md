@@ -319,7 +319,11 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - All images are re-encoded as JPEG of at most 1024 px with Emgu CV. Pictures and page images (at most 24 on desktops, 10
     on phones, page images first) are only indexed when the selected model takes images; only the first 150 pages are read.
 - The index uses the shared search model (`SearchEmbedder`, EmbeddingGemma 2 Text Vision by default; downloaded on first use,
-  kept while the page is open, released with it).
+  kept while the page is open, released with it). Settings > Embedding model also lists both models on the GPU on Windows
+  (WebGPU builds), the Mac (Metal) and Android (OpenCL), falling back to the CPU when the GPU load fails; the first GPU load
+  compiles its programs (about 20 s). On a Galaxy S10 (2026-11-01, temporary self-test, the 740M model): 4 photos indexed in
+  6.2 s against 29.0 s on the CPU, a 20 s video in 15.8 s against 72.5 s, the same search results; with Gemma 4 E2B also
+  on the GPU the app used 4.1 GB (PSS) with 1.1 GB left, and wasn't killed.
 - Indexes are saved in the chat database: `ChatHistoryStore`'s `Document` (id = the file's SHA-256 in hex, name, pages, chip
   summary, `Settings`) and `DocumentItem` (each passage's text and location, or each image's bytes, media type, location and
   page flag, with its embedding as floats), plus `Conversation.DocumentId`.
