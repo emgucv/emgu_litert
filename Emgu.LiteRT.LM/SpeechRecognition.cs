@@ -9,7 +9,7 @@ namespace Emgu.LiteRT.LM
 {
     /// <summary>
     /// P/Invoke entry points into libomniextern, Emgu's C API over LiteRT-LM's OmniEngine (omni/, which LiteRT-LM only
-    /// has in C++): speech recognition for now. It is built from litertextern/omniextern in LiteRT-LM's Bazel workspace
+    /// has in C++): speech recognition and text to image. It is built from litertextern/omniextern in LiteRT-LM's Bazel workspace
     /// and links against libLiteRt, like liblitert-lm. Its functions return a status (LiteRtLmStatusCode's values) and
     /// record a message for the calling thread, as LiteRT-LM's C API does; nothing is thrown across it.
     /// </summary>
@@ -64,6 +64,20 @@ namespace Emgu.LiteRT.LM
 
         [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
         internal static extern void omniextern_free_string(IntPtr text);
+
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern LiteRtLmStatusCode omniextern_image_engine_create(byte[] modelName, byte[] modelPath,
+            byte[] backend, int numThreads, int size, byte[] cacheDir, out IntPtr engine);
+
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern void omniextern_image_engine_delete(IntPtr engine);
+
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern LiteRtLmStatusCode omniextern_image_generate(IntPtr engine, byte[] prompt, int steps,
+            ulong seed, out IntPtr rgb, out int width, out int height, out int channels);
+
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern void omniextern_free_buffer(IntPtr buffer);
 
         private static bool? _isAvailable;
 

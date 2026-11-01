@@ -134,10 +134,10 @@ public sealed class LiteRtLmChatPage : ChatPage
         parts.Server = new ServerFeature();
         models.Add(parts.Server.Option);
         parts.Workload = new DeviceIndexingWorkload();
-        // Pictures drawn with Z-Image-Turbo: the demo's model selector above the switch, and a Save As dialog.
+        // Pictures drawn with the demo's image models (Settings > Image model), and a Save As dialog.
         parts.Images = new ImageFeature(parts.Workload)
         {
-            ModelSelector = BuildImageModelSelector,
+            ModelOptions = ImageModelOptions(),
             PictureSaver = async (png, fileName) =>
             {
                 using var stream = new System.IO.MemoryStream(png, writable: false);
@@ -277,14 +277,36 @@ public sealed class LiteRtLmChatPage : ChatPage
         return settings;
     }
 
-    // The image-generation model's selector, above the image feature's switch (one choice today).
-    private static View BuildImageModelSelector()
+    // Settings > Image model: LiteRT-LM's Bonsai Image 4B (the default) and FLUX.2-klein 4B where libomniextern is in the
+    // app (not on Windows yet), on the CPU and - where the app has LiteRT's GPU plugin (Mac Catalyst's Metal, Android's
+    // OpenCL) - on the GPU, then Z-Image-Turbo. A model's CPU and GPU choices share its file.
+    private static List<ImageModelOption> ImageModelOptions()
     {
-        var button = new Button { Text = "Z-Image-Turbo · CPU", HorizontalOptions = LayoutOptions.Fill };
-        button.Clicked += async (_, _) =>
-            await Application.Current.Windows[0].Page.DisplayActionSheetAsync("Image-generation model", "Cancel", null, "Z-Image-Turbo · CPU");
-        return new VerticalStackLayout { Spacing = 6, Children = { Theme.SectionTitle("Image-generation model"), button,
-            new Label { Text = "Z-Image-Turbo is the only available image model. 10.6 GB download, 256 × 256 images. GPU execution is not supported by this selector.", FontFamily = Theme.BodyFont, FontSize = 12, TextColor = Theme.SecondaryText } } };
+        var options = new List<ImageModelOption>();
+        if (Emgu.LiteRT.LM.OmniInvoke.IsAvailable)
+        {
+            const long caches = 3_600_000_000L;
+            string bonsai = System.IO.Path.GetFileName(BonsaiImage4B.DefaultModelFile.LocalFile);
+            string klein = System.IO.Path.GetFileName(Flux2Klein4B.DefaultModelFile.LocalFile);
+            options.Add(new ImageModelOption("bonsai", "Bonsai Image 4B · CPU",
+                "256 x 256, 4 steps; a 4.3 GB download. About 25 s a picture on a computer, 4-5 minutes on an older phone.", bonsai,
+                () => new OmniImageModel(new BonsaiImage4B(), "cpu", caches)));
+#if MACCATALYST || ANDROID
+            options.Add(new ImageModelOption("bonsai_gpu", "Bonsai Image 4B · GPU",
+                "The same model on the GPU: about 11 s a picture on a Mac. The first load compiles the GPU programs (about 30 s); a GPU without enough memory (an 8 GB phone's) falls back to the CPU.", bonsai,
+                () => new OmniImageModel(new BonsaiImage4B(), "gpu", caches)));
+#endif
+            options.Add(new ImageModelOption("flux2_klein", "FLUX.2-klein 4B · CPU",
+                "256 x 256, 4 steps; a 4.7 GB download. About 25 s a picture on a computer, minutes on a phone.", klein,
+                () => new OmniImageModel(new Flux2Klein4B(), "cpu", caches)));
+#if MACCATALYST || ANDROID
+            options.Add(new ImageModelOption("flux2_klein_gpu", "FLUX.2-klein 4B · GPU",
+                "The same model on the GPU: about 17 s a picture on a Mac. The first load compiles the GPU programs (about 30 s); a GPU without enough memory (an 8 GB phone's) falls back to the CPU.", klein,
+                () => new OmniImageModel(new Flux2Klein4B(), "gpu", caches)));
+#endif
+        }
+        options.Add(ImageFeature.ZImageTurboOption);
+        return options;
     }
 
     // What the storage page lists: the catalog's models, the two search models (downloadable again from the page), the
@@ -304,6 +326,14 @@ public sealed class LiteRtLmChatPage : ChatPage
                 ParakeetTdt06BV3.ObsoleteFileNames,
                 "Speech recognition model. Deleting goes back to the device's speech recognizer.",
                 new[] { ParakeetTdt06BV3.RegisteredName }));
+        if (Emgu.LiteRT.LM.OmniInvoke.IsAvailable)
+        {
+            using var bonsai = new BonsaiImage4B();
+            using var klein = new Flux2Klein4B();
+            foreach (TextToImageModel model in new TextToImageModel[] { bonsai, klein })
+                models.Add(StorageModel.Image(model.DisplayName, System.IO.Path.GetFileName(model.ModelFile.LocalFile),
+                    "Image model and its CPU/GPU caches. Deleting the chosen one turns image generation off.", model.CacheFolderName));
+        }
         using var image = new ZImageTurbo();
         return new StorageCatalog(SharedStore, System.IO.Path.GetDirectoryName(catalog[0].ModelFile.LocalFile), ExportFeature.ExportFolder, models,
             new[]

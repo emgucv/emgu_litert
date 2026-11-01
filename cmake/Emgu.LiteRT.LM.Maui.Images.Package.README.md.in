@@ -2,17 +2,27 @@
 
 This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
 
-- `Emgu.LiteRT.LM.Maui.Images.dll`: `ImageFeature`, a feature of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `ChatPage` that lets the model draw pictures ("draw a red fox in the snow") with Z-Image-Turbo (`${EMGU_LITERT_MODELS_NUGET_ID}`' `ZImageTurbo`), 256 x 256, on the device's CPU, through the generate_image tool. Its settings section has the "Image generation" switch (off by default; turning it on downloads the model, a 10.6 GB download that goes on in the background), and a picture is shown above the reply as it is drawn, kept with the reply in the saved chat, and opens large with its description and seed, "Draw it again", "Add to Photos", Share and Save. The description and seed are written into the PNG. The model's folder is kept out of iCloud backups on iOS, and a storage feature on the page can delete it (the feature is an `IStorageParticipant`; `ImageFeature.StorageKey` names the folder for a `StorageFolder`).
+- `Emgu.LiteRT.LM.Maui.Images.dll`: `ImageFeature`, a feature of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}`'s `ChatPage` that lets the model draw pictures ("draw a red fox in the snow") on the device, through the generate_image tool. Its settings section has the "Image generation" switch (off by default; turning it on downloads the chosen model in the background) and, when the app offers several, a choice of image model. A picture is shown above the reply as it is drawn, kept with the reply in the saved chat, and opens large with its description, seed and model, "Draw it again", "Add to Photos", Share and Save. The description, seed and model are written into the PNG. The models' folders are kept out of iCloud backups on iOS, and a storage feature on the page can delete a model (the feature is an `IStorageParticipant`).
+- The image models (`IImageModel`): `ZImageTurboImageModel` (Z-Image-Turbo, `${EMGU_LITERT_MODELS_NUGET_ID}`' `ZImageTurbo`: 256 x 256 on the CPU, a 10.6 GB download; the default) and `OmniImageModel` over `${EMGU_LITERT_LM_MODELS_NUGET_ID}`' `TextToImageModel` (LiteRT-LM's Bonsai Image 4B and FLUX.2-klein 4B, one 4.3-4.7 GB file each).
 
-It is kept out of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}` so that package doesn't depend on the models package.
+It is kept out of `${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}` so that package doesn't depend on the models packages.
 
 ## Adding it to a chat page
 
 ```csharp
 using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.LM.Maui.Images;
+using Emgu.LiteRT.LM.Models;
 
-options.Features.Add(new ImageFeature());   // or new ImageFeature(workload) to share the searches' IIndexingWorkload
+options.Features.Add(new ImageFeature   // or new ImageFeature(workload) to share the searches' IIndexingWorkload
+{
+    ModelOptions = new[]
+    {
+        new ImageModelOption("bonsai", "Bonsai Image 4B · CPU", null, "bonsai-flux2-4b.litertlm",
+            () => new OmniImageModel(new BonsaiImage4B())),
+        ImageFeature.ZImageTurboOption,
+    }
+});
 ```
 
-`PictureSaver` adds a "Save image…" button that calls the app's Save As dialog (e.g. CommunityToolkit.Maui's `FileSaver`); `ModelSelector` adds a view of the app's own above the switch. The app adds the LiteRT native runtime packages the model needs, and `NSPhotoLibraryAddUsageDescription` on iOS for "Add to Photos".
+`ModelOptions` lists the models (the first is the default; Z-Image-Turbo alone when not set), and the choice is kept in the "image_model" setting. For a storage catalog, Z-Image-Turbo is a `StorageFolder` named by `ImageFeature.StorageKey`, and a LiteRT-LM model a `StorageModel.Image` with its .litertlm. `PictureSaver` adds a "Save image…" button that calls the app's Save As dialog (e.g. CommunityToolkit.Maui's `FileSaver`); `ModelSelector` replaces the choice of model with a view of the app's own. The app adds the LiteRT and LiteRT-LM native runtime packages the models need, and `NSPhotoLibraryAddUsageDescription` on iOS for "Add to Photos".

@@ -13,18 +13,28 @@ using Microsoft.Maui.Controls.Shapes;
 
 namespace Emgu.LiteRT.LM.Maui.Images;
 
+/// <summary>An image model <see cref="ImageFeature"/> offers.</summary>
+/// <param name="Key">What tells it apart in the "image_model" setting</param>
+/// <param name="Name">Its name in the list, e.g. "Bonsai Image 4B · CPU"</param>
+/// <param name="Detail">A line about it in the list, or null</param>
+/// <param name="StorageKey">Its entry's key in the storage catalog: its .litertlm's file name, or a folder's key
+/// (<see cref="ImageFeature.StorageKey"/> for Z-Image-Turbo's)</param>
+/// <param name="Create">Makes the model (owned by the feature, disposed when it lets go of it)</param>
+public sealed record ImageModelOption(string Key, string Name, string Detail, string StorageKey, Func<IImageModel> Create);
+
 /// <summary>
 /// Image generation: with Settings > "Image generation" on (off by default), the model gets the generate_image tool
-/// (Emgu.LiteRT.LM.Agents' <c>AgentTools.GenerateImage</c>), which draws a 256 x 256 picture with Z-Image-Turbo
-/// (Emgu.LiteRT.Models' <see cref="ZImageTurbo"/>) on this device's CPU and shows it above the reply - the model doesn't
-/// see it. The model is 10.6 GB, downloaded when the setting is turned on (in the background, through
-/// <see cref="BackgroundDownloads"/>), and its first image writes ~9 GB of weight caches. The pictures are kept with the
-/// reply in the saved chat (<see cref="ChatMessageItem.SavedFiles"/>, kind <see cref="GeneratedKind"/>, never given back
-/// to the model) and open large with their description and seed, "Draw it again", "Add to Photos", Share and - with a
+/// (Emgu.LiteRT.LM.Agents' <c>AgentTools.GenerateImage</c>), which draws a picture with the chosen image model
+/// (<see cref="ModelOptions"/>: Z-Image-Turbo by default, or LiteRT-LM's Bonsai Image and FLUX.2-klein through
+/// <see cref="OmniImageModel"/>) on this device and shows it above the reply - the model doesn't see it. The model is
+/// downloaded when the setting is turned on or another model is chosen (in the background, through
+/// <see cref="BackgroundDownloads"/>). The pictures are kept with the reply in the saved chat
+/// (<see cref="ChatMessageItem.SavedFiles"/>, kind <see cref="GeneratedKind"/>, never given back to the model) and open
+/// large with their description, seed and model, "Draw it again", "Add to Photos", Share and - with a
 /// <see cref="PictureSaver"/> - Save. On iOS the model folder is kept out of iCloud backups. With the setting off the
 /// tool is offered anyway and tells the model where to turn it on. A tool group of the router
-/// (<see cref="ChatImageGeneration"/>). A storage feature on the page deletes the model's folder through
-/// <see cref="StorageKey"/> (the feature is an <see cref="IStorageParticipant"/>).
+/// (<see cref="ChatImageGeneration"/>). A storage feature on the page deletes a model's files through its option's
+/// <see cref="ImageModelOption.StorageKey"/> (the feature is an <see cref="IStorageParticipant"/>).
 /// </summary>
 public sealed class ImageFeature : ChatFeature, IStorageParticipant
 {
@@ -34,19 +44,30 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     /// <summary>The settings key of the switch.</summary>
     public const string SettingKey = "image_generation";
 
-    /// <summary>The image model's folder in a storage catalog (<c>new StorageFolder(ImageFeature.StorageKey, "Z-Image-Turbo", new ZImageTurbo().Folder, ...)</c>).</summary>
+    /// <summary>The settings key of the chosen image model (its <see cref="ImageModelOption.Key"/>).</summary>
+    public const string ModelSettingKey = "image_model";
+
+    /// <summary>Z-Image-Turbo's folder in a storage catalog (<c>new StorageFolder(ImageFeature.StorageKey, "Z-Image-Turbo", new ZImageTurbo().Folder, ...)</c>).</summary>
     public const string StorageKey = "image";
+
+    /// <summary>Z-Image-Turbo's option (the default list's only one).</summary>
+    public static ImageModelOption ZImageTurboOption { get; } = new ImageModelOption("z-image-turbo", "Z-Image-Turbo · CPU",
+        "256 x 256, 8 steps; a 10.6 GB download and about 9 GB of caches.", StorageKey, () => new ZImageTurboImageModel());
 
     private readonly IIndexingWorkload _workload;
     private string _imagePauseReason;
     private Switch _imageSwitch;
     private Label _imageStatus;
+    private Label _imageNote;
     private Button _imageDeleteButton;
-    private ZImageTurbo _zimage;
-    private Task _zimageInit;
-    private CancellationTokenSource _zimageDownload;
-    private Task _zimageDownloadTask;
-    private double _zimageDownloadFraction = -1;
+    private Button _modelButton;
+    private ImageModelOption _option;
+    private IImageModel _model;
+    private Task _modelInit;
+    private CancellationTokenSource _download;
+    private Task _downloadTask;
+    private double _downloadFraction = -1;
+    private bool _gpuFallbackShown;
 
     /// <summary>Create the feature.</summary>
     /// <param name="workload">When heavy work may run (a cool, charged device): e.g. the searches' <see cref="SearchServices.Workload"/>; null for the device's own policy</param>
@@ -55,8 +76,14 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         _workload = workload ?? new DeviceIndexingWorkload();
     }
 
-    /// <summary>A view of the app's own above the switch (e.g. its choice of image model), or null.</summary>
+    /// <summary>A view of the app's own above the switch, or null (the feature shows its own choice of model when there are several).</summary>
     public Func<View> ModelSelector { get; set; }
+
+    /// <summary>The image models to choose from, the first the default; set before the feature is attached.</summary>
+    public IReadOnlyList<ImageModelOption> ModelOptions { get; set; } = new[] { ZImageTurboOption };
+
+    /// <summary>The chosen image model's option.</summary>
+    public ImageModelOption SelectedOption => _option;
 
     /// <summary>
     /// Saves a picture where the user chooses (a Save As dialog, e.g. CommunityToolkit.Maui's FileSaver): given the PNG
@@ -84,16 +111,21 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     public override void OnAttached(IChatPageHost host)
     {
         base.OnAttached(host);
-        _zimage = new ZImageTurbo();
-        ExcludeFromBackup(_zimage.Folder);
+        if (ModelOptions == null || ModelOptions.Count == 0)
+            ModelOptions = new[] { ZImageTurboOption };
+        string key = host.Settings.Get(ModelSettingKey, ModelOptions[0].Key);
+        _option = ModelOptions.FirstOrDefault(o => o.Key == key) ?? ModelOptions[0];
+        _model = _option.Create();
+        ExcludeFromBackup(_model.Folder);
     }
 
     // ---------- IStorageParticipant ----------
 
-    // Storage is deleting the image model's folder: image generation is turned off and the model let go of first.
+    // Storage is deleting the chosen image model's files: image generation is turned off and the model let go of first.
     /// <inheritdoc/>
     public Task PrepareStorageDeleteAsync(StorageEntry entry) =>
-        entry.Kind == StorageKind.Folder && entry.Key == StorageKey ? TurnOffAndResetAsync() : Task.CompletedTask;
+        (entry.Kind == StorageKind.Folder || entry.Kind == StorageKind.ImageModel) && _option != null && entry.Key == _option.StorageKey
+            ? TurnOffAndResetAsync() : Task.CompletedTask;
 
     /// <inheritdoc/>
     public void StorageChanged(StorageEntry entry) => UpdateStatus();
@@ -106,8 +138,8 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             () => ChatImageGeneration.Instructions)
     };
 
-    // iOS backs up the app's Library/Application Support (where ZImageTurbo keeps its ~21 GB) to iCloud unless told
-    // not to; the model can be downloaded again.
+    // iOS backs up the app's Library/Application Support (where the image models keep their 4-21 GB) to iCloud unless
+    // told not to; the model can be downloaded again.
     private static void ExcludeFromBackup(string folder)
     {
 #if IOS && !MACCATALYST
@@ -150,11 +182,12 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             IsVisible = false
         };
         _imageDeleteButton.Clicked += OnDeleteImageModelClicked;
+        _imageNote = ChatPage.Note(string.Empty);
         UpdateStatus();
         // Turned on before and the model isn't complete: go on downloading.
-        if (on && !_zimage.IsDownloaded)
+        if (on && !_model.IsDownloaded)
             StartImageModelDownload();
-        View modelSelector = ModelSelector?.Invoke() ?? new ContentView();
+        View modelSelector = ModelSelector?.Invoke() ?? BuildModelChoice();
         return new VerticalStackLayout
         {
             Spacing = 6,
@@ -162,52 +195,118 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             {
                 modelSelector,
                 row,
-                ChatPage.Note(string.Format(CultureInfo.InvariantCulture,
-                    "Lets the model draw pictures (\"draw a red fox in the snow\") with Z-Image-Turbo, 256 x 256, on this device. The model is a {0:F1} GB download, and the first picture prepares about 9 GB more; a picture takes about half a minute on a computer, longer on a phone. Nothing leaves the device.",
-                    ZImageTurbo.DownloadSize / 1e9)),
+                _imageNote,
                 _imageStatus,
                 _imageDeleteButton
             }
         };
     }
 
+    // A button with the chosen model's name and a list of the models, like Settings > Embedding model; nothing when
+    // there is only one.
+    private View BuildModelChoice()
+    {
+        if (ModelOptions.Count < 2)
+            return new ContentView();
+        var title = new Label { Text = "Image model" };
+        ChatResources.ApplyStyle(title, "ChatSectionTextStyle");
+        _modelButton = new Button { Text = _option.Name, HorizontalOptions = LayoutOptions.Fill };
+        _modelButton.Clicked += OnChooseModelClicked;
+        SemanticProperties.SetDescription(_modelButton, "Choose the model that draws pictures");
+        return new VerticalStackLayout { Spacing = 6, Children = { title, _modelButton } };
+    }
+
+    private static string Gigabytes(long bytes) => bytes >= 1e9
+        ? string.Format(CultureInfo.InvariantCulture, "{0:F1} GB", bytes / 1e9)
+        : string.Format(CultureInfo.InvariantCulture, "{0:F0} MB", Math.Ceiling(bytes / 1e6));
+
+    private string ModelNote() => string.Format(CultureInfo.InvariantCulture,
+        "Lets the model draw pictures (\"draw a red fox in the snow\") with {0}, {1}, on this device. The model is a {2} download{3}. Nothing leaves the device.",
+        _model.Name, _model.SizeLabel, Gigabytes(_model.DownloadSize),
+        _model.CacheSize > 0 ? ", and the first picture prepares about " + Gigabytes(_model.CacheSize) + " more" : string.Empty);
+
+    private async void OnChooseModelClicked(object sender, EventArgs e)
+    {
+        if (Host.IsBusy)
+        {
+            Host.SetStatus("Hang on - still busy.");
+            return;
+        }
+        string chosen = await Host.ChooseAsync("Image model", ModelOptions.Select(o => new ChatChoice(o.Key, o.Name, o.Detail)), _option.Key);
+        ImageModelOption option = ModelOptions.FirstOrDefault(o => o.Key == chosen);
+        if (option == null || option == _option || Host.IsBusy)
+            return;
+        await SwitchModelAsync(option);
+    }
+
+    /// <summary>Choose another image model: the current one is let go of, and the new one downloaded (asked first) when image generation is on.</summary>
+    /// <param name="option">One of <see cref="ModelOptions"/></param>
+    public async Task SwitchModelAsync(ImageModelOption option)
+    {
+        if (option == null)
+            throw new ArgumentNullException(nameof(option));
+        await ReleaseModelAsync();
+        _modelInit = null;
+        _option = option;
+        _model = option.Create();
+        ExcludeFromBackup(_model.Folder);
+        Host.Settings.Set(ModelSettingKey, option.Key);
+        if (_modelButton != null)
+            _modelButton.Text = option.Name;
+        UpdateStatus();
+        if (ImageGenerationOn && !_model.IsDownloaded && !await AskToDownloadAsync())
+        {
+            _imageSwitch.Toggled -= OnImageGenerationToggled;
+            _imageSwitch.IsToggled = false;
+            _imageSwitch.Toggled += OnImageGenerationToggled;
+            Host.Settings.Set(SettingKey, false);
+            UpdateStatus();
+        }
+    }
+
+    // Asks before downloading the model, and starts the download on yes.
+    private async Task<bool> AskToDownloadAsync()
+    {
+        long remaining = Math.Max(0, _model.DownloadSize - _model.DownloadedBytes);
+        bool download = await Host.AskAsync("Image generation",
+            string.Format(CultureInfo.InvariantCulture,
+                "Download {0} ({1} remaining)? Its files{2} use about {3} in total.",
+                _model.Name, Gigabytes(remaining), _model.CacheSize > 0 ? " and prepared caches" : string.Empty,
+                Gigabytes(_model.DownloadSize + _model.CacheSize)),
+            "Download", "Cancel");
+        if (download)
+            StartImageModelDownload();
+        return download;
+    }
+
     private async void OnImageGenerationToggled(object sender, ToggledEventArgs e)
     {
         Host.Settings.Set(SettingKey, e.Value);
-        if (e.Value && !_zimage.IsDownloaded)
+        if (e.Value && !_model.IsDownloaded)
         {
-            long remaining = Math.Max(0, ZImageTurbo.DownloadSize - _zimage.DownloadedBytes);
-            string remainingSize = remaining >= 1e9
-                ? string.Format(CultureInfo.InvariantCulture, "{0:F1} GB", remaining / 1e9)
-                : string.Format(CultureInfo.InvariantCulture, "{0:F0} MB", Math.Ceiling(remaining / 1e6));
-            bool download = await Host.AskAsync("Image generation",
-                string.Format(CultureInfo.InvariantCulture,
-                    "Download the image model ({0} remaining)? Model files and prepared caches use about {1:F0} GB in total.",
-                    remainingSize, (ZImageTurbo.DownloadSize + 9e9) / 1e9),
-                "Download", "Cancel");
-            if (!download)
+            if (!await AskToDownloadAsync())
             {
                 _imageSwitch.IsToggled = false;
                 return;
             }
-            StartImageModelDownload();
         }
         else if (!e.Value)
         {
-            _zimageDownload?.Cancel();
+            _download?.Cancel();
         }
         UpdateStatus();
     }
 
     private void StartImageModelDownload()
     {
-        if (_zimageDownload != null)
+        if (_download != null)
             return;
         CancellationTokenSource cancel = new CancellationTokenSource();
-        _zimageDownload = cancel;
-        _zimageDownloadFraction = (double)_zimage.DownloadedBytes / ZImageTurbo.DownloadSize;
+        _download = cancel;
+        IImageModel model = _model;
+        _downloadFraction = (double)model.DownloadedBytes / model.DownloadSize;
         UpdateStatus();
-        _zimageDownloadTask = Task.Run(async () =>
+        _downloadTask = Task.Run(async () =>
         {
             string error = null;
             bool paused = false;
@@ -216,12 +315,12 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             {
                 await using var lease = await BackgroundDownloads.BeginAsync("Image model", cancel.Token);
                 downloadLease = lease;
-                await _zimage.Download(new InlineProgress<ZImageDownloadProgress>(p =>
+                await model.DownloadAsync((done, total) =>
                 {
-                    lease.Report(p.TotalBytes, p.BytesDone);
-                    _zimageDownloadFraction = (double)p.BytesDone / p.TotalBytes;
+                    lease.Report(total, done);
+                    _downloadFraction = (double)done / total;
                     UpdateStatus();
-                }), lease.Token);
+                }, lease.Token);
             }
             catch (Exception) when (cancel.IsCancellationRequested || downloadLease?.Token.IsCancellationRequested == true)
             {
@@ -233,8 +332,8 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             }
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
-                _zimageDownload = null;
-                _zimageDownloadFraction = -1;
+                _download = null;
+                _downloadFraction = -1;
                 UpdateStatus();
                 if (_imageStatus == null)
                     return;
@@ -256,19 +355,21 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             MainThread.BeginInvokeOnMainThread(UpdateStatus);
             return;
         }
-        bool downloaded = _zimage.IsDownloaded;
-        long present = _zimage.DownloadedBytes;
+        bool downloaded = _model.IsDownloaded;
+        long present = _model.DownloadedBytes;
+        if (_imageNote != null)
+            _imageNote.Text = ModelNote();
         _imageDeleteButton.IsVisible = present > 0 && Host.Services.Get<StorageFeature>() != null;
         if (_imagePauseReason != null)
         {
             _imageStatus.IsVisible = true;
             _imageStatus.Text = "Image generation paused: " + _imagePauseReason;
         }
-        else if (_zimageDownload != null)
+        else if (_download != null)
         {
             _imageStatus.IsVisible = true;
-            _imageStatus.Text = string.Format(CultureInfo.InvariantCulture, "Downloading the image model: {0:P0} of {1:F1} GB",
-                Math.Max(0, _zimageDownloadFraction), ZImageTurbo.DownloadSize / 1e9);
+            _imageStatus.Text = string.Format(CultureInfo.InvariantCulture, "Downloading {0}: {1:P0} of {2}",
+                _model.Name, Math.Max(0, _downloadFraction), Gigabytes(_model.DownloadSize));
         }
         else if (ImageGenerationOn)
         {
@@ -291,12 +392,9 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     /// <summary>Load the model (once; again after <see cref="ResetModelAsync"/>), with the page's CPU thread count.</summary>
     public Task EnsureModelAsync()
     {
-        if (_zimageInit == null || _zimageInit.IsFaulted)
-        {
-            _zimage.NumThreads = CpuThreadSettings.Count;
-            _zimageInit = _zimage.Init();
-        }
-        return _zimageInit;
+        if (_modelInit == null || _modelInit.IsFaulted)
+            _modelInit = _model.InitAsync(CpuThreadSettings.Count);
+        return _modelInit;
     }
 
     /// <summary>The generate_image tool: draw the picture, show it above the reply, and tell the model what happened.</summary>
@@ -306,14 +404,13 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     {
         if (!ImageGenerationOn)
             return string.Format(CultureInfo.InvariantCulture,
-                "Image generation is turned off, so no picture can be drawn. Tell the user they can turn on \"Image generation\" in {0}; the image model is a {1:F1} GB download and runs on this device.",
-                Host.SettingsLocation,
-                ZImageTurbo.DownloadSize / 1e9);
-        if (_zimageDownload != null)
+                "Image generation is turned off, so no picture can be drawn. Tell the user they can turn on \"Image generation\" in {0}; the image model ({1}) is a {2} download and runs on this device.",
+                Host.SettingsLocation, _model.Name, Gigabytes(_model.DownloadSize));
+        if (_download != null)
             return string.Format(CultureInfo.InvariantCulture,
                 "The image model is still downloading ({0:P0} done), so no picture can be drawn yet. Tell the user to try again when it has finished.",
-                Math.Max(0, _zimageDownloadFraction));
-        if (!_zimage.IsDownloaded)
+                Math.Max(0, _downloadFraction));
+        if (!_model.IsDownloaded)
             return "The image model isn't downloaded. Tell the user to turn \"Image generation\" off and on in the settings to download it.";
         prompt = (prompt ?? string.Empty).Trim();
         if (prompt.Length == 0)
@@ -325,12 +422,16 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             UpdateStatus();
         });
         await _workload.WaitAsync(modelPaused, cancel);
+        IImageModel model = _model;
         await EnsureModelAsync();
-        int tokens = _zimage.CountPromptTokens(prompt);
-        if (tokens > ZImageTurbo.MaxPromptTokens)
-            return string.Format(CultureInfo.InvariantCulture,
-                "The description is too long for the image model ({0} tokens, at most {1} fit). Call generate_image again with a shorter English description of about 15 words, keeping the subject and the style.",
-                tokens, ZImageTurbo.MaxPromptTokens);
+        if (model is OmniImageModel { GpuFailure: not null } && !_gpuFallbackShown)
+        {
+            _gpuFallbackShown = true;
+            MainThread.BeginInvokeOnMainThread(() => Host.SetStatus("The GPU couldn't load the image model, so it draws on the CPU (slower)."));
+        }
+        string tooLong = model.CheckPrompt(prompt);
+        if (tooLong != null)
+            return tooLong;
 
         long seed = Random.Shared.NextInt64(1, 1L << 40);
         ImageTile tile = await MainThread.InvokeOnMainThreadAsync(() =>
@@ -340,24 +441,28 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             return created;
         });
         Stopwatch watch = Stopwatch.StartNew();
+        // A model that doesn't report its steps (LiteRT-LM's draw a picture in one call) shows how long it has taken.
+        using var ticking = new CancellationTokenSource();
+        if (!model.ReportsSteps)
+            _ = TickAsync(tile, watch, ticking.Token);
         try
         {
             // The tool runs off the UI thread, so the progress is marshalled to it here.
-            ZImageResult result = await _zimage.Generate(prompt, seed, 8, new InlineProgress<ZImageProgress>(p =>
+            ImageModelPicture result = await model.GenerateAsync(prompt, seed, stage =>
             {
-                // Generate reports each stage synchronously on its worker thread, before the native graph runs.
-                // Keep the current latent state while waiting; cancellation still stops the pending generation.
-                if (p.Stage != "Done")
-                    _workload.WaitAsync(reason => MainThread.BeginInvokeOnMainThread(() =>
-                    {
-                        _imagePauseReason = reason;
-                        UpdateStatus();
-                        tile.Stage.Text = reason == null ? p.Stage : "Image generation paused: " + reason;
-                    }), cancel).GetAwaiter().GetResult();
-                string text = p.Stage + string.Format(CultureInfo.InvariantCulture, " ({0:F0} s)", watch.Elapsed.TotalSeconds);
+                // Reported synchronously on the worker thread, before the stage's native graph runs. Keep the current
+                // latent state while waiting; cancellation still stops the pending generation.
+                _workload.WaitAsync(reason => MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    _imagePauseReason = reason;
+                    UpdateStatus();
+                    tile.Stage.Text = reason == null ? stage : "Image generation paused: " + reason;
+                }), cancel).GetAwaiter().GetResult();
+                string text = stage + string.Format(CultureInfo.InvariantCulture, " ({0:F0} s)", watch.Elapsed.TotalSeconds);
                 MainThread.BeginInvokeOnMainThread(() => tile.Stage.Text = text);
-            }), cancel);
-            byte[] png = await Task.Run(() => AddPictureDetails(PngEncoder.Encode(result), prompt, seed));
+            }, cancel);
+            ticking.Cancel();
+            byte[] png = await Task.Run(() => AddPictureDetails(PngEncoder.Encode(result.Rgb, result.Width, result.Height), prompt, seed, model));
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
                 ShowGeneratedImage(tile, png, string.Format(CultureInfo.InvariantCulture, "{0:F0} s", result.Elapsed.TotalSeconds));
@@ -368,41 +473,46 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         }
         catch (OperationCanceledException)
         {
+            ticking.Cancel();
             await MainThread.InvokeOnMainThreadAsync(() => tile.Stage.Text = "Stopped");
             throw;
         }
         catch (Exception ex)
         {
+            ticking.Cancel();
             await MainThread.InvokeOnMainThreadAsync(() => tile.Stage.Text = "Couldn't draw it: " + ex.Message);
             return "The picture couldn't be drawn: " + ex.Message;
         }
     }
 
-    // IProgress without Progress<T>'s capture of the current SynchronizationContext (none on a worker thread):
-    // the handler runs where Report is called.
-    private sealed class InlineProgress<T> : IProgress<T>
+    // "Drawing the picture (12 s)" under the tile every second until stopped.
+    private static async Task TickAsync(ImageTile tile, Stopwatch watch, CancellationToken stop)
     {
-        private readonly Action<T> _handler;
-
-        public InlineProgress(Action<T> handler)
+        try
         {
-            _handler = handler;
+            while (!stop.IsCancellationRequested)
+            {
+                string text = string.Format(CultureInfo.InvariantCulture, "Drawing the picture ({0:F0} s)", watch.Elapsed.TotalSeconds);
+                MainThread.BeginInvokeOnMainThread(() => { if (!stop.IsCancellationRequested) tile.Stage.Text = text; });
+                await Task.Delay(1000, stop);
+            }
         }
-
-        public void Report(T value)
+        catch (OperationCanceledException)
         {
-            _handler(value);
         }
     }
 
-    // The description and seed go into the PNG (PngMetadata): a saved chat keeps only the picture, and a saved or shared
-    // file then says how it was made.
-    private static byte[] AddPictureDetails(byte[] png, string prompt, long seed)
+    // The description, seed and model go into the PNG (PngMetadata): a saved chat keeps only the picture, and a saved
+    // or shared file then says how it was made.
+    private static byte[] AddPictureDetails(byte[] png, string prompt, long seed, IImageModel model)
     {
         png = PngMetadata.AddText(png, "Description", prompt);
         png = PngMetadata.AddText(png, "Seed", seed.ToString(CultureInfo.InvariantCulture));
-        return PngMetadata.AddText(png, "Software", "Emgu LiteRT, Z-Image-Turbo, 8 steps");
+        return PngMetadata.AddText(png, "Software", string.Format(CultureInfo.InvariantCulture, "{0}{1}, {2} steps",
+            SoftwarePrefix, model.Name, model.Steps));
     }
+
+    private const string SoftwarePrefix = "Emgu LiteRT, ";
 
     private sealed class ImageTile
     {
@@ -475,6 +585,10 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         var details = PngMetadata.ReadText(png);
         details.TryGetValue("Description", out string description);
         details.TryGetValue("Seed", out string seed);
+        details.TryGetValue("Software", out string software);
+        // "Emgu LiteRT, Bonsai Image 4B, 4 steps": the model and its steps.
+        string madeWith = software != null && software.StartsWith(SoftwarePrefix, StringComparison.Ordinal)
+            ? software.Substring(SoftwarePrefix.Length) : null;
         var status = new Label { IsVisible = false };
         ChatResources.ApplyStyle(status, "ChatSectionNoteStyle");
         string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
@@ -484,7 +598,8 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         if (!string.IsNullOrEmpty(description))
         {
             // What it was drawn from, so it can be made again; the seed is what makes this exact picture.
-            var caption = new Label { Text = description + (string.IsNullOrEmpty(seed) ? "" : "\nSeed " + seed + " · 8 steps") };
+            var caption = new Label { Text = description + (string.IsNullOrEmpty(seed) ? "" : "\nSeed " + seed)
+                + (madeWith == null ? "" : (string.IsNullOrEmpty(seed) ? "\n" : " · ") + madeWith) };
             ChatResources.ApplyStyle(caption, "ChatSectionTextStyle");
             SemanticProperties.SetDescription(caption, "Description and seed of this picture");
             content.Children.Add(caption);
@@ -558,10 +673,10 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     }
 
     /// <summary>Whether the model has been loaded (or is loading).</summary>
-    public bool ModelLoaded => _zimageInit != null;
+    public bool ModelLoaded => _modelInit != null;
 
     /// <summary>Forget the prompts' cached encodings (a private chat began or ended).</summary>
-    public void ClearPromptCache() => _zimage?.ClearPromptCache();
+    public void ClearPromptCache() => _model?.ClearPromptCache();
 
     /// <summary>
     /// Release the model and start again with a new instance, loaded on the next picture (the CPU thread count changed,
@@ -570,9 +685,9 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     public async Task ResetModelAsync()
     {
         await ReleaseModelAsync();
-        _zimageInit = null;
-        if (_zimage != null)
-            _zimage = new ZImageTurbo();
+        _modelInit = null;
+        if (_model != null)
+            _model = _option.Create();
     }
 
     /// <summary>Storage deleted the model: image generation is turned off and the model let go of.</summary>
@@ -591,12 +706,12 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     /// <summary>Release the model (and stop its download), e.g. when the page closes.</summary>
     public async Task ReleaseModelAsync()
     {
-        _zimageDownload?.Cancel();
-        try { await (_zimageDownloadTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
-        ZImageTurbo model = _zimage;
+        _download?.Cancel();
+        try { await (_downloadTask ?? Task.CompletedTask); } catch (OperationCanceledException) { }
+        IImageModel model = _model;
         if (model == null)
             return;
-        try { await (_zimageInit ?? Task.CompletedTask); } catch (Exception) { }
+        try { await (_modelInit ?? Task.CompletedTask); } catch (Exception) { }
         await Task.Run(() => model.Dispose());
     }
 }

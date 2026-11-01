@@ -711,3 +711,16 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
   Later:
   - past the first 10 minutes of a long video;
   - the photo cards saved with replies too, like the video cards.
+
+## 56. Text to image through LiteRT-LM's omni engine (Bonsai Image 4B, FLUX.2-klein 4B)
+
+`libomniextern` draws with LiteRT-LM's two text-to-image models (2026-11-01): `TextToImageEngine`, `TextToImageModel` with `BonsaiImage4B` and `Flux2Klein4B`, `ImageFeature` over `IImageModel` with Settings > Image model (Bonsai on the CPU the default, Z-Image-Turbo kept), one Storage row per model. Measured on an M1 and a Galaxy S10 (`Emgu.LiteRT.Models/MODELS.md`).
+
+- [x] Mac: both models on the CPU and Metal through `omni_runner` and the C# tests (`UnitTestTextToImage`, `TEST_MODELS`); macOS, iOS and Android natives rebuilt; the demo builds for Catalyst, the iOS simulator and Android.
+- [x] Galaxy S10: Bonsai on the CPU (260-285 s a picture) beside Gemma 4 E2B on the GPU (no kill); the GPU (Adreno 640) runs out of memory, falling back to the CPU; a picture drawn through the chat.
+- [ ] Pixel Fold and Z Fold 3 (12 GB): Bonsai and FLUX.2-klein on the GPU (OpenCL) - does a 12 GB phone's GPU fit the FP32 graphs? - and FLUX.2-klein on the CPU.
+- [ ] Mac Catalyst through the UI (choose a model, draw, Stop during a picture, delete a model in Storage); not driven (no clicks on this Mac).
+- [ ] Regenerate `Resources/Raw/licenses.json.gz` with `tools/make_licenses.py` (Bonsai Image and FLUX.2-klein added to its list).
+- [ ] Windows: `libomniextern` isn't built there yet, so the demo offers Z-Image-Turbo only.
+- [ ] iOS on a device (8 GB iPhones are the floor by the model card); the simulator build links.
+- [ ] Maybe: prune caches of an older copy of the model file (their names carry the file's time and size) when it is downloaded again.

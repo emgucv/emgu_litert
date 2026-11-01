@@ -520,7 +520,22 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 
 ## Image generation
 
-- Settings > "Image generation" (off by default; the library's `ImageFeature` in `Emgu.LiteRT.LM.Maui.Images` since
+- Settings > Image model (2026-11-01): the library's `ImageFeature` draws with an `IImageModel` the app lists
+  (`ModelOptions`, kept in the "image_model" setting). The demo offers LiteRT-LM's Bonsai Image 4B (the default) and
+  FLUX.2-klein 4B through `OmniImageModel` (`Emgu.LiteRT.LM.Models`' `TextToImageModel`, `libomniextern`), each on the CPU
+  and - on Mac Catalyst and Android - the GPU, where `libomniextern` is in the app (not Windows yet), then Z-Image-Turbo.
+  Both omni models draw 256 x 256 in 4 steps from one 4.3-4.7 GB file plus a cache folder of ~3.6 GB per backend; on an
+  M1 Bonsai takes 24 s on the CPU and 11 s on Metal (`Emgu.LiteRT.Models/MODELS.md`). They draw a picture in one call,
+  so the tile shows "Drawing the picture (12 s)" instead of the steps, and Stop leaves the picture to finish in the
+  background (thrown away). Switching models lets the old one go and asks before downloading the new one; each model is
+  its own Storage row (`StorageModel.Image` with its cache folder; Z-Image-Turbo's folder as before), and deleting the
+  chosen one turns image generation off. The PNG's Software text and the enlarged picture's caption name the model and
+  its steps. A GPU choice whose load fails falls back to the CPU (`OmniImageModel.GpuFailure`) and the status line says
+  so once. On a Galaxy S10 (2026-11-01, driven by uiautomator): the five choices listed, the GPU choice kept across
+  Settings, the switch on without asking (the model copied from the Mac), "Draw a red fox sitting in the snow" with Gemma
+  4 E2B on the GPU drew the fox in 319 s on the CPU after the GPU (Adreno 640) ran out of memory, beside the chat model
+  (peak PSS 4.9 GB, no kill); the caption read "Seed ... · Bonsai Image 4B, 4 steps".
+- Before that, Settings > "Image generation" (off by default; the library's `ImageFeature` in `Emgu.LiteRT.LM.Maui.Images` since
   2026-10-27, its PNG written by `Emgu.LiteRT.Models`' `PngEncoder` instead of Emgu CV; the demo gives it its model
   selector and a Save As dialog) asks before downloading `Emgu.LiteRT.Models`'
   `ZImageTurbo` (10.6 GB) to its default folder, `LocalApplicationData/Z-Image-Turbo` (`~/Documents/Z-Image-Turbo` for the

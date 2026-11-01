@@ -2,14 +2,15 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
-// A small C API over LiteRT-LM's OmniEngine (omni/, C++ only), for P/Invoke. For now it covers speech recognition
+// A small C API over LiteRT-LM's OmniEngine (omni/, C++ only), for P/Invoke. It covers speech recognition
 // (omni/speech2text): an engine loads a model (e.g. Parakeet-TDT-0.6B-v3 from its .litertlm), a session takes mono
-// audio pushed in pieces and returns the text.
+// audio pushed in pieces and returns the text; and text to image (omni/text2image): an image engine loads a model
+// (Bonsai-Image-ternary-4B or FLUX.2-klein-4B from its .litertlm) and draws a picture for a prompt.
 //
 // Errors: every function that can fail returns a status code (0 on success; otherwise the same values as absl's status
 // codes and LiteRT-LM's LiteRtLmStatusCode) and records a message for the calling thread, read with
 // omniextern_get_last_error_message. Nothing is thrown across this API. Strings returned are malloc'd: free them with
-// omniextern_free_string.
+// omniextern_free_string; pixels with omniextern_free_buffer.
 
 #ifndef EMGU_OMNIEXTERN_H_
 #define EMGU_OMNIEXTERN_H_
@@ -26,6 +27,7 @@ extern "C" {
 
 typedef struct OmniExternEngine OmniExternEngine;
 typedef struct OmniExternSession OmniExternSession;
+typedef struct OmniExternImageEngine OmniExternImageEngine;
 
 // The status codes (absl::StatusCode's values).
 #define OMNIEXTERN_STATUS_OK 0
@@ -76,6 +78,27 @@ OMNIEXTERN_EXPORT int omniextern_session_process(OmniExternSession* session, int
 OMNIEXTERN_EXPORT int omniextern_session_reset(OmniExternSession* session);
 
 OMNIEXTERN_EXPORT void omniextern_free_string(char* text);
+
+// Creates a text-to-image engine for a model LiteRT-LM registers ("bonsai-flux2", "flux2-klein") from its local
+// .litertlm: nothing is downloaded. backend is "cpu", "gpu" or "npu"; num_threads <= 0 for the default; size is the
+// side of the square pictures in pixels, a multiple of 16, <= 0 for the model's own (its graphs are made for one size:
+// 256 for both models, which refuse any other). cache_dir is the folder for the compiled-model caches (about 3.5 GB,
+// named after the graphs, "flux2_dit_<file time>_<file size>...", so each model wants a folder of its own), or null
+// for the model file's folder.
+OMNIEXTERN_EXPORT int omniextern_image_engine_create(const char* model_name, const char* model_path,
+                                                     const char* backend, int num_threads, int size,
+                                                     const char* cache_dir, OmniExternImageEngine** out_engine);
+OMNIEXTERN_EXPORT void omniextern_image_engine_delete(OmniExternImageEngine* engine);
+
+// Draws a picture for prompt (UTF-8): steps <= 0 for the model's default (4); seed > 0 picks the starting noise
+// (the same seed and prompt give the same picture), 0 for the model's default. Blocks until the picture is done; it
+// can't be cancelled. *out_rgb is the picture, interleaved RGB888 (*out_height rows of *out_width x *out_channels
+// bytes), malloc'd: free it with omniextern_free_buffer. One picture at a time per engine.
+OMNIEXTERN_EXPORT int omniextern_image_generate(OmniExternImageEngine* engine, const char* prompt, int steps,
+                                                unsigned long long seed, unsigned char** out_rgb, int* out_width,
+                                                int* out_height, int* out_channels);
+
+OMNIEXTERN_EXPORT void omniextern_free_buffer(void* buffer);
 
 #ifdef __cplusplus
 }

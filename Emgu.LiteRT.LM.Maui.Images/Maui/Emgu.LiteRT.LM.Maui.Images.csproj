@@ -22,13 +22,14 @@
 	<Import Project="..\Emgu.LiteRT.LM.Maui.Images.Shared.projitems" Label="Shared" />
 
 	<!--
-	Emgu.LiteRT.LM.Maui.Images is ChatPage's ImageFeature: pictures the model draws with Z-Image-Turbo (Emgu.LiteRT.Models)
-	on the device, through the generate_image tool. Kept out of Emgu.LiteRT.LM.Maui so that package doesn't depend on
-	Emgu.LiteRT.Models and its LiteRT runtime.
+	Emgu.LiteRT.LM.Maui.Images is ChatPage's ImageFeature: pictures the model draws on the device, through the
+	generate_image tool, with Z-Image-Turbo (Emgu.LiteRT.Models) or LiteRT-LM's Bonsai Image and FLUX.2-klein
+	(Emgu.LiteRT.LM.Models). Kept out of Emgu.LiteRT.LM.Maui so that package doesn't depend on either models package.
 	-->
 	<ItemGroup>
 		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Maui\Maui\Emgu.LiteRT.LM.Maui.csproj" />
 		<ProjectReference Include="..\..\Emgu.LiteRT.Models\NetStandard\Emgu.LiteRT.Models.csproj" />
+		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 	</ItemGroup>
 </Project>

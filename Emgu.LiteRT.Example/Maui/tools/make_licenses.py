@@ -150,6 +150,8 @@ def curated():
         ("Qwen3 0.6B", "litert-community/Qwen3-0.6B", "Qwen/Qwen3-0.6B", "Alibaba Cloud (Qwen team)"),
         ("Qwen3.5 0.8B, 0.8B VL and 4B", "litert-community/Qwen3.5-0.8B", "Qwen/Qwen3.5-0.8B", "Alibaba Cloud (Qwen team)"),
         ("Z-Image-Turbo", "litert-community/Z-Image-Turbo-LiteRT", "Tongyi-MAI/Z-Image-Turbo", "Alibaba Tongyi-MAI"),
+        ("Bonsai Image 4B", "litert-community/Bonsai-Image-ternary-4B", "prism-ml/bonsai-image-ternary-4B-unpacked", "PrismML"),
+        ("FLUX.2-klein 4B", "litert-community/FLUX.2-klein-4B-LiteRT", "black-forest-labs/FLUX.2-klein-4B", "Black Forest Labs"),
     ]:
         add(model, name, "Apache-2.0", APACHE, copyright=by, url=hf + base,
             used_for="LiteRT conversion: " + hf + repo)

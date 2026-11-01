@@ -94,6 +94,40 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
+        public async Task EachImageModelIsItsOwnRowAndDeletingOneKeepsTheOthers()
+        {
+            var catalog = new StorageCatalog(_store, _models, _exports, new[]
+            {
+                new StorageModel("Chat A", "a.litertlm"),
+                StorageModel.Image("Bonsai", "bonsai.litertlm", "Image model.", "bonsai-flux2-cache"),
+                StorageModel.Image("Klein", "klein.litertlm", null, "flux2-klein-cache")
+            }, new[] { new StorageFolder("image", "Z-Image-Turbo", _image, "Z-Image.") });
+            // LiteRT-LM names both models' caches after the graphs ("flux2_dit_..."), so each has its own folder.
+            string[] bonsai = { "bonsai.litertlm", "bonsai.litertlm.sha256ok", "bonsai.litertlm.part",
+                "bonsai-flux2-cache/flux2_dit_1_2.xnnpack_cache" };
+            string[] others = { "klein.litertlm", "flux2-klein-cache/flux2_dit_1_2.xnnpack_cache", "a.litertlm" };
+            foreach (string file in bonsai.Concat(others)) FileWithSize(Path.Combine(_models, file), 10);
+            FileWithSize(Path.Combine(_image, "zc_main0.tflite"), 10);
+            StorageSnapshot snapshot = await catalog.ReadAsync();
+            StorageEntry[] images = snapshot.Entries.Where(e => e.Kind == StorageKind.ImageModel).ToArray();
+            Assert.That(images.Select(e => (e.Key, e.Bytes)), Is.EqualTo(new[] { ("bonsai.litertlm", 40L), ("klein.litertlm", 20L) }));
+            Assert.That(images[1].Detail, Does.Contain("Image model"));
+            // Not also listed as chat models, and Z-Image's folder is still its own row.
+            Assert.That(snapshot.Entries.Count(e => e.Key == "bonsai.litertlm" || e.Key == "klein.litertlm"), Is.EqualTo(2));
+            Assert.That(snapshot.Entries.Single(e => e.Kind == StorageKind.Folder).Name, Is.EqualTo("Z-Image-Turbo"));
+            await catalog.DeleteAsync(images[0]);
+            foreach (string file in bonsai) Assert.That(File.Exists(Path.Combine(_models, file)), Is.False, file);
+            Assert.That(Directory.Exists(Path.Combine(_models, "bonsai-flux2-cache")), Is.False);
+            foreach (string file in others) Assert.That(File.Exists(Path.Combine(_models, file)), Is.True, file);
+            Assert.That(File.Exists(Path.Combine(_image, "zc_main0.tflite")), Is.True);
+            // A cache folder outside the models' folder is refused.
+            var bad = new StorageCatalog(_store, _models, _exports, new[] { StorageModel.Image("X", "x.litertlm", null, "../image") });
+            Assert.ThrowsAsync<InvalidOperationException>(() => bad.ReadAsync());
+            // A speech row can't delete an image model's file.
+            Assert.ThrowsAsync<InvalidOperationException>(() => catalog.DeleteAsync(new StorageEntry { Kind = StorageKind.SpeechModel, Key = "klein.litertlm" }));
+        }
+
+        [Test]
         public async Task TotalsCountDatabaseOnceAndIncludeImageAttachmentsExportsAndLegacyModels()
         {
             FileWithSize(Path.Combine(_models, "a.litertlm"), 100);

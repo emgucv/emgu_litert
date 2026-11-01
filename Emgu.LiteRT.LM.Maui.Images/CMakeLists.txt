@@ -26,7 +26,7 @@ IF(HAVE_LITE_BUILD)
   IF (DOTNET_FOUND AND (APPLE OR WIN32))
     PROJECT(Emgu.LiteRT.LM.Maui.Images)
     BUILD_DOTNET_PROJ(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/Maui/Emgu.LiteRT.LM.Maui.Images.csproj" "/p:Platform=\"AnyCPU\"" ALL)
-    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.LM.Maui Emgu.LiteRT.Models)
+    ADD_DEPENDENCIES(${PROJECT_NAME} Emgu.LiteRT.LM.Maui Emgu.LiteRT.Models Emgu.LiteRT.LM.Models)
 
     INSTALL(
       DIRECTORY

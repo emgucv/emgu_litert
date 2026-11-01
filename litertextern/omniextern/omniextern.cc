@@ -19,6 +19,7 @@
 #include "omni/omni_engine.h"
 #include "omni/omni_session.h"
 #include "runtime/proto/speech2text_session_config.pb.h"
+#include "runtime/proto/text2image_session_config.pb.h"
 
 namespace {
 
@@ -26,6 +27,7 @@ using ::litert::omni::OmniEngine;
 using ::litert::omni::OmniSession;
 using ::litert::omni::PushInputSource;
 using ::litert::lm::proto::Speech2TextSessionConfig;
+using ::litert::lm::proto::Text2ImageSessionConfig;
 
 // The sample rate the app pushes; the session resamples to the model's.
 constexpr int kInputSampleRateHz = 16000;
@@ -62,9 +64,35 @@ char* CopyString(const std::string& text) {
   return copy;
 }
 
+// The engine settings both kinds of model share: the compiled-model caches go next to the model, as LiteRT-LM's
+// engine does.
+OmniEngine::Settings MakeSettings(const char* model_path, const char* backend, int num_threads) {
+  OmniEngine::Settings settings;
+  settings.model_path = model_path;
+  std::string model_file(model_path);
+  size_t slash = model_file.find_last_of("/\\");
+  settings.cache_dir = slash == std::string::npos ? std::string(".") : model_file.substr(0, slash);
+  std::string backend_name = backend == nullptr ? "cpu" : backend;
+  if (absl::EqualsIgnoreCase(backend_name, "gpu")) {
+    settings.backend = OmniEngine::Settings::Backend::kGpu;
+  } else if (absl::EqualsIgnoreCase(backend_name, "npu")) {
+    settings.backend = OmniEngine::Settings::Backend::kNpu;
+  } else {
+    settings.backend = OmniEngine::Settings::Backend::kCpu;
+  }
+  if (num_threads > 0) {
+    settings.num_threads = num_threads;
+  }
+  return settings;
+}
+
 }  // namespace
 
 struct OmniExternEngine {
+  std::unique_ptr<OmniEngine> engine;
+};
+
+struct OmniExternImageEngine {
   std::unique_ptr<OmniEngine> engine;
 };
 
@@ -114,23 +142,7 @@ int omniextern_engine_create(const char* model_name, const char* model_path, con
     return Fail(absl::StatusCode::kInvalidArgument, "model_name, model_path and out_engine are required.");
   }
   return Guard([&]() -> int {
-    OmniEngine::Settings settings;
-    settings.model_path = model_path;
-    // The compiled-model caches go next to the model, as LiteRT-LM's engine does.
-    std::string model_file(model_path);
-    size_t slash = model_file.find_last_of("/\\");
-    settings.cache_dir = slash == std::string::npos ? std::string(".") : model_file.substr(0, slash);
-    std::string backend_name = backend == nullptr ? "cpu" : backend;
-    if (absl::EqualsIgnoreCase(backend_name, "gpu")) {
-      settings.backend = OmniEngine::Settings::Backend::kGpu;
-    } else if (absl::EqualsIgnoreCase(backend_name, "npu")) {
-      settings.backend = OmniEngine::Settings::Backend::kNpu;
-    } else {
-      settings.backend = OmniEngine::Settings::Backend::kCpu;
-    }
-    if (num_threads > 0) {
-      settings.num_threads = num_threads;
-    }
+    OmniEngine::Settings settings = MakeSettings(model_path, backend, num_threads);
     Speech2TextSessionConfig session_config;
     if (overlap_ratio >= 0.0f && overlap_ratio < 1.0f) {
       session_config.set_overlap_ratio(overlap_ratio);
@@ -244,5 +256,89 @@ int omniextern_session_reset(OmniExternSession* session) {
 }
 
 void omniextern_free_string(char* text) { std::free(text); }
+
+int omniextern_image_engine_create(const char* model_name, const char* model_path, const char* backend,
+                                   int num_threads, int size, const char* cache_dir,
+                                   OmniExternImageEngine** out_engine) {
+  if (out_engine != nullptr) *out_engine = nullptr;
+  if (model_name == nullptr || model_path == nullptr || out_engine == nullptr) {
+    return Fail(absl::StatusCode::kInvalidArgument, "model_name, model_path and out_engine are required.");
+  }
+  if (size > 0 && size % 16 != 0) {
+    return Fail(absl::StatusCode::kInvalidArgument, "size must be a multiple of 16.");
+  }
+  return Guard([&]() -> int {
+    OmniEngine::Settings settings = MakeSettings(model_path, backend, num_threads);
+    if (cache_dir != nullptr && cache_dir[0] != '\0') {
+      settings.cache_dir = cache_dir;
+    }
+    // The stages are built for one square size, taken from the session config (a prompt's own size is ignored).
+    Text2ImageSessionConfig session_config;
+    if (size > 0) {
+      session_config.set_width(size);
+      session_config.set_height(size);
+    }
+    auto engine = OmniEngine::Create(model_name, settings, &session_config);
+    if (!engine.ok()) {
+      return Fail(engine.status());
+    }
+    *out_engine = new OmniExternImageEngine{std::move(*engine)};
+    return OMNIEXTERN_STATUS_OK;
+  });
+}
+
+void omniextern_image_engine_delete(OmniExternImageEngine* engine) { delete engine; }
+
+int omniextern_image_generate(OmniExternImageEngine* engine, const char* prompt, int steps, unsigned long long seed,
+                              unsigned char** out_rgb, int* out_width, int* out_height, int* out_channels) {
+  if (out_rgb != nullptr) *out_rgb = nullptr;
+  if (engine == nullptr || prompt == nullptr || out_rgb == nullptr || out_width == nullptr || out_height == nullptr ||
+      out_channels == nullptr) {
+    return Fail(absl::StatusCode::kInvalidArgument, "engine, prompt and the out parameters are required.");
+  }
+  if (prompt[0] == '\0') {
+    return Fail(absl::StatusCode::kInvalidArgument, "The prompt is empty.");
+  }
+  return Guard([&]() -> int {
+    // A session per picture: its stages are made over the engine's loaded models, so this costs little, and the
+    // engine keeps no state between pictures.
+    auto input = std::make_unique<PushInputSource>();
+    PushInputSource* raw_input = input.get();
+    auto session = engine->engine->CreateSession(std::move(input));
+    if (!session.ok()) {
+      return Fail(session.status());
+    }
+    OmniSession::ImageGenInputMetadata metadata;
+    metadata.num_inference_steps = steps;  // <= 0: the model's default
+    metadata.seed = seed;                  // 0: the model's default
+    absl::Status status = raw_input->PushInput(metadata);
+    if (status.ok()) {
+      status = raw_input->PushInput(OmniSession::TextInput{.text = prompt});
+    }
+    if (!status.ok()) {
+      return Fail(status);
+    }
+    absl::StatusOr<OmniSession::Output> output = (*session)->ProcessNext();
+    if (!output.ok()) {
+      return Fail(output.status());
+    }
+    const auto* image = std::get_if<litert::omni::ImageOutput>(&*output);
+    if (image == nullptr || image->rgb_data.empty()) {
+      return Fail(absl::StatusCode::kInternal, "The model returned no picture.");
+    }
+    auto* pixels = static_cast<unsigned char*>(std::malloc(image->rgb_data.size()));
+    if (pixels == nullptr) {
+      return Fail(absl::StatusCode::kResourceExhausted, "Out of memory for the picture.");
+    }
+    std::memcpy(pixels, image->rgb_data.data(), image->rgb_data.size());
+    *out_rgb = pixels;
+    *out_width = image->width;
+    *out_height = image->height;
+    *out_channels = image->channels;
+    return OMNIEXTERN_STATUS_OK;
+  });
+}
+
+void omniextern_free_buffer(void* buffer) { std::free(buffer); }
 
 }  // extern "C"

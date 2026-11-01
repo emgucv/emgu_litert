@@ -35,7 +35,9 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>"Search my videos"' index, in the database.</summary>
         VideoIndex,
         /// <summary>A speech recognition model's files (e.g. Parakeet's model and tokenizer).</summary>
-        SpeechModel
+        SpeechModel,
+        /// <summary>An image model's file and caches (e.g. Bonsai Image's .litertlm).</summary>
+        ImageModel
     }
 
     /// <summary>One thing the app keeps on the device, with its size.</summary>
@@ -107,8 +109,28 @@ namespace Emgu.LiteRT.LM.Chat
                 CacheNames = (cacheNames ?? Enumerable.Empty<string>()).ToList()
             };
 
+        /// <summary>
+        /// Describe an image model on LiteRT-LM (a .litertlm in the models' folder, with its caches in a folder of
+        /// their own beside it), its own row rather than a chat model's.
+        /// </summary>
+        /// <param name="name">Its name, shown</param>
+        /// <param name="file">Its model file's name in the models' folder (a .litertlm)</param>
+        /// <param name="detail">What deleting it does, shown</param>
+        /// <param name="cacheFolder">Its caches' folder's name in the models' folder (e.g. "bonsai-flux2-cache"), deleted with it, or null</param>
+        public static StorageModel Image(string name, string file, string detail, string cacheFolder = null) =>
+            new StorageModel(name, file) { IsImage = true, Detail = detail, CacheFolder = cacheFolder };
+
+        /// <summary>An image model's caches' folder in the models' folder, or null.</summary>
+        public string CacheFolder { get; private set; }
+
         /// <summary>True for a speech recognition model (<see cref="Speech"/>).</summary>
         public bool IsSpeech { get; private set; }
+
+        /// <summary>True for an image model (<see cref="Image"/>).</summary>
+        public bool IsImage { get; private set; }
+
+        // A speech or image model: its own row, with its companions and caches, never listed as a chat model.
+        internal bool HasOwnRow => IsSpeech || IsImage;
 
         /// <summary>The other files deleted with it (a speech model's tokenizer or older files).</summary>
         public IReadOnlyList<string> Companions { get; private set; } = new string[0];
@@ -203,9 +225,9 @@ namespace Emgu.LiteRT.LM.Chat
         public async Task<StorageSnapshot> ReadAsync()
         {
             var result = new StorageSnapshot();
-            var models = _models.Where(m => !m.IsSpeech).Select(m => (m.Name, m.File, m.IsSearch)).ToList();
-            // A speech model's .litertlm is its own row, not an unknown chat model's.
-            var speechFiles = new HashSet<string>(_models.Where(m => m.IsSpeech).Select(m => m.File), StringComparer.OrdinalIgnoreCase);
+            var models = _models.Where(m => !m.HasOwnRow).Select(m => (m.Name, m.File, m.IsSearch)).ToList();
+            // A speech or image model's .litertlm is its own row, not an unknown chat model's.
+            var speechFiles = new HashSet<string>(_models.Where(m => m.HasOwnRow).Select(m => m.File), StringComparer.OrdinalIgnoreCase);
             if (Directory.Exists(ModelRoot))
             {
                 // Include older downloads and caches left behind by models no longer in the picker.
@@ -233,12 +255,13 @@ namespace Emgu.LiteRT.LM.Chat
                     Detail = "Model, partial downloads, and its CPU/GPU caches. Download again to use after deletion."
                 });
             }
-            foreach (StorageModel model in _models.Where(m => m.IsSpeech))
+            foreach (StorageModel model in _models.Where(m => m.HasOwnRow))
                 result.Entries.Add(new StorageEntry
                 {
-                    Kind = StorageKind.SpeechModel, Key = model.File, Name = model.Name,
-                    Bytes = SpeechFiles(model).Sum(StorageFiles.Size),
-                    Detail = model.Detail ?? "Speech recognition model. Downloaded again when it is used."
+                    Kind = model.IsImage ? StorageKind.ImageModel : StorageKind.SpeechModel, Key = model.File, Name = model.Name,
+                    Bytes = SpeechFiles(model).Sum(StorageFiles.Size) + (CacheFolderPath(model) is string caches ? StorageFiles.Size(caches) : 0),
+                    Detail = model.Detail ?? (model.IsImage ? "Image model and its caches. Downloaded again when it is chosen."
+                        : "Speech recognition model. Downloaded again when it is used.")
                 });
             foreach (StorageFolder folder in _folders)
                 result.Entries.Add(new StorageEntry { Kind = StorageKind.Folder, Key = folder.Key, Name = folder.Name, Bytes = StorageFiles.Size(folder.Path), Detail = folder.Detail });
@@ -297,8 +320,10 @@ namespace Emgu.LiteRT.LM.Chat
                     StorageFiles.DeleteModel(ModelRoot, Path.Combine(ModelRoot, entry.Key));
                     return;
                 case StorageKind.SpeechModel:
-                    StorageModel speech = _models.FirstOrDefault(m => m.IsSpeech && m.File == entry.Key)
-                        ?? throw new InvalidOperationException("Unknown speech model.");
+                case StorageKind.ImageModel:
+                    StorageModel speech = _models.FirstOrDefault(m => m.HasOwnRow && m.File == entry.Key
+                            && m.IsImage == (entry.Kind == StorageKind.ImageModel))
+                        ?? throw new InvalidOperationException("Unknown speech or image model.");
                     foreach (string file in new[] { speech.File }.Concat(speech.Companions))
                     {
                         ValidateModelName(file, speech: true);
@@ -306,6 +331,8 @@ namespace Emgu.LiteRT.LM.Chat
                     }
                     foreach (string cache in SpeechCaches(speech))
                         File.Delete(cache);
+                    if (CacheFolderPath(speech) is string cacheFolder && Directory.Exists(cacheFolder))
+                        StorageFiles.DeleteDirectory(ModelRoot, cacheFolder);
                     return;
                 case StorageKind.Folder:
                     StorageFolder folder = _folders.FirstOrDefault(f => f.Key == entry.Key)
@@ -325,7 +352,7 @@ namespace Emgu.LiteRT.LM.Chat
             await _store.CompactAsync().ConfigureAwait(false);
         }
 
-        // A speech model's files, each with its partial download and marker.
+        // A speech or image model's files, each with its partial download and marker, and its caches.
         private List<string> SpeechFiles(StorageModel model)
         {
             var files = new List<string>();
@@ -336,6 +363,17 @@ namespace Emgu.LiteRT.LM.Chat
             }
             files.AddRange(SpeechCaches(model).Where(cache => !files.Contains(cache)));
             return files;
+        }
+
+        // An image model's caches' folder, right in the models' folder; null when it has none.
+        private string CacheFolderPath(StorageModel model)
+        {
+            if (model.CacheFolder == null)
+                return null;
+            if (string.IsNullOrWhiteSpace(model.CacheFolder) || model.CacheFolder.IndexOfAny(new[] { '/', '\\', ':' }) >= 0
+                || model.CacheFolder.StartsWith(".", StringComparison.Ordinal))
+                throw new InvalidOperationException("Invalid cache folder name.");
+            return Path.Combine(ModelRoot, model.CacheFolder);
         }
 
         // The caches named after a speech model (its CacheNames) rather than its file: cache files only.
