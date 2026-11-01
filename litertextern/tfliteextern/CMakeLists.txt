@@ -65,14 +65,29 @@ ENDIF()
 # The TFLite version (TfLiteVersion(), TFLITE_VERSION_STRING) is TensorFlow's version. Bazel passes it to
 # litert/tflite/version.h as TF_MAJOR_VERSION etc., but LiteRT's CMake doesn't, so version.h would fall back to its
 # hardcoded (stale) default. Define them here, before LiteRT's directories are added so they inherit them, from the
-# TensorFlow source LiteRT's CMake builds against: TENSORFLOW_SOURCE_DIR's tf_version.bzl if one is given, else the
-# GIT_TAG litert/tflite/CMakeLists.txt downloads. tflite_version.txt below records it for the package versions.
-IF(TENSORFLOW_SOURCE_DIR AND EXISTS "${TENSORFLOW_SOURCE_DIR}/tensorflow/tf_version.bzl")
+# TensorFlow source LiteRT's CMake builds against: TFLITEEXTERN_TF_VERSION if given (e.g. -DTFLITEEXTERN_TF_VERSION=
+# 2.22.0), else TENSORFLOW_SOURCE_DIR's tf_version.bzl if one is given, else the GIT_TAG litert/tflite/CMakeLists.txt
+# downloads (LiteRT's CMake stopped downloading TensorFlow after v2.2.0-643), else the tflite_version.txt the Bazel
+# builds write next to the libraries from the TensorFlow they built against (lib/runtimes/osx/native, lib/ios).
+# tflite_version.txt below records it for the package versions.
+SET(TFLITEEXTERN_TF_VERSION "" CACHE STRING "The TensorFlow version TfLiteVersion() reports (e.g. 2.22.0); empty to detect it")
+SET(TFLITEEXTERN_TF_VERSION_TEXT "${TFLITEEXTERN_TF_VERSION}")
+IF(TFLITEEXTERN_TF_VERSION_TEXT STREQUAL "" AND TENSORFLOW_SOURCE_DIR AND EXISTS "${TENSORFLOW_SOURCE_DIR}/tensorflow/tf_version.bzl")
   INCLUDE(TensorflowVersion)
   SET(TFLITEEXTERN_TF_VERSION_SUFFIX "")
 ELSE()
-  FILE(STRINGS "${LITERT_SOURCE_DIR_ABS}/tflite/CMakeLists.txt" TFLITEEXTERN_TF_GIT_TAG REGEX "GIT_TAG[ ]+v[0-9]+\\.[0-9]+\\.[0-9]+")
-  STRING(REGEX MATCH "v([0-9]+)\\.([0-9]+)\\.([0-9]+)([-a-z0-9]*)" TFLITEEXTERN_TF_TAG_MATCH "${TFLITEEXTERN_TF_GIT_TAG}")
+  IF(TFLITEEXTERN_TF_VERSION_TEXT STREQUAL "")
+    FILE(STRINGS "${LITERT_SOURCE_DIR_ABS}/tflite/CMakeLists.txt" TFLITEEXTERN_TF_GIT_TAG REGEX "GIT_TAG[ ]+v[0-9]+\\.[0-9]+\\.[0-9]+")
+    STRING(REGEX MATCH "v[0-9]+\\.[0-9]+\\.[0-9]+[-a-z0-9]*" TFLITEEXTERN_TF_VERSION_TEXT "${TFLITEEXTERN_TF_GIT_TAG}")
+  ENDIF()
+  FOREACH(TFLITEEXTERN_VERSION_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../lib/runtimes/osx/native/tflite_version.txt"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../lib/ios/tflite_version.txt")
+    IF(TFLITEEXTERN_TF_VERSION_TEXT STREQUAL "" AND EXISTS "${TFLITEEXTERN_VERSION_FILE}")
+      FILE(STRINGS "${TFLITEEXTERN_VERSION_FILE}" TFLITEEXTERN_TF_VERSION_TEXT LIMIT_COUNT 1)
+    ENDIF()
+  ENDFOREACH()
+  STRING(REGEX MATCH "([0-9]+)\\.([0-9]+)\\.([0-9]+)([-a-z0-9]*)" TFLITEEXTERN_TF_TAG_MATCH "${TFLITEEXTERN_TF_VERSION_TEXT}")
   SET(TENSORFLOW_VERSION_MAJOR "${CMAKE_MATCH_1}")
   SET(TENSORFLOW_VERSION_MINOR "${CMAKE_MATCH_2}")
   SET(TENSORFLOW_VERSION_PATCH "${CMAKE_MATCH_3}")

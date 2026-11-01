@@ -347,101 +347,6 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
-        // The safety guard must reject every GPU entry point before downloading or calling native code.
-        [TestAttribute]
-        public async Task TestEmbeddingGpuRequiresExplicitWindowsOptIn()
-        {
-            foreach (string component in new[] { "text", "vision", "audio" })
-            {
-                using (EmbeddingGemma2Multimodal model = new EmbeddingGemma2Multimodal())
-                {
-                    if (component == "vision") model.VisionBackend = "gpu";
-                    if (component == "audio") model.AudioBackend = "gpu";
-                    bool refused = false;
-                    try { await model.Init(backend: component == "text" ? "gpu" : "cpu"); }
-                    catch (NotSupportedException) { refused = true; }
-                    if (!refused) throw new Exception("Embedding GPU guard did not reject " + component);
-                }
-            }
-            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
-            {
-                using (EmbeddingGemma2Multimodal model = new EmbeddingGemma2Multimodal { EnableWindowsWebGpu = true })
-                {
-                    bool refused = false;
-                    try { await model.Init(backend: "gpu"); }
-                    catch (NotSupportedException) { refused = true; }
-                    if (!refused) throw new Exception("Windows GPU opt-in enabled another platform");
-                }
-            }
-        }
-
-        // VideoMomentIndex with EmbeddingGemma 2 740M: a 20 s "video" of five 4 s scenes (the test pictures, with the
-        // spoken "have a wonderful day" over the last), indexed frames only and with its sound; a query finds its scene.
-#if !TEST_MODELS
-#if VS_TEST
-        [Ignore()]
-#else
-        [Ignore("Ignore from test run by default.")]
-#endif
-#endif
-        [TestAttribute]
-        public async Task TestVideoMomentIndex()
-        {
-            RequireLiteRtLm();
-            String[] scenes = { "tulips.jpg", "dog416.png", "space_shuttle.jpg", "surfers.jpg", "grace_hopper.jpg" };
-            byte[][] pictures = scenes.Select(System.IO.File.ReadAllBytes).ToArray();
-            const long SceneMs = 4000;
-            long durationMs = SceneMs * scenes.Length;
-            // 16 kHz sound: silence, the speech (24 kHz, resampled) at the start of the last scene.
-            short[] speech = Resample(ReadWavSamples("have_a_wonderful_day.wav", out int rate), rate, 16000);
-            short[] sound = new short[durationMs * 16];
-            Array.Copy(speech, 0, sound, (int)(SceneMs * 4 * 16), Math.Min(speech.Length, (int)(SceneMs * 16)));
-            Func<long, CancellationToken, Task<byte[]>> frameAt = (t, c) =>
-                Task.FromResult(pictures[(int)Math.Min(scenes.Length - 1, t / SceneMs)]);
-            Func<long, long, CancellationToken, Task<short[]>> audioBetween = (from, to, c) =>
-                Task.FromResult(sound.Skip((int)(from * 16)).Take((int)((to - from) * 16)).ToArray());
-            (String Query, int Scene)[] queries =
-            {
-                ("tulip flowers", 0), ("a dog", 1), ("a space shuttle launch", 2), ("people surfing on waves", 3),
-                ("a woman in a military uniform", 4)
-            };
-            using (EmbeddingGemma2Multimodal model = new EmbeddingGemma2Multimodal())
-            {
-                await model.Init();
-                foreach (bool withSound in new[] { false, true })
-                {
-                    VideoMomentIndex index = new VideoMomentIndex();
-                    System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
-                    await index.BuildAsync(model, durationMs, frameAt, withSound ? audioBetween : null);
-                    Console.WriteLine("{0}: {1} windows in {2:F1} s, with sound: {3}", withSound ? "Frames and sound" : "Frames only",
-                        index.Windows.Count, watch.Elapsed.TotalSeconds, index.WithAudio);
-                    Assert.That(index.IsBuilt, Is.True);
-                    Assert.That(index.WithAudio, Is.EqualTo(withSound));
-                    foreach ((String query, int scene) in queries)
-                    {
-                        IReadOnlyList<VideoMoment> moments = index.Search(model, query, 2);
-                        Console.WriteLine("  {0}: {1}", query, String.Join(", ", moments.Select(m => String.Format("{0} ({1:F3})", m, m.Score))));
-                        // The best moment covers the middle of the scene (a window's last frame, at its end, is the next
-                        // scene's first, so the window before a scene matches it in part too).
-                        long middle = scene * SceneMs + SceneMs / 2;
-                        Assert.That(moments[0].StartMs, Is.LessThanOrEqualTo(middle), query);
-                        Assert.That(moments[0].EndMs, Is.GreaterThanOrEqualTo(middle), query);
-                    }
-                    String spoken = "someone saying have a wonderful day";
-                    Console.WriteLine("  {0}: {1}", spoken, String.Join(", ", index.Search(model, spoken, 2).Select(m => String.Format("{0} ({1:F3})", m, m.Score))));
-
-                    using (System.IO.MemoryStream saved = new System.IO.MemoryStream())
-                    {
-                        index.Save(saved);
-                        saved.Position = 0;
-                        VideoMomentIndex loaded = VideoMomentIndex.Load(saved);
-                        Assert.That(loaded.Search(model, "a dog", 2)[0].ToString(), Is.EqualTo(index.Search(model, "a dog", 2)[0].ToString()));
-                        Assert.That(loaded.WithAudio, Is.EqualTo(index.WithAudio));
-                    }
-                }
-            }
-        }
-
         // The 16-bit samples of a mono WAV file and its sample rate.
         private static short[] ReadWavSamples(String file, out int sampleRate)
         {
@@ -476,8 +381,9 @@ namespace Emgu.TF.Lite.Test
             return result;
         }
 
-        // Windows only: EmbeddingGemma 2 Text Vision 440M on the Direct3D 12 GPU (the source-built WebGPU bundle next to
-        // libLiteRt, see TestLiteRtMobilenetGpu) must give the CPU's embeddings for text and an image.
+        // EmbeddingGemma 2 Text Vision 440M on the GPU (the accelerator plugin next to libLiteRt: Metal on a Mac, the
+        // source-built WebGPU bundle on Windows, see TestLiteRtMobilenetGpu) must give the CPU's embeddings for text and an
+        // image. Before LiteRT-LM v0.19.0 the prebuilt plugins crashed binding the model's weights.
 #if !TEST_MODELS
 #if VS_TEST
         [Ignore()]
@@ -489,10 +395,8 @@ namespace Emgu.TF.Lite.Test
         public async Task TestEmbeddingGemma2TextVisionGpuMatchesCpu()
         {
             RequireLiteRtLm();
-            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
-                Skip("The embedding models' GPU is only enabled on Windows");
-            if (!System.IO.File.Exists(System.IO.Path.Combine(AppContext.BaseDirectory, "libLiteRtWebGpuAccelerator.dll")))
-                Skip("No LiteRT WebGPU accelerator next to libLiteRt (run TestLiteRtMobilenetGpu with EMGU_LITERT_WEBGPU_DIR first)");
+            if (!UnitTest1.StageGpuPlugin())
+                Skip("No LiteRT GPU accelerator plugin next to libLiteRt (on Windows: set EMGU_LITERT_WEBGPU_DIR)");
 
             String[] texts = { "How do I change my password?", "The Eiffel Tower is 330 metres tall.", "a red apple" };
             float[][] cpuText;
@@ -503,7 +407,7 @@ namespace Emgu.TF.Lite.Test
                 cpuText = cpu.Embed(texts);
                 cpuImage = cpu.EmbedImageFile("apple.jpg");
             }
-            using (EmbeddingGemma2TextVision gpu = new EmbeddingGemma2TextVision { EnableWindowsWebGpu = true, VisionBackend = "gpu" })
+            using (EmbeddingGemma2TextVision gpu = new EmbeddingGemma2TextVision { VisionBackend = "gpu" })
             {
                 await gpu.Init(backend: "gpu");
                 float[][] gpuText = gpu.Embed(texts);
@@ -539,10 +443,8 @@ namespace Emgu.TF.Lite.Test
         public async Task TestEmbeddingGemma2MultimodalGpuMatchesCpu()
         {
             RequireLiteRtLm();
-            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
-                Skip("The embedding models' GPU is only enabled on Windows");
-            if (!System.IO.File.Exists(System.IO.Path.Combine(AppContext.BaseDirectory, "libLiteRtWebGpuAccelerator.dll")))
-                Skip("No LiteRT WebGPU accelerator next to libLiteRt (run TestLiteRtMobilenetGpu with EMGU_LITERT_WEBGPU_DIR first)");
+            if (!UnitTest1.StageGpuPlugin())
+                Skip("No LiteRT GPU accelerator plugin next to libLiteRt (on Windows: set EMGU_LITERT_WEBGPU_DIR)");
 
             String[] texts = { "How do I change my password?", "a red apple", "Have a wonderful day!" };
             float[][] cpuText;
@@ -554,7 +456,7 @@ namespace Emgu.TF.Lite.Test
                 cpuImage = cpu.EmbedImageFile("apple.jpg");
                 cpuAudio = cpu.EmbedAudioFile("have_a_wonderful_day.wav");
             }
-            using (EmbeddingGemma2Multimodal gpu = new EmbeddingGemma2Multimodal { EnableWindowsWebGpu = true, VisionBackend = "gpu", AudioBackend = "gpu" })
+            using (EmbeddingGemma2Multimodal gpu = new EmbeddingGemma2Multimodal { VisionBackend = "gpu", AudioBackend = "gpu" })
             {
                 System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
                 await gpu.Init(backend: "gpu");
@@ -1714,8 +1616,6 @@ namespace Emgu.TF.Lite.Test
         private static async Task TestChatClientTools(bool constrained)
         {
             RequireLiteRtLm();
-            if (constrained && !LiteRtLmInvoke.IsV018OrLater)
-                throw new Exception("Constrained decoding needs LiteRT-LM v0.18.0 or later");
             using (Gemma4E2B model = new Gemma4E2B())
             {
                 await model.Init();

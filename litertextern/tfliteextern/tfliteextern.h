@@ -200,3 +200,8 @@ TFAPI(const char*) tfeGetLiteVersion();
 extern "C" typedef int (*TfeErrorCallback)(int status, const char* errMsg);
 
 TFAPI(void) tfeRedirectError(TfeErrorCallback errCallback);
+
+// The errors TFLite reported on this thread since the last tfeClearPendingError (several are joined by newlines), or
+// null; valid until the next error or tfeClearPendingError on this thread.
+TFAPI(const char*) tfeGetPendingError();
+TFAPI(void) tfeClearPendingError();

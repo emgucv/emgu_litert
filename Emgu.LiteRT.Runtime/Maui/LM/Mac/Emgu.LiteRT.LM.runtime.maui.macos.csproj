@@ -17,8 +17,8 @@
        LiteRT-LM's prebuilt libGemmaModelConstraintProvider only exists for macOS, iOS and Android. A Mac Catalyst
        app can't link against a macOS dylib, but it can load one at run time, so this add-on ships the macOS
        liblitert-lm.dylib built by platforms/macos/bazel_build_tflite_macos (Apple Silicon only), with the
-       libGemmaModelConstraintProvider.dylib and libLiteRt.dylib it depends on (found through its @loader_path
-       rpath), in the app bundle's Contents/MonoBundle, where Emgu.LiteRT.LM's DllImport("liblitert-lm") finds
+       libGemmaModelConstraintProvider.dylib, libwebgpu_dawn.dylib and libLiteRt.dylib it depends on (found through
+       its @loader_path rpath), in the app bundle's Contents/MonoBundle, where Emgu.LiteRT.LM's DllImport("liblitert-lm") finds
        them. They're copied, not linked, so the static tfliteextern of Emgu.LiteRT.runtime.maui.macos and the
        TFLite inside these dylibs never meet in one binary. -->
   <ItemGroup Condition="Exists('$(EmguLiteRtLmMacLibrary)')">
@@ -29,11 +29,19 @@
       <Pack>True</Pack>
       <PackagePath>runtimes\maccatalyst-arm64\native</PackagePath>
     </None>
+    <!-- Dawn, which liblitert-lm.dylib loads for its WebGPU sampler since LiteRT-LM v0.19.0. -->
+    <None Include="$(EmguLiteRtLmMacBinaryDir)\libwebgpu_dawn.dylib" Condition="Exists('$(EmguLiteRtLmMacBinaryDir)\libwebgpu_dawn.dylib')">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Pack>True</Pack>
+      <PackagePath>runtimes\maccatalyst-arm64\native</PackagePath>
+    </None>
   </ItemGroup>
-  <!-- libasrextern.dylib: Emgu's C API over LiteRT-LM's speech recognition (Emgu.LiteRT.LM's AsrEngine), built next to
+  <!-- libomniextern.dylib: Emgu's C API over LiteRT-LM's OmniEngine (Emgu.LiteRT.LM's SpeechToTextEngine), built next to
        liblitert-lm.dylib and loaded the same way. Optional. -->
-  <ItemGroup Condition="Exists('$(EmguLiteRtLmMacBinaryDir)\libasrextern.dylib')">
-    <None Include="$(EmguLiteRtLmMacBinaryDir)\libasrextern.dylib">
+  <ItemGroup Condition="Exists('$(EmguLiteRtLmMacBinaryDir)\libomniextern.dylib')">
+    <None Include="$(EmguLiteRtLmMacBinaryDir)\libomniextern.dylib">
       <Link>%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

@@ -77,23 +77,42 @@ namespace Emgu.LiteRT.LM
         {
             try
             {
-                int count = LiteRtLmInvoke.litert_lm_responses_get_num_candidates(responses);
+                UIntPtr numCandidates;
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_responses_get_num_candidates(responses, out numCandidates), "litert_lm_responses_get_num_candidates");
+                int count = checked((int)numCandidates.ToUInt64());
                 ResponseCandidate[] candidates = new ResponseCandidate[count];
                 for (int i = 0; i < count; i++)
                 {
+                    UIntPtr index = new UIntPtr((uint)i);
                     ResponseCandidate candidate = new ResponseCandidate();
-                    candidate.Text = LiteRtLmInvoke.PtrToStringUtf8(LiteRtLmInvoke.litert_lm_responses_get_response_text_at(responses, i));
-                    if (LiteRtLmInvoke.litert_lm_responses_has_score_at(responses, i))
-                        candidate.Score = LiteRtLmInvoke.litert_lm_responses_get_score_at(responses, i);
-                    if (LiteRtLmInvoke.litert_lm_responses_has_token_length_at(responses, i))
-                        candidate.TokenLength = LiteRtLmInvoke.litert_lm_responses_get_token_length_at(responses, i);
-                    if (LiteRtLmInvoke.litert_lm_responses_has_token_scores_at(responses, i))
+                    IntPtr text;
+                    if (LiteRtLmInvoke.CheckFound(LiteRtLmInvoke.litert_lm_responses_get_response_text_at(responses, index, out text), "litert_lm_responses_get_response_text_at"))
+                        candidate.Text = LiteRtLmInvoke.PtrToStringUtf8(text);
+                    bool has;
+                    LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_responses_has_score_at(responses, index, out has), "litert_lm_responses_has_score_at");
+                    if (has)
                     {
-                        int numScores = LiteRtLmInvoke.litert_lm_responses_get_num_token_scores_at(responses, i);
-                        float[] scores = new float[numScores];
-                        IntPtr scoresPtr = LiteRtLmInvoke.litert_lm_responses_get_token_scores_at(responses, i);
-                        if (numScores > 0 && scoresPtr != IntPtr.Zero)
-                            Marshal.Copy(scoresPtr, scores, 0, numScores);
+                        float score;
+                        LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_responses_get_score_at(responses, index, out score), "litert_lm_responses_get_score_at");
+                        candidate.Score = score;
+                    }
+                    LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_responses_has_token_length_at(responses, index, out has), "litert_lm_responses_has_token_length_at");
+                    if (has)
+                    {
+                        UIntPtr length;
+                        LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_responses_get_token_length_at(responses, index, out length), "litert_lm_responses_get_token_length_at");
+                        candidate.TokenLength = checked((int)length.ToUInt64());
+                    }
+                    LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_responses_has_token_scores_at(responses, index, out has), "litert_lm_responses_has_token_scores_at");
+                    if (has)
+                    {
+                        UIntPtr numScores;
+                        LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_responses_get_num_token_scores_at(responses, index, out numScores), "litert_lm_responses_get_num_token_scores_at");
+                        float[] scores = new float[checked((int)numScores.ToUInt64())];
+                        IntPtr scoresPtr;
+                        LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_responses_get_token_scores_at(responses, index, out scoresPtr), "litert_lm_responses_get_token_scores_at");
+                        if (scores.Length > 0 && scoresPtr != IntPtr.Zero)
+                            Marshal.Copy(scoresPtr, scores, 0, scores.Length);
                         candidate.TokenScores = scores;
                     }
                     candidates[i] = candidate;
@@ -113,33 +132,33 @@ namespace Emgu.LiteRT.LM
         internal static extern void litert_lm_responses_delete(IntPtr responses);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_responses_get_num_candidates(IntPtr responses);
+        internal static extern LiteRtLmStatusCode litert_lm_responses_get_num_candidates(IntPtr responses, out UIntPtr numCandidates);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_responses_get_response_text_at(IntPtr responses, int index);
+        internal static extern LiteRtLmStatusCode litert_lm_responses_get_response_text_at(IntPtr responses, UIntPtr index, out IntPtr text);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        [return: MarshalAs(BoolMarshalType)]
-        internal static extern bool litert_lm_responses_has_score_at(IntPtr responses, int index);
+        internal static extern LiteRtLmStatusCode litert_lm_responses_has_score_at(
+            IntPtr responses, UIntPtr index, [MarshalAs(BoolMarshalType)] out bool hasScore);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern float litert_lm_responses_get_score_at(IntPtr responses, int index);
+        internal static extern LiteRtLmStatusCode litert_lm_responses_get_score_at(IntPtr responses, UIntPtr index, out float score);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        [return: MarshalAs(BoolMarshalType)]
-        internal static extern bool litert_lm_responses_has_token_length_at(IntPtr responses, int index);
+        internal static extern LiteRtLmStatusCode litert_lm_responses_has_token_length_at(
+            IntPtr responses, UIntPtr index, [MarshalAs(BoolMarshalType)] out bool hasTokenLength);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_responses_get_token_length_at(IntPtr responses, int index);
+        internal static extern LiteRtLmStatusCode litert_lm_responses_get_token_length_at(IntPtr responses, UIntPtr index, out UIntPtr tokenLength);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        [return: MarshalAs(BoolMarshalType)]
-        internal static extern bool litert_lm_responses_has_token_scores_at(IntPtr responses, int index);
+        internal static extern LiteRtLmStatusCode litert_lm_responses_has_token_scores_at(
+            IntPtr responses, UIntPtr index, [MarshalAs(BoolMarshalType)] out bool hasTokenScores);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_responses_get_num_token_scores_at(IntPtr responses, int index);
+        internal static extern LiteRtLmStatusCode litert_lm_responses_get_num_token_scores_at(IntPtr responses, UIntPtr index, out UIntPtr numTokenScores);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_responses_get_token_scores_at(IntPtr responses, int index);
+        internal static extern LiteRtLmStatusCode litert_lm_responses_get_token_scores_at(IntPtr responses, UIntPtr index, out IntPtr tokenScores);
     }
 }

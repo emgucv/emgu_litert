@@ -1,6 +1,7 @@
 EXPORTS
 tfeBuiltinOpResolverCreate
 tfeBuiltinOpResolverRelease
+tfeClearPendingError
 tfeDynamicBufferAddString
 tfeDynamicBufferCreate
 tfeDynamicBufferRelease
@@ -11,6 +12,7 @@ tfeFlatBufferModelCheckModelIdentifier
 tfeFlatBufferModelInitialized
 tfeFlatBufferModelRelease
 tfeGetLiteVersion
+tfeGetPendingError
 tfeGpuDelegateV2Create
 tfeGpuDelegateV2Delete
 tfeIntArrayCreate

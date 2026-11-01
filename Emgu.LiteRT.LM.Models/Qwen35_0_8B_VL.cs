@@ -25,9 +25,10 @@ namespace Emgu.LiteRT.LM.Models
             get
             {
                 return new DownloadableFile(
-                    "https://huggingface.co/litert-community/Qwen3.5-0.8B/resolve/main/Qwen3.5-0.8B-VL_int8.litertlm",
+                    // Pinned to a revision: litert-community replaces the files in place (2026-10-16: the tokenizer section).
+                    "https://huggingface.co/litert-community/Qwen3.5-0.8B/resolve/ff11c109e8e56797cd1ee5befa856975bb465afc/Qwen3.5-0.8B-VL_int8.litertlm",
                     DefaultLocalSubfolder,
-                    "5e6d69e55f92d21799fe0a2552da979c95a2533b64e4f0ed73fe87dd9d759ab9");
+                    "1ab56460263fe94fde5fec160363d3aacbae9c5ee3638121c11feb51e483e29d");
             }
         }
 

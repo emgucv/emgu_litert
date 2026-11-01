@@ -190,7 +190,7 @@ public class UnitTestAgentRegression
                 RecordedUtc = DateTime.UtcNow, Model = nameof(Gemma4E2B), ModelUrl = model.DefaultModelFile.Url,
                 ModelSha256 = model.DefaultModelFile.Sha256Hash, Backend = "cpu", Threads = 4, MaxNumTokens = 4096,
                 MaxOutputTokens = 160, Reasoning = "None", Instructions, Repetitions = repetitions,
-                ConstrainedDecoding = LiteRtLmInvoke.IsV018OrLater,
+                ConstrainedDecoding = true,
                 Framework = RuntimeInformation.FrameworkDescription, Platform = RuntimeInformation.OSDescription,
                 Architecture = RuntimeInformation.ProcessArchitecture.ToString(), ToolContractSha256 = contractHash,
                 AgentFramework = typeof(ChatClientAgent).Assembly.GetName().Version.ToString(),

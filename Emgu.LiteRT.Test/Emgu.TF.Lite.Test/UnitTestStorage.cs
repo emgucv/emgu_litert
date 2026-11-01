@@ -67,21 +67,24 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
-        public async Task SpeechModelIsOneRowWithItsTokenizerAndDeletesBoth()
+        public async Task SpeechModelIsOneRowWithItsOlderFilesAndDeletesThem()
         {
+            // A .litertlm speech model with the .tflite and tokenizer an older version used, if still there.
             var catalog = new StorageCatalog(_store, _models, _exports, new[]
             {
                 new StorageModel("Chat A", "a.litertlm"),
-                StorageModel.Speech("Parakeet", "speech.tflite", new[] { "speech_tokenizer.json" }, "Speech model.")
+                StorageModel.Speech("Parakeet", "speech.litertlm", new[] { "speech.tflite", "speech_tokenizer.json" }, "Speech model.", new[] { "speech-model" })
             });
-            string[] owned = { "speech.tflite", "speech.tflite.sha256ok", "speech.tflite.part", "speech_tokenizer.json", "speech_tokenizer.json.sha256ok" };
-            string[] unrelated = { "a.litertlm", "other.tflite", "tokenizer.json" };
+            // Its compiled caches may be named after the model rather than the file ("speech-model_..."): only caches.
+            string[] owned = { "speech.litertlm", "speech.litertlm.sha256ok", "speech.litertlm.part", "speech.litertlm_1_2.xnnpack_cache",
+                "speech-model_3_4.xnnpack_cache", "speech.tflite", "speech.tflite.sha256ok", "speech_tokenizer.json", "speech_tokenizer.json.sha256ok" };
+            string[] unrelated = { "a.litertlm", "other.tflite", "tokenizer.json", "speech-model", "speech-model_notes.txt" };
             foreach (string file in owned.Concat(unrelated)) FileWithSize(Path.Combine(_models, file), 10);
             StorageSnapshot snapshot = await catalog.ReadAsync();
             StorageEntry speech = snapshot.Entries.Single(e => e.Kind == StorageKind.SpeechModel);
-            Assert.That((speech.Key, speech.Name, speech.Bytes, speech.Detail), Is.EqualTo(("speech.tflite", "Parakeet", owned.Length * 10L, "Speech model.")));
-            // Not also listed as a chat model.
-            Assert.That(snapshot.Entries.Count(e => e.Key == "speech.tflite"), Is.EqualTo(1));
+            Assert.That((speech.Key, speech.Name, speech.Bytes, speech.Detail), Is.EqualTo(("speech.litertlm", "Parakeet", owned.Length * 10L, "Speech model.")));
+            // Not also listed as a chat model (the scan finds every .litertlm).
+            Assert.That(snapshot.Entries.Count(e => e.Key == "speech.litertlm"), Is.EqualTo(1));
             await catalog.DeleteAsync(speech);
             foreach (string file in owned) Assert.That(File.Exists(Path.Combine(_models, file)), Is.False, file);
             foreach (string file in unrelated) Assert.That(File.Exists(Path.Combine(_models, file)), Is.True, file);

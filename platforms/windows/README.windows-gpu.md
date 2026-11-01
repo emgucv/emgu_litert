@@ -42,7 +42,10 @@ XNNPACK configuration explicitly.
 
 Initialize `litert` and `LiteRT-LM` at the repository's checked-in pins before
 building. The patches currently support LiteRT `26895c9f` and LiteRT-LM
-`b2f686e2` (v0.18.0); the script checks both revisions and their agreement.
+`b2f686e2` (v0.18.0); the script checks both revisions and their agreement. The
+submodules moved to LiteRT-LM v0.19.0 (LiteRT `dcb657e8`) on 2026-11-01: check
+out the v0.18.0 revisions (tag `v0.18.0`) for this script until its pins and
+patches are rebased (TODO item 9).
 
 ## Output
 

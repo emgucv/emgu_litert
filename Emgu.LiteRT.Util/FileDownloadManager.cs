@@ -197,6 +197,30 @@ namespace Emgu.LiteRT.Util
         }
 
         /// <summary>
+        /// A download's connection stopped sending data (see HttpClientWithProgress.StallTimeout): retried from the bytes
+        /// saved, with what held the connection closed in the background.
+        /// </summary>
+        public class ConnectionStalledException : IOException
+        {
+            /// <summary>Create the exception.</summary>
+            /// <param name="message">The message</param>
+            public ConnectionStalledException(string message) : base(message) { }
+        }
+
+        // Close a download's stream, response or client: in the background after a stall, where closing a stuck
+        // connection can block (Android's streams), else now.
+        private static void Release(IDisposable disposable, bool stalled)
+        {
+            if (disposable == null) return;
+            if (!stalled)
+            {
+                disposable.Dispose();
+                return;
+            }
+            Task.Run(() => { try { disposable.Dispose(); } catch (Exception) { } });
+        }
+
+        /// <summary>
         /// An http client with progress based on source code from https://stackoverflow.com/questions/20661652/progress-bar-with-httpclient with modification
         /// </summary>
         public class HttpClientWithProgress : HttpClient
@@ -211,6 +235,37 @@ namespace Emgu.LiteRT.Util
             /// Handle download download progress change.
             /// </summary>
             public event DownloadProgressChangedEventHandler DownloadProgressChanged;
+
+            /// <summary>
+            /// How long a download may go without receiving data before its connection counts as stalled: the read fails
+            /// with an IOException, so a retry continues from the bytes already saved. HttpClient's own Timeout only covers
+            /// the wait for the response headers; a body read can otherwise hang for good when the network changes (seen on
+            /// a Pixel Fold whose Wi-Fi reconnected mid-download).
+            /// </summary>
+            public static TimeSpan StallTimeout { get; set; } = TimeSpan.FromSeconds(60);
+
+            private static async Task<int> ReadWithStallTimeoutAsync(Stream input, byte[] buffer, CancellationToken cancellationToken)
+            {
+                // Raced against a timer rather than relying on the read honouring a token: Android's stream (a blocking
+                // Java read) ignores the token, and closing it doesn't always interrupt the read either. On a stall the
+                // read is abandoned (the caller closes the stream, response and client in the background) and the retry opens
+                // a new connection.
+                Task<int> read = input.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+                using (CancellationTokenSource timer = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+                {
+                    Task finished = await Task.WhenAny(read, Task.Delay(StallTimeout, timer.Token)).ConfigureAwait(false);
+                    if (finished == read)
+                    {
+                        timer.Cancel();
+                        return await read.ConfigureAwait(false);
+                    }
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+                // Observe the abandoned read's outcome, so its exception (once the stream is closed) isn't unobserved.
+                _ = read.ContinueWith(t => { GC.KeepAlive(t.Exception); }, TaskContinuationOptions.OnlyOnFaulted);
+                Debug.WriteLine(String.Format("Download: no data for {0:F0} s, the connection stalled; retrying from the bytes saved.", StallTimeout.TotalSeconds));
+                throw new ConnectionStalledException(String.Format("No data for {0:F0} s: the connection stalled.", StallTimeout.TotalSeconds));
+            }
 
             /// <summary>
             /// Download file asynchronously
@@ -256,7 +311,9 @@ namespace Emgu.LiteRT.Util
                             request.Headers.Range = new RangeHeaderValue(offset, null);
                             request.Headers.IfRange = new RangeConditionHeaderValue(EntityTagHeaderValue.Parse(metadata[1]));
                         }
-                        using (HttpResponseMessage response = await SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false))
+                        HttpResponseMessage response = await SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                        bool stalled = false;
+                        try
                         {
                             ContentRangeHeaderValue range = response.Content.Headers.ContentRange;
                             string etag = response.Headers.ETag != null && !response.Headers.ETag.IsWeak ? response.Headers.ETag.ToString() : "";
@@ -311,12 +368,13 @@ namespace Emgu.LiteRT.Util
                                 File.WriteAllLines(file.ResumeMetadataFile, new[] { file.ResumeIdentity, etag,
                                     total.HasValue ? total.Value.ToString(CultureInfo.InvariantCulture) : "" });
                                 TriggerProgressChanged(total, received);
-                                using (var input = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                                Stream input = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                                try
                                 {
                                     byte[] buffer = new byte[81920];
                                     long lastProgress = received;
                                     int count;
-                                    while ((count = await input.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false)) != 0)
+                                    while ((count = await ReadWithStallTimeoutAsync(input, buffer, cancellationToken).ConfigureAwait(false)) != 0)
                                     {
                                         if (segmentLength.HasValue && received - offset + count > segmentLength.Value)
                                         {
@@ -332,6 +390,15 @@ namespace Emgu.LiteRT.Util
                                         }
                                     }
                                 }
+                                catch (ConnectionStalledException)
+                                {
+                                    stalled = true;
+                                    throw;
+                                }
+                                finally
+                                {
+                                    Release(input, stalled);
+                                }
                             }
                             TriggerProgressChanged(total, received);
                             cancellationToken.ThrowIfCancellationRequested();
@@ -344,6 +411,10 @@ namespace Emgu.LiteRT.Util
                             }
                             PublishDownload(file, cancellationToken);
                             return;
+                        }
+                        finally
+                        {
+                            Release(response, stalled);
                         }
                     }
                 }
@@ -414,11 +485,22 @@ namespace Emgu.LiteRT.Util
                     cancellationToken.ThrowIfCancellationRequested();
                     try
                     {
-                        using (HttpClientWithProgress client = new HttpClientWithProgress())
+                        HttpClientWithProgress client = new HttpClientWithProgress();
+                        bool stalled = false;
+                        try
                         {
                             if (onDownloadProgressChanged != null) client.DownloadProgressChanged += onDownloadProgressChanged;
                             await client.DownloadFileTaskAsync(downloadableFile.Url, downloadableFile.LocalFile,
                                 downloadableFile.Sha256Hash, cancellationToken).ConfigureAwait(false);
+                        }
+                        catch (ConnectionStalledException)
+                        {
+                            stalled = true;
+                            throw;
+                        }
+                        finally
+                        {
+                            Release(client, stalled);
                         }
                         return;
                     }

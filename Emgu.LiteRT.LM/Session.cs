@@ -25,13 +25,30 @@ namespace Emgu.LiteRT.LM
             if (config == null)
             {
                 using (SessionConfig defaultConfig = new SessionConfig())
-                    _ptr = LiteRtLmInvoke.litert_lm_engine_create_session(engine, defaultConfig);
+                    LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_create_session(engine, defaultConfig, out _ptr), "litert_lm_engine_create_session");
             }
             else
             {
-                _ptr = LiteRtLmInvoke.litert_lm_engine_create_session(engine, config);
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_create_session(engine, config, out _ptr), "litert_lm_engine_create_session");
             }
-            LiteRtLmInvoke.CheckPtr(_ptr, "litert_lm_engine_create_session");
+        }
+
+        private Session(Engine engine, IntPtr ptr)
+        {
+            _engine = engine;
+            _ptr = ptr;
+        }
+
+        /// <summary>
+        /// Create a copy of the session, with its context so far: e.g. to generate different continuations of the
+        /// same prefill.
+        /// </summary>
+        /// <returns>The copy</returns>
+        public Session Clone()
+        {
+            IntPtr clone;
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_clone(_ptr, out clone), "litert_lm_session_clone");
+            return new Session(_engine, clone);
         }
 
         /// <summary>
@@ -50,9 +67,7 @@ namespace Emgu.LiteRT.LM
         public Responses GenerateContent(params InputData[] inputs)
         {
             IntPtr[] ptrs = InputData.ToPtrArray(inputs);
-            IntPtr responses = LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_session_generate_content(_ptr, ptrs, new UIntPtr((uint)ptrs.Length)),
-                "litert_lm_session_generate_content");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_generate_content(_ptr, ptrs, new UIntPtr((uint)ptrs.Length), out IntPtr responses), "litert_lm_session_generate_content");
             GC.KeepAlive(inputs);
             return Responses.FromNative(responses);
         }
@@ -121,8 +136,7 @@ namespace Emgu.LiteRT.LM
         public void RunPrefill(params InputData[] inputs)
         {
             IntPtr[] ptrs = InputData.ToPtrArray(inputs);
-            LiteRtLmInvoke.CheckStatus(
-                LiteRtLmInvoke.litert_lm_session_run_prefill(_ptr, ptrs, new UIntPtr((uint)ptrs.Length)),
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_run_prefill(_ptr, ptrs, new UIntPtr((uint)ptrs.Length)),
                 "litert_lm_session_run_prefill");
             GC.KeepAlive(inputs);
         }
@@ -133,8 +147,9 @@ namespace Emgu.LiteRT.LM
         /// <returns>The responses</returns>
         public Responses RunDecode()
         {
-            return Responses.FromNative(
-                LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_session_run_decode(_ptr), "litert_lm_session_run_decode"));
+            IntPtr responses;
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_run_decode(_ptr, out responses), "litert_lm_session_run_decode");
+            return Responses.FromNative(responses);
         }
 
         /// <summary>
@@ -177,9 +192,11 @@ namespace Emgu.LiteRT.LM
                     texts[i] = Marshal.AllocHGlobal(bytes.Length);
                     Marshal.Copy(bytes, 0, texts[i], bytes.Length);
                 }
-                return Responses.FromNative(LiteRtLmInvoke.CheckPtr(
-                    LiteRtLmInvoke.litert_lm_session_run_text_scoring(_ptr, texts, new UIntPtr((uint)texts.Length), storeTokenLengths),
-                    "litert_lm_session_run_text_scoring"));
+                IntPtr responses;
+                LiteRtLmInvoke.CheckError(
+                    LiteRtLmInvoke.litert_lm_session_run_text_scoring(_ptr, texts, new UIntPtr((uint)texts.Length), storeTokenLengths, out responses),
+                    "litert_lm_session_run_text_scoring");
+                return Responses.FromNative(responses);
             }
             finally
             {
@@ -195,8 +212,7 @@ namespace Emgu.LiteRT.LM
         /// <param name="label">The checkpoint label</param>
         public void SaveCheckpoint(String label)
         {
-            LiteRtLmInvoke.CheckStatus(
-                LiteRtLmInvoke.litert_lm_session_save_checkpoint(_ptr, LiteRtLmInvoke.ToUtf8(label)),
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_save_checkpoint(_ptr, LiteRtLmInvoke.ToUtf8(label)),
                 "litert_lm_session_save_checkpoint");
         }
 
@@ -206,8 +222,7 @@ namespace Emgu.LiteRT.LM
         /// <param name="label">The checkpoint label</param>
         public void RewindToCheckpoint(String label)
         {
-            LiteRtLmInvoke.CheckStatus(
-                LiteRtLmInvoke.litert_lm_session_rewind_to_checkpoint(_ptr, LiteRtLmInvoke.ToUtf8(label)),
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_rewind_to_checkpoint(_ptr, LiteRtLmInvoke.ToUtf8(label)),
                 "litert_lm_session_rewind_to_checkpoint");
         }
 
@@ -217,8 +232,7 @@ namespace Emgu.LiteRT.LM
         /// <param name="step">The step to return to</param>
         public void RewindToStep(int step)
         {
-            LiteRtLmInvoke.CheckStatus(
-                LiteRtLmInvoke.litert_lm_session_rewind_to_step(_ptr, step),
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_rewind_to_step(_ptr, step),
                 "litert_lm_session_rewind_to_step");
         }
 
@@ -228,6 +242,7 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public void Cancel()
         {
+            // Best effort, also from a callback's thread pool continuation: nothing to report if it fails.
             if (_ptr != IntPtr.Zero)
                 LiteRtLmInvoke.litert_lm_session_cancel_process(_ptr);
         }
@@ -238,8 +253,7 @@ namespace Emgu.LiteRT.LM
         /// <returns>The benchmark timings, or null if not available</returns>
         public BenchmarkInfo GetBenchmarkInfo()
         {
-            IntPtr info = LiteRtLmInvoke.litert_lm_session_get_benchmark_info(_ptr);
-            return info == IntPtr.Zero ? null : BenchmarkInfo.FromNative(info);
+            return BenchmarkInfo.FromStatus(LiteRtLmInvoke.litert_lm_session_get_benchmark_info(_ptr, out IntPtr info), info);
         }
 
         /// <summary>
@@ -258,50 +272,54 @@ namespace Emgu.LiteRT.LM
     public static partial class LiteRtLmInvoke
     {
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_engine_create_session(IntPtr engine, IntPtr config);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_create_session(IntPtr engine, IntPtr config, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_session_delete(IntPtr session);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_session_cancel_process(IntPtr session);
+        internal static extern LiteRtLmStatusCode litert_lm_session_clone(IntPtr session, out IntPtr outSession);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_session_save_checkpoint(IntPtr session, byte[] label);
+        internal static extern LiteRtLmStatusCode litert_lm_session_cancel_process(IntPtr session);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_session_rewind_to_checkpoint(IntPtr session, byte[] label);
+        internal static extern LiteRtLmStatusCode litert_lm_session_save_checkpoint(IntPtr session, byte[] label);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_session_rewind_to_step(IntPtr session, int step);
+        internal static extern LiteRtLmStatusCode litert_lm_session_rewind_to_checkpoint(IntPtr session, byte[] label);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_session_run_prefill(IntPtr session, IntPtr[] inputs, UIntPtr numInputs);
+        internal static extern LiteRtLmStatusCode litert_lm_session_rewind_to_step(IntPtr session, int step);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_session_run_decode(IntPtr session);
+        internal static extern LiteRtLmStatusCode litert_lm_session_run_prefill(IntPtr session, IntPtr[] inputs, UIntPtr numInputs);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_session_run_text_scoring(
+        internal static extern LiteRtLmStatusCode litert_lm_session_run_decode(IntPtr session, out IntPtr outResult);
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        internal static extern LiteRtLmStatusCode litert_lm_session_run_text_scoring(
             IntPtr session,
             IntPtr[] targetText,
             UIntPtr numTargets,
-            [MarshalAs(BoolMarshalType)] bool storeTokenLengths);
+            [MarshalAs(BoolMarshalType)] bool storeTokenLengths,
+            out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_session_generate_content(IntPtr session, IntPtr[] inputs, UIntPtr numInputs);
+        internal static extern LiteRtLmStatusCode litert_lm_session_generate_content(IntPtr session, IntPtr[] inputs, UIntPtr numInputs, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_session_get_benchmark_info(IntPtr session);
+        internal static extern LiteRtLmStatusCode litert_lm_session_get_benchmark_info(IntPtr session, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_session_run_decode_async(
+        internal static extern LiteRtLmStatusCode litert_lm_session_run_decode_async(
             IntPtr session,
             LiteRtLmStreamCallback callback,
             IntPtr callbackData);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_session_generate_content_stream(
+        internal static extern LiteRtLmStatusCode litert_lm_session_generate_content_stream(
             IntPtr session,
             IntPtr[] inputs,
             UIntPtr numInputs,

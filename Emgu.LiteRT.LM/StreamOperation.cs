@@ -61,7 +61,7 @@ namespace Emgu.LiteRT.LM
         /// <returns>A task that completes with the chunks when the final chunk arrives</returns>
         internal static Task<String[]> Start(
             object owner,
-            Func<LiteRtLmInvoke.LiteRtLmStreamCallback, IntPtr, int> start,
+            Func<LiteRtLmInvoke.LiteRtLmStreamCallback, IntPtr, LiteRtLmStatusCode> start,
             String functionName,
             Action<String> onChunk,
             Action cancel,
@@ -70,7 +70,7 @@ namespace Emgu.LiteRT.LM
             cancellationToken.ThrowIfCancellationRequested();
             StreamOperation operation = new StreamOperation(owner, onChunk, cancel, cancellationToken);
             operation._handle = GCHandle.Alloc(operation);
-            int status;
+            LiteRtLmStatusCode status;
             try
             {
                 status = start(NativeCallback, GCHandle.ToIntPtr(operation._handle));
@@ -80,12 +80,12 @@ namespace Emgu.LiteRT.LM
                 operation._handle.Free();
                 throw;
             }
-            if (status != 0)
+            if (status != LiteRtLmStatusCode.Ok)
             {
                 // The stream didn't start, so the callback will never be called.
                 if (Interlocked.Exchange(ref operation._completed, 1) == 0)
                     operation._handle.Free();
-                LiteRtLmInvoke.CheckStatus(status, functionName);
+                LiteRtLmInvoke.CheckError(status, functionName);
             }
             if (cancellationToken.CanBeCanceled)
                 operation._registration = cancellationToken.Register(operation.RequestCancel);
@@ -140,9 +140,16 @@ namespace Emgu.LiteRT.LM
             if (Volatile.Read(ref _completed) != 0)
                 return;
 
-            if (!LiteRtLmInvoke.litert_lm_stream_chunk_is_final(chunk))
+            // On LiteRT-LM's callback thread: nothing may be thrown here, so a chunk that can't be read counts as
+            // final (with no error) or as no text.
+            bool isFinal;
+            if (LiteRtLmInvoke.litert_lm_stream_chunk_is_final(chunk, out isFinal) != LiteRtLmStatusCode.Ok)
+                isFinal = true;
+            if (!isFinal)
             {
-                String text = LiteRtLmInvoke.PtrToStringUtf8(LiteRtLmInvoke.litert_lm_stream_chunk_get_text(chunk));
+                IntPtr textPtr;
+                String text = LiteRtLmInvoke.litert_lm_stream_chunk_get_text(chunk, out textPtr) == LiteRtLmStatusCode.Ok
+                    ? LiteRtLmInvoke.PtrToStringUtf8(textPtr) : null;
                 if (text == null)
                     return;
                 lock (_chunks)
@@ -164,7 +171,10 @@ namespace Emgu.LiteRT.LM
                 return;
             }
 
-            String error = LiteRtLmInvoke.PtrToStringUtf8(LiteRtLmInvoke.litert_lm_stream_chunk_get_error(chunk));
+            // OK with NULL when the stream ended without an error.
+            IntPtr errorPtr;
+            String error = LiteRtLmInvoke.litert_lm_stream_chunk_get_error(chunk, out errorPtr) == LiteRtLmStatusCode.Ok
+                ? LiteRtLmInvoke.PtrToStringUtf8(errorPtr) : null;
             String[] chunks;
             lock (_chunks)
                 chunks = _chunks.ToArray();
@@ -201,13 +211,13 @@ namespace Emgu.LiteRT.LM
         internal delegate void LiteRtLmStreamCallback(IntPtr callbackData, IntPtr chunk);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_stream_chunk_get_text(IntPtr chunk);
+        internal static extern LiteRtLmStatusCode litert_lm_stream_chunk_get_text(IntPtr chunk, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        [return: MarshalAs(BoolMarshalType)]
-        internal static extern bool litert_lm_stream_chunk_is_final(IntPtr chunk);
+        internal static extern LiteRtLmStatusCode litert_lm_stream_chunk_is_final(
+            IntPtr chunk, [MarshalAs(BoolMarshalType)] out bool isFinal);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_stream_chunk_get_error(IntPtr chunk);
+        internal static extern LiteRtLmStatusCode litert_lm_stream_chunk_get_error(IntPtr chunk, out IntPtr outResult);
     }
 }

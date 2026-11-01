@@ -9,7 +9,7 @@ namespace Emgu.LiteRT.LM.Maui
 {
     /// <summary>
     /// NVIDIA's Parakeet-TDT-0.6B-v3 for <see cref="SpeechRecognizer"/>: downloaded in the background the first time it is
-    /// needed (614 MB and its tokenizer), loaded on the CPU, one recording at a time, and freed after a while unused
+    /// needed (a 614 MB .litertlm), loaded on the CPU, one recording at a time, and freed after a while unused
     /// unless <see cref="KeepLoaded"/> (a meeting being recorded). The weights are CC-BY-4.0: an app using them credits
     /// NVIDIA (<see cref="Credit"/>).
     /// </summary>
@@ -39,17 +39,14 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>How long it stays loaded after its last recording.</summary>
         public static TimeSpan IdleRelease { get; set; } = TimeSpan.FromMinutes(2);
 
-        /// <summary>The model file.</summary>
+        /// <summary>The model file (a .litertlm holding the tokenizer too).</summary>
         public DownloadableFile ModelFile { get; } = ParakeetTdt06BV3.DefaultModelFile;
 
-        /// <summary>The tokenizer file.</summary>
-        public DownloadableFile TokenizerFile { get; } = ParakeetTdt06BV3.DefaultTokenizerFile;
+        /// <summary>True if it can run here: libomniextern is in the app (not yet on Windows).</summary>
+        public static bool IsAvailable => OmniInvoke.IsAvailable;
 
-        /// <summary>True if it can run here: libasrextern is in the app (not yet on Windows or Android's x86_64 emulator).</summary>
-        public static bool IsAvailable => AsrInvoke.IsAvailable;
-
-        /// <summary>True when both files are downloaded and verified (cheap: no hashing).</summary>
-        public bool IsDownloaded => ModelFile.IsLocalFileVerified && TokenizerFile.IsLocalFileVerified;
+        /// <summary>True when the model is downloaded and verified (cheap: no hashing).</summary>
+        public bool IsDownloaded => ModelFile.IsLocalFileVerified;
 
         /// <summary>Whether it is loaded or loading.</summary>
         public bool IsLoaded => _load != null;
@@ -93,13 +90,12 @@ namespace Emgu.LiteRT.LM.Maui
             var model = new ParakeetTdt06BV3();
             try
             {
-                foreach (DownloadableFile file in new[] { TokenizerFile, ModelFile })
+                if (!ModelFile.IsLocalFileVerified)
                 {
-                    if (file.IsLocalFileVerified) continue;
                     stage?.Report(string.Format("Downloading the speech model ({0} MB)...", DownloadMegabytes));
-                    await BackgroundDownloads.DownloadFileAsync(file, "Speech model", (total, received, percent) =>
+                    await BackgroundDownloads.DownloadFileAsync(ModelFile, "Speech model", (total, received, percent) =>
                     {
-                        if (file != ModelFile || percent == null) return;
+                        if (percent == null) return;
                         DownloadPercent = percent;
                         stage?.Report(string.Format("Downloading the speech model: {0:F0}%", percent));
                         Changed?.Invoke();
@@ -109,6 +105,7 @@ namespace Emgu.LiteRT.LM.Maui
                 stage?.Report("Loading the speech model...");
                 // Init verifies the files (hashing them once) and skips its own download.
                 await model.Init("cpu", CpuThreadSettings.Count, cancel);
+                DeleteObsoleteFiles();
             }
             catch (Exception)
             {
@@ -121,6 +118,18 @@ namespace Emgu.LiteRT.LM.Maui
             // Loaded ahead of a recording (its download done): freed if none comes.
             ScheduleRelease();
             return model;
+        }
+
+        // The .tflite and tokenizer.json LiteRT-LM before v0.19.0 loaded (614 MB): not needed once the .litertlm loads.
+        private void DeleteObsoleteFiles()
+        {
+            string folder = System.IO.Path.GetDirectoryName(ModelFile.LocalFile);
+            foreach (string name in ParakeetTdt06BV3.ObsoleteFileNames)
+                foreach (string path in new[] { name, name + ".sha256ok" })
+                {
+                    try { System.IO.File.Delete(System.IO.Path.Combine(folder, path)); }
+                    catch (Exception) { /* Left for the Storage page. */ }
+                }
         }
 
         /// <summary>The words in some audio, loading the model first if needed.</summary>

@@ -47,7 +47,7 @@ namespace Emgu.LiteRT.LM
         /// <param name="level">The minimum severity to log</param>
         public static void SetMinLogLevel(LogSeverity level)
         {
-            litert_lm_set_min_log_level(level);
+            CheckError(litert_lm_set_min_log_level(level), "litert_lm_set_min_log_level");
         }
 
         /// <summary>
@@ -86,70 +86,95 @@ namespace Emgu.LiteRT.LM
         }
 
         /// <summary>
-        /// Throw a LiteRtLmException if a LiteRT-LM C API call returned NULL, with LiteRT-LM's error message.
+        /// Throw a LiteRtLmException if a LiteRT-LM C API call didn't return Ok, with the status and the message
+        /// LiteRT-LM recorded. As Emgu CV's CvInvoke.CheckError: called right after the call, on the same thread (the
+        /// message is thread-local), so nothing is thrown while native frames are on the stack.
         /// </summary>
-        /// <param name="ptr">The pointer returned by the call</param>
-        /// <param name="functionName">The name of the C API function, for the exception message</param>
-        /// <returns>The pointer</returns>
-        internal static IntPtr CheckPtr(IntPtr ptr, String functionName)
+        /// <param name="status">The status returned by the call</param>
+        /// <param name="functionName">The name of the C API function, for the exception</param>
+        internal static void CheckError(LiteRtLmStatusCode status, String functionName)
         {
-            if (ptr == IntPtr.Zero)
-                throw new LiteRtLmException(String.Format("{0} failed: {1}", functionName, TakeLastError()));
-            return ptr;
+            if (status != LiteRtLmStatusCode.Ok)
+                throw new LiteRtLmException(status, functionName, TakeLastError());
         }
 
         /// <summary>
-        /// Throw a LiteRtLmException if a LiteRT-LM C API call returned a non-zero status, with LiteRT-LM's error
-        /// message.
+        /// Whether a call that reports a missing value with NotFound found it: true for Ok, false for NotFound, else
+        /// the exception CheckError throws.
         /// </summary>
-        /// <param name="status">The status returned by the call, 0 on success</param>
-        /// <param name="functionName">The name of the C API function, for the exception message</param>
-        internal static void CheckStatus(int status, String functionName)
+        /// <param name="status">The status returned by the call</param>
+        /// <param name="functionName">The name of the C API function, for the exception</param>
+        /// <returns>True if the value was there</returns>
+        internal static bool CheckFound(LiteRtLmStatusCode status, String functionName)
         {
-            if (status != 0)
-                throw new LiteRtLmException(String.Format("{0} failed with status {1}: {2}", functionName, status, TakeLastError()));
+            if (status == LiteRtLmStatusCode.NotFound)
+            {
+                DiscardLastError();
+                return false;
+            }
+            CheckError(status, functionName);
+            return true;
         }
 
-        // Whether liblitert-lm has the error reporter: null until checked.
-        private static bool? _hasErrorReporter;
+        /// <summary>
+        /// Drop the message recorded for a failure that is handled (e.g. a value that isn't there), so it isn't
+        /// reported with a later failure.
+        /// </summary>
+        internal static void DiscardLastError()
+        {
+            litert_lm_clear_last_error();
+        }
+
+        // The loaded liblitert-lm's C API version: null until read; NoVersion if it is older than 1.0.0.
+        private static Version _apiVersion;
+        private static readonly Version NoVersion = new Version(0, 0, 0);
 
         /// <summary>
-        /// True if the loaded liblitert-lm is LiteRT-LM v0.18.0 or later, detected by the error reporter functions
-        /// (litert_lm_get_last_error_message etc.) that version added. Loads liblitert-lm.
+        /// The C API version of the loaded liblitert-lm (litert_lm_get_api_version, 1.0.0 for LiteRT-LM v0.19.0), or
+        /// null if it is older than 1.0.0, which this wrapper can't use. Loads liblitert-lm.
         /// </summary>
-        public static bool IsV018OrLater
+        public static Version ApiVersion
         {
             get
             {
-                if (!_hasErrorReporter.HasValue)
+                if (_apiVersion == null)
                 {
                     try
                     {
-                        // Harmless: only resets this thread's error state.
-                        litert_lm_clear_last_error();
-                        _hasErrorReporter = true;
+                        int major, minor, patch;
+                        CheckError(litert_lm_get_api_version(out major, out minor, out patch), "litert_lm_get_api_version");
+                        _apiVersion = new Version(major, minor, patch);
                     }
                     catch (EntryPointNotFoundException)
                     {
-                        _hasErrorReporter = false;
+                        _apiVersion = NoVersion;
                     }
                 }
-                return _hasErrorReporter.Value;
+                return ReferenceEquals(_apiVersion, NoVersion) ? null : _apiVersion;
             }
+        }
+
+        /// <summary>
+        /// True if the loaded liblitert-lm is LiteRT-LM v0.18.0 or later. Loads liblitert-lm.
+        /// </summary>
+        [Obsolete("Use ApiVersion: this wrapper needs C API 1.0.0 (LiteRT-LM v0.19.0) or later.")]
+        public static bool IsV018OrLater
+        {
+            get { return ApiVersion != null; }
         }
 
         // The error message LiteRT-LM recorded for the last failed call on this thread, cleared once read so a later
         // failure that records none can't report it again. Must be called on the thread that made the failed call,
-        // right after it (the error state is thread-local). Older liblitert-lm versions have no error reporter.
+        // right after it (the error state is thread-local).
         private static String TakeLastError()
         {
-            const String NoDetails = "see the LiteRT-LM log for details";
-            if (!IsV018OrLater)
-                return NoDetails;
             String message = PtrToStringUtf8(litert_lm_get_last_error_message());
             litert_lm_clear_last_error();
-            return String.IsNullOrEmpty(message) ? NoDetails : message;
+            return message;
         }
+
+        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
+        private static extern LiteRtLmStatusCode litert_lm_get_api_version(out int major, out int minor, out int patch);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         private static extern IntPtr litert_lm_get_last_error_message();
@@ -158,6 +183,6 @@ namespace Emgu.LiteRT.LM
         private static extern void litert_lm_clear_last_error();
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        private static extern void litert_lm_set_min_log_level(LogSeverity level);
+        private static extern LiteRtLmStatusCode litert_lm_set_min_log_level(LogSeverity level);
     }
 }

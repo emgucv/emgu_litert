@@ -137,9 +137,112 @@ namespace Emgu.LiteRT.LM
     public enum ConstraintProviderType
     {
         /// <summary>
+        /// None: unsets the provider
+        /// </summary>
+        None = 0,
+        /// <summary>
         /// llguidance
         /// </summary>
         LlGuidance = 1,
+    }
+
+    /// <summary>
+    /// The status of a LiteRT-LM C API call (LiteRtLmStatusCode, the same values as absl::StatusCode)
+    /// </summary>
+    public enum LiteRtLmStatusCode
+    {
+        /// <summary>Success</summary>
+        Ok = 0,
+        /// <summary>The operation was cancelled</summary>
+        Cancelled = 1,
+        /// <summary>An unknown error</summary>
+        Unknown = 2,
+        /// <summary>An invalid argument</summary>
+        InvalidArgument = 3,
+        /// <summary>A deadline passed</summary>
+        DeadlineExceeded = 4,
+        /// <summary>Something (a file, a value) wasn't found</summary>
+        NotFound = 5,
+        /// <summary>It already exists</summary>
+        AlreadyExists = 6,
+        /// <summary>Permission denied</summary>
+        PermissionDenied = 7,
+        /// <summary>A resource (e.g. memory) ran out</summary>
+        ResourceExhausted = 8,
+        /// <summary>The system isn't in a state for the operation</summary>
+        FailedPrecondition = 9,
+        /// <summary>The operation was aborted</summary>
+        Aborted = 10,
+        /// <summary>Out of range</summary>
+        OutOfRange = 11,
+        /// <summary>Not implemented</summary>
+        Unimplemented = 12,
+        /// <summary>An internal error</summary>
+        Internal = 13,
+        /// <summary>Unavailable</summary>
+        Unavailable = 14,
+        /// <summary>Data was lost or corrupted</summary>
+        DataLoss = 15,
+        /// <summary>Not authenticated</summary>
+        Unauthenticated = 16,
+    }
+
+    /// <summary>
+    /// How speculative decoding (e.g. MTP) is used during decode (LiteRtLmSpeculativeDecodingMode)
+    /// </summary>
+    public enum SpeculativeDecodingMode
+    {
+        /// <summary>Never speculate</summary>
+        Off = 0,
+        /// <summary>Speculate on every decode step</summary>
+        On = 1,
+        /// <summary>Speculate only while it is measured to be faster than plain decoding</summary>
+        Adaptive = 2,
+    }
+
+    /// <summary>
+    /// A backend a model can run on (LiteRtLmBackendType)
+    /// </summary>
+    public enum BackendType
+    {
+        /// <summary>CPU</summary>
+        Cpu = 1,
+        /// <summary>GPU</summary>
+        Gpu = 2,
+        /// <summary>NPU</summary>
+        Npu = 3,
+    }
+
+    /// <summary>
+    /// The NPU a model file was compiled for (LiteRtLmNpuBrand)
+    /// </summary>
+    public enum NpuBrand
+    {
+        /// <summary>Unknown, or not compiled for an NPU</summary>
+        Unknown = 0,
+        /// <summary>Qualcomm</summary>
+        Qualcomm = 1,
+        /// <summary>Google Tensor</summary>
+        GoogleTensor = 2,
+        /// <summary>MediaTek</summary>
+        MediaTek = 3,
+        /// <summary>Intel</summary>
+        Intel = 4,
+        /// <summary>Samsung</summary>
+        Samsung = 5,
+    }
+
+    /// <summary>
+    /// What kind of model a .litertlm file holds (LiteRtLmModelType)
+    /// </summary>
+    public enum ModelType
+    {
+        /// <summary>Unknown</summary>
+        Unknown = 0,
+        /// <summary>A language model</summary>
+        Llm = 1,
+        /// <summary>An embedding model</summary>
+        Embedding = 2,
     }
 
     /// <summary>

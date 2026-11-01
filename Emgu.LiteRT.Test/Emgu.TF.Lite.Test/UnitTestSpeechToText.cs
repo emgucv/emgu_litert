@@ -54,8 +54,8 @@ public class UnitTestSpeechToTextHelpers
     }
 }
 
-// Parakeet-TDT-0.6B-v3 through libasrextern (downloads 614 MB and its tokenizer on the first run). Ignored by default,
-// like the other model tests: dotnet test -p:TestModels=true. Skipped where libasrextern isn't built.
+// Parakeet-TDT-0.6B-v3 through libomniextern (downloads its 615 MB .litertlm on the first run). Ignored by default,
+// like the other model tests: dotnet test -p:TestModels=true. Skipped where libomniextern isn't built.
 [TestFixture, Category("Native")]
 public class UnitTestSpeechToText
 {
@@ -75,7 +75,7 @@ public class UnitTestSpeechToText
         catch (DllNotFoundException e)
         {
             model.Dispose();
-            Assert.Ignore("libasrextern isn't available here: " + e.Message);
+            Assert.Ignore("libomniextern isn't available here: " + e.Message);
         }
         _model = model;
         return model;
@@ -186,7 +186,7 @@ public class UnitTestSpeechToText
         string whole = await model.TranscribeAsync(audio, 16000);
         // Pushed in 100 ms pieces, processed whenever a window is ready, as from a microphone.
         var text = new StringBuilder();
-        using (AsrSession session = model.CreateSession())
+        using (SpeechToTextSession session = model.CreateSession())
         {
             for (int offset = 0; offset < audio.Length; offset += 1600)
             {

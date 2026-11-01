@@ -19,13 +19,15 @@ namespace Emgu.LiteRT.LM
         private SamplerParams _samplerParams;
         private String _loraPath;
         private String _audioLoraPath;
+        private bool _enableSpeculativeDecoding;
+        private SpeculativeDecodingMode? _speculativeDecoding;
 
         /// <summary>
         /// Create a session configuration with the default values.
         /// </summary>
         public SessionConfig()
         {
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_session_config_create(), "litert_lm_session_config_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_config_create(out _ptr), "litert_lm_session_config_create");
         }
 
         /// <summary>
@@ -34,7 +36,7 @@ namespace Emgu.LiteRT.LM
         public int MaxOutputTokens
         {
             get { return _maxOutputTokens; }
-            set { LiteRtLmInvoke.litert_lm_session_config_set_max_output_tokens(_ptr, value); _maxOutputTokens = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_config_set_max_output_tokens(_ptr, value), "litert_lm_session_config_set_max_output_tokens"); _maxOutputTokens = value; }
         }
 
         /// <summary>
@@ -43,7 +45,7 @@ namespace Emgu.LiteRT.LM
         public bool ApplyPromptTemplate
         {
             get { return _applyPromptTemplate; }
-            set { LiteRtLmInvoke.litert_lm_session_config_set_apply_prompt_template(_ptr, value); _applyPromptTemplate = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_config_set_apply_prompt_template(_ptr, value), "litert_lm_session_config_set_apply_prompt_template"); _applyPromptTemplate = value; }
         }
 
         /// <summary>
@@ -52,7 +54,7 @@ namespace Emgu.LiteRT.LM
         public SamplerParams SamplerParams
         {
             get { return _samplerParams; }
-            set { LiteRtLmInvoke.litert_lm_session_config_set_sampler_params(_ptr, value); _samplerParams = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_config_set_sampler_params(_ptr, value), "litert_lm_session_config_set_sampler_params"); _samplerParams = value; }
         }
 
         /// <summary>
@@ -63,8 +65,7 @@ namespace Emgu.LiteRT.LM
             get { return _loraPath; }
             set
             {
-                LiteRtLmInvoke.CheckStatus(
-                    LiteRtLmInvoke.litert_lm_session_config_set_lora_path(_ptr, LiteRtLmInvoke.ToUtf8(value)),
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_config_set_lora_path(_ptr, LiteRtLmInvoke.ToUtf8(value)),
                     "litert_lm_session_config_set_lora_path");
                 _loraPath = value;
             }
@@ -78,11 +79,37 @@ namespace Emgu.LiteRT.LM
             get { return _audioLoraPath; }
             set
             {
-                LiteRtLmInvoke.CheckStatus(
-                    LiteRtLmInvoke.litert_lm_session_config_set_audio_lora_path(_ptr, LiteRtLmInvoke.ToUtf8(value)),
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_config_set_audio_lora_path(_ptr, LiteRtLmInvoke.ToUtf8(value)),
                     "litert_lm_session_config_set_audio_lora_path");
                 _audioLoraPath = value;
             }
+        }
+
+        /// <summary>
+        /// How this session uses speculative decoding (e.g. MTP), overriding EngineSettings.SpeculativeDecoding; null
+        /// until set (the engine's setting)
+        /// </summary>
+        public SpeculativeDecodingMode? SpeculativeDecoding
+        {
+            get { return _speculativeDecoding; }
+            set
+            {
+                if (value == null)
+                    throw new ArgumentNullException("value", "Speculative decoding can't be unset; create a new config instead.");
+                using (SpeculativeDecodingConfig config = new SpeculativeDecodingConfig(value.Value))
+                    LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_config_set_speculative_decoding_config(_ptr, config), "litert_lm_session_config_set_speculative_decoding_config");
+                _speculativeDecoding = value;
+            }
+        }
+
+        /// <summary>
+        /// Whether this session uses speculative decoding, if the model supports it
+        /// </summary>
+        [Obsolete("Use SpeculativeDecoding (litert_lm_session_config_set_enable_speculative_decoding is deprecated in LiteRT-LM's C API 1.0.0).")]
+        public bool EnableSpeculativeDecoding
+        {
+            get { return _enableSpeculativeDecoding; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_session_config_set_enable_speculative_decoding(_ptr, value), "litert_lm_session_config_set_enable_speculative_decoding"); _enableSpeculativeDecoding = value; }
         }
 
         /// <summary>
@@ -101,26 +128,26 @@ namespace Emgu.LiteRT.LM
     public static partial class LiteRtLmInvoke
     {
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_session_config_create();
+        internal static extern LiteRtLmStatusCode litert_lm_session_config_create(out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_session_config_delete(IntPtr config);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_session_config_set_max_output_tokens(IntPtr config, int maxOutputTokens);
+        internal static extern LiteRtLmStatusCode litert_lm_session_config_set_max_output_tokens(IntPtr config, int maxOutputTokens);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_session_config_set_apply_prompt_template(
+        internal static extern LiteRtLmStatusCode litert_lm_session_config_set_apply_prompt_template(
             IntPtr config,
             [MarshalAs(BoolMarshalType)] bool applyPromptTemplate);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_session_config_set_sampler_params(IntPtr config, IntPtr samplerParams);
+        internal static extern LiteRtLmStatusCode litert_lm_session_config_set_sampler_params(IntPtr config, IntPtr samplerParams);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_session_config_set_lora_path(IntPtr config, byte[] loraPath);
+        internal static extern LiteRtLmStatusCode litert_lm_session_config_set_lora_path(IntPtr config, byte[] loraPath);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_session_config_set_audio_lora_path(IntPtr config, byte[] audioLoraPath);
+        internal static extern LiteRtLmStatusCode litert_lm_session_config_set_audio_lora_path(IntPtr config, byte[] audioLoraPath);
     }
 }

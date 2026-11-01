@@ -24,9 +24,7 @@ namespace Emgu.LiteRT.LM
         {
             Type = type;
             byte[] bytes = data ?? new byte[0];
-            _ptr = LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_input_data_create(type, bytes, new UIntPtr((uint)bytes.Length)),
-                "litert_lm_input_data_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_input_data_create(type, bytes, new UIntPtr((uint)bytes.Length), out _ptr), "litert_lm_input_data_create");
         }
 
         /// <summary>
@@ -106,7 +104,7 @@ namespace Emgu.LiteRT.LM
     public static partial class LiteRtLmInvoke
     {
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_input_data_create(InputDataType type, byte[] data, UIntPtr size);
+        internal static extern LiteRtLmStatusCode litert_lm_input_data_create(InputDataType type, byte[] data, UIntPtr size, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_input_data_delete(IntPtr inputData);

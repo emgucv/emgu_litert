@@ -250,10 +250,10 @@ public sealed class LiteRtLmChatPage : ChatPage
 #if WINDOWS_WEBGPU
         const string gpuNote = " A compatible Direct3D 12 GPU is required.";
         options.Add(new SearchModelOption("text_vision_gpu", "EmbeddingGemma 2 Text Vision 440M · GPU",
-            () => new EmbeddingGemma2TextVision { EnableWindowsWebGpu = true, VisionBackend = "gpu", AudioBackend = "gpu" },
+            () => new EmbeddingGemma2TextVision { VisionBackend = "gpu", AudioBackend = "gpu" },
             options[0].Detail + " Text and vision embeddings use Windows GPU." + gpuNote) { Backend = "gpu", CpuFallback = "text_vision" });
         options.Add(new SearchModelOption("multimodal_gpu", "EmbeddingGemma 2 Multimodal 740M · GPU",
-            () => new EmbeddingGemma2Multimodal { EnableWindowsWebGpu = true, VisionBackend = "gpu", AudioBackend = "gpu" },
+            () => new EmbeddingGemma2Multimodal { VisionBackend = "gpu", AudioBackend = "gpu" },
             options[1].Detail + " Text, vision and audio embeddings use Windows GPU." + gpuNote) { Backend = "gpu", CpuFallback = "multimodal" });
 #endif
         return options;
@@ -291,9 +291,11 @@ public sealed class LiteRtLmChatPage : ChatPage
         models.Add(new StorageModel("EmbeddingGemma 2 Multimodal 740M", System.IO.Path.GetFileName(multimodal.DefaultModelFile.LocalFile), isSearch: true) { Download = multimodal.DefaultModelFile });
         ParakeetSpeech speech = ParakeetSpeech.Default;
         if (ParakeetSpeech.IsAvailable)
+            // The files the app used before LiteRT-LM v0.19.0 are counted and deleted with it, if still there.
             models.Add(StorageModel.Speech(ParakeetSpeech.Name, System.IO.Path.GetFileName(speech.ModelFile.LocalFile),
-                new[] { System.IO.Path.GetFileName(speech.TokenizerFile.LocalFile) },
-                "Speech recognition model and its tokenizer. Deleting goes back to the device's speech recognizer."));
+                ParakeetTdt06BV3.ObsoleteFileNames,
+                "Speech recognition model. Deleting goes back to the device's speech recognizer.",
+                new[] { ParakeetTdt06BV3.RegisteredName }));
         using var image = new ZImageTurbo();
         return new StorageCatalog(SharedStore, System.IO.Path.GetDirectoryName(catalog[0].ModelFile.LocalFile), ExportFeature.ExportFolder, models,
             new[]

@@ -72,43 +72,45 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       never gets the icons MAUI generates into `obj/.../resizetizer/r/` (`appicon*.png`) - copy them to the folder's root, like `Resources/Raw`, then
       register again. A real MSIX package has them.
 
-## 9. Update to the next LiteRT-LM release
+## 9. Update to the next LiteRT-LM release — v0.19.0 done on macOS, Mac Catalyst, iOS and Android; Windows pending
 
-LiteRT-LM v0.18.0 is the current pin. The next release brings upstream fixes and unblocks the embedding models' GPU
-(item 11: its `main` already pins a LiteRT with `dd3db3123`).
+**Moved to LiteRT-LM v0.19.0 (2026-11-01)**, with `litert` at its `LITERT_REF` `dcb657e8` (LiteRT 2.4.0, TFLite 2.23.0); the
+code before it is tagged `v0.18.0`. The plan, with what changed and why: `history/LITERT_LM_V019_PLAN.md`. In short:
+- C API 1.0.0: every `Emgu.LiteRT.LM` import ported to status codes and `out` results (`size_t` as `UIntPtr`, borrowed stop
+  tokens), the 28 functions never imported are wrapped too (speculative decoding, `Session.Clone`, the model-info queries,
+  file descriptors, single-threaded execution, the experimental header), and `LiteRtLmException` carries `Status`,
+  `FunctionName` and `ErrorMessage`. Errors follow Emgu CV's pattern everywhere (CLAUDE.md, "Error handling"), including a
+  fix for TFLite's error callback, which threw through native frames.
+- Speech: `omni/asr` became `omni/speech2text` on `OmniEngine`; `asrextern` was rewritten and renamed `omniextern`
+  (`SpeechToTextEngine`/`Session`), and Parakeet is one `.litertlm`. The merger fix took the noisy turns from 15.2% to 1.3%
+  of words wrong (docs/litert-lm.md).
+- The embedding models run on the GPU (item 11), and the thinking-with-images workaround is gone (fixed upstream).
+- `liblitert-lm` on macOS needs Google's `libwebgpu_dawn.dylib` (packaged next to it); the Gemma constraint provider's iOS
+  simulator prebuilt has no header room for an rpath (`ios_frameworks.sh` adds one only when needed); CMake's TFLite
+  version now falls back to the Bazel builds' `tflite_version.txt`.
+- Tests: 685 model-free, 50 Native (with new exception tests) and the LiteRT-LM model tests on the Mac, the speech tests,
+  and the demo on Mac Catalyst, a Galaxy S10 and the Pixel Fold (Gemma 4 E2B on the GPU, Parakeet downloaded and run, the
+  embedding GPU).
+  Qwen3.5-0.8B's files had been replaced on Hugging Face: now pinned to a revision. `TestVideoMomentIndex` searches with
+  the feature's top 5 (a near tie decided its top 2).
 
-**v0.18.1 (tagged 2026-10-20) was skipped: it doesn't build.** It changes no LiteRT-LM source, only appends a second
-`LITERT_REF` (`ca21dc99`, which contains `dd3db3123`) and `TENSORFLOW_REF` (`a1179d3c`) to `WORKSPACE`, and that
-TensorFlow loads `compatibility_proxy_repo` from `@rules_cc//cc:extensions.bzl`, which the WORKSPACE's `rules_cc`
-lacks - the failure the WORKSPACE's own comment above the first `TENSORFLOW_REF` warns about. Our macOS build and all six
-of Google's CI workflows on the tag failed with it. `main` fixed it by pinning `rules_cc` 1.9.0 (CI-Mac green on
-`25016d6e`, 2026-10-23), so wait for the next tag (v0.18.2 or later). Found while checking v0.18.1, still true for
-the next release:
-- LiteRT renamed the CPU accelerator's options identifier from `"xnnpack"` to `"cpu_options"` (`ca21dc99`); each
-  runtime ignores the other's. `Emgu.LiteRT`'s `Options.AddCpuOptions` already sends the payload under both, so thread
-  counts and the XNNPACK weight cache (Z-Image-Turbo) keep working - checked with v0.18.0's `libLiteRt` (the weight
-  cache is written). The GPU options keys and identifier (`"gpu_options"`) are unchanged.
-- `ca21dc99` only adds exports (12: delegation metrics, local response normalization options), so the checked-in
-  `litert_windows_exports.def` still links; regenerate it on Windows (`generate_litert_windows_exports.ps1`) to
-  export them. All 39 functions `Emgu.LiteRT` imports are still there.
+Still to do:
+- [ ] Windows: build with `bazel_build_litert.ps1 64` and `cmake_build_litert.ps1`, regenerate `litert_windows_exports.def`,
+      check `omniextern` builds with MSVC; rebase `bazel_build_windows_gpu.ps1`'s pins and `gpu_source_patches/`.
+- [ ] The agent regression test (item 7) with v0.19.0.
+- [ ] The demo: offer the GPU search models on Apple and Android too (only `WINDOWS_WEBGPU` builds list them).
+- [ ] Ubuntu/Debian natives (CI builds them).
 
-- [ ] Move `LiteRT-LM` to the release and `litert` to its `LITERT_REF` (CLAUDE.md, "The `litert` submodule must match
-      LiteRT-LM's LiteRT version").
-- [ ] Rebuild the natives for macOS, Mac Catalyst, iOS, Android (all four ABIs) and Windows; check the Windows export
-      list (`litert_windows_exports.def`) and the C API wrappers against header changes.
-- [ ] Re-run the model tests, check every model file in the demo still loads and answers correctly (some community files
-      broke with v0.18.0), and the agent regression test (item 7).
-- [ ] Parakeet's dropped text: v0.18.0's Levenshtein merger drops 2-3 s at some window seams (22.8% of a clean 56 s
-      meeting in one session, 45.6% of the Pixel Fold's recording of it). LiteRT-LM fixed it in b34761f3 and b2f2d9d9
-      (2026-10-02/13, in the 0.19.0 nightlies) - check the release has them, then score Parakeet again with the same
-      recordings and decide on `SpeechToTextModel.OverlapRatio` (docs/litert-lm.md, "The Levenshtein merger drops text").
-
-## 11. GPU for the embedding models — Windows completed; Apple/Android pending
+## 11. GPU for the embedding models — Windows, Mac (Metal), a Galaxy S10 and the Pixel Fold (OpenCL) checked; the demo offers it on Windows only
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Update LiteRT-LM/LiteRT together for matching prebuilt Metal/OpenCL accelerators (item 9); rebuild Apple/Android.
-- [ ] Verify CPU/GPU text/image/audio embeddings and search on Mac and a real Android phone before enabling them.
+- [x] Update LiteRT-LM/LiteRT together for matching prebuilt Metal/OpenCL accelerators (item 9; 2026-11-01): `EmbeddingModel.Init`
+      no longer refuses the GPU.
+- [x] CPU/GPU embeddings on a Mac (Metal: text, image and audio, cosine above 0.99, search unchanged, ~3x faster), a Galaxy
+      S10 and the Pixel Fold (OpenCL: text, cosine above 0.997, 3-5x faster); docs/litert-lm.md.
+- [ ] Offer the GPU search models in the demo on Apple and Android (only `WINDOWS_WEBGPU` builds list them), and check images,
+      audio and search on a phone's GPU.
 - [ ] Verify simultaneous chat/search GPU memory use and indexing performance on phones.
 
 ## 12. Pixel Fold freeze — rendering stalls fixed; original ANR unconfirmed
@@ -131,6 +133,12 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] Extended screen-off / battery-policy checks on physical Android and iOS devices.
+- [x] Stalled connections (2026-11-01): on a Pixel Fold the 615 MB Parakeet download hung three times (47, 309 and 527 MB;
+      once when its Wi-Fi reconnected), since a body read had no time limit. `FileDownloadManager` now races each read
+      against `HttpClientWithProgress.StallTimeout` (60 s; Android's stream ignores cancellation), closes the stuck
+      stream, response and client in the background (`ConnectionStalledException`), and the retry resumes from the bytes
+      saved; `BackgroundDownloads` retries 3 times. `TestStalledDownloadResumesAfterTheStallTimeout`; the Fold then
+      finished from 527 MB in 67 s.
 
 ## 17. Image generation extras — implemented; verified on Mac Catalyst (draw again) and a Galaxy S10 (gallery)
 
@@ -687,10 +695,10 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
   - several videos in one chat;
   - telling "no moment matches" apart from a weak best match (photo search's lift against a baseline).
 - [ ] Speech recognition with Parakeet (Settings > Speech recognition, `SpeechEngineFeature`, 2026-10-31; see FEATURES.md, "Speech recognition with Parakeet"). Voice messages, the voice chat and meetings use it when chosen, or where the device has no recognizer (the Galaxy S10's Android 12); checked on Mac Catalyst, the S10 and the iOS simulator with synthetic speech, and on the S10 beside Gemma 4 E2B with a meeting through the card and the Storage page's delete (2026-11-01). Still to do:
-  - noise and long recordings: 15-16% of words wrong with room noise (Apple's recognizer 5.7%, Google's 4.4%) is mostly text LiteRT-LM v0.18.0's merger drops at window seams, which also loses words on long clean recordings; fixed upstream, so it waits for the LiteRT-LM update (item 9). Noise removal didn't help (docs/litert-lm.md, "The Levenshtein merger drops text");
+  - noise: fixed by LiteRT-LM v0.19.0's merger (item 9): 1.3% of words wrong on the noisy turns (Apple's recognizer 5.7%, Google's 4.4%); with that, decide whether Parakeet should be the default where it is downloaded;
   - a real microphone, the Pixel Fold and Z Fold 3;
-  - Windows and Ubuntu builds of `libasrextern` (then Parakeet is Windows' only recognizer; the code is there);
-  - text while speaking: `AsrSession` fed from the microphone as it records, instead of after the recording;
+  - Windows and Ubuntu builds of `libomniextern` (then Parakeet is Windows' only recognizer; the code is there);
+  - text while speaking: `SpeechToTextSession` fed from the microphone as it records, instead of after the recording;
   - the languages Parakeet doesn't have (Chinese, Japanese...) go to the device's recognizer: Qwen3-ASR later.
 - [ ] Search my videos (`VideoSearchFeature`, 2026-10-30; see FEATURES.md, "Search my videos"). Checked in the iOS simulator, on a Galaxy S10 and on the Pixel Fold with four synthetic clips. Still to check:
   - a real library: the thresholds (lift 0.02 over "a video") come from four synthetic clips; videos with talking, music, dark or busy scenes;

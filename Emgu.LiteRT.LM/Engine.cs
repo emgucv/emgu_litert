@@ -30,9 +30,13 @@ namespace Emgu.LiteRT.LM
                 || String.Equals(settings.VisionBackend, "gpu", StringComparison.OrdinalIgnoreCase)
                 || String.Equals(settings.AudioBackend, "gpu", StringComparison.OrdinalIgnoreCase))
                 Emgu.LiteRT.Util.AcceleratorPlugins.Load();
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_engine_create(settings), "litert_lm_engine_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_create(settings, out _ptr), "litert_lm_engine_create");
             ConfiguredContextTokens = settings.MaxNumTokens;
+            SingleThreadedExecution = settings.SingleThreadedExecution;
         }
+
+        /// <summary>Whether the engine was created with EngineSettings.SingleThreadedExecution.</summary>
+        public bool SingleThreadedExecution { get; private set; }
 
         /// <summary>
         /// Create a session, for prompt-level generation.
@@ -61,15 +65,19 @@ namespace Emgu.LiteRT.LM
         /// <returns>The token ids</returns>
         public int[] Tokenize(String text)
         {
-            IntPtr result = LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_engine_tokenize(_ptr, LiteRtLmInvoke.ToUtf8(text ?? String.Empty)),
-                "litert_lm_engine_tokenize");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_tokenize(_ptr, LiteRtLmInvoke.ToUtf8(text ?? String.Empty), out IntPtr result), "litert_lm_engine_tokenize");
             try
             {
-                int numTokens = (int)LiteRtLmInvoke.litert_lm_tokenize_result_get_num_tokens(result).ToUInt32();
+                UIntPtr count;
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_tokenize_result_get_num_tokens(result, out count), "litert_lm_tokenize_result_get_num_tokens");
+                int numTokens = checked((int)count.ToUInt64());
                 int[] tokens = new int[numTokens];
                 if (numTokens > 0)
-                    Marshal.Copy(LiteRtLmInvoke.litert_lm_tokenize_result_get_tokens(result), tokens, 0, numTokens);
+                {
+                    IntPtr ids;
+                    LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_tokenize_result_get_tokens(result, out ids), "litert_lm_tokenize_result_get_tokens");
+                    Marshal.Copy(ids, tokens, 0, numTokens);
+                }
                 return tokens;
             }
             finally
@@ -86,12 +94,12 @@ namespace Emgu.LiteRT.LM
         public String Detokenize(int[] tokens)
         {
             int[] ids = tokens ?? new int[0];
-            IntPtr result = LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_engine_detokenize(_ptr, ids, new UIntPtr((uint)ids.Length)),
-                "litert_lm_engine_detokenize");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_detokenize(_ptr, ids, new UIntPtr((uint)ids.Length), out IntPtr result), "litert_lm_engine_detokenize");
             try
             {
-                return LiteRtLmInvoke.PtrToStringUtf8(LiteRtLmInvoke.litert_lm_detokenize_result_get_string(result));
+                IntPtr text;
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_detokenize_result_get_string(result, out text), "litert_lm_detokenize_result_get_string");
+                return LiteRtLmInvoke.PtrToStringUtf8(text);
             }
             finally
             {
@@ -106,8 +114,19 @@ namespace Emgu.LiteRT.LM
         {
             get
             {
-                IntPtr tokenUnion = LiteRtLmInvoke.litert_lm_engine_get_start_token(_ptr);
-                return tokenUnion == IntPtr.Zero ? null : Token.FromTokenUnion(tokenUnion);
+                // Ok with NULL when the model has none; the token union is the caller's.
+                IntPtr tokenUnion;
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_get_start_token(_ptr, out tokenUnion), "litert_lm_engine_get_start_token");
+                if (tokenUnion == IntPtr.Zero)
+                    return null;
+                try
+                {
+                    return Token.FromTokenUnion(tokenUnion);
+                }
+                finally
+                {
+                    LiteRtLmInvoke.litert_lm_token_union_delete(tokenUnion);
+                }
             }
         }
 
@@ -118,16 +137,23 @@ namespace Emgu.LiteRT.LM
         {
             get
             {
-                IntPtr tokenUnions = LiteRtLmInvoke.litert_lm_engine_get_stop_tokens(_ptr);
+                IntPtr tokenUnions;
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_get_stop_tokens(_ptr, out tokenUnions), "litert_lm_engine_get_stop_tokens");
                 if (tokenUnions == IntPtr.Zero)
                     return new Token[0];
                 try
                 {
-                    int count = (int)LiteRtLmInvoke.litert_lm_token_unions_get_num_tokens(tokenUnions).ToUInt32();
+                    UIntPtr numTokens;
+                    LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_token_unions_get_num_tokens(tokenUnions, out numTokens), "litert_lm_token_unions_get_num_tokens");
+                    int count = checked((int)numTokens.ToUInt64());
                     Token[] tokens = new Token[count];
                     for (int i = 0; i < count; i++)
-                        tokens[i] = Token.FromTokenUnion(
-                            LiteRtLmInvoke.litert_lm_token_unions_get_token_at(tokenUnions, new UIntPtr((uint)i)));
+                    {
+                        // Borrowed from tokenUnions (since C API 1.0.0): not deleted on its own.
+                        IntPtr tokenUnion;
+                        LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_token_unions_get_token_at(tokenUnions, new UIntPtr((uint)i), out tokenUnion), "litert_lm_token_unions_get_token_at");
+                        tokens[i] = Token.FromTokenUnion(tokenUnion);
+                    }
                     return tokens;
                 }
                 finally
@@ -175,94 +201,90 @@ namespace Emgu.LiteRT.LM
         }
 
         /// <summary>
-        /// Read a LiteRtLmTokenUnion into a Token, and delete the token union.
+        /// Read a LiteRtLmTokenUnion into a Token. The token union isn't deleted: the caller owns it (a start token)
+        /// or it is borrowed (a stop token).
         /// </summary>
         internal static Token FromTokenUnion(IntPtr tokenUnion)
         {
             if (tokenUnion == IntPtr.Zero)
                 return null;
-            try
+            Token token = new Token();
+            int type;
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_token_union_get_type(tokenUnion, out type), "litert_lm_token_union_get_type");
+            if (type == 0)
             {
-                Token token = new Token();
-                if (LiteRtLmInvoke.litert_lm_token_union_get_type(tokenUnion) == 0)
-                {
-                    token.Text = LiteRtLmInvoke.PtrToStringUtf8(LiteRtLmInvoke.litert_lm_token_union_get_string(tokenUnion));
-                }
-                else
-                {
-                    IntPtr ids;
-                    UIntPtr numIds;
-                    if (LiteRtLmInvoke.litert_lm_token_union_get_ids(tokenUnion, out ids, out numIds) == 0)
-                    {
-                        int count = (int)numIds.ToUInt32();
-                        token.Ids = new int[count];
-                        if (count > 0)
-                            Marshal.Copy(ids, token.Ids, 0, count);
-                    }
-                }
-                return token;
+                IntPtr text;
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_token_union_get_string(tokenUnion, out text), "litert_lm_token_union_get_string");
+                token.Text = LiteRtLmInvoke.PtrToStringUtf8(text);
             }
-            finally
+            else
             {
-                LiteRtLmInvoke.litert_lm_token_union_delete(tokenUnion);
+                IntPtr ids;
+                UIntPtr numIds;
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_token_union_get_ids(tokenUnion, out ids, out numIds), "litert_lm_token_union_get_ids");
+                int count = checked((int)numIds.ToUInt64());
+                token.Ids = new int[count];
+                if (count > 0)
+                    Marshal.Copy(ids, token.Ids, 0, count);
             }
+            return token;
         }
     }
 
     public static partial class LiteRtLmInvoke
     {
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_engine_create(IntPtr settings);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_create(IntPtr settings, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_engine_delete(IntPtr engine);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_engine_tokenize(IntPtr engine, byte[] text);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_tokenize(IntPtr engine, byte[] text, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_tokenize_result_delete(IntPtr result);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_tokenize_result_get_tokens(IntPtr result);
+        internal static extern LiteRtLmStatusCode litert_lm_tokenize_result_get_tokens(IntPtr result, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern UIntPtr litert_lm_tokenize_result_get_num_tokens(IntPtr result);
+        internal static extern LiteRtLmStatusCode litert_lm_tokenize_result_get_num_tokens(IntPtr result, out UIntPtr numTokens);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_engine_detokenize(IntPtr engine, int[] tokens, UIntPtr numTokens);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_detokenize(IntPtr engine, int[] tokens, UIntPtr numTokens, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_detokenize_result_delete(IntPtr result);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_detokenize_result_get_string(IntPtr result);
+        internal static extern LiteRtLmStatusCode litert_lm_detokenize_result_get_string(IntPtr result, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_engine_get_start_token(IntPtr engine);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_get_start_token(IntPtr engine, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_engine_get_stop_tokens(IntPtr engine);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_get_stop_tokens(IntPtr engine, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_token_union_delete(IntPtr tokenUnion);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_token_union_get_type(IntPtr tokenUnion);
+        internal static extern LiteRtLmStatusCode litert_lm_token_union_get_type(IntPtr tokenUnion, out int type);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_token_union_get_string(IntPtr tokenUnion);
+        internal static extern LiteRtLmStatusCode litert_lm_token_union_get_string(IntPtr tokenUnion, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_token_union_get_ids(IntPtr tokenUnion, out IntPtr outTokens, out UIntPtr outNumTokens);
+        internal static extern LiteRtLmStatusCode litert_lm_token_union_get_ids(IntPtr tokenUnion, out IntPtr outTokens, out UIntPtr outNumTokens);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_token_unions_delete(IntPtr tokenUnions);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern UIntPtr litert_lm_token_unions_get_num_tokens(IntPtr tokenUnions);
+        internal static extern LiteRtLmStatusCode litert_lm_token_unions_get_num_tokens(IntPtr tokenUnions, out UIntPtr numTokens);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_token_unions_get_token_at(IntPtr tokenUnions, UIntPtr index);
+        internal static extern LiteRtLmStatusCode litert_lm_token_unions_get_token_at(IntPtr tokenUnions, UIntPtr index, out IntPtr outResult);
     }
 }

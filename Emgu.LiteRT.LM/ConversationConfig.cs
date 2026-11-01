@@ -22,7 +22,7 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public ThinkingConfig()
         {
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_thinking_config_create(), "litert_lm_thinking_config_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_thinking_config_create(out _ptr), "litert_lm_thinking_config_create");
         }
 
         /// <summary>
@@ -31,7 +31,7 @@ namespace Emgu.LiteRT.LM
         public bool EnableThinking
         {
             get { return _enableThinking; }
-            set { LiteRtLmInvoke.litert_lm_thinking_config_set_enable_thinking(_ptr, value); _enableThinking = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_thinking_config_set_enable_thinking(_ptr, value), "litert_lm_thinking_config_set_enable_thinking"); _enableThinking = value; }
         }
 
         /// <summary>
@@ -40,7 +40,7 @@ namespace Emgu.LiteRT.LM
         public int ThinkingTokenBudget
         {
             get { return _thinkingTokenBudget; }
-            set { LiteRtLmInvoke.litert_lm_thinking_config_set_thinking_token_budget(_ptr, value); _thinkingTokenBudget = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_thinking_config_set_thinking_token_budget(_ptr, value), "litert_lm_thinking_config_set_thinking_token_budget"); _thinkingTokenBudget = value; }
         }
 
         /// <summary>
@@ -81,7 +81,7 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public ConversationConfig()
         {
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_conversation_config_create(), "litert_lm_conversation_config_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_create(out _ptr), "litert_lm_conversation_config_create");
         }
 
         /// <summary>
@@ -90,7 +90,7 @@ namespace Emgu.LiteRT.LM
         public SessionConfig SessionConfig
         {
             get { return _sessionConfig; }
-            set { LiteRtLmInvoke.litert_lm_conversation_config_set_session_config(_ptr, value); _sessionConfig = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_set_session_config(_ptr, value), "litert_lm_conversation_config_set_session_config"); _sessionConfig = value; }
         }
 
         /// <summary>
@@ -100,7 +100,7 @@ namespace Emgu.LiteRT.LM
         public String SystemMessage
         {
             get { return _systemMessage; }
-            set { LiteRtLmInvoke.litert_lm_conversation_config_set_system_message(_ptr, LiteRtLmInvoke.ToUtf8(value)); _systemMessage = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_set_system_message(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_conversation_config_set_system_message"); _systemMessage = value; }
         }
 
         /// <summary>
@@ -109,7 +109,7 @@ namespace Emgu.LiteRT.LM
         public String ToolsJson
         {
             get { return _toolsJson; }
-            set { LiteRtLmInvoke.litert_lm_conversation_config_set_tools(_ptr, LiteRtLmInvoke.ToUtf8(value)); _toolsJson = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_set_tools(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_conversation_config_set_tools"); _toolsJson = value; }
         }
 
         /// <summary>
@@ -118,7 +118,7 @@ namespace Emgu.LiteRT.LM
         public String MessagesJson
         {
             get { return _messagesJson; }
-            set { LiteRtLmInvoke.litert_lm_conversation_config_set_messages(_ptr, LiteRtLmInvoke.ToUtf8(value)); _messagesJson = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_set_messages(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_conversation_config_set_messages"); _messagesJson = value; }
         }
 
         /// <summary>
@@ -127,7 +127,7 @@ namespace Emgu.LiteRT.LM
         public String ExtraContextJson
         {
             get { return _extraContextJson; }
-            set { LiteRtLmInvoke.litert_lm_conversation_config_set_extra_context(_ptr, LiteRtLmInvoke.ToUtf8(value)); _extraContextJson = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_set_extra_context(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_conversation_config_set_extra_context"); _extraContextJson = value; }
         }
 
         /// <summary>
@@ -136,7 +136,7 @@ namespace Emgu.LiteRT.LM
         public String PromptTemplate
         {
             get { return _promptTemplate; }
-            set { LiteRtLmInvoke.litert_lm_conversation_config_set_prompt_template(_ptr, LiteRtLmInvoke.ToUtf8(value)); _promptTemplate = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_set_prompt_template(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_conversation_config_set_prompt_template"); _promptTemplate = value; }
         }
 
         /// <summary>
@@ -145,7 +145,7 @@ namespace Emgu.LiteRT.LM
         public bool EnableConstrainedDecoding
         {
             get { return _enableConstrainedDecoding; }
-            set { LiteRtLmInvoke.litert_lm_conversation_config_set_enable_constrained_decoding(_ptr, value); _enableConstrainedDecoding = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_set_enable_constrained_decoding(_ptr, value), "litert_lm_conversation_config_set_enable_constrained_decoding"); _enableConstrainedDecoding = value; }
         }
 
         /// <summary>
@@ -156,15 +156,10 @@ namespace Emgu.LiteRT.LM
             get { return _constraintProvider; }
             set
             {
-                if (value.HasValue)
-                {
-                    int provider = (int)value.Value;
-                    LiteRtLmInvoke.litert_lm_conversation_config_set_constraint_provider(_ptr, ref provider);
-                }
-                else
-                {
-                    LiteRtLmInvoke.litert_lm_conversation_config_set_constraint_provider(_ptr, IntPtr.Zero);
-                }
+                // Passed by value since C API 1.0.0; None unsets it.
+                LiteRtLmInvoke.CheckError(
+                    LiteRtLmInvoke.litert_lm_conversation_config_set_constraint_provider(_ptr, value ?? ConstraintProviderType.None),
+                    "litert_lm_conversation_config_set_constraint_provider");
                 _constraintProvider = value;
             }
         }
@@ -175,7 +170,7 @@ namespace Emgu.LiteRT.LM
         public bool FilterChannelContentFromKvCache
         {
             get { return _filterChannelContentFromKvCache; }
-            set { LiteRtLmInvoke.litert_lm_conversation_config_set_filter_channel_content_from_kv_cache(_ptr, value); _filterChannelContentFromKvCache = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_set_filter_channel_content_from_kv_cache(_ptr, value), "litert_lm_conversation_config_set_filter_channel_content_from_kv_cache"); _filterChannelContentFromKvCache = value; }
         }
 
         /// <summary>
@@ -185,7 +180,7 @@ namespace Emgu.LiteRT.LM
         /// <param name="channelName">The channel the tool calls are streamed on, or null</param>
         public void SetStreamToolCalls(bool streamToolCalls, String channelName = null)
         {
-            LiteRtLmInvoke.litert_lm_conversation_config_set_stream_tool_calls(_ptr, streamToolCalls, LiteRtLmInvoke.ToUtf8(channelName));
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_set_stream_tool_calls(_ptr, streamToolCalls, LiteRtLmInvoke.ToUtf8(channelName)), "litert_lm_conversation_config_set_stream_tool_calls");
         }
 
         /// <summary>
@@ -194,7 +189,7 @@ namespace Emgu.LiteRT.LM
         public ThinkingConfig ThinkingConfig
         {
             get { return _thinkingConfig; }
-            set { LiteRtLmInvoke.litert_lm_conversation_config_set_thinking_config(_ptr, value); _thinkingConfig = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_config_set_thinking_config(_ptr, value), "litert_lm_conversation_config_set_thinking_config"); _thinkingConfig = value; }
         }
 
         /// <summary>
@@ -229,7 +224,7 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public ConversationOptionalArgs()
         {
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_conversation_optional_args_create(), "litert_lm_conversation_optional_args_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_optional_args_create(out _ptr), "litert_lm_conversation_optional_args_create");
         }
 
         /// <summary>
@@ -238,7 +233,7 @@ namespace Emgu.LiteRT.LM
         public RepetitionPenaltyConfig RepetitionPenaltyConfig
         {
             get { return _repetitionPenaltyConfig; }
-            set { LiteRtLmInvoke.litert_lm_conversation_optional_args_set_repetition_penalty_config(_ptr, value); _repetitionPenaltyConfig = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_optional_args_set_repetition_penalty_config(_ptr, value), "litert_lm_conversation_optional_args_set_repetition_penalty_config"); _repetitionPenaltyConfig = value; }
         }
 
         /// <summary>
@@ -247,7 +242,7 @@ namespace Emgu.LiteRT.LM
         public NoRepeatNgramConfig NoRepeatNgramConfig
         {
             get { return _noRepeatNgramConfig; }
-            set { LiteRtLmInvoke.litert_lm_conversation_optional_args_set_no_repeat_ngram_config(_ptr, value); _noRepeatNgramConfig = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_optional_args_set_no_repeat_ngram_config(_ptr, value), "litert_lm_conversation_optional_args_set_no_repeat_ngram_config"); _noRepeatNgramConfig = value; }
         }
 
         /// <summary>
@@ -256,7 +251,7 @@ namespace Emgu.LiteRT.LM
         public SuppressTokensConfig SuppressTokensConfig
         {
             get { return _suppressTokensConfig; }
-            set { LiteRtLmInvoke.litert_lm_conversation_optional_args_set_suppress_tokens_config(_ptr, value); _suppressTokensConfig = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_optional_args_set_suppress_tokens_config(_ptr, value), "litert_lm_conversation_optional_args_set_suppress_tokens_config"); _suppressTokensConfig = value; }
         }
 
         /// <summary>
@@ -265,7 +260,7 @@ namespace Emgu.LiteRT.LM
         public int VisualTokenBudget
         {
             get { return _visualTokenBudget; }
-            set { LiteRtLmInvoke.litert_lm_conversation_optional_args_set_visual_token_budget(_ptr, value); _visualTokenBudget = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_optional_args_set_visual_token_budget(_ptr, value), "litert_lm_conversation_optional_args_set_visual_token_budget"); _visualTokenBudget = value; }
         }
 
         /// <summary>
@@ -274,7 +269,7 @@ namespace Emgu.LiteRT.LM
         public int MaxOutputTokens
         {
             get { return _maxOutputTokens; }
-            set { LiteRtLmInvoke.litert_lm_conversation_optional_args_set_max_output_tokens(_ptr, value); _maxOutputTokens = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_optional_args_set_max_output_tokens(_ptr, value), "litert_lm_conversation_optional_args_set_max_output_tokens"); _maxOutputTokens = value; }
         }
 
         /// <summary>
@@ -283,7 +278,7 @@ namespace Emgu.LiteRT.LM
         public ThinkingConfig ThinkingConfig
         {
             get { return _thinkingConfig; }
-            set { LiteRtLmInvoke.litert_lm_conversation_optional_args_set_thinking_config(_ptr, value); _thinkingConfig = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_optional_args_set_thinking_config(_ptr, value), "litert_lm_conversation_optional_args_set_thinking_config"); _thinkingConfig = value; }
         }
 
         /// <summary>
@@ -293,7 +288,7 @@ namespace Emgu.LiteRT.LM
         /// <param name="constraint">The regular expression or JSON schema</param>
         public void SetConstraint(ConstraintType constraintType, String constraint)
         {
-            LiteRtLmInvoke.litert_lm_conversation_optional_args_set_constraint(_ptr, constraintType, LiteRtLmInvoke.ToUtf8(constraint));
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_optional_args_set_constraint(_ptr, constraintType, LiteRtLmInvoke.ToUtf8(constraint)), "litert_lm_conversation_optional_args_set_constraint");
         }
 
         /// <summary>
@@ -312,94 +307,91 @@ namespace Emgu.LiteRT.LM
     public static partial class LiteRtLmInvoke
     {
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_thinking_config_create();
+        internal static extern LiteRtLmStatusCode litert_lm_thinking_config_create(out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_thinking_config_delete(IntPtr config);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_thinking_config_set_enable_thinking(
+        internal static extern LiteRtLmStatusCode litert_lm_thinking_config_set_enable_thinking(
             IntPtr config,
             [MarshalAs(BoolMarshalType)] bool enableThinking);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_thinking_config_set_thinking_token_budget(IntPtr config, int thinkingTokenBudget);
+        internal static extern LiteRtLmStatusCode litert_lm_thinking_config_set_thinking_token_budget(IntPtr config, int thinkingTokenBudget);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_conversation_config_create();
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_create(out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_conversation_config_delete(IntPtr config);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_session_config(IntPtr config, IntPtr sessionConfig);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_session_config(IntPtr config, IntPtr sessionConfig);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_system_message(IntPtr config, byte[] systemMessageJson);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_system_message(IntPtr config, byte[] systemMessageJson);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_tools(IntPtr config, byte[] toolsJson);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_tools(IntPtr config, byte[] toolsJson);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_messages(IntPtr config, byte[] messagesJson);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_messages(IntPtr config, byte[] messagesJson);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_extra_context(IntPtr config, byte[] extraContextJson);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_extra_context(IntPtr config, byte[] extraContextJson);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_prompt_template(IntPtr config, byte[] promptTemplate);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_prompt_template(IntPtr config, byte[] promptTemplate);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_enable_constrained_decoding(
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_enable_constrained_decoding(
             IntPtr config,
             [MarshalAs(BoolMarshalType)] bool enableConstrainedDecoding);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_constraint_provider(IntPtr config, ref int providerType);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_constraint_provider(IntPtr config, ConstraintProviderType providerType);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_constraint_provider(IntPtr config, IntPtr providerType);
-
-        [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_filter_channel_content_from_kv_cache(
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_filter_channel_content_from_kv_cache(
             IntPtr config,
             [MarshalAs(BoolMarshalType)] bool filterChannelContentFromKvCache);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_stream_tool_calls(
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_stream_tool_calls(
             IntPtr config,
             [MarshalAs(BoolMarshalType)] bool streamToolCalls,
             byte[] channelName);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_config_set_thinking_config(IntPtr config, IntPtr thinkingConfig);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_config_set_thinking_config(IntPtr config, IntPtr thinkingConfig);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_conversation_optional_args_create();
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_optional_args_create(out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_conversation_optional_args_delete(IntPtr optionalArgs);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_optional_args_set_repetition_penalty_config(IntPtr optionalArgs, IntPtr config);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_optional_args_set_repetition_penalty_config(IntPtr optionalArgs, IntPtr config);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_optional_args_set_no_repeat_ngram_config(IntPtr optionalArgs, IntPtr config);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_optional_args_set_no_repeat_ngram_config(IntPtr optionalArgs, IntPtr config);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_optional_args_set_suppress_tokens_config(IntPtr optionalArgs, IntPtr config);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_optional_args_set_suppress_tokens_config(IntPtr optionalArgs, IntPtr config);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_optional_args_set_visual_token_budget(IntPtr optionalArgs, int visualTokenBudget);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_optional_args_set_visual_token_budget(IntPtr optionalArgs, int visualTokenBudget);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_optional_args_set_max_output_tokens(IntPtr optionalArgs, int maxOutputTokens);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_optional_args_set_max_output_tokens(IntPtr optionalArgs, int maxOutputTokens);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_optional_args_set_thinking_config(IntPtr optionalArgs, IntPtr thinkingConfig);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_optional_args_set_thinking_config(IntPtr optionalArgs, IntPtr thinkingConfig);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_optional_args_set_constraint(
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_optional_args_set_constraint(
             IntPtr optionalArgs,
             ConstraintType constraintType,
             byte[] constraintString);

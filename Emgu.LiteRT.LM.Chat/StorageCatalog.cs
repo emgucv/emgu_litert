@@ -90,19 +90,31 @@ namespace Emgu.LiteRT.LM.Chat
             IsSearch = isSearch;
         }
 
-        /// <summary>Describe a speech recognition model: a .tflite file and the files that go with it, deleted together.</summary>
+        /// <summary>Describe a speech recognition model: its model file and the files that go with it, deleted together.</summary>
         /// <param name="name">Its name, shown</param>
-        /// <param name="file">Its model file's name in the models' folder (a .tflite)</param>
-        /// <param name="companions">The other files' names in the models' folder (its tokenizer)</param>
+        /// <param name="file">Its model file's name in the models' folder (a .litertlm, or a .tflite)</param>
+        /// <param name="companions">The other files' names in the models' folder (e.g. a tokenizer, or the files an
+        /// older version used, so they are counted and deleted with it)</param>
         /// <param name="detail">What deleting it does, shown</param>
-        public static StorageModel Speech(string name, string file, IEnumerable<string> companions, string detail) =>
-            new StorageModel(name, file) { IsSpeech = true, Companions = (companions ?? Enumerable.Empty<string>()).ToList(), Detail = detail };
+        /// <param name="cacheNames">Names its compiled-model caches start with when they are named after the model
+        /// rather than the file (LiteRT-LM's speech models: "parakeet-tdt-0.6b-v3_..._.xnnpack_cache"); only cache
+        /// files match</param>
+        public static StorageModel Speech(string name, string file, IEnumerable<string> companions, string detail,
+            IEnumerable<string> cacheNames = null) =>
+            new StorageModel(name, file)
+            {
+                IsSpeech = true, Companions = (companions ?? Enumerable.Empty<string>()).ToList(), Detail = detail,
+                CacheNames = (cacheNames ?? Enumerable.Empty<string>()).ToList()
+            };
 
         /// <summary>True for a speech recognition model (<see cref="Speech"/>).</summary>
         public bool IsSpeech { get; private set; }
 
-        /// <summary>The other files deleted with it (a speech model's tokenizer).</summary>
+        /// <summary>The other files deleted with it (a speech model's tokenizer or older files).</summary>
         public IReadOnlyList<string> Companions { get; private set; } = new string[0];
+
+        /// <summary>Names its caches start with when named after the model (a speech model's).</summary>
+        public IReadOnlyList<string> CacheNames { get; private set; } = new string[0];
 
         /// <summary>What deleting it does, shown; null for the usual text.</summary>
         public string Detail { get; private set; }
@@ -192,6 +204,8 @@ namespace Emgu.LiteRT.LM.Chat
         {
             var result = new StorageSnapshot();
             var models = _models.Where(m => !m.IsSpeech).Select(m => (m.Name, m.File, m.IsSearch)).ToList();
+            // A speech model's .litertlm is its own row, not an unknown chat model's.
+            var speechFiles = new HashSet<string>(_models.Where(m => m.IsSpeech).Select(m => m.File), StringComparer.OrdinalIgnoreCase);
             if (Directory.Exists(ModelRoot))
             {
                 // Include older downloads and caches left behind by models no longer in the picker.
@@ -201,7 +215,7 @@ namespace Emgu.LiteRT.LM.Chat
                     int end = name.IndexOf(".litertlm", StringComparison.OrdinalIgnoreCase);
                     if (end < 0) continue;
                     string file = name.Substring(0, end + ".litertlm".Length);
-                    if (models.Any(m => string.Equals(m.File, file, StringComparison.OrdinalIgnoreCase))) continue;
+                    if (speechFiles.Contains(file) || models.Any(m => string.Equals(m.File, file, StringComparison.OrdinalIgnoreCase))) continue;
                     models.Add((file, file, file.StartsWith("embedding", StringComparison.OrdinalIgnoreCase)));
                 }
             }
@@ -224,7 +238,7 @@ namespace Emgu.LiteRT.LM.Chat
                 {
                     Kind = StorageKind.SpeechModel, Key = model.File, Name = model.Name,
                     Bytes = SpeechFiles(model).Sum(StorageFiles.Size),
-                    Detail = model.Detail ?? "Speech recognition model and its tokenizer. Downloaded again when it is used."
+                    Detail = model.Detail ?? "Speech recognition model. Downloaded again when it is used."
                 });
             foreach (StorageFolder folder in _folders)
                 result.Entries.Add(new StorageEntry { Kind = StorageKind.Folder, Key = folder.Key, Name = folder.Name, Bytes = StorageFiles.Size(folder.Path), Detail = folder.Detail });
@@ -290,6 +304,8 @@ namespace Emgu.LiteRT.LM.Chat
                         ValidateModelName(file, speech: true);
                         StorageFiles.DeleteModel(ModelRoot, Path.Combine(ModelRoot, file));
                     }
+                    foreach (string cache in SpeechCaches(speech))
+                        File.Delete(cache);
                     return;
                 case StorageKind.Folder:
                     StorageFolder folder = _folders.FirstOrDefault(f => f.Key == entry.Key)
@@ -318,13 +334,29 @@ namespace Emgu.LiteRT.LM.Chat
                 ValidateModelName(file, speech: true);
                 files.AddRange(StorageFiles.ModelFiles(Path.Combine(ModelRoot, file)));
             }
+            files.AddRange(SpeechCaches(model).Where(cache => !files.Contains(cache)));
             return files;
         }
 
-        // A file name right in the models' folder: a .litertlm, or for a speech model a .tflite or its tokenizer's .json.
+        // The caches named after a speech model (its CacheNames) rather than its file: cache files only.
+        private List<string> SpeechCaches(StorageModel model)
+        {
+            var caches = new List<string>();
+            foreach (string cacheName in model.CacheNames)
+            {
+                if (string.IsNullOrWhiteSpace(cacheName) || cacheName.IndexOfAny(new[] { '/', '\\', ':' }) >= 0)
+                    throw new InvalidOperationException("Invalid cache name.");
+                caches.AddRange(StorageFiles.ModelFiles(Path.Combine(ModelRoot, cacheName))
+                    .Where(file => !string.Equals(Path.GetFileName(file), cacheName, StringComparison.OrdinalIgnoreCase)
+                        && Path.GetFileName(file).StartsWith(cacheName + "_", StringComparison.OrdinalIgnoreCase)));
+            }
+            return caches;
+        }
+
+        // A file name right in the models' folder: a .litertlm, or for a speech model also a .tflite or a tokenizer's .json.
         private static void ValidateModelName(string name, bool speech = false)
         {
-            string[] extensions = speech ? new[] { ".tflite", ".json" } : new[] { ".litertlm" };
+            string[] extensions = speech ? new[] { ".litertlm", ".tflite", ".json" } : new[] { ".litertlm" };
             if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(new[] { '/', '\\', ':' }) >= 0
                 || !extensions.Any(e => name.EndsWith(e, StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidOperationException("Invalid model file name.");

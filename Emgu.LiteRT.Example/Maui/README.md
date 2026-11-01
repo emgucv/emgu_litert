@@ -100,7 +100,7 @@ Gemma 4 12B), only if missing (by size) and if the phone keeps 512 MB free; each
 (the app's folder is private, so it needs the debuggable Debug build), and the file's time and `.sha256ok` marker go
 with it, so the app doesn't hash it again either. Gemma 4 E2B (2.6 GB) takes a few minutes over Wi-Fi. `NO_BUILD=1`
 only copies the models. `MODELS_OVERRIDE="file ..."` copies those files instead, e.g. Parakeet for Settings > Speech recognition:
-`MODELS_OVERRIDE="parakeet_tdt_0.6b_v3_5s_i8_stateful.tflite parakeet-tdt-0.6b-v3_tokenizer.json"`.
+`MODELS_OVERRIDE="parakeet_tdt_0.6b_v3_5s_i8_stateful.litertlm"` (one file since LiteRT-LM v0.19.0; the app deletes the old `.tflite` and tokenizer once it loads).
 
 **A phone over Wi-Fi** (Android 11+): on the phone, open Settings → Developer options → Wireless debugging, then
 "Pair device with pairing code". On the computer:

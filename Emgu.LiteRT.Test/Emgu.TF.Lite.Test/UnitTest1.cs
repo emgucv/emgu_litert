@@ -74,7 +74,7 @@ namespace Emgu.TF.Lite.Test
         // runtime package: it needs the matching source-built bundle (platforms/windows/bazel_build_windows_gpu.ps1,
         // by default .tmp/wgpu/artifacts), whose folder EMGU_LITERT_WEBGPU_DIR names; its DLLs are copied next to the
         // test (replacing libLiteRt.dll fails once it is loaded, so run this test on its own with --filter).
-        private static bool StageGpuPlugin()
+        internal static bool StageGpuPlugin()
         {
             string baseDir = AppContext.BaseDirectory;
             if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))

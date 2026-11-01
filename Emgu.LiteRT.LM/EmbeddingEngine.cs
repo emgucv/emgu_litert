@@ -58,13 +58,10 @@ namespace Emgu.LiteRT.LM
             Backend = backend;
             VisionBackend = visionBackend;
             AudioBackend = audioBackend;
-            _ptr = LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_embedding_engine_settings_create(
-                    LiteRtLmInvoke.ToUtf8(modelPath),
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_create(LiteRtLmInvoke.ToUtf8(modelPath),
                     LiteRtLmInvoke.ToUtf8(backend),
                     LiteRtLmInvoke.ToUtf8(visionBackend),
-                    LiteRtLmInvoke.ToUtf8(audioBackend)),
-                "litert_lm_embedding_engine_settings_create");
+                    LiteRtLmInvoke.ToUtf8(audioBackend), out _ptr), "litert_lm_embedding_engine_settings_create");
         }
 
         /// <summary>
@@ -93,7 +90,7 @@ namespace Emgu.LiteRT.LM
         public int NumThreads
         {
             get { return _numThreads; }
-            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_num_threads(_ptr, value); _numThreads = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_num_threads(_ptr, value), "litert_lm_embedding_engine_settings_set_num_threads"); _numThreads = value; }
         }
 
         /// <summary>
@@ -102,7 +99,7 @@ namespace Emgu.LiteRT.LM
         public int AudioNumThreads
         {
             get { return _audioNumThreads; }
-            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_audio_num_threads(_ptr, value); _audioNumThreads = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_audio_num_threads(_ptr, value), "litert_lm_embedding_engine_settings_set_audio_num_threads"); _audioNumThreads = value; }
         }
 
         /// <summary>
@@ -112,7 +109,7 @@ namespace Emgu.LiteRT.LM
         public int VisionTokensPerImage
         {
             get { return _visionTokensPerImage; }
-            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_vision_tokens_per_image(_ptr, value); _visionTokensPerImage = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_vision_tokens_per_image(_ptr, value), "litert_lm_embedding_engine_settings_set_vision_tokens_per_image"); _visionTokensPerImage = value; }
         }
 
         /// <summary>
@@ -121,7 +118,7 @@ namespace Emgu.LiteRT.LM
         public String LitertDispatchLibDir
         {
             get { return _litertDispatchLibDir; }
-            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)); _litertDispatchLibDir = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_embedding_engine_settings_set_litert_dispatch_lib_dir"); _litertDispatchLibDir = value; }
         }
 
         /// <summary>
@@ -130,7 +127,7 @@ namespace Emgu.LiteRT.LM
         public String VisionLitertDispatchLibDir
         {
             get { return _visionLitertDispatchLibDir; }
-            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_vision_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)); _visionLitertDispatchLibDir = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_vision_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_embedding_engine_settings_set_vision_litert_dispatch_lib_dir"); _visionLitertDispatchLibDir = value; }
         }
 
         /// <summary>
@@ -139,7 +136,7 @@ namespace Emgu.LiteRT.LM
         public String AudioLitertDispatchLibDir
         {
             get { return _audioLitertDispatchLibDir; }
-            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_audio_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)); _audioLitertDispatchLibDir = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_audio_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_embedding_engine_settings_set_audio_litert_dispatch_lib_dir"); _audioLitertDispatchLibDir = value; }
         }
 
         /// <summary>
@@ -148,7 +145,7 @@ namespace Emgu.LiteRT.LM
         public String CacheDir
         {
             get { return _cacheDir; }
-            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_cache_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)); _cacheDir = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_cache_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_embedding_engine_settings_set_cache_dir"); _cacheDir = value; }
         }
 
         /// <summary>
@@ -157,7 +154,7 @@ namespace Emgu.LiteRT.LM
         public int MaxInputLength
         {
             get { return _maxInputLength; }
-            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_max_input_length(_ptr, value); _maxInputLength = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_max_input_length(_ptr, value), "litert_lm_embedding_engine_settings_set_max_input_length"); _maxInputLength = value; }
         }
 
         /// <summary>
@@ -166,7 +163,7 @@ namespace Emgu.LiteRT.LM
         public int MinInputLength
         {
             get { return _minInputLength; }
-            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_min_input_length(_ptr, value); _minInputLength = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_min_input_length(_ptr, value), "litert_lm_embedding_engine_settings_set_min_input_length"); _minInputLength = value; }
         }
 
         /// <summary>
@@ -175,7 +172,7 @@ namespace Emgu.LiteRT.LM
         public ActivationDataType ActivationDataType
         {
             get { return _activationDataType; }
-            set { LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_activation_data_type(_ptr, value); _activationDataType = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_settings_set_activation_data_type(_ptr, value), "litert_lm_embedding_engine_settings_set_activation_data_type"); _activationDataType = value; }
         }
 
         /// <summary>
@@ -201,7 +198,7 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public EmbeddingOptions()
         {
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_embedding_options_create(), "litert_lm_embedding_options_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_options_create(out _ptr), "litert_lm_embedding_options_create");
         }
 
         /// <summary>
@@ -210,8 +207,8 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public bool Normalize
         {
-            get { return LiteRtLmInvoke.litert_lm_embedding_options_get_normalize(_ptr); }
-            set { LiteRtLmInvoke.litert_lm_embedding_options_set_normalize(_ptr, value); }
+            get { bool value; LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_options_get_normalize(_ptr, out value), "litert_lm_embedding_options_get_normalize"); return value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_options_set_normalize(_ptr, value), "litert_lm_embedding_options_set_normalize"); }
         }
 
         /// <summary>
@@ -219,8 +216,8 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public bool InsertSpecialTokens
         {
-            get { return LiteRtLmInvoke.litert_lm_embedding_options_get_insert_special_tokens(_ptr); }
-            set { LiteRtLmInvoke.litert_lm_embedding_options_set_insert_special_tokens(_ptr, value); }
+            get { bool value; LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_options_get_insert_special_tokens(_ptr, out value), "litert_lm_embedding_options_get_insert_special_tokens"); return value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_options_set_insert_special_tokens(_ptr, value), "litert_lm_embedding_options_set_insert_special_tokens"); }
         }
 
         /// <summary>
@@ -228,8 +225,8 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public InputOverflowStrategy InputOverflowStrategy
         {
-            get { return LiteRtLmInvoke.litert_lm_embedding_options_get_input_overflow_strategy(_ptr); }
-            set { LiteRtLmInvoke.litert_lm_embedding_options_set_input_overflow_strategy(_ptr, value); }
+            get { InputOverflowStrategy value; LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_options_get_input_overflow_strategy(_ptr, out value), "litert_lm_embedding_options_get_input_overflow_strategy"); return value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_options_set_input_overflow_strategy(_ptr, value), "litert_lm_embedding_options_set_input_overflow_strategy"); }
         }
 
         /// <summary>
@@ -238,8 +235,13 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public int OutputSize
         {
-            get { return LiteRtLmInvoke.litert_lm_embedding_options_get_output_size(_ptr); }
-            set { LiteRtLmInvoke.litert_lm_embedding_options_set_output_size(_ptr, value); }
+            get
+            {
+                // NotFound when it was never set: the model's full size.
+                int value;
+                return LiteRtLmInvoke.CheckFound(LiteRtLmInvoke.litert_lm_embedding_options_get_output_size(_ptr, out value), "litert_lm_embedding_options_get_output_size") ? value : 0;
+            }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_options_set_output_size(_ptr, value), "litert_lm_embedding_options_set_output_size"); }
         }
 
         /// <summary>
@@ -248,8 +250,13 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public int VisionTokensPerImage
         {
-            get { return LiteRtLmInvoke.litert_lm_embedding_options_get_vision_tokens_per_image(_ptr); }
-            set { LiteRtLmInvoke.litert_lm_embedding_options_set_vision_tokens_per_image(_ptr, value); }
+            get
+            {
+                // NotFound when it was never set: the engine's setting.
+                int value;
+                return LiteRtLmInvoke.CheckFound(LiteRtLmInvoke.litert_lm_embedding_options_get_vision_tokens_per_image(_ptr, out value), "litert_lm_embedding_options_get_vision_tokens_per_image") ? value : 0;
+            }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_options_set_vision_tokens_per_image(_ptr, value), "litert_lm_embedding_options_set_vision_tokens_per_image"); }
         }
 
         /// <summary>
@@ -285,7 +292,7 @@ namespace Emgu.LiteRT.LM
                 || String.Equals(settings.VisionBackend, "gpu", StringComparison.OrdinalIgnoreCase)
                 || String.Equals(settings.AudioBackend, "gpu", StringComparison.OrdinalIgnoreCase))
                 Emgu.LiteRT.Util.AcceleratorPlugins.Load();
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_embedding_engine_create(settings), "litert_lm_embedding_engine_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_create(settings, out _ptr), "litert_lm_embedding_engine_create");
         }
 
         /// <summary>
@@ -313,10 +320,7 @@ namespace Emgu.LiteRT.LM
             IntPtr[] pointers = new IntPtr[inputs.Length];
             for (int i = 0; i < inputs.Length; i++)
                 pointers[i] = inputs[i].Ptr;
-            IntPtr response = LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_embedding_engine_compute_embedding(
-                    _ptr, pointers, new UIntPtr((uint)pointers.Length), options == null ? IntPtr.Zero : options.Ptr),
-                "litert_lm_embedding_engine_compute_embedding");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_compute_embedding(_ptr, pointers, new UIntPtr((uint)pointers.Length), options == null ? IntPtr.Zero : options.Ptr, out IntPtr response), "litert_lm_embedding_engine_compute_embedding");
             try
             {
                 return ReadResponse(response);
@@ -385,16 +389,19 @@ namespace Emgu.LiteRT.LM
                 for (int i = 0; i < requestPointers.Length; i++)
                     Marshal.WriteIntPtr(batch, i * IntPtr.Size, requestPointers[i]);
 
-                IntPtr responses = LiteRtLmInvoke.CheckPtr(
-                    LiteRtLmInvoke.litert_lm_embedding_engine_compute_embedding_batch(
-                        _ptr, batch, counts, new UIntPtr((uint)requests.Length), options == null ? IntPtr.Zero : options.Ptr),
-                    "litert_lm_embedding_engine_compute_embedding_batch");
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_engine_compute_embedding_batch(_ptr, batch, counts, new UIntPtr((uint)requests.Length), options == null ? IntPtr.Zero : options.Ptr, out IntPtr responses), "litert_lm_embedding_engine_compute_embedding_batch");
                 try
                 {
-                    int count = (int)LiteRtLmInvoke.litert_lm_embedding_responses_get_size(responses).ToUInt32();
-                    float[][] embeddings = new float[count][];
-                    for (int i = 0; i < count; i++)
-                        embeddings[i] = ReadResponse(LiteRtLmInvoke.litert_lm_embedding_responses_get_at(responses, new UIntPtr((uint)i)));
+                    UIntPtr size;
+                    LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_responses_get_size(responses, out size), "litert_lm_embedding_responses_get_size");
+                    float[][] embeddings = new float[checked((int)size.ToUInt64())][];
+                    for (int i = 0; i < embeddings.Length; i++)
+                    {
+                        // Borrowed from responses.
+                        IntPtr response;
+                        LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_responses_get_at(responses, new UIntPtr((uint)i), out response), "litert_lm_embedding_responses_get_at");
+                        embeddings[i] = ReadResponse(response);
+                    }
                     return embeddings;
                 }
                 finally
@@ -416,10 +423,15 @@ namespace Emgu.LiteRT.LM
 
         private static float[] ReadResponse(IntPtr response)
         {
-            int size = (int)LiteRtLmInvoke.litert_lm_embedding_response_get_size(response).ToUInt32();
-            float[] values = new float[size];
-            if (size > 0)
-                Marshal.Copy(LiteRtLmInvoke.litert_lm_embedding_response_get_values(response), values, 0, size);
+            UIntPtr size;
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_response_get_size(response, out size), "litert_lm_embedding_response_get_size");
+            float[] values = new float[checked((int)size.ToUInt64())];
+            if (values.Length > 0)
+            {
+                IntPtr data;
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_embedding_response_get_values(response, out data), "litert_lm_embedding_response_get_values");
+                Marshal.Copy(data, values, 0, values.Length);
+            }
             return values;
         }
 
@@ -460,107 +472,105 @@ namespace Emgu.LiteRT.LM
     public static partial class LiteRtLmInvoke
     {
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_embedding_engine_settings_create(byte[] modelPath, byte[] backend, byte[] visionBackend, byte[] audioBackend);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_create(byte[] modelPath, byte[] backend, byte[] visionBackend, byte[] audioBackend, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_embedding_engine_settings_delete(IntPtr settings);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_engine_settings_set_num_threads(IntPtr settings, int numThreads);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_set_num_threads(IntPtr settings, int numThreads);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_engine_settings_set_cache_dir(IntPtr settings, byte[] cacheDir);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_set_cache_dir(IntPtr settings, byte[] cacheDir);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_engine_settings_set_max_input_length(IntPtr settings, int maxInputLength);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_set_max_input_length(IntPtr settings, int maxInputLength);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_engine_settings_set_min_input_length(IntPtr settings, int minInputLength);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_set_min_input_length(IntPtr settings, int minInputLength);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_engine_settings_set_activation_data_type(IntPtr settings, ActivationDataType activationDataType);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_set_activation_data_type(IntPtr settings, ActivationDataType activationDataType);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_engine_settings_set_audio_num_threads(IntPtr settings, int numThreads);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_set_audio_num_threads(IntPtr settings, int numThreads);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_engine_settings_set_vision_tokens_per_image(IntPtr settings, int visionTokensPerImage);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_set_vision_tokens_per_image(IntPtr settings, int visionTokensPerImage);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_engine_settings_set_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_set_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_engine_settings_set_vision_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_set_vision_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_engine_settings_set_audio_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_settings_set_audio_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_embedding_options_create();
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_create(out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_embedding_options_delete(IntPtr options);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_options_set_normalize(IntPtr options, [MarshalAs(BoolMarshalType)] bool normalize);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_set_normalize(IntPtr options, [MarshalAs(BoolMarshalType)] bool normalize);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        [return: MarshalAs(BoolMarshalType)]
-        internal static extern bool litert_lm_embedding_options_get_normalize(IntPtr options);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_get_normalize(IntPtr options, [MarshalAs(BoolMarshalType)] out bool normalize);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_options_set_insert_special_tokens(IntPtr options, [MarshalAs(BoolMarshalType)] bool insertSpecialTokens);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_set_insert_special_tokens(IntPtr options, [MarshalAs(BoolMarshalType)] bool insertSpecialTokens);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        [return: MarshalAs(BoolMarshalType)]
-        internal static extern bool litert_lm_embedding_options_get_insert_special_tokens(IntPtr options);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_get_insert_special_tokens(IntPtr options, [MarshalAs(BoolMarshalType)] out bool insertSpecialTokens);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_options_set_input_overflow_strategy(IntPtr options, InputOverflowStrategy strategy);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_set_input_overflow_strategy(IntPtr options, InputOverflowStrategy strategy);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern InputOverflowStrategy litert_lm_embedding_options_get_input_overflow_strategy(IntPtr options);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_get_input_overflow_strategy(IntPtr options, out InputOverflowStrategy strategy);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_options_set_output_size(IntPtr options, int outputSize);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_set_output_size(IntPtr options, int outputSize);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_embedding_options_get_output_size(IntPtr options);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_get_output_size(IntPtr options, out int outputSize);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_embedding_options_set_vision_tokens_per_image(IntPtr options, int visionTokensPerImage);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_set_vision_tokens_per_image(IntPtr options, int visionTokensPerImage);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_embedding_options_get_vision_tokens_per_image(IntPtr options);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_options_get_vision_tokens_per_image(IntPtr options, out int visionTokensPerImage);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_embedding_response_delete(IntPtr response);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern UIntPtr litert_lm_embedding_response_get_size(IntPtr response);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_response_get_size(IntPtr response, out UIntPtr size);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_embedding_response_get_values(IntPtr response);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_response_get_values(IntPtr response, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_embedding_responses_delete(IntPtr responses);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern UIntPtr litert_lm_embedding_responses_get_size(IntPtr responses);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_responses_get_size(IntPtr responses, out UIntPtr size);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_embedding_responses_get_at(IntPtr responses, UIntPtr index);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_responses_get_at(IntPtr responses, UIntPtr index, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_embedding_engine_create(IntPtr settings);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_create(IntPtr settings, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_embedding_engine_delete(IntPtr engine);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_embedding_engine_compute_embedding(IntPtr engine, IntPtr[] inputs, UIntPtr numInputs, IntPtr options);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_compute_embedding(IntPtr engine, IntPtr[] inputs, UIntPtr numInputs, IntPtr options, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_embedding_engine_compute_embedding_batch(IntPtr engine, IntPtr inputsBatch, UIntPtr[] numInputsPerBatch, UIntPtr batchSize, IntPtr options);
+        internal static extern LiteRtLmStatusCode litert_lm_embedding_engine_compute_embedding_batch(IntPtr engine, IntPtr inputsBatch, UIntPtr[] numInputsPerBatch, UIntPtr batchSize, IntPtr options, out IntPtr outResult);
     }
 }

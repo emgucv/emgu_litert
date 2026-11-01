@@ -29,18 +29,18 @@ namespace Emgu.TF.Lite
             if (!File.Exists(filename))
                 throw new FileNotFoundException(String.Format("File {0} does not exist", filename));
 
-            try
+            TfLiteInvoke.ClearLastError();
+            _ptr = TfLiteInvoke.tfeFlatBufferModelBuildFromFile(filename);
+            if (_ptr == IntPtr.Zero)
             {
-                _ptr = TfLiteInvoke.tfeFlatBufferModelBuildFromFile(filename);
-            }
-            catch (Exception e)
-            {
+                // The file couldn't be opened or mapped natively (e.g. a path the native side can't read): try its bytes.
                 byte[] buffer = File.ReadAllBytes(filename);
                 if (buffer.Length == 0)
-                    throw new FileNotFoundException(String.Format("File {0} is empty", filename), e);
+                    throw new FileNotFoundException(String.Format("File {0} is empty", filename));
+                TfLiteInvoke.ClearLastError();
                 ReadModelFromBuffer(buffer);
             }
-            
+
         }
 
         private void ReadModelFromBuffer(byte[] buffer)
@@ -48,15 +48,12 @@ namespace Emgu.TF.Lite
             _buffer = new byte[buffer.Length];
             Array.Copy(buffer, _buffer, _buffer.Length);
             _handle = GCHandle.Alloc(_buffer, GCHandleType.Pinned);
-            try
-            {
-                _ptr = TfLiteInvoke.tfeFlatBufferModelBuildFromBuffer(_handle.AddrOfPinnedObject(), buffer.Length);
-            }
-            catch
+            _ptr = TfLiteInvoke.tfeFlatBufferModelBuildFromBuffer(_handle.AddrOfPinnedObject(), buffer.Length);
+            if (_ptr == IntPtr.Zero)
             {
                 _handle.Free();
                 _buffer = null;
-                throw;
+                TfLiteInvoke.ThrowError();
             }
         }
 

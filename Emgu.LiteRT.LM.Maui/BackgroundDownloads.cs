@@ -145,7 +145,8 @@ namespace Emgu.LiteRT.LM.Maui
                 lease.Report(total, received);
                 progress?.Invoke(total, received, percent);
             };
-            await Task.Run(() => manager.Download(1, lease.Token), lease.Token);
+            // A few retries: each continues from the bytes saved, e.g. after a stalled connection when the network changed.
+            await Task.Run(() => manager.Download(3, lease.Token), lease.Token);
         }
     }
 }

@@ -73,7 +73,11 @@ wrap_framework() {
     for RPATH in $(otool -l "$FRAMEWORK/$NAME" | awk '/cmd LC_RPATH/ {getline; getline; print $2}'); do
         install_name_tool -delete_rpath "$RPATH" "$FRAMEWORK/$NAME" || exit 1
     done
-    install_name_tool -add_rpath @loader_path/.. "$FRAMEWORK/$NAME" || exit 1
+    # Only a library that loads others through @rpath needs the rpath: LiteRT-LM v0.19.0's simulator prebuilt of
+    # GemmaModelConstraintProvider loads none and has no room left in its header for another load command.
+    if otool -L "$FRAMEWORK/$NAME" | tail -n +2 | grep -v "@rpath/$NAME.framework/$NAME " | grep -q "@rpath/"; then
+        install_name_tool -add_rpath @loader_path/.. "$FRAMEWORK/$NAME" || exit 1
+    fi
     cat > "$FRAMEWORK/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

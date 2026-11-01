@@ -40,8 +40,11 @@ namespace Emgu.TF.Lite
         /// </summary>
         /// <param name="flatBufferModel">The flat buffer model.</param>
         /// <param name="resolver">An instance that implements the Resolver interface which maps custom op names and builtin op codes to op registrations.</param>
+        /// <exception cref="TfLiteException">The interpreter couldn't be built (e.g. an unsupported operator), with
+        /// what TFLite reported</exception>
         public void Build(FlatBufferModel flatBufferModel, IOpResolver resolver = null)
         {
+            TfLiteInvoke.ClearLastError();
             if (resolver == null)
             {
                 using (BuildinOpResolver buildinResolver = new BuildinOpResolver())
@@ -51,6 +54,9 @@ namespace Emgu.TF.Lite
             }
             else
                 TfLiteInvoke.tfeInterpreterCreateFromModel(ref _ptr, flatBufferModel.Ptr, resolver.OpResolverPtr);
+            // The native side releases the interpreter when it can't be built.
+            if (_ptr == IntPtr.Zero)
+                TfLiteInvoke.ThrowError();
         }
 
         /// <summary>
@@ -58,9 +64,10 @@ namespace Emgu.TF.Lite
         /// the input tensor dimensionality as given. This is relatively expensive.
         /// If you know that your sizes are not changing, you need not call this.
         /// </summary>
-        /// <returns>Status of success or failure.</returns>
+        /// <returns>Status of success or failure; on failure TfLiteInvoke.LastErrorMessage says why.</returns>
         public Status AllocateTensors()
         {
+            TfLiteInvoke.ClearLastError();
             return TfLiteInvoke.tfeInterpreterAllocateTensors(_ptr);
         }
 
@@ -69,9 +76,10 @@ namespace Emgu.TF.Lite
         /// </summary>
         /// <param name="inputIndex">The index of the input tensor</param>
         /// <param name="dimension">The new dimension for the input tensor</param>
-        /// <returns>Status of success or failure.</returns>
+        /// <returns>Status of success or failure; on failure TfLiteInvoke.LastErrorMessage says why.</returns>
         public Status ResizeInputTensor(int inputIndex, int[] dimension)
         {
+            TfLiteInvoke.ClearLastError();
             GCHandle handle = GCHandle.Alloc(dimension, GCHandleType.Pinned);
             try
             {
@@ -91,13 +99,14 @@ namespace Emgu.TF.Lite
         /// <summary>
         /// Invoke the interpreter (run the whole graph in dependency order).
         /// </summary>
-        /// <returns>Status of success or failure.</returns>
+        /// <returns>Status of success or failure; on failure TfLiteInvoke.LastErrorMessage says why.</returns>
         /// <remarks>It is possible that the interpreter is not in a ready state
         /// to evaluate (i.e. if a ResizeTensor() has been performed without an
         /// AllocateTensors().
         /// </remarks>
         public Status Invoke()
         {
+            TfLiteInvoke.ClearLastError();
             return TfLiteInvoke.tfeInterpreterInvoke(_ptr);
         }
 
@@ -232,9 +241,10 @@ namespace Emgu.TF.Lite
         /// WARNING: This is an experimental API and subject to change.
         /// </summary>
         /// <param name="tfDelegate">The delegate</param>
-        /// <returns>The status</returns>
+        /// <returns>The status; on failure TfLiteInvoke.LastErrorMessage says why.</returns>
         public Status ModifyGraphWithDelegate(Emgu.TF.Lite.IDelegate tfDelegate)
         {
+            TfLiteInvoke.ClearLastError();
             return TfLiteInvoke.tfeInterpreterModifyGraphWithDelegate(_ptr, tfDelegate.DelegatePtr);
         }
     }

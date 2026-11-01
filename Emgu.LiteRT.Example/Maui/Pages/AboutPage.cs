@@ -37,7 +37,8 @@ public class AboutPage : ContentPage
             String shown;
             try
             {
-                shown = Emgu.LiteRT.LM.LiteRtLmInvoke.IsV018OrLater ? liteRtLmVer : "older than 0.18.0";
+                Version api = Emgu.LiteRT.LM.LiteRtLmInvoke.ApiVersion;
+                shown = api == null ? "older than 0.19.0" : String.Format("{0} (C API {1})", liteRtLmVer, api.ToString(3));
             }
             catch (Exception ex) when (ex is DllNotFoundException || ex is EntryPointNotFoundException || ex is BadImageFormatException)
             {

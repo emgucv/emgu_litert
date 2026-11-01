@@ -26,9 +26,7 @@ namespace Emgu.LiteRT.LM
         internal Conversation(Engine engine, ConversationConfig config)
         {
             _engine = engine;
-            _ptr = LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_conversation_create(engine, config),
-                "litert_lm_conversation_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_create(engine, config, out _ptr), "litert_lm_conversation_create");
         }
 
         private Conversation(Engine engine, IntPtr ptr)
@@ -71,13 +69,12 @@ namespace Emgu.LiteRT.LM
         {
             if (messageJson == null)
                 throw new ArgumentNullException("messageJson");
-            IntPtr response = LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_conversation_send_message(
-                    _ptr, LiteRtLmInvoke.ToUtf8(messageJson), LiteRtLmInvoke.ToUtf8(extraContextJson), optionalArgs),
-                "litert_lm_conversation_send_message");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_send_message(_ptr, LiteRtLmInvoke.ToUtf8(messageJson), LiteRtLmInvoke.ToUtf8(extraContextJson), optionalArgs, out IntPtr response), "litert_lm_conversation_send_message");
             try
             {
-                return LiteRtLmInvoke.PtrToStringUtf8(LiteRtLmInvoke.litert_lm_json_response_get_string(response));
+                IntPtr json;
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_json_response_get_string(response, out json), "litert_lm_json_response_get_string");
+                return LiteRtLmInvoke.PtrToStringUtf8(json);
             }
             finally
             {
@@ -118,7 +115,19 @@ namespace Emgu.LiteRT.LM
                 Cancel,
                 cancellationToken);
             GC.KeepAlive(optionalArgs);
+            // A single-threaded engine only makes progress while a caller drives it: the chunks are delivered here.
+            if (_engine.SingleThreadedExecution)
+                WaitUntilDone();
             return task;
+        }
+
+        /// <summary>
+        /// Run, and wait for, the conversation's pending work. Only needed with EngineSettings.SingleThreadedExecution,
+        /// where a stream makes progress only inside this call (SendMessageStreamAsync calls it).
+        /// </summary>
+        public void WaitUntilDone()
+        {
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_wait_until_done(_ptr), "litert_lm_conversation_wait_until_done");
         }
 
         /// <summary>
@@ -127,9 +136,9 @@ namespace Emgu.LiteRT.LM
         /// <returns>The copy</returns>
         public Conversation Clone()
         {
-            return new Conversation(
-                _engine,
-                LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_conversation_clone(_ptr), "litert_lm_conversation_clone"));
+            IntPtr clone;
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_clone(_ptr, out clone), "litert_lm_conversation_clone");
+            return new Conversation(_engine, clone);
         }
 
         /// <summary>
@@ -139,9 +148,12 @@ namespace Emgu.LiteRT.LM
         /// <returns>The rendered prompt text</returns>
         public String RenderMessageToString(String messageJson)
         {
-            return LiteRtLmInvoke.PtrToStringUtf8(LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_conversation_render_message_to_string(_ptr, LiteRtLmInvoke.ToUtf8(messageJson)),
-                "litert_lm_conversation_render_message_to_string"));
+            // The text belongs to the conversation until the next render: copied right away.
+            IntPtr text;
+            LiteRtLmInvoke.CheckError(
+                LiteRtLmInvoke.litert_lm_conversation_render_message_to_string(_ptr, LiteRtLmInvoke.ToUtf8(messageJson), out text),
+                "litert_lm_conversation_render_message_to_string");
+            return LiteRtLmInvoke.PtrToStringUtf8(text);
         }
 
         /// <summary>
@@ -150,9 +162,11 @@ namespace Emgu.LiteRT.LM
         /// <returns>The rendered preface text</returns>
         public String RenderPrefaceToString()
         {
-            return LiteRtLmInvoke.PtrToStringUtf8(LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_conversation_render_preface_to_string(_ptr),
-                "litert_lm_conversation_render_preface_to_string"));
+            IntPtr text;
+            LiteRtLmInvoke.CheckError(
+                LiteRtLmInvoke.litert_lm_conversation_render_preface_to_string(_ptr, out text),
+                "litert_lm_conversation_render_preface_to_string");
+            return LiteRtLmInvoke.PtrToStringUtf8(text);
         }
 
         /// <summary>
@@ -161,6 +175,7 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public void Cancel()
         {
+            // Best effort, also from a callback's thread pool continuation: nothing to report if it fails.
             if (_ptr != IntPtr.Zero)
                 LiteRtLmInvoke.litert_lm_conversation_cancel_process(_ptr);
         }
@@ -170,7 +185,12 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public int TokenCount
         {
-            get { return LiteRtLmInvoke.litert_lm_conversation_get_token_count(_ptr); }
+            get
+            {
+                UIntPtr count;
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_conversation_get_token_count(_ptr, out count), "litert_lm_conversation_get_token_count");
+                return checked((int)count.ToUInt64());
+            }
         }
 
         /// <summary>
@@ -179,8 +199,7 @@ namespace Emgu.LiteRT.LM
         /// <returns>The benchmark timings, or null if not available</returns>
         public BenchmarkInfo GetBenchmarkInfo()
         {
-            IntPtr info = LiteRtLmInvoke.litert_lm_conversation_get_benchmark_info(_ptr);
-            return info == IntPtr.Zero ? null : BenchmarkInfo.FromNative(info);
+            return BenchmarkInfo.FromStatus(LiteRtLmInvoke.litert_lm_conversation_get_benchmark_info(_ptr, out IntPtr info), info);
         }
 
         /// <summary>
@@ -229,29 +248,30 @@ namespace Emgu.LiteRT.LM
     public static partial class LiteRtLmInvoke
     {
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_conversation_create(IntPtr engine, IntPtr config);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_create(IntPtr engine, IntPtr config, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_conversation_delete(IntPtr conversation);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_conversation_clone(IntPtr conversation);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_clone(IntPtr conversation, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_conversation_send_message(
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_send_message(
             IntPtr conversation,
             byte[] messageJson,
             byte[] extraContext,
-            IntPtr optionalArgs);
+            IntPtr optionalArgs,
+            out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_json_response_delete(IntPtr response);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_json_response_get_string(IntPtr response);
+        internal static extern LiteRtLmStatusCode litert_lm_json_response_get_string(IntPtr response, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_conversation_send_message_stream(
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_send_message_stream(
             IntPtr conversation,
             byte[] messageJson,
             byte[] extraContext,
@@ -260,18 +280,18 @@ namespace Emgu.LiteRT.LM
             IntPtr callbackData);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_conversation_render_message_to_string(IntPtr conversation, byte[] messageJson);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_render_message_to_string(IntPtr conversation, byte[] messageJson, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_conversation_render_preface_to_string(IntPtr conversation);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_render_preface_to_string(IntPtr conversation, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_conversation_cancel_process(IntPtr conversation);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_cancel_process(IntPtr conversation);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_conversation_get_benchmark_info(IntPtr conversation);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_get_benchmark_info(IntPtr conversation, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_conversation_get_token_count(IntPtr conversation);
+        internal static extern LiteRtLmStatusCode litert_lm_conversation_get_token_count(IntPtr conversation, out UIntPtr count);
     }
 }

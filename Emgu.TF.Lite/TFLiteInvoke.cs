@@ -14,6 +14,9 @@ namespace Emgu.TF.Lite
 {
     public static partial class TfLiteInvoke
     {
+        // Called by TFLite while its native code runs: it must not throw (a managed exception can't unwind through
+        // TFLite's frames; .NET ends the process). tfliteextern records the message for the calling thread anyway, and
+        // CheckError throws it after the call returns, so there is nothing to do here.
 #if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR || UNITY_STANDALONE
         [AOT.MonoPInvokeCallback(typeof(TfLiteErrorCallback))]
 #endif
@@ -21,9 +24,52 @@ namespace Emgu.TF.Lite
             int status,
             IntPtr errMsg)
         {
-            String msg = Marshal.PtrToStringAnsi(errMsg);
-            throw new Exception(msg);
+            return 0;
         }
+
+        /// <summary>
+        /// The errors TFLite reported on this thread since they were last read or cleared (several are joined by
+        /// newlines), or null. Read it after a call that returned a Status other than Ok.
+        /// </summary>
+        public static String LastErrorMessage
+        {
+            get { return Marshal.PtrToStringAnsi(tfeGetPendingError()); }
+        }
+
+        /// <summary>
+        /// Forget the errors TFLite reported on this thread (LastErrorMessage becomes null).
+        /// </summary>
+        public static void ClearLastError()
+        {
+            tfeClearPendingError();
+        }
+
+        /// <summary>
+        /// Throw a TfLiteException with the errors TFLite reported on this thread, if any, and clear them. As Emgu CV's
+        /// CvInvoke.CheckError: called right after a native call, on the same thread.
+        /// </summary>
+        public static void CheckError()
+        {
+            String message = LastErrorMessage;
+            if (message == null)
+                return;
+            tfeClearPendingError();
+            throw new TfLiteException(Status.Error, message);
+        }
+
+        // Throw for a native call that failed (status not Ok, or nothing created), with what TFLite reported.
+        internal static void ThrowError(Status status = Status.Error)
+        {
+            String message = LastErrorMessage;
+            tfeClearPendingError();
+            throw new TfLiteException(status, message);
+        }
+
+        [DllImport(ExternLibrary, CallingConvention = TfLiteCallingConvention)]
+        private static extern IntPtr tfeGetPendingError();
+
+        [DllImport(ExternLibrary, CallingConvention = TfLiteCallingConvention)]
+        private static extern void tfeClearPendingError();
 
         /// <summary>
         /// Define the functional interface for the error callback
@@ -517,12 +563,9 @@ namespace Emgu.TF.Lite
 
             try
             {
-                if (Emgu.LiteRT.Util.Toolbox.FindAssembly("Microsoft.iOS.dll") == null)
-                {
-                    //When not running on iOS
-                    //Use the custom error handler
-                    RedirectError(TfliteErrorHandlerThrowException);
-                }
+                // No error callback is needed: tfliteextern records TFLite's errors for the calling thread, and the
+                // wrappers throw them (TfLiteException) after the native call returns. This call loads the library.
+                tfeClearPendingError();
             }
             catch (DllNotFoundException e)
             {
@@ -534,7 +577,8 @@ namespace Emgu.TF.Lite
         }
 
         /// <summary>
-        /// The default error handler for tensorflow lite
+        /// An error handler that does nothing (despite its name, kept for compatibility): TFLite's errors are recorded
+        /// natively and thrown as TfLiteException after the call returns, never from inside it.
         /// </summary>
         public static readonly TfLiteErrorCallback TfliteErrorHandlerThrowException =
             (TfLiteErrorCallback) TfLiteErrorHandler;

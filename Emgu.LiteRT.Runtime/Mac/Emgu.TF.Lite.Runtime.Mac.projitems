@@ -32,7 +32,8 @@
     </Content>
   </ItemGroup>
   <!-- LiteRT-LM's C API (Apple Silicon only), P/Invoked directly by the Emgu.LiteRT.LM classes, and the prebuilt
-       libGemmaModelConstraintProvider.dylib it depends on. Optional. -->
+       libGemmaModelConstraintProvider.dylib and libwebgpu_dawn.dylib (Dawn, for its WebGPU sampler; since v0.19.0)
+       it depends on. Optional. -->
   <ItemGroup Condition="Exists('$(TFLiteBinaryDir)\runtimes\osx\native\liblitert-lm.dylib')">
     <Content Include="$(TFLiteBinaryDir)\runtimes\osx\native\liblitert-lm.dylib">
       <Link>liblitert-lm.dylib</Link>
@@ -42,12 +43,16 @@
       <Link>libGemmaModelConstraintProvider.dylib</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="$(TFLiteBinaryDir)\runtimes\osx\native\libwebgpu_dawn.dylib" Condition="Exists('$(TFLiteBinaryDir)\runtimes\osx\native\libwebgpu_dawn.dylib')">
+      <Link>libwebgpu_dawn.dylib</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
-  <!-- Emgu's C API over LiteRT-LM's speech recognition (Apple Silicon only), P/Invoked by Emgu.LiteRT.LM's AsrEngine.
+  <!-- Emgu's C API over LiteRT-LM's OmniEngine (Apple Silicon only), P/Invoked by Emgu.LiteRT.LM's SpeechToTextEngine.
        Optional. -->
-  <ItemGroup Condition="Exists('$(TFLiteBinaryDir)\runtimes\osx\native\libasrextern.dylib')">
-    <Content Include="$(TFLiteBinaryDir)\runtimes\osx\native\libasrextern.dylib">
-      <Link>libasrextern.dylib</Link>
+  <ItemGroup Condition="Exists('$(TFLiteBinaryDir)\runtimes\osx\native\libomniextern.dylib')">
+    <Content Include="$(TFLiteBinaryDir)\runtimes\osx\native\libomniextern.dylib">
+      <Link>libomniextern.dylib</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

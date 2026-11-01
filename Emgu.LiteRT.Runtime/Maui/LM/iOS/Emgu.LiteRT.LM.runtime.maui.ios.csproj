@@ -11,7 +11,7 @@
     <TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\lib))</TfLiteBinaryDir>
     <EmguLiteRtLmIOSFramework>$(TfLiteBinaryDir)\ios\LiteRtLm.xcframework</EmguLiteRtLmIOSFramework>
     <EmguLiteRtLmGemmaIOSFramework>$(TfLiteBinaryDir)\ios\GemmaModelConstraintProvider.xcframework</EmguLiteRtLmGemmaIOSFramework>
-    <EmguAsrExternIOSFramework>$(TfLiteBinaryDir)\ios\asrextern.xcframework</EmguAsrExternIOSFramework>
+    <EmguOmniExternIOSFramework>$(TfLiteBinaryDir)\ios\omniextern.xcframework</EmguOmniExternIOSFramework>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
@@ -41,9 +41,9 @@
       <Kind>Framework</Kind>
       <SmartLink>False</SmartLink>
     </NativeReference>
-    <!-- Emgu's C API over LiteRT-LM's speech recognition (Emgu.LiteRT.LM's AsrEngine), built by the same script and
-         also linked to LiteRt.framework; DllImport names it @rpath/asrextern.framework/asrextern. Optional. -->
-    <NativeReference Condition="Exists('$(EmguAsrExternIOSFramework)')" Include="$(EmguAsrExternIOSFramework)">
+    <!-- Emgu's C API over LiteRT-LM's OmniEngine (Emgu.LiteRT.LM's SpeechToTextEngine), built by the same script and
+         also linked to LiteRt.framework; DllImport names it @rpath/omniextern.framework/omniextern. Optional. -->
+    <NativeReference Condition="Exists('$(EmguOmniExternIOSFramework)')" Include="$(EmguOmniExternIOSFramework)">
       <Kind>Framework</Kind>
       <SmartLink>False</SmartLink>
     </NativeReference>

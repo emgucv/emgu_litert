@@ -5,6 +5,7 @@
 #include <fstream>
 #include <map>
 #include <mutex>
+#include <string>
 
 #include "tflite/schema/schema_generated.h"
 
@@ -14,10 +15,30 @@
 
 static TfeErrorCallback customErrorCallback = 0;
 
+// The calling thread's errors since the last tfeClearPendingError, recorded whether or not a callback is set, as
+// Emgu CV records OpenCV's: the managed side reads them after the call returns. A callback must only record too: a
+// managed exception thrown from it would have to unwind through TFLite's frames, which .NET can't do (it ends the
+// process on macOS and Linux).
+static thread_local std::string pendingError;
+static thread_local bool hasPendingError = false;
+
 static void tfeReportError(void* /*userData*/, const char* format, va_list args) {
   char errBuffer[2048];
   const int result = vsnprintf(errBuffer, sizeof(errBuffer), format, args);
+  // TFLite often reports one failure as several messages (the node, then the call): keep them all, within reason.
+  if (pendingError.size() < 16384) {
+    if (hasPendingError) pendingError += '\n';
+    pendingError += errBuffer;
+  }
+  hasPendingError = true;
   if (customErrorCallback) customErrorCallback(result, errBuffer);
+}
+
+const char* tfeGetPendingError() { return hasPendingError ? pendingError.c_str() : nullptr; }
+
+void tfeClearPendingError() {
+  pendingError.clear();
+  hasPendingError = false;
 }
 
 static void tfeReportErrorf(const char* format, ...) {

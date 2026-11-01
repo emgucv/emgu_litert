@@ -25,7 +25,7 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public RepetitionPenaltyConfig()
         {
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_repetition_penalty_config_create(), "litert_lm_repetition_penalty_config_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_repetition_penalty_config_create(out _ptr), "litert_lm_repetition_penalty_config_create");
         }
 
         /// <summary>
@@ -34,7 +34,7 @@ namespace Emgu.LiteRT.LM
         public float RepetitionPenalty
         {
             get { return _repetitionPenalty; }
-            set { LiteRtLmInvoke.litert_lm_repetition_penalty_config_set_repetition_penalty(_ptr, value); _repetitionPenalty = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_repetition_penalty_config_set_repetition_penalty(_ptr, value), "litert_lm_repetition_penalty_config_set_repetition_penalty"); _repetitionPenalty = value; }
         }
 
         /// <summary>
@@ -43,7 +43,7 @@ namespace Emgu.LiteRT.LM
         public float PresencePenalty
         {
             get { return _presencePenalty; }
-            set { LiteRtLmInvoke.litert_lm_repetition_penalty_config_set_presence_penalty(_ptr, value); _presencePenalty = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_repetition_penalty_config_set_presence_penalty(_ptr, value), "litert_lm_repetition_penalty_config_set_presence_penalty"); _presencePenalty = value; }
         }
 
         /// <summary>
@@ -52,7 +52,7 @@ namespace Emgu.LiteRT.LM
         public float FrequencyPenalty
         {
             get { return _frequencyPenalty; }
-            set { LiteRtLmInvoke.litert_lm_repetition_penalty_config_set_frequency_penalty(_ptr, value); _frequencyPenalty = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_repetition_penalty_config_set_frequency_penalty(_ptr, value), "litert_lm_repetition_penalty_config_set_frequency_penalty"); _frequencyPenalty = value; }
         }
 
         /// <summary>
@@ -61,7 +61,7 @@ namespace Emgu.LiteRT.LM
         public int WindowSize
         {
             get { return _windowSize; }
-            set { LiteRtLmInvoke.litert_lm_repetition_penalty_config_set_window_size(_ptr, value); _windowSize = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_repetition_penalty_config_set_window_size(_ptr, value), "litert_lm_repetition_penalty_config_set_window_size"); _windowSize = value; }
         }
 
         /// <summary>
@@ -92,7 +92,7 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public NoRepeatNgramConfig()
         {
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_no_repeat_ngram_config_create(), "litert_lm_no_repeat_ngram_config_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_no_repeat_ngram_config_create(out _ptr), "litert_lm_no_repeat_ngram_config_create");
         }
 
         /// <summary>
@@ -101,7 +101,7 @@ namespace Emgu.LiteRT.LM
         public int NoRepeatNgramSize
         {
             get { return _noRepeatNgramSize; }
-            set { LiteRtLmInvoke.litert_lm_no_repeat_ngram_config_set_no_repeat_ngram_size(_ptr, value); _noRepeatNgramSize = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_no_repeat_ngram_config_set_no_repeat_ngram_size(_ptr, value), "litert_lm_no_repeat_ngram_config_set_no_repeat_ngram_size"); _noRepeatNgramSize = value; }
         }
 
         /// <summary>
@@ -110,7 +110,7 @@ namespace Emgu.LiteRT.LM
         public int WindowSize
         {
             get { return _windowSize; }
-            set { LiteRtLmInvoke.litert_lm_no_repeat_ngram_config_set_window_size(_ptr, value); _windowSize = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_no_repeat_ngram_config_set_window_size(_ptr, value), "litert_lm_no_repeat_ngram_config_set_window_size"); _windowSize = value; }
         }
 
         /// <summary>
@@ -138,7 +138,7 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public SuppressTokensConfig()
         {
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_suppress_tokens_config_create(), "litert_lm_suppress_tokens_config_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_suppress_tokens_config_create(out _ptr), "litert_lm_suppress_tokens_config_create");
         }
 
         /// <summary>
@@ -150,7 +150,7 @@ namespace Emgu.LiteRT.LM
             set
             {
                 int[] tokens = value ?? new int[0];
-                LiteRtLmInvoke.litert_lm_suppress_tokens_config_set_suppress_tokens(_ptr, tokens, new UIntPtr((uint)tokens.Length));
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_suppress_tokens_config_set_suppress_tokens(_ptr, tokens, new UIntPtr((uint)tokens.Length)), "litert_lm_suppress_tokens_config_set_suppress_tokens");
                 _suppressTokens = value;
             }
         }
@@ -171,42 +171,42 @@ namespace Emgu.LiteRT.LM
     public static partial class LiteRtLmInvoke
     {
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_repetition_penalty_config_create();
+        internal static extern LiteRtLmStatusCode litert_lm_repetition_penalty_config_create(out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_repetition_penalty_config_delete(IntPtr config);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_repetition_penalty_config_set_repetition_penalty(IntPtr config, float repetitionPenalty);
+        internal static extern LiteRtLmStatusCode litert_lm_repetition_penalty_config_set_repetition_penalty(IntPtr config, float repetitionPenalty);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_repetition_penalty_config_set_presence_penalty(IntPtr config, float presencePenalty);
+        internal static extern LiteRtLmStatusCode litert_lm_repetition_penalty_config_set_presence_penalty(IntPtr config, float presencePenalty);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_repetition_penalty_config_set_frequency_penalty(IntPtr config, float frequencyPenalty);
+        internal static extern LiteRtLmStatusCode litert_lm_repetition_penalty_config_set_frequency_penalty(IntPtr config, float frequencyPenalty);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_repetition_penalty_config_set_window_size(IntPtr config, int windowSize);
+        internal static extern LiteRtLmStatusCode litert_lm_repetition_penalty_config_set_window_size(IntPtr config, int windowSize);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_no_repeat_ngram_config_create();
+        internal static extern LiteRtLmStatusCode litert_lm_no_repeat_ngram_config_create(out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_no_repeat_ngram_config_delete(IntPtr config);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_no_repeat_ngram_config_set_no_repeat_ngram_size(IntPtr config, int noRepeatNgramSize);
+        internal static extern LiteRtLmStatusCode litert_lm_no_repeat_ngram_config_set_no_repeat_ngram_size(IntPtr config, int noRepeatNgramSize);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_no_repeat_ngram_config_set_window_size(IntPtr config, int windowSize);
+        internal static extern LiteRtLmStatusCode litert_lm_no_repeat_ngram_config_set_window_size(IntPtr config, int windowSize);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_suppress_tokens_config_create();
+        internal static extern LiteRtLmStatusCode litert_lm_suppress_tokens_config_create(out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_suppress_tokens_config_delete(IntPtr config);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_suppress_tokens_config_set_suppress_tokens(IntPtr config, int[] suppressTokens, UIntPtr numTokens);
+        internal static extern LiteRtLmStatusCode litert_lm_suppress_tokens_config_set_suppress_tokens(IntPtr config, int[] suppressTokens, UIntPtr numTokens);
     }
 }

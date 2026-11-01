@@ -13,13 +13,13 @@ using Emgu.LiteRT.Util;
 namespace Emgu.LiteRT.LM.Models
 {
     /// <summary>
-    /// A speech recognition model on LiteRT-LM's ASR engine (<see cref="AsrEngine"/>): downloads its files, then turns
-    /// audio into text, all on the device.
+    /// A speech recognition model on LiteRT-LM's speech-to-text engine (<see cref="SpeechToTextEngine"/>): downloads
+    /// its files, then turns audio into text, all on the device.
     /// </summary>
     public abstract class SpeechToTextModel : DisposableObject
     {
         private readonly FileDownloadManager _downloadManager;
-        private AsrEngine _engine;
+        private SpeechToTextEngine _engine;
 
         /// <summary>Create the model; call Init before transcribing.</summary>
         protected SpeechToTextModel()
@@ -35,13 +35,13 @@ namespace Emgu.LiteRT.LM.Models
         /// <summary>The download's progress.</summary>
         public event FileDownloadManager.DownloadProgressChangedEventHandler OnDownloadProgressChanged;
 
-        /// <summary>The model's name in LiteRT-LM's ASR metadata, e.g. "parakeet-tdt-0.6b-v3".</summary>
+        /// <summary>The model's name in LiteRT-LM's model registry, e.g. "parakeet-tdt-0.6b-v3".</summary>
         public abstract String ModelName { get; }
 
         /// <summary>The model file.</summary>
         public abstract DownloadableFile ModelFile { get; }
 
-        /// <summary>The tokenizer file (tokenizer.json), or null when the model file has it.</summary>
+        /// <summary>A separate tokenizer file (tokenizer.json), or null when the model file has it (every .litertlm).</summary>
         public virtual DownloadableFile TokenizerFile
         {
             get { return null; }
@@ -57,7 +57,7 @@ namespace Emgu.LiteRT.LM.Models
         public float OverlapRatio { get; set; } = 0.4f;
 
         /// <summary>The engine, once initialized.</summary>
-        public AsrEngine Engine
+        public SpeechToTextEngine Engine
         {
             get { return _engine; }
         }
@@ -117,7 +117,7 @@ namespace Emgu.LiteRT.LM.Models
             cancellationToken.ThrowIfCancellationRequested();
             String modelPath = ModelFile.LocalFile;
             String tokenizerPath = TokenizerFile == null ? null : TokenizerFile.LocalFile;
-            AsrEngine engine = await Task.Run(() => new AsrEngine(ModelName, modelPath, tokenizerPath, "cpu", numThreads, OverlapRatio, TextMerger)).ConfigureAwait(false);
+            SpeechToTextEngine engine = await Task.Run(() => new SpeechToTextEngine(ModelName, modelPath, tokenizerPath, "cpu", numThreads, OverlapRatio, TextMerger)).ConfigureAwait(false);
             if (_engine != null)
                 _engine.Dispose();
             _engine = engine;
@@ -127,7 +127,7 @@ namespace Emgu.LiteRT.LM.Models
         /// Start recognizing a stream of audio (e.g. from the microphone): push 16 kHz mono samples to the session as
         /// they come, and process it for the text.
         /// </summary>
-        public AsrSession CreateSession()
+        public SpeechToTextSession CreateSession()
         {
             return CheckEngine().CreateSession();
         }
@@ -145,11 +145,11 @@ namespace Emgu.LiteRT.LM.Models
         {
             if (samples == null)
                 throw new ArgumentNullException("samples");
-            AsrEngine engine = CheckEngine();
+            SpeechToTextEngine engine = CheckEngine();
             return Task.Run(() =>
             {
                 float[] audio = Resample(samples, sampleRate, engine.SampleRate);
-                using (AsrSession session = engine.CreateSession())
+                using (SpeechToTextSession session = engine.CreateSession())
                 {
                     session.PushAudio(audio);
                     session.EndAudio();
@@ -184,7 +184,7 @@ namespace Emgu.LiteRT.LM.Models
         /// <param name="partial">Told the text so far after each window, or null</param>
         /// <param name="cancellationToken">Stops between windows</param>
         /// <returns>The confirmed text</returns>
-        public static String ReadAll(AsrSession session, IProgress<String> partial = null,
+        public static String ReadAll(SpeechToTextSession session, IProgress<String> partial = null,
             CancellationToken cancellationToken = default(CancellationToken))
         {
             if (session == null)
@@ -194,9 +194,9 @@ namespace Emgu.LiteRT.LM.Models
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 String confirmed, unconfirmed;
-                AsrResult result = session.Process(out confirmed, out unconfirmed);
+                SpeechToTextResult result = session.Process(out confirmed, out unconfirmed);
                 Append(text, confirmed);
-                if (result != AsrResult.Text)
+                if (result != SpeechToTextResult.Text)
                     break;
                 if (partial != null)
                     partial.Report(Join(text.ToString(), unconfirmed));
@@ -288,7 +288,7 @@ namespace Emgu.LiteRT.LM.Models
             return result;
         }
 
-        private AsrEngine CheckEngine()
+        private SpeechToTextEngine CheckEngine()
         {
             if (_engine == null)
                 throw new InvalidOperationException("The model is not initialized: call Init first");
@@ -309,43 +309,44 @@ namespace Emgu.LiteRT.LM.Models
     /// <summary>
     /// NVIDIA's Parakeet-TDT-0.6B-v3 (int8, LiteRT): speech recognition in 25 European languages, detected
     /// automatically, with punctuation and capitalization; about 5% word error rate in English. The weights are
-    /// CC-BY-4.0: apps using them must credit NVIDIA. 614 MB and its 1.2 MB tokenizer, downloaded on Init.
+    /// CC-BY-4.0: apps using them must credit NVIDIA. One 615 MB .litertlm (the model and its tokenizer), downloaded on
+    /// Init.
     /// </summary>
     public class ParakeetTdt06BV3 : SpeechToTextModel
     {
+        /// <summary>
+        /// The model's name in LiteRT-LM's registry; its compiled-model caches next to the file are named after it
+        /// ("parakeet-tdt-0.6b-v3_..._.xnnpack_cache").
+        /// </summary>
+        public const String RegisteredName = "parakeet-tdt-0.6b-v3";
+
         /// <inheritdoc/>
         public override String ModelName
         {
-            get { return "parakeet-tdt-0.6b-v3"; }
+            get { return RegisteredName; }
         }
 
-        /// <summary>The model file (int8, stateful decoder, 5 s windows).</summary>
+        /// <summary>The model file (int8, stateful decoder, 5 s windows, with the tokenizer).</summary>
         public static DownloadableFile DefaultModelFile
         {
             get
             {
                 return new DownloadableFile(
-                    "https://huggingface.co/litert-community/parakeet-tdt-0.6b-v3/resolve/main/parakeet_tdt_0.6b_v3_5s_i8_stateful.tflite",
+                    "https://huggingface.co/litert-community/parakeet-tdt-0.6b-v3/resolve/main/parakeet_tdt_0.6b_v3_5s_i8_stateful.litertlm",
                     LanguageModel.DefaultLocalSubfolder,
-                    "334745b8bc7fd372b1c213516f0b6338bb827b1a2abb3e77ad35fe6fea5cd16b");
+                    "66c5a74cf6c2c1d2b990901f6cece5bb53e3214dbceafa0989900a6f0eeb3504");
             }
         }
 
-        /// <summary>The tokenizer, saved under the model's name (its file is just "tokenizer.json").</summary>
-        public static DownloadableFile DefaultTokenizerFile
+        /// <summary>
+        /// The files LiteRT-LM before v0.19.0 loaded instead (the .tflite and NVIDIA's tokenizer.json), for an app to
+        /// delete once the .litertlm is there.
+        /// </summary>
+        public static readonly String[] ObsoleteFileNames =
         {
-            get
-            {
-                DownloadableFile file = new DownloadableFile(
-                    "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3/resolve/main/tokenizer.json",
-                    LanguageModel.DefaultLocalSubfolder,
-                    TokenizerSha256);
-                file.LocalFile = file.GetLocalFileName("parakeet-tdt-0.6b-v3_tokenizer.json");
-                return file;
-            }
-        }
-
-        private const String TokenizerSha256 = "bd321b096832a3f270bd3b2a88823957920f1a5c5ada71114a26ea729d0cbe91";
+            "parakeet_tdt_0.6b_v3_5s_i8_stateful.tflite",
+            "parakeet-tdt-0.6b-v3_tokenizer.json",
+        };
 
         /// <summary>
         /// Create the model, joining its windows' texts with the Levenshtein merger: on a 34 s English sample the
@@ -358,18 +359,11 @@ namespace Emgu.LiteRT.LM.Models
         }
 
         private readonly DownloadableFile _modelFile = DefaultModelFile;
-        private readonly DownloadableFile _tokenizerFile = DefaultTokenizerFile;
 
         /// <inheritdoc/>
         public override DownloadableFile ModelFile
         {
             get { return _modelFile; }
-        }
-
-        /// <inheritdoc/>
-        public override DownloadableFile TokenizerFile
-        {
-            get { return _tokenizerFile; }
         }
     }
 }

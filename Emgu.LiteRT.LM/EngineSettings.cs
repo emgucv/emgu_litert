@@ -38,6 +38,8 @@ namespace Emgu.LiteRT.LM
         private int _audioLoraRank;
         private int[] _supportedAudioLoraRanks;
         private bool _gpuEnableMetalResidencySet;
+        private bool _singleThreadedExecution;
+        private SpeculativeDecodingMode? _speculativeDecoding;
 
         /// <summary>
         /// Create the engine settings for a model file.
@@ -54,13 +56,40 @@ namespace Emgu.LiteRT.LM
             Backend = backend;
             VisionBackend = visionBackend;
             AudioBackend = audioBackend;
-            _ptr = LiteRtLmInvoke.CheckPtr(
-                LiteRtLmInvoke.litert_lm_engine_settings_create(
-                    LiteRtLmInvoke.ToUtf8(modelPath),
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_create(LiteRtLmInvoke.ToUtf8(modelPath),
                     LiteRtLmInvoke.ToUtf8(backend),
                     LiteRtLmInvoke.ToUtf8(visionBackend),
-                    LiteRtLmInvoke.ToUtf8(audioBackend)),
-                "litert_lm_engine_settings_create");
+                    LiteRtLmInvoke.ToUtf8(audioBackend), out _ptr), "litert_lm_engine_settings_create");
+        }
+
+        private EngineSettings(String modelPath, String backend, String visionBackend, String audioBackend, IntPtr ptr)
+        {
+            ModelPath = modelPath;
+            Backend = backend;
+            VisionBackend = visionBackend;
+            AudioBackend = audioBackend;
+            _ptr = ptr;
+        }
+
+        /// <summary>
+        /// Create the engine settings for a model read from an open file descriptor, e.g. one an Android content
+        /// URI or ParcelFileDescriptor gives (ParcelFileDescriptor.DetachFd). LiteRT-LM takes ownership of the
+        /// descriptor and closes it when done: don't close it yourself, even if this throws after the call was made.
+        /// </summary>
+        /// <param name="fd">The file descriptor of the .litertlm model, open for reading</param>
+        /// <param name="backend">The main backend, e.g. "cpu", "gpu" or "npu"</param>
+        /// <param name="visionBackend">The vision backend, or null if not used</param>
+        /// <param name="audioBackend">The audio backend, or null if not used</param>
+        /// <returns>The settings (ModelPath is null)</returns>
+        public static EngineSettings FromFileDescriptor(int fd, String backend = "cpu", String visionBackend = null, String audioBackend = null)
+        {
+            if (fd < 0)
+                throw new ArgumentOutOfRangeException("fd");
+            IntPtr ptr;
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_create_from_raw_file_descriptor(fd,
+                LiteRtLmInvoke.ToUtf8(backend), LiteRtLmInvoke.ToUtf8(visionBackend), LiteRtLmInvoke.ToUtf8(audioBackend), out ptr),
+                "litert_lm_engine_settings_create_from_raw_file_descriptor");
+            return new EngineSettings(null, backend, visionBackend, audioBackend, ptr);
         }
 
         /// <summary>
@@ -89,7 +118,7 @@ namespace Emgu.LiteRT.LM
         public int MaxNumTokens
         {
             get { return _maxNumTokens; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_max_num_tokens(_ptr, value); _maxNumTokens = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_max_num_tokens(_ptr, value), "litert_lm_engine_settings_set_max_num_tokens"); _maxNumTokens = value; }
         }
 
         /// <summary>
@@ -98,7 +127,7 @@ namespace Emgu.LiteRT.LM
         public int NumThreads
         {
             get { return _numThreads; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_num_threads(_ptr, value); _numThreads = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_num_threads(_ptr, value), "litert_lm_engine_settings_set_num_threads"); _numThreads = value; }
         }
 
         /// <summary>
@@ -107,7 +136,7 @@ namespace Emgu.LiteRT.LM
         public int AudioNumThreads
         {
             get { return _audioNumThreads; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_audio_num_threads(_ptr, value); _audioNumThreads = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_audio_num_threads(_ptr, value), "litert_lm_engine_settings_set_audio_num_threads"); _audioNumThreads = value; }
         }
 
         /// <summary>
@@ -116,7 +145,7 @@ namespace Emgu.LiteRT.LM
         public bool ParallelFileSectionLoading
         {
             get { return _parallelFileSectionLoading; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_parallel_file_section_loading(_ptr, value); _parallelFileSectionLoading = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_parallel_file_section_loading(_ptr, value), "litert_lm_engine_settings_set_parallel_file_section_loading"); _parallelFileSectionLoading = value; }
         }
 
         /// <summary>
@@ -125,7 +154,7 @@ namespace Emgu.LiteRT.LM
         public int MaxNumImages
         {
             get { return _maxNumImages; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_max_num_images(_ptr, value); _maxNumImages = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_max_num_images(_ptr, value), "litert_lm_engine_settings_set_max_num_images"); _maxNumImages = value; }
         }
 
         /// <summary>
@@ -134,7 +163,7 @@ namespace Emgu.LiteRT.LM
         public int MaxVisionTokensPerImage
         {
             get { return _maxVisionTokensPerImage; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_max_vision_tokens_per_image(_ptr, value); _maxVisionTokensPerImage = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_max_vision_tokens_per_image(_ptr, value), "litert_lm_engine_settings_set_max_vision_tokens_per_image"); _maxVisionTokensPerImage = value; }
         }
 
         /// <summary>
@@ -143,7 +172,7 @@ namespace Emgu.LiteRT.LM
         public String CacheDir
         {
             get { return _cacheDir; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_cache_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)); _cacheDir = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_cache_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_engine_settings_set_cache_dir"); _cacheDir = value; }
         }
 
         /// <summary>
@@ -152,7 +181,7 @@ namespace Emgu.LiteRT.LM
         public String LitertDispatchLibDir
         {
             get { return _litertDispatchLibDir; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)); _litertDispatchLibDir = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_litert_dispatch_lib_dir(_ptr, LiteRtLmInvoke.ToUtf8(value)), "litert_lm_engine_settings_set_litert_dispatch_lib_dir"); _litertDispatchLibDir = value; }
         }
 
         /// <summary>
@@ -161,7 +190,7 @@ namespace Emgu.LiteRT.LM
         public ActivationDataType ActivationDataType
         {
             get { return _activationDataType; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_activation_data_type(_ptr, value); _activationDataType = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_activation_data_type(_ptr, value), "litert_lm_engine_settings_set_activation_data_type"); _activationDataType = value; }
         }
 
         /// <summary>
@@ -170,7 +199,7 @@ namespace Emgu.LiteRT.LM
         public int PrefillChunkSize
         {
             get { return _prefillChunkSize; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_prefill_chunk_size(_ptr, value); _prefillChunkSize = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_prefill_chunk_size(_ptr, value), "litert_lm_engine_settings_set_prefill_chunk_size"); _prefillChunkSize = value; }
         }
 
         /// <summary>
@@ -179,7 +208,7 @@ namespace Emgu.LiteRT.LM
         public bool EnableYnnpack
         {
             get { return _enableYnnpack; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_enable_ynnpack(_ptr, value); _enableYnnpack = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_enable_ynnpack(_ptr, value), "litert_lm_engine_settings_set_enable_ynnpack"); _enableYnnpack = value; }
         }
 
         /// <summary>
@@ -195,7 +224,7 @@ namespace Emgu.LiteRT.LM
         /// </summary>
         public void EnableBenchmark()
         {
-            LiteRtLmInvoke.litert_lm_engine_settings_enable_benchmark(_ptr);
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_enable_benchmark(_ptr), "litert_lm_engine_settings_enable_benchmark");
             _benchmarkEnabled = true;
         }
 
@@ -205,7 +234,7 @@ namespace Emgu.LiteRT.LM
         public int NumPrefillTokens
         {
             get { return _numPrefillTokens; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_num_prefill_tokens(_ptr, value); _numPrefillTokens = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_num_prefill_tokens(_ptr, value), "litert_lm_engine_settings_set_num_prefill_tokens"); _numPrefillTokens = value; }
         }
 
         /// <summary>
@@ -214,16 +243,46 @@ namespace Emgu.LiteRT.LM
         public int NumDecodeTokens
         {
             get { return _numDecodeTokens; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_num_decode_tokens(_ptr, value); _numDecodeTokens = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_num_decode_tokens(_ptr, value), "litert_lm_engine_settings_set_num_decode_tokens"); _numDecodeTokens = value; }
         }
 
         /// <summary>
         /// Whether to use speculative decoding, if the model supports it
         /// </summary>
+        [Obsolete("Use SpeculativeDecoding (litert_lm_engine_settings_set_enable_speculative_decoding is deprecated in LiteRT-LM's C API 1.0.0).")]
         public bool EnableSpeculativeDecoding
         {
             get { return _enableSpeculativeDecoding; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_enable_speculative_decoding(_ptr, value); _enableSpeculativeDecoding = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_enable_speculative_decoding(_ptr, value), "litert_lm_engine_settings_set_enable_speculative_decoding"); _enableSpeculativeDecoding = value; }
+        }
+
+        /// <summary>
+        /// How every session of the engine uses speculative decoding (e.g. MTP), if the model supports it
+        /// (LoadedFile.HasSpeculativeDecodingSupport); null until set (the engine's default). A SessionConfig can
+        /// override it for one session.
+        /// </summary>
+        public SpeculativeDecodingMode? SpeculativeDecoding
+        {
+            get { return _speculativeDecoding; }
+            set
+            {
+                if (value == null)
+                    throw new ArgumentNullException("value", "Speculative decoding can't be unset; create new settings instead.");
+                using (SpeculativeDecodingConfig config = new SpeculativeDecodingConfig(value.Value))
+                    LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_speculative_decoding_config(_ptr, config), "litert_lm_engine_settings_set_speculative_decoding_config");
+                _speculativeDecoding = value;
+            }
+        }
+
+        /// <summary>
+        /// Whether the engine runs its work only while a caller drives it, on that caller's thread, instead of on its
+        /// own threads. Conversation streaming then completes inside SendMessageStreamAsync (which calls
+        /// Conversation.WaitUntilDone).
+        /// </summary>
+        public bool SingleThreadedExecution
+        {
+            get { return _singleThreadedExecution; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_single_threaded_execution(_ptr, value), "litert_lm_engine_settings_set_single_threaded_execution"); _singleThreadedExecution = value; }
         }
 
         /// <summary>
@@ -232,7 +291,7 @@ namespace Emgu.LiteRT.LM
         public int GpuDecodeStepsPerSync
         {
             get { return _gpuDecodeStepsPerSync; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_gpu_decode_steps_per_sync(_ptr, value); _gpuDecodeStepsPerSync = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_gpu_decode_steps_per_sync(_ptr, value), "litert_lm_engine_settings_set_gpu_decode_steps_per_sync"); _gpuDecodeStepsPerSync = value; }
         }
 
         /// <summary>
@@ -241,7 +300,7 @@ namespace Emgu.LiteRT.LM
         public bool GpuWaitForWeightUploads
         {
             get { return _gpuWaitForWeightUploads; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_gpu_wait_for_weight_uploads(_ptr, value); _gpuWaitForWeightUploads = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_gpu_wait_for_weight_uploads(_ptr, value), "litert_lm_engine_settings_set_gpu_wait_for_weight_uploads"); _gpuWaitForWeightUploads = value; }
         }
 
         /// <summary>
@@ -250,7 +309,7 @@ namespace Emgu.LiteRT.LM
         public bool UseRingbuffersLocalAttention
         {
             get { return _useRingbuffersLocalAttention; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_use_ringbuffers_local_attention(_ptr, value); _useRingbuffersLocalAttention = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_use_ringbuffers_local_attention(_ptr, value), "litert_lm_engine_settings_set_use_ringbuffers_local_attention"); _useRingbuffersLocalAttention = value; }
         }
 
         /// <summary>
@@ -259,7 +318,7 @@ namespace Emgu.LiteRT.LM
         public int LoraRank
         {
             get { return _loraRank; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_lora_rank(_ptr, value); _loraRank = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_lora_rank(_ptr, value), "litert_lm_engine_settings_set_lora_rank"); _loraRank = value; }
         }
 
         /// <summary>
@@ -271,8 +330,7 @@ namespace Emgu.LiteRT.LM
             set
             {
                 int[] ranks = value ?? new int[0];
-                LiteRtLmInvoke.CheckStatus(
-                    LiteRtLmInvoke.litert_lm_engine_settings_set_supported_lora_ranks(_ptr, ranks, new UIntPtr((uint)ranks.Length)),
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_supported_lora_ranks(_ptr, ranks, new UIntPtr((uint)ranks.Length)),
                     "litert_lm_engine_settings_set_supported_lora_ranks");
                 _supportedLoraRanks = value;
             }
@@ -284,7 +342,7 @@ namespace Emgu.LiteRT.LM
         public int AudioLoraRank
         {
             get { return _audioLoraRank; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_audio_lora_rank(_ptr, value); _audioLoraRank = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_audio_lora_rank(_ptr, value), "litert_lm_engine_settings_set_audio_lora_rank"); _audioLoraRank = value; }
         }
 
         /// <summary>
@@ -296,8 +354,7 @@ namespace Emgu.LiteRT.LM
             set
             {
                 int[] ranks = value ?? new int[0];
-                LiteRtLmInvoke.CheckStatus(
-                    LiteRtLmInvoke.litert_lm_engine_settings_set_supported_audio_lora_ranks(_ptr, ranks, new UIntPtr((uint)ranks.Length)),
+                LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_supported_audio_lora_ranks(_ptr, ranks, new UIntPtr((uint)ranks.Length)),
                     "litert_lm_engine_settings_set_supported_audio_lora_ranks");
                 _supportedAudioLoraRanks = value;
             }
@@ -309,7 +366,7 @@ namespace Emgu.LiteRT.LM
         public bool GpuEnableMetalResidencySet
         {
             get { return _gpuEnableMetalResidencySet; }
-            set { LiteRtLmInvoke.litert_lm_engine_settings_set_gpu_enable_metal_residency_set(_ptr, value); _gpuEnableMetalResidencySet = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_gpu_enable_metal_residency_set(_ptr, value), "litert_lm_engine_settings_set_gpu_enable_metal_residency_set"); _gpuEnableMetalResidencySet = value; }
         }
 
         /// <summary>
@@ -328,89 +385,89 @@ namespace Emgu.LiteRT.LM
     public static partial class LiteRtLmInvoke
     {
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_engine_settings_create(byte[] modelPath, byte[] backend, byte[] visionBackend, byte[] audioBackend);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_create(byte[] modelPath, byte[] backend, byte[] visionBackend, byte[] audioBackend, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_engine_settings_delete(IntPtr settings);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_max_num_tokens(IntPtr settings, int maxNumTokens);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_max_num_tokens(IntPtr settings, int maxNumTokens);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_num_threads(IntPtr settings, int numThreads);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_num_threads(IntPtr settings, int numThreads);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_audio_num_threads(IntPtr settings, int numThreads);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_audio_num_threads(IntPtr settings, int numThreads);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_parallel_file_section_loading(
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_parallel_file_section_loading(
             IntPtr settings,
             [MarshalAs(BoolMarshalType)] bool parallelFileSectionLoading);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_max_num_images(IntPtr settings, int maxNumImages);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_max_num_images(IntPtr settings, int maxNumImages);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_max_vision_tokens_per_image(IntPtr settings, int maxVisionTokensPerImage);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_max_vision_tokens_per_image(IntPtr settings, int maxVisionTokensPerImage);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_cache_dir(IntPtr settings, byte[] cacheDir);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_cache_dir(IntPtr settings, byte[] cacheDir);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_litert_dispatch_lib_dir(IntPtr settings, byte[] libDir);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_activation_data_type(IntPtr settings, ActivationDataType activationDataType);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_activation_data_type(IntPtr settings, ActivationDataType activationDataType);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_prefill_chunk_size(IntPtr settings, int prefillChunkSize);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_prefill_chunk_size(IntPtr settings, int prefillChunkSize);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_enable_ynnpack(
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_enable_ynnpack(
             IntPtr settings,
             [MarshalAs(BoolMarshalType)] bool enableYnnpack);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_enable_benchmark(IntPtr settings);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_enable_benchmark(IntPtr settings);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_num_prefill_tokens(IntPtr settings, int numPrefillTokens);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_num_prefill_tokens(IntPtr settings, int numPrefillTokens);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_num_decode_tokens(IntPtr settings, int numDecodeTokens);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_num_decode_tokens(IntPtr settings, int numDecodeTokens);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_enable_speculative_decoding(
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_enable_speculative_decoding(
             IntPtr settings,
             [MarshalAs(BoolMarshalType)] bool enableSpeculativeDecoding);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_gpu_decode_steps_per_sync(IntPtr settings, int numDecodeStepsPerSync);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_gpu_decode_steps_per_sync(IntPtr settings, int numDecodeStepsPerSync);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_gpu_wait_for_weight_uploads(
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_gpu_wait_for_weight_uploads(
             IntPtr settings,
             [MarshalAs(BoolMarshalType)] bool waitForWeightUploads);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_use_ringbuffers_local_attention(
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_use_ringbuffers_local_attention(
             IntPtr settings,
             [MarshalAs(BoolMarshalType)] bool useRingbuffersLocalAttention);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_lora_rank(IntPtr settings, int loraRank);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_lora_rank(IntPtr settings, int loraRank);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_engine_settings_set_supported_lora_ranks(IntPtr settings, int[] loraRanks, UIntPtr numRanks);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_supported_lora_ranks(IntPtr settings, int[] loraRanks, UIntPtr numRanks);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_audio_lora_rank(IntPtr settings, int loraRank);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_audio_lora_rank(IntPtr settings, int loraRank);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern int litert_lm_engine_settings_set_supported_audio_lora_ranks(IntPtr settings, int[] loraRanks, UIntPtr numRanks);
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_supported_audio_lora_ranks(IntPtr settings, int[] loraRanks, UIntPtr numRanks);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_engine_settings_set_gpu_enable_metal_residency_set(
+        internal static extern LiteRtLmStatusCode litert_lm_engine_settings_set_gpu_enable_metal_residency_set(
             IntPtr settings,
             [MarshalAs(BoolMarshalType)] bool enableMetalResidencySet);
     }

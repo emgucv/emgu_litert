@@ -6,8 +6,8 @@
 #                                                        --define=litert_runtime_link_mode=dynamic
 #   lib/ios/GemmaModelConstraintProvider.xcframework   - LiteRT-LM's prebuilt Gemma model constraint provider,
 #                                                        which it links, wrapped into a framework
-#   lib/ios/asrextern.xcframework                      - Emgu's C API over LiteRT-LM's speech recognition
-#                                                        (litertextern/asrextern, staged into the workspace), built
+#   lib/ios/omniextern.xcframework                     - Emgu's C API over LiteRT-LM's OmniEngine (speech recognition)
+#                                                        (litertextern/omniextern, staged into the workspace), built
 #                                                        the same way
 # Both are dynamic frameworks with a device (arm64) and a simulator (arm64) slice. The LiteRT-LM add-on
 # Emgu.LiteRT.Runtime/Maui/LM/iOS (Emgu.LiteRT.LM.runtime.maui.ios) embeds them; LiteRt.framework comes from the base
@@ -43,10 +43,10 @@ for SLICE in ios_arm64 ios_sim_arm64; do
     fi
 done
 
-# asrextern isn't part of LiteRT-LM: stage our tracked source into its workspace, as the macOS and Android scripts do.
-mkdir -p $WORKSPACE_DIR/asrextern
-cp -f litertextern/asrextern/bazel/BUILD $WORKSPACE_DIR/asrextern/BUILD || exit 1
-cp -f litertextern/asrextern/asrextern.cc litertextern/asrextern/asrextern.h $WORKSPACE_DIR/asrextern/ || exit 1
+# omniextern isn't part of LiteRT-LM: stage our tracked source into its workspace, as the macOS and Android scripts do.
+mkdir -p $WORKSPACE_DIR/omniextern
+cp -f litertextern/omniextern/bazel/BUILD $WORKSPACE_DIR/omniextern/BUILD || exit 1
+cp -f litertextern/omniextern/omniextern.cc litertextern/omniextern/omniextern.h $WORKSPACE_DIR/omniextern/ || exit 1
 
 STAGING=$(mktemp -d)
 LM_ARGS=""
@@ -62,14 +62,14 @@ for ENTRY in $IOS_SLICES; do
     # Bazel's output folder name, and in dynamic mode LiteRT's C API libraries would be built empty.
     run_bazel build --verbose_failures -c opt --config=$CONFIG --ios_minimum_os=$IOS_MINIMUM_OS \
         --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic \
-        --linkopt=$STAGING/link/$XCF_SLICE/LiteRt "$@" //c:litert-lm //asrextern:asrextern || exit 1
+        --linkopt=$STAGING/link/$XCF_SLICE/LiteRt "$@" //c:litert-lm //omniextern:omniextern || exit 1
     LM_DYLIB=$WORKSPACE_DIR/bazel-bin/c/liblitert-lm.dylib
     check_bound $LM_DYLIB
     wrap_framework $LM_DYLIB $STAGING/$XCF_SLICE/LiteRtLm.framework $PLATFORM $IOS_MINIMUM_OS
-    ASR_DYLIB=$WORKSPACE_DIR/bazel-bin/asrextern/libasrextern.dylib
+    ASR_DYLIB=$WORKSPACE_DIR/bazel-bin/omniextern/libomniextern.dylib
     check_bound $ASR_DYLIB
-    wrap_framework $ASR_DYLIB $STAGING/$XCF_SLICE/asrextern.framework $PLATFORM $IOS_MINIMUM_OS
-    ASR_ARGS="$ASR_ARGS -framework $STAGING/$XCF_SLICE/asrextern.framework"
+    wrap_framework $ASR_DYLIB $STAGING/$XCF_SLICE/omniextern.framework $PLATFORM $IOS_MINIMUM_OS
+    ASR_ARGS="$ASR_ARGS -framework $STAGING/$XCF_SLICE/omniextern.framework"
     wrap_framework $WORKSPACE_DIR/prebuilt/$CONFIG/libGemmaModelConstraintProvider.dylib \
         $STAGING/$XCF_SLICE/GemmaModelConstraintProvider.framework $PLATFORM 26.4
     LM_ARGS="$LM_ARGS -framework $STAGING/$XCF_SLICE/LiteRtLm.framework"
@@ -78,10 +78,10 @@ done
 
 # CLiteRTLM.xcframework is what this script built before: LiteRT-LM's own //swift:CLiteRTLM, with its own LiteRT.
 rm -rf $OUT_DIR/LiteRtLm.xcframework $OUT_DIR/GemmaModelConstraintProvider.xcframework $OUT_DIR/CLiteRTLM.xcframework \
-    $OUT_DIR/asrextern.xcframework
+    $OUT_DIR/omniextern.xcframework
 xcodebuild -create-xcframework $LM_ARGS -output $OUT_DIR/LiteRtLm.xcframework || exit 1
 xcodebuild -create-xcframework $GEMMA_ARGS -output $OUT_DIR/GemmaModelConstraintProvider.xcframework || exit 1
-xcodebuild -create-xcframework $ASR_ARGS -output $OUT_DIR/asrextern.xcframework || exit 1
+xcodebuild -create-xcframework $ASR_ARGS -output $OUT_DIR/omniextern.xcframework || exit 1
 rm -rf $STAGING
 
-echo Output written to $OUT_DIR/LiteRtLm.xcframework, $OUT_DIR/GemmaModelConstraintProvider.xcframework and $OUT_DIR/asrextern.xcframework
+echo Output written to $OUT_DIR/LiteRtLm.xcframework, $OUT_DIR/GemmaModelConstraintProvider.xcframework and $OUT_DIR/omniextern.xcframework

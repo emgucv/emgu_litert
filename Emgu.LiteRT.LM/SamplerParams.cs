@@ -26,7 +26,7 @@ namespace Emgu.LiteRT.LM
         public SamplerParams(SamplerType type)
         {
             Type = type;
-            _ptr = LiteRtLmInvoke.CheckPtr(LiteRtLmInvoke.litert_lm_sampler_params_create(type), "litert_lm_sampler_params_create");
+            LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_sampler_params_create(type, out _ptr), "litert_lm_sampler_params_create");
         }
 
         /// <summary>
@@ -40,7 +40,7 @@ namespace Emgu.LiteRT.LM
         public int TopK
         {
             get { return _topK; }
-            set { LiteRtLmInvoke.litert_lm_sampler_params_set_top_k(_ptr, value); _topK = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_sampler_params_set_top_k(_ptr, value), "litert_lm_sampler_params_set_top_k"); _topK = value; }
         }
 
         /// <summary>
@@ -49,7 +49,7 @@ namespace Emgu.LiteRT.LM
         public float TopP
         {
             get { return _topP; }
-            set { LiteRtLmInvoke.litert_lm_sampler_params_set_top_p(_ptr, value); _topP = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_sampler_params_set_top_p(_ptr, value), "litert_lm_sampler_params_set_top_p"); _topP = value; }
         }
 
         /// <summary>
@@ -58,7 +58,7 @@ namespace Emgu.LiteRT.LM
         public float Temperature
         {
             get { return _temperature; }
-            set { LiteRtLmInvoke.litert_lm_sampler_params_set_temperature(_ptr, value); _temperature = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_sampler_params_set_temperature(_ptr, value), "litert_lm_sampler_params_set_temperature"); _temperature = value; }
         }
 
         /// <summary>
@@ -67,7 +67,7 @@ namespace Emgu.LiteRT.LM
         public int Seed
         {
             get { return _seed; }
-            set { LiteRtLmInvoke.litert_lm_sampler_params_set_seed(_ptr, value); _seed = value; }
+            set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_sampler_params_set_seed(_ptr, value), "litert_lm_sampler_params_set_seed"); _seed = value; }
         }
 
         /// <summary>
@@ -86,21 +86,21 @@ namespace Emgu.LiteRT.LM
     public static partial class LiteRtLmInvoke
     {
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern IntPtr litert_lm_sampler_params_create(SamplerType type);
+        internal static extern LiteRtLmStatusCode litert_lm_sampler_params_create(SamplerType type, out IntPtr outResult);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
         internal static extern void litert_lm_sampler_params_delete(IntPtr parameters);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_sampler_params_set_top_k(IntPtr parameters, int topK);
+        internal static extern LiteRtLmStatusCode litert_lm_sampler_params_set_top_k(IntPtr parameters, int topK);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_sampler_params_set_top_p(IntPtr parameters, float topP);
+        internal static extern LiteRtLmStatusCode litert_lm_sampler_params_set_top_p(IntPtr parameters, float topP);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_sampler_params_set_temperature(IntPtr parameters, float temperature);
+        internal static extern LiteRtLmStatusCode litert_lm_sampler_params_set_temperature(IntPtr parameters, float temperature);
 
         [DllImport(LiteRtLmLibrary, CallingConvention = LiteRtLmCallingConvention)]
-        internal static extern void litert_lm_sampler_params_set_seed(IntPtr parameters, int seed);
+        internal static extern LiteRtLmStatusCode litert_lm_sampler_params_set_seed(IntPtr parameters, int seed);
     }
 }

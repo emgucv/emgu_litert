@@ -112,6 +112,27 @@ public class UnitTestDownloads
         Complete(file);
     }
 
+    // A connection that stops sending (e.g. after the network changed) counts as stalled after StallTimeout, and the retry
+    // continues from the bytes saved instead of the download hanging for good.
+    [Test, CancelAfter(20000)]
+    public async Task TestStalledDownloadResumesAfterTheStallTimeout()
+    {
+        using var server = new Server((r, n) => n == 1 ? new Response { Body = Data, Send = 524288, Stall = true } : Response.Range(Data, r.Offset));
+        var file = FileFor(server);
+        TimeSpan before = FileDownloadManager.HttpClientWithProgress.StallTimeout;
+        FileDownloadManager.HttpClientWithProgress.StallTimeout = TimeSpan.FromSeconds(1);
+        try
+        {
+            await Manager(file).Download(1, TestContext.CurrentContext.CancellationToken);
+        }
+        finally
+        {
+            FileDownloadManager.HttpClientWithProgress.StallTimeout = before;
+        }
+        Check(server.Requests.Count == 2 && server.Requests[1].Offset > 0, "The retry didn't resume from the saved bytes");
+        Complete(file);
+    }
+
     [Test, CancelAfter(20000)]
     public async Task TestBackgroundPauseRetainsVerifiedResumeState()
     {
@@ -289,6 +310,8 @@ public class UnitTestDownloads
         public string Etag = "\"v1\"";
         public string ContentRange;
         public int? Send;
+        // After Send bytes, keep the connection open without sending anything until the client closes it.
+        public bool Stall;
         public static Response Full(byte[] body, string etag = "\"v1\"", int? send = null) => new Response { Body = body, Etag = etag, Send = send };
         public static Response Range(byte[] body, long offset) => new Response
         {
@@ -341,6 +364,8 @@ public class UnitTestDownloads
                                 await stream.WriteAsync(response.Body, start, Math.Min(65536, send - start)).ConfigureAwait(false);
                                 await Task.Delay(1).ConfigureAwait(false);
                             }
+                            if (response.Stall)
+                                await stream.ReadAsync(new byte[1], 0, 1, _stop.Token).ConfigureAwait(false);
                         }
                         catch (IOException) { } // Cancellation/disconnection by the client is intentional.
                     }

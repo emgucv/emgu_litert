@@ -93,9 +93,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
         /// <summary>
         /// Whether to constrain generation when tools are given, so the model can only produce well-formed calls to the
         /// given tools (or plain text): LiteRT-LM's constrained decoding, using its Gemma model constraint provider
-        /// (libGemmaModelConstraintProvider). On by default. Only applied with LiteRT-LM v0.18.0 or later
-        /// (LiteRtLmInvoke.IsV018OrLater): v0.17.1's prebuilt constraint provider crashes the process, so with an older
-        /// liblitert-lm the tools are used without constraints.
+        /// (libGemmaModelConstraintProvider). On by default.
         /// </summary>
         public bool EnableConstrainedDecoding { get; set; } = true;
 
@@ -151,7 +149,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             int maxOutputTokens = options != null && options.MaxOutputTokens.HasValue ? options.MaxOutputTokens.Value : 0;
             if (EnableContextManagement && enableThinking == true && MaxThinkingTokens <= 0)
                 throw new ArgumentOutOfRangeException(nameof(MaxThinkingTokens), "Thinking needs a positive token budget.");
-            bool constrained = EnableConstrainedDecoding && toolsJson != null && LiteRtLmInvoke.IsV018OrLater;
+            bool constrained = EnableConstrainedDecoding && toolsJson != null;
             String settingsKey = String.Join("\u0001", new[] { systemMessage ?? "", toolsJson ?? "", enableThinking.ToString(), maxOutputTokens.ToString(), constrained.ToString(), EnableContextManagement.ToString(), MaxThinkingTokens.ToString() });
             List<String> keys = turns.Select(GetMessageKey).ToList();
 
@@ -160,13 +158,12 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             bool retainConversation = false;
             try
             {
-                // Reuse an unchanged prefix. v0.18 also accepts a batch of appended messages: a media tool result
-                // needs both its acknowledgement and an image turn, without re-reading the whole conversation.
+                // Reuse an unchanged prefix. LiteRT-LM (since v0.18) also accepts a batch of appended messages: a media
+                // tool result needs both its acknowledgement and an image turn, without re-reading the whole conversation.
                 conversation = _open;
                 if (conversation != null
                     && (conversation.SettingsKey != settingsKey
                         || keys.Count <= conversation.MessageKeys.Count
-                        || (!LiteRtLmInvoke.IsV018OrLater && keys.Count != conversation.MessageKeys.Count + 1)
                         || !conversation.MessageKeys.SequenceEqual(keys.Take(conversation.MessageKeys.Count))))
                 {
                     CloseConversation();
@@ -465,11 +462,6 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                 if (history.Count > 0)
                 {
                     open.Config.MessagesJson = "[" + String.Join(",", history.Select(ToLiteRtLmJson)) + "]";
-                    // LiteRT-LM v0.18.0 drops the images and audio of the initial messages when it re-reads them to
-                    // remove the previous reply's thinking from the KV cache, and the next message fails ("Provided
-                    // less images than expected in the prompt"): keep the thinking in the KV cache instead.
-                    if (history.Any(m => m.Contents.OfType<DataContent>().Any()))
-                        open.Config.FilterChannelContentFromKvCache = false;
                 }
                 open.Conversation = engine.CreateConversation(open.Config);
                 return open;
