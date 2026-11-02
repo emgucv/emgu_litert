@@ -187,6 +187,12 @@ namespace Emgu.LiteRT.LM.Maui
             using (BeginReload())
             {
                 await _chatView.PendingSend;
+                // A feature's model on the GPU lets go of its video memory first (an image model).
+                foreach (ChatFeature feature in _features)
+                {
+                    try { await feature.OnModelReloadingAsync(option); }
+                    catch (Exception) { }
+                }
                 _backend = Backend(option, backend ?? _backend);
                 if (option.Backends.Count > 1)
                     _options.Settings.Set(GpuKey, _backend == "gpu");

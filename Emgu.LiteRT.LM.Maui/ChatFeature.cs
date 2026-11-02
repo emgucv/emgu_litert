@@ -135,6 +135,18 @@ namespace Emgu.LiteRT.LM.Maui
         {
         }
 
+        /// <summary>
+        /// Called, and awaited, when the chosen model is about to be loaded again - on another backend, with another context
+        /// window or CPU threads - before the new engine loads: a feature that holds memory the model needs (a model on the
+        /// GPU: video memory) can let go of it.
+        /// </summary>
+        /// <param name="model">The model</param>
+        /// <returns>A task that completes when the memory is free</returns>
+        public virtual System.Threading.Tasks.Task OnModelReloadingAsync(ChatModelOption model)
+        {
+            return System.Threading.Tasks.Task.CompletedTask;
+        }
+
         /// <summary>Called when an exchange is complete (the reply done or interrupted), on the UI thread.</summary>
         /// <param name="e">The message and the reply</param>
         public virtual void OnReplyCompleted(ChatExchangeEventArgs e)

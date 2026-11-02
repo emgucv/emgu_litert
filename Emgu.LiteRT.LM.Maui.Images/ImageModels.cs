@@ -68,6 +68,12 @@ public interface IImageModel : IDisposable
     /// <summary>Whether the caches the first load makes exist (they are gone when the model's files are deleted).</summary>
     bool CachesExist { get; }
 
+    /// <summary>
+    /// Null, or why a model asked to run on the GPU runs, all or in part, on the CPU (the GPU couldn't load it, or its video
+    /// memory is short): the picture is drawn, more slowly.
+    /// </summary>
+    string GpuFailure { get; }
+
     /// <summary>Why a prompt is too long for the model (a sentence for the chat model), or null when it fits.</summary>
     string CheckPrompt(string prompt);
 
@@ -78,16 +84,22 @@ public interface IImageModel : IDisposable
     void ClearPromptCache();
 }
 
-/// <summary>Z-Image-Turbo (Emgu.LiteRT.Models' <see cref="ZImageTurbo"/>): 256 x 256, 8 steps, on the CPU.</summary>
+/// <summary>
+/// Z-Image-Turbo (Emgu.LiteRT.Models' <see cref="ZImageTurbo"/>): 256 x 256, 8 steps, on the CPU, or on the GPU (the graphs
+/// that fit its video memory go there: all of them need about 5.5 GB, and a picture then takes seconds instead of minutes).
+/// </summary>
 public sealed class ZImageTurboImageModel : IImageModel
 {
     private const int StepCount = 8;
     private readonly ZImageTurbo _model;
+    private readonly string _backend;
 
     /// <summary>Create it over the model in its default folder.</summary>
-    public ZImageTurboImageModel()
+    /// <param name="backend">"cpu" or "gpu"</param>
+    public ZImageTurboImageModel(string backend = "cpu")
     {
-        _model = new ZImageTurbo();
+        _backend = string.Equals(backend, "gpu", StringComparison.OrdinalIgnoreCase) ? "gpu" : "cpu";
+        _model = new ZImageTurbo { Backend = _backend };
     }
 
     /// <inheritdoc/>
@@ -97,11 +109,12 @@ public sealed class ZImageTurboImageModel : IImageModel
     /// <inheritdoc/>
     public int Steps => StepCount;
     /// <inheritdoc/>
-    public string Backend => "cpu";
+    public string Backend => _backend;
     /// <inheritdoc/>
     public long DownloadSize => ZImageTurbo.DownloadSize;
     /// <inheritdoc/>
-    public long CacheSize => 9_000_000_000L;
+    // 9 GB of CPU weight caches (the graphs that stay on the CPU need them too), and the GPU's 5.6 GB of compiled programs.
+    public long CacheSize => _backend == "gpu" ? 14_700_000_000L : 9_000_000_000L;
     /// <inheritdoc/>
     public long DownloadedBytes => _model.DownloadedBytes;
     /// <inheritdoc/>
@@ -123,10 +136,15 @@ public sealed class ZImageTurboImageModel : IImageModel
     }
 
     /// <inheritdoc/>
-    public string FirstLoadEstimate => null;
+    // The GPU compiled about a dozen graphs for 132 s the first time (an RTX 3070); on the CPU a graph loads when it runs.
+    public string FirstLoadEstimate => _backend == "gpu" ? "about 2 minutes" : null;
 
     /// <inheritdoc/>
-    public bool CachesExist => true;
+    public bool CachesExist => _backend != "gpu"
+        || (System.IO.Directory.Exists(_model.GpuCacheFolder) && System.Linq.Enumerable.Any(System.IO.Directory.EnumerateFileSystemEntries(_model.GpuCacheFolder)));
+
+    /// <inheritdoc/>
+    public string GpuFailure => _model.GpuFailure;
 
     /// <inheritdoc/>
     public string CheckPrompt(string prompt)

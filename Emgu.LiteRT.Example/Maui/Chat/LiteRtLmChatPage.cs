@@ -324,6 +324,9 @@ public sealed class LiteRtLmChatPage : ChatPage
 #endif
         }
         options.Add(ImageFeature.ZImageTurboOption);
+#if WINDOWS_WEBGPU
+        options.Add(ImageFeature.ZImageTurboGpuOption);
+#endif
         return options;
     }
 

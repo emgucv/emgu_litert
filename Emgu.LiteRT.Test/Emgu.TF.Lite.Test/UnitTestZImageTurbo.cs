@@ -327,5 +327,137 @@ namespace Emgu.TF.Lite.Test
                 }
             }
         }
+
+        // Which transformer graphs go to the GPU for a video memory budget (the file sizes plus 200 MB for the first one).
+        [TestAttribute]
+        public void TestZImageGpuChoosesTheGraphsThatFit()
+        {
+            Assert.That(ZImageTurbo.ChooseGpuGraphs(0), Is.Empty);
+            // 1 GB: the small graphs; a transformer block (0.9 GB) doesn't fit beside them.
+            Assert.That(ZImageTurbo.ChooseGpuGraphs(1000000000L), Is.EqualTo(new[] { "z_embx", "z_refx", "zc_final" }));
+            // 5.1 GB: four blocks; the fifth and sixth don't, the small final layer after them still does.
+            Assert.That(ZImageTurbo.ChooseGpuGraphs(5100000000L),
+                Is.EqualTo(new[] { "z_embx", "z_refx", "zc_main0", "zc_main1", "zc_main2", "zc_main3", "zc_final" }));
+            // Everything: 5.8 GB of graphs and 0.2 GB for the first (6,015,876,128 bytes).
+            string[] all = { "z_embx", "z_refx", "zc_main0", "zc_main1", "zc_main2", "zc_main3", "zc_main4", "zc_main5", "zc_final" };
+            Assert.That(ZImageTurbo.ChooseGpuGraphs(6015876128L), Is.EqualTo(all));
+            Assert.That(ZImageTurbo.ChooseGpuGraphs(6015876127L), Is.EqualTo(all.Take(8)));
+            Assert.That(ZImageTurbo.ChooseGpuGraphs(long.MaxValue), Is.EqualTo(all));
+        }
+
+        // Backend is "cpu" or "gpu", and can't change once the model is loaded.
+        [TestAttribute]
+        public void TestZImageBackendIsCheckedBeforeInit()
+        {
+            using (var model = new ZImageTurbo(Path.Combine(Path.GetTempPath(), "emgu-zimage-backend-" + Guid.NewGuid().ToString("N"))))
+            {
+                Assert.That(model.Backend, Is.EqualTo("cpu"));
+                model.Backend = "GPU";
+                Assert.That(model.Backend, Is.EqualTo("gpu"));
+                Assert.Throws<ArgumentException>(() => model.Backend = "npu");
+                Assert.That(model.GpuGraphsResident, Is.EqualTo(0));
+                Assert.That(model.GpuGraphsTotal, Is.EqualTo(9));
+                Assert.That(model.GpuFailure, Is.Null);
+            }
+        }
+
+        private const string GpuPrompt = "a red fox sitting in fresh snow at sunrise";
+
+        private static double Psnr(byte[] a, byte[] b)
+        {
+            double squared = 0;
+            for (int i = 0; i < a.Length; i++)
+            {
+                double d = a[i] - b[i];
+                squared += d * d;
+            }
+            return 10 * Math.Log10(255.0 * 255.0 / Math.Max(squared / a.Length, 1e-9));
+        }
+
+        private static async Task<byte[]> CpuPicture()
+        {
+            using (var cpu = new ZImageTurbo())
+            {
+                await cpu.Init();
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                ZImageResult result = await cpu.Generate(GpuPrompt, 42, 8, null);
+                Console.WriteLine("CPU picture in {0:F1} s", watch.Elapsed.TotalSeconds);
+                return result.Rgb;
+            }
+        }
+
+        // Z-Image-Turbo on the GPU draws the CPU's picture (PSNR 28 dB on an RTX 3070), in seconds once the graphs are compiled.
+        // Skipped without a LiteRT GPU accelerator plugin next to libLiteRt (on Windows: EMGU_LITERT_WEBGPU_DIR, the bundle
+        // bazel_build_windows_gpu.ps1 makes). The whole model needs about 5.5 GB of video memory.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestZImageTurboGpu()
+        {
+            if (!UnitTest1.StageGpuPlugin())
+                Assert.Ignore("No LiteRT GPU accelerator plugin next to libLiteRt (on Windows: set EMGU_LITERT_WEBGPU_DIR)");
+            byte[] cpuPicture = await CpuPicture();
+            using (var gpu = new ZImageTurbo { Backend = "gpu" })
+            {
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                await gpu.Init();
+                Console.WriteLine("Loaded on the GPU in {0:F1} s: {1} of {2} graphs on the GPU{3}", watch.Elapsed.TotalSeconds,
+                    gpu.GpuGraphsResident, gpu.GpuGraphsTotal, gpu.GpuFailure == null ? string.Empty : " (" + gpu.GpuFailure + ")");
+                watch.Restart();
+                ZImageResult first = await gpu.Generate(GpuPrompt, 42, 8, null);
+                Console.WriteLine("First GPU picture in {0:F1} s", watch.Elapsed.TotalSeconds);
+                watch.Restart();
+                ZImageResult second = await gpu.Generate(GpuPrompt, 42, 8, null);
+                Console.WriteLine("Second GPU picture in {0:F1} s", watch.Elapsed.TotalSeconds);
+                Assert.That(second.Rgb, Is.EqualTo(first.Rgb), "the same seed gave another picture on the GPU");
+                double psnr = Psnr(cpuPicture, first.Rgb);
+                Console.WriteLine("GPU against CPU: PSNR {0:F1} dB", psnr);
+                Assert.That(psnr, Is.GreaterThan(25), "the GPU's picture is not the CPU's");
+                // On an idle 8 GB card everything fits; a card with less, or other programs using it, leaves some on the CPU.
+                if (gpu.GpuGraphsResident == gpu.GpuGraphsTotal)
+                    Assert.That(gpu.GpuFailure, Is.Null);
+            }
+        }
+
+        // A video memory budget that fits only part of the model: the rest runs on the CPU, and the picture is the same;
+        // a budget of nothing is the CPU's picture exactly.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestZImageTurboGpuWithLessVideoMemory()
+        {
+            if (!UnitTest1.StageGpuPlugin())
+                Assert.Ignore("No LiteRT GPU accelerator plugin next to libLiteRt (on Windows: set EMGU_LITERT_WEBGPU_DIR)");
+            byte[] cpuPicture = await CpuPicture();
+            using (var partial = new ZImageTurbo { Backend = "gpu", GpuMemoryBudget = 2000000000L })
+            {
+                await partial.Init();
+                Console.WriteLine("Budget 2 GB: {0} of {1} graphs on the GPU ({2})", partial.GpuGraphsResident, partial.GpuGraphsTotal, partial.GpuFailure);
+                Assert.That(partial.GpuGraphsResident, Is.GreaterThan(0).And.LessThan(partial.GpuGraphsTotal));
+                Assert.That(partial.GpuFailure, Is.Not.Null);
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                ZImageResult picture = await partial.Generate(GpuPrompt, 42, 8, null);
+                Console.WriteLine("Partial picture in {0:F1} s, PSNR {1:F1} dB", watch.Elapsed.TotalSeconds, Psnr(cpuPicture, picture.Rgb));
+                // Part of the graphs round differently (int8 activations on the GPU): 24.7 dB with 4 of 9 on the GPU.
+                Assert.That(Psnr(cpuPicture, picture.Rgb), Is.GreaterThan(20));
+            }
+            using (var none = new ZImageTurbo { Backend = "gpu", GpuMemoryBudget = 0 })
+            {
+                await none.Init();
+                Assert.That(none.GpuGraphsResident, Is.EqualTo(0));
+                ZImageResult picture = await none.Generate(GpuPrompt, 42, 8, null);
+                Assert.That(picture.Rgb, Is.EqualTo(cpuPicture), "with no graph on the GPU the picture is the CPU's");
+            }
+        }
     }
 }

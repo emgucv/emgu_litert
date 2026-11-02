@@ -71,14 +71,21 @@ namespace Emgu.LiteRT.Models
 
     /// <summary>
     /// Text-to-image with Z-Image-Turbo (Alibaba Tongyi-MAI, a 6B single-stream diffusion transformer, Apache-2.0) on the
-    /// device's CPU, through LiteRT's CompiledModel API: the 13 int8 graphs of litert-community/Z-Image-Turbo-LiteRT
+    /// device's CPU or GPU, through LiteRT's CompiledModel API: the 13 int8 graphs of litert-community/Z-Image-Turbo-LiteRT
     /// (9.8 GB) plus 0.78 GB of host tensors read from the original checkpoint (Tongyi-MAI/Z-Image-Turbo; only the needed
     /// byte ranges are downloaded). Makes 256x256 images from prompts of up to MaxPromptTokens tokens (about 23 words).
     /// <para>
     /// The graphs run one at a time on the CPU (XNNPACK), each compiled with a weight cache in the model folder: the first
     /// generation writes the caches (about 9 GB more), after which a graph loads in milliseconds as a memory map and stays
-    /// file-backed. The GPU is no faster for this model and needs fp32 and several GB per graph. Turbo is distilled for
-    /// guidance 0, so each step is one transformer pass. The host loop (tokenizer, schedule, timestep MLP, RoPE, Euler
+    /// file-backed. Turbo is distilled for guidance 0, so each step is one transformer pass.
+    /// </para>
+    /// <para>
+    /// With <see cref="Backend"/> "gpu" the nine graphs every step runs (the transformer's blocks) are compiled for the GPU
+    /// when the model is loaded and stay there: a picture takes 4.7 s on an RTX 3070 (WebGPU) instead of 120 s on the CPU,
+    /// for about 5.5 GB of video memory (the int8 weights stay int8; the picture is the CPU's to 28 dB PSNR). The graphs
+    /// that fit <see cref="GpuMemoryBudget"/> go to the GPU, the others, and the graphs a picture runs once (the text
+    /// encoder, the caption, the VAE), run on the CPU. The first load compiles the programs (about two minutes, 5.6 GB in
+    /// <see cref="GpuCacheFolder"/>), later loads read them. The host loop (tokenizer, schedule, timestep MLP, RoPE, Euler
     /// steps) is ported from https://github.com/alexeyw/android-image-generator (Apache-2.0).
     /// </para>
     /// </summary>
@@ -145,6 +152,121 @@ namespace Emgu.LiteRT.Models
 
         private readonly String _folder;
         private Environment _environment;
+
+        // The graphs kept compiled on the GPU (Backend "gpu"), by name.
+        private sealed class GpuGraph : IDisposable
+        {
+            public Model Model;
+            public Options Options;
+            public CompiledModel Compiled;
+            public TensorBuffer[] Inputs;
+            public TensorBuffer[] Outputs;
+
+            public void Dispose()
+            {
+                foreach (TensorBuffer buffer in (Inputs ?? new TensorBuffer[0]).Concat(Outputs ?? new TensorBuffer[0]))
+                    buffer.Dispose();
+                if (Compiled != null) Compiled.Dispose();
+                if (Options != null) Options.Dispose();
+                if (Model != null) Model.Dispose();
+            }
+        }
+
+        private readonly Dictionary<String, GpuGraph> _gpuGraphs = new Dictionary<String, GpuGraph>();
+        private String _backend = "cpu";
+        private String _gpuFailure;
+
+        // The graphs every denoising step runs, in the order they run: the ones worth keeping on the GPU.
+        private static readonly String[] StepGraphs =
+        {
+            "z_embx", "z_refx", "zc_main0", "zc_main1", "zc_main2", "zc_main3", "zc_main4", "zc_main5", "zc_final"
+        };
+
+        // GPU settings: fp32 compute, and int8 weights kept (AllowSrcQuantizedFcConvOps: the FC and convolution layers keep
+        // their int8 weights, about 1 GB of video memory per transformer block instead of ~4 GB dequantized).
+        private const GpuPrecision GpuComputePrecision = GpuPrecision.Fp32;
+        private const bool GpuKeepInt8 = true;
+
+        // Video memory a GPU load leaves free for the activations, the driver and the desktop, and what an unknown
+        // video memory (not Windows) is taken to be.
+        private const long GpuMarginBytes = 600000000L;
+        private const long GpuUnknownBudgetBytes = 3000000000L;
+
+        // The first compiled graph's fixed share (device, shared buffers), measured: all nine graphs take 5.5 GB for 5.8 GB of files.
+        private const long GpuFixedBytes = 200000000L;
+
+        /// <summary>
+        /// "cpu" (the default) or "gpu": where the transformer's graphs run (see the class comment). Set it before
+        /// <see cref="Init"/>; the GPU needs LiteRT's GPU accelerator next to libLiteRt, and without it, or when a graph
+        /// can't be compiled or run there, the model runs on the CPU (<see cref="GpuFailure"/>).
+        /// </summary>
+        public String Backend
+        {
+            get { return _backend; }
+            set
+            {
+                if (Initialized)
+                    throw new InvalidOperationException("Set Backend before Init");
+                if (!String.Equals(value, "cpu", StringComparison.OrdinalIgnoreCase) && !String.Equals(value, "gpu", StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException("The backend is \"cpu\" or \"gpu\"", "value");
+                _backend = value.ToLowerInvariant();
+            }
+        }
+
+        /// <summary>
+        /// How many bytes of video memory the graphs on the GPU may take, or null to use what the system has free for this
+        /// process, less a margin (Windows; elsewhere 3 GB). All nine graphs need about 6 GB.
+        /// </summary>
+        public long? GpuMemoryBudget { get; set; }
+
+        /// <summary>How many of the <see cref="GpuGraphsTotal"/> graphs run on the GPU (0 for the CPU).</summary>
+        public int GpuGraphsResident
+        {
+            get { return _gpuGraphs.Count; }
+        }
+
+        /// <summary>The number of graphs the GPU can take: the nine every step runs.</summary>
+        public int GpuGraphsTotal
+        {
+            get { return StepGraphs.Length; }
+        }
+
+        /// <summary>
+        /// Null, or why the GPU doesn't run all the graphs the model was asked to run there (not enough video memory, a graph
+        /// that couldn't be compiled or run, no accelerator); the rest run on the CPU.
+        /// </summary>
+        public String GpuFailure
+        {
+            get { return _gpuFailure; }
+        }
+
+        /// <summary>The folder of the GPU's compiled programs (about 5.6 GB), in <see cref="Folder"/>.</summary>
+        public String GpuCacheFolder
+        {
+            get { return Path.Combine(_folder, "gpu-cache"); }
+        }
+
+        /// <summary>
+        /// The step graphs that fit a budget of video memory, in the order they run. A graph takes about its file's size (the
+        /// int8 weights stay int8), and the first one 200 MB more; one that doesn't fit is left out (the others may still fit).
+        /// </summary>
+        /// <param name="budget">The bytes of video memory</param>
+        /// <returns>The graph names</returns>
+        internal static String[] ChooseGpuGraphs(long budget)
+        {
+            List<String> chosen = new List<String>();
+            long used = 0;
+            foreach (String name in StepGraphs)
+            {
+                long need = Graphs.First(g => g.Key == name).Value + (chosen.Count == 0 ? GpuFixedBytes : 0);
+                if (used + need > budget)
+                    continue;
+                used += need;
+                chosen.Add(name);
+            }
+            return chosen.ToArray();
+        }
+
         private QwenTokenizer _tokenizer;
         private ZImageMath.TimestepWeights _timestep;
         private float[] _captionPadToken;
@@ -333,8 +455,9 @@ namespace Emgu.LiteRT.Models
         }
 
         /// <summary>
-        /// Download the model files if needed, and load the tokenizer and the host tensors. The graphs are loaded when
-        /// they run.
+        /// Download the model files if needed, and load the tokenizer and the host tensors. On the CPU the graphs are loaded
+        /// when they run; on the GPU the ones that fit the video memory are compiled now (the first time about two minutes,
+        /// later seconds, from <see cref="GpuCacheFolder"/>).
         /// </summary>
         /// <param name="progress">Reports the download, or null</param>
         /// <param name="cancellationToken">Cancels the download</param>
@@ -365,6 +488,20 @@ namespace Emgu.LiteRT.Models
                 _timestep = timestep;
                 _captionPadToken = captionPadToken;
                 _environment = new Environment();
+                if (_backend == "gpu")
+                {
+                    try
+                    {
+                        LoadGpuGraphs(cancellationToken);
+                    }
+                    catch
+                    {
+                        ReleaseGpuGraphs();
+                        _environment.Dispose();
+                        _environment = null;
+                        throw;
+                    }
+                }
             }, cancellationToken).ConfigureAwait(false);
         }
 
@@ -539,6 +676,26 @@ namespace Emgu.LiteRT.Models
         // memory map (milliseconds), so streaming the graphs keeps memory low at no real cost.
         internal float[] RunGraph(String name, params float[][] inputs)
         {
+            GpuGraph gpu;
+            if (_gpuGraphs.TryGetValue(name, out gpu))
+            {
+                if (inputs.Length != gpu.Inputs.Length)
+                    throw new ArgumentException(String.Format("{0} takes {1} inputs, not {2}", name, gpu.Inputs.Length, inputs.Length));
+                try
+                {
+                    for (int i = 0; i < inputs.Length; i++)
+                        gpu.Inputs[i].Write(inputs[i]);
+                    gpu.Compiled.Run(gpu.Inputs, gpu.Outputs);
+                    return gpu.Outputs[0].Read<float>();
+                }
+                catch (Exception ex)
+                {
+                    // The GPU can't run it (a lost device, out of memory): the CPU does, from now on, and the picture goes on.
+                    _gpuGraphs.Remove(name);
+                    gpu.Dispose();
+                    _gpuFailure = String.Format("{0} failed on the GPU ({1}): it runs on the CPU from now on.", name, ex.Message);
+                }
+            }
             CpuOptions cpu = new CpuOptions
             {
                 NumThreads = NumThreads,
@@ -570,6 +727,74 @@ namespace Emgu.LiteRT.Models
             }
         }
 
+        // Compile the step graphs that fit the video memory budget, in the order they run. A graph that can't be compiled ends it
+        // (the others run on the CPU).
+        private void LoadGpuGraphs(CancellationToken cancellationToken)
+        {
+            long budget = GpuMemoryBudget ?? AutoGpuBudget();
+            String[] chosen = ChooseGpuGraphs(budget);
+            if (chosen.Length == 0)
+                _gpuFailure = String.Format("No video memory to spare ({0:F1} GB free for the GPU): the image model runs on the CPU.", budget / 1e9);
+            else if (chosen.Length < StepGraphs.Length)
+                _gpuFailure = String.Format("Not enough video memory for the whole image model ({0:F1} GB for the GPU): {1} of {2} parts run on the GPU, the others on the CPU.",
+                    budget / 1e9, chosen.Length, StepGraphs.Length);
+            foreach (String name in chosen)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    _gpuGraphs[name] = CompileOnGpu(name);
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException))
+                {
+                    _gpuFailure = String.Format("{0} couldn't be compiled for the GPU ({1}): the graphs from it on run on the CPU.", name, ex.Message);
+                    break;
+                }
+            }
+        }
+
+        private static long AutoGpuBudget()
+        {
+            long? free = GpuMemory.AvailableBytes();
+            return free.HasValue ? Math.Max(0, free.Value - GpuMarginBytes) : GpuUnknownBudgetBytes;
+        }
+
+        private GpuGraph CompileOnGpu(String name)
+        {
+            Directory.CreateDirectory(GpuCacheFolder);
+            GpuOptions gpu = new GpuOptions
+            {
+                Precision = GpuComputePrecision,
+                AllowSrcQuantizedFcConvOps = GpuKeepInt8,
+                SerializationDir = GpuCacheFolder,
+                ModelCacheKey = name + "_" + GpuComputePrecision.ToString().ToLowerInvariant() + (GpuKeepInt8 ? "_q" : String.Empty),
+                SerializeProgramCache = true
+            };
+            GpuGraph graph = new GpuGraph();
+            try
+            {
+                graph.Model = new Model(_environment, GraphFile(name));
+                graph.Options = new Options(HwAccelerators.Gpu);
+                graph.Options.AddGpuOptions(gpu);
+                graph.Compiled = new CompiledModel(_environment, graph.Model, graph.Options);
+                graph.Inputs = graph.Compiled.CreateInputBuffers();
+                graph.Outputs = graph.Compiled.CreateOutputBuffers();
+                return graph;
+            }
+            catch
+            {
+                graph.Dispose();
+                throw;
+            }
+        }
+
+        private void ReleaseGpuGraphs()
+        {
+            foreach (GpuGraph graph in _gpuGraphs.Values)
+                graph.Dispose();
+            _gpuGraphs.Clear();
+        }
+
         private static float[] ReadFloats(String file, int count)
         {
             byte[] bytes = File.ReadAllBytes(file);
@@ -593,7 +818,8 @@ namespace Emgu.LiteRT.Models
         }
 
         /// <summary>
-        /// Delete the weight caches (about 9 GB); the next generation writes them again.
+        /// Delete the weight caches (about 9 GB) and the GPU's compiled programs (about 5.6 GB); the next generation or load
+        /// writes them again. Not while the model is loaded on the GPU.
         /// </summary>
         public void DeleteWeightCache()
         {
@@ -603,6 +829,8 @@ namespace Emgu.LiteRT.Models
                 foreach (String file in Directory.GetFiles(cache, "*.xnnpack_cache"))
                     File.Delete(file);
             }
+            if (Directory.Exists(GpuCacheFolder))
+                Directory.Delete(GpuCacheFolder, true);
         }
 
         /// <summary>Forget the last prompt and its text embedding. Call only when generation is idle.</summary>
@@ -617,6 +845,7 @@ namespace Emgu.LiteRT.Models
         /// </summary>
         public void Dispose()
         {
+            ReleaseGpuGraphs();
             if (_environment != null)
             {
                 _environment.Dispose();

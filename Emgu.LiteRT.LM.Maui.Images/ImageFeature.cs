@@ -54,6 +54,15 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     public static ImageModelOption ZImageTurboOption { get; } = new ImageModelOption("z-image-turbo", "Z-Image-Turbo · CPU",
         "256 x 256, 8 steps; a 10.6 GB download and about 9 GB of caches.", StorageKey, () => new ZImageTurboImageModel());
 
+    /// <summary>
+    /// Z-Image-Turbo on the GPU (the same files as <see cref="ZImageTurboOption"/>, so the same storage entry): about 5 s a picture
+    /// on an RTX 3070 when the whole model fits the video memory, 120 s on the CPU. For a PC with a GPU runtime (the demo lists it
+    /// under WINDOWS_WEBGPU).
+    /// </summary>
+    public static ImageModelOption ZImageTurboGpuOption { get; } = new ImageModelOption("z-image-turbo_gpu", "Z-Image-Turbo · GPU",
+        "256 x 256, 8 steps on the GPU: about 5 s a picture on an RTX 3070 when the whole model fits its video memory (about 5.5 GB; a GPU chat model on the same card leaves part of it on the CPU). The first use compiles the GPU programs: about 2 minutes, once. A 10.6 GB download and about 15 GB of caches.",
+        StorageKey, () => new ZImageTurboImageModel("gpu"));
+
     private readonly IIndexingWorkload _workload;
     private string _imagePauseReason;
     private Switch _imageSwitch;
@@ -355,6 +364,29 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         });
     }
 
+    /// <inheritdoc/>
+    public override void OnModelChanged(ChatModelOption model) => _ = ReleaseGpuModelAsync();
+
+    /// <inheritdoc/>
+    public override Task OnModelReloadingAsync(ChatModelOption model) => ReleaseGpuModelAsync();
+
+    // An image model on the GPU holds video memory (Z-Image-Turbo about 5.5 GB of an 8 GB card): it is let go of when the chat
+    // model changes, so the chat model's load has the room, and loads again - from its program cache - with the next picture.
+    private async Task ReleaseGpuModelAsync()
+    {
+        IImageModel model = _model;
+        Task init = _modelInit;
+        if (model == null || init == null || model.Backend != "gpu")
+            return;
+        try { await init; } catch (Exception) { }
+        if (!ReferenceEquals(model, _model))
+            return;
+        _modelInit = null;
+        _model = _option.Create();
+        await Task.Run(() => model.Dispose());
+        UpdateStatus();
+    }
+
     /// <summary>Show the model's state in the settings again (downloading, ready, paused...).</summary>
     public void UpdateStatus()
     {
@@ -414,6 +446,11 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         return _modelInit;
     }
 
+    // What to tell the user when a model asked to run on the GPU doesn't, all or in part; null when it does.
+    private static string GpuNote(IImageModel model) => model.GpuFailure == null ? null
+        : model is OmniImageModel ? "The GPU couldn't load the image model, so it draws on the CPU (slower)."
+        : model.GpuFailure;
+
     // The settings key that says this choice (a model on a backend) has made its caches: its first load is done.
     private string PreparedKey => "image_prepared_" + _option.Key;
 
@@ -432,7 +469,9 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         try
         {
             await model.InitAsync(CpuThreadSettings.Count);
-            Host.Settings.Set(preparedKey, true);
+            // A GPU load that put nothing on the GPU (no video memory to spare) made no programs: the next one is the first.
+            if (model.GpuFailure == null || model.CachesExist)
+                Host.Settings.Set(preparedKey, true);
         }
         finally
         {
@@ -532,8 +571,12 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
                     _imagePauseReason = reason;
                     UpdateStatus();
                 }), CancellationToken.None);
+                IImageModel warmed = _model;
                 await EnsureModelAsync();
-                MainThread.BeginInvokeOnMainThread(() => Host.SetStatus("The image model is ready."));
+                string note = GpuNote(warmed);
+                if (note != null)
+                    _gpuFallbackShown = true;
+                MainThread.BeginInvokeOnMainThread(() => Host.SetStatus(note ?? "The image model is ready."));
             }
             catch (Exception ex)
             {
@@ -605,10 +648,11 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         {
             await load;
         }
-        if (model is OmniImageModel { GpuFailure: not null } && !_gpuFallbackShown)
+        string gpuNote = GpuNote(model);
+        if (gpuNote != null && !_gpuFallbackShown)
         {
             _gpuFallbackShown = true;
-            MainThread.BeginInvokeOnMainThread(() => Host.SetStatus("The GPU couldn't load the image model, so it draws on the CPU (slower)."));
+            MainThread.BeginInvokeOnMainThread(() => Host.SetStatus(gpuNote));
         }
         string tooLong = model.CheckPrompt(prompt);
         if (tooLong != null)
