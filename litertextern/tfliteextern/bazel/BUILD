@@ -239,8 +239,19 @@ cc_shared_library(
 #
 # bazel build --config=windows //tfliteextern:libLiteRt
 # ---------------------------------------------------------------------------------------------------------
+# Public C API functions that are in libraries which are not whole-archived (so MSVC drops them unless forced):
+# /INCLUDE pulls them in and litert_windows_exports.def exports them. Keep the same list in
+# generate_litert_windows_exports.ps1.
+_FORCED_EXPORTS = [
+    "LiteRtGetStatusString",
+    "LiteRtWrapDelegate",
+    "LiteRtUnwrapDelegate",
+    "LiteRtDestroyDelegateWrapper",
+]
+
 cc_binary(
     name = "libLiteRt",
+    linkopts = ["/INCLUDE:" + symbol for symbol in _FORCED_EXPORTS],
     linkshared = 1,
     linkstatic = 1,
     target_compatible_with = ["@platforms//os:windows"],

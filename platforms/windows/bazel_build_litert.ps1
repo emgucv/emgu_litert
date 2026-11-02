@@ -311,12 +311,14 @@ $CommonBazelArgs = @(
 
 # See $LitertLmOutputBaseDir/$LitertLmOutputUserRootDir above for why //c:litert-lm uses a separate,
 # short output_base/root instead of $CommonBazelArgs's.
+# LiteRT-LM's omni sources (Kokoro's G2P tables: char32 literals of Devanagari letters) are UTF-8; MSVC reads source as the system code page without /utf-8
+# (C2015 "too many characters in constant", then C2196). Only this build needs it, so libLiteRt's cache is untouched.
 $LitertLmBazelArgs = @(
     "--output_base=$LitertLmOutputBaseDir",
     "--output_user_root=$LitertLmOutputUserRootDir",
     "build",
     "--repo_env=BAZEL_LLVM=$BazelLlvm"
-) + $CpuFlags + $BazelXnnFlags + $DockerFlags + @("-c", "opt")
+) + $CpuFlags + $BazelXnnFlags + $DockerFlags + @("--copt=/utf-8", "--host_copt=/utf-8") + @("-c", "opt")
 
 & $BazelCommand @CommonBazelArgs "@litert//tflite:version" "--verbose_failures"
 
@@ -355,6 +357,14 @@ if ($BuildLitertLm) {
     # every platform (Emgu.LiteRT.LM P/Invokes this one name regardless of OS).
     Copy-Item (Join-Path $WorkspaceDir "bazel-bin\c\litert-lm.dll") "$NativeOutDir\liblitert-lm.dll" -Force
     Copy-Item $GemmaPrebuilt "$NativeOutDir\libGemmaModelConstraintProvider.dll" -Force
+    # Since LiteRT-LM v0.19.0 liblitert-lm.dll also imports webgpu_dawn.dll (Google's prebuilt Dawn, for its WebGPU sampler; Git LFS
+    # like the Gemma library): without it next to liblitert-lm.dll the load fails.
+    $WebGpuDawn = Join-Path $WorkspaceDir "prebuilt\windows_x86_64\webgpu_dawn.dll"
+    if ((Test-Path $WebGpuDawn) -and ((Get-Item $WebGpuDawn).Length -gt 1024)) {
+        Copy-Item $WebGpuDawn "$NativeOutDir\webgpu_dawn.dll" -Force
+    } else {
+        Write-Warning "$WebGpuDawn missing or too small (a Git LFS pointer?) - run 'git -C $WorkspaceDir lfs pull'. liblitert-lm.dll will not load without it."
+    }
     # omniextern.dll (speech recognition, built the same way against libLiteRt.dll) is renamed the same way, for
     # DllImport("libomniextern"). Not built on Windows yet: the omni dependencies may need fixes there.
     $OmniexternDll = Join-Path $WorkspaceDir "bazel-bin\omniextern\omniextern.dll"

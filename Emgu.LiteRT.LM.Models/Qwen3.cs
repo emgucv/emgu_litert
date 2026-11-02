@@ -29,7 +29,8 @@ namespace Emgu.LiteRT.LM.Models
             get
             {
                 return new DownloadableFile(
-                    "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm",
+                    // Pinned to a revision: litert-community replaces the files in place (2026-10-31: the GPU-composite build).
+                    "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/e6bb3e4a1eb3f663153f0c1c12b735d64be657a7/Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm",
                     LocalSubfolder,
                     "03e7da1eb1108b50dffaa9bb52cc7bcbad2eb0c66ca990267f480c1e545d2856");
             }

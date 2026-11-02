@@ -28,7 +28,8 @@ namespace Emgu.LiteRT.LM.Models
             get
             {
                 return new DownloadableFile(
-                    "https://huggingface.co/litert-community/Qwen3.5-4B/resolve/main/Qwen3.5-4B_mixed_int4.litertlm",
+                    // Pinned to a revision: litert-community replaces the files in place (2026-10-16: the tokenizer section).
+                    "https://huggingface.co/litert-community/Qwen3.5-4B/resolve/6e49632cd95c0e0b8de43ca645c4fcb0f53d1bac/Qwen3.5-4B_mixed_int4.litertlm",
                     DefaultLocalSubfolder,
                     "37209c42c4bd8108373305e7f9820a84fd6d8f8a3481549a31c48bd7880b700f");
             }

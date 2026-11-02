@@ -967,6 +967,12 @@ IF (HAVE_WINDESKTOP_LITE)
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\liblitert-lm.dll\" target=\"runtimes\\win-x64\\native\" />
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libGemmaModelConstraintProvider.dll\" target=\"runtimes\\win-x64\\native\" />
 	")
+    # webgpu_dawn.dll (Google's prebuilt Dawn): a load dependency of liblitert-lm.dll since LiteRT-LM v0.19.0.
+    IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/webgpu_dawn.dll")
+      SET(EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\webgpu_dawn.dll\" target=\"runtimes\\win-x64\\native\" />
+	")
+    ENDIF()
   ENDIF()
   IF(HAVE_WINDOWS_LITERT_LM AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/libomniextern.dll")
     SET(EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST}

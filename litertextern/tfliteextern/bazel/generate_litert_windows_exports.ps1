@@ -123,6 +123,12 @@ foreach ($relPath in $libPaths) {
     }
 }
 
+# Public C API functions the whole-archived libraries do not contain (LiteRT builds them into libraries that are not
+# whole-archived, so the linker would drop them): bazel/BUILD forces them into //tfliteextern:libLiteRt with /INCLUDE, and
+# they are exported here. Emgu.LiteRT imports LiteRtGetStatusString; upstream's own Windows libLiteRt.dll exports the three delegate
+# wrapper functions. Keep this list and _FORCED_EXPORTS in BUILD the same.
+foreach ($forced in @("LiteRtGetStatusString", "LiteRtWrapDelegate", "LiteRtUnwrapDelegate", "LiteRtDestroyDelegateWrapper")) { [void]$symbols.Add($forced) }
+
 Write-Host "Matched $($symbols.Count) LiteRt*/TfLite* symbols"
 
 $sorted = $symbols | Sort-Object

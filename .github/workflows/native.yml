@@ -241,7 +241,7 @@ jobs:
       # liblitert-lm.dll depends on prebuilt/windows_x86_64/libGemmaModelConstraintProvider.dll, which LiteRT-LM stores
       # with Git LFS; without it the script skips liblitert-lm.dll. Its import library (.lib) is an LFS file too, and the link
       # needs it: with only its pointer file, link.exe failed with LNK1107 ("invalid or corrupt file").
-      run: git -C LiteRT-LM lfs pull --include="prebuilt/windows_x86_64/libGemmaModelConstraintProvider.dll,prebuilt/windows_x86_64/libGemmaModelConstraintProvider.lib"
+      run: git -C LiteRT-LM lfs pull --include="prebuilt/windows_x86_64/libGemmaModelConstraintProvider.dll,prebuilt/windows_x86_64/libGemmaModelConstraintProvider.lib,prebuilt/windows_x86_64/webgpu_dawn.dll"
     - name: Build tfliteextern.dll, libLiteRt.dll and liblitert-lm.dll
       # The LiteRT-LM build's Rust objects come within a few characters of link.exe's 260-character path limit even under
       # short "o"/"u" output folders: under the checkout (D:\a\emgu_litert\emgu_litert) one went to 261 (LNK1181), so they go
@@ -252,7 +252,7 @@ jobs:
     - name: Check the built libraries
       # The script doesn't stop at a failed Bazel build, so check that every library was written.
       run: |
-        $missing = @("tfliteextern.dll", "libLiteRt.dll", "liblitert-lm.dll", "libGemmaModelConstraintProvider.dll", "tflite_version.txt") |
+        $missing = @("tfliteextern.dll", "libLiteRt.dll", "liblitert-lm.dll", "libGemmaModelConstraintProvider.dll", "webgpu_dawn.dll", "libomniextern.dll", "tflite_version.txt") |
           Where-Object { -not (Test-Path "lib\runtimes\win-x64\native\$_") }
         Get-ChildItem lib\runtimes\win-x64\native
         if ($missing) { Write-Error "Missing: $($missing -join ', ')"; exit 1 }
@@ -264,6 +264,8 @@ jobs:
           lib/runtimes/win-x64/native/libLiteRt.dll
           lib/runtimes/win-x64/native/liblitert-lm.dll
           lib/runtimes/win-x64/native/libGemmaModelConstraintProvider.dll
+          lib/runtimes/win-x64/native/webgpu_dawn.dll
+          lib/runtimes/win-x64/native/libomniextern.dll
           lib/runtimes/win-x64/native/tflite_version.txt
         if-no-files-found: error
     - uses: actions/setup-dotnet@v6

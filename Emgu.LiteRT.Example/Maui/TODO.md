@@ -95,8 +95,16 @@ code before it is tagged `v0.18.0`. The plan, with what changed and why: `histor
   the feature's top 5 (a near tie decided its top 2).
 
 Still to do:
-- [ ] Windows: build with `bazel_build_litert.ps1 64` and `cmake_build_litert.ps1`, regenerate `litert_windows_exports.def`,
-      check `omniextern` builds with MSVC; rebase `bazel_build_windows_gpu.ps1`'s pins and `gpu_source_patches/`.
+- [x] Windows x64 natives (2026-11-01): `bazel_build_litert.ps1 64` and `cmake_build_litert.ps1` build; `litert_windows_exports.def`
+      regenerated (the old one named two symbols LiteRT dropped: LNK2001), `LiteRtGetStatusString` and the delegate wrapper
+      functions forced into `libLiteRt.dll` with `/INCLUDE`; `omniextern` (Kokoro and all) builds with MSVC given `/utf-8`;
+      `liblitert-lm.dll` now imports `webgpu_dawn.dll`, which is shipped with it; packages 0.19.0 / LiteRT 2.4.0 / TFLite 2.23.0 build.
+      Model-free and Native tests: 741 passed, 0 failed. Details: `docs/native-builds.md`.
+- [ ] Windows GPU: `bazel_build_windows_gpu.ps1`'s pins (`$litertRevision`, `$lmRevision`) and `gpu_source_patches/` still target v0.18.0, so
+      the GPU bundle (`.tmp/wgpu/artifacts`) is stale and `build_emgu_litert.ps1` rejects it; until it is rebuilt there is no
+      `Emgu.LiteRT.GPU.runtime.windows` for v0.19.0. Google's prebuilt `libLiteRt.dll` + `libLiteRtWebGpuAccelerator.dll` +
+      `webgpu_dawn.dll` (`LiteRT-LM/prebuilt/windows_x86_64`) don't replace it: `litert_lm_embedding_engine_create` on the GPU throws an
+      SEHException (the second GPU test then kills the test host) right after `delegate_webgpu.cc` starts, with Google's `libLiteRt.dll` too.
 - [ ] The agent regression test (item 7) with v0.19.0.
 - [x] The demo: offer the GPU search models on Mac Catalyst and Android too (item 11, 2026-11-01).
 - [ ] Ubuntu/Debian natives (CI builds them).
