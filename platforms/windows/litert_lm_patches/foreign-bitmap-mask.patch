@@ -1,0 +1,158 @@
+diff --git a/runtime/components/constrained_decoding/logit_mask.h b/runtime/components/constrained_decoding/logit_mask.h
+index 46485063..ed6c2b7d 100644
+--- a/runtime/components/constrained_decoding/logit_mask.h
++++ b/runtime/components/constrained_decoding/logit_mask.h
+@@ -97,6 +97,13 @@ class BitmapLogitMask : public LogitMask {
+   std::vector<uint64_t> words_;
+ };
+ 
++// Whether `mask` is a BitmapLogitMask of this binary, whose words_ can be read
++// directly. A mask made by a separately built library (the prebuilt Gemma
++// constraint provider) reports MaskType::kBitmap as well, but its class may be
++// laid out differently (another C++ standard library: its std::vector is
++// {data, size, capacity}): only its virtual methods (Apply) are safe to call.
++bool IsHostBitmapLogitMask(const LogitMask& mask);
++
+ // Immutable soft constraint mask representing sparse token adjustments:
+ // z'_i = z_i * w_i + b_i
+ class SparseLogitMask : public LogitMask {
+diff --git a/runtime/components/constrained_decoding/logit_mask.cc b/runtime/components/constrained_decoding/logit_mask.cc
+index 1e861529..baf22e89 100644
+--- a/runtime/components/constrained_decoding/logit_mask.cc
++++ b/runtime/components/constrained_decoding/logit_mask.cc
+@@ -138,7 +138,13 @@ absl::Status ApplyCompositeImpl(
+     if (!mask) continue;
+     switch (mask->GetType()) {
+       case MaskType::kBitmap:
+-        bitmap_masks.push_back(static_cast<const BitmapLogitMask*>(mask.get()));
++        if (IsHostBitmapLogitMask(*mask)) {
++          bitmap_masks.push_back(
++              static_cast<const BitmapLogitMask*>(mask.get()));
++        } else {
++          // Made by another binary: apply it through its own Apply.
++          other_masks.push_back(mask.get());
++        }
+         break;
+       case MaskType::kSparse:
+         sparse_masks.push_back(static_cast<const SparseLogitMask*>(mask.get()));
+@@ -286,6 +292,19 @@ BitmapLogitMask::BitmapLogitMask(int vocab_size,
+   }
+ }
+ 
++bool IsHostBitmapLogitMask(const LogitMask& mask) {
++  if (mask.GetType() != MaskType::kBitmap) {
++    return false;
++  }
++  // The vtable of a BitmapLogitMask made here; one made by another binary has
++  // its own (the type_info names are equal, so they cannot tell them apart).
++  static const void* const host_vtable = [] {
++    std::unique_ptr<BitmapLogitMask> probe = BitmapLogitMask::CreateAllAllowed(64);
++    return *reinterpret_cast<const void* const*>(probe.get());
++  }();
++  return *reinterpret_cast<const void* const*>(&mask) == host_vtable;
++}
++
+ bool BitmapLogitMask::IsAllowed(int token_id) const {
+   if (token_id < 0 || token_id >= vocab_size_) {
+     return false;
+diff --git a/runtime/components/constrained_decoding/litert_logit_mask_runner.cc b/runtime/components/constrained_decoding/litert_logit_mask_runner.cc
+index c029352f..306e7069 100644
+--- a/runtime/components/constrained_decoding/litert_logit_mask_runner.cc
++++ b/runtime/components/constrained_decoding/litert_logit_mask_runner.cc
+@@ -190,6 +190,14 @@ absl::Status CollectMasks(const LogitMask* mask,
+   }
+   switch (mask->GetType()) {
+     case MaskType::kBitmap:
++      if (!IsHostBitmapLogitMask(*mask)) {
++        // Made by another binary (the prebuilt Gemma constraint provider): its
++        // words cannot be read here, so mask on the host through Apply.
++        return absl::UnimplementedError(
++            "LiteRtLogitMaskRunner cannot read a BitmapLogitMask made by "
++            "another binary; mask the logits on the host with "
++            "LogitMask::Apply instead.");
++      }
+       bitmaps.push_back(static_cast<const BitmapLogitMask*>(mask));
+       return absl::OkStatus();
+     case MaskType::kSparse:
+diff --git a/runtime/components/constrained_decoding/thinking_budget_constraint.cc b/runtime/components/constrained_decoding/thinking_budget_constraint.cc
+index 48eb2427..9ff4639d 100644
+--- a/runtime/components/constrained_decoding/thinking_budget_constraint.cc
++++ b/runtime/components/constrained_decoding/thinking_budget_constraint.cc
+@@ -207,7 +207,9 @@ ThinkingBudgetConstraint::ComputeMask(const Constraint::State& state) const {
+         << "Start token out of vocabulary range: " << start_token;
+     ABSL_ASSIGN_OR_RETURN(auto user_mask,
+                           user_constraint_->ComputeMask(*s.user_state));
+-    if (user_mask->GetType() != MaskType::kBitmap) {
++    // A bitmap mask made by another binary (the prebuilt Gemma constraint
++    // provider) is not read here: its std::vector may be laid out differently.
++    if (!IsHostBitmapLogitMask(*user_mask)) {
+       return std::make_unique<OverlayTokenLogitMask>(std::move(user_mask),
+                                                      start_token);
+     }
+diff --git a/runtime/components/constrained_decoding/composite_constraint.cc b/runtime/components/constrained_decoding/composite_constraint.cc
+index 866b4b2e..5e506ed1 100644
+--- a/runtime/components/constrained_decoding/composite_constraint.cc
++++ b/runtime/components/constrained_decoding/composite_constraint.cc
+@@ -23,6 +23,7 @@
+ #include "absl/status/status.h"  // from @com_google_absl
+ #include "absl/status/status_macros.h"  // from @com_google_absl
+ #include "absl/status/statusor.h"  // from @com_google_absl
++#include "absl/types/span.h"  // from @com_google_absl
+ #include "absl/strings/str_cat.h"  // from @com_google_absl
+ #include "runtime/components/constrained_decoding/constraint.h"
+ #include "runtime/components/constrained_decoding/logit_mask.h"
+@@ -102,6 +103,24 @@ class BitmapLogitMaskWrapper : public Bitmap {
+   std::unique_ptr<BitmapLogitMask> mask_;
+ };
+ 
++// A Bitmap of the tokens a mask allows, found by applying the mask to a zeroed
++// logit vector. For a BitmapLogitMask made by another binary (the prebuilt Gemma
++// constraint provider), whose words must not be read directly: only its virtual
++// Apply is safe to call.
++class AppliedMaskBitmap : public Bitmap {
++ public:
++  explicit AppliedMaskBitmap(std::vector<bool> allowed)
++      : allowed_(std::move(allowed)) {}
++
++  bool Get(int index) const override {
++    return index >= 0 && static_cast<size_t>(index) < allowed_.size() &&
++           allowed_[index];
++  }
++
++ private:
++  std::vector<bool> allowed_;
++};
++
+ // Converts a LogitMask to a Bitmap.
+ //
+ // - Returns AllAllowedBitmap if `mask` is null or of type kSparse (soft
+@@ -110,10 +129,19 @@ class BitmapLogitMaskWrapper : public Bitmap {
+ // - Returns an InvalidArgumentError if `mask` is of any other type (such as
+ //   kComposite or kCustom) that cannot be directly converted to a Bitmap.
+ absl::StatusOr<std::unique_ptr<Bitmap>> LogitMaskToBitmap(
+-    std::unique_ptr<LogitMask> mask) {
++    std::unique_ptr<LogitMask> mask, int vocab_size) {
+   if (mask == nullptr) {
+     return std::make_unique<AllAllowedBitmap>();
+   }
++  if (mask->GetType() == MaskType::kBitmap && !IsHostBitmapLogitMask(*mask)) {
++    std::vector<float> logits(vocab_size > 0 ? vocab_size : 0, 0.0f);
++    ABSL_RETURN_IF_ERROR(mask->Apply(absl::MakeSpan(logits)));
++    std::vector<bool> allowed(logits.size());
++    for (size_t i = 0; i < logits.size(); ++i) {
++      allowed[i] = logits[i] == 0.0f;
++    }
++    return std::make_unique<AppliedMaskBitmap>(std::move(allowed));
++  }
+   if (mask->GetType() == MaskType::kBitmap) {
+     return std::make_unique<BitmapLogitMaskWrapper>(
+         std::unique_ptr<BitmapLogitMask>(
+@@ -270,7 +298,7 @@ absl::StatusOr<std::unique_ptr<Bitmap>> CompositeConstraint::ComputeBitmap(
+       ABSL_ASSIGN_OR_RETURN(auto mask, constraints_[i]->ComputeMask(
+                                            *composite_state.sub_states[i]));
+       ABSL_ASSIGN_OR_RETURN(auto mask_bitmap,
+-                            LogitMaskToBitmap(std::move(mask)));
++                            LogitMaskToBitmap(std::move(mask), vocab_size_));
+       if (mask_bitmap != nullptr) {
+         bitmaps.push_back(std::move(mask_bitmap));
+       }

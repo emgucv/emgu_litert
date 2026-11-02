@@ -1646,9 +1646,10 @@ namespace Emgu.TF.Lite.Test
             await TestChatClientTools(true);
         }
 
-        // Tools and thinking together, with the client's defaults: constrained decoding stays on where it works, and is left
-        // off on Windows (LiteRtLmChatClient.EnableConstrainedDecodingWithThinking: with LiteRT-LM v0.19.0's prebuilt
-        // constraint provider the process ended in an uncaught std::length_error, see docs/litert-lm.md).
+        // Tools and thinking together, with the client's defaults (constrained decoding on). On Windows this needs the
+        // liblitert-lm built from the patched LiteRT-LM tree (platforms/windows/litert_lm_patches, the script's default):
+        // with the pristine one LiteRT-LM v0.19.0's prebuilt constraint provider ended the process in an uncaught
+        // std::length_error (see docs/litert-lm.md; LiteRtLmChatClient.EnableConstrainedDecodingWithThinking = false avoids it).
 #if !TEST_MODELS
 #if VS_TEST
         [Ignore()]

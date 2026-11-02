@@ -40,6 +40,14 @@
     so it has the same compiler and class layouts as the TFLite objects inside liblitert-lm.dll (it reads private TFLite C++
     members across the DLL boundary). Copied to lib\runtimes\win-x64\native.
 
+.PARAMETER NoLiteRtLmPatches
+    By default liblitert-lm.dll, omniextern.dll (and the accelerator, with -Gpu) are built from a patched copy of the LiteRT-LM
+    tree (the folder "p" next to the "o"/"u" build folders, built with its own output base "q"), made from the submodule with
+    platforms\windows\litert_lm_patches\*.patch; the submodule is not edited. The patch makes LiteRT-LM never read the words of
+    a BitmapLogitMask that the prebuilt libGemmaModelConstraintProvider.dll made (its std::vector is laid out differently from
+    the MSVC STL's: thinking with tools ended the process with a std::length_error); see docs\litert-lm.md. This switch builds
+    from the pristine submodule instead (then LiteRtLmChatClient.EnableConstrainedDecodingWithThinking must be off).
+
 .PARAMETER DockerFlag
     Pass "docker" as the second positional argument to use the Bazel docker/remote executor.
 
@@ -53,8 +61,11 @@ param(
     [Parameter(Position = 0)][string]$Arch = "64",
     [Parameter(Position = 1)][ValidateSet('', 'docker')][string]$DockerFlag = "",
     [switch]$DisableXnn,
-    [switch]$Gpu
+    [switch]$Gpu,
+    [switch]$NoLiteRtLmPatches
 )
+# liblitert-lm.dll, omniextern.dll and the accelerator are built from a patched copy of the LiteRT-LM tree, unless -NoLiteRtLmPatches.
+$PatchLiteRtLm = -not $NoLiteRtLmPatches
 
 $ErrorActionPreference = "Continue"
 
@@ -163,7 +174,8 @@ if (-not (Test-Path $OutputBaseDir)) { New-Item -ItemType Directory -Path $Outpu
 # real path.
 $LitertLmRoot = if ($env:LITERT_LM_BAZEL_ROOT) { $env:LITERT_LM_BAZEL_ROOT } else { $RepoRoot }
 $LitertLmOutputUserRootDir = Join-Path $LitertLmRoot "u"
-$LitertLmOutputBaseDir = Join-Path $LitertLmRoot "o"
+# The patched LiteRT-LM tree ("p", -PatchLiteRtLm) is a different workspace: its own output base (a single letter, as short as "o": see above).
+$LitertLmOutputBaseDir = Join-Path $LitertLmRoot $(if ($PatchLiteRtLm) { "q" } else { "o" })
 if (-not (Test-Path $LitertLmOutputUserRootDir)) { New-Item -ItemType Directory -Path $LitertLmOutputUserRootDir | Out-Null }
 if (-not (Test-Path $LitertLmOutputBaseDir)) { New-Item -ItemType Directory -Path $LitertLmOutputBaseDir | Out-Null }
 
@@ -345,7 +357,41 @@ Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\tfliteextern.dll") "$
 Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\libLiteRt.dll") "$NativeOutDir\libLiteRt.dll" -Force
 
 if ($BuildLitertLm) {
-    Set-Location $WorkspaceDir
+    $LmWorkspaceDir = $WorkspaceDir
+    if ($PatchLiteRtLm) {
+        $PatchedDir = Join-Path $LitertLmRoot "p"
+        $PatchFiles = @(Get-ChildItem (Join-Path $RepoRoot "platforms\windows\litert_lm_patches") -Filter *.patch | Sort-Object Name)
+        $LmHead = (& git -C $WorkspaceDir rev-parse HEAD).Trim()
+        $PatchState = "$LmHead " + (($PatchFiles | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash }) -join " ")
+        $PatchStateFile = Join-Path $PatchedDir ".patch-state"
+        # Copy and patch again only when the pinned commit or a patch changed: new modification times would rebuild the patched files.
+        if (-not ((Test-Path $PatchStateFile) -and ((Get-Content $PatchStateFile -Raw).Trim() -eq $PatchState))) {
+            Write-Host "Staging the patched LiteRT-LM tree in $PatchedDir"
+            robocopy $WorkspaceDir $PatchedDir /MIR /XD .git bazel-bin bazel-litert-lm bazel-out bazel-testlogs tfliteextern omniextern /XF .git .patch-state /NFL /NDL /NJH /NJS /NP | Out-Null
+            if ($LASTEXITCODE -ge 8) { throw "robocopy of $WorkspaceDir to $PatchedDir failed ($LASTEXITCODE)" }
+            # Inside a repository (the usual case: "p" next to "o"/"u" in the repo root) git apply only touches paths relative to the
+            # repository root, and silently skips the rest: give the directory explicitly. Then check that the patch is really in.
+            if ($PatchedDir.StartsWith($RepoRoot.Path + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+                $ApplyRoot = $RepoRoot.Path
+                $ApplyDirectory = @("--directory=" + $PatchedDir.Substring($RepoRoot.Path.Length + 1).Replace([IO.Path]::DirectorySeparatorChar, '/'))
+            } else {
+                $ApplyRoot = $PatchedDir
+                $ApplyDirectory = @()
+            }
+            foreach ($PatchFile in $PatchFiles) {
+                & git -C $ApplyRoot apply @ApplyDirectory $PatchFile.FullName
+                if ($LASTEXITCODE -ne 0) { throw "Could not apply $($PatchFile.Name) to $PatchedDir (is the LiteRT-LM pin the one the patch was made for?)" }
+                & git -C $ApplyRoot apply @ApplyDirectory --check --reverse $PatchFile.FullName
+                if ($LASTEXITCODE -ne 0) { throw "$($PatchFile.Name) was not applied to $PatchedDir" }
+            }
+            Set-Content -Path $PatchStateFile -Value $PatchState
+        }
+        $PatchedOmniextern = Join-Path $PatchedDir "omniextern"
+        if (-not (Test-Path $PatchedOmniextern)) { New-Item -ItemType Directory -Path $PatchedOmniextern | Out-Null }
+        Copy-Item (Join-Path $OmniexternStageDir "*") $PatchedOmniextern -Force
+        $LmWorkspaceDir = $PatchedDir
+    }
+    Set-Location $LmWorkspaceDir
     $GpuTargets = @()
     if ($Gpu) { $GpuTargets = @("@litert//litert/runtime/accelerators/gpu:libLiteRtWebGpuAccelerator") }
     # --define=litert_runtime_link_mode=dynamic makes litert-lm.dll link against libLiteRt.dll instead of
@@ -356,14 +402,14 @@ if ($BuildLitertLm) {
     # platforms/android/bazel_build_tflite_android. Uses $LitertLmBazelArgs (a separate, short
     # output_base/root - see above), not $CommonBazelArgs.
     & $BazelCommand @LitertLmBazelArgs "//c:litert-lm" "//omniextern:omniextern" @GpuTargets "--define=litert_runtime_link_mode=dynamic" "--platform_suffix=-litert_lm_dynamic" "--verbose_failures"
-    Set-Location ".."
+    Set-Location $RepoRoot
 
     # Bazel's Windows shared-library naming doesn't auto-prepend "lib" the way Linux/macOS do (see
     # tfliteextern.dll vs. libLiteRt.dll above - libLiteRt gets its prefix from the target name itself,
     # ":libLiteRt", not from Bazel); the //c:litert-lm target has no such prefix, so its Windows output is
     # litert-lm.dll - renamed here to liblitert-lm.dll to match what DllImport("liblitert-lm") resolves on
     # every platform (Emgu.LiteRT.LM P/Invokes this one name regardless of OS).
-    Copy-Item (Join-Path $WorkspaceDir "bazel-bin\c\litert-lm.dll") "$NativeOutDir\liblitert-lm.dll" -Force
+    Copy-Item (Join-Path $LmWorkspaceDir "bazel-bin\c\litert-lm.dll") "$NativeOutDir\liblitert-lm.dll" -Force
     Copy-Item $GemmaPrebuilt "$NativeOutDir\libGemmaModelConstraintProvider.dll" -Force
     # Since LiteRT-LM v0.19.0 liblitert-lm.dll also imports webgpu_dawn.dll (Google's prebuilt Dawn, for its WebGPU sampler; Git LFS
     # like the Gemma library): without it next to liblitert-lm.dll the load fails.
@@ -374,13 +420,13 @@ if ($BuildLitertLm) {
         Write-Warning "$WebGpuDawn missing or too small (a Git LFS pointer?) - run 'git -C $WorkspaceDir lfs pull'. liblitert-lm.dll will not load without it."
     }
     if ($Gpu) {
-        $GpuAccelerator = Join-Path $WorkspaceDir "bazel-bin\external\litert\litert\runtime\accelerators\gpu\libLiteRtWebGpuAccelerator.dll"
+        $GpuAccelerator = Join-Path $LmWorkspaceDir "bazel-bin\external\litert\litert\runtime\accelerators\gpu\libLiteRtWebGpuAccelerator.dll"
         if (Test-Path $GpuAccelerator) { Copy-Item $GpuAccelerator "$NativeOutDir\libLiteRtWebGpuAccelerator.dll" -Force }
         else { Write-Warning "$GpuAccelerator was not built." }
     }
     # omniextern.dll (speech recognition, built the same way against libLiteRt.dll) is renamed the same way, for
     # DllImport("libomniextern"). Not built on Windows yet: the omni dependencies may need fixes there.
-    $OmniexternDll = Join-Path $WorkspaceDir "bazel-bin\omniextern\omniextern.dll"
+    $OmniexternDll = Join-Path $LmWorkspaceDir "bazel-bin\omniextern\omniextern.dll"
     if (Test-Path $OmniexternDll) { Copy-Item $OmniexternDll "$NativeOutDir\libomniextern.dll" -Force }
 }
 # Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
