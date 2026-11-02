@@ -100,11 +100,13 @@ Still to do:
       functions forced into `libLiteRt.dll` with `/INCLUDE`; `omniextern` (Kokoro and all) builds with MSVC given `/utf-8`;
       `liblitert-lm.dll` now imports `webgpu_dawn.dll`, which is shipped with it; packages 0.19.0 / LiteRT 2.4.0 / TFLite 2.23.0 build.
       Model-free and Native tests: 741 passed, 0 failed. Details: `docs/native-builds.md`.
-- [ ] Windows GPU: `bazel_build_windows_gpu.ps1`'s pins (`$litertRevision`, `$lmRevision`) and `gpu_source_patches/` still target v0.18.0, so
-      the GPU bundle (`.tmp/wgpu/artifacts`) is stale and `build_emgu_litert.ps1` rejects it; until it is rebuilt there is no
-      `Emgu.LiteRT.GPU.runtime.windows` for v0.19.0. Google's prebuilt `libLiteRt.dll` + `libLiteRtWebGpuAccelerator.dll` +
-      `webgpu_dawn.dll` (`LiteRT-LM/prebuilt/windows_x86_64`) don't replace it: `litert_lm_embedding_engine_create` on the GPU throws an
-      SEHException (the second GPU test then kills the test host) right after `delegate_webgpu.cc` starts, with Google's `libLiteRt.dll` too.
+- [x] Windows GPU (2026-11-02): the accelerator builds unpatched on v0.19.0 in the same Bazel invocation as `liblitert-lm.dll`
+      (`bazel_build_litert.ps1 64 -Gpu`; the LiteRT-LM workspace downloads ML Drift and links its prebuilt `webgpu_dawn.dll`), and
+      `bazel_build_windows_gpu.ps1` is a thin wrapper that collects the six-DLL bundle (the ML-Drift clone, Dawn CMake build and
+      `gpu_source_patches/` are gone). Google's prebuilt accelerator does not work with our `liblitert-lm.dll` (SEHException in
+      `litert_lm_embedding_engine_create`): the accelerator must be compiled like the TFLite objects it is handed. On the RTX 3070:
+      `TestGemma4E2BChatGpu` (new) and both `...GpuMatchesCpu` embedding tests pass (cosine 0.998 to 0.999, audio included);
+      `Emgu.LiteRT.GPU.runtime.windows` 2.4.0 builds. Details: `platforms/windows/README.windows-gpu.md`, `INVESTIGATION.md`.
 - [ ] The agent regression test (item 7) with v0.19.0.
 - [x] The demo: offer the GPU search models on Mac Catalyst and Android too (item 11, 2026-11-01).
 - [ ] Ubuntu/Debian natives (CI builds them).

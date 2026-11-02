@@ -6,15 +6,21 @@ Run from the repository root:
 powershell -NoProfile -ExecutionPolicy Bypass -File platforms/windows/bazel_build_windows_gpu.ps1
 ```
 
-The script prepares pinned LiteRT, LiteRT-LM, ML Drift, and Dawn source copies,
-applies the checked-in [GPU source patches](gpu_source_patches/), builds Dawn with
-Direct3D 12 and DXC support, and builds the LiteRT runtime and WebGPU accelerator
-with the same Bazel configuration. Source submodules are not modified.
+Since LiteRT-LM v0.19.0 (LiteRT `dcb657e8`) the script is a thin wrapper: the WebGPU
+accelerator builds from the pinned sources, unpatched, in the same Bazel invocation as
+`liblitert-lm.dll` (`bazel_build_litert.ps1 64 -Gpu`; the LiteRT-LM workspace now downloads
+ML Drift itself and uses LiteRT-LM's prebuilt `webgpu_dawn.dll`), and the script collects
+the six DLLs and their manifest. Building the accelerator in that invocation matters: it
+reads private TFLite C++ members across the DLL boundary, so it must be compiled like the
+TFLite objects it is handed (inside `liblitert-lm.dll` for the embedding models). Google's
+prebuilt accelerator and `libLiteRt.dll` (`LiteRT-LM/prebuilt/windows_x86_64`) are built
+differently, and `litert_lm_embedding_engine_create` on the GPU throws an SEHException with
+them. Before v0.19.0 the script staged patched sources under `.tmp/wgpu` and built Dawn with
+CMake (see [INVESTIGATION.md](INVESTIGATION.md)); those patches are gone. Source submodules are
+not modified.
 
-The default build directory is `.tmp/wgpu`. Re-running the command reuses source
-downloads, Dawn's CMake build, and Bazel's build cache. An interrupted preparation
-can be retried. If the source pins or patch contents change, the script stops;
-use a fresh build directory after updating and validating the patches.
+`-SkipBuild` only collects the bundle from `lib/runtimes/win-x64/native` (after a
+`bazel_build_litert.ps1 64 -Gpu`).
 
 ## Prerequisites
 
@@ -41,11 +47,8 @@ XNNPACK configuration explicitly.
 - Network access and space for the source trees, dependency downloads, and native builds.
 
 Initialize `litert` and `LiteRT-LM` at the repository's checked-in pins before
-building. The patches currently support LiteRT `26895c9f` and LiteRT-LM
-`b2f686e2` (v0.18.0); the script checks both revisions and their agreement. The
-submodules moved to LiteRT-LM v0.19.0 (LiteRT `dcb657e8`) on 2026-11-01: check
-out the v0.18.0 revisions (tag `v0.18.0`) for this script until its pins and
-patches are rebased (TODO item 9).
+building (v0.19.0, LiteRT `dcb657e8`). The manifest records both revisions, and CMake and
+`validate_windows_gpu.ps1` reject a bundle built from other ones.
 
 ## Output
 
@@ -53,11 +56,11 @@ The default output folder is `.tmp/wgpu/artifacts`:
 
 | File | Purpose |
 |---|---|
-| `libLiteRt.dll` | Matching LiteRT runtime with XNNPACK CPU support |
-| `libLiteRtWebGpuAccelerator.dll` | Source-built GPU accelerator |
-| `webgpu_dawn.dll` | Source-built Dawn WebGPU / Direct3D 12 implementation |
+| `libLiteRt.dll` | Matching LiteRT runtime with XNNPACK CPU support (the same build as the core package) |
+| `libLiteRtWebGpuAccelerator.dll` | Source-built GPU accelerator (6.0 MB) |
+| `webgpu_dawn.dll` | LiteRT-LM's prebuilt Dawn WebGPU / Direct3D 12 implementation |
 | `dxcompiler.dll`, `dxil.dll`, `d3dcompiler_47.dll` | Windows SDK shader compilers |
-| `gpu-build.json` | Source/tool versions, patch hashes, and output DLL hashes |
+| `gpu-build.json` | Source revisions, Windows SDK version and output DLL hashes |
 | `licenses/*.txt` | LiteRT, ML Drift, Dawn, and DXC source license notices |
 
 The script checks that every DLL is an x64 PE library before copying the bundle.
@@ -142,21 +145,24 @@ image generation remains CPU-only.
 ## Options
 
 ```powershell
-# Limit compilation parallelism.
-powershell -NoProfile -ExecutionPolicy Bypass -File platforms/windows/bazel_build_windows_gpu.ps1 -Jobs 8
+# Collect the bundle from an earlier build, into another folder.
+powershell -NoProfile -ExecutionPolicy Bypass -File platforms/windows/bazel_build_windows_gpu.ps1 -SkipBuild -OutputDirectory E:\gpu-dlls
 
-# Use another isolated build folder and export the DLL bundle elsewhere.
-powershell -NoProfile -ExecutionPolicy Bypass -File platforms/windows/bazel_build_windows_gpu.ps1 -BuildRoot E:\repo\emgu_litert\.tmp\wgpu-next -OutputDirectory E:\gpu-dlls
-
-# Override Python or the SDK version when several installations are present.
-powershell -NoProfile -ExecutionPolicy Bypass -File platforms/windows/bazel_build_windows_gpu.ps1 -PythonExecutable C:\Python312\python.exe -WindowsSdkVersion 10.0.28000.0
+# Use another Windows SDK's shader compiler DLLs.
+powershell -NoProfile -ExecutionPolicy Bypass -File platforms/windows/bazel_build_windows_gpu.ps1 -WindowsSdkVersion 10.0.28000.0
 ```
 
-`BuildRoot` must be a subdirectory of this repository's `.tmp` directory. Keeping
-its path short helps avoid Windows native-build path limits. `CMakeExecutable`
-can also be set explicitly to a CMake executable path.
+The build itself takes `bazel_build_litert.ps1`'s environment (`LITERT_LM_BAZEL_ROOT`, `BAZEL_COMMAND`).
 
 ## Validation
+
+On November 2, 2026, on LiteRT-LM v0.19.0, the bundle built this way passed on an RTX 3070
+(Direct3D 12): Gemma 4 E2B chat on the GPU (`TestGemma4E2BChatGpu`: "Paris", then "Berlin" from
+the history), and the CPU/GPU embedding comparisons for EmbeddingGemma 2 Text Vision and
+Multimodal (`...GpuMatchesCpu`: cosine 0.998 to 0.999 for text, image and audio). Run them with
+`EMGU_LITERT_WEBGPU_DIR` set to the bundle folder and `-p:TestModels=true`.
+
+The notes below are from the v0.18.0 build of October 14, 2026, which used the patched sources.
 
 On October 14, 2026, a clean script build completed on Visual Studio 2026 with
 Windows SDK 10.0.28000.0. Its six-DLL bundle passed Gemma 4 E2B CPU and RTX 3070

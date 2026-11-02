@@ -1,5 +1,31 @@
 # Windows WebGPU investigation
 
+## Update, 2026-11-02: LiteRT-LM v0.19.0
+
+The notes below are the October 2026 investigation on LiteRT-LM v0.18.0, where the accelerator needed three source patches
+and a Dawn built with CMake. On v0.19.0 (LiteRT `dcb657e8`) none of that is needed any more: the LiteRT-LM workspace downloads
+ML Drift (`ML_DRIFT_COMMIT` in its `WORKSPACE`, with a URL and checksum now) and links the prebuilt `webgpu_dawn.dll`
+(`//runtime/components:webgpu_dawn_shared_lib`), so `@litert//litert/runtime/accelerators/gpu:libLiteRtWebGpuAccelerator` builds
+as it is, in the same `bazel_build_litert.ps1 64 -Gpu` invocation as `liblitert-lm.dll`. `gpu_source_patches/` was removed.
+
+What the v0.19.0 work found:
+
+- **Google's prebuilt accelerator is still the wrong one for our `liblitert-lm.dll`.** `litert_lm_embedding_engine_create` on the GPU
+  threw an SEHException right after `delegate_webgpu.cc` started (and the second GPU test killed the test host), with Google's
+  prebuilt `libLiteRt.dll`, `libLiteRtWebGpuAccelerator.dll` and `webgpu_dawn.dll` (`LiteRT-LM/prebuilt/windows_x86_64`) as well as with
+  our `libLiteRt.dll` and the prebuilt accelerator. The embedding engine runs TFLite objects that live inside our (MSVC-built)
+  `liblitert-lm.dll`, and the accelerator reads private members of them (`tflite::Subgraph`, see "Native evidence" below), so it
+  must be compiled with the same compiler and flags: the accelerator built in the same Bazel invocation works.
+- **Results (RTX 3070, Direct3D 12):** Gemma 4 E2B chat on the GPU answers from its history (`TestGemma4E2BChatGpu`), and the
+  CPU/GPU embedding vectors of EmbeddingGemma 2 Text Vision and Multimodal match (cosine 0.998 to 0.999 for text, image and audio).
+- **A stale bundle loads silently:** the old v0.18.0 DLLs left in a test's output folder (`libLiteRt.dll`,
+  `libLiteRtWebGpuAccelerator.dll`, `webgpu_dawn.dll` at its root) shadow `runtimes\win-x64
+ative` and crash the new
+  `liblitert-lm.dll` (access violation) - delete them when changing bundles.
+- `LiteRtGetStatusString` is not in the whole-archived libraries any more, so `bazel/BUILD` forces it into `libLiteRt.dll`
+  (see `docs/native-builds.md`).
+
+
 ## Result
 
 **The matched source-build route now works in an isolated Windows chat test.** The source-built LiteRT runtime, WebGPU accelerator, and Dawn DLL create Gemma 4 E2B and return `Hello!` on the NVIDIA RTX 3070 through Direct3D 12, without the diagnostic ABI redirect or shader validation errors. The CPU control also returns `Hello!`; both processes exit 0. GPU inference uses CPU token sampling because the optional prebuilt GPU sampler was deliberately excluded.

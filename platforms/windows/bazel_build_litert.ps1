@@ -35,6 +35,11 @@
     Without this switch, no XNNPACK flags are passed; upstream enables it by default.
     The pinned LiteRT also uses this define to disable its built-in CPU accelerator.
 
+.PARAMETER Gpu
+    Also build LiteRT's WebGPU accelerator (libLiteRtWebGpuAccelerator.dll) in the same Bazel invocation as liblitert-lm.dll,
+    so it has the same compiler and class layouts as the TFLite objects inside liblitert-lm.dll (it reads private TFLite C++
+    members across the DLL boundary). Copied to lib\runtimes\win-x64\native.
+
 .PARAMETER DockerFlag
     Pass "docker" as the second positional argument to use the Bazel docker/remote executor.
 
@@ -47,7 +52,8 @@
 param(
     [Parameter(Position = 0)][string]$Arch = "64",
     [Parameter(Position = 1)][ValidateSet('', 'docker')][string]$DockerFlag = "",
-    [switch]$DisableXnn
+    [switch]$DisableXnn,
+    [switch]$Gpu
 )
 
 $ErrorActionPreference = "Continue"
@@ -340,6 +346,8 @@ Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\libLiteRt.dll") "$Nat
 
 if ($BuildLitertLm) {
     Set-Location $WorkspaceDir
+    $GpuTargets = @()
+    if ($Gpu) { $GpuTargets = @("@litert//litert/runtime/accelerators/gpu:libLiteRtWebGpuAccelerator") }
     # --define=litert_runtime_link_mode=dynamic makes litert-lm.dll link against libLiteRt.dll instead of
     # containing LiteRT's runtime; the libLiteRt.dll built above (same LiteRT source) is deployed next to it
     # in place of the LiteRt*-only one this build produces. The define isn't part of Bazel's output folder
@@ -347,7 +355,7 @@ if ($BuildLitertLm) {
     # under the same (short) output_base - same approach as bazel_build_tflite_macos and
     # platforms/android/bazel_build_tflite_android. Uses $LitertLmBazelArgs (a separate, short
     # output_base/root - see above), not $CommonBazelArgs.
-    & $BazelCommand @LitertLmBazelArgs "//c:litert-lm" "//omniextern:omniextern" "--define=litert_runtime_link_mode=dynamic" "--platform_suffix=-litert_lm_dynamic" "--verbose_failures"
+    & $BazelCommand @LitertLmBazelArgs "//c:litert-lm" "//omniextern:omniextern" @GpuTargets "--define=litert_runtime_link_mode=dynamic" "--platform_suffix=-litert_lm_dynamic" "--verbose_failures"
     Set-Location ".."
 
     # Bazel's Windows shared-library naming doesn't auto-prepend "lib" the way Linux/macOS do (see
@@ -364,6 +372,11 @@ if ($BuildLitertLm) {
         Copy-Item $WebGpuDawn "$NativeOutDir\webgpu_dawn.dll" -Force
     } else {
         Write-Warning "$WebGpuDawn missing or too small (a Git LFS pointer?) - run 'git -C $WorkspaceDir lfs pull'. liblitert-lm.dll will not load without it."
+    }
+    if ($Gpu) {
+        $GpuAccelerator = Join-Path $WorkspaceDir "bazel-bin\external\litert\litert\runtime\accelerators\gpu\libLiteRtWebGpuAccelerator.dll"
+        if (Test-Path $GpuAccelerator) { Copy-Item $GpuAccelerator "$NativeOutDir\libLiteRtWebGpuAccelerator.dll" -Force }
+        else { Write-Warning "$GpuAccelerator was not built." }
     }
     # omniextern.dll (speech recognition, built the same way against libLiteRt.dll) is renamed the same way, for
     # DllImport("libomniextern"). Not built on Windows yet: the omni dependencies may need fixes there.

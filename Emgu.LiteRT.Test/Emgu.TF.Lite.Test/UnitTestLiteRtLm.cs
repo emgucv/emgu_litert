@@ -1293,6 +1293,39 @@ namespace Emgu.TF.Lite.Test
             await TestGemma4Chat(new Gemma4E4B());
         }
 
+        // Gemma 4 E2B on the GPU (the demo's "GPU models" on Windows): skipped without an accelerator plugin next to libLiteRt,
+        // like the embedding GPU tests (on Windows: EMGU_LITERT_WEBGPU_DIR, a bundle built by bazel_build_windows_gpu.ps1).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestGemma4E2BChatGpu()
+        {
+            RequireLiteRtLm();
+            if (!UnitTest1.StageGpuPlugin())
+                Skip("No LiteRT GPU accelerator plugin next to libLiteRt (on Windows: set EMGU_LITERT_WEBGPU_DIR)");
+
+            using (Gemma4E2B model = new Gemma4E2B())
+            {
+                await model.Init(backend: "gpu");
+                using (Chat chat = model.CreateChat("You are a helpful assistant. Answer in one short sentence."))
+                {
+                    chat.MaxOutputTokens = 64;
+                    ChatReply first = chat.Send("What is the capital of France?");
+                    ChatReply second = chat.Send("And of Germany?");
+                    Console.WriteLine("GPU replies: {0} | {1}", first.Text, second.Text);
+                    if (!first.Text.Contains("Paris"))
+                        throw new Exception("The GPU reply doesn't name Paris: " + first.Text);
+                    if (!second.Text.Contains("Berlin"))
+                        throw new Exception("The second GPU reply doesn't use the history: " + second.Text);
+                }
+            }
+        }
+
         // Emgu.LiteRT.LM.Chat's ChatConversation over LiteRtLmChatClient: a fact is recalled in the next message, the
         // conversation is compacted by a summary the model writes, and the fact is recalled from the summary.
 #if !TEST_MODELS
