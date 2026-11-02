@@ -68,6 +68,11 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     private Task _downloadTask;
     private double _downloadFraction = -1;
     private bool _gpuFallbackShown;
+    // A load going on (the first one makes the model's caches and can take minutes: shown in the settings and on the picture's tile).
+    private bool _loading;
+    private bool _loadFirstTime;
+    private readonly Stopwatch _loadWatch = new Stopwatch();
+    private CancellationTokenSource _statusTicker;
 
     /// <summary>Create the feature.</summary>
     /// <param name="workload">When heavy work may run (a cool, charged device): e.g. the searches' <see cref="SearchServices.Workload"/>; null for the device's own policy</param>
@@ -262,6 +267,7 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             Host.Settings.Set(SettingKey, false);
             UpdateStatus();
         }
+        StartWarmUp();
     }
 
     // Asks before downloading the model, and starts the download on yes.
@@ -295,6 +301,8 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             _download?.Cancel();
         }
         UpdateStatus();
+        if (e.Value)
+            StartWarmUp();
     }
 
     private void StartImageModelDownload()
@@ -341,6 +349,8 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
                     _imageStatus.Text = "Download stopped: " + error + " (turn the switch off and on to retry)";
                 else if (paused && _imageSwitch.IsToggled)
                     _imageStatus.Text = "Download paused. Turn Image generation off and on to continue from the saved bytes.";
+                else
+                    StartWarmUp();
             });
         });
     }
@@ -371,10 +381,17 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             _imageStatus.Text = string.Format(CultureInfo.InvariantCulture, "Downloading {0}: {1:P0} of {2}",
                 _model.Name, Math.Max(0, _downloadFraction), Gigabytes(_model.DownloadSize));
         }
+        else if (_loading)
+        {
+            _imageStatus.IsVisible = true;
+            _imageStatus.Text = LoadingText();
+        }
         else if (ImageGenerationOn)
         {
             _imageStatus.IsVisible = true;
-            _imageStatus.Text = downloaded ? "Ready" : "The image model isn't downloaded";
+            _imageStatus.Text = !downloaded ? "The image model isn't downloaded"
+                : IsPrepared || _model.FirstLoadEstimate == null ? "Ready"
+                : "Ready. The first picture prepares the model first: " + _model.FirstLoadEstimate + ", once.";
         }
         else
         {
@@ -393,8 +410,136 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     public Task EnsureModelAsync()
     {
         if (_modelInit == null || _modelInit.IsFaulted)
-            _modelInit = _model.InitAsync(CpuThreadSettings.Count);
+            _modelInit = LoadModelAsync();
         return _modelInit;
+    }
+
+    // The settings key that says this choice (a model on a backend) has made its caches: its first load is done.
+    private string PreparedKey => "image_prepared_" + _option.Key;
+
+    // Whether a load takes seconds: the choice has loaded before and its caches are still there (deleting the model's files removes them).
+    private bool IsPrepared => Host.Settings.Get(PreparedKey, false) && _model.CachesExist;
+
+    private async Task LoadModelAsync()
+    {
+        IImageModel model = _model;
+        string preparedKey = PreparedKey;
+        _loadFirstTime = !IsPrepared && model.FirstLoadEstimate != null;
+        _loadWatch.Restart();
+        _loading = true;
+        UpdateStatus();
+        StartStatusTicker();
+        try
+        {
+            await model.InitAsync(CpuThreadSettings.Count);
+            Host.Settings.Set(preparedKey, true);
+        }
+        finally
+        {
+            _loading = false;
+            _statusTicker?.Cancel();
+            UpdateStatus();
+        }
+    }
+
+    private static string FormatElapsed(TimeSpan elapsed) => elapsed.TotalSeconds < 60
+        ? string.Format(CultureInfo.InvariantCulture, "{0:F0} s", elapsed.TotalSeconds)
+        : string.Format(CultureInfo.InvariantCulture, "{0:F0} min {1:D2} s", Math.Floor(elapsed.TotalMinutes), elapsed.Seconds);
+
+    // What is going on while the model loads, with how long it has taken and, the first time, how long it takes.
+    private string LoadingText()
+    {
+        string elapsed = FormatElapsed(_loadWatch.Elapsed);
+        return _loadFirstTime
+            ? string.Format(CultureInfo.InvariantCulture, "Preparing the image model for the first time: {0} ({1}). It happens once; the picture follows.", _model.FirstLoadEstimate, elapsed)
+            : string.Format(CultureInfo.InvariantCulture, "Loading the image model ({0})...", elapsed);
+    }
+
+    // Keeps the settings' status line current (the elapsed time) while the model loads.
+    private void StartStatusTicker()
+    {
+        _statusTicker?.Cancel();
+        CancellationTokenSource stop = new CancellationTokenSource();
+        _statusTicker = stop;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!stop.IsCancellationRequested)
+                {
+                    await Task.Delay(1000, stop.Token);
+                    UpdateStatus();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        });
+    }
+
+    // The elapsed time on the tile of the picture that waits for the model to load.
+    private async Task TickLoadAsync(ImageTile tile, CancellationToken stop)
+    {
+        try
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                string text = LoadingText();
+                MainThread.BeginInvokeOnMainThread(() => { if (!stop.IsCancellationRequested) tile.Stage.Text = text; });
+                await Task.Delay(1000, stop);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    // Waits for a task that can't itself be cancelled (a native load): on a cancellation the caller stops waiting and
+    // the task goes on, and its result stays for the next picture.
+    private static async Task WaitOrCancelAsync(Task task, CancellationToken cancel)
+    {
+        if (cancel.CanBeCanceled)
+        {
+            TaskCompletionSource<bool> cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using (cancel.Register(() => cancelled.TrySetResult(true)))
+            {
+                if (await Task.WhenAny(task, cancelled.Task) != task)
+                {
+                    _ = task.ContinueWith(t => { var ignored = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+                    throw new OperationCanceledException(cancel);
+                }
+            }
+        }
+        await task;
+    }
+
+    // Loads the model in the background when its first load, the long one, hasn't been done (the user chose it or turned the
+    // feature on): the settings' status shows how it goes, and the first picture doesn't wait. Nothing when it is prepared,
+    // loaded or loading already, or not downloaded yet.
+    private void StartWarmUp()
+    {
+        if (!ImageGenerationOn || _download != null || !_model.IsDownloaded || IsPrepared
+            || (_modelInit != null && !_modelInit.IsFaulted) || _model.FirstLoadEstimate == null)
+            return;
+        string estimate = _model.FirstLoadEstimate;
+        Host.SetStatus("Preparing the image model: the first time takes " + estimate + ". You can go on chatting.");
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _workload.WaitAsync(reason => MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    _imagePauseReason = reason;
+                    UpdateStatus();
+                }), CancellationToken.None);
+                await EnsureModelAsync();
+                MainThread.BeginInvokeOnMainThread(() => Host.SetStatus("The image model is ready."));
+            }
+            catch (Exception ex)
+            {
+                MainThread.BeginInvokeOnMainThread(() => Host.SetStatus("The image model couldn't be loaded: " + ex.Message));
+            }
+        });
     }
 
     /// <summary>The generate_image tool: draw the picture, show it above the reply, and tell the model what happened.</summary>
@@ -423,7 +568,43 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         });
         await _workload.WaitAsync(modelPaused, cancel);
         IImageModel model = _model;
-        await EnsureModelAsync();
+        Task load = EnsureModelAsync();
+        ImageTile tile = null;
+        if (!load.IsCompleted)
+        {
+            // The first load can take minutes (it makes the model's caches): the tile is there from the start, saying what is
+            // going on and how long it takes, and Stop works.
+            tile = await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                ImageTile created = CreateImageTile(prompt);
+                created.Stage.Text = LoadingText();
+                Host.AddCardToReply(created.View);
+                return created;
+            });
+            using var loadTicking = new CancellationTokenSource();
+            _ = TickLoadAsync(tile, loadTicking.Token);
+            try
+            {
+                await WaitOrCancelAsync(load, cancel);
+            }
+            catch (OperationCanceledException)
+            {
+                loadTicking.Cancel();
+                await MainThread.InvokeOnMainThreadAsync(() => tile.Stage.Text = "Stopped (the model goes on loading)");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                loadTicking.Cancel();
+                await MainThread.InvokeOnMainThreadAsync(() => tile.Stage.Text = "Couldn't load the image model: " + ex.Message);
+                throw;
+            }
+            loadTicking.Cancel();
+        }
+        else
+        {
+            await load;
+        }
         if (model is OmniImageModel { GpuFailure: not null } && !_gpuFallbackShown)
         {
             _gpuFallbackShown = true;
@@ -431,10 +612,14 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         }
         string tooLong = model.CheckPrompt(prompt);
         if (tooLong != null)
+        {
+            if (tile != null)
+                await MainThread.InvokeOnMainThreadAsync(() => tile.Stage.Text = "Not drawn: the description is too long");
             return tooLong;
+        }
 
         long seed = Random.Shared.NextInt64(1, 1L << 40);
-        ImageTile tile = await MainThread.InvokeOnMainThreadAsync(() =>
+        tile ??= await MainThread.InvokeOnMainThreadAsync(() =>
         {
             ImageTile created = CreateImageTile(prompt);
             Host.AddCardToReply(created.View);
@@ -538,7 +723,7 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             Content = new ActivityIndicator { IsRunning = true, Color = Accent, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center }
         };
         ChatResources.SetThemeColor(tile.Frame, VisualElement.BackgroundColorProperty, "ChatSurface");
-        tile.Stage = new Label { Text = "Starting..." };
+        tile.Stage = new Label { Text = "Starting...", WidthRequest = GeneratedImageSize };
         ChatResources.ApplyStyle(tile.Stage, "ChatListDetailStyle");
         tile.View = new VerticalStackLayout
         {

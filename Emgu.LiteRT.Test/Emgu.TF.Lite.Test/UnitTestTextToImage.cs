@@ -114,6 +114,62 @@ public class UnitTestTextToImage
     [Test]
     public Task BonsaiDrawsTheSamePictureForTheSameSeed() => DrawsTheSamePictureForTheSameSeed<BonsaiImage4B>();
 
+// Each model on the GPU (the demo's "· GPU" choices): skipped without a LiteRT GPU accelerator plugin next to
+// libLiteRt, like the other GPU tests (on Windows: EMGU_LITERT_WEBGPU_DIR names the bundle bazel_build_windows_gpu.ps1 made).
+// Draws the CPU's picture for the same seed too, and compares them: the GPU stages run in FP32 and the pictures may differ in details.
+#if !TEST_MODELS
+#if VS_TEST
+    [Ignore()]
+#else
+    [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+    [Test]
+    public Task BonsaiDrawsOnTheGpu() => DrawsOnTheGpu<BonsaiImage4B>();
+
+#if !TEST_MODELS
+#if VS_TEST
+    [Ignore()]
+#else
+    [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+    [Test]
+    public Task Flux2KleinDrawsOnTheGpu() => DrawsOnTheGpu<Flux2Klein4B>();
+
+    private static async Task DrawsOnTheGpu<T>() where T : TextToImageModel, new()
+    {
+        if (!UnitTest1.StageGpuPlugin())
+            Assert.Ignore("No LiteRT GPU accelerator plugin next to libLiteRt (on Windows: set EMGU_LITERT_WEBGPU_DIR)");
+        TextToImageResult gpuPicture;
+        using (T gpu = await Load<T>("gpu"))
+        {
+            var watch = Stopwatch.StartNew();
+            gpuPicture = await gpu.GenerateAsync(Prompt, 42);
+            TestContext.Progress.WriteLine($"First GPU picture in {watch.Elapsed.TotalSeconds:F1} s");
+            CheckPicture(gpu, gpuPicture, $"{gpu.ModelName}_gpu_{gpu.ImageSize}_fox");
+            watch.Restart();
+            TextToImageResult again = await gpu.GenerateAsync(Prompt, 42);
+            TestContext.Progress.WriteLine($"Second GPU picture in {watch.Elapsed.TotalSeconds:F1} s");
+            Assert.That(again.Rgb, Is.EqualTo(gpuPicture.Rgb), "the same seed gave another picture on the GPU");
+        }
+        using (T cpu = await Load<T>("cpu"))
+        {
+            var watch = Stopwatch.StartNew();
+            TextToImageResult cpuPicture = await cpu.GenerateAsync(Prompt, 42);
+            TestContext.Progress.WriteLine($"CPU picture in {watch.Elapsed.TotalSeconds:F1} s");
+            double squared = 0;
+            for (int i = 0; i < cpuPicture.Rgb.Length; i++)
+            {
+                double d = cpuPicture.Rgb[i] - gpuPicture.Rgb[i];
+                squared += d * d;
+            }
+            double psnr = 10 * Math.Log10(255.0 * 255.0 / Math.Max(squared / cpuPicture.Rgb.Length, 1e-9));
+            TestContext.Progress.WriteLine($"GPU against CPU, same seed: PSNR {psnr:F1} dB");
+            Assert.That(psnr, Is.GreaterThan(15), "the GPU's picture is nothing like the CPU's");
+        }
+    }
+
 #if !TEST_MODELS
 #if VS_TEST
     [Ignore()]

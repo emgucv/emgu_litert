@@ -44,6 +44,15 @@ The ready-made models: `Emgu.LiteRT.Models` (on LiteRT's CompiledModel API), `Em
   - Beside Gemma 4 E2B on the GPU (PSS 3.8 GB before): peak PSS 4.9 GB, 1.2 GB still available, the same time; Android closed other cached apps to make room, the demo wasn't killed. So the chat model isn't released for a picture.
   - GPU (Adreno 640, OpenCL): fails to load - `clCreateBuffer: Out of resources` compiling the FP32 graphs - so `OmniImageModel` falls back to the CPU (`GpuFailure`) and the chat says so once.
   - Through the chat (Gemma 4 E2B on the GPU, "Draw a red fox sitting in the snow"): the GPU choice fell back to the CPU, the tile counted "Drawing the picture (... s)", the picture came after 319 s (with the failed GPU attempt), and the enlarged picture's caption read "Seed ... · Bonsai Image 4B, 4 steps".
+- On a Windows PC (20 logical processors, RTX 3070 8 GB, Direct3D 12 through LiteRT's WebGPU accelerator, 2026-11-02, `UnitTestTextToImage`'s `BonsaiDrawsOnTheGpu` and `Flux2KleinDrawsOnTheGpu`, "a red fox sitting in fresh snow at sunrise", seed 42, 4 steps, 256 x 256; the accelerator is the one `bazel_build_litert.ps1 -Gpu` builds in the same Bazel run as `liblitert-lm.dll`, see `docs/litert-lm.md`):
+
+  | | Bonsai CPU | Bonsai GPU | FLUX.2-klein CPU | FLUX.2-klein GPU |
+  |---|---|---|---|---|
+  | First load (makes the caches) | - | 17 min with the 4.3 GB download; **about 10 minutes of it compiling the GPU programs** (in the demo, caches already on disk: 48 s) | - | 20 min with the 4.7 GB download |
+  | Later loads | 29 s | - | 31 s | - |
+  | A picture (warm) | 48 s | **3.8-4.0 s** | 55 s | **9.5-18 s** |
+
+  The same seed gives the same bytes on the GPU (twice) and a picture like the CPU's, not the same one (PSNR 18.3 dB for Bonsai, 16.7 dB for FLUX: the GPU stages run in FP32 and the pictures differ in details); both pictures are good (a fox in the snow at sunrise). In the demo with Gemma 4 E4B on the same 8 GB GPU (7.5 GB in use) a Bonsai picture took 18-38 s: the chat model isn't released for a picture, so the two share the card's memory. The first load of a GPU choice is the long one (the demo says so: see `FEATURES.md`, "Settings > Image model").
 
 ## YOLOX, D-FINE and PicoDet
 

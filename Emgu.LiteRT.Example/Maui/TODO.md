@@ -32,6 +32,7 @@ Their full write-ups are in [history/TODO-done.md](history/TODO-done.md):
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
+- [x] Windows image generation on the GPU (2026-11-02): Bonsai Image 4B and FLUX.2-klein 4B draw on the RTX 3070 through WebGPU (3.8-4 s and 9.5-18 s a picture against 48 and 55 s on the CPU; `BonsaiDrawsOnTheGpu`, `Flux2KleinDrawsOnTheGpu`), offered in the demo when the GPU runtime is in the build, and the first load of an image model (about 10 minutes of compiling on the GPU) is no longer silent: the picture's tile and Settings count it with an estimate, Stop works, and a choice is loaded in the background when it is chosen (`FEATURES.md`). Open: Bonsai 512 x 512 on Windows (Mac Catalyst only now; another 4.3 GB download), a picture beside a GPU chat model takes 18-38 s here (shared 8 GB), the first-load estimate is measured on one GPU.
 - [x] Windows image generation, the model itself (2026-10-29): `TestZImageTurbo` passes on Windows x64 (CPU, models already on disk):
       step 0 matches the reference (cosine 0.995), 8 steps in 64-69 s (23 s on an M1), a good apple picture, deterministic between
       runs. Its PSNR against the reference is 17.9 dB (35.1 on the M1: other CPU kernels, same scene, different details), so the

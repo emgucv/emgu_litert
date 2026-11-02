@@ -58,6 +58,16 @@ public interface IImageModel : IDisposable
     /// <summary>Load the model with this many CPU threads.</summary>
     Task InitAsync(int threads);
 
+    /// <summary>
+    /// About how long the first load takes on this device, in words ("up to about 10 minutes"), or null when it isn't
+    /// long: LiteRT-LM compiles the model's graphs for the backend on the first load and keeps them in the caches, so
+    /// later loads take seconds (a Windows PC's GPU: about 10 minutes for Bonsai Image 4B on an RTX 3070).
+    /// </summary>
+    string FirstLoadEstimate { get; }
+
+    /// <summary>Whether the caches the first load makes exist (they are gone when the model's files are deleted).</summary>
+    bool CachesExist { get; }
+
     /// <summary>Why a prompt is too long for the model (a sentence for the chat model), or null when it fits.</summary>
     string CheckPrompt(string prompt);
 
@@ -111,6 +121,12 @@ public sealed class ZImageTurboImageModel : IImageModel
         _model.NumThreads = threads;
         return _model.Init();
     }
+
+    /// <inheritdoc/>
+    public string FirstLoadEstimate => null;
+
+    /// <inheritdoc/>
+    public bool CachesExist => true;
 
     /// <inheritdoc/>
     public string CheckPrompt(string prompt)
@@ -196,6 +212,29 @@ public sealed class OmniImageModel : IImageModel
         finally
         {
             _model.OnDownloadProgressChanged -= handler;
+        }
+    }
+
+    /// <inheritdoc/>
+    public string FirstLoadEstimate
+    {
+        get
+        {
+            if (!string.Equals(_backend, "gpu", StringComparison.OrdinalIgnoreCase))
+                return "a few minutes";
+            // Measured: Bonsai Image 4B on an RTX 3070 (WebGPU) 9-10 minutes; a Mac's Metal about 30 s, a phone's OpenCL about a minute.
+            return Microsoft.Maui.Devices.DeviceInfo.Current.Platform == Microsoft.Maui.Devices.DevicePlatform.WinUI
+                ? "up to about 10 minutes" : "about a minute";
+        }
+    }
+
+    /// <inheritdoc/>
+    public bool CachesExist
+    {
+        get
+        {
+            string folder = _model.CacheFolder;
+            return System.IO.Directory.Exists(folder) && System.Linq.Enumerable.Any(System.IO.Directory.EnumerateFileSystemEntries(folder));
         }
     }
 
