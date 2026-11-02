@@ -170,12 +170,14 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             bool retainConversation = false;
             try
             {
-                // Reuse an unchanged prefix. LiteRT-LM (since v0.18) also accepts a batch of appended messages: a media
-                // tool result needs both its acknowledgement and an image turn, without re-reading the whole conversation.
+                // Reuse an unchanged prefix, when one message is appended. LiteRT-LM v0.19 rejects a batch (a JSON array) in
+                // SendMessage (v0.18 accepted it; a conversation's history can still be an array), so a media tool result,
+                // an acknowledgement and an image turn, starts the conversation again with all but the last as its history.
                 conversation = _open;
                 if (conversation != null
                     && (conversation.SettingsKey != settingsKey
                         || keys.Count <= conversation.MessageKeys.Count
+                        || keys.Count - conversation.MessageKeys.Count > 1
                         || !conversation.MessageKeys.SequenceEqual(keys.Take(conversation.MessageKeys.Count))))
                 {
                     CloseConversation();
@@ -223,7 +225,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
                     thinkingBudget = enableThinking == true ? Math.Max(1, Math.Min(MaxThinkingTokens, outputBudget / 3)) : 0;
                 }
                 var pendingMessages = turns.Skip(conversation.MessageKeys.Count).Select(ToLiteRtLmJson).ToList();
-                String messageJson = pendingMessages.Count == 1 ? pendingMessages[0] : "[" + String.Join(",", pendingMessages) + "]";
+                String messageJson = pendingMessages[0];
                 ReportContext(compacted ? "compact" : "prepare", conversation, inputEstimate, outputBudget, thinkingBudget);
                 String responseId = Guid.NewGuid().ToString("N");
                 String messageId = Guid.NewGuid().ToString("N");

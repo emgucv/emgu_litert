@@ -111,6 +111,8 @@ public class UnitTestCameraTools
         TestContext.WriteLine(second.Text);
         Assert.That(captures, Is.EqualTo(2));
         Assert.That(second.Text, Does.Contain("apple").IgnoreCase);
-        Assert.That(openField.GetValue(native), Is.SameAs(conversation), "Camera captures should reuse the conversation cache.");
+        // LiteRT-LM v0.19 doesn't accept a batch of appended messages, so a capture (a tool acknowledgement and an image
+        // turn) starts the conversation again with the history; v0.18 reused it. The conversation is open for the next turn.
+        Assert.That(openField.GetValue(native), Is.Not.Null);
     }
 }
