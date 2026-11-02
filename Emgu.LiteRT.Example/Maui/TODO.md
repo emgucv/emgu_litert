@@ -107,6 +107,7 @@ Still to do:
       `litert_lm_embedding_engine_create`): the accelerator must be compiled like the TFLite objects it is handed. On the RTX 3070:
       `TestGemma4E2BChatGpu` (new) and both `...GpuMatchesCpu` embedding tests pass (cosine 0.998 to 0.999, audio included);
       `Emgu.LiteRT.GPU.runtime.windows` 2.4.0 builds. Details: `platforms/windows/README.windows-gpu.md`, `INVESTIGATION.md`.
+- [ ] Windows: thinking with tools aborts the process (found 2026-11-02 driving the packaged demo: Think on, the default, crashes on the first message; Think off works, on the GPU too). `ThinkingBudgetConstraint::ComputeMask` reads the prebuilt `libGemmaModelConstraintProvider.dll`'s mask words inline, and that DLL's `std::vector` layout ({data, size, capacity}) differs from our MSVC-built `liblitert-lm.dll`'s ({first, last, end}): `length_error`, uncaught. Root cause in `docs/litert-lm.md`. Worked around (2026-11-02) with `LiteRtLmChatClient.EnableConstrainedDecodingWithThinking` (off on Windows: tools + thinking run unconstrained; `TestChatClientToolsWithThinking`, and the demo with Think on replies and calls tools). To do: report it to LiteRT-LM, then drop the workaround when fixed.
 - [ ] The agent regression test (item 7) with v0.19.0.
 - [x] The demo: offer the GPU search models on Mac Catalyst and Android too (item 11, 2026-11-01).
 - [ ] Ubuntu/Debian natives (CI builds them).

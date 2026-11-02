@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -98,6 +99,17 @@ namespace Emgu.LiteRT.LM.Extensions.AI
         public bool EnableConstrainedDecoding { get; set; } = true;
 
         /// <summary>
+        /// Whether to keep constrained decoding for a request that has both tools and thinking
+        /// (<see cref="ChatOptions.Reasoning"/>). On by default, except on Windows: LiteRT-LM v0.19.0 wraps the constraint in a
+        /// <c>ThinkingBudgetConstraint</c> then, which reads the mask the prebuilt Gemma constraint provider made as if it had
+        /// been built by the same C++ standard library, and the Windows provider's <c>std::vector</c> has another layout than the
+        /// MSVC-built liblitert-lm.dll's: an uncaught <c>std::length_error</c> ends the process on the first decode step. With
+        /// this off, such a request is not constrained (the model's tool calls are parsed as usual, without the guarantee of
+        /// well-formed calls). See docs/litert-lm.md.
+        /// </summary>
+        public bool EnableConstrainedDecodingWithThinking { get; set; } = !RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+
+        /// <summary>
         /// The language model this client runs
         /// </summary>
         public LanguageModel Model
@@ -149,7 +161,7 @@ namespace Emgu.LiteRT.LM.Extensions.AI
             int maxOutputTokens = options != null && options.MaxOutputTokens.HasValue ? options.MaxOutputTokens.Value : 0;
             if (EnableContextManagement && enableThinking == true && MaxThinkingTokens <= 0)
                 throw new ArgumentOutOfRangeException(nameof(MaxThinkingTokens), "Thinking needs a positive token budget.");
-            bool constrained = EnableConstrainedDecoding && toolsJson != null;
+            bool constrained = EnableConstrainedDecoding && toolsJson != null && (enableThinking != true || EnableConstrainedDecodingWithThinking);
             String settingsKey = String.Join("\u0001", new[] { systemMessage ?? "", toolsJson ?? "", enableThinking.ToString(), maxOutputTokens.ToString(), constrained.ToString(), EnableContextManagement.ToString(), MaxThinkingTokens.ToString() });
             List<String> keys = turns.Select(GetMessageKey).ToList();
 
