@@ -763,12 +763,16 @@ third chip in Settings > Speech recognition, a Storage row, and no spaces at Chi
 - [x] Mac: `omni_runner` on 12 synthetic clips in 8 languages (CPU and GPU, both mergers, overlaps 0.4 and 0.75);
   `UnitTestQwen3Asr` (English, Chinese, Japanese, 24 s of Chinese across windows) and the model-free routing tests.
 - [x] macOS, iOS and Android natives rebuilt; the demo builds for Android.
-- [ ] On a phone (the Galaxy S10 when it is back on adb): Settings > Speech recognition with Qwen3-ASR (download or
-  `MODELS_OVERRIDE`), a Japanese voice message, Parakeet chosen with Chinese spoken (Qwen3-ASR used when downloaded), a
-  short meeting, its speed, and memory beside Gemma 4 E2B on the GPU.
-- [ ] Mac Catalyst and iOS: the Catalyst build needs `SupportedOSPlatformVersion` 17.0 with the new Mac Catalyst SDK
-  pack, and the iOS simulator build fails to link (`_xamarin_initialize_dynamic_registrar`) since Xcode 27.2 - both from
-  the toolchain update, not this change.
+- [x] Galaxy S10 (2026-11-03, a temporary self-test with `say` clips through `SpeechRecognizer`, `MODELS_OVERRIDE`):
+  Japanese, Chinese, Korean and English as on the Mac, about real time on long clips; Parakeet chosen with Chinese used
+  Qwen3-ASR; a 77 s meeting cut into pieces kept up one piece behind; beside Gemma 4 E2B on the GPU both worked; the
+  Settings section shown (FEATURES.md).
+- [ ] Through the microphone on a phone: a Japanese voice message and a meeting card with Qwen3-ASR.
+- [ ] Faster on phones: Qwen3-ASR is only just real time on the S10 (a meeting falls one 25 s piece behind); try the GPU
+  there, or fewer windows' overlap.
+- [ ] Mac Catalyst and iOS: the Catalyst builds again since the demo and MauiChat need Mac Catalyst 17.0 (the new SDK
+  pack's lowest, 2026-11-03), not run with Qwen3-ASR yet; the iOS simulator build fails to link
+  (`_xamarin_initialize_dynamic_registrar`) since Xcode 27.2 - from the toolchain update, not this change.
 - [ ] Maybe: pass the language Qwen3-ASR detects back (its decoder skips it; a LiteRT-LM change), and the 1.7B model on
   computers.
 - [ ] Next omni models: maybe Moonshine tiny (English, 52 MB) or Whisper tiny for older phones.
