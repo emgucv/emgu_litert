@@ -279,7 +279,8 @@ public sealed class LiteRtLmChatPage : ChatPage
 
     // Settings > Image model: LiteRT-LM's Bonsai Image 4B (the default) and FLUX.2-klein 4B where libomniextern is in the
     // app, on the CPU and - where the app has LiteRT's GPU plugin (Mac Catalyst's Metal, Android's OpenCL, Windows' WebGPU
-    // when the GPU runtime package is in the build: WINDOWS_WEBGPU) - on the GPU, Bonsai at 512 x 512 on Mac Catalyst, then
+    // when the GPU runtime package is in the build: WINDOWS_WEBGPU) - on the GPU, Bonsai at 512 x 512 on Mac Catalyst (and
+    // on the GPU, not the CPU, on Windows), then
     // Z-Image-Turbo. A model's CPU and GPU choices share its file.
     // What the first load of a GPU choice does, once: it compiles the model's GPU programs and keeps them (the app says so while it works).
 #if WINDOWS_WEBGPU
@@ -304,12 +305,14 @@ public sealed class LiteRtLmChatPage : ChatPage
                 "The same model on the GPU: about 11 s a picture on a Mac, 4 s on a Windows PC with an RTX 3070 (20-40 s while the chat model is on the same 8 GB GPU). " + GpuFirstLoad + " A GPU without enough memory (an 8 GB phone's) falls back to the CPU.", bonsai,
                 () => new OmniImageModel(new BonsaiImage4B(), "gpu", caches)));
 #endif
-#if MACCATALYST
+#if MACCATALYST || WINDOWS_WEBGPU
             // 512 x 512 on computers only: on a phone's CPU a picture would take a quarter of an hour.
             string bonsai512 = System.IO.Path.GetFileName(BonsaiImage4B512.DefaultModelFile.LocalFile);
             options.Add(new ImageModelOption("bonsai_512_gpu", "Bonsai Image 4B 512 · GPU",
-                "512 x 512, 4 steps; a 4.3 GB download (Emgu's repackaging). About 25 s a picture on a Mac's GPU; the first load compiles the GPU programs (about 25 s).", bonsai512,
+                "512 x 512, 4 steps; a 4.3 GB download (Emgu's repackaging). About 25 s a picture on a Mac's GPU, 13-15 s on a Windows PC with an RTX 3070 (it needs about 5 GB of video memory, so not beside a chat model on the same 8 GB GPU). " + GpuFirstLoad, bonsai512,
                 () => new OmniImageModel(new BonsaiImage4B512(), "gpu", caches)));
+#endif
+#if MACCATALYST
             options.Add(new ImageModelOption("bonsai_512", "Bonsai Image 4B 512 · CPU",
                 "The same model on the CPU: about 65 s a picture on a Mac.", bonsai512,
                 () => new OmniImageModel(new BonsaiImage4B512(), "cpu", caches)));

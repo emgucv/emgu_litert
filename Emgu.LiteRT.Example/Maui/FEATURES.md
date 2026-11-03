@@ -552,7 +552,7 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   and - on Mac Catalyst, Android and Windows (when the GPU runtime package is in the build: `WINDOWS_WEBGPU`) - the GPU, then Z-Image-Turbo.
   Both omni models draw 256 x 256 in 4 steps from one 4.3-4.7 GB file plus a cache folder of ~3.6 GB per backend; on an
   M1 Bonsai takes 24 s on the CPU and 11 s on Metal (`Emgu.LiteRT.Models/MODELS.md`). On Mac Catalyst the demo also
-  offers "Bonsai Image 4B 512" (GPU and CPU): Emgu's repackaging for 512 x 512 from its public S3, 25 s on Metal and 66 s
+  offers "Bonsai Image 4B 512" (GPU and CPU; on Windows with the GPU runtime the GPU choice only, 13-15 s a picture on an RTX 3070, about 5.2 GB of video memory): Emgu's repackaging for 512 x 512 from its public S3, 25 s on Metal and 66 s
   on the CPU. They draw a picture in one call,
   so the tile shows "Drawing the picture (12 s)" instead of the steps, and Stop leaves the picture to finish in the
   background (thrown away). Switching models lets the old one go and asks before downloading the new one; each model is
