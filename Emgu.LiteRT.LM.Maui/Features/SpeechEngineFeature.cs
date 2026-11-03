@@ -19,6 +19,10 @@ public sealed class SpeechEngineFeature : ChatFeature, IStorageParticipant
 {
     private readonly List<(SpeechEngine Value, ToggleChip Chip)> _chips = new();
     private Label _note, _state, _credit;
+    private View _gpu;
+
+    /// <summary>The settings key of "Run on the GPU" for the models that can (<see cref="OmniSpeech.UseGpu"/>; off by default).</summary>
+    public const string GpuSettingKey = "speech_model_gpu";
     private Button _download;
     private bool _updatingChips;
     private CancellationTokenSource _downloadCancel;
@@ -40,8 +44,12 @@ public sealed class SpeechEngineFeature : ChatFeature, IStorageParticipant
     {
         base.OnAttached(host);
         SpeechRecognizer.Engine = SpeechEngines.Parse(host.Settings.Get(SpeechEngines.SettingKey, string.Empty), SpeechRecognizer.SystemSupported);
+        bool gpu = host.Settings.Get(GpuSettingKey, false);
         foreach (OmniSpeech model in OmniSpeech.All)
+        {
+            model.UseGpu = gpu && model.CanUseGpu;
             model.Changed += OnModelChanged;
+        }
     }
 
     /// <inheritdoc/>
@@ -94,7 +102,13 @@ public sealed class SpeechEngineFeature : ChatFeature, IStorageParticipant
             catch (Exception ex) { Host?.SetStatus("Couldn't open the model card: " + ex.Message); }
         };
         _credit.GestureRecognizers.Add(open);
+        _gpu = ChatPage.SwitchRow("Run Qwen3-ASR on the GPU",
+            "Faster: on a Galaxy S10 it wrote down a 26 s recording in 17 s instead of 27 s, with the same text. But it takes "
+            + "about 1 GB more memory than on the CPU and 13 s to load, so beside a chat model on the GPU the phone may run "
+            + "short of memory. It goes back to the CPU when the GPU can't load it.",
+            Host?.Settings.Get(GpuSettingKey, false) == true, OnGpuToggled);
         section.Children.Add(_note);
+        section.Children.Add(_gpu);
         section.Children.Add(_state);
         section.Children.Add(_download);
         section.Children.Add(_credit);
@@ -113,6 +127,14 @@ public sealed class SpeechEngineFeature : ChatFeature, IStorageParticipant
         OmniSpeech model = OmniSpeech.For(value);
         if (on && model != null && !model.IsDownloaded)
             StartDownload(model);
+    }
+
+    private void OnGpuToggled(bool on)
+    {
+        Host?.Settings.Set(GpuSettingKey, on);
+        foreach (OmniSpeech model in OmniSpeech.All)
+            model.UseGpu = on && model.CanUseGpu;
+        UpdateState();
     }
 
     private void Choose(SpeechEngine engine)
@@ -166,11 +188,12 @@ public sealed class SpeechEngineFeature : ChatFeature, IStorageParticipant
         bool downloading = _downloadCancel != null && !model.IsDownloaded;
         _state.Text = model.DownloadPercent is double percent ? string.Format("Downloading {0}: {1:F0}%", name, percent)
             : downloading ? "Downloading " + name + "..."
-            : model.IsDownloaded ? (model.IsLoaded ? name + " is downloaded and loaded." : name + " is downloaded.")
+            : model.IsDownloaded ? (model.IsLoaded ? name + " is downloaded and loaded" + (model.OnGpu ? " on the GPU." : ".") : name + " is downloaded.")
             : chosen != null ? name + " isn't downloaded yet (" + model.DownloadMegabytes + " MB)." + (SpeechRecognizer.SystemSupported ? " Until it is, the device's recognizer writes down recordings." : "")
             : string.Empty;
         _state.IsVisible = _state.Text.Length > 0;
         _download.IsVisible = chosen != null && !model.IsDownloaded && _downloadCancel == null;
+        _gpu.IsVisible = chosen != null && chosen.CanUseGpu && OmniSpeech.GpuAvailable;
         _credit.Text = model.Credit + " (model card)";
         SemanticProperties.SetDescription(_credit, "Open " + name + "'s model card");
     }

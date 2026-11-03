@@ -773,8 +773,11 @@ third chip in Settings > Speech recognition, a Storage row, and no spaces at Chi
 - [ ] Japanese through a phone's microphone at a distance is still 21-45% wrong; try nearer the speaker, or the GPU.
 - [x] The GPU on the S10 (2026-11-03): about 1.6 times as fast (0.4-0.6 of real time), the same text, but 12.8 s to create
   and ~1.2 GB of free memory against ~0.4 GB; `SpeechToTextModel.Init("gpu")` allowed, the app stays on the CPU.
-- [ ] Maybe: a GPU choice for Qwen3-ASR where memory allows (a phone without a chat model loaded, a computer), or fewer
-  windows' overlap on the CPU.
+- [x] A GPU choice for Qwen3-ASR (2026-11-04): Settings > Speech recognition > "Run Qwen3-ASR on the GPU", off by default
+  (`OmniSpeech.UseGpu`, Android and Mac Catalyst; the CPU when the GPU fails). On the S10 beside Gemma 4 E2B on the GPU:
+  26 s in 16.9 s (the CPU 26.4 s), 1.2 GB left available (the CPU 2.0 GB), Gemma kept answering. Not run on a Mac in
+  the app (the Mac's GPU was only ~20% faster in the spike).
+- [ ] Maybe: fewer windows' overlap on the CPU.
 - [x] Qwen3.5-2B on the S10 (2026-11-03): CPU 7.2 tokens/s, 2.7-3.6 GB; its GPU slower and 6 GB, so the catalog keeps the CPU.
 - [ ] Mac Catalyst and iOS: the Catalyst builds again since the demo and MauiChat need Mac Catalyst 17.0 (the new SDK
   pack's lowest, 2026-11-03), not run with Qwen3-ASR yet. The iOS simulator build failed to link

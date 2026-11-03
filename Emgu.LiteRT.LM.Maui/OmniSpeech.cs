@@ -2,6 +2,7 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
+using System.Diagnostics;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.Util;
@@ -23,11 +24,12 @@ namespace Emgu.LiteRT.LM.Maui
         private readonly string[] _obsoleteFileNames;
         private Task<SpeechToTextModel> _load;
         private CancellationTokenSource _idle;
-        private bool _keepLoaded;
+        private bool _keepLoaded, _useGpu;
 
         private OmniSpeech(SpeechEngine engine, string name, string credit, string modelCardUrl, int downloadMegabytes,
-            DownloadableFile modelFile, Func<SpeechToTextModel> create, string[] obsoleteFileNames)
+            DownloadableFile modelFile, Func<SpeechToTextModel> create, string[] obsoleteFileNames, bool canUseGpu)
         {
+            CanUseGpu = canUseGpu;
             Engine = engine;
             Name = name;
             Credit = credit;
@@ -41,7 +43,7 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>NVIDIA's Parakeet-TDT-0.6B-v3: 25 European languages, a 614 MB download.</summary>
         public static OmniSpeech Parakeet { get; } = new OmniSpeech(SpeechEngine.Parakeet, "Parakeet-TDT-0.6B-v3",
             "Parakeet-TDT-0.6B-v3 by NVIDIA, CC-BY-4.0", "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3", 614,
-            ParakeetTdt06BV3.DefaultModelFile, () => new ParakeetTdt06BV3(), ParakeetTdt06BV3.ObsoleteFileNames);
+            ParakeetTdt06BV3.DefaultModelFile, () => new ParakeetTdt06BV3(), ParakeetTdt06BV3.ObsoleteFileNames, false);
 
         /// <summary>
         /// Alibaba Qwen's Qwen3-ASR-0.6B: 30 languages including Chinese, Japanese and Korean, a 960 MB download; slower
@@ -49,7 +51,7 @@ namespace Emgu.LiteRT.LM.Maui
         /// </summary>
         public static OmniSpeech Qwen3Asr { get; } = new OmniSpeech(SpeechEngine.Qwen3Asr, "Qwen3-ASR-0.6B",
             "Qwen3-ASR-0.6B by Alibaba Qwen, Apache-2.0", "https://huggingface.co/Qwen/Qwen3-ASR-0.6B", 960,
-            Qwen3Asr06B.DefaultModelFile, () => new Qwen3Asr06B(), null);
+            Qwen3Asr06B.DefaultModelFile, () => new Qwen3Asr06B(), null, true);
 
         /// <summary>The models, in <see cref="SpeechEngines.Models"/>' order.</summary>
         public static IReadOnlyList<OmniSpeech> All { get; } = new[] { Parakeet, Qwen3Asr };
@@ -74,6 +76,38 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>How long a model stays loaded after its last recording.</summary>
         public static TimeSpan IdleRelease { get; set; } = TimeSpan.FromMinutes(2);
+
+        /// <summary>
+        /// Whether it may run on the GPU (<see cref="UseGpu"/>): Qwen3-ASR (on a Galaxy S10 about 1.6 times as fast, with ~1 GB
+        /// more memory); Parakeet on a GPU isn't measured.
+        /// </summary>
+        public bool CanUseGpu { get; }
+
+        /// <summary>True where the app has a GPU accelerator for the models: Android (OpenCL) and Mac Catalyst (Metal).</summary>
+        public static bool GpuAvailable =>
+#if ANDROID || MACCATALYST
+            IsAvailable;
+#else
+            false;
+#endif
+
+        /// <summary>
+        /// Load it on the GPU (where <see cref="CanUseGpu"/> and <see cref="GpuAvailable"/>; the CPU when the GPU fails).
+        /// Changing it frees the model, so the next recording loads it on the other.
+        /// </summary>
+        public bool UseGpu
+        {
+            get => _useGpu;
+            set
+            {
+                if (_useGpu == value) return;
+                _useGpu = value;
+                if (IsLoaded) _ = ReleaseAsync();
+            }
+        }
+
+        /// <summary>Whether it is loaded on the GPU.</summary>
+        public bool OnGpu { get; private set; }
 
         /// <summary>The model file (a .litertlm holding the tokenizer too).</summary>
         public DownloadableFile ModelFile { get; }
@@ -144,7 +178,18 @@ namespace Emgu.LiteRT.LM.Maui
                         await other.ReleaseAsync();
                 stage?.Report("Loading the speech model...");
                 // Init verifies the files (hashing them once) and skips its own download.
-                await model.Init("cpu", CpuThreadSettings.Count, cancel);
+                bool gpu = UseGpu && CanUseGpu && GpuAvailable;
+                try { await model.Init(gpu ? "gpu" : "cpu", CpuThreadSettings.Count, cancel); }
+                catch (Exception ex) when (gpu && !(ex is OperationCanceledException))
+                {
+                    // No GPU here after all, or not enough memory for it: the CPU.
+                    Debug.WriteLine(Name + " couldn't load on the GPU, so on the CPU: " + ex.Message);
+                    model.Dispose();
+                    model = _create();
+                    gpu = false;
+                    await model.Init("cpu", CpuThreadSettings.Count, cancel);
+                }
+                OnGpu = gpu;
                 DeleteObsoleteFiles();
             }
             catch (Exception)
@@ -214,6 +259,7 @@ namespace Emgu.LiteRT.LM.Maui
                 if (load == null) return;
                 try { (await load).Dispose(); }
                 catch (Exception) { /* It failed to load: nothing to free. */ }
+                OnGpu = false;
             }
             finally
             {
