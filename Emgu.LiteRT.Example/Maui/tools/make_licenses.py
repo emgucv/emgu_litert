@@ -148,7 +148,7 @@ def curated():
         ("Gemma 4 E2B, E4B and 12B", "litert-community/gemma-4-E2B-it-litert-lm", "google/gemma-4-E2B-it", "Google LLC"),
         ("EmbeddingGemma 2", "litert-community/embeddinggemma-2-text-vision-440m-litert-lm", "google/embeddinggemma-2", "Google LLC"),
         ("Qwen3 0.6B", "litert-community/Qwen3-0.6B", "Qwen/Qwen3-0.6B", "Alibaba Cloud (Qwen team)"),
-        ("Qwen3.5 0.8B, 0.8B VL and 4B", "litert-community/Qwen3.5-0.8B", "Qwen/Qwen3.5-0.8B", "Alibaba Cloud (Qwen team)"),
+        ("Qwen3.5 0.8B, 0.8B VL, 2B and 4B", "litert-community/Qwen3.5-0.8B", "Qwen/Qwen3.5-0.8B", "Alibaba Cloud (Qwen team)"),
         ("Z-Image-Turbo", "litert-community/Z-Image-Turbo-LiteRT", "Tongyi-MAI/Z-Image-Turbo", "Alibaba Tongyi-MAI"),
         ("Bonsai Image 4B", "litert-community/Bonsai-Image-ternary-4B", "prism-ml/bonsai-image-ternary-4B-unpacked", "PrismML"),
         ("FLUX.2-klein 4B", "litert-community/FLUX.2-klein-4B-LiteRT", "black-forest-labs/FLUX.2-klein-4B", "Black Forest Labs"),

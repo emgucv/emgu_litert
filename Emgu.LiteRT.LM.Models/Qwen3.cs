@@ -22,7 +22,8 @@ namespace Emgu.LiteRT.LM.Models
         /// The dynamic int4 build of Qwen3-0.6B (about 350 MB). Its chat template takes message content as text parts,
         /// which LiteRT-LM v0.18.0 always passes; with the repository's earlier qwen3_0_6b_mixed_int4.litertlm the
         /// template drops the user's text and fails on a system message, and its Qwen3-0.6B.litertlm fails loading its
-        /// tokenizer.
+        /// tokenizer. Since revision 2670e142 (2026-10-31) the file is the GPU-composite export, faster on the GPU, whose
+        /// GPU path needs LiteRT-LM v0.19.0.
         /// </summary>
         public static DownloadableFile ModelFile
         {
@@ -30,9 +31,9 @@ namespace Emgu.LiteRT.LM.Models
             {
                 return new DownloadableFile(
                     // Pinned to a revision: litert-community replaces the files in place (2026-10-31: the GPU-composite build).
-                    "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/e6bb3e4a1eb3f663153f0c1c12b735d64be657a7/Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm",
+                    "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/722a0a54c1301a4b07a9856a9590d56362f0969b/Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm",
                     LocalSubfolder,
-                    "03e7da1eb1108b50dffaa9bb52cc7bcbad2eb0c66ca990267f480c1e545d2856");
+                    "bf1aba9ce8d963124407353c6aa4cbf72eba78db21ae133de983eac672ce83e0");
             }
         }
 

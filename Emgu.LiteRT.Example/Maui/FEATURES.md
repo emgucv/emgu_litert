@@ -46,7 +46,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   the screen and its end (the context window) couldn't be reached (verified on a Galaxy Z Fold3 and a Pixel 8 emulator).
   The demo's own sheet, `MenuSheet` (`Theme.cs`), remains for menus of rows: the "+" menu (`DemoAttachmentSource`) and the
   vision demo page.
-- The model picker offers Qwen3, Qwen3.5 0.8B VL, Qwen3.5 4B, Gemma 4 E2B and E4B (and Gemma 4 12B on Mac Catalyst and
+- The model picker offers Qwen3, Qwen3.5 0.8B VL, Qwen3.5 2B (since 2026-11-03), Qwen3.5 4B, Gemma 4 E2B and E4B (and Gemma 4 12B on Mac Catalyst and
   Windows, from `Emgu.LiteRT.LM.Chat`'s `ChatModelCatalog`). Each model's `AcceptsImages`, `AcceptsAudio` and `CanThink` flags decide which of the
   attach, talk and thinking controls show.
 - Gemma 4 always gets the agent's tools and instructions. The Web search chip sets `ChatToolMode.Auto` or `None` per

@@ -21,7 +21,7 @@ using System.Threading.Tasks;
 namespace Emgu.TF.Lite.Test
 {
     // Tests of the Emgu.LiteRT.LM wrapper of LiteRT-LM's C API (liblitert-lm) and of Emgu.LiteRT.LM.Models, on the
-    // CPU. They download large models on the first run (Qwen3-0.6B ~500 MB, Qwen3.5 0.8B ~1 GB / VL ~1.3 GB / 4B ~2.8 GB, Gemma 4 E2B ~2.6 GB, E4B ~3.7 GB), so like Emgu CV's
+    // CPU. They download large models on the first run (Qwen3-0.6B ~500 MB, Qwen3.5 0.8B ~1 GB / VL ~1.3 GB / 2B ~2.1 GB / 4B ~2.8 GB, Gemma 4 E2B ~2.6 GB, E4B ~3.7 GB), so like Emgu CV's
     // model tests they are ignored by default: opt in with dotnet test -p:TestModels=true (defines TEST_MODELS). They
     // are also skipped where liblitert-lm isn't available (it is currently built for Apple Silicon macOS and Android
     // only).
@@ -1685,10 +1685,24 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
-        private static async Task TestChatClientTools(bool constrained)
+        // Qwen3.5 4B's file has LiteRT-LM's qwen3_5 tool-call format since revision 7a91b285 (2.8 GB download).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestQwen35_4BChatClientTools()
+        {
+            await TestChatClientTools(true, () => new Qwen35_4B());
+        }
+
+        private static async Task TestChatClientTools(bool constrained, Func<LanguageModel> create = null)
         {
             RequireLiteRtLm();
-            using (Gemma4E2B model = new Gemma4E2B())
+            using (LanguageModel model = create != null ? create() : new Gemma4E2B())
             {
                 await model.Init();
                 int calls = 0;
@@ -1812,6 +1826,37 @@ namespace Emgu.TF.Lite.Test
                     ChatReply second = await chat.SendAsync("What is my name?");
                     Console.WriteLine("Replies: {0} | {1}", first.Text, second.Text);
                     if (!first.Text.Contains("Paris"))
+                        throw new Exception("The first reply is wrong");
+                    if (!second.Text.Contains("Kenji"))
+                        throw new Exception("The second reply doesn't use the history");
+                }
+            }
+        }
+
+        // Qwen3.5 2B, text only (2.1 GB download).
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestQwen35_2BChat()
+        {
+            RequireLiteRtLm();
+            using (Qwen35_2B model = new Qwen35_2B())
+            {
+                await model.Init();
+                if (model.SupportsToolCalling || model.SupportsImages)
+                    throw new Exception("Qwen3.5 2B should take text only, without tools");
+                using (Chat chat = model.CreateChat("You are a helpful assistant. Answer in one short sentence."))
+                {
+                    chat.MaxOutputTokens = 64;
+                    ChatReply first = chat.Send("My name is Kenji. What is 17 times 23?");
+                    ChatReply second = await chat.SendAsync("What is my name?");
+                    Console.WriteLine("Replies: {0} | {1}", first.Text, second.Text);
+                    if (!first.Text.Contains("391"))
                         throw new Exception("The first reply is wrong");
                     if (!second.Text.Contains("Kenji"))
                         throw new Exception("The second reply doesn't use the history");

@@ -27,7 +27,7 @@ namespace Emgu.LiteRT.LM.Chat
     /// tools, thinking, summaries), its download size and file, the context window to load it with and the largest its
     /// file allows, and the GPU where it was verified (Gemma 4 E2B with OpenCL on Android; the Gemma 4 models with Metal
     /// on a Mac; all but Gemma 4 12B on Windows). Gemma 4 12B is offered on desktops only. Each call makes new options;
-    /// an app takes the ones it wants by <see cref="ChatModelOption.Id"/> ("Qwen3", "Qwen35_0_8B_VL", "Qwen35_4B",
+    /// an app takes the ones it wants by <see cref="ChatModelOption.Id"/> ("Qwen3", "Qwen35_0_8B_VL", "Qwen35_2B", "Qwen35_4B",
     /// "Gemma4E2B", "Gemma4E4B", "Gemma4_12B" - lasting, since saved chats and settings keep them).
     /// <code>
     /// foreach (ChatModelOption model in ChatModelCatalog.For(ChatDevicePlatform.Current))
@@ -54,6 +54,11 @@ namespace Emgu.LiteRT.LM.Chat
                     "~350 MB download. Fast, and can think before answering.", gpu: windows),
                 Model("Qwen35_0_8B_VL", "Qwen3.5 0.8B", () => new Qwen35_0_8B_VL(), Qwen35_0_8B_VL.ModelFile, 1300,
                     "~1.3 GB download. Newer and still fast; understands images.", gpu: windows, images: true, canThink: false),
+                // Not verified on a GPU here (its card: Mac and iPhone Metal, an Adreno phone; not Mali), so the CPU only.
+                Model("Qwen35_2B", "Qwen3.5 2B", () => new Qwen35_2B(), Qwen35_2B.ModelFile, 2100,
+                    "~2.1 GB download. Between 0.8B and 4B: better answers than 0.8B and faster than 4B. Text only.", gpu: false, canThink: false),
+                // Its file can call tools since 2026-11-03 (Qwen35_4B.SupportsToolCalling), but not the chat's: the file is
+                // fixed at 4096 tokens, and the chat's instructions and tool groups take ~1.1-2.5k of them.
                 Model("Qwen35_4B", "Qwen3.5 4B", () => new Qwen35_4B(), Qwen35_4B.ModelFile, 2800,
                     "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", gpu: windows, summarize: true),
                 Gemma("Gemma4E2B", "Gemma 4 E2B", () => new Gemma4E2B(), Gemma4E2B.ModelFile, 2600,

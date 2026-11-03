@@ -28,10 +28,11 @@ namespace Emgu.LiteRT.LM.Models
             get
             {
                 return new DownloadableFile(
-                    // Pinned to a revision: litert-community replaces the files in place (2026-10-16: the tokenizer section).
-                    "https://huggingface.co/litert-community/Qwen3.5-4B/resolve/6e49632cd95c0e0b8de43ca645c4fcb0f53d1bac/Qwen3.5-4B_mixed_int4.litertlm",
+                    // Pinned to a revision: litert-community replaces the files in place (2026-10-16: the tokenizer section;
+                    // 2026-11-03: LiteRT-LM's qwen3_5 tool-call format in the metadata).
+                    "https://huggingface.co/litert-community/Qwen3.5-4B/resolve/7a91b2850a4a8dfd8108fca33e74a6ddb6ff4fba/Qwen3.5-4B_mixed_int4.litertlm",
                     DefaultLocalSubfolder,
-                    "37209c42c4bd8108373305e7f9820a84fd6d8f8a3481549a31c48bd7880b700f");
+                    "f4d0be6c412e1310d43335d804ba4e4ed6aaad320f575ee31d0a9951b479b529");
             }
         }
 
@@ -41,6 +42,15 @@ namespace Emgu.LiteRT.LM.Models
         public override DownloadableFile DefaultModelFile
         {
             get { return ModelFile; }
+        }
+
+        /// <summary>
+        /// True: since revision 7a91b285 the file's metadata has LiteRT-LM v0.19.0's qwen3_5 tool-call format, so LiteRT-LM
+        /// parses its tool calls (before, they came back as text)
+        /// </summary>
+        public override bool SupportsToolCalling
+        {
+            get { return true; }
         }
 
         /// <summary>Use 32-bit activations for reliable GPU multi-turn inference.</summary>

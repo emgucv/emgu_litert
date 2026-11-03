@@ -22,6 +22,7 @@ ADB="${ANDROID_HOME:?set ANDROID_HOME}/platform-tools/adb"
 MODELS=(
   Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm
   Qwen3.5-0.8B-VL_int8.litertlm
+  Qwen3.5-2B_int8.litertlm
   Qwen3.5-4B_mixed_int4.litertlm
   gemma-4-E2B-it.litertlm
   gemma-4-E4B-it.litertlm

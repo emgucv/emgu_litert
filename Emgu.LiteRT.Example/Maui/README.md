@@ -206,7 +206,7 @@ The chat page is built on the reusable chat libraries:
 See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HISTORY_PLAN.md](history/CHAT_VOICE_AND_HISTORY_PLAN.md);
 [`Emgu.LiteRT.Example/MauiChat`](../MauiChat/README.md) is a minimal app using them.
 
-- Choosing a model you haven't downloaded yet shows its download size (Qwen3 0.6B ~350 MB, Qwen3.5 0.8B ~1.3 GB,
+- Choosing a model you haven't downloaded yet shows its download size (Qwen3 0.6B ~350 MB, Qwen3.5 0.8B ~1.3 GB, 2B ~2.1 GB,
   Gemma 4 E2B ~2.6 GB, E4B ~3.7 GB, Qwen3.5 4B ~2.8 GB) with a Download button; models already on the device start
   loading as soon as they are selected, and the page reopens with the model used last. The first load after a
   download checks the file once (a few seconds for the larger models); you can type meanwhile, and a message sent

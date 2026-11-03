@@ -9,7 +9,7 @@ namespace Emgu.LiteRT.LM.Models
 {
     /// <summary>
     /// Base class of the Qwen3.5 models (Apache 2.0 license) in LiteRT-LM format, from the litert-community
-    /// conversions: Qwen35_0_8B, Qwen35_0_8B_VL and Qwen35_4B.
+    /// conversions: Qwen35_0_8B, Qwen35_0_8B_VL, Qwen35_2B and Qwen35_4B.
     /// </summary>
     /// <remarks>
     /// Qwen3.5 is a hybrid architecture (gated delta rule linear attention mixed with a few full attention layers), so

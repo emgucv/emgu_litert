@@ -17,7 +17,7 @@ public class UnitTestChatModelCatalog
         foreach (ChatPlatform platform in Enum.GetValues(typeof(ChatPlatform)))
         {
             IList<ChatModelOption> models = ChatModelCatalog.For(platform);
-            Assert.That(models.Take(5).Select(m => m.Id), Is.EqualTo(new[] { "Qwen3", "Qwen35_0_8B_VL", "Qwen35_4B", "Gemma4E2B", "Gemma4E4B" }), platform.ToString());
+            Assert.That(models.Take(6).Select(m => m.Id), Is.EqualTo(new[] { "Qwen3", "Qwen35_0_8B_VL", "Qwen35_2B", "Qwen35_4B", "Gemma4E2B", "Gemma4E4B" }), platform.ToString());
             Assert.That(models.All(m => !m.IsRemote), Is.True, "the server isn't in the catalog");
         }
     }
@@ -65,6 +65,8 @@ public class UnitTestChatModelCatalog
         Assert.That(gemma.MaxContextWindow, Is.EqualTo(32000));
         Assert.That(gemma.DownloadSize, Is.EqualTo(2600L << 20));
         Assert.That(android.Single(o => o.Id == "Qwen35_0_8B_VL").CanThink, Is.False);
+        Assert.That(android.Single(o => o.Id == "Qwen35_2B").CanThink, Is.False);
+        Assert.That(ChatModelCatalog.For(ChatPlatform.Windows).Single(o => o.Id == "Qwen35_2B").Backends, Is.EqualTo(new[] { "cpu" }), "2B not verified on a GPU");
         Assert.That(ChatModelCatalog.For(ChatPlatform.Android), Is.Not.SameAs(android), "each call makes new options");
     }
 }
