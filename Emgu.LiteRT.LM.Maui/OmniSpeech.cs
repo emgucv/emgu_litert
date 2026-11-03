@@ -2,47 +2,83 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
+using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.Util;
 
 namespace Emgu.LiteRT.LM.Maui
 {
     /// <summary>
-    /// NVIDIA's Parakeet-TDT-0.6B-v3 for <see cref="SpeechRecognizer"/>: downloaded in the background the first time it is
-    /// needed (a 614 MB .litertlm), loaded on the CPU, one recording at a time, and freed after a while unused
-    /// unless <see cref="KeepLoaded"/> (a meeting being recorded). The weights are CC-BY-4.0: an app using them credits
-    /// NVIDIA (<see cref="Credit"/>).
+    /// A speech recognition model on LiteRT-LM's omni engine for <see cref="SpeechRecognizer"/>: NVIDIA's
+    /// Parakeet-TDT-0.6B-v3 (<see cref="Parakeet"/>) or Alibaba Qwen's Qwen3-ASR-0.6B (<see cref="Qwen3Asr"/>). Downloaded
+    /// in the background the first time it is needed, loaded on the CPU, one recording at a time, and freed after a while
+    /// unused unless <see cref="KeepLoaded"/> (a meeting being recorded). One of them is loaded at a time: loading one frees
+    /// the other. An app using them shows their <see cref="Credit"/> (Parakeet's CC-BY-4.0 licence asks for it).
     /// </summary>
-    public sealed class ParakeetSpeech
+    public sealed class OmniSpeech
     {
         private readonly SemaphoreSlim _gate = new SemaphoreSlim(1, 1);
         private readonly object _lock = new object();
-        private Task<ParakeetTdt06BV3> _load;
+        private readonly Func<SpeechToTextModel> _create;
+        private readonly string[] _obsoleteFileNames;
+        private Task<SpeechToTextModel> _load;
         private CancellationTokenSource _idle;
         private bool _keepLoaded;
 
-        /// <summary>The app's one Parakeet.</summary>
-        public static ParakeetSpeech Default { get; } = new ParakeetSpeech();
+        private OmniSpeech(SpeechEngine engine, string name, string credit, string modelCardUrl, int downloadMegabytes,
+            DownloadableFile modelFile, Func<SpeechToTextModel> create, string[] obsoleteFileNames)
+        {
+            Engine = engine;
+            Name = name;
+            Credit = credit;
+            ModelCardUrl = modelCardUrl;
+            DownloadMegabytes = downloadMegabytes;
+            ModelFile = modelFile;
+            _create = create;
+            _obsoleteFileNames = obsoleteFileNames ?? new string[0];
+        }
+
+        /// <summary>NVIDIA's Parakeet-TDT-0.6B-v3: 25 European languages, a 614 MB download.</summary>
+        public static OmniSpeech Parakeet { get; } = new OmniSpeech(SpeechEngine.Parakeet, "Parakeet-TDT-0.6B-v3",
+            "Parakeet-TDT-0.6B-v3 by NVIDIA, CC-BY-4.0", "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3", 614,
+            ParakeetTdt06BV3.DefaultModelFile, () => new ParakeetTdt06BV3(), ParakeetTdt06BV3.ObsoleteFileNames);
+
+        /// <summary>
+        /// Alibaba Qwen's Qwen3-ASR-0.6B: 30 languages including Chinese, Japanese and Korean, a 960 MB download; slower
+        /// and larger than Parakeet, with fewer errors.
+        /// </summary>
+        public static OmniSpeech Qwen3Asr { get; } = new OmniSpeech(SpeechEngine.Qwen3Asr, "Qwen3-ASR-0.6B",
+            "Qwen3-ASR-0.6B by Alibaba Qwen, Apache-2.0", "https://huggingface.co/Qwen/Qwen3-ASR-0.6B", 960,
+            Qwen3Asr06B.DefaultModelFile, () => new Qwen3Asr06B(), null);
+
+        /// <summary>The models, in <see cref="SpeechEngines.Models"/>' order.</summary>
+        public static IReadOnlyList<OmniSpeech> All { get; } = new[] { Parakeet, Qwen3Asr };
+
+        /// <summary>The model for an engine, or null for the platform's recognizer.</summary>
+        public static OmniSpeech For(SpeechEngine engine) => All.FirstOrDefault(m => m.Engine == engine);
+
+        /// <summary>The engine it is.</summary>
+        public SpeechEngine Engine { get; }
 
         /// <summary>The model's name, shown.</summary>
-        public const string Name = "Parakeet-TDT-0.6B-v3";
+        public string Name { get; }
 
-        /// <summary>The credit the model's licence asks for, shown where it is chosen.</summary>
-        public const string Credit = "Parakeet-TDT-0.6B-v3 by NVIDIA, CC-BY-4.0";
+        /// <summary>The credit its licence asks for, shown where it is chosen.</summary>
+        public string Credit { get; }
 
         /// <summary>The model card, for the credit's link.</summary>
-        public const string ModelCardUrl = "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3";
+        public string ModelCardUrl { get; }
 
         /// <summary>The download's size in megabytes, shown.</summary>
-        public const int DownloadMegabytes = 614;
+        public int DownloadMegabytes { get; }
 
-        /// <summary>How long it stays loaded after its last recording.</summary>
+        /// <summary>How long a model stays loaded after its last recording.</summary>
         public static TimeSpan IdleRelease { get; set; } = TimeSpan.FromMinutes(2);
 
         /// <summary>The model file (a .litertlm holding the tokenizer too).</summary>
-        public DownloadableFile ModelFile { get; } = ParakeetTdt06BV3.DefaultModelFile;
+        public DownloadableFile ModelFile { get; }
 
-        /// <summary>True if it can run here: libomniextern is in the app (not yet on Windows).</summary>
+        /// <summary>True if they can run here: libomniextern is in the app (not yet on Windows).</summary>
         public static bool IsAvailable => OmniInvoke.IsAvailable;
 
         /// <summary>True when the model is downloaded and verified (cheap: no hashing).</summary>
@@ -73,7 +109,7 @@ namespace Emgu.LiteRT.LM.Maui
         /// <param name="cancel">Stops the download or the loading</param>
         public Task EnsureAsync(IProgress<string> stage, CancellationToken cancel) => LoadedAsync(stage, cancel);
 
-        private Task<ParakeetTdt06BV3> LoadedAsync(IProgress<string> stage, CancellationToken cancel)
+        private Task<SpeechToTextModel> LoadedAsync(IProgress<string> stage, CancellationToken cancel)
         {
             lock (_lock)
             {
@@ -83,11 +119,11 @@ namespace Emgu.LiteRT.LM.Maui
             }
         }
 
-        private async Task<ParakeetTdt06BV3> LoadAsync(IProgress<string> stage, CancellationToken cancel)
+        private async Task<SpeechToTextModel> LoadAsync(IProgress<string> stage, CancellationToken cancel)
         {
             if (!IsAvailable)
-                throw new PlatformNotSupportedException("Parakeet speech recognition isn't in this build of the app on this platform.");
-            var model = new ParakeetTdt06BV3();
+                throw new PlatformNotSupportedException(Name + " speech recognition isn't in this build of the app on this platform.");
+            SpeechToTextModel model = _create();
             try
             {
                 if (!ModelFile.IsLocalFileVerified)
@@ -102,6 +138,10 @@ namespace Emgu.LiteRT.LM.Maui
                     }, cancel);
                 }
                 DownloadPercent = null;
+                // One model in memory at a time (Qwen3-ASR takes about 400 MB, Parakeet about 150 MB): the other lets go.
+                foreach (OmniSpeech other in All)
+                    if (other != this && !other.KeepLoaded)
+                        await other.ReleaseAsync();
                 stage?.Report("Loading the speech model...");
                 // Init verifies the files (hashing them once) and skips its own download.
                 await model.Init("cpu", CpuThreadSettings.Count, cancel);
@@ -120,11 +160,12 @@ namespace Emgu.LiteRT.LM.Maui
             return model;
         }
 
-        // The .tflite and tokenizer.json LiteRT-LM before v0.19.0 loaded (614 MB): not needed once the .litertlm loads.
+        // Files an older LiteRT-LM loaded instead (Parakeet's .tflite and tokenizer.json before v0.19.0, 614 MB): not
+        // needed once the .litertlm loads.
         private void DeleteObsoleteFiles()
         {
             string folder = System.IO.Path.GetDirectoryName(ModelFile.LocalFile);
-            foreach (string name in ParakeetTdt06BV3.ObsoleteFileNames)
+            foreach (string name in _obsoleteFileNames)
                 foreach (string path in new[] { name, name + ".sha256ok" })
                 {
                     try { System.IO.File.Delete(System.IO.Path.Combine(folder, path)); }
@@ -140,12 +181,12 @@ namespace Emgu.LiteRT.LM.Maui
         /// <param name="cancel">Stops recognizing</param>
         public async Task<string> TranscribeAsync(float[] samples, int sampleRate, IProgress<string> partial, IProgress<string> stage, CancellationToken cancel)
         {
-            ParakeetTdt06BV3 model = await LoadedAsync(stage, cancel);
+            SpeechToTextModel model = await LoadedAsync(stage, cancel);
             await _gate.WaitAsync(cancel);
             try
             {
                 CancelRelease();
-                // Freed meanwhile (Storage, idle): load it again.
+                // Freed meanwhile (Storage, idle, the other model loaded): load it again.
                 if (!model.Initialized)
                     model = await LoadedAsync(stage, cancel);
                 return (await model.TranscribeAsync(samples, sampleRate, partial, cancel)).Trim();
@@ -163,7 +204,7 @@ namespace Emgu.LiteRT.LM.Maui
             await _gate.WaitAsync();
             try
             {
-                Task<ParakeetTdt06BV3> load;
+                Task<SpeechToTextModel> load;
                 lock (_lock)
                 {
                     load = _load;

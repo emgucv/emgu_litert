@@ -208,7 +208,8 @@ namespace Emgu.LiteRT.LM.Models
         /// Append a piece of confirmed text, with one space between pieces. The model capitalizes the first word of
         /// each window, so a piece that continues a sentence ("...morning, | Clearing by the afternoon") gets its first
         /// word lowercased - unless it looks like a name: "I", a word with other capitals, or one followed by another
-        /// capitalized word ("City Library").
+        /// capitalized word ("City Library"). Chinese and Japanese have no spaces between words, so a seam next to their
+        /// characters (Han, kana, or their punctuation) gets none.
         /// </summary>
         /// <param name="text">The text so far</param>
         /// <param name="piece">The piece</param>
@@ -222,9 +223,20 @@ namespace Emgu.LiteRT.LM.Models
                 end--;
             if (end > 0 && ".?!:;\"”".IndexOf(text[end - 1]) < 0)
                 piece = LowercaseFirstWord(piece);
-            if (text.Length > 0 && !Char.IsWhiteSpace(text[text.Length - 1]))
+            if (text.Length > 0 && !Char.IsWhiteSpace(text[text.Length - 1]) && !IsUnspaced(text[text.Length - 1]) && !IsUnspaced(piece[0]))
                 text.Append(' ');
             text.Append(piece);
+        }
+
+        // Han ideographs, kana and CJK or full-width punctuation: written without spaces between words (Korean's Hangul is not).
+        private static bool IsUnspaced(char c)
+        {
+            return (c >= '　' && c <= 'ヿ')    // CJK punctuation, hiragana, katakana
+                || (c >= 'ㇰ' && c <= 'ㇿ')    // katakana extensions
+                || (c >= '㐀' && c <= '䶿')    // Han extension A
+                || (c >= '一' && c <= '鿿')    // Han
+                || (c >= '豈' && c <= '﫿')    // Han compatibility
+                || (c >= '＀' && c <= '･');   // full-width forms and half-width CJK punctuation
         }
 
         private static String LowercaseFirstWord(String piece)
@@ -356,6 +368,69 @@ namespace Emgu.LiteRT.LM.Models
         public ParakeetTdt06BV3()
         {
             TextMerger = "levenshtein";
+        }
+
+        private readonly DownloadableFile _modelFile = DefaultModelFile;
+
+        /// <inheritdoc/>
+        public override DownloadableFile ModelFile
+        {
+            get { return _modelFile; }
+        }
+    }
+
+    /// <summary>
+    /// Alibaba Qwen's Qwen3-ASR-0.6B (int8, LiteRT): speech recognition in 30 languages - Chinese, Japanese, Korean,
+    /// Arabic, Hindi and others Parakeet doesn't have - and Chinese dialects, detected automatically, with punctuation.
+    /// Apache-2.0. An audio encoder and a small Qwen3 language model as the decoder, so it is slower and larger than
+    /// Parakeet: on an M1's CPU a 21 s English clip took 5.3 s with the load (Parakeet 1.7 s) and 365 MB (Parakeet 114 MB),
+    /// with fewer errors (1.4-2.8% of the words against 4-6%). One 960 MB .litertlm, downloaded on Init.
+    /// </summary>
+    public class Qwen3Asr06B : SpeechToTextModel
+    {
+        /// <summary>The model's name in LiteRT-LM's registry.</summary>
+        public const String RegisteredName = "qwen3-asr-0.6b";
+
+        /// <summary>
+        /// Its languages (ISO 639-1, and "yue" for Cantonese and "fil" for Filipino), from Qwen's model card: Chinese,
+        /// English, Cantonese, Arabic, German, French, Spanish, Portuguese, Indonesian, Italian, Korean, Russian, Thai,
+        /// Vietnamese, Japanese, Turkish, Hindi, Malay, Dutch, Swedish, Danish, Finnish, Polish, Czech, Filipino, Persian,
+        /// Greek, Hungarian, Macedonian and Romanian. It detects which is spoken.
+        /// </summary>
+        public static readonly String[] Languages =
+        {
+            "zh", "en", "yue", "ar", "de", "fr", "es", "pt", "id", "it", "ko", "ru", "th", "vi", "ja", "tr", "hi", "ms", "nl",
+            "sv", "da", "fi", "pl", "cs", "fil", "fa", "el", "hu", "mk", "ro"
+        };
+
+        /// <inheritdoc/>
+        public override String ModelName
+        {
+            get { return RegisteredName; }
+        }
+
+        /// <summary>The model file (int8, 5 s windows, with the tokenizer), at the Hugging Face revision checked here.</summary>
+        public static DownloadableFile DefaultModelFile
+        {
+            get
+            {
+                return new DownloadableFile(
+                    "https://huggingface.co/litert-community/Qwen3-ASR-0.6B/resolve/80384dfbad4a6cd0c698892395c4664fd122c081/qwen3_asr_0.6b_5s_i8.litertlm",
+                    LanguageModel.DefaultLocalSubfolder,
+                    "d4444d51f0c08142f57e16097673150f3ea02900a00b29a58a41f6e7578db251");
+            }
+        }
+
+        /// <summary>The model file's size in bytes.</summary>
+        public const long FileSize = 959627232;
+
+        /// <summary>
+        /// Create the model with LiteRT-LM's default text merger: its decoder gives no word times, and the timestamp
+        /// merger then joins the windows by word count - as good as or better than the Levenshtein one on English,
+        /// Spanish, Chinese and Japanese clips of 20-26 s (2026-11-02), which left capitalized words at the seams.
+        /// </summary>
+        public Qwen3Asr06B()
+        {
         }
 
         private readonly DownloadableFile _modelFile = DefaultModelFile;

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Emgu.LiteRT.LM.Models;
 
 namespace Emgu.LiteRT.LM.Chat;
 
@@ -16,17 +17,20 @@ public enum SpeechEngine
     /// <summary>The platform's speech recognizer: Android's or Apple's.</summary>
     System,
     /// <summary>NVIDIA's Parakeet-TDT-0.6B-v3 on LiteRT-LM, on the device (Emgu.LiteRT.LM.Models' <c>ParakeetTdt06BV3</c>).</summary>
-    Parakeet
+    Parakeet,
+    /// <summary>Alibaba Qwen's Qwen3-ASR-0.6B on LiteRT-LM, on the device (Emgu.LiteRT.LM.Models' <c>Qwen3Asr06B</c>).</summary>
+    Qwen3Asr
 }
 
 /// <summary>
-/// Choosing what writes down a recording: Parakeet when it was chosen (or there is no other, as on Windows) and it has the
-/// language spoken, else the platform's recognizer - Parakeet has 25 European languages, so Chinese or Japanese still
-/// go to the platform's. And reading a recording's samples for it.
+/// Choosing what writes down a recording: the on-device model chosen (Parakeet or Qwen3-ASR) when it has the language
+/// spoken, else the other on-device model when it is downloaded and has it (Parakeet chosen, Japanese spoken: Qwen3-ASR),
+/// else the platform's recognizer - or, where there is none (Windows), whichever model has the language. Parakeet has 25
+/// European languages, Qwen3-ASR 30 including Chinese, Japanese and Korean. And reading a recording's samples for it.
 /// </summary>
 public static class SpeechEngines
 {
-    /// <summary>The settings key of the choice ("system" or "parakeet"; absent: the platform's where there is one).</summary>
+    /// <summary>The settings key of the choice ("system", "parakeet" or "qwen3_asr"; absent: the platform's where there is one).</summary>
     public const string SettingKey = "speech_engine";
 
     /// <summary>
@@ -50,35 +54,82 @@ public static class SpeechEngines
         return ParakeetLanguages.Contains(language, StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>Qwen3-ASR-0.6B's languages (ISO 639-1, "yue" for Cantonese, "fil" for Filipino), from Qwen's model card. It detects which is spoken.</summary>
+    public static IReadOnlyList<string> Qwen3AsrLanguages => Qwen3Asr06B.Languages;
+
+    /// <summary>Whether Qwen3-ASR has a language (any region of it).</summary>
+    /// <param name="tag">A BCP-47 tag, e.g. "zh-CN"</param>
+    public static bool Qwen3AsrCovers(string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+            return false;
+        string language = VoiceLanguages.Resolve(tag, null).Split('-')[0];
+        return Qwen3AsrLanguages.Contains(language, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The on-device models, in the order they are tried.</summary>
+    public static readonly IReadOnlyList<SpeechEngine> Models = new[] { SpeechEngine.Parakeet, SpeechEngine.Qwen3Asr };
+
+    /// <summary>Whether an engine has a language: the platform's always says it does (it tells when it doesn't).</summary>
+    /// <param name="engine">The engine</param>
+    /// <param name="tag">A BCP-47 tag</param>
+    public static bool Covers(SpeechEngine engine, string tag)
+    {
+        switch (engine)
+        {
+            case SpeechEngine.Parakeet: return ParakeetCovers(tag);
+            case SpeechEngine.Qwen3Asr: return Qwen3AsrCovers(tag);
+            default: return true;
+        }
+    }
+
     /// <summary>
-    /// What writes down a recording: Parakeet when it was chosen, or when there is no platform recognizer, and it is here
-    /// and has the language spoken; else the platform's recognizer; null when neither can.
+    /// What writes down a recording: the on-device model chosen when it has the language spoken; else the other one if it
+    /// is downloaded and has it; else the platform's recognizer; where there is no platform recognizer, whichever model has
+    /// the language (downloaded when it is used); null when nothing can.
     /// </summary>
     /// <param name="choice">The user's choice</param>
     /// <param name="systemSupported">Whether the platform's recognizer can write down recordings here</param>
-    /// <param name="parakeetAvailable">Whether Parakeet can run here (its native library is in the app)</param>
+    /// <param name="modelsAvailable">Whether the on-device models can run here (their native library is in the app)</param>
+    /// <param name="isDownloaded">Whether a model is downloaded, or null for none</param>
     /// <param name="voiceLanguage">The language chosen in the settings, or null / empty for the device's</param>
     /// <param name="deviceLanguage">The device's language</param>
-    public static SpeechEngine? Choose(SpeechEngine choice, bool systemSupported, bool parakeetAvailable, string voiceLanguage, string deviceLanguage)
+    public static SpeechEngine? Choose(SpeechEngine choice, bool systemSupported, bool modelsAvailable, Func<SpeechEngine, bool> isDownloaded,
+        string voiceLanguage, string deviceLanguage)
     {
-        bool wantParakeet = choice == SpeechEngine.Parakeet || !systemSupported;
-        if (wantParakeet && parakeetAvailable && ParakeetCovers(VoiceLanguages.Resolve(voiceLanguage, deviceLanguage)))
-            return SpeechEngine.Parakeet;
+        string language = VoiceLanguages.Resolve(voiceLanguage, deviceLanguage);
+        if (modelsAvailable && (choice != SpeechEngine.System || !systemSupported))
+        {
+            if (choice != SpeechEngine.System && Covers(choice, language))
+                return choice;
+            foreach (SpeechEngine model in Models)
+                if (model != choice && Covers(model, language) && isDownloaded != null && isDownloaded(model))
+                    return model;
+            if (!systemSupported)
+                foreach (SpeechEngine model in Models)
+                    if (Covers(model, language))
+                        return model;
+        }
         return systemSupported ? SpeechEngine.System : (SpeechEngine?)null;
     }
 
-    /// <summary>The choice in a setting's value: Parakeet for "parakeet", else the platform's.</summary>
+    /// <summary>The choice in a setting's value: Parakeet for "parakeet", Qwen3-ASR for "qwen3_asr", else the platform's.</summary>
     /// <param name="value">The setting's value, or null</param>
     /// <param name="systemSupported">Whether the platform's recognizer works here (without one, Parakeet is the default)</param>
     public static SpeechEngine Parse(string value, bool systemSupported)
     {
         if (string.IsNullOrEmpty(value))
             return systemSupported ? SpeechEngine.System : SpeechEngine.Parakeet;
-        return string.Equals(value, "parakeet", StringComparison.OrdinalIgnoreCase) ? SpeechEngine.Parakeet : SpeechEngine.System;
+        if (string.Equals(value, "parakeet", StringComparison.OrdinalIgnoreCase))
+            return SpeechEngine.Parakeet;
+        if (string.Equals(value, "qwen3_asr", StringComparison.OrdinalIgnoreCase))
+            return SpeechEngine.Qwen3Asr;
+        return SpeechEngine.System;
     }
 
     /// <summary>A choice's setting value.</summary>
-    public static string ToSetting(SpeechEngine engine) => engine == SpeechEngine.Parakeet ? "parakeet" : "system";
+    public static string ToSetting(SpeechEngine engine) =>
+        engine == SpeechEngine.Parakeet ? "parakeet" : engine == SpeechEngine.Qwen3Asr ? "qwen3_asr" : "system";
 
     /// <summary>
     /// A 16-bit PCM WAV recording's samples, mono, in [-1, 1] (a stereo one is mixed down); its other chunks (Apple's

@@ -153,6 +153,7 @@ def curated():
         ("Bonsai Image 4B", "litert-community/Bonsai-Image-ternary-4B", "prism-ml/bonsai-image-ternary-4B-unpacked", "PrismML"),
         ("FLUX.2-klein 4B", "litert-community/FLUX.2-klein-4B-LiteRT", "black-forest-labs/FLUX.2-klein-4B", "Black Forest Labs"),
         ("Kokoro 82M", "litert-community/Kokoro-82M", "hexgrad/Kokoro-82M", "hexgrad"),
+        ("Qwen3-ASR 0.6B", "litert-community/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-0.6B", "Alibaba Cloud (Qwen team)"),
     ]:
         add(model, name, "Apache-2.0", APACHE, copyright=by, url=hf + base,
             used_for="LiteRT conversion: " + hf + repo)

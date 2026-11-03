@@ -750,4 +750,25 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] On a phone: a hands-free voice-chat turn with Kokoro (the microphone pausing and resuming around its playback), a camera alert's `speak_text`, and memory beside Gemma 4 E2B on the GPU.
 - [ ] Shorter pauses: play the pieces gaplessly (AudioTrack, AVAudioEngine, AudioGraph) instead of a WAV file and a player each; start the first sound sooner by cutting the first sentence at a comma.
 - [ ] Mac Catalyst through the UI (the section, "Try it", a reply read aloud); iOS on a device (the CPU file there).
-- [ ] Next omni models: Qwen3-ASR 0.6B (Chinese, Japanese and the other languages Parakeet lacks), then maybe Moonshine or Whisper tiny for older phones.
+- [x] Next omni models: Qwen3-ASR 0.6B (Chinese, Japanese and the other languages Parakeet lacks) - item 58.
+
+## 58. Qwen3-ASR speech recognition through LiteRT-LM's omni engine
+
+`libomniextern` writes down speech with Alibaba Qwen's Qwen3-ASR-0.6B too (2026-11-02): `Qwen3Asr06B` (30 languages,
+960 MB), `SpeechEngine.Qwen3Asr` and its routing in `SpeechEngines.Choose` (the chosen model when it has the language,
+else the other downloaded one, else the device's recognizer), `OmniSpeech` (was `ParakeetSpeech`) for both models, a
+third chip in Settings > Speech recognition, a Storage row, and no spaces at Chinese and Japanese window seams
+(`SpeechToTextModel.Append`). Measurements in `docs/litert-lm.md`, "Speech recognition".
+
+- [x] Mac: `omni_runner` on 12 synthetic clips in 8 languages (CPU and GPU, both mergers, overlaps 0.4 and 0.75);
+  `UnitTestQwen3Asr` (English, Chinese, Japanese, 24 s of Chinese across windows) and the model-free routing tests.
+- [x] macOS, iOS and Android natives rebuilt; the demo builds for Android.
+- [ ] On a phone (the Galaxy S10 when it is back on adb): Settings > Speech recognition with Qwen3-ASR (download or
+  `MODELS_OVERRIDE`), a Japanese voice message, Parakeet chosen with Chinese spoken (Qwen3-ASR used when downloaded), a
+  short meeting, its speed, and memory beside Gemma 4 E2B on the GPU.
+- [ ] Mac Catalyst and iOS: the Catalyst build needs `SupportedOSPlatformVersion` 17.0 with the new Mac Catalyst SDK
+  pack, and the iOS simulator build fails to link (`_xamarin_initialize_dynamic_registrar`) since Xcode 27.2 - both from
+  the toolchain update, not this change.
+- [ ] Maybe: pass the language Qwen3-ASR detects back (its decoder skips it; a LiteRT-LM change), and the 1.7B model on
+  computers.
+- [ ] Next omni models: maybe Moonshine tiny (English, 52 MB) or Whisper tiny for older phones.

@@ -343,13 +343,18 @@ public sealed class LiteRtLmChatPage : ChatPage
         using var multimodal = new EmbeddingGemma2Multimodal();
         models.Add(new StorageModel("EmbeddingGemma 2 Text Vision 440M", System.IO.Path.GetFileName(vision.DefaultModelFile.LocalFile), isSearch: true) { Download = vision.DefaultModelFile });
         models.Add(new StorageModel("EmbeddingGemma 2 Multimodal 740M", System.IO.Path.GetFileName(multimodal.DefaultModelFile.LocalFile), isSearch: true) { Download = multimodal.DefaultModelFile });
-        ParakeetSpeech speech = ParakeetSpeech.Default;
-        if (ParakeetSpeech.IsAvailable)
-            // The files the app used before LiteRT-LM v0.19.0 are counted and deleted with it, if still there.
-            models.Add(StorageModel.Speech(ParakeetSpeech.Name, System.IO.Path.GetFileName(speech.ModelFile.LocalFile),
+        if (OmniSpeech.IsAvailable)
+        {
+            // The files the app used before LiteRT-LM v0.19.0 are counted and deleted with Parakeet, if still there.
+            models.Add(StorageModel.Speech(OmniSpeech.Parakeet.Name, System.IO.Path.GetFileName(OmniSpeech.Parakeet.ModelFile.LocalFile),
                 ParakeetTdt06BV3.ObsoleteFileNames,
-                "Speech recognition model. Deleting goes back to the device's speech recognizer.",
+                "Speech recognition model (25 European languages). Deleting it when it is chosen goes back to the device's speech recognizer.",
                 new[] { ParakeetTdt06BV3.RegisteredName }));
+            models.Add(StorageModel.Speech(OmniSpeech.Qwen3Asr.Name, System.IO.Path.GetFileName(OmniSpeech.Qwen3Asr.ModelFile.LocalFile),
+                null,
+                "Speech recognition model (30 languages, Chinese, Japanese and Korean among them). Deleting it when it is chosen goes back to the device's speech recognizer.",
+                new[] { Qwen3Asr06B.RegisteredName }));
+        }
         if (Emgu.LiteRT.LM.OmniInvoke.IsAvailable)
         {
             using Kokoro82M kokoro = KokoroSpeech.CreateModel();

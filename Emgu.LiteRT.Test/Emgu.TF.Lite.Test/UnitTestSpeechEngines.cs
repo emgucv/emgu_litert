@@ -9,26 +9,53 @@ using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
 
-// Choosing what writes down a recording (the device's recognizer or Parakeet), and reading a recording's samples.
+// Choosing what writes down a recording (the device's recognizer, Parakeet or Qwen3-ASR), and reading a recording's samples.
 [TestFixture]
 public class UnitTestSpeechEngines
 {
+    private static readonly Func<SpeechEngine, bool> NoneDownloaded = _ => false;
+    private static readonly Func<SpeechEngine, bool> QwenDownloaded = m => m == SpeechEngine.Qwen3Asr;
+    private static readonly Func<SpeechEngine, bool> ParakeetDownloaded = m => m == SpeechEngine.Parakeet;
+
     [Test]
     public void ParakeetWhenChosenAndItKnowsTheLanguage()
     {
         // Chosen, and English (the device's) or a chosen French: Parakeet.
-        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, true, null, "en-US"), Is.EqualTo(SpeechEngine.Parakeet));
-        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, true, "fr-FR", "ja-JP"), Is.EqualTo(SpeechEngine.Parakeet));
-        // Japanese, chosen or the device's: the device's recognizer.
-        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, true, "ja-JP", "en-US"), Is.EqualTo(SpeechEngine.System));
-        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, true, null, "zh-Hans-CN"), Is.EqualTo(SpeechEngine.System));
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, true, NoneDownloaded, null, "en-US"), Is.EqualTo(SpeechEngine.Parakeet));
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, true, NoneDownloaded, "fr-FR", "ja-JP"), Is.EqualTo(SpeechEngine.Parakeet));
+        // Japanese, chosen or the device's, and Qwen3-ASR not downloaded: the device's recognizer.
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, true, NoneDownloaded, "ja-JP", "en-US"), Is.EqualTo(SpeechEngine.System));
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, true, NoneDownloaded, null, "zh-Hans-CN"), Is.EqualTo(SpeechEngine.System));
         // Not chosen, or not in the app: the device's.
-        Assert.That(SpeechEngines.Choose(SpeechEngine.System, true, true, null, "en-US"), Is.EqualTo(SpeechEngine.System));
-        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, false, null, "en-US"), Is.EqualTo(SpeechEngine.System));
-        // No recognizer of the device's (Windows): Parakeet even when not chosen, for the languages it knows; else nothing.
-        Assert.That(SpeechEngines.Choose(SpeechEngine.System, false, true, null, "de-DE"), Is.EqualTo(SpeechEngine.Parakeet));
-        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, false, true, "ja-JP", "en-US"), Is.Null);
-        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, false, false, null, "en-US"), Is.Null);
+        Assert.That(SpeechEngines.Choose(SpeechEngine.System, true, true, QwenDownloaded, null, "en-US"), Is.EqualTo(SpeechEngine.System));
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, false, NoneDownloaded, null, "en-US"), Is.EqualTo(SpeechEngine.System));
+    }
+
+    [Test]
+    public void TheOtherModelWhenItIsDownloadedAndKnowsTheLanguage()
+    {
+        // Parakeet chosen, Japanese or Chinese spoken, Qwen3-ASR downloaded: Qwen3-ASR.
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, true, QwenDownloaded, "ja-JP", "en-US"), Is.EqualTo(SpeechEngine.Qwen3Asr));
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, true, true, QwenDownloaded, null, "zh-Hans-CN"), Is.EqualTo(SpeechEngine.Qwen3Asr));
+        // Qwen3-ASR chosen: it, for the languages it has (English too, though Parakeet is downloaded).
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Qwen3Asr, true, true, ParakeetDownloaded, null, "en-US"), Is.EqualTo(SpeechEngine.Qwen3Asr));
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Qwen3Asr, true, true, NoneDownloaded, "ko-KR", "en-US"), Is.EqualTo(SpeechEngine.Qwen3Asr));
+        // Qwen3-ASR chosen, Ukrainian (Parakeet's, not Qwen3-ASR's): Parakeet if it is downloaded, else the device's.
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Qwen3Asr, true, true, ParakeetDownloaded, "uk-UA", "en-US"), Is.EqualTo(SpeechEngine.Parakeet));
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Qwen3Asr, true, true, NoneDownloaded, "uk-UA", "en-US"), Is.EqualTo(SpeechEngine.System));
+        // Neither has it (Norwegian): the device's.
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Qwen3Asr, true, true, m => true, "nb-NO", "en-US"), Is.EqualTo(SpeechEngine.System));
+    }
+
+    [Test]
+    public void WithoutTheDevicesRecognizerAModelThatKnowsTheLanguage()
+    {
+        // No recognizer of the device's (Windows): Parakeet even when not chosen, for the languages it knows; Qwen3-ASR
+        // for the others it has, downloaded or not; else nothing.
+        Assert.That(SpeechEngines.Choose(SpeechEngine.System, false, true, NoneDownloaded, null, "de-DE"), Is.EqualTo(SpeechEngine.Parakeet));
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, false, true, NoneDownloaded, "ja-JP", "en-US"), Is.EqualTo(SpeechEngine.Qwen3Asr));
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, false, true, NoneDownloaded, "nb-NO", "en-US"), Is.Null);
+        Assert.That(SpeechEngines.Choose(SpeechEngine.Parakeet, false, false, NoneDownloaded, null, "en-US"), Is.Null);
     }
 
     [Test]
@@ -42,12 +69,23 @@ public class UnitTestSpeechEngines
     }
 
     [Test]
+    public void KnowsQwen3AsrsLanguages()
+    {
+        Assert.That(SpeechEngines.Qwen3AsrLanguages.Count, Is.EqualTo(30));
+        foreach (string tag in new[] { "zh-Hans", "zh-HK", "ja-JP", "ko-KR", "ar-SA", "hi-IN", "th", "en-GB", "es_419", "fil-PH", "yue" })
+            Assert.That(SpeechEngines.Qwen3AsrCovers(tag), Is.True, tag);
+        foreach (string tag in new[] { "uk-UA", "nb-NO", "bg", "he-IL", "", null })
+            Assert.That(SpeechEngines.Qwen3AsrCovers(tag), Is.False, tag ?? "null");
+    }
+
+    [Test]
     public void TheSettingDefaultsToTheDevicesRecognizerWhereThereIsOne()
     {
         Assert.That(SpeechEngines.Parse(null, true), Is.EqualTo(SpeechEngine.System));
         Assert.That(SpeechEngines.Parse("", false), Is.EqualTo(SpeechEngine.Parakeet));
-        Assert.That(SpeechEngines.Parse(SpeechEngines.ToSetting(SpeechEngine.Parakeet), true), Is.EqualTo(SpeechEngine.Parakeet));
-        Assert.That(SpeechEngines.Parse(SpeechEngines.ToSetting(SpeechEngine.System), false), Is.EqualTo(SpeechEngine.System));
+        foreach (SpeechEngine engine in new[] { SpeechEngine.System, SpeechEngine.Parakeet, SpeechEngine.Qwen3Asr })
+            Assert.That(SpeechEngines.Parse(SpeechEngines.ToSetting(engine), false), Is.EqualTo(engine));
+        Assert.That(SpeechEngines.ToSetting(SpeechEngine.Qwen3Asr), Is.EqualTo("qwen3_asr"));
     }
 
     // A WAV file with the chunks given after "fmt ".

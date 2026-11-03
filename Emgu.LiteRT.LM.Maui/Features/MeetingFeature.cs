@@ -13,8 +13,8 @@ namespace Emgu.LiteRT.LM.Maui.Features;
 /// microphone's samples (<see cref="MicrophoneSoundSource"/>, through <see cref="MicrophoneGate"/>, so other listeners pause)
 /// are cut into 30-50 s pieces at quiet moments (<see cref="MeetingAudioChunker"/>), and each piece is written down by the
 /// platform's speech recognizer (<see cref="SpeechRecognizer"/>: on the device where it can be) while the recording goes on,
-/// so the card shows the transcript as it grows - or by Parakeet when it is the speech engine (<see cref="ParakeetSpeech"/>:
-/// 15-28 s pieces, each shown as it is written down, the model kept loaded until the meeting is). Stop (the card, or <see cref="Stop"/> from elsewhere - e.g. an app's
+/// so the card shows the transcript as it grows - or by a model on the device when it is the speech engine (<see cref="OmniSpeech"/>,
+/// Parakeet or Qwen3-ASR: 15-28 s pieces, each shown as it is written down, the model kept loaded until the meeting is). Stop (the card, or <see cref="Stop"/> from elsewhere - e.g. an app's
 /// notification, with a foreground service it keeps running through <see cref="SyncBackgroundService"/>) writes down the
 /// rest, then the model writes the notes in requests of its own (<see cref="MeetingNotes"/>: section summaries first when
 /// the transcript is longer than the window), shown in the card; the notes and the transcript go to
@@ -218,7 +218,7 @@ public sealed class MeetingFeature : ChatFeature
         MeetingTranscriber? used = Transcriber;
         string now = used == MeetingTranscriber.Model ? model + " writes down what is said as it records - more accurate than the speech recognizer, but slow on a phone (Gemma 4 E2B took 3 s per second of speech on a Pixel Fold) and the chat waits meanwhile."
             : used == MeetingTranscriber.RecognizerThenModel ? "The speech recognizer writes it down as it records, then " + model + " again after Stop for a better transcript (on a phone that takes about 3 s per second of speech)."
-            : used == MeetingTranscriber.Recognizer ? (SpeechRecognizer.CurrentEngine == SpeechEngine.Parakeet ? "Parakeet writes down what is said on the device as it records (Settings > Speech recognition)."
+            : used == MeetingTranscriber.Recognizer ? (SpeechRecognizer.CurrentModel is OmniSpeech speech ? speech.Name + " writes down what is said on the device as it records (Settings > Speech recognition)."
                 : "The device's speech recognizer writes down what is said as it records.")
             : "Meetings can't be written down here: there is no speech recognizer and the chat model doesn't take audio.";
         if (used != null)
@@ -241,14 +241,14 @@ public sealed class MeetingFeature : ChatFeature
 #if ANDROID || IOS || MACCATALYST
         MeetingTranscriber? transcriber = Transcriber;
         if (transcriber == null)
-            return "Writing down speech needs a speech recognizer (Android 13 or later, an iPhone, iPad or a Mac, or Parakeet in Settings > Speech recognition for the languages it knows) or a chat model that hears audio (Gemma 4). Tell the user.";
+            return "Writing down speech needs a speech recognizer (Android 13 or later, an iPhone, iPad or a Mac, or Parakeet or Qwen3-ASR in Settings > Speech recognition for the languages they know) or a chat model that hears audio (Gemma 4). Tell the user.";
         if (_meeting != null)
             return "A meeting is already being recorded. Tell the user.";
         var session = new MeetingSession { Title = title ?? "", Started = DateTime.Now, Voiceprint = Voiceprint, Transcriber = transcriber.Value };
-        // The model takes clips of at most 30 s; after Stop it writes down the same pieces again. Parakeet takes the same
-        // shorter pieces: it keeps up on a phone, so the text comes sooner.
-        bool parakeet = session.Transcriber != MeetingTranscriber.Model && SpeechRecognizer.CurrentEngine == SpeechEngine.Parakeet;
-        bool modelPieces = session.Transcriber != MeetingTranscriber.Recognizer || parakeet;
+        // The model takes clips of at most 30 s; after Stop it writes down the same pieces again. A speech model on the
+        // device (Parakeet, Qwen3-ASR) takes the same shorter pieces: it keeps up on a phone, so the text comes sooner.
+        OmniSpeech speechModel = session.Transcriber != MeetingTranscriber.Model ? SpeechRecognizer.CurrentModel : null;
+        bool modelPieces = session.Transcriber != MeetingTranscriber.Recognizer || speechModel != null;
         session.Chunker = new MeetingAudioChunker(16000, modelPieces ? MeetingTranscription.ModelMinSeconds : 30,
             modelPieces ? MeetingTranscription.ModelMaxSeconds : 50, session.Voiceprint != null ? TurnSeconds : 0);
         session.PieceFolder = System.IO.Path.Combine(FileSystem.CacheDirectory, "meeting-pieces", Guid.NewGuid().ToString("N"));
@@ -302,8 +302,8 @@ public sealed class MeetingFeature : ChatFeature
             return "Microphone access was denied, so nothing could be recorded. Tell the user they can allow it in the system settings.";
         }
         _meeting = session;
-        // Parakeet stays loaded until the meeting is written down.
-        if (parakeet) ParakeetSpeech.Default.KeepLoaded = true;
+        // The speech model stays loaded until the meeting is written down.
+        if (speechModel != null) speechModel.KeepLoaded = true;
 #if IOS
         // Without the audio background mode (UIBackgroundModes in Info.plist), iOS stops the microphone when the screen locks.
         if (!MicrophoneSoundSource.CanRecordInBackground)
@@ -368,7 +368,7 @@ public sealed class MeetingFeature : ChatFeature
         finally
         {
             try { if (Directory.Exists(session.PieceFolder)) Directory.Delete(session.PieceFolder, true); } catch (Exception) { }
-            if (parakeet) ParakeetSpeech.Default.KeepLoaded = false;
+            if (speechModel != null) speechModel.KeepLoaded = false;
         }
         _work?.Update("Saving the recording…");
         await KeepRecordingAsync(session);
@@ -635,7 +635,7 @@ public sealed class MeetingFeature : ChatFeature
                             text = chunk.HasSpeech ? await ModelStepAsync(session, "write down the meeting", () => TranscribeWithModelAsync(wav, CancellationToken.None), CancellationToken.None) : string.Empty;
                         else
                         {
-                            // Parakeet tells the text as it goes (every 5 s of the piece): shown under what is written down.
+                            // A speech model on the device tells the text as it goes (every 5 s of the piece): shown under what is written down.
                             var partial = new Progress<string>(writing => ShowMeetingProgress(session, writing));
                             text = await SpeechRecognizer.TranscribeAsync(chunk.Samples, chunk.SampleRate, partial, null, CancellationToken.None);
                             if (session.Transcriber == MeetingTranscriber.RecognizerThenModel && chunk.HasSpeech)

@@ -10,8 +10,9 @@ namespace Emgu.LiteRT.LM.Maui
     /// Turns a voice recording (<see cref="VoiceRecorder"/>'s 16 kHz mono WAV) into text with the platform's speech
     /// recognizer - on the device where it can be - so models that don't take audio (a server's model, small text models)
     /// can be talked to: Android's SpeechRecognizer fed the recording (Android 13+), and Apple's Speech framework on iOS
-    /// and Mac Catalyst. Or with NVIDIA's Parakeet on the device (<see cref="ParakeetSpeech"/>) when it is the
-    /// <see cref="Engine"/> and has the language (<see cref="SpeechEngines.Choose"/>) - the only one on Windows.
+    /// and Mac Catalyst. Or with a model on the device (<see cref="OmniSpeech"/>: NVIDIA's Parakeet, Alibaba Qwen's
+    /// Qwen3-ASR) when it is the <see cref="Engine"/> and has the language, or another downloaded one has it
+    /// (<see cref="SpeechEngines.Choose"/>) - the only ones on Windows.
     /// <para>
     /// iOS and Mac Catalyst ask the user the first time, which needs <c>NSSpeechRecognitionUsageDescription</c> in
     /// Info.plist. On Android the on-device recognizer is used when it has the language; otherwise the normal one, which
@@ -43,12 +44,16 @@ namespace Emgu.LiteRT.LM.Maui
         /// </summary>
         public static SpeechEngine Engine { get; set; } = SpeechEngines.Parse(null, SystemSupported);
 
-        /// <summary>True if this device can write down a recording: with its own recognizer, or with Parakeet.</summary>
-        public static bool IsSupported => SystemSupported || ParakeetSpeech.IsAvailable;
+        /// <summary>True if this device can write down a recording: with its own recognizer, or with a model on the device.</summary>
+        public static bool IsSupported => SystemSupported || OmniSpeech.IsAvailable;
 
-        /// <summary>What writes down the next recording, or null when nothing can (Parakeet doesn't have the language and there's no other).</summary>
+        /// <summary>What writes down the next recording, or null when nothing can (no model has the language and there's no other).</summary>
         public static SpeechEngine? CurrentEngine =>
-            SpeechEngines.Choose(Engine, SystemSupported, ParakeetSpeech.IsAvailable, Language, System.Globalization.CultureInfo.CurrentUICulture.Name);
+            SpeechEngines.Choose(Engine, SystemSupported, OmniSpeech.IsAvailable, e => OmniSpeech.For(e)?.IsDownloaded == true,
+                Language, System.Globalization.CultureInfo.CurrentUICulture.Name);
+
+        /// <summary>The model on the device that writes down the next recording, or null for the platform's recognizer (or none).</summary>
+        public static OmniSpeech CurrentModel => CurrentEngine is SpeechEngine engine ? OmniSpeech.For(engine) : null;
 
         /// <summary>True if the platform's own recognizer can write down a recording (Android 13+ with a recognizer, iOS, Mac Catalyst).</summary>
         public static bool SystemSupported
@@ -80,51 +85,56 @@ namespace Emgu.LiteRT.LM.Maui
         public static Task<string> TranscribeAsync(byte[] wav, CancellationToken token = default) => TranscribeAsync(wav, null, null, token);
 
         /// <summary>
-        /// The words in the recording, or an empty string if none were recognised; with Parakeet, the text so far as it goes.
+        /// The words in the recording, or an empty string if none were recognised; with a model on the device, the text so
+        /// far as it goes.
         /// </summary>
         /// <param name="wav">A 16 kHz mono 16-bit WAV recording, as <see cref="VoiceRecorder.StopAsync"/> returns</param>
-        /// <param name="partial">Told the text so far (Parakeet, every 5 s of the recording), or null</param>
-        /// <param name="stage">Told Parakeet's download and loading, or null</param>
+        /// <param name="partial">Told the text so far (a model on the device, every 5 s of the recording), or null</param>
+        /// <param name="stage">Told the model's download and loading, or null</param>
         /// <param name="token">Stops recognizing</param>
         public static async Task<string> TranscribeAsync(byte[] wav, IProgress<string> partial, IProgress<string> stage, CancellationToken token)
         {
-            if (UseParakeet())
+            OmniSpeech model = UseModel();
+            if (model != null)
             {
                 float[] samples = SpeechEngines.WavSamples(wav, out int rate);
-                return await ParakeetSpeech.Default.TranscribeAsync(samples, rate, partial, stage, token);
+                return await model.TranscribeAsync(samples, rate, partial, stage, token);
             }
             return await TranscribeSystemAsync(wav, token);
         }
 
         /// <summary>
-        /// The words in some audio (a meeting's piece), or an empty string if none were recognised; with Parakeet, the
-        /// text so far as it goes.
+        /// The words in some audio (a meeting's piece), or an empty string if none were recognised; with a model on the
+        /// device, the text so far as it goes.
         /// </summary>
         /// <param name="samples">Mono samples in [-1, 1]</param>
         /// <param name="sampleRate">Their sample rate</param>
-        /// <param name="partial">Told the text so far (Parakeet, every 5 s of the audio), or null</param>
-        /// <param name="stage">Told Parakeet's download and loading, or null</param>
+        /// <param name="partial">Told the text so far (a model on the device, every 5 s of the audio), or null</param>
+        /// <param name="stage">Told the model's download and loading, or null</param>
         /// <param name="token">Stops recognizing</param>
         public static async Task<string> TranscribeAsync(float[] samples, int sampleRate, IProgress<string> partial, IProgress<string> stage, CancellationToken token)
         {
-            if (UseParakeet())
-                return await ParakeetSpeech.Default.TranscribeAsync(samples, sampleRate, partial, stage, token);
+            OmniSpeech model = UseModel();
+            if (model != null)
+                return await model.TranscribeAsync(samples, sampleRate, partial, stage, token);
             return await TranscribeSystemAsync(new Emgu.LiteRT.LM.Agents.MeetingAudioChunk(TimeSpan.Zero, samples, sampleRate).ToWav(), token);
         }
 
-        // Parakeet when it is the engine for this language; while it still downloads, the platform's recognizer writes down
-        // the recording when there is one (the download goes on), else it waits for Parakeet.
-        private static bool UseParakeet()
+        // The model on the device when it is the engine for this language; while it still downloads, the platform's
+        // recognizer writes down the recording when there is one (the download goes on), else it waits for the model.
+        // Null for the platform's recognizer.
+        private static OmniSpeech UseModel()
         {
             SpeechEngine? engine = CurrentEngine;
             if (engine == null)
-                throw new InvalidOperationException("Parakeet, the speech recognizer here, doesn't know " + VoiceLanguages.NameOf(LanguageTag) + "." + Hint);
-            if (engine != SpeechEngine.Parakeet)
-                return false;
-            if (ParakeetSpeech.Default.IsDownloaded || ParakeetSpeech.Default.IsLoaded || !SystemSupported)
-                return true;
-            _ = ParakeetSpeech.Default.EnsureAsync(null, CancellationToken.None).ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
-            return false;
+                throw new InvalidOperationException("The speech recognizers here don't know " + VoiceLanguages.NameOf(LanguageTag) + "." + Hint);
+            OmniSpeech model = OmniSpeech.For(engine.Value);
+            if (model == null)
+                return null;
+            if (model.IsDownloaded || model.IsLoaded || !SystemSupported)
+                return model;
+            _ = model.EnsureAsync(null, CancellationToken.None).ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            return null;
         }
 
         // The platform's recognizer.

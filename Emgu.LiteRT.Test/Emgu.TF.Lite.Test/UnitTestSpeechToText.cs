@@ -52,6 +52,160 @@ public class UnitTestSpeechToTextHelpers
             "The service expects rain on Thursday morning, clearing by the afternoon. On Friday, the City Library opens, " +
             "with 40 desks I'm told paris is next. So come."));
     }
+
+    [Test]
+    public void JoinsChineseAndJapanesePiecesWithoutSpaces()
+    {
+        // Qwen3-ASR's windows in Chinese and Japanese: no space at a seam next to Han, kana or their punctuation;
+        // Korean and Latin text still get one.
+        var text = new StringBuilder();
+        foreach (string piece in new[] { "大家下午好，今天我们来讨论", "社区花园的新计划：", "市政府同意" })
+            SpeechToTextModel.Append(text, piece);
+        Assert.That(text.ToString(), Is.EqualTo("大家下午好，今天我们来讨论社区花园的新计划：市政府同意"));
+        text.Clear();
+        foreach (string piece in new[] { "皆さんこんにちは。", "今日は新しい", "コミュニティガーデン" })
+            SpeechToTextModel.Append(text, piece);
+        Assert.That(text.ToString(), Is.EqualTo("皆さんこんにちは。今日は新しいコミュニティガーデン"));
+        text.Clear();
+        foreach (string piece in new[] { "내일 아침에", "토마토에 물" })
+            SpeechToTextModel.Append(text, piece);
+        Assert.That(text.ToString(), Is.EqualTo("내일 아침에 토마토에 물"));
+        text.Clear();
+        foreach (string piece in new[] { "我们用", "LiteRT", "来测试" })
+            SpeechToTextModel.Append(text, piece);
+        Assert.That(text.ToString(), Is.EqualTo("我们用LiteRT来测试"));
+    }
+}
+
+// Qwen3-ASR-0.6B through libomniextern (downloads its 960 MB .litertlm on the first run). Ignored by default, like the
+// other model tests: dotnet test -p:TestModels=true. The Chinese and Japanese speech is made with macOS's say command
+// (skipped elsewhere, or without the voice).
+[TestFixture, Category("Native")]
+public class UnitTestQwen3Asr
+{
+    private static Qwen3Asr06B _model;
+
+    private static async Task<Qwen3Asr06B> Model()
+    {
+        if (_model != null)
+            return _model;
+        var model = new Qwen3Asr06B();
+        try
+        {
+            var watch = Stopwatch.StartNew();
+            await model.Init();
+            TestContext.Progress.WriteLine($"Qwen3-ASR loaded in {watch.Elapsed.TotalSeconds:F1} s");
+        }
+        catch (DllNotFoundException e)
+        {
+            model.Dispose();
+            Assert.Ignore("libomniextern isn't available here: " + e.Message);
+        }
+        _model = model;
+        return model;
+    }
+
+    [OneTimeTearDown]
+    public void TearDown()
+    {
+        _model?.Dispose();
+        _model = null;
+    }
+
+    // Speech from a macOS voice, as 16 kHz samples.
+    private static float[] Say(string voice, string text)
+    {
+        if (!File.Exists("/usr/bin/say"))
+            Assert.Ignore("Needs macOS's say command for the voices.");
+        string dir = Path.Combine(Path.GetTempPath(), "Emgu.LiteRT.Tests", "Qwen3Asr");
+        Directory.CreateDirectory(dir);
+        string wav = Path.Combine(dir, voice + "_" + (uint)text.GetHashCode() + ".wav");
+        var start = new ProcessStartInfo("/usr/bin/say") { UseShellExecute = false, RedirectStandardError = true };
+        foreach (string a in new[] { "-v", voice, "-o", wav, "--data-format=LEI16@16000", text })
+            start.ArgumentList.Add(a);
+        using (Process process = Process.Start(start))
+        {
+            process.WaitForExit();
+            if (process.ExitCode != 0 || !File.Exists(wav))
+                Assert.Ignore("The macOS voice " + voice + " isn't installed.");
+        }
+        byte[] bytes = File.ReadAllBytes(wav);
+        int data = 12;
+        while (Encoding.ASCII.GetString(bytes, data, 4) != "data")
+            data += 8 + BitConverter.ToInt32(bytes, data + 4);
+        int count = BitConverter.ToInt32(bytes, data + 4) / 2;
+        var samples = new float[count];
+        for (int k = 0; k < count; k++)
+            samples[k] = BitConverter.ToInt16(bytes, data + 8 + 2 * k) / 32768f;
+        return samples;
+    }
+
+    private static async Task<string> Transcribe(float[] samples, int rate = 16000)
+    {
+        Qwen3Asr06B model = await Model();
+        var watch = Stopwatch.StartNew();
+        string text = await model.TranscribeAsync(samples, rate);
+        TestContext.Progress.WriteLine($"\"{text}\" in {watch.ElapsedMilliseconds} ms ({samples.Length / (double)rate:F1} s of audio)");
+        return text;
+    }
+
+#if !TEST_MODELS
+#if VS_TEST
+    [Ignore()]
+#else
+    [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+    [Test]
+    public async Task TranscribesEnglish()
+    {
+        byte[] wav = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "have_a_wonderful_day.wav"));
+        int rate = BitConverter.ToInt32(wav, 24);
+        int data = 12;
+        while (Encoding.ASCII.GetString(wav, data, 4) != "data")
+            data += 8 + BitConverter.ToInt32(wav, data + 4);
+        int count = Math.Min(BitConverter.ToInt32(wav, data + 4), wav.Length - data - 8) / 2;
+        float[] samples = Enumerable.Range(0, count).Select(k => BitConverter.ToInt16(wav, data + 8 + 2 * k) / 32768f).ToArray();
+        // 24 kHz in the file: resampled by TranscribeAsync.
+        string text = await Transcribe(samples, rate);
+        Assert.That(text.ToLowerInvariant(), Does.Contain("wonderful day"));
+    }
+
+#if !TEST_MODELS
+#if VS_TEST
+    [Ignore()]
+#else
+    [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+    [Test]
+    public async Task TranscribesChineseAndJapanese()
+    {
+        string chinese = await Transcribe(Say("Tingting", "请提醒我明天早上给西红柿浇水。"));
+        Assert.That(chinese, Does.Contain("明天早上").And.Contain("西红柿"));
+        string japanese = await Transcribe(Say("Kyoko", "明日の朝、トマトに水をやるのを思い出させてください。"));
+        Assert.That(japanese, Does.Contain("明日の朝").And.Contain("トマト"));
+    }
+
+#if !TEST_MODELS
+#if VS_TEST
+    [Ignore()]
+#else
+    [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+    [Test]
+    public async Task TranscribesChineseAcrossWindows()
+    {
+        // About 24 s, five windows: the pieces join without spaces, and the phrases at both ends are there.
+        const string script = "大家下午好。今天我们来讨论社区花园的新计划。市政府同意把图书馆后面的空地借给我们使用三年。"
+            + "我们需要志愿者来搭建十二个种植箱，安装一个水龙头，并为大门画一块招牌。第一次劳动日定在下周六上午九点，午饭由榆树街的面包店提供。";
+        string text = await Transcribe(Say("Tingting", script));
+        Assert.That(text, Does.Not.Contain(" "));
+        Assert.That(text, Does.StartWith("大家下午好").And.Contain("社区花园").And.Contain("面包店"));
+        // No phrase repeated at a seam: about as many characters as the script (punctuation may differ).
+        Assert.That(text.Length, Is.InRange(script.Length - 8, script.Length + 8));
+    }
 }
 
 // Parakeet-TDT-0.6B-v3 through libomniextern (downloads its 615 MB .litertlm on the first run). Ignored by default,
