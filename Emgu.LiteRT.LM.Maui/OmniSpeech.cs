@@ -83,9 +83,12 @@ namespace Emgu.LiteRT.LM.Maui
         /// </summary>
         public bool CanUseGpu { get; }
 
-        /// <summary>True where the app has a GPU accelerator for the models: Android (OpenCL) and Mac Catalyst (Metal).</summary>
+        /// <summary>
+        /// True where the app has a GPU accelerator for the models: Android (OpenCL), iOS and Mac Catalyst (Metal; on an iPad
+        /// Air M4 Qwen3-ASR wrote 26 s in 3.2 s on the GPU, 4.3 s on the CPU).
+        /// </summary>
         public static bool GpuAvailable =>
-#if ANDROID || MACCATALYST
+#if ANDROID || IOS || MACCATALYST
             IsAvailable;
 #else
             false;

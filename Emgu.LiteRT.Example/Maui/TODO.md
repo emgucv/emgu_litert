@@ -352,9 +352,13 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
   and found through an rpath on `LiteRt.framework` (`docs/native-builds.md`). On an iPad Air M4: Gemma 4 E2B loaded in
   6.6 s and wrote 52 tokens/s; EmbeddingGemma 2 the same scores, no faster (text 43 ms, image 417 ms); Qwen3-ASR 26 s in
   3.2 s (the CPU 4.3 s). No Metal sampler library (the CPU samples, as on Android).
-- [ ] Offer "· GPU" on iOS where it helps: Gemma 4 E2B/E4B in the chat catalog (measure the CPU's speed beside it, and a
-  long chat), the image models (Bonsai, FLUX.2-klein, Z-Image-Turbo), Qwen3-ASR's switch (`OmniSpeech.GpuAvailable`);
-  not the embedding models (no faster). Then a Metal add-on package for iOS, as on macOS.
+- [x] "· GPU" on iOS where it helps (2026-11-04, measured on the iPad Air M4 in temporary self-tests): Gemma 4 E2B (55
+  tokens/s on the GPU, 29 on the CPU) and E4B (30 and 13) in `ChatModelCatalog`; Bonsai Image 4B (8-9 s a picture, the
+  CPU 21 s; 19 s for the first load) and FLUX.2-klein (10 s, the CPU 22 s) in the demo's image list; Qwen3-ASR's "Run on
+  the GPU" switch (`OmniSpeech.GpuAvailable`; 3.2 s against 4.3 s for 26 s). Not Z-Image-Turbo: iOS killed the app
+  compiling its graphs for the GPU, alone too (signal 9, before the load returned); not the embedding models (no faster).
+- [ ] Through the UI on the iPad (choosing "· GPU" in the lists, a long chat on the GPU), an 8 GB iPhone, and a Metal
+  add-on package for iOS, as on macOS.
 
 ## 32. Live camera tools — first version implemented
 

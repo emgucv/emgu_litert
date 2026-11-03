@@ -26,7 +26,7 @@ namespace Emgu.LiteRT.LM.Chat
     /// The Emgu.LiteRT.LM.Models language models as a chat offers them, per platform: what each can do (images, audio,
     /// tools, thinking, summaries), its download size and file, the context window to load it with and the largest its
     /// file allows, and the GPU where it was verified (Gemma 4 E2B with OpenCL on Android; the Gemma 4 models with Metal
-    /// on a Mac; all but Gemma 4 12B on Windows). Gemma 4 12B is offered on desktops only. Each call makes new options;
+    /// on a Mac and on iOS; all but Gemma 4 12B on Windows). Gemma 4 12B is offered on desktops only. Each call makes new options;
     /// an app takes the ones it wants by <see cref="ChatModelOption.Id"/> ("Qwen3", "Qwen35_0_8B_VL", "Qwen35_2B", "Qwen35_4B",
     /// "Gemma4E2B", "Gemma4E4B", "Gemma4_12B" - lasting, since saved chats and settings keep them).
     /// <code>
@@ -47,7 +47,8 @@ namespace Emgu.LiteRT.LM.Chat
         /// <param name="platform">The platform</param>
         public static IList<ChatModelOption> For(ChatPlatform platform)
         {
-            bool android = platform == ChatPlatform.Android, mac = platform == ChatPlatform.MacCatalyst, windows = platform == ChatPlatform.Windows;
+            bool android = platform == ChatPlatform.Android, ios = platform == ChatPlatform.iOS, mac = platform == ChatPlatform.MacCatalyst,
+                windows = platform == ChatPlatform.Windows;
             var models = new List<ChatModelOption>
             {
                 Model("Qwen3", "Qwen3 0.6B", () => new Qwen3(), Qwen3.ModelFile, 350,
@@ -63,11 +64,12 @@ namespace Emgu.LiteRT.LM.Chat
                 Model("Qwen35_4B", "Qwen3.5 4B", () => new Qwen35_4B(), Qwen35_4B.ModelFile, 2800,
                     "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", gpu: windows, summarize: true),
                 Gemma("Gemma4E2B", "Gemma 4 E2B", () => new Gemma4E2B(), Gemma4E2B.ModelFile, 2600,
-                    "~2.6 GB download. Understands images and speech, and can think before answering.", gpu: android || mac || windows),
+                    "~2.6 GB download. Understands images and speech, and can think before answering.", gpu: android || ios || mac || windows),
                 // E4B on Android's GPU (the OpenCL plugin, as E2B): first tried on a Pixel Fold on 2026-10-27; a failed GPU
-                // load offers the CPU.
+                // load offers the CPU. On iOS (LiteRT's Metal accelerator, 2026-11-04) an iPad Air M4 wrote E2B at 55 tokens/s
+                // on the GPU against 29 on its CPU, E4B at 30 against 13.
                 Gemma("Gemma4E4B", "Gemma 4 E4B", () => new Gemma4E4B(), Gemma4E4B.ModelFile, 3700,
-                    "~3.7 GB download. More capable than E2B, but slower and needs more memory.", gpu: android || mac || windows),
+                    "~3.7 GB download. More capable than E2B, but slower and needs more memory.", gpu: android || ios || mac || windows),
             };
             // A large desktop model; on Windows its GPU image inference failed compatibility testing.
             if (mac || windows)

@@ -300,9 +300,9 @@ public sealed class LiteRtLmChatPage : ChatPage
             options.Add(new ImageModelOption("bonsai", "Bonsai Image 4B · CPU",
                 "256 x 256, 4 steps; a 4.3 GB download. About 25 s a picture on a computer, 4-5 minutes on an older phone.", bonsai,
                 () => new OmniImageModel(new BonsaiImage4B(), "cpu", caches)));
-#if MACCATALYST || ANDROID || WINDOWS_WEBGPU
+#if MACCATALYST || ANDROID || IOS || WINDOWS_WEBGPU
             options.Add(new ImageModelOption("bonsai_gpu", "Bonsai Image 4B · GPU",
-                "The same model on the GPU: about 11 s a picture on a Mac, 4 s on a Windows PC with an RTX 3070 (20-40 s while the chat model is on the same 8 GB GPU). " + GpuFirstLoad + " A GPU without enough memory (an 8 GB phone's) falls back to the CPU.", bonsai,
+                "The same model on the GPU: about 11 s a picture on a Mac, 8-9 s on an iPad Air (21 s on its CPU), 4 s on a Windows PC with an RTX 3070 (20-40 s while the chat model is on the same 8 GB GPU). " + GpuFirstLoad + " A GPU without enough memory (an 8 GB phone's) falls back to the CPU.", bonsai,
                 () => new OmniImageModel(new BonsaiImage4B(), "gpu", caches)));
 #endif
 #if MACCATALYST || WINDOWS_WEBGPU
@@ -320,13 +320,14 @@ public sealed class LiteRtLmChatPage : ChatPage
             options.Add(new ImageModelOption("flux2_klein", "FLUX.2-klein 4B · CPU",
                 "256 x 256, 4 steps; a 4.7 GB download. About 25 s a picture on a computer, minutes on a phone.", klein,
                 () => new OmniImageModel(new Flux2Klein4B(), "cpu", caches)));
-#if MACCATALYST || ANDROID || WINDOWS_WEBGPU
+#if MACCATALYST || ANDROID || IOS || WINDOWS_WEBGPU
             options.Add(new ImageModelOption("flux2_klein_gpu", "FLUX.2-klein 4B · GPU",
-                "The same model on the GPU: about 17 s a picture on a Mac, 10-20 s on a Windows PC with an RTX 3070 (more while the chat model is on the same GPU). " + GpuFirstLoad + " A GPU without enough memory (an 8 GB phone's) falls back to the CPU.", klein,
+                "The same model on the GPU: about 17 s a picture on a Mac, 10 s on an iPad Air (22 s on its CPU), 10-20 s on a Windows PC with an RTX 3070 (more while the chat model is on the same GPU). " + GpuFirstLoad + " A GPU without enough memory (an 8 GB phone's) falls back to the CPU.", klein,
                 () => new OmniImageModel(new Flux2Klein4B(), "gpu", caches)));
 #endif
         }
         options.Add(ImageFeature.ZImageTurboOption);
+        // Not on iOS's GPU: an iPad Air M4 ran out of memory compiling its graphs (2026-11-04).
 #if WINDOWS_WEBGPU
         options.Add(ImageFeature.ZImageTurboGpuOption);
 #endif
