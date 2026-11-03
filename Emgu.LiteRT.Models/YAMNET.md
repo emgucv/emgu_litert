@@ -52,8 +52,9 @@ the best sound changes and scores at least 0.4. Microphone sources: `AudioRecord
 Catalyst. Not on Windows.
 
 Checked: on Mac Catalyst the tone sample gave Silence -> Sine wave 100% -> Static/Noise -> Pink noise/White noise -> Silence and the speech sample Speech
-96-100%; on a Galaxy S10, the microphone heard `say` and a quiet room from the Mac next to it (Speech 85-89% while it spoke, Silence otherwise). The Apple
-microphone path was not run (no permission prompt without the user); it is built.
+96-100%; on a Galaxy S10, the microphone heard `say` and a quiet room from the Mac next to it (Speech 85-89% while it spoke, Silence otherwise). On an iPad Air
+M4 (2026-11-04) the Apple microphone path (an `AVAudioEngine` input tap) heard the Mac beside it: speech -> Speech 0.99, a 1 kHz
+tone -> Beep 0.94, white noise -> Hiss, 3-4 ms a window.
 
 ## Sound monitors in the chat (TODO item 42)
 

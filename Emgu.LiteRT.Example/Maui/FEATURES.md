@@ -504,6 +504,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - "Someone saying have a wonderful day" found 00:20-00:22, where it is said.
   - Before `CountShown` every search also showed one or two other scenes. After it, only "a dog" did (the apples, 00:24-00:28).
   - Opened again, the saved index loaded in 0.8 s.
+- **On an iPad Air M4** (2026-11-04, the same video and queries, a temporary self-test through `VideoSource` and `VideoMomentIndex`): watched, seen and heard, in 7.8 s; every query's first moment its scene, "have a wonderful day" at 00:20-00:22; searches about 50 ms.
   - The sheet played the copy from 00:05 to the end.
 - **Checked on Mac Catalyst** (M-series Mac, macOS 27, 2026-10-30) with the same video and self-test, on the CPU.
   - Multimodal 740M watched it in 17.7 s and found the same moments as in the simulator, including "have a wonderful day" at 00:20-00:22. "A dog" again also showed the apples.

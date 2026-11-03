@@ -127,7 +127,10 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       a phone's GPU: on the S10, image cosines 0.9896-0.9983, audio 0.9982, 4/4 searches; docs/litert-lm.md.
 - [x] Simultaneous chat/search GPU memory and indexing speed on the S10 (2026-11-01): Gemma 4 E2B and the 740M model both on
       the GPU, PSS 4.1 GB with 1.1 GB left, no kill; 4 photos in 6.2 s (CPU 29.0 s), a 20 s video in 15.8 s (CPU 72.5 s).
-- [ ] The same on the Pixel Fold (it was off adb), and the GPU options in the Catalyst demo's list; iOS untried.
+- [ ] The same on the Pixel Fold (it was off adb), and the GPU options in the Catalyst demo's list.
+- [x] iOS (2026-11-04, an iPad Air M4, a temporary self-test): the text+vision 440M model on the CPU loaded in 0.6 s, 48 ms a
+  text and 412 ms an image, each text closest to its picture (0.80 against 0.53-0.56); on the GPU the engine isn't created
+  (`litert_lm_embedding_engine_create`: iOS has no GPU accelerator in this build), and the demo doesn't offer it there.
 
 ## 12. Pixel Fold freeze — rendering stalls fixed; original ANR unconfirmed
 
@@ -548,7 +551,10 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] Combined camera + sound conditions, a camera snapshot as a sound alert, and sound monitors listed beside the camera monitors.
 - [ ] Windows microphone stream (`Emgu.LiteRT.LM.Maui`'s `MicrophoneSoundSource`, `IsSupported` false on Windows); listening in the background (Android foreground service, iOS background audio).
 - [ ] Run with the camera loop and Gemma together on a phone (heat, battery) - nothing was timed together.
-- [ ] Try on iOS (the `AVAudioEngine` tap and the microphone gate are built, not run).
+- [x] iOS (2026-11-04, an iPad Air M4 beside a Mac playing sounds on cue, a temporary self-test; only class names were
+  logged): the `AVAudioEngine` tap gave 16 kHz audio, YAMNet 3-4 ms a window; speech -> Speech 0.99, a 1 kHz tone ->
+  Beep 0.94, white noise -> Hiss/White noise, a synthetic two-tone chime -> Music/Glockenspiel (not Doorbell: try a real
+  doorbell recording). The microphone gate and a monitor's alert weren't run.
 
 ## 43. Video clips as a visual-alert action — `record_clip` built for Android (Camera2); tested on a Galaxy S10 and a Pixel Fold
 
@@ -696,8 +702,8 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       DLL back loaded it. Not run: the dialog's Cancel.
 - [x] Photos the library can't load are counted in the status ("; 1 couldn't be read", checked with a corrupt PNG, removed afterwards).
 
-- [ ] Places search (`search_places`, 2026-10-29; see `docs/agents.md`): built and unit-tested, checked on Windows with OpenStreetMap and a named town. Still to check: the device-position path ("nearest ..." with Share my location on) on the Fold and an iPhone, Google Places with a real key (the request is written from Google's documentation, never sent), Apple Maps on iOS and Mac Catalyst (`AppleMapsPlaceSearch`, written without a Mac: it has not been compiled).
-- [ ] Video moments (`VideoMomentsFeature`, 2026-10-29; see FEATURES.md, "Video moments"). It was checked in the iOS simulator, on Mac Catalyst, the Galaxy S10 and the Galaxy Z Fold 3 with a synthetic 30 s video. Still to check:
+- [ ] Places search (`search_places`, 2026-10-29; see `docs/agents.md`): built and unit-tested, checked on Windows with OpenStreetMap and a named town. Still to check: the device-position path ("nearest ..." with Share my location on) on the Fold and an iPhone, Google Places with a real key (the request is written from Google's documentation, never sent), Apple Maps on Mac Catalyst (`AppleMapsPlaceSearch`; on iOS it ran on an iPad Air on 2026-11-04: 25 libraries near a fixed point in 0.9 s, the nearest not first).
+- [ ] Video moments (`VideoMomentsFeature`, 2026-10-29; see FEATURES.md, "Video moments"). It was checked in the iOS simulator, on Mac Catalyst, the Galaxy S10 and the Galaxy Z Fold 3 with a synthetic 30 s video, and on an iPad Air M4 (2026-11-04: watched with sound in 7.8 s, the simulator 19.6 s; every query's first moment its scene, the spoken phrase at 00:20-00:22; searches ~50 ms). Still to check:
   - the Pixel Fold;
   - a search waited about 7 s behind photo indexing (Z Fold 3): searches now go first (`SearchFirstGate`, 2026-10-30; 1.8 s during video indexing on the S10) - measure again on the Z Fold 3;
   - the S10 takes 25-40 min for a 5-minute video: a shorter limit or fewer frames on slow phones?
@@ -754,7 +760,9 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [x] Galaxy S10: Settings > Voice and "Try it" through the UI; about 2.2 s a run on its GPU; three sentences said in 15.6 s for 12.8 s of speech.
 - [ ] On a phone: a hands-free voice-chat turn with Kokoro (the microphone pausing and resuming around its playback), a camera alert's `speak_text`, and memory beside Gemma 4 E2B on the GPU.
 - [ ] Shorter pauses: play the pieces gaplessly (AudioTrack, AVAudioEngine, AudioGraph) instead of a WAV file and a player each; start the first sound sooner by cutting the first sentence at a comma.
-- [ ] Mac Catalyst through the UI (the section, "Try it", a reply read aloud); iOS on a device (the CPU file there).
+- [ ] Mac Catalyst through the UI (the section, "Try it", a reply read aloud).
+- [x] iOS on a device (2026-11-04, an iPad Air M4, the CPU file): loaded in 0.8 s, 4.0 s and 6.6 s of speech in 0.6 s
+  (0.09-0.16 of real time); Qwen3-ASR on the Mac wrote both back word for word. Not through the UI (a reply read aloud).
 - [x] Next omni models: Qwen3-ASR 0.6B (Chinese, Japanese and the other languages Parakeet lacks) - item 58.
 
 ## 58. Qwen3-ASR speech recognition through LiteRT-LM's omni engine
