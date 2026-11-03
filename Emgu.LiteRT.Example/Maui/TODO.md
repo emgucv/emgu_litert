@@ -770,7 +770,11 @@ third chip in Settings > Speech recognition, a Storage row, and no spaces at Chi
 - [x] Through the microphone on the S10 (2026-11-03, clips from the Mac's speakers): voice messages (Japanese, Chinese,
   Parakeet chosen with Japanese) and a meeting card; the meeting was first dropped as silence, fixed (quiet pieces to
   the speech model, `SpeechEngines.Boost`; FEATURES.md).
-- [ ] Japanese through a phone's microphone at a distance is still 21-45% wrong; try nearer the speaker, or the GPU.
+- [x] Japanese through a microphone near the speaker (2026-11-04, an iPad Air M4 beside a Mac mini's speakers, a temporary
+  self-test through `MicrophoneSoundSource`, nothing saved): recorded at -14 to -19 dBFS peak, Qwen3-ASR wrote 4 s of
+  Japanese word for word and 26 s with 8.7% of the characters wrong (5.1% from the file), Chinese 1.0%, English 1.4%,
+  each in 1-4 s; so the S10's 21-45% came from the distance (-43 dBFS). It added a word from the 2.5 s of room after
+  two clips ("空。", "Stream.").
 - [x] The GPU on the S10 (2026-11-03): about 1.6 times as fast (0.4-0.6 of real time), the same text, but 12.8 s to create
   and ~1.2 GB of free memory against ~0.4 GB; `SpeechToTextModel.Init("gpu")` allowed, the app stays on the CPU.
 - [x] A GPU choice for Qwen3-ASR (2026-11-04): Settings > Speech recognition > "Run Qwen3-ASR on the GPU", off by default

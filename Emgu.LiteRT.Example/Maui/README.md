@@ -418,6 +418,10 @@ See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HIS
   (`UiStallWatchdog.cs`), with what the app was doing and, on Android, the main thread's stack: in the log (tag
   `UISTALL`; `adb logcat -s UISTALL`) and in `ui_stalls.log` in the app's data folder - on Android
   `adb shell run-as com.emgu.litert cat files/ui_stalls.log`.
+- **"You've implemented -[<UIApplicationDelegate> application:performFetchWithCompletionHandler:], but you still need
+  to add "fetch" to the list of your supported UIBackgroundModes" (iOS console):** harmless. MAUI's own
+  `MauiUIApplicationDelegate` implements that method in every MAUI app, not the demo; declaring `fetch` in `Info.plist`
+  would silence it but claim a background mode the demo doesn't use.
 - **The chat page's model fails to load:** check that the LiteRT-LM libraries were built for the platform (step 2)
   and that `git -C LiteRT-LM lfs pull` fetched real libraries, not Git LFS pointer files.
 
