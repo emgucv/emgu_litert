@@ -206,6 +206,31 @@ public class UnitTestQwen3Asr
         // No phrase repeated at a seam: about as many characters as the script (punctuation may differ).
         Assert.That(text.Length, Is.InRange(script.Length - 8, script.Length + 8));
     }
+
+    // On the GPU (Metal on a Mac; OpenCL on Android), a model of its own.
+#if !TEST_MODELS
+#if VS_TEST
+    [Ignore()]
+#else
+    [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+    [Test]
+    public async Task TranscribesOnTheGpu()
+    {
+        float[] samples = Say("Kyoko", "明日の朝、トマトに水をやるのを思い出させてください。");
+        using (var model = new Qwen3Asr06B())
+        {
+            var watch = Stopwatch.StartNew();
+            try { await model.Init("gpu"); }
+            catch (DllNotFoundException e) { Assert.Ignore("libomniextern isn't available here: " + e.Message); }
+            TestContext.Progress.WriteLine($"Qwen3-ASR on the GPU loaded in {watch.Elapsed.TotalSeconds:F1} s");
+            watch.Restart();
+            string text = await model.TranscribeAsync(samples, 16000);
+            TestContext.Progress.WriteLine($"\"{text}\" in {watch.ElapsedMilliseconds} ms");
+            Assert.That(text, Does.Contain("明日の朝").And.Contain("トマト"));
+        }
+    }
 }
 
 // Parakeet-TDT-0.6B-v3 through libomniextern (downloads its 615 MB .litertlm on the first run). Ignored by default,

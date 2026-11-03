@@ -93,15 +93,15 @@ namespace Emgu.LiteRT.LM.Models
         /// <summary>
         /// Download the model's files if needed, then load it.
         /// </summary>
-        /// <param name="backend">"cpu" (the only one supported for now)</param>
+        /// <param name="backend">"cpu", or "gpu": on a Galaxy S10 (Adreno 640, OpenCL; 2026-11-03) Qwen3-ASR ran about 1.6 times
+        /// as fast on the GPU (0.4-0.6 of real time against 0.7-1.0) with the same text, but its engine took 12.8 s to
+        /// create (0.8 s on the CPU) and ~1.2 GB of the phone's free memory (~0.4 GB), so apps on phones keep the CPU;
+        /// Parakeet on a GPU isn't measured. (Until then the GPU was refused: its prebuilt accelerators didn't match
+        /// libLiteRt before LiteRT-LM v0.19.0.)</param>
         /// <param name="numThreads">The CPU threads, or 0 for the default (4)</param>
         /// <param name="cancellationToken">Cancels the download</param>
         public async Task Init(String backend = "cpu", int numThreads = 0, CancellationToken cancellationToken = default(CancellationToken))
         {
-            if (!String.Equals(backend ?? "cpu", "cpu", StringComparison.OrdinalIgnoreCase))
-                throw new NotSupportedException(
-                    "Speech recognition runs on the CPU only for now: its decoding loop is slower on a mobile GPU, and this "
-                    + "LiteRT build's prebuilt GPU accelerators have an ABI mismatch with libLiteRt.");
             List<DownloadableFile> files = new List<DownloadableFile>(Files);
             List<DownloadableFile> missing = await Task.Run(() => files.FindAll(f => !f.IsLocalFileValid), cancellationToken).ConfigureAwait(false);
             if (missing.Count > 0)
@@ -117,7 +117,7 @@ namespace Emgu.LiteRT.LM.Models
             cancellationToken.ThrowIfCancellationRequested();
             String modelPath = ModelFile.LocalFile;
             String tokenizerPath = TokenizerFile == null ? null : TokenizerFile.LocalFile;
-            SpeechToTextEngine engine = await Task.Run(() => new SpeechToTextEngine(ModelName, modelPath, tokenizerPath, "cpu", numThreads, OverlapRatio, TextMerger)).ConfigureAwait(false);
+            SpeechToTextEngine engine = await Task.Run(() => new SpeechToTextEngine(ModelName, modelPath, tokenizerPath, backend ?? "cpu", numThreads, OverlapRatio, TextMerger)).ConfigureAwait(false);
             if (_engine != null)
                 _engine.Dispose();
             _engine = engine;

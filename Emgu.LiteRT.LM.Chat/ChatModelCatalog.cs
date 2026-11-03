@@ -54,7 +54,8 @@ namespace Emgu.LiteRT.LM.Chat
                     "~350 MB download. Fast, and can think before answering.", gpu: windows),
                 Model("Qwen35_0_8B_VL", "Qwen3.5 0.8B", () => new Qwen35_0_8B_VL(), Qwen35_0_8B_VL.ModelFile, 1300,
                     "~1.3 GB download. Newer and still fast; understands images.", gpu: windows, images: true, canThink: false),
-                // Not verified on a GPU here (its card: Mac and iPhone Metal, an Adreno phone; not Mali), so the CPU only.
+                // The CPU only: on a Galaxy S10's GPU it took 250 s to load and 6 GB, and wrote slower (5.8-6.5 tokens/s against
+                // 7.2 on its CPU); its card verifies the GPU on Macs, iPhones and one Adreno phone, not Mali.
                 Model("Qwen35_2B", "Qwen3.5 2B", () => new Qwen35_2B(), Qwen35_2B.ModelFile, 2100,
                     "~2.1 GB download. Between 0.8B and 4B: better answers than 0.8B and faster than 4B. Text only.", gpu: false, canThink: false),
                 // Its file can call tools since 2026-11-03 (Qwen35_4B.SupportsToolCalling), but not the chat's: the file is
