@@ -58,6 +58,20 @@ namespace Emgu.LiteRT.LM.Agents
             return skip;
         }
 
+        /// <summary>
+        /// What a speech model wrote down from a near-silent piece (<see cref="MeetingAudioChunk.IsSilent"/>), kept only when
+        /// it has words: from a room where nobody spoke Qwen3-ASR wrote "嗯。", which would fill a long pause's transcript.
+        /// Quiet pieces go to the speech models on the device anyway, since a phone far from the speakers recorded speech
+        /// below the silence level (a Galaxy S10, 2026-11-03: its whole meeting was dropped as silence).
+        /// </summary>
+        /// <param name="text">What was written down</param>
+        /// <returns>The text, or an empty string when it has fewer than three letters or digits</returns>
+        public static string KeepFromQuietPiece(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            return text.Count(char.IsLetterOrDigit) >= 3 ? text : string.Empty;
+        }
+
         /// <summary>The settings key of the choice (absent: automatic).</summary>
         public const string SettingKey = "meeting_transcriber";
 

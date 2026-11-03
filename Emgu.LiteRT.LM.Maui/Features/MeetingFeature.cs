@@ -114,6 +114,8 @@ public sealed class MeetingFeature : ChatFeature
         public Func<float[], CancellationToken, Task<float[]>> Voiceprint;
         public string VoiceprintProblem;
         public MeetingTranscriber Transcriber;
+        // The speech model on the device that writes the pieces down (Parakeet, Qwen3-ASR), or null.
+        public OmniSpeech SpeechModel;
         // The recording itself, as it goes (null when not kept, or after it failed).
         public WavFileWriter Recording;
         // Temporary WAV files: RecognizerThenModel's written-down pieces, kept for the model after Stop, and the pieces set
@@ -248,6 +250,7 @@ public sealed class MeetingFeature : ChatFeature
         // The model takes clips of at most 30 s; after Stop it writes down the same pieces again. A speech model on the
         // device (Parakeet, Qwen3-ASR) takes the same shorter pieces: it keeps up on a phone, so the text comes sooner.
         OmniSpeech speechModel = session.Transcriber != MeetingTranscriber.Model ? SpeechRecognizer.CurrentModel : null;
+        session.SpeechModel = speechModel;
         bool modelPieces = session.Transcriber != MeetingTranscriber.Recognizer || speechModel != null;
         session.Chunker = new MeetingAudioChunker(16000, modelPieces ? MeetingTranscription.ModelMinSeconds : 30,
             modelPieces ? MeetingTranscription.ModelMaxSeconds : 50, session.Voiceprint != null ? TurnSeconds : 0);
@@ -617,7 +620,7 @@ public sealed class MeetingFeature : ChatFeature
                     chunk = session.Pending.Dequeue();
                 }
                 foreach (MeetingAudioChunk piece in behind) SetAside(session, piece);
-                if (chunk.IsSilent) continue;
+                if (chunk.IsSilent && session.SpeechModel == null) continue;
                 // The model can't run while the app is away (iOS): the piece waits for after Stop, as a skipped one.
                 if (ModelNeedsFront && _away && !session.Stopping && session.Transcriber == MeetingTranscriber.Model)
                 {
@@ -655,6 +658,7 @@ public sealed class MeetingFeature : ChatFeature
                         }
                     }
                 }
+                if (chunk.IsSilent) text = MeetingTranscription.KeepFromQuietPiece(text);
                 session.Transcript.Add(chunk.Start, text, await VoiceprintOfAsync(session, chunk, text), chunk.VoicedSeconds);
                 ShowMeetingProgress(session);
             }
@@ -862,10 +866,11 @@ public sealed class MeetingFeature : ChatFeature
         catch (Exception ex) { Debug.WriteLine("Keeping a meeting piece failed: " + ex.Message); }
     }
 
-    // A piece the live transcript skipped, on disk until after Stop (near silence is dropped, as live).
+    // A piece the live transcript skipped, on disk until after Stop (near silence is dropped, as live, unless a speech model
+    // on the device writes the pieces down: a phone far from the speakers recorded speech below the silence level).
     private static void SetAside(MeetingSession session, MeetingAudioChunk chunk)
     {
-        if (chunk.IsSilent) return;
+        if (chunk.IsSilent && session.SpeechModel == null) return;
         session.SkippedTime += chunk.Duration;
         try
         {
@@ -903,6 +908,7 @@ public sealed class MeetingFeature : ChatFeature
                     byte[] wav = chunk.ToWav();
                     text = model ? chunk.HasSpeech ? await ModelStepAsync(session, "write down the skipped parts", () => TranscribeWithModelAsync(wav, token), token) : string.Empty
                         : await SpeechRecognizer.TranscribeAsync(wav);
+                    if (text != null && chunk.IsSilent) text = MeetingTranscription.KeepFromQuietPiece(text);
                 }
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex)

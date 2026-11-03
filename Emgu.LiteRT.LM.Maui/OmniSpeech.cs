@@ -189,7 +189,8 @@ namespace Emgu.LiteRT.LM.Maui
                 // Freed meanwhile (Storage, idle, the other model loaded): load it again.
                 if (!model.Initialized)
                     model = await LoadedAsync(stage, cancel);
-                return (await model.TranscribeAsync(samples, sampleRate, partial, cancel)).Trim();
+                // A phone far from whoever speaks records them quietly: raised to a set level first.
+                return (await model.TranscribeAsync(SpeechEngines.Boost(samples), sampleRate, partial, cancel)).Trim();
             }
             finally
             {

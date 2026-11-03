@@ -131,6 +131,34 @@ public static class SpeechEngines
     public static string ToSetting(SpeechEngine engine) =>
         engine == SpeechEngine.Parakeet ? "parakeet" : engine == SpeechEngine.Qwen3Asr ? "qwen3_asr" : "system";
 
+    /// <summary>The peak <see cref="Boost"/> raises a quiet recording to (-6 dBFS).</summary>
+    public const float BoostPeak = 0.5f;
+
+    /// <summary>The most <see cref="Boost"/> amplifies (40 dB), so a recording of the room alone isn't blown up to full scale.</summary>
+    public const float MaxBoost = 100f;
+
+    /// <summary>
+    /// The samples raised to <see cref="BoostPeak"/> when they are quieter, at most <see cref="MaxBoost"/> times, for the
+    /// speech models on the device: a Galaxy S10 far from the speakers recorded a meeting's speech peaking at -43 dBFS, and
+    /// Qwen3-ASR (on a Mac, 2026-11-03) got 46% of its Japanese characters wrong as recorded, 21% boosted 100 times
+    /// (Chinese 5% and English 3% either way). Recordings already loud enough come back as they are (the same array).
+    /// </summary>
+    /// <param name="samples">Mono samples in [-1, 1]</param>
+    public static float[] Boost(float[] samples)
+    {
+        if (samples == null || samples.Length == 0) return samples;
+        float peak = 0;
+        foreach (float s in samples)
+            peak = Math.Max(peak, Math.Abs(s));
+        if (peak <= 0) return samples;
+        float gain = Math.Min(MaxBoost, BoostPeak / peak);
+        if (gain <= 1.5f) return samples;
+        var boosted = new float[samples.Length];
+        for (int i = 0; i < samples.Length; i++)
+            boosted[i] = samples[i] * gain;
+        return boosted;
+    }
+
     /// <summary>
     /// A 16-bit PCM WAV recording's samples, mono, in [-1, 1] (a stereo one is mixed down); its other chunks (Apple's
     /// recorder writes a "FLLR" or "LIST" one before the samples) are skipped.

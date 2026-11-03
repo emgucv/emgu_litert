@@ -171,4 +171,21 @@ public class UnitTestSpeechEngines
         // Floats (sub-format 3) aren't read.
         Assert.Throws<InvalidDataException>(() => SpeechEngines.WavSamples(Extensible(new short[] { 0 }, 3), out _));
     }
+
+    // Quiet recordings are raised to -6 dBFS for the speech models, at most 100 times; loud ones are left alone.
+    [Test]
+    public void BoostsQuietRecordings()
+    {
+        float[] quiet = { 0.007f, -0.005f, 0.001f };
+        float[] boosted = SpeechEngines.Boost(quiet);
+        Assert.That(boosted[0], Is.EqualTo(SpeechEngines.BoostPeak).Within(1e-6), "the peak to -6 dBFS");
+        Assert.That(boosted[1] / boosted[0], Is.EqualTo(-5f / 7).Within(1e-6), "the shape kept");
+        Assert.That(quiet[0], Is.EqualTo(0.007f), "the samples given aren't changed");
+        Assert.That(SpeechEngines.Boost(new[] { 0.0001f })[0], Is.EqualTo(0.01f).Within(1e-6), "at most 100 times");
+        float[] loud = { 0.4f, -0.2f };
+        Assert.That(SpeechEngines.Boost(loud), Is.SameAs(loud), "loud enough");
+        float[] silence = new float[10];
+        Assert.That(SpeechEngines.Boost(silence), Is.SameAs(silence));
+        Assert.That(SpeechEngines.Boost(new float[0]), Is.Empty);
+    }
 }

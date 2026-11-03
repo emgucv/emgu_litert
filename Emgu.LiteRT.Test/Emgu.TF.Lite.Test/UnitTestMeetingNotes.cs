@@ -350,6 +350,17 @@ public class UnitTestMeetingNotes
         System.IO.File.Delete(path);
     }
 
+    // Quiet pieces go to the speech model anyway; what it writes down from near silence is kept only when it has words.
+    [Test]
+    public void KeepsWordsFromQuietPieces()
+    {
+        Assert.That(MeetingTranscription.KeepFromQuietPiece("嗯。"), Is.Empty, "a filler from the room");
+        Assert.That(MeetingTranscription.KeepFromQuietPiece(" Uh. "), Is.Empty);
+        Assert.That(MeetingTranscription.KeepFromQuietPiece(null), Is.Empty);
+        Assert.That(MeetingTranscription.KeepFromQuietPiece("大家好"), Is.EqualTo("大家好"));
+        Assert.That(MeetingTranscription.KeepFromQuietPiece("Yes, go on."), Is.EqualTo("Yes, go on."));
+    }
+
     // The live transcript skips ahead once more than a minute of audio waits; the newest piece is always written down.
     [Test]
     public void SkipsAheadWhenFarBehind()

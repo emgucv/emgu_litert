@@ -41,14 +41,22 @@ if [ ${#DEVICES[@]} -eq 0 ]; then
   exit 1
 fi
 
-# The model file on this Mac (following links), or nothing.
+# The model file on this Mac (following links), or nothing. When both folders have it, the newer: litert-community
+# replaces files in place under the same name, and the folder of whichever app ran last has the version it pins (on
+# 2026-11-03 the Catalyst demo's folder had the Qwen3-0.6B file of October, the tests' that of November).
 find_source() {
+  local found="" found_time=0
   for dir in "${SOURCES[@]}"; do
     if [ -s "$dir/$1" ]; then
-      echo "$dir/$1"
-      return
+      local t
+      t=$(/usr/bin/stat -L -f %m "$dir/$1")
+      if [ -z "$found" ] || [ "$t" -gt "$found_time" ]; then
+        found="$dir/$1"
+        found_time=$t
+      fi
     fi
   done
+  if [ -n "$found" ]; then echo "$found"; fi
 }
 
 copy_models() {

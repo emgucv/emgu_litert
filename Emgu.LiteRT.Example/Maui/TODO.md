@@ -767,7 +767,10 @@ third chip in Settings > Speech recognition, a Storage row, and no spaces at Chi
   Japanese, Chinese, Korean and English as on the Mac, about real time on long clips; Parakeet chosen with Chinese used
   Qwen3-ASR; a 77 s meeting cut into pieces kept up one piece behind; beside Gemma 4 E2B on the GPU both worked; the
   Settings section shown (FEATURES.md).
-- [ ] Through the microphone on a phone: a Japanese voice message and a meeting card with Qwen3-ASR.
+- [x] Through the microphone on the S10 (2026-11-03, clips from the Mac's speakers): voice messages (Japanese, Chinese,
+  Parakeet chosen with Japanese) and a meeting card; the meeting was first dropped as silence, fixed (quiet pieces to
+  the speech model, `SpeechEngines.Boost`; FEATURES.md).
+- [ ] Japanese through a phone's microphone at a distance is still 21-45% wrong; try nearer the speaker, or the GPU.
 - [ ] Faster on phones: Qwen3-ASR is only just real time on the S10 (a meeting falls one 25 s piece behind); try the GPU
   there, or fewer windows' overlap.
 - [ ] Mac Catalyst and iOS: the Catalyst builds again since the demo and MauiChat need Mac Catalyst 17.0 (the new SDK
