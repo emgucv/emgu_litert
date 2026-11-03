@@ -357,8 +357,12 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
   CPU 21 s; 19 s for the first load) and FLUX.2-klein (10 s, the CPU 22 s) in the demo's image list; Qwen3-ASR's "Run on
   the GPU" switch (`OmniSpeech.GpuAvailable`; 3.2 s against 4.3 s for 26 s). Not Z-Image-Turbo: iOS killed the app
   compiling its graphs for the GPU, alone too (signal 9, before the load returned); not the embedding models (no faster).
-- [ ] Through the UI on the iPad (choosing "· GPU" in the lists, a long chat on the GPU), an 8 GB iPhone, and a Metal
-  add-on package for iOS, as on macOS.
+- [x] Bonsai 512 on iOS (2026-11-04, the iPad Air M4): on the GPU loaded in 11.2 s and drew in 21-26 s (an M1's GPU ~25 s),
+  9.2 GB still allowed; on the CPU 56-69 s. Offered as "Bonsai Image 4B 512 · GPU" on iOS devices with 12 GB of memory
+  or more (`LiteRtLmChatPage.LargeMemoryDevice`: `NSProcessInfo.PhysicalMemory` >= 11e9 bytes; the iPad reports 12.44e9),
+  not the CPU choice (a minute a picture).
+- [ ] Through the UI on the iPad (choosing "· GPU" in the lists, a long chat on the GPU), an 8 GB iPhone (Bonsai 512 is
+  hidden there), and a Metal add-on package for iOS, as on macOS.
 
 ## 32. Live camera tools — first version implemented
 

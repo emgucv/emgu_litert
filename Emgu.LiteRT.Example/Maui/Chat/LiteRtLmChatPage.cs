@@ -289,6 +289,16 @@ public sealed class LiteRtLmChatPage : ChatPage
     private const string GpuFirstLoad = "The first load compiles the GPU programs (about 30 s).";
 #endif
 
+    // True on computers, and on iOS devices with 12 GB of memory or more (they report a little less: an iPad Air M4's 12 GB
+    // as 12.44e9 bytes; 8 GB devices about 8.0e9): Bonsai 512 on an iPad Air M4's GPU took about 3 GB, with 9 GB still
+    // allowed (the memory entitlements), and drew in 21-26 s.
+    private static bool LargeMemoryDevice =>
+#if IOS && !MACCATALYST
+        Foundation.NSProcessInfo.ProcessInfo.PhysicalMemory >= 11_000_000_000UL;
+#else
+        true;
+#endif
+
     private static List<ImageModelOption> ImageModelOptions()
     {
         var options = new List<ImageModelOption>();
@@ -305,12 +315,16 @@ public sealed class LiteRtLmChatPage : ChatPage
                 "The same model on the GPU: about 11 s a picture on a Mac, 8-9 s on an iPad Air (21 s on its CPU), 4 s on a Windows PC with an RTX 3070 (20-40 s while the chat model is on the same 8 GB GPU). " + GpuFirstLoad + " A GPU without enough memory (an 8 GB phone's) falls back to the CPU.", bonsai,
                 () => new OmniImageModel(new BonsaiImage4B(), "gpu", caches)));
 #endif
-#if MACCATALYST || WINDOWS_WEBGPU
-            // 512 x 512 on computers only: on a phone's CPU a picture would take a quarter of an hour.
+#if MACCATALYST || WINDOWS_WEBGPU || IOS
+            // 512 x 512 on computers, and on iOS devices with 12 GB of memory on the GPU: on a phone's CPU a picture would take
+            // a quarter of an hour, an Android phone's GPU ran out of memory (a Pixel Fold), and 8 GB iPhones weren't tried.
             string bonsai512 = System.IO.Path.GetFileName(BonsaiImage4B512.DefaultModelFile.LocalFile);
-            options.Add(new ImageModelOption("bonsai_512_gpu", "Bonsai Image 4B 512 · GPU",
-                "512 x 512, 4 steps; a 4.3 GB download (Emgu's repackaging). About 25 s a picture on a Mac's GPU, 13-15 s on a Windows PC with an RTX 3070 (it needs about 5 GB of video memory, so not beside a chat model on the same 8 GB GPU). " + GpuFirstLoad, bonsai512,
-                () => new OmniImageModel(new BonsaiImage4B512(), "gpu", caches)));
+            if (LargeMemoryDevice)
+            {
+                options.Add(new ImageModelOption("bonsai_512_gpu", "Bonsai Image 4B 512 · GPU",
+                    "512 x 512, 4 steps; a 4.3 GB download (Emgu's repackaging). About 25 s a picture on a Mac's GPU, 21-26 s on an iPad Air, 13-15 s on a Windows PC with an RTX 3070 (it needs about 5 GB of video memory, so not beside a chat model on the same 8 GB GPU). " + GpuFirstLoad, bonsai512,
+                    () => new OmniImageModel(new BonsaiImage4B512(), "gpu", caches)));
+            }
 #endif
 #if MACCATALYST
             options.Add(new ImageModelOption("bonsai_512", "Bonsai Image 4B 512 · CPU",
