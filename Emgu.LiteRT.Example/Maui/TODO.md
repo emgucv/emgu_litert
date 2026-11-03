@@ -338,10 +338,13 @@ agent runs on a schedule, with a notification when there is something to say.
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Speed: ~205-225 s per picture in the simulator, about 10x the Mac's CPU with the caches in use; measure on an
-      iPhone (if it is as slow, check which XNNPACK kernels the iOS build uses).
-- [ ] Memory and storage on an iPhone: the text encoder maps 3.5 GB; ~21 GB with the caches. Consider the
-      `com.apple.developer.kernel.increased-memory-limit` entitlement if the app is killed.
+- [x] On a device (2026-11-04, an iPad Air M4, a temporary self-test through `ZImageTurboImageModel`): 48 s for the
+      first picture (its 9.8 GB of caches built), then 19 s - the simulator's 205-225 s weren't the device's.
+- [x] Memory: the omni models' first picture failed without more address space ("could not mmap ... xnnpack_cache:
+      Cannot allocate memory" with 4.9 GB still allowed); with `Platforms/iOS/Memory.entitlements.plist` (Extended
+      Virtual Addressing, Increased Memory Limit; the App ID `com.emgu.litert` has both) iOS allowed 12.2 GB, and
+      every model drew with at least 10.5 GB left.
+- [ ] An 8 GB iPhone (the model cards' floor): the iPad has more memory.
 
 ## 32. Live camera tools — first version implemented
 
@@ -736,7 +739,9 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] Mac Catalyst through the UI (choose a model, draw, Stop during a picture, delete a model in Storage); not driven (no clicks on this Mac).
 - [x] Regenerate `Resources/Raw/licenses.json.gz` with `tools/make_licenses.py` (Bonsai Image and FLUX.2-klein added to its list; 2026-11-01).
 - [ ] Windows: `libomniextern` isn't built there yet, so the demo offers Z-Image-Turbo only.
-- [ ] iOS on a device (8 GB iPhones are the floor by the model card); the simulator build links.
+- [x] iOS on a device (2026-11-04, an iPad Air M4, with the memory entitlements; see item 31): Bonsai on the CPU loaded
+  in 5.9 s and drew in 21 s, FLUX.2-klein in 9.0 s and 22 s, 3.9 GB of caches each, the pictures right. Not yet on an
+  8 GB iPhone, nor through the chat's UI.
 - [x] Bonsai at 512 x 512 (2026-11-01): Emgu's repackaging with a GPU-friendly VAE decoder (`tools/export_flux2_vae_decoder.py`, `MODELS.md`), on Emgu's public S3; `BonsaiImage4B512`, offered on Mac Catalyst (CPU and GPU); 66 s / 25 s on an M1.
 - [ ] Bonsai 512 on phones: on the Pixel Fold's GPU (2026-11-01) it loads in 159 s and draws in 201 s, but at 7.0 GB PSS (about 5 GB of GPU memory) Android closed the other apps and then killed the demo (in the background) before a second picture. To offer it on 12 GB phones: try with the demo in front, release the chat model while drawing, and limit it to phones with 12 GB or more.
 - [ ] Maybe: prune caches of an older copy of the model file (their names carry the file's time and size) when it is downloaded again.

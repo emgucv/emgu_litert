@@ -68,21 +68,25 @@ or later runtime.
 ### iOS device
 
 Device builds need code signing: a development certificate, and a provisioning profile for `com.emgu.litert` that
-includes the device. Verified on an iPad Air (M4, iPadOS 27.2; 2026-11-03) with the team's Xcode-managed
-"iOS Team Provisioning Profile: com.emgu.*":
+includes the device and the two memory entitlements of `Platforms/iOS/Memory.entitlements.plist` (applied to device
+builds that pass `CodesignProvision`): Extended Virtual Addressing and Increased Memory Limit, which the image models
+need. Those take an explicit App ID with both capabilities; the team's is `com.emgu.litert`, with the Xcode-managed
+"iOS Team Provisioning Profile: com.emgu.litert" (since 2026-11-04; the wildcard "com.emgu.*" profile can't carry
+them). Verified on an iPad Air (M4, iPadOS 27.2):
 
 ```bash
 xcrun devicectl list devices                   # the device's identifier
 dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug -p:RuntimeIdentifier=ios-arm64 \
   -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: <name> (<id>)" \
-  -p:CodesignProvision="iOS Team Provisioning Profile: com.emgu.*"
+  -p:CodesignProvision="iOS Team Provisioning Profile: com.emgu.litert"
 xcrun devicectl device install app --device <identifier> Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios/ios-arm64/Maui.Demo.Lite.app
 xcrun devicectl device process launch --device <identifier> com.emgu.litert
 ```
 
 A new device first needs Developer Mode (Settings > Privacy & Security > Developer Mode, then a restart) and to be in
 the profile: `xcodebuild -allowProvisioningUpdates -allowProvisioningDeviceRegistration` registers it and refreshes the
-profile while building any Xcode project with automatic signing for it (it needs Xcode signed in to the team's account,
+profile while building any Xcode project with automatic signing for it (bundle ID `com.emgu.litert` and an
+entitlements file with the two keys, so the profile keeps them) (it needs Xcode signed in to the team's account,
 and the team's latest Program License Agreement accepted). Models can be copied into the app instead of downloaded:
 `xcrun devicectl device copy to --device <identifier> --domain-type appDataContainer --domain-identifier com.emgu.litert
 --source <file> --destination Documents/LiteRT-LM/<file>` (with its `.sha256ok`; the modification time is kept). A

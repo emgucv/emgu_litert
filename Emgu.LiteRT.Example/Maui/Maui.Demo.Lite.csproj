@@ -34,6 +34,14 @@
 		<CodesignEntitlements Condition="'$(CodesignEntitlements)' == ''">Platforms/MacCatalyst/Keychain.entitlements.plist</CodesignEntitlements>
 	</PropertyGroup>
 
+	<!-- iOS device builds: the image models need more address space and memory than iOS gives an app by default
+	     (Platforms/iOS/Memory.entitlements.plist). The entitlements need an explicit App ID with the Extended Virtual
+	     Addressing and Increased Memory Limit capabilities: sign with its profile, e.g.
+	     -p:CodesignProvision="iOS Team Provisioning Profile: com.emgu.litert" (the wildcard com.emgu.* profile can't). -->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' and '$(CodesignProvision)' != ''">
+		<CodesignEntitlements Condition="'$(CodesignEntitlements)' == ''">Platforms/iOS/Memory.entitlements.plist</CodesignEntitlements>
+	</PropertyGroup>
+
 	<!-- iOS: compile ahead of time in Debug too, without Mono's interpreter (which Debug builds otherwise use for hot
 	     reload). In the interpreter, image generation (Z-Image-Turbo through Emgu.LiteRT) crashed at the start of a
 	     second picture - an ArrayTypeMismatchException, and once that was worked around a SIGSEGV in
