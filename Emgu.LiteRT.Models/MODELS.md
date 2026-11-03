@@ -50,6 +50,7 @@ The ready-made models: `Emgu.LiteRT.Models` (on LiteRT's CompiledModel API), `Em
   | Peak RSS (warm) | 4.8 GB | 2.1 GB | 5.6 GB | 2.2 GB |
 
   Both drew a convincing fox (Bonsai's more photographic); Z-Image-Turbo takes 23 s for 8 steps on the same Mac's CPU with a 10.6 GB download and ~9 GB of caches. Through the C# wrapper (`UnitTestTextToImage`, `TEST_MODELS`) the same times and the same picture as `omni_runner`.
+- On a Pixel Fold (2026-11-02) Bonsai on the GPU beside Gemma 4 E2B on the GPU gets the demo killed by Android's low-memory killer (no error, so no CPU fallback); on the CPU it draws in 380 s. Measurements and the options: [BONSAI_ANDROID_MEMORY.md](BONSAI_ANDROID_MEMORY.md).
 - On a Galaxy S10 (Snapdragon 855, 8 GB, 2026-11-01, the demo; Bonsai only - the other phones were off adb):
   - CPU (6 threads): first load 46.7 s (writing the caches), later 2.7 s; **260-285 s a picture** (the Mac's CPU is ~11x faster), the same picture as the Mac's CPU; peak PSS 3.8 GB alone.
   - Beside Gemma 4 E2B on the GPU (PSS 3.8 GB before): peak PSS 4.9 GB, 1.2 GB still available, the same time; Android closed other cached apps to make room, the demo wasn't killed. So the chat model isn't released for a picture.
