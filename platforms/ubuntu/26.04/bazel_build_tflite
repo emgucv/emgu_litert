@@ -62,13 +62,17 @@ mkdir -p $WORKSPACE_DIR/omniextern
 cp -f litertextern/omniextern/bazel/BUILD $WORKSPACE_DIR/omniextern/BUILD || exit 1
 cp -f litertextern/omniextern/omniextern.cc litertextern/omniextern/omniextern.h $WORKSPACE_DIR/omniextern/ || exit 1
 
-# liblitert-lm.so (LiteRT-LM's C API) needs LiteRT-LM's prebuilt libGemmaModelConstraintProvider.so
-# (prebuilt/linux_<arch>, Git LFS).
+# liblitert-lm.so (LiteRT-LM's C API) needs LiteRT-LM's prebuilt libGemmaModelConstraintProvider.so and, since
+# LiteRT-LM v0.19.0, Google's prebuilt Dawn, libwebgpu_dawn.so (its WebGPU sampler links it; prebuilt/linux_<arch>, Git
+# LFS): both are deployed next to it.
 GEMMA_PREBUILT=prebuilt/linux_$PREBUILT_ARCH/libGemmaModelConstraintProvider.so
-if ! head -c 4 "$WORKSPACE_DIR/$GEMMA_PREBUILT" | grep -q ELF; then
-    echo "$WORKSPACE_DIR/$GEMMA_PREBUILT is not an ELF library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
-    exit 1
-fi
+DAWN_PREBUILT=prebuilt/linux_$PREBUILT_ARCH/libwebgpu_dawn.so
+for PREBUILT in $GEMMA_PREBUILT $DAWN_PREBUILT; do
+    if ! head -c 4 "$WORKSPACE_DIR/$PREBUILT" | grep -q ELF; then
+        echo "$WORKSPACE_DIR/$PREBUILT is not an ELF library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
+        exit 1
+    fi
+done
 
 cd $WORKSPACE_DIR
 
@@ -88,6 +92,7 @@ cp -f bazel-bin/c/liblitert-lm.so ../lib/$OUT_FOLDER/liblitert-lm.so || exit 1
 # libomniextern.so (speech recognition) is built the same way, so it also links against libLiteRt.so.
 cp -f bazel-bin/omniextern/libomniextern.so ../lib/$OUT_FOLDER/libomniextern.so || exit 1
 cp -f $GEMMA_PREBUILT ../lib/$OUT_FOLDER/libGemmaModelConstraintProvider.so || exit 1
+cp -f $DAWN_PREBUILT ../lib/$OUT_FOLDER/libwebgpu_dawn.so || exit 1
 
 bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS "${@:1}" //tfliteextern:litert_runtime_so //tfliteextern:tfliteextern_so || exit 1
 
@@ -113,5 +118,8 @@ done
 # Record the tflite_with_xnnpack define next to the library. The top level CMakeLists.txt reads it
 # to set EMGU_TF_LITE_UBUNTU_XNNPACK, and it travels with the binary in the zip package.
 echo $TFLITE_WITH_XNNPACK > lib/$OUT_FOLDER/tflite_with_xnnpack.txt
+
+# What liblitert-lm.so loads, for the log (a library "not found" here has to be next to it or on the loader's path).
+ldd lib/$OUT_FOLDER/liblitert-lm.so || true
 
 echo Files copied to lib/$OUT_FOLDER

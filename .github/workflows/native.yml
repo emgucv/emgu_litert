@@ -48,10 +48,13 @@ jobs:
     - name: Install clang
       # The build script compiles with clang when it's installed; Ubuntu 26.04's GCC rejects some LiteRT sources.
       run: command -v clang++ || (sudo apt-get update && sudo apt-get install -y clang)
-    - name: Fetch LiteRT-LM's prebuilt Gemma library
-      # liblitert-lm.so depends on prebuilt/linux_<arch>/libGemmaModelConstraintProvider.so, which LiteRT-LM stores
-      # with Git LFS; the submodule checkout only has its pointer file.
-      run: git -C LiteRT-LM lfs pull --include=prebuilt/${{ matrix.prebuilt }}/libGemmaModelConstraintProvider.so
+    - name: Fetch LiteRT-LM's prebuilt libraries
+      # liblitert-lm.so depends on prebuilt/linux_<arch>/libGemmaModelConstraintProvider.so and (since LiteRT-LM
+      # v0.19.0) libwebgpu_dawn.so, which LiteRT-LM stores with Git LFS; the submodule checkout only has their pointer
+      # files (with Dawn's, the link failed: "libwebgpu_dawn.so:1: unknown directive: version").
+      run: >
+        git -C LiteRT-LM lfs pull
+        --include=prebuilt/${{ matrix.prebuilt }}/libGemmaModelConstraintProvider.so,prebuilt/${{ matrix.prebuilt }}/libwebgpu_dawn.so
     - name: Build libLiteRt.so, libtfliteextern.so and liblitert-lm.so
       # The script detects the host architecture (x86_64 or aarch64) and picks the Bazel configs and output folder.
       # The runner's ANDROID_* variables point at the SDK the "Free disk space" step removed; litert's WORKSPACE
@@ -122,12 +125,13 @@ jobs:
       with:
         submodules: true
     - name: Fetch LiteRT-LM's prebuilt libraries
-      # liblitert-lm.dylib depends on prebuilt/macos_arm64/libGemmaModelConstraintProvider.dylib, and the build also
-      # copies LiteRT's GPU (Metal) accelerator, libLiteRtMetalAccelerator.dylib; LiteRT-LM stores both with Git LFS,
-      # and the submodule checkout only has their pointer files.
+      # liblitert-lm.dylib depends on prebuilt/macos_arm64/libGemmaModelConstraintProvider.dylib and (since LiteRT-LM
+      # v0.19.0) libwebgpu_dawn.dylib, and the build also copies LiteRT's GPU (Metal) accelerator,
+      # libLiteRtMetalAccelerator.dylib; LiteRT-LM stores them with Git LFS, and the submodule checkout only has their
+      # pointer files.
       run: >
         git -C LiteRT-LM lfs pull
-        --include=prebuilt/macos_arm64/libGemmaModelConstraintProvider.dylib,prebuilt/macos_arm64/libLiteRtMetalAccelerator.dylib
+        --include=prebuilt/macos_arm64/libGemmaModelConstraintProvider.dylib,prebuilt/macos_arm64/libLiteRtMetalAccelerator.dylib,prebuilt/macos_arm64/libwebgpu_dawn.dylib
     - name: Build universal libLiteRt.dylib and libtfliteextern.dylib, and arm64 liblitert-lm.dylib
       run: platforms/macos/bazel_build_tflite_macos_fat
     - uses: actions/upload-artifact@v7

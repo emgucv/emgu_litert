@@ -967,12 +967,9 @@ IF (HAVE_WINDESKTOP_LITE)
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\liblitert-lm.dll\" target=\"runtimes\\win-x64\\native\" />
     <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\libGemmaModelConstraintProvider.dll\" target=\"runtimes\\win-x64\\native\" />
 	")
-    # webgpu_dawn.dll (Google's prebuilt Dawn): a load dependency of liblitert-lm.dll since LiteRT-LM v0.19.0.
-    IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/webgpu_dawn.dll")
-      SET(EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
-    <file src=\"..\\..\\..\\lib\\runtimes\\win-x64\\native\\webgpu_dawn.dll\" target=\"runtimes\\win-x64\\native\" />
-	")
-    ENDIF()
+    # Not webgpu_dawn.dll (Google's prebuilt Dawn, 13 MB): since LiteRT-LM v0.19.0 liblitert-lm.dll delay-loads it,
+    # for its WebGPU sampler only, so it loads and runs on the CPU without it. It ships in the optional
+    # Emgu.LiteRT.GPU.runtime.windows package (the Windows GPU bundle) instead.
   ENDIF()
   IF(HAVE_WINDOWS_LITERT_LM AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/win-x64/native/libomniextern.dll")
     SET(EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST "${EMGU_LITERT_LM_WINDOWS_NUGET_FILE_LIST}
@@ -1078,15 +1075,15 @@ IF(HAVE_OSX_LITE)
 ENDIF()
 
 IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
-  # liblitert-lm.so/libGemmaModelConstraintProvider.so/libomniextern.so (when present) are excluded from this package's
+  # liblitert-lm.so/libGemmaModelConstraintProvider.so/libomniextern.so/libwebgpu_dawn.so (when present) are excluded from this package's
   # *.so glob - they ship in ${EMGU_LITERT_LM_UBUNTU_NUGET_ID} instead, see below.
   IF (HAVE_UBUNTU_X86_64_LITE)
     SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
-      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libomniextern.so\" target=\"runtimes\\runtimes\\ubuntu-x64\\native\" />")
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libwebgpu_dawn.so\" target=\"runtimes\\runtimes\\ubuntu-x64\\native\" />")
   ENDIF()
   IF (HAVE_UBUNTU_ARM64_LITE)
     SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
-      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libomniextern.so\" target=\"runtimes\\runtimes\\ubuntu-arm64\\native\" />")
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libwebgpu_dawn.so\" target=\"runtimes\\runtimes\\ubuntu-arm64\\native\" />")
   ENDIF()
   SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
@@ -1099,13 +1096,15 @@ IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
 ENDIF()
 
 # Emgu.LiteRT.LM.runtime.ubuntu: liblitert-lm.so (LiteRT-LM's C API, built by
-# platforms/ubuntu/{24.04,26.04}/bazel_build_tflite) plus the prebuilt libGemmaModelConstraintProvider.so
+# platforms/ubuntu/{24.04,26.04}/bazel_build_tflite) plus the prebuilt libGemmaModelConstraintProvider.so and (since
+# LiteRT-LM v0.19.0) libwebgpu_dawn.so
 # it depends on. Optional - guarded on EXISTS the same way the macOS packaging treats liblitert-lm.dylib,
 # so a build that didn't produce it doesn't fail to pack an empty package.
 IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-x64/native/liblitert-lm.so")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so\" target=\"runtimes\\ubuntu-x64\\native\" />
-    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\ubuntu-x64\\native\" />")
+    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\ubuntu-x64\\native\" />
+    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libwebgpu_dawn.so\" target=\"runtimes\\ubuntu-x64\\native\" />")
 ENDIF()
 IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-x64/native/libomniextern.so")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
@@ -1114,7 +1113,8 @@ ENDIF()
 IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-arm64/native/liblitert-lm.so")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so\" target=\"runtimes\\ubuntu-arm64\\native\" />
-    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\ubuntu-arm64\\native\" />")
+    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so\" target=\"runtimes\\ubuntu-arm64\\native\" />
+    <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libwebgpu_dawn.so\" target=\"runtimes\\ubuntu-arm64\\native\" />")
 ENDIF()
 IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-arm64/native/libomniextern.so")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}

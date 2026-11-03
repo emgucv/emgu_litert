@@ -100,7 +100,7 @@ Still to do:
 - [x] Windows x64 natives (2026-11-01): `bazel_build_litert.ps1 64` and `cmake_build_litert.ps1` build; `litert_windows_exports.def`
       regenerated (the old one named two symbols LiteRT dropped: LNK2001), `LiteRtGetStatusString` and the delegate wrapper
       functions forced into `libLiteRt.dll` with `/INCLUDE`; `omniextern` (Kokoro and all) builds with MSVC given `/utf-8`;
-      `liblitert-lm.dll` now imports `webgpu_dawn.dll`, which is shipped with it; packages 0.19.0 / LiteRT 2.4.0 / TFLite 2.23.0 build.
+      `liblitert-lm.dll` now delay-loads `webgpu_dawn.dll` (needed for the GPU only; shipped in the GPU package since 2026-11-03); packages 0.19.0 / LiteRT 2.4.0 / TFLite 2.23.0 build.
       Model-free and Native tests: 741 passed, 0 failed. Details: `docs/native-builds.md`.
 - [x] Windows GPU (2026-11-02): the accelerator builds unpatched on v0.19.0 in the same Bazel invocation as `liblitert-lm.dll`
       (`bazel_build_litert.ps1 64 -Gpu`; the LiteRT-LM workspace downloads ML Drift and links its prebuilt `webgpu_dawn.dll`), and

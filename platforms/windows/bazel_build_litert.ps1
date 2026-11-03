@@ -411,13 +411,14 @@ if ($BuildLitertLm) {
     # every platform (Emgu.LiteRT.LM P/Invokes this one name regardless of OS).
     Copy-Item (Join-Path $LmWorkspaceDir "bazel-bin\c\litert-lm.dll") "$NativeOutDir\liblitert-lm.dll" -Force
     Copy-Item $GemmaPrebuilt "$NativeOutDir\libGemmaModelConstraintProvider.dll" -Force
-    # Since LiteRT-LM v0.19.0 liblitert-lm.dll also imports webgpu_dawn.dll (Google's prebuilt Dawn, for its WebGPU sampler; Git LFS
-    # like the Gemma library): without it next to liblitert-lm.dll the load fails.
+    # Since LiteRT-LM v0.19.0 liblitert-lm.dll delay-loads webgpu_dawn.dll (Google's prebuilt Dawn, for its WebGPU sampler; Git LFS
+    # like the Gemma library): it loads and runs on the CPU without it, and needs it for the GPU. Copied for local runs and
+    # for bazel_build_windows_gpu.ps1, whose bundle (Emgu.LiteRT.GPU.runtime.windows) ships it.
     $WebGpuDawn = Join-Path $WorkspaceDir "prebuilt\windows_x86_64\webgpu_dawn.dll"
     if ((Test-Path $WebGpuDawn) -and ((Get-Item $WebGpuDawn).Length -gt 1024)) {
         Copy-Item $WebGpuDawn "$NativeOutDir\webgpu_dawn.dll" -Force
     } else {
-        Write-Warning "$WebGpuDawn missing or too small (a Git LFS pointer?) - run 'git -C $WorkspaceDir lfs pull'. liblitert-lm.dll will not load without it."
+        Write-Warning "$WebGpuDawn missing or too small (a Git LFS pointer?) - run 'git -C $WorkspaceDir lfs pull'. Without it liblitert-lm.dll runs on the CPU only, and the GPU bundle can't be built."
     }
     if ($Gpu) {
         $GpuAccelerator = Join-Path $LmWorkspaceDir "bazel-bin\external\litert\litert\runtime\accelerators\gpu\libLiteRtWebGpuAccelerator.dll"
