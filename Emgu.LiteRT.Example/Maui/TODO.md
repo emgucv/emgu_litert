@@ -774,8 +774,10 @@ third chip in Settings > Speech recognition, a Storage row, and no spaces at Chi
 - [ ] Faster on phones: Qwen3-ASR is only just real time on the S10 (a meeting falls one 25 s piece behind); try the GPU
   there, or fewer windows' overlap.
 - [ ] Mac Catalyst and iOS: the Catalyst builds again since the demo and MauiChat need Mac Catalyst 17.0 (the new SDK
-  pack's lowest, 2026-11-03), not run with Qwen3-ASR yet; the iOS simulator build fails to link
-  (`_xamarin_initialize_dynamic_registrar`) since Xcode 27.2 - from the toolchain update, not this change.
+  pack's lowest, 2026-11-03), not run with Qwen3-ASR yet. The iOS simulator build failed to link
+  (`_xamarin_initialize_dynamic_registrar` undefined) after the iOS SDK pack moved to 27.1: `obj/.../nativelibraries`
+  kept the old pack's `libxamarin-dotnet-debug.dylib`, which the link searches first; it builds again with the
+  platform's `bin`/`obj` deleted (2026-11-03, the demo and MauiChat).
 - [ ] Maybe: pass the language Qwen3-ASR detects back (its decoder skips it; a LiteRT-LM change), and the 1.7B model on
   computers.
 - [ ] Next omni models: maybe Moonshine tiny (English, 52 MB) or Whisper tiny for older phones.

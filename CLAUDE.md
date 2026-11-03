@@ -52,7 +52,7 @@ Pitfalls:
 - `git -C LiteRT-LM lfs pull` before the macOS, iOS and Android builds (LiteRT-LM's prebuilt libraries are Git LFS files).
 - The Bazel scripts keep Bazel's output in `bazel_output/` (`--output_user_root`); run `bazel` by hand with the same startup flag, or it starts again with a cold cache.
 - `-p:ValidateXcodeVersion=false` when the .NET Apple SDK pack doesn't match the installed Xcode; `-p:RuntimeIdentifier=iossimulator-arm64` / `android-arm64` to build one architecture; `-p:AdbTarget="-s <serial>"` with several adb devices.
-- Delete the platform's `bin`/`obj` after editing an `Info.plist`, or after changing native libraries for Android (an incremental build can leave them out of the APK).
+- Delete the platform's `bin`/`obj` after editing an `Info.plist`, after changing native libraries for Android (an incremental build can leave them out of the APK), or after an Apple SDK pack update (`obj/.../nativelibraries` keeps the old pack's `libxamarin-dotnet*.dylib`, which the link finds first: "Undefined symbols: _xamarin_initialize_dynamic_registrar").
 
 ## Running Tests
 
