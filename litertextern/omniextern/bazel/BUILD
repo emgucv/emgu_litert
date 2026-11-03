@@ -10,6 +10,12 @@
 
 package(default_visibility = ["//visibility:public"])
 
+# Also compiled by //omniextern_ios (litertextern/omniextern/bazel_ios), the iOS build.
+exports_files([
+    "omniextern.cc",
+    "omniextern.h",
+])
+
 cc_binary(
     name = "omniextern",
     srcs = [

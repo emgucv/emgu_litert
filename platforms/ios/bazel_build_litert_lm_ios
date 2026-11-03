@@ -2,13 +2,18 @@
 
 # Builds LiteRT-LM's C API for iOS (Emgu.LiteRT.LM's native library) from the LiteRT-LM submodule, linked to the base
 # LiteRt.framework instead of carrying its own LiteRT runtime - the same split as macOS and Android:
-#   lib/ios/LiteRtLm.xcframework                       - LiteRT-LM's //c:litert-lm, built with
+#   lib/ios/LiteRtLm.xcframework                       - LiteRT-LM's C API (//c:engine, what //c:litert-lm is built
+#                                                        from) with the runtime it exports to omniextern, built with
 #                                                        --define=litert_runtime_link_mode=dynamic
 #   lib/ios/GemmaModelConstraintProvider.xcframework   - LiteRT-LM's prebuilt Gemma model constraint provider,
 #                                                        which it links, wrapped into a framework
-#   lib/ios/omniextern.xcframework                     - Emgu's C API over LiteRT-LM's OmniEngine (speech recognition)
-#                                                        (litertextern/omniextern, staged into the workspace), built
-#                                                        the same way
+#   lib/ios/omniextern.xcframework                     - Emgu's C API over LiteRT-LM's OmniEngine (speech recognition,
+#                                                        text to image and speech; litertextern/omniextern, staged
+#                                                        into the workspace), linked against LiteRtLm
+# Since 2026-11-04 both come from //omniextern_ios (litertextern/omniextern/bazel_ios), two cc_shared_libraries: before,
+# //c:litert-lm and //omniextern:omniextern each linked the whole runtime, so omniextern (22.5 MB) duplicated LiteRtLm
+# (18.6 MB) and both registered miniaudio's Objective-C class ma_ios_notification_handler, which iOS warned about at
+# launch. Now LiteRtLm (29 MB, exporting the runtime) and omniextern (2.4 MB, linking against it) have one copy.
 # Both are dynamic frameworks with a device (arm64) and a simulator (arm64) slice. The LiteRT-LM add-on
 # Emgu.LiteRT.Runtime/Maui/LM/iOS (Emgu.LiteRT.LM.runtime.maui.ios) embeds them; LiteRt.framework comes from the base
 # Emgu.LiteRT.runtime.maui.ios. Run platforms/ios/bazel_build_tflite_ios_frameworks first: this script links against
@@ -43,10 +48,13 @@ for SLICE in ios_arm64 ios_sim_arm64; do
     fi
 done
 
-# omniextern isn't part of LiteRT-LM: stage our tracked source into its workspace, as the macOS and Android scripts do.
-mkdir -p $WORKSPACE_DIR/omniextern
+# omniextern isn't part of LiteRT-LM: stage our tracked source into its workspace, as the macOS and Android scripts do,
+# with the iOS package that builds both frameworks.
+mkdir -p $WORKSPACE_DIR/omniextern $WORKSPACE_DIR/omniextern_ios
 cp -f litertextern/omniextern/bazel/BUILD $WORKSPACE_DIR/omniextern/BUILD || exit 1
 cp -f litertextern/omniextern/omniextern.cc litertextern/omniextern/omniextern.h $WORKSPACE_DIR/omniextern/ || exit 1
+cp -f litertextern/omniextern/bazel_ios/BUILD litertextern/omniextern/bazel_ios/static_archives.bzl \
+    $WORKSPACE_DIR/omniextern_ios/ || exit 1
 
 STAGING=$(mktemp -d)
 LM_ARGS=""
@@ -62,11 +70,11 @@ for ENTRY in $IOS_SLICES; do
     # Bazel's output folder name, and in dynamic mode LiteRT's C API libraries would be built empty.
     run_bazel build --verbose_failures -c opt --config=$CONFIG --ios_minimum_os=$IOS_MINIMUM_OS \
         --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic \
-        --linkopt=$STAGING/link/$XCF_SLICE/LiteRt "$@" //c:litert-lm //omniextern:omniextern || exit 1
-    LM_DYLIB=$WORKSPACE_DIR/bazel-bin/c/liblitert-lm.dylib
+        --linkopt=$STAGING/link/$XCF_SLICE/LiteRt "$@" //omniextern_ios:litert_lm //omniextern_ios:omniextern || exit 1
+    LM_DYLIB=$WORKSPACE_DIR/bazel-bin/omniextern_ios/libLiteRtLm.dylib
     check_bound $LM_DYLIB
     wrap_framework $LM_DYLIB $STAGING/$XCF_SLICE/LiteRtLm.framework $PLATFORM $IOS_MINIMUM_OS
-    ASR_DYLIB=$WORKSPACE_DIR/bazel-bin/omniextern/libomniextern.dylib
+    ASR_DYLIB=$WORKSPACE_DIR/bazel-bin/omniextern_ios/libomniextern.dylib
     check_bound $ASR_DYLIB
     wrap_framework $ASR_DYLIB $STAGING/$XCF_SLICE/omniextern.framework $PLATFORM $IOS_MINIMUM_OS
     ASR_ARGS="$ASR_ARGS -framework $STAGING/$XCF_SLICE/omniextern.framework"
