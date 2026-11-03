@@ -781,6 +781,14 @@ third chip in Settings > Speech recognition, a Storage row, and no spaces at Chi
   (`_xamarin_initialize_dynamic_registrar` undefined) after the iOS SDK pack moved to 27.1: `obj/.../nativelibraries`
   kept the old pack's `libxamarin-dotnet-debug.dylib`, which the link searches first; it builds again with the
   platform's `bin`/`obj` deleted (2026-11-03, the demo and MauiChat).
+- [x] iOS simulator (iPhone 18 Pro, iOS 27.2, 2026-11-03): the demo starts; Qwen3-ASR through `SpeechRecognizer` (a
+  temporary self-test, `EMGU_LM_SELFTEST=1`) wrote down the clips as on the Mac (4.2 s with the load, then 0.2 of real
+  time), and a clip at 1% volume word for word (`SpeechEngines.Boost`).
+- [ ] iOS: `omniextern.framework` and `LiteRtLm.framework` both register miniaudio's Objective-C class
+  `ma_ios_notification_handler` (both link LiteRT-LM's miniaudio; omniextern also exports its 1,077 `ma_*` symbols), and
+  iOS warns at launch that this "may cause spurious casting failures and mysterious crashes". The same source, so far
+  harmless; fix by building miniaudio without device IO in omniextern (`MA_NO_DEVICE_IO`), or by taking LiteRT-LM's
+  audio code from `LiteRtLm` instead of linking it twice.
 - [ ] Maybe: pass the language Qwen3-ASR detects back (its decoder skips it; a LiteRT-LM change), and the 1.7B model on
   computers.
 - [ ] Next omni models: maybe Moonshine tiny (English, 52 MB) or Whisper tiny for older phones.
