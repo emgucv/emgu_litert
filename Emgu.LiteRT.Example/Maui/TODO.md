@@ -348,6 +348,13 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       Virtual Addressing, Increased Memory Limit; the App ID `com.emgu.litert` has both) iOS allowed 12.2 GB, and
       every model drew with at least 10.5 GB left.
 - [ ] An 8 GB iPhone (the model cards' floor): the iPad has more memory.
+- [x] The GPU on iOS (2026-11-04): LiteRT-LM's prebuilt Metal accelerator, wrapped as `LiteRtMetalAccelerator.framework`
+  and found through an rpath on `LiteRt.framework` (`docs/native-builds.md`). On an iPad Air M4: Gemma 4 E2B loaded in
+  6.6 s and wrote 52 tokens/s; EmbeddingGemma 2 the same scores, no faster (text 43 ms, image 417 ms); Qwen3-ASR 26 s in
+  3.2 s (the CPU 4.3 s). No Metal sampler library (the CPU samples, as on Android).
+- [ ] Offer "· GPU" on iOS where it helps: Gemma 4 E2B/E4B in the chat catalog (measure the CPU's speed beside it, and a
+  long chat), the image models (Bonsai, FLUX.2-klein, Z-Image-Turbo), Qwen3-ASR's switch (`OmniSpeech.GpuAvailable`);
+  not the embedding models (no faster). Then a Metal add-on package for iOS, as on macOS.
 
 ## 32. Live camera tools — first version implemented
 

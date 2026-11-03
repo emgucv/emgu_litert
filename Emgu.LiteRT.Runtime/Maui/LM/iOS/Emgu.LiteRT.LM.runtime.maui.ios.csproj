@@ -12,6 +12,7 @@
     <EmguLiteRtLmIOSFramework>$(TfLiteBinaryDir)\ios\LiteRtLm.xcframework</EmguLiteRtLmIOSFramework>
     <EmguLiteRtLmGemmaIOSFramework>$(TfLiteBinaryDir)\ios\GemmaModelConstraintProvider.xcframework</EmguLiteRtLmGemmaIOSFramework>
     <EmguOmniExternIOSFramework>$(TfLiteBinaryDir)\ios\omniextern.xcframework</EmguOmniExternIOSFramework>
+    <EmguLiteRtMetalIOSFramework>$(TfLiteBinaryDir)\ios\LiteRtMetalAccelerator.xcframework</EmguLiteRtMetalIOSFramework>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
@@ -44,6 +45,12 @@
     <!-- Emgu's C API over LiteRT-LM's OmniEngine (Emgu.LiteRT.LM's SpeechToTextEngine), built by the same script and
          also linked to LiteRt.framework; DllImport names it @rpath/omniextern.framework/omniextern. Optional. -->
     <NativeReference Condition="Exists('$(EmguOmniExternIOSFramework)')" Include="$(EmguOmniExternIOSFramework)">
+      <Kind>Framework</Kind>
+      <SmartLink>False</SmartLink>
+    </NativeReference>
+    <!-- LiteRT's GPU (Metal) accelerator, Google's prebuilt: LiteRt.framework loads it by name for the GPU backend
+         (platforms/ios/bazel_build_litert_lm_ios). -->
+    <NativeReference Condition="Exists('$(EmguLiteRtMetalIOSFramework)')" Include="$(EmguLiteRtMetalIOSFramework)">
       <Kind>Framework</Kind>
       <SmartLink>False</SmartLink>
     </NativeReference>

@@ -36,6 +36,11 @@ for ENTRY in $IOS_SLICES; do
     check_bound $WORKSPACE_DIR/bazel-bin/tfliteextern/libLiteRt.dylib
     check_bound $WORKSPACE_DIR/bazel-bin/tfliteextern/libtfliteextern.dylib
     wrap_framework $WORKSPACE_DIR/bazel-bin/tfliteextern/libLiteRt.dylib $STAGING/$XCF_SLICE/LiteRt.framework $PLATFORM $IOS_MINIMUM_OS
+    # LiteRT loads its GPU accelerator by name, dlopen("LiteRtMetalAccelerator") (litert/runtime/accelerators/gpu_registry.cc,
+    # with no folder set: LiteRT-LM sets none), and dyld looks a bare name up in the caller's rpaths: with this one it finds
+    # LiteRtMetalAccelerator.framework (bazel_build_litert_lm_ios), which apps without it simply don't have.
+    install_name_tool -add_rpath @loader_path/../LiteRtMetalAccelerator.framework $STAGING/$XCF_SLICE/LiteRt.framework/LiteRt || exit 1
+    codesign -f -s - $STAGING/$XCF_SLICE/LiteRt.framework/LiteRt || exit 1
     wrap_framework $WORKSPACE_DIR/bazel-bin/tfliteextern/libtfliteextern.dylib $STAGING/$XCF_SLICE/tfliteextern.framework $PLATFORM $IOS_MINIMUM_OS
     LITERT_ARGS="$LITERT_ARGS -framework $STAGING/$XCF_SLICE/LiteRt.framework"
     TFLITEEXTERN_ARGS="$TFLITEEXTERN_ARGS -framework $STAGING/$XCF_SLICE/tfliteextern.framework"

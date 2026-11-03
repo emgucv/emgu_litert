@@ -41,11 +41,12 @@ if [ ! -d $OUT_DIR/LiteRt.xcframework ]; then
     exit 1
 fi
 for SLICE in ios_arm64 ios_sim_arm64; do
-    GEMMA=$WORKSPACE_DIR/prebuilt/$SLICE/libGemmaModelConstraintProvider.dylib
-    if ! file "$GEMMA" | grep -q Mach-O; then
-        echo "$GEMMA is not a Mach-O library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
-        exit 1
-    fi
+    for PREBUILT in libGemmaModelConstraintProvider libLiteRtMetalAccelerator; do
+        if ! file "$WORKSPACE_DIR/prebuilt/$SLICE/$PREBUILT.dylib" | grep -q Mach-O; then
+            echo "$WORKSPACE_DIR/prebuilt/$SLICE/$PREBUILT.dylib is not a Mach-O library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
+            exit 1
+        fi
+    done
 done
 
 # omniextern isn't part of LiteRT-LM: stage our tracked source into its workspace, as the macOS and Android scripts do,
@@ -60,6 +61,7 @@ STAGING=$(mktemp -d)
 LM_ARGS=""
 GEMMA_ARGS=""
 ASR_ARGS=""
+METAL_ARGS=""
 for ENTRY in $IOS_SLICES; do
     IFS=: read CONFIG XCF_SLICE PLATFORM <<< "$ENTRY"
     # A copy in a new folder each run: Bazel doesn't track files named only in --linkopt, so a changed path makes it
@@ -82,14 +84,20 @@ for ENTRY in $IOS_SLICES; do
         $STAGING/$XCF_SLICE/GemmaModelConstraintProvider.framework $PLATFORM 26.4
     LM_ARGS="$LM_ARGS -framework $STAGING/$XCF_SLICE/LiteRtLm.framework"
     GEMMA_ARGS="$GEMMA_ARGS -framework $STAGING/$XCF_SLICE/GemmaModelConstraintProvider.framework"
+    # LiteRT's GPU (Metal) accelerator, Google's prebuilt for iOS 15+: libLiteRt loads it by name from
+    # LiteRtMetalAccelerator.framework (see the rpath in bazel_build_tflite_ios_frameworks).
+    wrap_framework $WORKSPACE_DIR/prebuilt/$CONFIG/libLiteRtMetalAccelerator.dylib \
+        $STAGING/$XCF_SLICE/LiteRtMetalAccelerator.framework $PLATFORM $IOS_MINIMUM_OS
+    METAL_ARGS="$METAL_ARGS -framework $STAGING/$XCF_SLICE/LiteRtMetalAccelerator.framework"
 done
 
 # CLiteRTLM.xcframework is what this script built before: LiteRT-LM's own //swift:CLiteRTLM, with its own LiteRT.
 rm -rf $OUT_DIR/LiteRtLm.xcframework $OUT_DIR/GemmaModelConstraintProvider.xcframework $OUT_DIR/CLiteRTLM.xcframework \
-    $OUT_DIR/omniextern.xcframework
+    $OUT_DIR/omniextern.xcframework $OUT_DIR/LiteRtMetalAccelerator.xcframework
 xcodebuild -create-xcframework $LM_ARGS -output $OUT_DIR/LiteRtLm.xcframework || exit 1
 xcodebuild -create-xcframework $GEMMA_ARGS -output $OUT_DIR/GemmaModelConstraintProvider.xcframework || exit 1
 xcodebuild -create-xcframework $ASR_ARGS -output $OUT_DIR/omniextern.xcframework || exit 1
+xcodebuild -create-xcframework $METAL_ARGS -output $OUT_DIR/LiteRtMetalAccelerator.xcframework || exit 1
 rm -rf $STAGING
 
-echo Output written to $OUT_DIR/LiteRtLm.xcframework, $OUT_DIR/GemmaModelConstraintProvider.xcframework and $OUT_DIR/omniextern.xcframework
+echo Output written to $OUT_DIR/LiteRtLm.xcframework, $OUT_DIR/GemmaModelConstraintProvider.xcframework, $OUT_DIR/omniextern.xcframework and $OUT_DIR/LiteRtMetalAccelerator.xcframework
