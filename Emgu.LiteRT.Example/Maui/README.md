@@ -67,14 +67,27 @@ or later runtime.
 
 ### iOS device
 
-Device builds need code signing (an Apple developer team and provisioning profile). With those set up:
+Device builds need code signing: a development certificate, and a provisioning profile for `com.emgu.litert` that
+includes the device. Verified on an iPad Air (M4, iPadOS 27.2; 2026-11-03) with the team's Xcode-managed
+"iOS Team Provisioning Profile: com.emgu.*":
 
 ```bash
-xcrun xctrace list devices                     # find the device's UDID
-dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -t:Run -f net10.0-ios -c Release -r ios-arm64 -p:_DeviceName=<UDID>
+xcrun devicectl list devices                   # the device's identifier
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug -p:RuntimeIdentifier=ios-arm64 \
+  -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: <name> (<id>)" \
+  -p:CodesignProvision="iOS Team Provisioning Profile: com.emgu.*"
+xcrun devicectl device install app --device <identifier> Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios/ios-arm64/Maui.Demo.Lite.app
+xcrun devicectl device process launch --device <identifier> com.emgu.litert
 ```
 
-(Not yet verified with this version of the demo.)
+A new device first needs Developer Mode (Settings > Privacy & Security > Developer Mode, then a restart) and to be in
+the profile: `xcodebuild -allowProvisioningUpdates -allowProvisioningDeviceRegistration` registers it and refreshes the
+profile while building any Xcode project with automatic signing for it (it needs Xcode signed in to the team's account,
+and the team's latest Program License Agreement accepted). Models can be copied into the app instead of downloaded:
+`xcrun devicectl device copy to --device <identifier> --domain-type appDataContainer --domain-identifier com.emgu.litert
+--source <file> --destination Documents/LiteRT-LM/<file>` (with its `.sha256ok`; the modification time is kept). A
+self-test gets its environment from `DEVICECTL_CHILD_EMGU_LM_SELFTEST=1 xcrun devicectl device process launch --console
+...`, which also shows the app's console.
 
 ### Android
 

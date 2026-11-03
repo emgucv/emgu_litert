@@ -792,8 +792,11 @@ third chip in Settings > Speech recognition, a Storage row, and no spaces at Chi
   `ma_ios_notification_handler` (both link LiteRT-LM's miniaudio; omniextern also exports its 1,077 `ma_*` symbols), and
   iOS warns at launch that this "may cause spurious casting failures and mysterious crashes". The same source, so far
   harmless. Fixed 2026-11-04: omniextern links against LiteRtLm (`//omniextern_ios`, two `cc_shared_library`s; 2.4 MB
-  instead of 22.5 MB; `docs/native-builds.md`); no warning in the simulator, Qwen3-ASR and a Qwen3 chat work. Not run
-  yet on an iPhone, nor with constrained decoding or tool calls (linked, not exercised).
+  instead of 22.5 MB; `docs/native-builds.md`); no warning in the simulator, Qwen3-ASR and a Qwen3 chat work.
+- [x] On an iPad Air (M4, iPadOS 27.2; 2026-11-04), the same frameworks (a temporary self-test): no warning; Qwen3-ASR
+  4 s clips in 0.45-0.5 s and 21-26 s ones in 3.1-4.3 s (0.13-0.16 of real time), the same text, a 1%-volume clip word
+  for word; Qwen3 0.6B in 1.0 s; Gemma 4 E2B on the CPU called a tool with constrained decoding (one call, 2.5 s), used
+  its result in a follow-up, and again with thinking (6.1 s); iOS allowed at least 3.9 GB more throughout.
 - [ ] Maybe: pass the language Qwen3-ASR detects back (its decoder skips it; a LiteRT-LM change), and the 1.7B model on
   computers.
 - [ ] Next omni models: maybe Moonshine tiny (English, 52 MB) or Whisper tiny for older phones.
