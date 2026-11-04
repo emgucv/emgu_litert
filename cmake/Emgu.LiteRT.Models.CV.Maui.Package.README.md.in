@@ -4,9 +4,9 @@ This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSI
 
 - `Emgu.LiteRT.Models.CV.Maui.dll`: the live camera for the `${EMGU_LITERT_MODELS_CV_NUGET_ID}` detectors in a MAUI app.
   - `LiveCamera` delivers frames as Emgu CV `Mat`s (8-bit BGR, at most 960 px on the long side, turned upright as `RotationDegrees` says, up to 30 a second) and JPEG snapshots on request (`CaptureAsync`).
-  - On Android it runs through Camera2, with the back or the selfie camera (`Front`). While the frames go on, it also takes full-resolution photos (`TakePhotoAsync`) and records H.264 clips with sound (`RecordClipAsync`). Where Camera2 can't be set up, it falls back to OpenCV's camera.
-  - On Mac Catalyst and Windows it is OpenCV's capture of the first camera. iOS isn't supported yet (`LiveCamera.Supported`).
-  - `LiveCameraPreview` shows the frames through each platform's own image view: Emgu CV's `CvImageView` on Android, a `UIImageView` on iOS and Mac Catalyst, a `WriteableBitmap` on Windows.
+  - On Android it runs through Camera2 and on iOS through AVFoundation, with the back or the selfie camera (`Front`, `HasFrontCamera`). While the frames go on, it also takes full-resolution photos (`TakePhotoAsync`) and records H.264 clips with sound (`RecordClipAsync`). Where Camera2 can't be set up, Android falls back to OpenCV's camera. On iOS the frames come upright from AVFoundation itself (`FrameRotation` stays null).
+  - On Mac Catalyst and Windows it is OpenCV's capture of the first camera (frames only; `LiveCamera.Supported` says which platforms have a camera, `CanRecordClip` which cameras take photos and clips).
+  - `LiveCameraPreview` shows the frames through each platform's own image view: Emgu CV's `CvImageView` on Android, a `UIImageView` on Mac Catalyst, a `WriteableBitmap` on Windows. On iOS, call `builder.UseLiveCamera()` in `MauiProgram` to register its handler, which shows the frames through an `AVSampleBufferDisplayLayer` fed from a pool of IOSurface-backed pixel buffers (no image object or texture upload a frame; thread-safe); without it the preview is a `UIImageView`.
 
 It depends on Emgu CV's MAUI runtime package (`Emgu.CV.runtime.maui.mini`), which brings OpenCV's native libraries for each platform.
 

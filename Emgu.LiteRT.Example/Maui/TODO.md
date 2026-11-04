@@ -368,7 +368,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Real webcam check on Mac Catalyst (this Mac has no camera); iOS live capture is not enabled yet.
+- [ ] Real webcam check on Mac Catalyst (this Mac has no camera). iOS live capture: item 59 (2026-11-04).
 - [ ] Follow-ups: camera selection and YOLO detection/tracking. Continuous detector monitoring is covered by item 33;
       model image descriptions still capture only when asked. Neither feature records video.
 
@@ -580,7 +580,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] The clip starts when the alert fires (about a second after the person appears, plus the 0.3 s reconfiguration) and the frames pause that long at
       each end. A pre-roll (the seconds before the alert) needs a ring buffer of encoded frames: an always-running MediaCodec encoder muxed with
       MediaMuxer instead of MediaRecorder; and a MediaRecorder prepared in advance would remove the start's pause.
-- [ ] Other platforms: Mac Catalyst and Windows have no clip action (their cameras are OpenCV's), iOS has no live camera at all.
+- [ ] Other platforms: Mac Catalyst and Windows have no clip action (their cameras are OpenCV's). iOS has it since 2026-11-04 (item 59).
 - [ ] A clip as the action of a sound monitor ("record a clip when the dog barks") - the sound monitors have chime and speech only.
 
 ## 44. Full-resolution photos as a visual-alert action — `take_photo` built for Android (Camera2); tested on a Galaxy S10 and a Pixel Fold
@@ -591,7 +591,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       size and orientation were read), phones with other sensors, and the largest "high resolution" sizes some cameras list (e.g. 50 MP) - only the standard maximum
       (12 MP here) is used, since Camera2 only guarantees that beside a preview stream.
 - [ ] A photo of the frame that triggered the alert (the photo is taken ~2 s after the alert fires, about a second after confirmation); a photo as a sound monitor's
-      action; the same on Mac Catalyst and Windows (their cameras are OpenCV's).
+      action; the same on Mac Catalyst and Windows (their cameras are OpenCV's). iOS has it since 2026-11-04 (item 59).
 
 ## 45. The monitors say what they are for — the user's request on each card, and a live status on the camera preview
 
@@ -628,6 +628,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] Not run: a real face or hand in the selfie camera (only metadata was read - no frames were looked at), that the mirrored preview and the upright frames look right (no screenshot: the camera
       would be in it), phones with several front cameras or none, the camera switch while a clip or photo is being taken, and Mac Catalyst and Windows (one camera, no choice).
+      iOS has the switch since 2026-11-04 (item 59; `LiveCamera.HasFrontCamera` on both platforms).
 - [ ] An option to keep the last camera between chats; mirrored selfie photos and clips (Android's camera app mirrors selfies by default, ours are saved as the sensor sees them); asking for a
       specific lens (ultra-wide, telephoto).
 
@@ -832,3 +833,51 @@ third chip in Settings > Speech recognition, a Storage row, and no spaces at Chi
 - [ ] Maybe: pass the language Qwen3-ASR detects back (its decoder skips it; a LiteRT-LM change), and the 1.7B model on
   computers.
 - [ ] Next omni models: maybe Moonshine tiny (English, 52 MB) or Whisper tiny for older phones.
+
+## 59. The live camera on iOS — AVFoundation, at parity with Android's Camera2; measured on an iPad Air M4
+
+`LiveCamera` runs on iOS since 2026-11-04 (`Emgu.LiteRT.Models.CV.Maui/LiveCamera.AVFoundation.cs`): an `AVCaptureSession` at
+1280x720 with a BGRA video data output on its own queue, each buffer wrapped as a `Mat` without a copy, scaled to 960 px and
+converted to BGR (about a millisecond); the frames come upright from the connection's `VideoOrientation` (no `Rotate`,
+`FrameRotation` stays null) and unmirrored from the selfie camera; the back or the front camera (`Front`, the cross-platform
+`HasFrontCamera`); full-resolution photos from an `AVCapturePhotoOutput` in the same session (`TakePhotoAsync`: JPEG q0.95 at the
+active format's largest size, upright through the orientation tag, the frames never pause) and clips from an `AVAssetWriter`
+fed the camera's own buffers (`RecordClipAsync`: H.264 720p 30 fps MP4, AAC 44.1 kHz mono when `withAudio`, the microphone
+added to the session for the clip, the orientation frozen meanwhile). The shared parts of photos and clips (one at a time,
+a photo before a clip, no file on failure) moved from `LiveCamera.Camera2.cs` into `LiveCamera.cs`. The preview on iOS is a
+`LiveCameraPreviewHandler` (`AVSampleBufferDisplayLayer` fed IOSurface-backed pixel buffers from a pool, one BGR-to-BGRA
+conversion a frame, `ReadyForMoreMediaData` backpressure, the UIImage path as the fallback) registered by `UseLiveCamera()`.
+The camera feature's clips, photos, camera switch, shutter click and sound-triggered camera alerts are gated
+`ANDROID || (IOS && !MACCATALYST)`; the thumbnails come from ImageIO and `AVAssetImageGenerator`, Save goes to Photos
+(`PictureGallery.SavePhotoAsync`/`SaveVideoAsync`). The detectors try the Metal GPU on iOS (`CocoDetector.CanTryGpu`).
+
+- [x] Frames (iPad Air M4, iPadOS 27.2, a temporary self-test, numbers only): 30.0 fps from the back and the front camera,
+  960x540 in landscape and 540x960 in portrait, the camera started in 0.14-0.24 s and stopped in 0.05 s, a restart fine,
+  0.1 ms to copy a frame, snapshots 10-22 KB in 0.03 s, no frame dropped by the preview.
+- [x] The renderer: `Present` 0.84 ms a frame on the main thread against 0.87 ms through a UIImage a frame, both at 30 fps
+  with a gen-0 collection every 12 s: no main-thread time saved on this device at this size. Kept for what it does
+  save - no image object, CGImage or texture upload a frame - and because the layer takes frames from any thread
+  (the consumers still present from the main thread).
+- [x] The detectors on the live frames, GPU (Metal) against CPU, a frame: hands 2.9 ms against 3.7, YOLOX 8.6 against
+  10.7, face 1.3 either way, COCO 2.7 either way ("GPU + CPU"); pose and holistic kept the CPU by their own checks
+  (4.3 ms each; the pose models don't compile fully, the holistic GPU wasn't faster). GPU loads 0.6-1.2 s. The camera
+  and the preview held 30 fps while each detector ran.
+- [x] Photos: the back camera 4224x2376 (the 720p format's largest, 16:9; 1.27 MB) in 0.06-0.08 s, the front 2304x1296 in
+  0.05 s, the frames at 30 fps through and after them, the orientation tag set (TopLeft in landscape, the sensor's
+  pixels); a cancelled photo and one cut by a stop leave no file.
+- [x] Clips: 5 s H.264 1280x720 30 fps, 292 KB silent and 343 KB with AAC 44.1 kHz mono 95 kbps, the preview at 30 fps
+  (29.1 while the microphone joined), a clip with sound while `MicrophoneSoundSource`'s tap listened (16,000 samples/s
+  before, during and after: no clash, no interruption); a cancelled clip leaves no file; the camera stopping 1.5 s into
+  a clip kept the 1.2 s recorded - and returned 9 s after the stop at first: removing the microphone from the session
+  beside the stop's `StopRunning` blocked that long, so the clip's teardown and the camera's release share a lock and
+  the teardown leaves a stopping session alone (6 ms now).
+- [x] 2026-11-03: the user checked the camera view on the iPad: it works.
+- [ ] Open: the shutter click wasn't heard on the iPad when the chat took a photo. A self-test played `camera_click.wav`
+  through the same AVAudioPlayer path four times (alone, with the camera running, beside a photo, under the Playback
+  category) and the user heard all four, so the player, the session (SoloAmbient, speaker, volume 0.55) and Silent mode
+  are not it: the chat's own photo path skips or loses the click (`PlayCameraClickAsync`, or the photo was a
+  `take_snapshot`, which is silent by design). Next: log that path on the iPad while a photo is taken in the chat.
+- [ ] Not done: the rest of the visual checks (a photo and a clip looked at; Save to Photos), a real detection
+  triggering a photo or a clip, a sound-triggered photo and clip, the photo's 4:3 full-sensor size (the 720p format
+  offers 16:9), the preview presented from the detector thread (the layer allows it), Mac Catalyst on this path (it
+  keeps OpenCV's capture).

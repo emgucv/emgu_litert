@@ -1,5 +1,5 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
 using System.IO;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.Models.CV.Maui;
@@ -7,7 +7,7 @@ using Emgu.LiteRT.LM.Maui;
 
 namespace Emgu.LiteRT.LM.Maui.CV;
 
-// The take_photo alert action (TODO item 44): one full-resolution photo from the live camera (Camera2, LiveCamera.TakePhotoAsync), shown in the
+// The take_photo alert action (TODO item 44): one full-resolution photo from the live camera (Camera2 or AVFoundation, LiveCamera.TakePhotoAsync), shown in the
 // transcript as a thumbnail with its size, Open, Share and Save to gallery. Session only like the snapshots and clips: the JPEGs live in the app's
 // cache folder, the latest five are kept, New chat deletes them, and nothing is sent to the model.
 public sealed partial class CameraFeature
@@ -95,6 +95,19 @@ public sealed partial class CameraFeature
     {
         try
         {
+#if IOS
+            // ImageIO makes the small image straight from the file, upright (the orientation tag applied).
+            using var source = ImageIO.CGImageSource.FromUrl(Foundation.NSUrl.FromFilename(path));
+            if (source == null) return null;
+            using var small = source.CreateThumbnail(0, new ImageIO.CGImageThumbnailOptions
+            {
+                CreateThumbnailFromImageAlways = true, CreateThumbnailWithTransform = true, MaxPixelSize = 640
+            });
+            if (small == null) return null;
+            using var image = UIKit.UIImage.FromImage(small);
+            using Foundation.NSData jpeg = image.AsJPEG(0.8f);
+            return jpeg?.ToArray();
+#else
             var bounds = new Android.Graphics.BitmapFactory.Options { InJustDecodeBounds = true };
             Android.Graphics.BitmapFactory.DecodeFile(path, bounds);
             int sample = 1;
@@ -111,6 +124,7 @@ public sealed partial class CameraFeature
             using var stream = new MemoryStream();
             upright.Compress(Android.Graphics.Bitmap.CompressFormat.Jpeg, 80, stream);
             return stream.ToArray();
+#endif
         }
         catch (Exception) { return null; }
     }

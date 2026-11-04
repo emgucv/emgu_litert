@@ -12,7 +12,7 @@ namespace Maui.Demo.Lite;
 /// <summary>
 /// A photo demo's model on the live camera: each frame is analyzed by the demo page's <see cref="DemoPage.Analyze"/>
 /// - the same prepared model, with the backend chosen there - and shown with what it found drawn on it, full screen.
-/// The camera is <see cref="LiveCamera"/> (Camera2 on Android, OpenCV's capture on Mac Catalyst and Windows), like the
+/// The camera is <see cref="LiveCamera"/> (Camera2 on Android, AVFoundation on iOS, OpenCV's capture on Mac Catalyst and Windows), like the
 /// chat's camera monitors. As the Emgu CV demo's live pages: the feed edge to edge, a floating Exit, and a strip with
 /// the results.
 /// </summary>
@@ -95,8 +95,8 @@ internal sealed class LiveDemoPage : ContentPage
         };
         UpdateFlipLabel();
         _flip.OnTap(async () => await FlipAsync());
-#if ANDROID
-        _flip.IsVisible = LiveCamera.FindCameraId(true) != null;
+#if ANDROID || (IOS && !MACCATALYST)
+        _flip.IsVisible = LiveCamera.HasFrontCamera;
 #endif
 
         _resultLabel = new Label { FontFamily = Theme.TitleFont, FontSize = 15, TextColor = Colors.White, HorizontalTextAlignment = TextAlignment.Center, Text = "Starting the camera…" };

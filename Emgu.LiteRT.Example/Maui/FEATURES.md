@@ -927,7 +927,7 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   microphone on while a monitor is enabled, a monitor card, and chime or spoken alerts that the page doesn't listen to;
   `MicrophoneGate` gives `VoiceRecorder` the microphone first. Not on Windows. Verified with Gemma 4 E2B on Mac Catalyst and
   with a Galaxy S10's microphone (`Emgu.LiteRT.Models/YAMNET.md`).
-- On Android a sound monitor can also take a full-resolution photo and record a clip (TODO item 49; `SoundAlert.ClipSeconds`
+- On Android and iOS a sound monitor can also take a full-resolution photo and record a clip (TODO item 49; `SoundAlert.ClipSeconds`
   and `TakePhoto`, `create_sound_monitor`'s `clipSeconds` and `takePhoto` when `SoundMonitorTools.Create` gets
   `cameraActions`): the live camera opens when the monitor is created, the photo comes first, one capture per 30 s plus the
   clip, through the same `TakePhotoAsync`/`RecordClipAsync` as the camera monitors.
@@ -977,11 +977,18 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   it from the foreground (Android 14 refuses to start such services from the background). The camera may then be opened for
   an alert (`CameraUsable`) and is closed again afterwards. Camera monitors don't run in the background yet. Verified on a
   Galaxy S10 (Home, and screen off). Meeting recordings use the same service.
-- The selfie camera (TODO item 48; `LiveCamera.Front`, `FindCameraId`): a request that names a camera ("use the selfie
+- The selfie camera (TODO item 48; `LiveCamera.Front`, `HasFrontCamera`): a request that names a camera ("use the selfie
   camera", `VisualHostCatalog.CameraFacingRequest`) or the preview's camera button switches camera while the monitors go on.
   The button is labelled with the camera it switches to, "Selfie camera" or "Back camera" (it was "Flip", which read as
   mirroring). A front camera's rotation is (sensor + display) % 360; its preview is mirrored, but its photos, clips and
   detector frames aren't. New chat goes back to the back camera.
+- On iOS the live camera runs through AVFoundation since 2026-11-04 (`LiveCamera.AVFoundation.cs`, TODO item 59): the same
+  frames, selfie camera, photos (`AVCapturePhotoOutput`, the frames never pause), clips (`AVAssetWriter` fed the camera's
+  own buffers, the microphone added to the session for a clip with sound) and the same cards, thumbnails through ImageIO
+  and `AVAssetImageGenerator`, Save to Photos. The preview is an `AVSampleBufferDisplayLayer` (`LiveCameraPreviewHandler`,
+  registered by `UseLiveCamera()` in `MauiProgram.cs`). The iPad Air M4 numbers - 30 fps, photos in 0.06 s, 720p clips
+  with AAC, the detectors on Metal - are in TODO item 59. Not looked at yet: the preview, a photo or a clip (the checks
+  are the user's).
 - Each camera and sound monitor's card shows the user's request that created it (`CameraFeature.MonitorInfo.cs`, TODO item
   45: kept in memory, not in private chats; tap to expand), and the camera preview's label says what the camera is doing
   ("Watching · 2 monitors", "● Recording clip · 7 s left").
@@ -1136,7 +1143,8 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
 ## The TF Lite pages, the live camera and the About page
 
 - The TF Lite tab's photo demos (`DemoPage` subclasses: COCO SSD MobileNet, YOLOX, PicoDet, hand gestures, body pose,
-  MobileNet, Inception; not D-FINE) have a Live Camera button where `LiveCamera.Supported` (Android, Mac Catalyst, Windows).
+  MobileNet, Inception; not D-FINE) have a Live Camera button where `LiveCamera.Supported` (Android, iOS since 2026-11-04,
+  Mac Catalyst, Windows; Flip where `HasFrontCamera`).
   `LiveDemoPage` runs the page's `PrepareAsync` once and its `Analyze(input, render)` on every frame, skipping frames while
   one is analyzed. The page's default `RunAsync` uses the same two, so photo and camera share one model; classifiers set
   `DrawsOnPhoto` false and draw labels on live frames only. On a Galaxy S10: 30 fps at 12-23 ms; on an M1 with a Logitech
@@ -1144,7 +1152,7 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
 - `LiveCamera` doesn't set a frame size on Mac Catalyst any more (OpenCV's AVFoundation backend turned 640x480, larger than the
   StreamCam's active format, into an Objective-C exception that ended the app). It scales frames over 960 px down, and retries
   empty first reads for 3 s (AVFoundation starts asynchronously). `LiveCamera.FrameRotation(front)` is the Android rotation
-  the chat used.
+  the chat used (null on iOS: AVFoundation delivers the frames upright).
 - The About page lists the TensorFlow Lite, LiteRT and LiteRT-LM versions (not XNNPACK, though Mac Catalyst's static
   tfliteextern is built without it). LiteRT's and LiteRT-LM's come from the `Emgu.LiteRT` and `Emgu.LiteRT.LM` assembly
   versions, since neither C API has a version function. LiteRT-LM's is shown once `liblitert-lm` loads (in the background):

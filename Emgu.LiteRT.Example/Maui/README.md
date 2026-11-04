@@ -204,10 +204,11 @@ Lite (Interpreter API) demos - object detection, image recognition and the model
 again.
 
 The photo demos - Coco SSD MobileNet, YOLOX Nano, PicoDet S, Hand gestures, Body pose, Face, Holistic, Mobilenet and Inception - also
-have a **Live Camera** button on Android, Mac Catalyst and Windows: the same model, with the backend chosen on the page,
+have a **Live Camera** button on Android, iOS, Mac Catalyst and Windows: the same model, with the backend chosen on the page,
 runs on every camera frame, full screen, with what it found drawn on the frame and the top results, the time per frame
-and the frame rate below (`LiveDemoPage.cs`; Flip switches to the selfie camera on Android). D-FINE Nano stays on
-photos (it takes a few times longer). iOS has no live camera yet: `LiveCamera` has no iOS capture.
+and the frame rate below (`LiveDemoPage.cs`; Flip switches to the selfie camera on Android and iOS). D-FINE Nano stays on
+photos (it takes a few times longer). On iOS the camera is AVFoundation (`LiveCamera.AVFoundation.cs`) and the preview an
+`AVSampleBufferDisplayLayer`, registered by `UseLiveCamera()` in `MauiProgram.cs` (added 2026-11-04).
 
 ## Using the chat page
 

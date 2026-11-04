@@ -63,6 +63,7 @@ public sealed partial class CameraFeature
 #else
     private bool BackgroundCapture => false;
     private bool CameraUsable => PageVisible && !_cameraSuspended;
+    private bool AppInBackground => _cameraSuspended || !PageVisible;
     private void StartMonitoringStopButton() { }
     private void EndMonitoringStopButton() { }
     /// <summary>Start or stop the Android foreground service as the monitors (and a meeting recording) need it; nothing on other platforms.</summary>

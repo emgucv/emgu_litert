@@ -163,7 +163,7 @@ public sealed partial class CameraFeature : CvFeature
     public override View BuildSettingsSection()
     {
         var sections = new VerticalStackLayout { Spacing = 6 };
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
         sections.Children.Add(BuildCameraSoundSection());
         sections.Children.Add(ChatPage.Divider());
 #endif
@@ -186,7 +186,7 @@ public sealed partial class CameraFeature : CvFeature
     {
         _ = CloseCameraAsync();
         _cameraFront = false;
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
         UpdateCameraSwitch();
 #endif
         _visualRuntime?.Clear();
@@ -194,7 +194,7 @@ public sealed partial class CameraFeature : CvFeature
         ForgetMonitorRequests();
         ClearCameraTurn();
         ClearVisualSnapshots();
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
         ClearVisualClips();
         ClearVisualPhotos();
 #endif
@@ -237,8 +237,8 @@ public sealed partial class CameraFeature : CvFeature
         SemanticProperties.SetDescription(close, "Close live camera and stop capture");
         var header = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
         header.Add(_cameraLabel, 0); header.Add(close, 1);
-#if ANDROID
-        if (LiveCamera.FindCameraId(true) != null)
+#if ANDROID || (IOS && !MACCATALYST)
+        if (LiveCamera.HasFrontCamera)
         {
             var flip = _cameraSwitch = new Button { FontSize = 12, Padding = new Thickness(8, 0), MinimumHeightRequest = 40 };
             flip.Clicked += async (_, _) => await SwitchCameraAsync(!_cameraFront);
@@ -422,11 +422,11 @@ public sealed partial class CameraFeature : CvFeature
         {
             if (!LiveCamera.Supported) return "Live camera is not supported on this platform yet.";
             if (!CameraUsable) return "The chat must be visible in the foreground to open the camera.";
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
             string facing = followRequest ? VisualHostCatalog.CameraFacingRequest(Prompt) : null;
             if (facing != null && (facing == "front") != _cameraFront)
             {
-                if (facing == "front" && LiveCamera.FindCameraId(true) == null) return "This phone has no selfie camera. Tell the user.";
+                if (facing == "front" && !LiveCamera.HasFrontCamera) return "This device has no selfie camera. Tell the user.";
                 _cameraFront = facing == "front";
                 UpdateCameraSwitch();
                 if (_camera != null) await CloseCameraCoreAsync();
@@ -472,15 +472,15 @@ public sealed partial class CameraFeature : CvFeature
         finally { _cameraGate.Release(); }
     });
 
-    // Which camera, for what the tools tell the model (Android is the only platform with a choice).
+    // Which camera, for what the tools tell the model (Android and iOS are the platforms with a choice).
     private string CameraNote =>
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
         _cameraFront ? " (selfie camera)" : " (back camera)";
 #else
         "";
 #endif
 
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
     // The camera switch button names the camera it switches to ("Flip" read as mirroring the picture).
     private Button _cameraSwitch;
 
@@ -495,7 +495,7 @@ public sealed partial class CameraFeature : CvFeature
     private async Task SwitchCameraAsync(bool front)
     {
         if (front == _cameraFront) return;
-        if (front && LiveCamera.FindCameraId(true) == null) { Host.SetStatus("This phone has no selfie camera."); return; }
+        if (front && !LiveCamera.HasFrontCamera) { Host.SetStatus("This device has no selfie camera."); return; }
         _cameraFront = front;
         UpdateCameraSwitch();
         await CloseCameraAsync();

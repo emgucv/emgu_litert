@@ -12,9 +12,10 @@ using PreviewBase = Microsoft.Maui.Controls.Image;
 namespace Emgu.LiteRT.Models.CV.Maui;
 
 /// <summary>
-/// Shows <see cref="LiveCamera"/>'s frames (or any BGR Mats) through each platform's own image view, as Emgu CV's MAUI demo does: Emgu CV's
-/// CvImageView on Android, a UIImageView on iOS and Mac Catalyst, a WriteableBitmap on Windows. The view and its measured size stay the same
-/// between frames. Use it from the UI thread.
+/// Shows <see cref="LiveCamera"/>'s frames (or any BGR Mats) through each platform's own view, as Emgu CV's MAUI demo does: Emgu CV's CvImageView
+/// on Android, a display layer on iOS (<c>LiveCameraPreviewHandler</c>, registered by <c>UseLiveCamera()</c>; a UIImageView without it), a
+/// UIImageView on Mac Catalyst, a WriteableBitmap on Windows. The view and its measured size stay the same between frames. Use it from the UI
+/// thread (on iOS with the handler, any thread).
 /// </summary>
 public sealed class LiveCameraPreview : PreviewBase
 {
@@ -32,13 +33,11 @@ public sealed class LiveCameraPreview : PreviewBase
 #if ANDROID
         // CvImageView converts into its two reusable Android bitmaps and calls native ImageView.SetImageBitmap.
         SetImage(frame);
-#elif MACCATALYST || IOS
-        if (Handler?.PlatformView is not UIKit.UIImageView view) return;
-        var next = frame.ToUIImage();
-        var previous = _appleImage;
-        view.Image = next;
-        _appleImage = next;
-        previous?.Dispose();
+#elif IOS && !MACCATALYST
+        if (Handler is LiveCameraPreviewHandler fast) { fast.Present(frame); return; }
+        PresentUIImage(frame);
+#elif MACCATALYST
+        PresentUIImage(frame);
 #elif WINDOWS
         if (Handler?.PlatformView is not Microsoft.UI.Xaml.Controls.Image view) return;
         _bgra ??= new Mat();
@@ -56,15 +55,36 @@ public sealed class LiveCameraPreview : PreviewBase
 #endif
     }
 
+#if MACCATALYST || IOS
+    // A UIImage a frame into the MAUI Image's UIImageView: Mac Catalyst's path, and iOS's when the app didn't register the handler.
+    private void PresentUIImage(Mat frame)
+    {
+        if (Handler?.PlatformView is not UIKit.UIImageView view) return;
+        var next = frame.ToUIImage();
+        var previous = _appleImage;
+        view.Image = next;
+        _appleImage = next;
+        previous?.Dispose();
+    }
+
+    private void ClearUIImage()
+    {
+        if (Handler?.PlatformView is UIKit.UIImageView view) view.Image = null;
+        _appleImage?.Dispose();
+        _appleImage = null;
+    }
+#endif
+
     /// <summary>Show nothing, and release the platform image.</summary>
     public void ClearFrame()
     {
 #if ANDROID
         SetImage(null);
-#elif MACCATALYST || IOS
-        if (Handler?.PlatformView is UIKit.UIImageView view) view.Image = null;
-        _appleImage?.Dispose();
-        _appleImage = null;
+#elif IOS && !MACCATALYST
+        if (Handler is LiveCameraPreviewHandler fast) fast.Clear();
+        ClearUIImage();
+#elif MACCATALYST
+        ClearUIImage();
 #elif WINDOWS
         if (Handler?.PlatformView is Microsoft.UI.Xaml.Controls.Image view) view.Source = null;
         _bitmap = null;

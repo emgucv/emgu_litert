@@ -38,9 +38,12 @@ public sealed class CocoDetector : ICocoDetector
     public string Backend { get; private set; }
     /// <inheritdoc/>
     public string GpuFailure { get; private set; }
-    /// <summary>True on platforms where a detector may try the GPU (Android and Mac Catalyst).</summary>
+    /// <summary>
+    /// True on platforms where a detector may try the GPU: Android (OpenCL), Mac Catalyst and, since 2026-11-04, iOS (Metal: an iPad Air M4 ran hands
+    /// in 2.9 ms a frame on it against 3.7 on the CPU and YOLOX in 8.6 against 10.7, while the pose and holistic trackers kept the CPU).
+    /// </summary>
     public static bool CanTryGpu =>
-#if ANDROID || MACCATALYST
+#if ANDROID || MACCATALYST || IOS
         true;
 #else
         false;

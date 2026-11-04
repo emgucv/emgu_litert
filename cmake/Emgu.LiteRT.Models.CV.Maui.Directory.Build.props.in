@@ -18,8 +18,8 @@
     <version>${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
     <authors>${CPACK_PACKAGE_VENDOR}</authors>
     <owners>${CPACK_PACKAGE_VENDOR}</owners>
-	<summary>The live camera for Emgu LiteRT's vision models in a MAUI app: frames as Emgu CV Mats, a preview, and on Android photos and video clips while it runs.</summary>
-    <Description>The live camera for the Emgu LiteRT vision models (Emgu.LiteRT.Models.CV) in a MAUI app: frames as Emgu CV Mats, upright and at most 960 px, for detectors and a preview that draws them; on Android through Camera2, which also takes full-resolution photos and records video clips while the preview and the detectors go on, elsewhere through OpenCV's capture. Android, Mac Catalyst and Windows.</Description>
+	<summary>The live camera for Emgu LiteRT's vision models in a MAUI app: frames as Emgu CV Mats, a preview, and on Android and iOS photos and video clips while it runs.</summary>
+    <Description>The live camera for the Emgu LiteRT vision models (Emgu.LiteRT.Models.CV) in a MAUI app: frames as Emgu CV Mats, upright and at most 960 px, for detectors and a preview that draws them; on Android through Camera2 and on iOS through AVFoundation, which also take full-resolution photos and record video clips while the preview and the detectors go on, on Mac Catalyst and Windows through OpenCV's capture. Android, iOS, Mac Catalyst and Windows.</Description>
     <PackageReleaseNotes>This is the ${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT Models CV MAUI, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
 http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/</PackageReleaseNotes>
 

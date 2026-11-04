@@ -15,9 +15,9 @@ namespace Emgu.LiteRT.LM.Agents.CV;
 /// </summary>
 public static class VisualHostCatalog
 {
-    /// <summary>The camera planner's instructions for the visual agents and the alert actions. The camera switching, clip and full-resolution photo sentences are for Android, the only platform with them.</summary>
-    /// <param name="android">Whether the app runs on Android</param>
-    public static string PlannerInstructions(bool android) => VisualAgentTools.Instructions +
+    /// <summary>The camera planner's instructions for the visual agents and the alert actions. The camera switching, clip and full-resolution photo sentences are for the platforms with them (Android and iOS).</summary>
+    /// <param name="cameraActions">Whether the app can switch cameras, take photos and record clips (Android and iOS)</param>
+    public static string PlannerInstructions(bool cameraActions) => VisualAgentTools.Instructions +
         " Prefer coco-ssd-mobilenet-v3 for ordinary object monitors. Use the experimental coco-yolox-nano when the user asks for YOLOX." +
         " For a hand gesture use the hand-gesture agent and pick the label that matches the user's words: thumbs up = thumb up, thumbs down = thumb down, peace sign or V sign = victory, " +
         "open hand or high five = open palm, fist = closed fist, pointing finger = pointing up, rock sign = i love you. The label is just the class, never prefixed by the agent id, and never person. Raising or waving a hand is not a gesture: that is the body-pose agent. " +
@@ -32,7 +32,7 @@ public static class VisualHostCatalog
         " For a posture and an expression at once (raise a hand and smile, wave while smiling) use the holistic agent: the label is the posture, \"and\", then the expression, " +
         "e.g. hand raised and smiling, waving and smiling, arms raised and mouth open. For covering the eyes (peekaboo), a hand over the mouth or a hand on the face use the holistic agent " +
         "with exactly covering eyes, hand over mouth or hand on face." +
-        (android
+        (cameraActions
             ? " The app switches between the back camera and the selfie (front) camera by itself when the user's request says so: don't refuse such a request, use the camera tools as usual and say which camera is used." +
               " For record a video or clip when an object appears, select record_clip with parameters {seconds: the requested length, default 10, from 3 to 30}. " +
               "It records from the live camera with sound and shows the clip in this chat session; no automatic saving or model analysis. A request for both a picture and a clip uses take_snapshot and record_clip. " +
@@ -53,11 +53,11 @@ public static class VisualHostCatalog
         "Capture one fresh JPEG from the visible live camera after confirmed appearance and show it in this chat session. " +
         "Not sent to the model or saved automatically. The user can open the image and save it manually.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
-    /// <summary>The take_photo action: a full-resolution photo, shown in the chat (Android).</summary>
+    /// <summary>The take_photo action: a full-resolution photo, shown in the chat (Android and iOS).</summary>
     public static readonly VisualActionDescriptor Photo = new("take_photo", "Full-resolution photo",
         "Take one full-resolution photo (the camera's largest JPEG, after exposure and focus settle) from the visible live camera after confirmed " +
         "appearance and show it in this chat session. Slower than take_snapshot, which is a small frame. Not sent to the model or saved automatically. " +
-        "The user can open, share or save it. Android only.",
+        "The user can open, share or save it. Android and iOS only.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}"));
 
     /// <summary>The play_file action: one of the app's alert sounds - the names change as the user adds some, so the descriptor is built on request.</summary>
@@ -110,10 +110,10 @@ public static class VisualHostCatalog
     /// <summary>The longest clip, in seconds.</summary>
     public const int MaximumClipSeconds = 30;
 
-    /// <summary>The record_clip action: a short video clip from the live camera, shown in the chat (Android).</summary>
+    /// <summary>The record_clip action: a short video clip from the live camera, shown in the chat (Android and iOS).</summary>
     public static readonly VisualActionDescriptor Clip = new("record_clip", "Video clip",
         "Record a short video clip (with sound if the microphone is allowed) from the visible live camera when the alert fires, " +
-        "and show it in this chat session. Not sent to the model or saved automatically. The user can play, share or save it. Android only.",
+        "and show it in this chat session. Not sent to the model or saved automatically. The user can play, share or save it. Android and iOS only.",
         VisualActionParameters.Parse("{\"type\":\"object\",\"properties\":{\"seconds\":{\"type\":\"integer\",\"minimum\":" + MinimumClipSeconds +
             ",\"maximum\":" + MaximumClipSeconds + "}},\"additionalProperties\":false}"));
 

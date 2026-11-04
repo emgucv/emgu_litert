@@ -4,6 +4,7 @@
 
 
 using Emgu.LiteRT.LM.Maui;
+using Emgu.LiteRT.Models.CV.Maui;
 using Microsoft.Extensions.Logging;
 
 namespace Maui.Demo.Lite;
@@ -17,6 +18,8 @@ public static class MauiProgram
 			.UseMauiApp<App>()
 			// The chat controls' handlers: ChatPromptEditor's on Mac Catalyst (Enter sends), InlineVideoView's.
 			.UseLiteRtChat()
+			// The live camera preview's handler on iOS (the frames through a display layer).
+			.UseLiveCamera()
 			.ConfigureFonts(fonts =>
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

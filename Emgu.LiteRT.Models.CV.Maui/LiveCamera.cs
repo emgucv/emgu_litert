@@ -11,16 +11,32 @@ namespace Emgu.LiteRT.Models.CV.Maui;
 /// <summary>
 /// The live camera: frames as 8-bit BGR Mats, at most 960 px on the long side and turned upright as <see cref="RotationDegrees"/> says, up to
 /// 30 a second, for detectors and a <see cref="LiveCameraPreview"/>; JPEG snapshots on request (<see cref="CaptureAsync"/>). On Android it runs
-/// through Camera2, which also takes full-resolution photos (<c>TakePhotoAsync</c>) and records clips (<c>RecordClipAsync</c>) while the frames go
-/// on, and falls back to OpenCV's camera backend where Camera2 can't be set up; on Mac Catalyst and Windows it is OpenCV's capture (the first
-/// camera). The app must declare camera access (<c>android.permission.CAMERA</c>, <c>NSCameraUsageDescription</c>, the <c>webcam</c>
-/// capability) and ask for it before <see cref="StartAsync"/>. One worker owns the native capture and the Mats.
+/// through Camera2 and on iOS through AVFoundation, which also take full-resolution photos (<c>TakePhotoAsync</c>) and record clips
+/// (<c>RecordClipAsync</c>) while the frames go on (Android falls back to OpenCV's camera backend where Camera2 can't be set up); on Mac Catalyst
+/// and Windows it is OpenCV's capture (the first camera). The app must declare camera access (<c>android.permission.CAMERA</c>,
+/// <c>NSCameraUsageDescription</c>, the <c>webcam</c> capability) and ask for it before <see cref="StartAsync"/>. One worker owns the native
+/// capture and the Mats.
 /// </summary>
 public sealed partial class LiveCamera
 {
-    /// <summary>Whether this platform has it: Android, Mac Catalyst and Windows.</summary>
-    public static bool Supported => DeviceInfo.Platform == DevicePlatform.Android ||
+    /// <summary>Whether this platform has it: Android, iOS, Mac Catalyst and Windows.</summary>
+    public static bool Supported => DeviceInfo.Platform == DevicePlatform.Android || DeviceInfo.Platform == DevicePlatform.iOS ||
         DeviceInfo.Platform == DevicePlatform.MacCatalyst || DeviceInfo.Platform == DevicePlatform.WinUI;
+
+    /// <summary>Whether this device has a camera facing the user, for <see cref="Front"/>: Android (through Camera2) and iOS; false elsewhere.</summary>
+    public static bool HasFrontCamera
+    {
+        get
+        {
+#if ANDROID
+            try { return FindCameraId(true) != null; } catch (Exception) { return false; }
+#elif IOS && !MACCATALYST
+            return CaptureDevice(true) != null;
+#else
+            return false;
+#endif
+        }
+    }
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
     private readonly SemaphoreSlim _captureGate = new(1, 1);
@@ -38,7 +54,7 @@ public sealed partial class LiveCamera
     public Action<string> Failed { get; set; }
     /// <summary>How far to turn each frame clockwise (0, 90, 180 or 270), asked for every frame; e.g. <c>() =&gt; LiveCamera.FrameRotation(front) ?? 0</c>.</summary>
     public Func<int> RotationDegrees { get; set; }
-    /// <summary>The selfie camera instead of the back one (Android, Camera2 only); set before <see cref="StartAsync"/>.</summary>
+    /// <summary>The selfie camera instead of the back one (Android through Camera2, and iOS); set before <see cref="StartAsync"/>.</summary>
     public bool Front { get; init; }
     // Frames larger than this (on the long side) are scaled down: the detectors work at 192-640 px anyway.
     private const int MaxFrameSide = 960;
@@ -108,6 +124,10 @@ public sealed partial class LiveCamera
     {
         try
         {
+#if IOS && !MACCATALYST
+            // AVFoundation (LiveCamera.AVFoundation.cs): frames, both cameras, photos and clips. No OpenCV fallback here: a failure is reported.
+            await RunAvFoundationAsync();
+#else
 #if ANDROID
             // Camera2 first: it can record a video clip while the preview and the detectors keep running (LiveCamera.Camera2.cs);
             // OpenCV's camera backend below takes over on a device where Camera2 can't be set up.
@@ -190,6 +210,7 @@ public sealed partial class LiveCamera
                 TimeSpan delay = TimeSpan.FromSeconds(1.0 / 30) - Stopwatch.GetElapsedTime(started);
                 if (delay > TimeSpan.Zero) await Task.Delay(delay, _stop.Token);
             }
+#endif
         }
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
         catch (Exception ex)
@@ -204,4 +225,117 @@ public sealed partial class LiveCamera
             _ready.TrySetCanceled();
         }
     }
+
+#if ANDROID || (IOS && !MACCATALYST)
+    // Photos and clips: the platform's own camera API (Camera2 in LiveCamera.Camera2.cs, AVFoundation in LiveCamera.AVFoundation.cs) does them
+    // while the frames go on. What is shared: one at a time (_recordGate), a photo asked for with a clip goes first, and a photo or clip that
+    // fails or is cancelled leaves no file.
+
+    /// <summary>A photo taken (<see cref="TakePhotoAsync"/>).</summary>
+    public sealed class PhotoResult
+    {
+        /// <summary>The JPEG file</summary>
+        public string Path { get; init; }
+        /// <summary>Its width in pixels</summary>
+        public int Width { get; init; }
+        /// <summary>Its height in pixels</summary>
+        public int Height { get; init; }
+        /// <summary>The file's size</summary>
+        public long Bytes { get; init; }
+    }
+
+    /// <summary>A recorded clip (<see cref="RecordClipAsync"/>).</summary>
+    public sealed class ClipResult
+    {
+        /// <summary>The MP4 file</summary>
+        public string Path { get; init; }
+        /// <summary>How long it recorded</summary>
+        public TimeSpan Duration { get; init; }
+        /// <summary>Whether it has sound</summary>
+        public bool WithAudio { get; init; }
+        /// <summary>The file's size</summary>
+        public long Bytes { get; init; }
+    }
+
+    private readonly SemaphoreSlim _recordGate = new(1, 1);
+    private int _photosPending;
+
+    /// <summary>Whether this camera runs through the platform's own camera API (Camera2 on Android, AVFoundation on iOS), which photos and clips need.</summary>
+    public bool CanRecordClip =>
+#if ANDROID
+        _camera2
+#else
+        _avFoundation
+#endif
+        && !_stop.IsCancellationRequested;
+
+    private void Fail(string message)
+    {
+        lock (_gate) _snapshot?.TrySetException(new InvalidOperationException(message));
+        _ready.TrySetException(new InvalidOperationException(message));
+        if (!_stop.IsCancellationRequested) { _stop.Cancel(); Failed?.Invoke(message); }
+    }
+
+    /// <summary>
+    /// Takes one photo at the largest size the camera offers, into <paramref name="path"/>, while the frames go on. The photo is upright (its
+    /// JPEG orientation follows the preview's rotation). On Android the preview and the detectors pause briefly at both ends.
+    /// </summary>
+    public async Task<PhotoResult> TakePhotoAsync(string path, CancellationToken token)
+    {
+        if (!CanRecordClip) throw new InvalidOperationException("Photos need the live camera, and it isn't running through the platform's camera API.");
+        Interlocked.Increment(ref _photosPending);
+        try
+        {
+            await _recordGate.WaitAsync(token);
+            bool done = false;
+            try
+            {
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+#if ANDROID
+                PhotoResult result = await TakePhotoCamera2Async(path, token);
+#else
+                PhotoResult result = await TakePhotoAvFoundationAsync(path, token);
+#endif
+                done = true;
+                return result;
+            }
+            finally
+            {
+                if (!done) { try { File.Delete(path); } catch (Exception) { } }
+                _recordGate.Release();
+            }
+        }
+        finally { Interlocked.Decrement(ref _photosPending); }
+    }
+
+    /// <summary>
+    /// Records <paramref name="seconds"/> of video (H.264, 720p, with sound from the microphone if asked) into an MP4 file while the preview and the
+    /// detectors go on. The camera closing ends the clip early (what was recorded is kept); cancelling stops the recording and deletes the file.
+    /// </summary>
+    public async Task<ClipResult> RecordClipAsync(int seconds, string path, bool withAudio, CancellationToken token)
+    {
+        if (!CanRecordClip) throw new InvalidOperationException("Video clips need the live camera, and it isn't running through the platform's camera API.");
+        // A photo asked for with the clip comes first: it is quick, and the clip would hold the camera for its whole length.
+        await Task.Delay(150, token);
+        for (int i = 0; i < 200 && Volatile.Read(ref _photosPending) > 0; i++) await Task.Delay(50, token);
+        await _recordGate.WaitAsync(token);
+        bool finished = false;
+        try
+        {
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+#if ANDROID
+            ClipResult result = await RecordClipCamera2Async(seconds, path, withAudio, token);
+#else
+            ClipResult result = await RecordClipAvFoundationAsync(seconds, path, withAudio, token);
+#endif
+            finished = true;
+            return result;
+        }
+        finally
+        {
+            if (!finished) { try { File.Delete(path); } catch (Exception) { } }
+            _recordGate.Release();
+        }
+    }
+#endif
 }

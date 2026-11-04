@@ -43,7 +43,7 @@ internal sealed class CameraSpeechAction(AlertAudioCoordinator audio, string tex
     }
 }
 
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
 internal sealed class CameraClipFactory(Func<VisualEvent, int, CancellationToken, Task> record) : IVisualActionFactory
 {
     public VisualActionDescriptor Descriptor => VisualHostCatalog.Clip;
@@ -69,7 +69,7 @@ internal sealed class CameraClipAction(Func<VisualEvent, int, CancellationToken,
 }
 #endif
 
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
 internal sealed class CameraPhotoFactory(Func<VisualEvent, CancellationToken, Task> take) : IVisualActionFactory
 {
     public VisualActionDescriptor Descriptor => VisualHostCatalog.Photo;

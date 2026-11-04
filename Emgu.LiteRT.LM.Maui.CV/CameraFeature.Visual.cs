@@ -18,7 +18,7 @@ using Emgu.LiteRT.LM.Agents.CV;
 namespace Emgu.LiteRT.LM.Maui.CV;
 
 // The camera monitors ("tell me when you see a person"): the visual agents on the detectors, the monitors' runtime and
-// their actions (chime, speech, snapshot, a sound file; on Android a clip and a photo), the tools, and the monitors' card.
+// their actions (chime, speech, snapshot, a sound file; on Android and iOS a clip and a photo), the tools, and the monitors' card.
 public sealed partial class CameraFeature
 {
     private VisualAgentRegistry _visualAgents;
@@ -32,10 +32,10 @@ public sealed partial class CameraFeature
     private int _visualUiQueued;
     private long _visualFrameId, _lastVisualFrame;
     private static readonly string VisualInstructions = VisualHostCatalog.PlannerInstructions(
-#if ANDROID
-        android: true);
+#if ANDROID || (IOS && !MACCATALYST)
+        cameraActions: true);
 #else
-        android: false);
+        cameraActions: false);
 #endif
 
     // The agents and the alert audio, made with the feature: other features register with them (ExerciseFeature) and the
@@ -66,7 +66,7 @@ public sealed partial class CameraFeature
         _visualActions.Register(new CameraSpeechFactory(_alertAudio));
         _visualActions.Register(new CameraSnapshotFactory(TakeVisualSnapshotAsync));
         _visualActions.Register(new PlayFileFactory(_alertSounds, PlayAlertSoundAsync));
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
         _visualActions.Register(new CameraClipFactory(RecordVisualClipAsync));
         _visualActions.Register(new CameraPhotoFactory(TakeVisualPhotoAsync));
         // Clips and photos are for the session: those of a session that ended without cleaning up (the app was killed) go now.
@@ -240,7 +240,7 @@ public sealed partial class CameraFeature
     // A creation acknowledgement needs facts, not the full UI snapshot repeated in the context.
     // Which camera is in use is a fact the model should report (it said it couldn't switch, though the app had).
     private string MonitorToolResult(VisualMonitorInfo monitor) => VisualHostCatalog.MonitorResult(monitor) +
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
         " Camera: " + (_cameraFront ? "the selfie (front) camera" : "the back camera") + ".";
 #else
         "";

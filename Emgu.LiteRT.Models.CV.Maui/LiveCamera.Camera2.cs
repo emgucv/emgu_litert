@@ -24,32 +24,14 @@ namespace Emgu.LiteRT.Models.CV.Maui;
 // clip. A Galaxy S10's and a Pixel Fold's cameras all ran an analysis stream and a 720p recording together.
 public sealed partial class LiveCamera
 {
-    /// <summary>A recorded clip (<see cref="RecordClipAsync"/>).</summary>
-    public sealed class ClipResult
-    {
-        /// <summary>The MP4 file</summary>
-        public string Path { get; init; }
-        /// <summary>How long it recorded</summary>
-        public TimeSpan Duration { get; init; }
-        /// <summary>Whether it has sound</summary>
-        public bool WithAudio { get; init; }
-        /// <summary>The file's size</summary>
-        public long Bytes { get; init; }
-    }
-
-    private readonly SemaphoreSlim _recordGate = new(1, 1);
     private CameraDevice _device;
     private CameraCaptureSession _session;
     private ImageReader _reader;
     private Handler _handler;
     private Android.Util.Size _recordSize, _photoSize;
-    private int _photosPending;
     private volatile bool _camera2;
     private Mat _bgr, _rotatedBgr;
     private byte[] _y, _u, _v, _nv21;
-
-    /// <summary>Whether this camera runs through Camera2, which clips need.</summary>
-    public bool CanRecordClip => _camera2 && !_stop.IsCancellationRequested;
 
     private sealed class FrameListener(LiveCamera owner) : Java.Lang.Object, ImageReader.IOnImageAvailableListener
     {
@@ -162,13 +144,6 @@ public sealed partial class LiveCamera
         _rotatedBgr?.Dispose(); _rotatedBgr = null;
     }
 
-    private void Fail(string message)
-    {
-        lock (_gate) _snapshot?.TrySetException(new InvalidOperationException(message));
-        _ready.TrySetException(new InvalidOperationException(message));
-        if (!_stop.IsCancellationRequested) { _stop.Cancel(); Failed?.Invoke(message); }
-    }
-
     // A new session: the analysis reader, and one more output while a clip records or a photo is taken. The old session is closed first.
     // The repeating request targets the extra output only for a clip (a still is a single capture of its own).
     private async Task ConfigureSessionAsync(Surface extra, bool repeatToExtra = false, CameraCaptureSession.CaptureCallback callback = null,
@@ -258,20 +233,6 @@ public sealed partial class LiveCamera
         CvInvoke.CvtColor(yuv, bgr, ColorConversion.Yuv2BgrNv21);
     }
 
-
-    /// <summary>A photo taken (<see cref="TakePhotoAsync"/>).</summary>
-    public sealed class PhotoResult
-    {
-        /// <summary>The JPEG file</summary>
-        public string Path { get; init; }
-        /// <summary>Its width in pixels</summary>
-        public int Width { get; init; }
-        /// <summary>Its height in pixels</summary>
-        public int Height { get; init; }
-        /// <summary>The file's size</summary>
-        public long Bytes { get; init; }
-    }
-
     private sealed class ConvergenceCallback : CameraCaptureSession.CaptureCallback
     {
         public volatile int Frames;
@@ -315,75 +276,53 @@ public sealed partial class LiveCamera
             done.TrySetException(new InvalidOperationException("The camera couldn't take the photo (" + failure.Reason + ")."));
     }
 
-    /// <summary>
-    /// Takes one photo at the largest JPEG size the camera lists, into <paramref name="path"/>: a session with the analysis reader and a JPEG reader,
-    /// a short wait for exposure and focus to settle, then a still capture, then the session without the JPEG reader again (the preview and the
-    /// detectors pause briefly at both ends). The photo is upright (the JPEG orientation follows the preview's rotation).
-    /// </summary>
-    public async Task<PhotoResult> TakePhotoAsync(string path, CancellationToken token)
+    // The Camera2 photo, at the largest JPEG size the camera lists (TakePhotoAsync holds the gate and deletes the file on failure): a session with
+    // the analysis reader and a JPEG reader, a short wait for exposure and focus to settle, then a still capture, then the session without the
+    // JPEG reader again (the preview and the detectors pause briefly at both ends). The JPEG orientation follows the preview's rotation.
+    private async Task<PhotoResult> TakePhotoCamera2Async(string path, CancellationToken token)
     {
-        if (!CanRecordClip) throw new InvalidOperationException("Photos need the live camera, and it isn't running through Camera2.");
-        Interlocked.Increment(ref _photosPending);
+        ImageReader jpeg = null;
         try
         {
-            await _recordGate.WaitAsync(token);
-            ImageReader jpeg = null;
-            bool done = false;
+            var captured = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var listener = new StillListener(captured);
+            jpeg = ImageReader.NewInstance(_photoSize.Width, _photoSize.Height, ImageFormatType.Jpeg, 2);
+            jpeg.SetOnImageAvailableListener(listener, _handler);
+            var settle = new ConvergenceCallback();
+            await ConfigureSessionAsync(jpeg.Surface, repeatToExtra: false, settle, ControlAFMode.ContinuousPicture);
+            // Auto exposure and focus settle on the new session's first frames.
+            for (int i = 0; i < 30 && !settle.Settled; i++) await Task.Delay(50, token);
+            using (var request = _device.CreateCaptureRequest(CameraTemplate.StillCapture))
+            {
+                request.AddTarget(jpeg.Surface);
+                request.Set(CaptureRequest.ControlAfMode, (int)ControlAFMode.ContinuousPicture);
+                request.Set(CaptureRequest.JpegOrientation, RotationDegrees?.Invoke() ?? 0);
+                request.Set(CaptureRequest.JpegQuality, (Java.Lang.Byte)(sbyte)95);
+                _session.Capture(request.Build(), new StillCallback(captured), _handler);
+            }
+            byte[] bytes = await captured.Task.WaitAsync(TimeSpan.FromSeconds(8), token);
+            await File.WriteAllBytesAsync(path, bytes, token);
+            return new PhotoResult { Path = path, Width = listener.Width, Height = listener.Height, Bytes = bytes.Length };
+        }
+        finally
+        {
             try
             {
-                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
-                var captured = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
-                var listener = new StillListener(captured);
-                jpeg = ImageReader.NewInstance(_photoSize.Width, _photoSize.Height, ImageFormatType.Jpeg, 2);
-                jpeg.SetOnImageAvailableListener(listener, _handler);
-                var settle = new ConvergenceCallback();
-                await ConfigureSessionAsync(jpeg.Surface, repeatToExtra: false, settle, ControlAFMode.ContinuousPicture);
-                // Auto exposure and focus settle on the new session's first frames.
-                for (int i = 0; i < 30 && !settle.Settled; i++) await Task.Delay(50, token);
-                using (var request = _device.CreateCaptureRequest(CameraTemplate.StillCapture))
-                {
-                    request.AddTarget(jpeg.Surface);
-                    request.Set(CaptureRequest.ControlAfMode, (int)ControlAFMode.ContinuousPicture);
-                    request.Set(CaptureRequest.JpegOrientation, RotationDegrees?.Invoke() ?? 0);
-                    request.Set(CaptureRequest.JpegQuality, (Java.Lang.Byte)(sbyte)95);
-                    _session.Capture(request.Build(), new StillCallback(captured), _handler);
-                }
-                byte[] bytes = await captured.Task.WaitAsync(TimeSpan.FromSeconds(8), token);
-                await File.WriteAllBytesAsync(path, bytes, token);
-                done = true;
-                return new PhotoResult { Path = path, Width = listener.Width, Height = listener.Height, Bytes = bytes.Length };
+                if (!_stop.IsCancellationRequested && _device != null) await ConfigureSessionAsync(null);
             }
-            finally
-            {
-                try
-                {
-                    if (!_stop.IsCancellationRequested && _device != null) await ConfigureSessionAsync(null);
-                }
-                catch (Exception) { }
-                try { jpeg?.Close(); } catch (Exception) { }
-                if (!done) { try { File.Delete(path); } catch (Exception) { } }
-                _recordGate.Release();
-            }
+            catch (Exception) { }
+            try { jpeg?.Close(); } catch (Exception) { }
         }
-        finally { Interlocked.Decrement(ref _photosPending); }
     }
 
-    /// <summary>
-    /// Records <paramref name="seconds"/> of video (H.264, 720p, with sound from the microphone if asked) into an MP4 file while the preview and the
-    /// detectors go on. Cancelling stops the recording and deletes the file.
-    /// </summary>
-    public async Task<ClipResult> RecordClipAsync(int seconds, string path, bool withAudio, CancellationToken token)
+    // The Camera2 clip (RecordClipAsync holds the gate and deletes the file unless it finished): a MediaRecorder's surface added to the session
+    // for the clip's length.
+    private async Task<ClipResult> RecordClipCamera2Async(int seconds, string path, bool withAudio, CancellationToken token)
     {
-        if (!CanRecordClip) throw new InvalidOperationException("Video clips need the live camera, and it isn't running through Camera2.");
-        // A photo asked for with the clip comes first: it is quick, and the clip would hold the camera for its whole length.
-        await Task.Delay(150, token);
-        for (int i = 0; i < 200 && Volatile.Read(ref _photosPending) > 0; i++) await Task.Delay(50, token);
-        await _recordGate.WaitAsync(token);
         MediaRecorder recorder = null;
-        bool started = false, finished = false;
+        bool started = false;
         try
         {
-            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
             recorder = OperatingSystem.IsAndroidVersionAtLeast(31) ? new MediaRecorder(Android.App.Application.Context) : new MediaRecorder();
             if (withAudio) recorder.SetAudioSource(AudioSource.Mic);
             recorder.SetVideoSource(VideoSource.Surface);
@@ -414,7 +353,6 @@ public sealed partial class LiveCamera
             TimeSpan duration = clock.Elapsed;
             started = false;
             recorder.Stop();
-            finished = true;
             return new ClipResult { Path = path, Duration = duration, WithAudio = withAudio, Bytes = new FileInfo(path).Length };
         }
         finally
@@ -431,8 +369,6 @@ public sealed partial class LiveCamera
             }
             catch (Exception) { }
             try { recorder?.Release(); } catch (Exception) { }
-            if (!finished) { try { File.Delete(path); } catch (Exception) { } }
-            _recordGate.Release();
         }
     }
 }

@@ -1,5 +1,5 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID
+#if ANDROID || (IOS && !MACCATALYST)
 using System.IO;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Maui;
@@ -7,7 +7,7 @@ using Emgu.LiteRT.Models.CV.Maui;
 
 namespace Emgu.LiteRT.LM.Maui.CV;
 
-// The record_clip alert action (TODO item 43): a few seconds of video from the live camera (Camera2, LiveCamera.Camera2.cs), with sound when the
+// The record_clip alert action (TODO item 43): a few seconds of video from the live camera (Camera2 or AVFoundation, LiveCamera.RecordClipAsync), with sound when the
 // microphone is allowed, shown in the transcript with the first frame, Play (in the card, InlineVideoView) / Full screen / Share / Save to gallery. Session only, like the snapshots: the clips
 // live in the app's cache folder, the latest five are kept, New chat deletes them, and nothing is sent to the model.
 public sealed partial class CameraFeature
@@ -168,6 +168,16 @@ public sealed partial class CameraFeature
     {
         try
         {
+#if IOS
+            using var asset = AVFoundation.AVAsset.FromUrl(Foundation.NSUrl.FromFilename(path));
+            using var generator = new AVFoundation.AVAssetImageGenerator(asset) { AppliesPreferredTrackTransform = true, MaximumSize = new CoreGraphics.CGSize(640, 640) };
+            using var frame = generator.CopyCGImageAtTime(CoreMedia.CMTime.FromSeconds(0.5, 600), out _, out Foundation.NSError error)
+                ?? generator.CopyCGImageAtTime(CoreMedia.CMTime.Zero, out _, out error);
+            if (frame == null) return null;
+            using var image = UIKit.UIImage.FromImage(frame);
+            using Foundation.NSData jpeg = image.AsJPEG(0.8f);
+            return jpeg?.ToArray();
+#else
             using var retriever = new Android.Media.MediaMetadataRetriever();
             retriever.SetDataSource(path);
             using Android.Graphics.Bitmap frame = retriever.GetFrameAtTime(500_000, Android.Media.Option.ClosestSync) ?? retriever.GetFrameAtTime(0);
@@ -175,6 +185,7 @@ public sealed partial class CameraFeature
             using var stream = new MemoryStream();
             frame.Compress(Android.Graphics.Bitmap.CompressFormat.Jpeg, 80, stream);
             return stream.ToArray();
+#endif
         }
         catch (Exception) { return null; }
     }

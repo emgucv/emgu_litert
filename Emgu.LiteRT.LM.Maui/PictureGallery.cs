@@ -96,6 +96,30 @@ public static class PictureGallery
         }
         return "Saved to the gallery (Pictures/&lt;app&gt;)";
     });
+#elif IOS || MACCATALYST
+    /// <summary>Add a video file to Photos; returns a short description of where it went.</summary>
+    public static Task<string> SaveVideoAsync(string path, string fileName) => AddFileAsync(path, video: true);
+
+    /// <summary>Add a JPEG file to Photos without reading it into memory; returns a short description of where it went.</summary>
+    public static Task<string> SavePhotoAsync(string path, string fileName) => AddFileAsync(path, video: false);
+
+    private static async Task<string> AddFileAsync(string path, bool video)
+    {
+        Photos.PHAuthorizationStatus status = await Photos.PHPhotoLibrary.RequestAuthorizationAsync(Photos.PHAccessLevel.AddOnly);
+        if (status != Photos.PHAuthorizationStatus.Authorized && status != Photos.PHAuthorizationStatus.Limited)
+            throw new UnauthorizedAccessException("Photos access is off. Allow adding photos to this app in the system settings.");
+        var url = Foundation.NSUrl.FromFilename(path);
+        var changed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Photos.PHPhotoLibrary.SharedPhotoLibrary.PerformChanges(
+            () => { if (video) Photos.PHAssetChangeRequest.FromVideo(url); else Photos.PHAssetChangeRequest.FromImage(url); },
+            (success, error) =>
+            {
+                if (success) changed.TrySetResult(true);
+                else changed.TrySetException(new IOException(error?.LocalizedDescription ?? (video ? "Photos wouldn't take the video." : "Photos wouldn't take the photo.")));
+            });
+        await changed.Task;
+        return "Saved to Photos";
+    }
 #endif
 
     private static string ImageMediaType(string fileName) =>

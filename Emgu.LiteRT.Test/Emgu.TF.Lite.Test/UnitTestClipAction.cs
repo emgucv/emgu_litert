@@ -53,7 +53,7 @@ public class UnitTestClipAction
         Assert.That(clip.Available, Is.True);
         string schema = clip.ParameterSchema.GetRawText();
         Assert.That(schema, Does.Contain("\"seconds\"").And.Contain("\"minimum\":3").And.Contain("\"maximum\":30").And.Contain("\"additionalProperties\":false"));
-        Assert.That(clip.Description, Does.Contain("Android only"));
+        Assert.That(clip.Description, Does.Contain("Android and iOS only"));
     }
 
     [Test]
@@ -64,7 +64,7 @@ public class UnitTestClipAction
         Assert.That(photo.Id, Is.Not.EqualTo(VisualHostCatalog.Snapshot.Id));
         Assert.That(photo.Available, Is.True);
         Assert.That(photo.ParameterSchema.GetRawText(), Does.Contain("\"properties\":{}").And.Contain("\"additionalProperties\":false"));
-        Assert.That(photo.Description, Does.Contain("full-resolution").And.Contain("Android only"));
+        Assert.That(photo.Description, Does.Contain("full-resolution").And.Contain("Android and iOS only"));
     }
 
     [Test]
