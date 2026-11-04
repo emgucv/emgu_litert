@@ -878,7 +878,12 @@ The camera feature's clips, photos, camera switch, shutter click and sound-trigg
   see a person") ran `take_snapshot`, which was silent by design (item 50 clicked for `take_photo` only), because the
   planner keeps `take_photo` for a full-resolution or high-quality photo. Now `take_snapshot` plays the click too, under
   the same "Camera sounds" setting (`CameraFeature.Snapshots.cs`), on Android and iOS; clips stay silent.
+- [x] 2026-11-04: a sound-triggered photo on the iPad, through the real chat page from a self-test ("Take a photo when
+  you hear an alarm", the Mac playing a smoke-alarm pattern): the monitor heard it within a second and the camera took
+  a 1.3 MB photo (deleted by the test, not looked at). It first failed with "Could not create the sound monitor":
+  YAMNet's loading progress set the page's status label from a worker thread, a UIKit error on iOS; `ChatPage.SetStatus`
+  marshals to the main thread now (FEATURES.md), so sound monitors work on iOS at all.
 - [ ] Not done: the rest of the visual checks (a photo and a clip looked at; Save to Photos), a real detection
-  triggering a photo or a clip, a sound-triggered photo and clip, the photo's 4:3 full-sensor size (the 720p format
-  offers 16:9), the preview presented from the detector thread (the layer allows it), Mac Catalyst on this path (it
-  keeps OpenCV's capture).
+  triggering a photo or a clip, a sound-triggered clip, the photo's 4:3 full-sensor size (the 720p format offers
+  16:9), the preview presented from the detector thread (the layer allows it), Mac Catalyst on this path (it keeps
+  OpenCV's capture).

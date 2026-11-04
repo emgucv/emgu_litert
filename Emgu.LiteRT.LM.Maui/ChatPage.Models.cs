@@ -310,7 +310,9 @@ namespace Emgu.LiteRT.LM.Maui
                 return null;
             try
             {
-                if (file.IsLocalFileVerified)
+                // A complete file beside a partial download (a file copied in after a download attempt) is downloaded: the
+                // hash is checked when it is loaded, and the partial file goes then.
+                if (file.IsLocalFileVerified || (System.IO.File.Exists(file.LocalFile) && new System.IO.FileInfo(file.LocalFile).Length > 0))
                     return "Downloaded ·";
                 if (file.PartialDownloadBytes > 0)
                     return "Download paused at " + FormatSize(file.PartialDownloadBytes) + (option.DownloadSize > 0 ? " of " + FormatSize(option.DownloadSize) : string.Empty) + " ·";

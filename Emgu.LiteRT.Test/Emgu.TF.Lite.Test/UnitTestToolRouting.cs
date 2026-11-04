@@ -116,9 +116,9 @@ public class UnitTestToolRouting
                     done?.Invoke("document:" + document.Format + ":" + (document.Data.Length > 200 ? "content" : "short"));
                     return Task.FromResult(AgentTools.DocumentCreatedResult(document));
                 }, request), AgentTools.RecordMeeting((title, token) => Task.FromResult("none")) },
-                () => "When the user asks for a document or a file (Word, PDF, Markdown), write the whole content into create_document's content in Markdown - not into your reply - then say in one short sentence that it is ready."),
+                () => "When the user asks for a document or a file (Word, PDF, Markdown), write the whole content into create_document's content in Markdown - not into your reply - then say in one short sentence that it is ready.", rerunAfterStub: false),
             new ToolGroup(ChatImageGeneration.GroupName, ChatImageGeneration.GroupSummary, ChatImageGeneration.GroupKeywords,
-                () => new AITool[] { AgentTools.GenerateImage(Unused) }, () => ChatImageGeneration.Instructions),
+                () => new AITool[] { AgentTools.GenerateImage(Unused) }, () => ChatImageGeneration.Instructions, rerunAfterStub: true),
             new ToolGroup(ChatPhotoEffects.GroupName, ChatPhotoEffects.GroupSummary, ChatPhotoEffects.GroupKeywords,
                 () => new AITool[] { AgentTools.BlurPhotoBackground((image, strength, token) => Task.FromResult("ok")) }, () => ChatPhotoEffects.Instructions),
         };

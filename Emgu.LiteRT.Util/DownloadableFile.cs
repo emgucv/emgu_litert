@@ -123,7 +123,10 @@ namespace Emgu.LiteRT.Util
                     return false;
 
                 if (_sha256Hash == null || IsVerifiedByMarker(fi))
+                {
+                    DiscardStalePartial();
                     return true;
+                }
 
                 using (SHA256 sha256 = SHA256.Create())
                 {
@@ -149,7 +152,26 @@ namespace Emgu.LiteRT.Util
                     }
                 }
                 WriteVerifiedMarker(fi);
+                DiscardStalePartial();
                 return true;
+            }
+        }
+
+        // A partial download left beside a complete file (e.g. a download started before the file was copied in) would
+        // show as a paused download: gone once the file is known to be good.
+        private void DiscardStalePartial()
+        {
+            try
+            {
+                if (!File.Exists(PartialFile))
+                    return;
+                File.Delete(PartialFile);
+                if (File.Exists(ResumeMetadataFile)) File.Delete(ResumeMetadataFile);
+                if (File.Exists(PartialFile + ".sha256ok")) File.Delete(PartialFile + ".sha256ok");
+            }
+            catch (Exception e)
+            {
+                Trace.WriteLine($"Could not delete {PartialFile}: {e.Message}");
             }
         }
 

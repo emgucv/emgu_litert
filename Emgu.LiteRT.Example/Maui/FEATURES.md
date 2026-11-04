@@ -931,6 +931,11 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   and `TakePhoto`, `create_sound_monitor`'s `clipSeconds` and `takePhoto` when `SoundMonitorTools.Create` gets
   `cameraActions`): the live camera opens when the monitor is created, the photo comes first, one capture per 30 s plus the
   clip, through the same `TakePhotoAsync`/`RecordClipAsync` as the camera monitors.
+- On iOS, creating a sound monitor failed until 2026-11-04 whenever YAMNet still had to load: its loading progress
+  set the page's status label from the worker thread, a UIKit consistency error on iOS (Android tolerates it), and
+  the tool answered "Could not create the sound monitor". `ChatPage.SetStatus` marshals to the main thread now (70
+  callers set it from worker threads). Found by driving the chat page from a self-test on the iPad Air ("Take a photo
+  when you hear an alarm") and logging the tool steps' results.
 - `take_photo` and, since 2026-11-04, `take_snapshot` play a short shutter click (`camera_click.wav`,
   `CameraChimeAction("camera_click.wav")`, inside the sound mute) unless Settings > "Camera sounds" is off (TODO item 50);
   clips are silent. The planner answers "take a photo when you see a person" with `take_snapshot` (`take_photo` is for a

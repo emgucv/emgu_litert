@@ -30,9 +30,9 @@ namespace Emgu.LiteRT.LM.Agents
         /// <param name="alsoMatches">Another test of whether a message needs the group, e.g. the user's own goals'
         /// words, or null</param>
         /// <param name="rerunAfterStub">Whether its stub ends the request so the message is sent again with the group
-        /// (ToolRouter's endRequest) rather than continuing it</param>
+        /// (ToolRouter's endRequest) rather than continuing it: true by default since 2026-11-04 (see ToolRouter)</param>
         public ToolGroup(string name, string summary, IEnumerable<string> keywords, Func<IEnumerable<AITool>> createTools,
-            Func<string> instructions = null, Func<string, bool> alsoMatches = null, bool rerunAfterStub = false)
+            Func<string> instructions = null, Func<string, bool> alsoMatches = null, bool rerunAfterStub = true)
         {
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentException("A name is needed", nameof(name));
@@ -99,12 +99,14 @@ namespace Emgu.LiteRT.LM.Agents
         /// () => FunctionInvokingChatClient.CurrentContext?.Options; a stub adds its group's tools there. Without it (or
         /// if it returns null) the group is used from the next message on.</param>
         /// <param name="endRequest">Ends the request (e.g. () => FunctionInvokingChatClient.CurrentContext.Terminate =
-        /// true): the stubs of groups with RerunAfterStub call it instead of adding their tools, and TakeRerun tells the
-        /// app to send the message again - without the stub's turn, with the group's tools from the start. Which is better
-        /// depends on the group: continuing after the stub, Gemma 4 E2B asked for details it had been given ("Add the
-        /// dentist on Friday at 3 pm to my calendar": the date, the title), and sent again it added the event; but sent
-        /// again with the camera tools, it asked which object class "a bird" was, where continuing it set the monitor
-        /// up.</param>
+        /// true): the stubs of groups with RerunAfterStub (all by default) call it instead of adding their tools, and
+        /// TakeRerun tells the app to send the message again - without the stub's turn, with the group's tools from the
+        /// start. Continuing after the stub instead (RerunAfterStub false, or no endRequest) worked for some groups and
+        /// not others: Gemma 4 E2B asked for details it had been given ("Add the dentist on Friday at 3 pm to my
+        /// calendar": the date, the title) where sent again it added the event; given the image tools it mostly ended
+        /// its reply at once (2026-11-04, see Tools); and the camera group's tools after the stub's turn no longer fit a
+        /// 4k window. Sent again, every group tested set its tool up. (Once, sent again with the camera tools, it asked
+        /// which object class "a bird" was, where continuing it set the monitor up; not seen since.)</param>
         public ToolRouter(IEnumerable<ToolGroup> groups, Func<ChatOptions> currentOptions, Action endRequest = null)
         {
             _groups = (groups ?? throw new ArgumentNullException(nameof(groups))).ToList();

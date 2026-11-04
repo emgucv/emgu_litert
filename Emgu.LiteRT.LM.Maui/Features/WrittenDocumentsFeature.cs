@@ -55,7 +55,10 @@ public sealed class WrittenDocumentsFeature : ChatFeature
             () => new AITool[] { AgentTools.CreateDocument(SaveAsync, () => _prompt) }.Concat(Meetings?.Tools(Host?.HandsFree == true) ?? Array.Empty<AITool>()),
             () => Meetings?.Tools(Host?.HandsFree == true).Any() == true
                 ? ChatWrittenDocuments.Instructions + "\n\n" + ChatWrittenDocuments.MeetingInstructions
-                : ChatWrittenDocuments.Instructions);
+                : ChatWrittenDocuments.Instructions,
+            // Continuing after the stub, not sent again (the default): sent again, Gemma 4 E2B made "a moving-house
+            // checklist I can print" a Word document 3 times in 3, where continuing it made a PDF (2026-11-04).
+            rerunAfterStub: false);
     }
 
     /// <summary>create_document's save: the document is kept with the reply being written, with a card above it.</summary>

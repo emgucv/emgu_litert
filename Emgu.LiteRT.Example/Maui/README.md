@@ -89,7 +89,7 @@ profile while building any Xcode project with automatic signing for it (bundle I
 entitlements file with the two keys, so the profile keeps them) (it needs Xcode signed in to the team's account,
 and the team's latest Program License Agreement accepted). Models can be copied into the app instead of downloaded:
 `xcrun devicectl device copy to --device <identifier> --domain-type appDataContainer --domain-identifier com.emgu.litert
---source <file> --destination Documents/LiteRT-LM/<file>` (with its `.sha256ok`; the modification time is kept). A
+--source <file> --destination Documents/LiteRT-LM/<file>` (with its `.sha256ok`; the copy keeps the modification time to the second but not to the tick the marker records, so the app hashes the file once on first use and rewrites the marker; a `.part` left by an earlier download attempt is deleted then, and the model list shows the complete file as downloaded meanwhile). A
 self-test gets its environment from `DEVICECTL_CHILD_EMGU_LM_SELFTEST=1 xcrun devicectl device process launch --console
 ...`, which also shows the app's console.
 

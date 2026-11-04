@@ -378,6 +378,13 @@ namespace Emgu.LiteRT.LM.Maui
         {
             if (_statusLabel == null)
                 return;
+            // Features set it from their worker threads too (a model's loading progress): on iOS a label set off the main
+            // thread is a UIKit consistency error, which ended a sound monitor's creation on the iPad (2026-11-04).
+            if (!MainThread.IsMainThread)
+            {
+                MainThread.BeginInvokeOnMainThread(() => SetStatus(message));
+                return;
+            }
             _statusLabel.Text = message ?? string.Empty;
             _statusLabel.IsVisible = !string.IsNullOrEmpty(message);
         }

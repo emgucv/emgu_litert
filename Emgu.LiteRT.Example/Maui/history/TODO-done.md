@@ -996,9 +996,15 @@ on a phone's 4k window failed every message (phones now get 8k for Gemma 4, item
          ended its reply at once instead of calling `generate_image` - with thinking on or off, constrained decoding on
          or off, and not by size (2,800 tokens of padding text worked, 1,900 didn't): the model's choice given that
          shape of history. Sent again with `generate_image` declared from the start (`rerunAfterStub`, the calendar
-         group's mode) it drew every time (3 of 3 on the Mac at the failing sizes, and on the iPad), so the image group
-         reruns now. The other continuing groups (camera, photos, documents...) keep continuing; the same shape could
-         fail them on this model, to watch. "generate/create/make a photo" are image keywords now too.
+         group's mode) it drew every time (3 of 3 on the Mac at the failing sizes, and on the iPad). Rerun is every
+         group's default now (`ToolGroup`'s `rerunAfterStub`): `Gemma4E2BUsesGroupsAndStubsAt4k`'s camera case ("Say
+         welcome out loud whenever a person comes into view", through `use_camera`) failed continuing - the camera tools
+         after the stub's turn no longer fit the 4k window - and passed sent again, twice each; the calendar cases pass
+         either way; the written-documents group keeps continuing (`rerunAfterStub: false`): sent again, E2B made
+         "a moving-house checklist I can print" a Word document 3 times in 3 where continuing it made a PDF. "generate/create/make a photo" are image keywords now too.
+- [x] 2026-11-04: a `.part` left beside a complete model file (a download started on the iPad before the file was copied
+      in) showed "Download paused at 75 MB" in the model list: a complete file now shows as downloaded (the hash is
+      checked when it loads), and `DownloadableFile` deletes the stale partial files once the file is verified.
 - [x] What every message carries: 3,770 characters (core tools and instructions 2,376, 7 stubs 1,394) instead of
       ~15,400 with every group (the camera group alone 5,839). On the S10's GPU: "What is 12 times 7?" 22 s instead of
       48 s, goal messages 26-27 s instead of 44-46 s.
