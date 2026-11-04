@@ -164,7 +164,7 @@ namespace Emgu.LiteRT.LM.Chat
         public Func<string, int> CountTokens { get; set; } = ApproximateTokens;
 
         /// <summary>The size of the model's context window, in tokens.</summary>
-        public int ContextWindow { get; set; } = 4096;
+        public int ContextWindow { get; set; } = 8192;
 
         /// <summary>How the conversation makes room when it outgrows the context window.</summary>
         public ChatCompaction Compaction { get; set; } = ChatCompaction.Summarize;

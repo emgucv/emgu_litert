@@ -103,16 +103,32 @@ namespace Emgu.LiteRT.LM.Models
 
         /// <summary>
         /// The context window: how many tokens a conversation - system message, history, the new message and the reply -
-        /// can hold, set on the engine by Init (so change it before Init); 0 leaves it to LiteRT-LM. The default, 4096,
-        /// is what LiteRT-LM picks for the models in this package anyway. The Qwen files are fixed at 4096; Gemma 4 E2B
-        /// and E4B allow up to ~32k, at a cost in memory and in the time it takes to read a long conversation: on an
+        /// can hold, set on the engine by Init (so change it before Init); 0 leaves it to LiteRT-LM, which picks 4096 for
+        /// the models in this package. The default is 8192 since 2026-11-04 (4096 before): an agent's instructions and
+        /// tool definitions alone reach 4k tokens. The Qwen files are fixed at 4096; Gemma 4 E2B and E4B allow up to ~32k, at a cost in memory and in the time it takes to read a long conversation: on an
         /// Apple Silicon Mac's CPU, a conversation filling 8k / 16k / 32k took E2B 27 s / 82 s / 262 s (E4B: 61 s at
         /// 8k), and on a Pixel Fold a 4k one took 2 minutes and an 8k one almost 6. A conversation that outgrows the
         /// window fails, so chats that run long need to drop or summarize earlier messages; CountTokens helps measure
         /// them. A configureSettings callback passed to Init that sets EngineSettings.MaxNumTokens itself overrides
         /// this.
         /// </summary>
-        public int MaxNumTokens { get; set; } = 4096;
+        public int MaxNumTokens
+        {
+            get { return MaxSupportedContextTokens > 0 && _maxNumTokens > MaxSupportedContextTokens ? MaxSupportedContextTokens : _maxNumTokens; }
+            set { _maxNumTokens = value; }
+        }
+        private int _maxNumTokens = 8192;
+
+        /// <summary>
+        /// The largest context window the model's file supports, or 0 when it isn't fixed (Gemma 4's files take any size
+        /// up to ~32k). A fixed one caps <see cref="MaxNumTokens"/>: LiteRT-LM would clamp a larger engine setting to it
+        /// anyway ("Passed in max_num_tokens (8192) is larger than what the static model supports (4096). Using model
+        /// limit."), and the window a chat believes it has must be the engine's. The Qwen files are fixed at 4096.
+        /// </summary>
+        public virtual int MaxSupportedContextTokens
+        {
+            get { return 0; }
+        }
 
         /// <summary>
         /// Count the tokens of a text with the model's tokenizer (after Init). Chat templates add a few tokens per

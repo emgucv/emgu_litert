@@ -95,7 +95,7 @@ namespace Emgu.LiteRT.LM.Maui
             if (option == null)
                 return;
             int automatic = ChatContextWindow.Automatic(option.ContextWindow, OnPhone, option.CanUseTools);
-            _contextChips[0].Text = "Automatic (" + ChatContextWindow.Name(automatic > 0 ? automatic : 4096) + ")";
+            _contextChips[0].Text = "Automatic (" + ChatContextWindow.Name(automatic > 0 ? automatic : 8192) + ")";
             _contextNote.Text = ChatContextWindow.Note(ContextSetting, OnPhone);
         }
 
@@ -107,7 +107,7 @@ namespace Emgu.LiteRT.LM.Maui
             if (_memoryLabel == null)
                 return;
             ChatConversation conversation = Conversation;
-            int window = conversation?.ContextWindow ?? 4096;
+            int window = conversation?.ContextWindow ?? 8192;
             string text = string.Format(
                 "The model takes in about {0:N0} tokens. Longer chats are summarized - or, for the small models, their " +
                 "earliest messages are dropped - so it keeps up; the conversation here stays complete.", window);

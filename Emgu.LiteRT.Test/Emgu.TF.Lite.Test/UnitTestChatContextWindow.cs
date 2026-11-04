@@ -14,10 +14,10 @@ public class UnitTestChatContextWindow
     {
         // A fixed window (no maximum): always the model's default.
         Assert.That(ChatContextWindow.Choose(16384, 8192, 0, false, true), Is.Zero);
-        // Automatic: the model's size on a desktop; on a phone only for a model with tools.
+        // Automatic: the model's size, on a phone too (since 2026-11-04; before, a phone kept 4k for a model without tools).
         Assert.That(ChatContextWindow.Choose(0, 8192, 32000, false, false), Is.EqualTo(8192));
         Assert.That(ChatContextWindow.Choose(0, 8192, 32000, true, true), Is.EqualTo(8192));
-        Assert.That(ChatContextWindow.Choose(0, 8192, 32000, true, false), Is.Zero);
+        Assert.That(ChatContextWindow.Choose(0, 8192, 32000, true, false), Is.EqualTo(8192));
         // A choice, capped at the model's maximum.
         Assert.That(ChatContextWindow.Choose(16384, 8192, 32000, true, false), Is.EqualTo(16384));
         Assert.That(ChatContextWindow.Choose(64000, 8192, 32000, false, true), Is.EqualTo(32000));

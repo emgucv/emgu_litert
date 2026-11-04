@@ -180,8 +180,11 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Context window and compaction
 
-- Sizes: the models run with a 4,096-token context window (`LanguageModel.MaxNumTokens`, set on the engine; LiteRT-LM picked
-  4096 anyway), except that Gemma 4 E2B and E4B get 8,192 on Mac Catalyst and Windows (`ModelOption.DesktopContextTokens`).
+- Sizes: the models ran with a 4,096-token context window (`LanguageModel.MaxNumTokens`, set on the engine; LiteRT-LM picked
+  4096 anyway), except that Gemma 4 E2B and E4B got 8,192 on Mac Catalyst and Windows (`ModelOption.DesktopContextTokens`);
+  since 2026-11-04 the default is 8,192 everywhere (`LanguageModel.MaxNumTokens`, and the chat's Automatic on phones too);
+  the Qwen models cap it at their files' 4,096 themselves (`LanguageModel.MaxSupportedContextTokens`), so the chat's
+  window matches the engine's (LiteRT-LM clamps a larger setting with a warning).
   The Qwen files are fixed at 4096; both Gemma 4 files allow up to ~32k (E2B's model info says dynamic 32003; E4B's says 0,
   but its model has the same 32003 magic number and accepted 8k and 16k).
 - What a bigger window costs, measured by filling the window with a fact at its start (recalled at every size). Reading the
@@ -197,9 +200,10 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 - So phones kept 4k by default - until the agent's instructions and tool definitions alone grew to ~4k tokens (~14.5k
   characters; 7 of the 21 tools were the live camera's). Adding the goal tools made every Gemma 4 E2B message on a Galaxy
   S10 fail with "This request and its tools do not fit in the current context window". Now Automatic gives models with
-  tools (`CanUseTools`: Gemma 4) their `DesktopContextTokens`, 8k, on phones too; the other models stay at 4k.
+  tools (`CanUseTools`: Gemma 4) their `DesktopContextTokens`, 8k, on phones too; the other models stayed at 4k until
+  2026-11-04, when 8k became the default for every model and platform.
 - Settings > Context window (Gemma 4 only, up to `ModelOption.MaxContextTokens` 32000, under the files' 32003 limit; Qwen
-  hides it) chooses Automatic - 8k for Gemma 4, else 4k - or 4k, 8k, 16k or 32k, saved for all models
+  hides it) chooses Automatic - 8k - or 4k, 8k, 16k or 32k, saved for all models
   (the page's "context_tokens" setting). `ContextTokensFor(option)` is what `LoadModelAsync` sets `MaxNumTokens` to, and
   `ModelReady`/`PrepareModelAsync` compare it with the loaded or loading window, so a change reloads the model and the chat
   continues (compacted with the next message if it no longer fits).

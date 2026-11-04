@@ -18,6 +18,12 @@ namespace Emgu.LiteRT.LM.Models
     /// </remarks>
     public abstract class Qwen35 : LanguageModel
     {
+        /// <summary>4096: the files are fixed at that size.</summary>
+        public override int MaxSupportedContextTokens
+        {
+            get { return 4096; }
+        }
+
         /// <summary>
         /// True: the chat templates of these conversions support multi-turn LiteRT-LM conversations
         /// </summary>

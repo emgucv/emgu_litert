@@ -25,8 +25,8 @@ namespace Emgu.LiteRT.LM.Chat
 
         /// <summary>
         /// The window to load a model with: the user's setting, or for Automatic the model's own size
-        /// (<see cref="ChatModelOption.ContextWindow"/>) - on a phone only for models that call tools, whose
-        /// instructions and tool definitions don't fit the default 4k - capped at what the model's file allows.
+        /// (<see cref="ChatModelOption.ContextWindow"/>, 8k for Gemma 4 - on phones too since 2026-11-04; before, a phone
+        /// kept the model's default, 4k, for a model without tools), capped at what the model's file allows.
         /// </summary>
         /// <param name="setting">The user's choice in tokens, or 0 for Automatic</param>
         /// <param name="automatic">The model's own size for Automatic (<see cref="ChatModelOption.ContextWindow"/>), or 0</param>
@@ -42,11 +42,11 @@ namespace Emgu.LiteRT.LM.Chat
             return wanted > 0 ? Math.Min(wanted, max) : 0;
         }
 
-        /// <summary>What Automatic gives: the model's own size, or on a phone the default (0) for a model without tools.</summary>
+        /// <summary>What Automatic gives: the model's own size, on every platform (the phone and tools arguments no longer matter).</summary>
         /// <param name="automatic">The model's own size</param>
         /// <param name="phone">True on a phone</param>
         /// <param name="canUseTools">Whether the model calls tools</param>
-        public static int Automatic(int automatic, bool phone, bool canUseTools) => phone && !canUseTools ? 0 : automatic;
+        public static int Automatic(int automatic, bool phone, bool canUseTools) => automatic;
 
         /// <summary>The note under the choice: what a size costs, with a warning for the large ones.</summary>
         /// <param name="setting">The user's choice</param>

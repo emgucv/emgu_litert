@@ -39,7 +39,7 @@ namespace Emgu.LiteRT.LM.Chat
         // Gemma 4's files allow up to ~32k, but the model re-reads the whole conversation when a saved chat is opened or
         // after compacting, which grows with the window: a full 4k chat took 2 minutes on a Pixel Fold's CPU (8k: almost
         // 6, with 1.5 GB of its RAM left; on its GPU 8 s at 4k), 8k 27 s (E2B) / 61 s (E4B) on an Apple Silicon Mac.
-        // Phones use 8k too for models with tools: the agent's instructions and tool definitions alone grew to ~4k tokens.
+        // Phones use 8k too: the agent's instructions and tool definitions alone grew to ~4k tokens (every model since 2026-11-04).
         private const int GemmaContextWindow = 8192;
         private const int GemmaMaxContextWindow = 32000;
 

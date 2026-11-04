@@ -170,7 +170,7 @@ namespace Emgu.LiteRT.LM.Maui
 
         void IChatPageHost.SetHandsFree(bool handsFree) => SetHandsFree(handsFree);
 
-        int IChatPageHost.ContextWindow => Conversation?.ContextWindow ?? 4096;
+        int IChatPageHost.ContextWindow => Conversation?.ContextWindow ?? 8192;
 
         Func<string, int> IChatPageHost.TokenCounter => Conversation?.CountTokens ?? ChatConversation.ApproximateTokens;
 

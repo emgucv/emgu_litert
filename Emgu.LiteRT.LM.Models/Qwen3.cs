@@ -13,6 +13,12 @@ namespace Emgu.LiteRT.LM.Models
     /// </summary>
     public class Qwen3 : LanguageModel
     {
+        /// <summary>4096: the file is fixed at that size.</summary>
+        public override int MaxSupportedContextTokens
+        {
+            get { return 4096; }
+        }
+
         /// <summary>
         /// The folder, under the application's local data folder, the model file is downloaded to
         /// </summary>
