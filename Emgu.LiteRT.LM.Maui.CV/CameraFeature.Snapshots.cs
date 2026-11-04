@@ -23,8 +23,16 @@ public sealed partial class CameraFeature
                 throw new InvalidOperationException("Snapshot needs the visible live camera.");
             return _camera;
         });
-        // This is a fresh frame after the event, not the exact earlier frame used for detection.
+        // This is a fresh frame after the event, not the exact earlier frame used for detection. The shutter click plays with it, as with a
+        // full-resolution photo: the planner answers "take a photo when..." with a snapshot, and a picture taken by an alert needs its sign.
+#if ANDROID || (IOS && !MACCATALYST)
+        Task click = PlayCameraClickAsync(token);
+        byte[] jpeg;
+        try { jpeg = await camera.CaptureAsync(token); }
+        finally { await click; }
+#else
         byte[] jpeg = await camera.CaptureAsync(token);
+#endif
         DateTimeOffset capturedAt = DateTimeOffset.Now;
         await MainThread.InvokeOnMainThreadAsync(() =>
         {

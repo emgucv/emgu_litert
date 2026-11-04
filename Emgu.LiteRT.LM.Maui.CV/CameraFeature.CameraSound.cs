@@ -5,10 +5,11 @@ using Emgu.LiteRT.LM.Maui;
 
 namespace Emgu.LiteRT.LM.Maui.CV;
 
-// A short shutter click when the camera takes a full-resolution photo (TODO item 50), so a photo taken without anyone touching the phone - by a sound or
-// by something coming into view - doesn't go unnoticed. Settings > "Camera sounds" (on by default, Preferences litert_lm_chat_camera_sound) turns it off,
-// for a baby's room. Clips stay silent: the preview says "Recording clip", and a sound at the start would be in the clip. The sound monitors don't
-// listen while it plays (the alert mute), so the click can't be heard as a sound.
+// A short shutter click when the camera takes a full-resolution photo (TODO item 50) or, since 2026-11-04, a snapshot (the planner's answer to
+// "take a photo when..."), so a picture taken without anyone touching the phone - by a sound or by something coming into view - doesn't go
+// unnoticed. Settings > "Camera sounds" (on by default, Preferences litert_lm_chat_camera_sound) turns it off, for a baby's room. Clips stay
+// silent: the preview says "Recording clip", and a sound at the start would be in the clip. The sound monitors don't listen while it plays (the
+// alert mute), so the click can't be heard as a sound.
 public sealed partial class CameraFeature
 {
     private readonly CameraChimeAction _cameraClick = new CameraChimeAction("camera_click.wav");
@@ -29,12 +30,12 @@ public sealed partial class CameraFeature
             Children =
             {
                 SwitchRow("Camera sounds", toggle),
-                Note("A short click when the camera takes a photo for an alert, so nobody is photographed without a sign. Turn it off where a sound would be a nuisance, such as a baby's room. Clips are always silent.")
+                Note("A short click when the camera takes a photo or a snapshot for an alert, so nobody is photographed without a sign. Turn it off where a sound would be a nuisance, such as a baby's room. Clips are always silent.")
             }
         };
     }
 
-    // Starts the click and returns a task that ends when it has played (or failed: a click is never a reason to lose the photo).
+    // Starts the click and returns a task that ends when it has played (or failed: a click is never a reason to lose the picture).
     private Task PlayCameraClickAsync(CancellationToken token)
     {
         if (!CameraSoundOn) return Task.CompletedTask;

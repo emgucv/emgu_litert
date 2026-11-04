@@ -872,11 +872,12 @@ The camera feature's clips, photos, camera switch, shutter click and sound-trigg
   beside the stop's `StopRunning` blocked that long, so the clip's teardown and the camera's release share a lock and
   the teardown leaves a stopping session alone (6 ms now).
 - [x] 2026-11-03: the user checked the camera view on the iPad: it works.
-- [ ] Open: the shutter click wasn't heard on the iPad when the chat took a photo. A self-test played `camera_click.wav`
-  through the same AVAudioPlayer path four times (alone, with the camera running, beside a photo, under the Playback
-  category) and the user heard all four, so the player, the session (SoloAmbient, speaker, volume 0.55) and Silent mode
-  are not it: the chat's own photo path skips or loses the click (`PlayCameraClickAsync`, or the photo was a
-  `take_snapshot`, which is silent by design). Next: log that path on the iPad while a photo is taken in the chat.
+- [x] 2026-11-04: the shutter click not heard on the iPad when a monitor took a picture. A self-test played
+  `camera_click.wav` through the same AVAudioPlayer path four times (alone, with the camera running, beside a photo, under
+  the Playback category) and the user heard all four; the app's console then showed the monitor ("take a photo when you
+  see a person") ran `take_snapshot`, which was silent by design (item 50 clicked for `take_photo` only), because the
+  planner keeps `take_photo` for a full-resolution or high-quality photo. Now `take_snapshot` plays the click too, under
+  the same "Camera sounds" setting (`CameraFeature.Snapshots.cs`), on Android and iOS; clips stay silent.
 - [ ] Not done: the rest of the visual checks (a photo and a clip looked at; Save to Photos), a real detection
   triggering a photo or a clip, a sound-triggered photo and clip, the photo's 4:3 full-sensor size (the 720p format
   offers 16:9), the preview presented from the detector thread (the layer allows it), Mac Catalyst on this path (it

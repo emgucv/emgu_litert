@@ -931,8 +931,10 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   and `TakePhoto`, `create_sound_monitor`'s `clipSeconds` and `takePhoto` when `SoundMonitorTools.Create` gets
   `cameraActions`): the live camera opens when the monitor is created, the photo comes first, one capture per 30 s plus the
   clip, through the same `TakePhotoAsync`/`RecordClipAsync` as the camera monitors.
-- `take_photo` also plays a short shutter click (`camera_click.wav`, `CameraChimeAction("camera_click.wav")`, inside the sound
-  mute) unless Settings > "Camera sounds" is off (TODO item 50); clips are silent.
+- `take_photo` and, since 2026-11-04, `take_snapshot` play a short shutter click (`camera_click.wav`,
+  `CameraChimeAction("camera_click.wav")`, inside the sound mute) unless Settings > "Camera sounds" is off (TODO item 50);
+  clips are silent. The planner answers "take a photo when you see a person" with `take_snapshot` (`take_photo` is for a
+  full-resolution or high-quality photo), which is why the iPad's first alert picture was silent (TODO item 59).
 - On Android the live camera runs through Camera2 (`Emgu.LiteRT.Models.CV.Maui/LiveCamera.Camera2.cs`, moved out of the demo on 2026-10-25; OpenCV's camera is the fallback). A 640x480 YUV
   reader feeds the preview and the detectors.
   - The `record_clip` visual-alert action (TODO item 43) adds a `MediaRecorder` surface by configuring the session again for
