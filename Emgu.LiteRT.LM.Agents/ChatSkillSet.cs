@@ -60,6 +60,7 @@ namespace Emgu.LiteRT.LM.Agents
         private readonly Action _endRequest;
         private ToolRouter _router;
         private List<string> _activeGroups;
+        private List<string> _calledStubs;
 
         /// <summary>
         /// Create a set.
@@ -133,7 +134,10 @@ namespace Emgu.LiteRT.LM.Agents
                     var router = new ToolRouter(groups, _currentOptions, _endRequest);
                     foreach (string name in _activeGroups ?? Enumerable.Empty<string>())
                         router.Activate(name);
+                    foreach (string name in _calledStubs ?? Enumerable.Empty<string>())
+                        router.MarkStubCalled(name);
                     _activeGroups = null;
+                    _calledStubs = null;
                     router.GroupRequested += name => GroupRequested?.Invoke(name);
                     _router = router;
                 }
@@ -150,7 +154,10 @@ namespace Emgu.LiteRT.LM.Agents
         private void InvalidateRouter()
         {
             if (_router != null)
+            {
                 _activeGroups = _router.Active.ToList();
+                _calledStubs = _router.CalledStubs.ToList();
+            }
             _router = null;
         }
 
@@ -223,6 +230,7 @@ namespace Emgu.LiteRT.LM.Agents
         {
             _router?.Reset();
             _activeGroups = null;
+            _calledStubs = null;
             foreach (ChatSkill skill in _skills)
                 skill.OnNewConversation();
         }

@@ -252,14 +252,23 @@ public class UnitTestToolRouting
         {
         }
         Assert.That(requested, Is.EqualTo(ChatCamera.GroupName));
-        Assert.That(model.OfferedTools[1], Does.Contain("open_camera").And.Contain("create_visual_monitor").And.Not.Contain("use_camera"));
+        // The stub stays declared (the history now calls it; a model given a history calling an undeclared tool stops).
+        Assert.That(model.OfferedTools[1], Does.Contain("open_camera").And.Contain("create_visual_monitor").And.Contain("use_camera"));
         Assert.That(model.Instructions[1], Does.Contain("create_visual_monitor"));
         Assert.That(opened, Is.EqualTo(1));
-        // And it stays for the rest of the conversation.
+        // And it stays for the rest of the conversation, the called stub with it, once each.
         Assert.That(router.IsActive(ChatCamera.GroupName), Is.True);
-        Assert.That(router.Tools().Select(t => t.Name), Does.Contain("create_visual_monitor"));
+        Assert.That(router.CalledStubs, Is.EqualTo(new[] { ChatCamera.GroupName }));
+        List<string> names = router.Tools().Select(t => t.Name).ToList();
+        Assert.That(names, Does.Contain("create_visual_monitor").And.Contain("use_camera"));
+        Assert.That(names.Count, Is.EqualTo(names.Distinct().Count()));
+        AIFunction usedStub = (AIFunction)router.Tools().First(t => t.Name == "use_camera");
+        Assert.That(usedStub.Description, Does.Contain("Already called"));
+        string again = (await usedStub.InvokeAsync(new AIFunctionArguments()))?.ToString();
+        Assert.That(again, Does.Contain("already have").And.Contain("create_visual_monitor"));
         router.Reset();
-        Assert.That(router.Tools().Select(t => t.Name), Does.Contain("use_camera"));
+        Assert.That(router.CalledStubs, Is.Empty);
+        Assert.That(router.Tools().Select(t => t.Name), Does.Contain("use_camera").And.Not.Contain("create_visual_monitor"));
     }
 
 #if !TEST_MODELS

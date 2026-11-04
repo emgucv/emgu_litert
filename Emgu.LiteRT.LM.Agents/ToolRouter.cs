@@ -78,12 +78,15 @@ namespace Emgu.LiteRT.LM.Agents
     /// when its tools change. Every other group gets a stub tool (use_camera...) of a line or two: a model that calls
     /// one gets the group's tools and instructions in the same request (through the options the function invocation
     /// uses, e.g. FunctionInvokingChatClient.CurrentContext.Options) and can call them straight away, so a request the
-    /// keywords miss still works in one message.
+    /// keywords miss still works in one message. A called stub stays declared for the rest of the conversation (its call
+    /// is in the history, and a model given a history calling an undeclared tool may stop at once: Gemma 4 E2B did).
     /// </summary>
     public sealed class ToolRouter
     {
         private readonly List<ToolGroup> _groups;
         private readonly HashSet<string> _active = new HashSet<string>(StringComparer.Ordinal);
+        // The groups whose stub the model called in this conversation: the stub stays declared (see Tools).
+        private readonly HashSet<string> _calledStubs = new HashSet<string>(StringComparer.Ordinal);
         private readonly Func<ChatOptions> _currentOptions;
         private readonly Action _endRequest;
         private bool _rerun;
@@ -125,6 +128,24 @@ namespace Emgu.LiteRT.LM.Agents
         /// <summary>The names of the groups in use in this conversation</summary>
         public IReadOnlyCollection<string> Active => _active;
 
+        /// <summary>The names of the groups whose stub tool the model called in this conversation (their stub stays declared, see <see cref="Tools"/>)</summary>
+        public IReadOnlyCollection<string> CalledStubs => _calledStubs;
+
+        /// <summary>
+        /// Note that a group's stub was called in this conversation (e.g. when the router is made again for the same
+        /// conversation): the group is used, and its stub stays declared.
+        /// </summary>
+        /// <param name="name">The group's name</param>
+        /// <returns>True if the group exists</returns>
+        public bool MarkStubCalled(string name)
+        {
+            if (!_groups.Any(g => g.Name == name))
+                return false;
+            _active.Add(name);
+            _calledStubs.Add(name);
+            return true;
+        }
+
         /// <summary>Raised when a stub tool adds its group, with the group's name</summary>
         public event Action<string> GroupRequested;
 
@@ -136,6 +157,7 @@ namespace Emgu.LiteRT.LM.Agents
         public void Reset()
         {
             _active.Clear();
+            _calledStubs.Clear();
             _rerun = false;
         }
 
@@ -198,7 +220,10 @@ namespace Emgu.LiteRT.LM.Agents
             Regex.Replace(text.ToLowerInvariant().Replace('’', '\''), @"[^\p{L}\p{N}']+", " ").Trim();
 
         /// <summary>
-        /// The tools for a request: the tools of the groups in use, and a stub for each other group.
+        /// The tools for a request: the tools of the groups in use, and a stub for each other group. A group whose stub the
+        /// model called keeps its stub declared too (it answers that the tools are there): the conversation's history holds
+        /// that call, and Gemma 4 E2B, given a history calling a tool that is no longer declared, ends its reply at once
+        /// (found on an iPad on 2026-11-04 with "Generate a photo of ...": use_image_generation, then nothing).
         /// </summary>
         /// <returns>The tools</returns>
         public IList<AITool> Tools()
@@ -210,7 +235,11 @@ namespace Emgu.LiteRT.LM.Agents
                 if (groupTools.Count == 0)
                     continue;
                 if (_active.Contains(group.Name))
+                {
+                    if (_calledStubs.Contains(group.Name))
+                        tools.Add(UsedStub(group, groupTools));
                     tools.AddRange(groupTools);
+                }
                 else
                     tools.Add(Stub(group));
             }
@@ -239,9 +268,22 @@ namespace Emgu.LiteRT.LM.Agents
                 "Call this first to " + group.Summary + ": it gives you the tools for that, which you then call to do it.");
         }
 
+        // The stub of a group in use since the model called it: still declared, since the conversation's history calls it.
+        private AIFunction UsedStub(ToolGroup group, IList<AITool> tools)
+        {
+            return AIFunctionFactory.Create(() => AlreadyThere(group, tools), group.StubName,
+                "Already called: you have its tools (" + string.Join(", ", tools.Select(t => t.Name)) + "). Call those directly.");
+        }
+
+        private static string AlreadyThere(ToolGroup group, IList<AITool> tools) =>
+            "You already have the tools to " + group.Summary + ": " + string.Join(", ", tools.Select(t => t.Name)) + ". Call the right one directly.";
+
         private string UseGroup(ToolGroup group)
         {
-            _active.Add(group.Name);
+            List<AITool> tools = group.CreateTools().ToList();
+            // Called again in the same request (the stub stays declared): the tools are there already.
+            if (!_active.Add(group.Name))
+                return AlreadyThere(group, tools);
             GroupRequested?.Invoke(group.Name);
             if (_endRequest != null && group.RerunAfterStub)
             {
@@ -249,15 +291,13 @@ namespace Emgu.LiteRT.LM.Agents
                 _endRequest();
                 return "The tools are ready.";
             }
+            // The stub stays declared (its call is now in the history: see Tools); the group's tools join it.
+            _calledStubs.Add(group.Name);
             ChatOptions options = _currentOptions?.Invoke();
-            List<AITool> tools = group.CreateTools().ToList();
             if (options == null)
                 return "The tools to " + group.Summary + " can be used from the user's next message: ask them to say it again.";
             if (options.Tools == null)
                 options.Tools = new List<AITool>();
-            for (int i = options.Tools.Count - 1; i >= 0; i--)
-                if (options.Tools[i].Name == group.StubName)
-                    options.Tools.RemoveAt(i);
             foreach (AITool tool in tools)
                 options.Tools.Add(tool);
             string instructions = group.Instructions?.Invoke();

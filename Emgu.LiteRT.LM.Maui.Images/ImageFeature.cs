@@ -147,9 +147,13 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     /// <inheritdoc/>
     public override IEnumerable<ToolGroup> ToolGroups() => new[]
     {
+        // The stub ends the request and the message is sent again with the tools (rerunAfterStub): continuing after the
+        // stub, Gemma 4 E2B mostly ended its reply at once instead of calling generate_image (2026-11-04, an iPad Air and a
+        // Mac; the model's choice, found with every size of request from 1,100 to 2,600 tokens and with or without
+        // thinking and constrained decoding), while sent again with generate_image declared it drew every time.
         new ToolGroup(ChatImageGeneration.GroupName, ChatImageGeneration.GroupSummary, ChatImageGeneration.GroupKeywords,
             () => new AITool[] { AgentTools.GenerateImage(GenerateAsync) },
-            () => ChatImageGeneration.Instructions)
+            () => ChatImageGeneration.Instructions, rerunAfterStub: true)
     };
 
     // iOS backs up the app's Library/Application Support (where the image models keep their 4-21 GB) to iCloud unless

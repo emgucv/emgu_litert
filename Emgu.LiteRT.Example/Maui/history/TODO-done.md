@@ -983,6 +983,22 @@ on a phone's 4k window failed every message (phones now get 8k for Gemma 4, item
       is a stub tool (`use_camera`...) plus one line of instructions listing them: calling it adds the group's tools and
       instructions to the same request (`FunctionInvokingChatClient.CurrentContext.Options`, re-read each round), so a
       request the keywords miss still works in one message.
+- [x] 2026-11-04: on the iPad Air, "Generate a photo of a Shiba Inu dancing on the beach" (no image keyword, so
+      `use_image_generation`) failed every time with "The model stopped before answering or completing the tools":
+      found by driving the real chat page from a self-test and logging the client's rounds - round 2, the conversation
+      rebuilt with the image tools, decoded one token. Two causes, found with a Mac test of the same flow (Gemma 4 E2B
+      on Metal, the demo's instructions, the image group behind its stub, `ZzStubRepro`, not kept):
+      1. The stub was removed from the request's tools when it added its group, so the rebuilt history called a tool
+         no longer declared, and the model ended its reply at once (7 failures in 8 at 940 tokens; none with the stub
+         kept). A called stub now stays declared for the rest of the conversation (`ToolRouter.CalledStubs`, kept by
+         `ChatSkillSet` through a router rebuild; calling it again answers that the tools are there).
+      2. Even with the stub declared, continuing after it at the demo's size (1,100-2,600 input tokens) the model mostly
+         ended its reply at once instead of calling `generate_image` - with thinking on or off, constrained decoding on
+         or off, and not by size (2,800 tokens of padding text worked, 1,900 didn't): the model's choice given that
+         shape of history. Sent again with `generate_image` declared from the start (`rerunAfterStub`, the calendar
+         group's mode) it drew every time (3 of 3 on the Mac at the failing sizes, and on the iPad), so the image group
+         reruns now. The other continuing groups (camera, photos, documents...) keep continuing; the same shape could
+         fail them on this model, to watch. "generate/create/make a photo" are image keywords now too.
 - [x] What every message carries: 3,770 characters (core tools and instructions 2,376, 7 stubs 1,394) instead of
       ~15,400 with every group (the camera group alone 5,839). On the S10's GPU: "What is 12 times 7?" 22 s instead of
       48 s, goal messages 26-27 s instead of 44-46 s.

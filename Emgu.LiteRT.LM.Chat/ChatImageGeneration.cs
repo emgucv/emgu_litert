@@ -20,8 +20,8 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>The words of a message that need the group.</summary>
         public static readonly string[] GroupKeywords =
         {
-            "draw", "paint", "sketch", "illustrat", "generate an image", "generate a picture", "create an image",
-            "create a picture", "make an image", "make a picture", "imagine", "picture of a", "image of a", "artwork"
+            "draw", "paint", "sketch", "illustrat", "generate an image", "generate a picture", "generate a photo", "create an image",
+            "create a picture", "create a photo", "make an image", "make a picture", "make a photo", "imagine", "picture of a", "image of a", "artwork"
         };
 
         /// <summary>The instructions that come with the group.</summary>
