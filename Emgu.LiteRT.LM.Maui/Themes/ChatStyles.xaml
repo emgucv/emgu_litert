@@ -59,7 +59,7 @@
     <Style x:Key="ChatSendButtonStyle" TargetType="Button">
         <Setter Property="Text" Value="Send" />
         <Setter Property="FontFamily" Value="{StaticResource ChatTitleFont}" />
-        <Setter Property="BackgroundColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource ChatAccent}" />
         <Setter Property="TextColor" Value="White" />
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="CornerRadius" Value="18" />
@@ -72,7 +72,7 @@
         <Setter Property="Text" Value="Stop" />
         <Setter Property="FontFamily" Value="{StaticResource ChatTitleFont}" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ChatReplyBubbleLight}, Dark={StaticResource ChatReplyBubbleDark}}" />
-        <Setter Property="TextColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="TextColor" Value="{DynamicResource ChatAccent}" />
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="CornerRadius" Value="18" />
         <Setter Property="Padding" Value="18,0" />
@@ -93,7 +93,7 @@
         <Setter Property="Text" Value="+" />
         <Setter Property="FontSize" Value="22" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ChatReplyBubbleLight}, Dark={StaticResource ChatReplyBubbleDark}}" />
-        <Setter Property="TextColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="TextColor" Value="{DynamicResource ChatAccent}" />
         <Setter Property="CornerRadius" Value="18" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="WidthRequest" Value="36" />
@@ -106,7 +106,7 @@
         <Setter Property="Text" Value="&#x1F3A4;" />
         <Setter Property="FontSize" Value="17" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ChatReplyBubbleLight}, Dark={StaticResource ChatReplyBubbleDark}}" />
-        <Setter Property="TextColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="TextColor" Value="{DynamicResource ChatAccent}" />
         <Setter Property="CornerRadius" Value="18" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="WidthRequest" Value="36" />
@@ -131,7 +131,7 @@
         <Setter Property="FontFamily" Value="{StaticResource ChatTitleFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ChatSurfaceLight}, Dark={StaticResource ChatSurfaceDark}}" />
-        <Setter Property="TextColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="TextColor" Value="{DynamicResource ChatAccent}" />
         <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource ChatRowBorderLight}, Dark={StaticResource ChatRowBorderDark}}" />
         <Setter Property="BorderWidth" Value="1" />
         <Setter Property="CornerRadius" Value="18" />
@@ -175,9 +175,9 @@
     <Style x:Key="ChatChipOnStyle" TargetType="Button">
         <Setter Property="FontFamily" Value="{StaticResource ChatTitleFont}" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="BackgroundColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource ChatAccent}" />
         <Setter Property="TextColor" Value="White" />
-        <Setter Property="BorderColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="BorderColor" Value="{DynamicResource ChatAccent}" />
         <Setter Property="BorderWidth" Value="1" />
         <Setter Property="CornerRadius" Value="15" />
         <!-- At least 30 high, taller and on two lines when the text is large (the largest sizes cut the settings' choices off). -->
@@ -203,7 +203,7 @@
         <Setter Property="FontFamily" Value="{StaticResource ChatTitleFont}" />
         <Setter Property="FontSize" Value="17" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ChatReplyBubbleLight}, Dark={StaticResource ChatReplyBubbleDark}}" />
-        <Setter Property="TextColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="TextColor" Value="{DynamicResource ChatAccent}" />
         <Setter Property="CornerRadius" Value="14" />
         <Setter Property="HeightRequest" Value="52" />
     </Style>
@@ -233,7 +233,7 @@
     <Style x:Key="ChatLinkStyle" TargetType="Label">
         <Setter Property="FontFamily" Value="{StaticResource ChatTitleFont}" />
         <Setter Property="FontSize" Value="14" />
-        <Setter Property="TextColor" Value="{StaticResource ChatAccent}" />
+        <Setter Property="TextColor" Value="{DynamicResource ChatAccent}" />
         <Setter Property="Padding" Value="0,4" />
         <Setter Property="HorizontalOptions" Value="Start" />
     </Style>
@@ -295,7 +295,7 @@
                     <VerticalStackLayout x:Name="PART_Transcript" Spacing="8" />
                 </VerticalStackLayout>
             </ScrollView>
-            <Label x:Name="PART_Status" Grid.Row="1" FontSize="13" Margin="6,0" FontFamily="{StaticResource ChatBodyFont}" TextColor="{StaticResource ChatAccent}" />
+            <Label x:Name="PART_Status" Grid.Row="1" FontSize="13" Margin="6,0" FontFamily="{StaticResource ChatBodyFont}" TextColor="{DynamicResource ChatAccent}" />
             <ContentView x:Name="PART_Toolbar" Grid.Row="2" IsVisible="False" />
             <Border Grid.Row="3" Padding="10,6" StrokeThickness="1"
                     Stroke="{AppThemeBinding Light={StaticResource ChatRowBorderLight}, Dark={StaticResource ChatRowBorderDark}}"
@@ -346,7 +346,7 @@
                         <!-- The features' overlays (a camera preview, a monitor panel) over the chat area. -->
                         <Grid x:Name="PART_Overlay" InputTransparent="True" CascadeInputTransparent="False" />
                     </Grid>
-                    <Label x:Name="PART_Status" Grid.Row="1" FontSize="13" Margin="18,0,18,8" IsVisible="False" FontFamily="{StaticResource ChatBodyFont}" TextColor="{StaticResource ChatAccent}" />
+                    <Label x:Name="PART_Status" Grid.Row="1" FontSize="13" Margin="18,0,18,8" IsVisible="False" FontFamily="{StaticResource ChatBodyFont}" TextColor="{DynamicResource ChatAccent}" />
                 </Grid>
                 <Border x:Name="PART_SidePanel" Grid.Column="1" WidthRequest="300" IsVisible="False" Margin="0,0,12,12" Padding="16,12" StrokeThickness="0"
                         BackgroundColor="{AppThemeBinding Light={StaticResource ChatSurfaceLight}, Dark={StaticResource ChatSurfaceDark}}">
@@ -375,7 +375,7 @@
                        TextColor="{AppThemeBinding Light={StaticResource ChatPrimaryTextLight}, Dark={StaticResource ChatPrimaryTextDark}}" />
                 <Label x:Name="PART_Status" FontSize="14" FontFamily="{StaticResource ChatBodyFont}"
                        TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
-                <ProgressBar x:Name="PART_Progress" ProgressColor="{StaticResource ChatAccent}" />
+                <ProgressBar x:Name="PART_Progress" ProgressColor="{DynamicResource ChatAccent}" />
                 <Label x:Name="PART_Note" FontSize="13" FontFamily="{StaticResource ChatBodyFont}" TextColor="{StaticResource ChatDanger}" />
                 <HorizontalStackLayout Spacing="8">
                     <Button x:Name="PART_Download" Text="Download" Style="{StaticResource ChatSendButtonStyle}" />
@@ -410,7 +410,7 @@
                    HorizontalTextAlignment="End" MaximumWidthRequest="420" FontSize="13" FontAttributes="Italic" FontFamily="{StaticResource ChatBodyFont}"
                    TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
             <Border HorizontalOptions="End" MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0" IsVisible="{Binding HasText}"
-                    BackgroundColor="{StaticResource ChatAccent}">
+                    BackgroundColor="{DynamicResource ChatAccent}">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="18" />
                 </Border.StrokeShape>

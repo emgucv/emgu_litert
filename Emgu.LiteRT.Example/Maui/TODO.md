@@ -104,11 +104,8 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Contrast of the other colours under WCAG's 4.5:1 for text (2026-11-05): the accent #3D7BF7 as text 3.4-3.9 on the
-      light surfaces and 3.7-4.8 on the dark ones (header buttons, links, chip text) and white on it 3.9 (fine for the
-      bold Send, not for 13 pt text); ChatSuccess #2BA84A on white 3.1 (prices, "✓ Added"); ChatDanger #D93B3B on the
-      dark surface 3.7. The accent is the brand colour, so the user's call: a darker light-mode accent (~#2563EB, 5.2 on
-      white) with the current one kept for dark mode would need ChatAccent as a Light/Dark pair.
+- [ ] Contrast of the status colours under WCAG's 4.5:1 for text: ChatSuccess #2BA84A on white 3.1 (prices, "✓ Added");
+      ChatDanger #D93B3B on the dark surface 3.7. The dark mode's accent #3D7BF7 is 3.7-4.8 as text on the dark surfaces.
 
 ## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst
 

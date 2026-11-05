@@ -44,7 +44,7 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>The colour of links.</summary>
         public static readonly BindableProperty LinkColorProperty = BindableProperty.Create(
-            nameof(LinkColor), typeof(Color), typeof(ReplyView), Color.FromArgb("#3D7BF7"), propertyChanged: Restyle);
+            nameof(LinkColor), typeof(Color), typeof(ReplyView), Color.FromArgb("#2563EB"), propertyChanged: Restyle);
 
         /// <summary>The colour of quotes and rules.</summary>
         public static readonly BindableProperty SecondaryTextColorProperty = BindableProperty.Create(

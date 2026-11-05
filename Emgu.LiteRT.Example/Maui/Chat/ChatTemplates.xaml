@@ -46,7 +46,7 @@
             <Label Text="{Binding Transcript, StringFormat='&#x201C;{0}&#x201D;'}" IsVisible="{Binding HasTranscript}"
                    FontFamily="InterRegular" FontSize="14" FontAttributes="Italic" TextColor="#656B81"
                    HorizontalOptions="End" HorizontalTextAlignment="End" MaximumWidthRequest="420" />
-            <Border HorizontalOptions="End" MaximumWidthRequest="420" Padding="12,9" Stroke="Transparent" BackgroundColor="#3D7BF7"
+            <Border HorizontalOptions="End" MaximumWidthRequest="420" Padding="12,9" Stroke="Transparent" BackgroundColor="#2563EB"
                     IsVisible="{Binding HasText}">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="18" />
@@ -116,7 +116,7 @@
                         </BoxView.IsVisible>
                     </BoxView>
                     <chat:ReplyView x:Name="Body" Text="{Binding Text}" IsVisible="{Binding HasAnswer}" FontFamily="InterRegular"
-                                    FontSize="15" TextColor="#1A1C2E" LinkColor="#3D7BF7" SecondaryTextColor="#656B81"
+                                    FontSize="15" TextColor="#1A1C2E" LinkColor="#2563EB" SecondaryTextColor="#656B81"
                                     QuoteMarkColor="#C2C7D6" />
                     <Label Text="…" IsVisible="{Binding IsInterrupted}" FontFamily="InterRegular" FontSize="15" TextColor="#656B81" />
                     <Label Text="{Binding Error, StringFormat='Error: {0}'}" IsVisible="{Binding IsFailed}" FontFamily="InterRegular"

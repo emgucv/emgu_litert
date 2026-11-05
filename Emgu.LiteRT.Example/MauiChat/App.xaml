@@ -19,7 +19,7 @@
 
             <Style x:Key="ChatSendButtonStyle" TargetType="Button">
                 <Setter Property="Text" Value="Ask" />
-                <Setter Property="BackgroundColor" Value="{StaticResource ChatAccent}" />
+                <Setter Property="BackgroundColor" Value="{DynamicResource ChatAccent}" />
                 <Setter Property="TextColor" Value="White" />
                 <Setter Property="FontAttributes" Value="Bold" />
                 <Setter Property="CornerRadius" Value="8" />
@@ -31,7 +31,7 @@
             <!-- The user's messages: a green, square-cornered bubble with "You" above it, and any images or audio. -->
             <DataTemplate x:Key="ChatUserMessageTemplate" x:DataType="lm:ChatMessageItem">
                 <VerticalStackLayout Spacing="2" HorizontalOptions="End">
-                    <Label Text="You" FontSize="12" TextColor="{StaticResource ChatAccent}" HorizontalOptions="End" />
+                    <Label Text="You" FontSize="12" TextColor="{DynamicResource ChatAccent}" HorizontalOptions="End" />
                     <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Attachments}" Spacing="6" HorizontalOptions="End"
                                            IsVisible="{Binding HasAttachments}">
                         <BindableLayout.ItemTemplate>
@@ -40,7 +40,7 @@
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </HorizontalStackLayout>
-                    <Border MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0" BackgroundColor="{StaticResource ChatAccent}" IsVisible="{Binding HasText}">
+                    <Border MaximumWidthRequest="420" Padding="12,9" StrokeThickness="0" BackgroundColor="{DynamicResource ChatAccent}" IsVisible="{Binding HasText}">
                         <Border.StrokeShape>
                             <RoundRectangle CornerRadius="4" />
                         </Border.StrokeShape>

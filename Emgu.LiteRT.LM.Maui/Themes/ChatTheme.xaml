@@ -10,7 +10,11 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                     x:Class="Emgu.LiteRT.LM.Maui.ChatTheme">
 
-    <Color x:Key="ChatAccent">#3D7BF7</Color>
+    <!-- The accent follows the app's theme (ChatResources sets ChatAccent from the pair, unless the app defines its own
+         ChatAccent): in light mode a darker blue, 5.2:1 with white and on white (WCAG AA); #3D7BF7 was 3.4-3.9 as text. -->
+    <Color x:Key="ChatAccent">#2563EB</Color>
+    <Color x:Key="ChatAccentLight">#2563EB</Color>
+    <Color x:Key="ChatAccentDark">#3D7BF7</Color>
     <Color x:Key="ChatDanger">#D93B3B</Color>
     <Color x:Key="ChatSuccess">#2BA84A</Color>
     <Color x:Key="ChatPrimaryTextLight">#1A1C2E</Color>

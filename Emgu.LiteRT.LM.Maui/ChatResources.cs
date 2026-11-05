@@ -40,14 +40,33 @@ namespace Emgu.LiteRT.LM.Maui
             if (appResources == null)
                 return;
             _themeMerged = true;
-            if (appResources.MergedDictionaries.OfType<ChatTheme>().Any())
+            _theme = appResources.MergedDictionaries.OfType<ChatTheme>().FirstOrDefault();
+            if (_theme == null)
+            {
+                _theme = new ChatTheme();
+                // Checked after the app's merged dictionaries (the last added is looked up first).
+                if (appResources.MergedDictionaries is IList<ResourceDictionary> list)
+                    list.Insert(0, _theme);
+                else
+                    appResources.MergedDictionaries.Add(_theme);
+            }
+            UpdateAccent();
+            Application.Current.RequestedThemeChanged += (s, e) => UpdateAccent();
+        }
+
+        private static ChatTheme _theme;
+
+        // The theme's ChatAccent for the app's current theme, from "ChatAccentLight" / "ChatAccentDark" (the app's, if it
+        // defines them): a darker blue in light mode, for text that reads. An app's own ChatAccent is found before the
+        // theme's, so it is used in both. The styles take it as a DynamicResource and follow a switch; views built in code
+        // take the colour of the theme at the time.
+        private static void UpdateAccent()
+        {
+            if (_theme == null)
                 return;
-            ChatTheme theme = new ChatTheme();
-            // Checked after the app's merged dictionaries (the last added is looked up first).
-            if (appResources.MergedDictionaries is IList<ResourceDictionary> list)
-                list.Insert(0, theme);
-            else
-                appResources.MergedDictionaries.Add(theme);
+            Color accent = ThemeColor("ChatAccent");
+            if (accent != Colors.Transparent)
+                _theme["ChatAccent"] = accent;
         }
 
         /// <summary>A resource by key: the app's, else the built-in; null if neither has it.</summary>

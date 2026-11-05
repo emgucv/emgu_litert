@@ -552,6 +552,14 @@ the Windows share sheet opens and the shared ZIP holds chat.md. Import remains o
 - [x] Contrast of the secondary text (2026-11-05): the light theme's #8A8FA3 was 3.2:1 on white, 2.8 on the page and the
       reply bubble, under WCAG AA's 4.5:1; now #656B81 (the same blue-grey, darker): 5.3, 4.6 and 4.6 - in the chat's
       theme, `ReplyView`'s default, the demo's templates and `Theme`. The dark theme's #9AA0B4 was 5.5-7.1 already.
+- [x] The accent in light mode (2026-11-05, the user's choice): #3D7BF7 was 3.4-3.9:1 as text on the light surfaces and
+      3.9 under white text; now #2563EB, 5.2 either way. `ChatAccent` follows the app's theme: `ChatResources` sets it
+      from the new `ChatAccentLight` (#2563EB) / `ChatAccentDark` (#3D7BF7, unchanged) and again when the theme changes,
+      unless the app defines its own `ChatAccent` (then that, in both); the styles and the sample's `App.xaml` take it as
+      a `DynamicResource`, views built in code take the colour of the theme at the time. The demo (light only) has the
+      new blue in its `Theme`, templates and `ReplyView`'s link colour. Checked in the iPhone simulator: the demo; the
+      sample with its green in both themes; the sample without it, #3D7BF7 in dark mode and #2563EB after a live switch
+      to light.
 
 ## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst
 
