@@ -150,7 +150,9 @@
   <ItemGroup>
     <PackageReference Include="Emgu.CV.runtime.mini.windows" Version="4.12.0.5764" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
     <PackageReference Include="Emgu.CV.runtime.mini.macos" Version="4.12.0.5764" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
-    <PackageReference Include="Emgu.CV.runtime.mini.ubuntu-26.04-x64" Version="4.13.0.5924" Condition="$([MSBuild]::IsOSPlatform('linux'))" />
+    <PackageReference Include="Emgu.CV.runtime.mini.ubuntu-26.04-x64" Version="4.13.0.5924" Condition="$([MSBuild]::IsOSPlatform('linux')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'X64'" />
+    <!-- Linux arm64 (e.g. a Raspberry Pi on Debian): Emgu CV publishes no Ubuntu arm64 runtime for 4.13, only Debian trixie's. -->
+    <PackageReference Include="Emgu.CV.runtime.mini.debian-trixie-arm64" Version="4.13.0.5924" Condition="$([MSBuild]::IsOSPlatform('linux')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'Arm64'" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
     <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
     <PackageReference Include="SQLitePCLRaw.provider.sqlite3" Version="3.0.3" Condition="$([MSBuild]::IsOSPlatform('linux'))" />
