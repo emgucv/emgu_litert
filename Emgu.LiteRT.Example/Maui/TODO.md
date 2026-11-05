@@ -577,7 +577,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] Pixel Fold and Z Fold 3 (12 GB): Bonsai and FLUX.2-klein on the GPU (OpenCL) - does a 12 GB phone's GPU fit the FP32 graphs? - and FLUX.2-klein on the CPU.
 - [ ] Mac Catalyst through the UI (choose a model, draw, Stop during a picture, delete a model in Storage); not driven (no clicks on this Mac).
-- [ ] Windows: `libomniextern` isn't built there yet, so the demo offers Z-Image-Turbo only.
+- [ ] Bonsai on the Windows GPU, open: the first 512 load without the caches and the CPU 512 weren't timed; memory is ~5 GB (not beside a chat model on an 8 GB card): release the engine when idle or after a picture (the Z-Image way), or run one stage on the CPU (needs a patch exposing `Flux2ModelConfig`'s per-stage backends; measure the per-stage split first). FP16 was tried: noise (see `MODELS.md`).
 - [ ] Bonsai 512 on phones: on the Pixel Fold's GPU (2026-11-01) it loads in 159 s and draws in 201 s, but at 7.0 GB PSS (about 5 GB of GPU memory) Android closed the other apps and then killed the demo (in the background) before a second picture. To offer it on 12 GB phones: try with the demo in front, release the chat model while drawing, and limit it to phones with 12 GB or more.
 - [ ] Maybe: prune caches of an older copy of the model file (their names carry the file's time and size) when it is downloaded again.
 
