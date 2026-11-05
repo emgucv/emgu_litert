@@ -17,9 +17,9 @@ mkdir -p $OUT_DIR
 # The iOS slices built: Bazel config : xcframework slice folder : CFBundleSupportedPlatforms
 IOS_SLICES="ios_arm64:ios-arm64:iPhoneOS ios_sim_arm64:ios-arm64-simulator:iPhoneSimulator"
 
-# Every framework targets the same minimum iOS version as LiteRT-LM's own CLiteRTLM framework (LiteRT-LM's .bazelrc
-# sets 13.0, which the toolchain raises to 14.0).
-IOS_MINIMUM_OS=15.0
+# Every framework targets the minimum iOS version in cmake/ios_min_version.txt, which the managed projects'
+# SupportedOSPlatformVersion also uses (LiteRT-LM's .bazelrc sets 13.0, which the toolchain raises to 14.0).
+IOS_MINIMUM_OS="$(tr -d '[:space:]' < cmake/ios_min_version.txt)"
 
 # If Xcode is installed outside /Applications (e.g. on a separate volume), Bazel's sandbox won't use it by default.
 XCODE_DEVELOPER_DIR="$(xcode-select -p 2>/dev/null)"

@@ -2,7 +2,9 @@
 <Project>
   <PropertyGroup>
   	<TargetFrameworks>net${DOTNET_VERSION_MAJOR}.0-android</TargetFrameworks>
-	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-ios;net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFrameworks>
+	<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">$(TargetFrameworks);net${DOTNET_VERSION_MAJOR}.0-ios${IOS_TFM_VERSION};net${DOTNET_VERSION_MAJOR}.0-maccatalyst${IOS_TFM_VERSION}</TargetFrameworks>
+	<!-- From cmake/ios_min_version.txt, shared with the native iOS build. -->
+	<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">${EMGU_LITERT_IOS_MIN_VERSION}</SupportedOSPlatformVersion>
     ${MAUI_VERSION_MSBUILD}
   </PropertyGroup>
 </Project>

@@ -19,6 +19,8 @@ root="$(cd "$here/../../.." && pwd)"
 dest="${1:-$HOME/emgu_litert_catalyst}"
 shift || true
 cd "$root"
+# The Mac Catalyst TFM for the installed Xcode, as in the generated Directory.Build.props.
+tfm="net10.0-maccatalyst$(platforms/macos/apple_tfm_version.sh)"
 
 # The signing identity of MacCatalyst.Signing.props, if it is in the keychain.
 identity=""
@@ -34,14 +36,14 @@ fi
 
 if [ -n "$identity" ]; then
     echo "Signing with $identity (API keys kept in the keychain)."
-    dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false
+    dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f "$tfm" -c Debug -p:ValidateXcodeVersion=false
 else
     entitlements="$(mktemp -d)/empty.entitlements.plist"
     printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict/></plist>\n' > "$entitlements"
-    dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false \
+    dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f "$tfm" -c Debug -p:ValidateXcodeVersion=false \
         -p:CodesignKey=- -p:CodesignProvision= -p:CodesignEntitlements="$entitlements"
 fi
-src="$root/Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/Emgu LiteRT.app"
+src="$root/Emgu.LiteRT.Example/Maui/bin/Debug/$tfm/maccatalyst-arm64/Emgu LiteRT.app"
 app="$dest/Emgu LiteRT.app"
 mkdir -p "$dest"
 [ -e "$app" ] && mv "$app" "$app.old.$$" && rm -rf "$app.old.$$"

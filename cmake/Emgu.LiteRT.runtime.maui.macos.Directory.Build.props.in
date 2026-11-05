@@ -4,7 +4,7 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
   <PropertyGroup>
-    <TargetFramework>net${DOTNET_VERSION_MAJOR}.0-maccatalyst</TargetFramework>
+    <TargetFramework>net${DOTNET_VERSION_MAJOR}.0-maccatalyst${IOS_TFM_VERSION}</TargetFramework>
     <PackageId>${EMGU_LITERT_MAUI_MACOS_NUGET_ID}</PackageId>
 	<title>${EMGU_LITERT_MAUI_MACOS_NUGET_TITLE}</title>
     <version>${CPACK_PACKAGE_VERSION}</version>

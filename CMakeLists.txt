@@ -57,6 +57,25 @@ SET(CSC_TARGET_FRAMEWORK "" CACHE STRING "C# target framework")
 
 FIND_PACKAGE(CSharp REQUIRED)
 MESSAGE(STATUS "DOTNET_FOUND: ${DOTNET_FOUND}")
+
+# Minimum iOS version, shared by the native iOS and Mac Catalyst builds (platforms/ios/ios_frameworks.sh,
+# cmake_build_tflite_catalyst) and the managed projects' SupportedOSPlatformVersion, so they cannot drift apart.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ios_min_version.txt" EMGU_LITERT_IOS_MIN_VERSION LIMIT_COUNT 1)
+string(STRIP "${EMGU_LITERT_IOS_MIN_VERSION}" EMGU_LITERT_IOS_MIN_VERSION)
+
+# The bare net*-ios / net*-maccatalyst TFM binds to the newest iOS SDK in the installed .NET workload, which
+# requires the matching Xcode. Pick the TFM platform version that the installed Xcode can build (as Emgu CV does);
+# pass -DIOS_TFM_VERSION=... to override.
+IF(CMAKE_HOST_APPLE AND NOT DEFINED IOS_TFM_VERSION)
+  execute_process(
+    COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/platforms/macos/apple_tfm_version.sh"
+    OUTPUT_VARIABLE IOS_TFM_VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+ELSEIF(NOT DEFINED IOS_TFM_VERSION)
+  SET(IOS_TFM_VERSION "")
+ENDIF()
+MESSAGE(STATUS "iOS/MacCatalyst TFM platform version: '${IOS_TFM_VERSION}'; minimum iOS: ${EMGU_LITERT_IOS_MIN_VERSION}")
 INCLUDE (CheckPlatform)
 IF ( (IS_UBUNTU OR IS_DEBIAN) AND NOT (DOTNET_FOUND))
   MESSAGE(FATAL_ERROR "dotnet is required to build Emgu TF, please follow the instructions to install dotnet: https://dotnet.microsoft.com/download/dotnet")  
@@ -244,7 +263,7 @@ IF (HAVE_MAC_CATALYST_LITE_ARM64 OR HAVE_MAC_CATALYST_LITE_X86_64)
 ELSE()
   SET(HAVE_MAC_CATALYST_LITE OFF)
 ENDIF()
-CHECK_BINARY_EXIST("lib/Build/Emgu.LiteRT.runtime.maui.macos/AnyCPU/Release/net${DOTNET_VERSION_MAJOR}.0-maccatalyst" "Emgu.LiteRT.runtime.maui.macos.dll" HAVE_MAUI_MAC_LITE ${HAVE_MAC_CATALYST_LITE})
+CHECK_BINARY_EXIST("lib/Build/Emgu.LiteRT.runtime.maui.macos/AnyCPU/Release/net${DOTNET_VERSION_MAJOR}.0-maccatalyst${IOS_TFM_VERSION}" "Emgu.LiteRT.runtime.maui.macos.dll" HAVE_MAUI_MAC_LITE ${HAVE_MAC_CATALYST_LITE})
 
 
 CHECK_BINARY_EXIST("lib/runtimes/osx/native" "libtfliteextern.dylib" HAVE_OSX_LITE OFF)
@@ -877,7 +896,7 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # try to restore an iOS add-on package that was never built.
   SET(EMGU_LITERT_LM_MAUI_IOS_TFM "")
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/LiteRtLm.xcframework")
-    SET(EMGU_LITERT_LM_MAUI_IOS_TFM ";net${DOTNET_VERSION_MAJOR}.0-ios")
+    SET(EMGU_LITERT_LM_MAUI_IOS_TFM ";net${DOTNET_VERSION_MAJOR}.0-ios${IOS_TFM_VERSION}")
     SET(EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY "${EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY}
   	<ItemGroup>
       <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'\" Include=\"${EMGU_LITERT_LM_MAUI_IOS_NUGET_ID}\" Version=\"${EMGU_LITERT_LM_PACKAGE_VERSION}\">
@@ -888,7 +907,7 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # platforms/macos/bazel_build_tflite_macos darwin_arm64) the same way, with the maccatalyst TargetFramework.
   SET(EMGU_LITERT_LM_MAUI_MACCATALYST_TFM "")
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/liblitert-lm.dylib")
-    SET(EMGU_LITERT_LM_MAUI_MACCATALYST_TFM ";net${DOTNET_VERSION_MAJOR}.0-maccatalyst")
+    SET(EMGU_LITERT_LM_MAUI_MACCATALYST_TFM ";net${DOTNET_VERSION_MAJOR}.0-maccatalyst${IOS_TFM_VERSION}")
     SET(EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY "${EMGU_LITERT_LM_MAUI_NUGET_DEPENDENCY}
   	<ItemGroup>
       <PackageReference Condition=\"$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'\" Include=\"${EMGU_LITERT_LM_MAUI_MACOS_NUGET_ID}\" Version=\"${EMGU_LITERT_LM_PACKAGE_VERSION}\">

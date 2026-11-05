@@ -21,16 +21,15 @@ if [ "$ARCH" != "arm64" ] && [ "$ARCH" != "x86_64" ]; then
     echo "Unknown Mac Catalyst architecture '$ARCH'. Use one of: arm64, x86_64"
     exit 1
 fi
-# Same minimum version as the MAUI apps' SupportedOSPlatformVersion for maccatalyst.
-CATALYST_MIN_VERSION=15.0
-CATALYST_TARGET=$ARCH-apple-ios$CATALYST_MIN_VERSION-macabi
-
-JOB_COUNT=$(sysctl -n hw.ncpu)
-echo Building for $CATALYST_TARGET with $JOB_COUNT parallel jobs
 
 cd "$(dirname "$0")"
 cd ../../
 REPO_ROOT=$(pwd)
+# The minimum iOS version shared with the iOS builds and the MAUI projects.
+CATALYST_MIN_VERSION="$(tr -d '[:space:]' < cmake/ios_min_version.txt)"
+CATALYST_TARGET=$ARCH-apple-ios$CATALYST_MIN_VERSION-macabi
+JOB_COUNT=$(sysctl -n hw.ncpu)
+echo Building for $CATALYST_TARGET with $JOB_COUNT parallel jobs
 mkdir -p lib/ios
 
 BUILD_DIR=$REPO_ROOT/litertextern/tfliteextern/build_catalyst_$ARCH

@@ -187,16 +187,23 @@ jobs:
     - name: Generate the projects' Directory.Build.props
       # The projects take their target framework and package settings from files CMake generates.
       run: cmake -S . -B build
+    - name: Select the iOS TFM for the runner's Xcode
+      # The bare net10.0-ios binds to the workload's newest bindings, which need the matching Xcode; CMake puts the
+      # same version in the generated props (platforms/macos/apple_tfm_version.sh).
+      run: |
+        V="$(./platforms/macos/apple_tfm_version.sh)"
+        echo "Xcode: $(xcodebuild -version | head -1); TFM platform version: '$V'"
+        echo "IOS_TFM=net10.0-ios$V" >> "$GITHUB_ENV"
     - name: Build the MAUI demo for the iOS simulator
       # ValidateXcodeVersion=false: the runner's Xcode needn't be the exact version the .NET iOS SDK pack names.
       run: >
-        dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug
+        dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f "$IOS_TFM" -c Debug
         -p:RuntimeIdentifier=iossimulator-arm64 -p:ValidateXcodeVersion=false
     - name: Check the app bundle's frameworks
       # Each framework must be embedded, be a simulator binary, and find the frameworks it links in the app's
       # Frameworks folder.
       run: |
-        APP=$(ls -d Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios/iossimulator-arm64/*.app)
+        APP=$(ls -d Emgu.LiteRT.Example/Maui/bin/Debug/$IOS_TFM/iossimulator-arm64/*.app)
         echo "$APP"
         ls "$APP/Frameworks"
         for NAME in LiteRt tfliteextern LiteRtLm GemmaModelConstraintProvider; do

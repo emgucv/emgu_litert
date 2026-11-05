@@ -32,7 +32,7 @@ As for the MAUI demo (`../Maui/README.md`): build the platform's native librarie
 
 ```bash
 dotnet build Emgu.LiteRT.Example/MauiChat/MauiChat.csproj -f net10.0-android
-dotnet build Emgu.LiteRT.Example/MauiChat/MauiChat.csproj -f net10.0-maccatalyst -p:ValidateXcodeVersion=false
+dotnet build Emgu.LiteRT.Example/MauiChat/MauiChat.csproj -f net10.0-maccatalyst$(platforms/macos/apple_tfm_version.sh) -p:ValidateXcodeVersion=false
 ```
 
 The chats are kept in `MauiChat/chats` in the app's data folder: on Mac Catalyst that folder is `~/Library`, where the

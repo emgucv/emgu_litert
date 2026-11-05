@@ -31,7 +31,10 @@ REPO = os.path.dirname(os.path.dirname(DEMO))
 CACHE = os.path.join(HERE, ".license_cache")
 NUGET = os.path.expanduser("~/.nuget/packages")
 OUTPUT = os.path.join(DEMO, "Resources", "Raw", "licenses.json.gz")
-FRAMEWORKS = ["net10.0-android", "net10.0-ios", "net10.0-maccatalyst"]
+# The iOS / Mac Catalyst TFMs carry the platform version the installed Xcode builds (as in the generated props).
+APPLE_TFM = subprocess.run([os.path.join(REPO, "platforms", "macos", "apple_tfm_version.sh")], capture_output=True,
+                           text=True).stdout.strip() if sys.platform == "darwin" else ""
+FRAMEWORKS = ["net10.0-android", "net10.0-ios" + APPLE_TFM, "net10.0-maccatalyst" + APPLE_TFM]
 
 texts = {}
 entries = []

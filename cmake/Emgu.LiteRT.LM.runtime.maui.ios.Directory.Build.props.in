@@ -10,7 +10,7 @@
 
   <PropertyGroup>
 
-    <TargetFramework>net${DOTNET_VERSION_MAJOR}.0-ios</TargetFramework>
+    <TargetFramework>net${DOTNET_VERSION_MAJOR}.0-ios${IOS_TFM_VERSION}</TargetFramework>
 
     <PackageId>${EMGU_LITERT_LM_MAUI_IOS_NUGET_ID}</PackageId>
 

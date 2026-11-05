@@ -43,11 +43,19 @@ target frameworks") or after switching .NET SDKs.
 
 ## 4. Build and run
 
+On a Mac, the iOS and Mac Catalyst target frameworks carry the platform version the installed Xcode can build
+(`net10.0-ios26.0` with any Xcode 26.x, plain `net10.0-ios` with Xcode 27 or later): the same version CMake put in the
+generated `Directory.Build.props` (see `docs/native-builds.md`, "iOS and Mac Catalyst target frameworks"). Set it once:
+
+```bash
+V=$(platforms/macos/apple_tfm_version.sh)
+```
+
 ### Mac Catalyst
 
 ```bash
-dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false
-open "Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/Emgu LiteRT.app"
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst$V -c Debug -p:ValidateXcodeVersion=false
+open "Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-maccatalyst$V/maccatalyst-arm64/Emgu LiteRT.app"
 ```
 
 `-p:ValidateXcodeVersion=false` is needed when the .NET Mac Catalyst SDK pack doesn't match the installed Xcode
@@ -57,8 +65,8 @@ running its executable from a terminal) makes macOS ask for microphone access fo
 ### iOS simulator
 
 ```bash
-dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug -p:ValidateXcodeVersion=false -p:RuntimeIdentifier=iossimulator-arm64
-xcrun simctl install booted Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios/iossimulator-arm64/Maui.Demo.Lite.app
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios$V -c Debug -p:ValidateXcodeVersion=false -p:RuntimeIdentifier=iossimulator-arm64
+xcrun simctl install booted Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios$V/iossimulator-arm64/Maui.Demo.Lite.app
 xcrun simctl launch booted com.emgu.litert
 ```
 
@@ -76,10 +84,10 @@ them). Verified on an iPad Air (M4, iPadOS 27.2):
 
 ```bash
 xcrun devicectl list devices                   # the device's identifier
-dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios -c Debug -p:RuntimeIdentifier=ios-arm64 \
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios$V -c Debug -p:RuntimeIdentifier=ios-arm64 \
   -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: <name> (<id>)" \
   -p:CodesignProvision="iOS Team Provisioning Profile: com.emgu.litert"
-xcrun devicectl device install app --device <identifier> Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios/ios-arm64/Maui.Demo.Lite.app
+xcrun devicectl device install app --device <identifier> Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios$V/ios-arm64/Maui.Demo.Lite.app
 xcrun devicectl device process launch --device <identifier> com.emgu.litert
 ```
 
@@ -318,7 +326,7 @@ See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HIS
   Obtain a Mac Catalyst development profile for `com.emgu.litert` using your Apple developer team, then build with:
 
   ```bash
-  dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst -c Debug -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: Your Name (CERTIFICATE_ID)" -p:CodesignProvision="PROFILE_UUID"
+  dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst$V -c Debug -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: Your Name (CERTIFICATE_ID)" -p:CodesignProvision="PROFILE_UUID"
   ```
 
   The project includes `Platforms/MacCatalyst/Keychain.entitlements.plist` when `CodesignProvision` is supplied; its Keychain
