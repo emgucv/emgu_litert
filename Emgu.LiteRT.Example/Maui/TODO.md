@@ -192,7 +192,17 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       worked. Not a problem: the meeting card's button is "Stop and write notes" (the search for "Stop" found the
       chat's), and the "Translate to" row shows only while the thinking is expanded (then found and tapped by name).
       The image, photo and video tiles stay one element each (a picture to tap, nothing inside).
-- [ ] Large text: check the chat, settings and sheets with the largest font sizes on Android and iOS.
+- [x] Large text on iOS (2026-11-05, the iPhone 17e simulator - the narrowest phone - at the default size, the largest
+      standard size and the largest accessibility size, driven through WebDriverAgent): the chat, its reply and thinking,
+      Settings to the end, the model list, the chats sheet and the home page. Fixed: the chat header's model button ran
+      under Chats on a narrow phone at any size (a stack never shortened it; now a Grid, and when its name doesn't fit
+      beside the buttons it goes on a second header row - `ChatPage.UpdateHeaderRows`; one row in landscape and on wider
+      screens); the header's buttons keep their size, as iOS's own bars do (at the largest sizes they ran off the screen);
+      the settings' action buttons ("Apply and reload models"), the option chips and the demo's buttons wrap and grow
+      rather than cutting their text off; the embedding and image model buttons wrap the model's name; the home page's
+      tabs wrap onto a second line, and its 28 pt title keeps its size (it broke mid-word). Placeholders in the API key
+      fields stay small (iOS's own); Android not checked.
+- [ ] Large text on Android (the font scale at 200%).
 - [ ] Contrast of the secondary text in light and dark mode.
 
 ## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst

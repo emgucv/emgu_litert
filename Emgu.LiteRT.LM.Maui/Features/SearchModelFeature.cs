@@ -191,7 +191,8 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
         var title = new Label { Text = Title };
         ChatResources.ApplyStyle(title, "ChatSectionTextStyle");
         // A button with the model's whole name, and a list of the names (a picker's wheel cuts long names off on a Mac).
-        _button = new Button { HorizontalOptions = LayoutOptions.Fill };
+        // The model's name wraps rather than being cut at the edge (large text on a phone).
+        _button = new Button { HorizontalOptions = LayoutOptions.Fill, LineBreakMode = LineBreakMode.WordWrap };
         _button.Clicked += OnChooseClicked;
         SemanticProperties.SetDescription(_button, "Choose the model document, photo and past-chat search use");
         _detail = ChatPage.Note(string.Empty);

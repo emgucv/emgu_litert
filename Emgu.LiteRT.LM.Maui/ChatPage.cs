@@ -195,6 +195,7 @@ namespace Emgu.LiteRT.LM.Maui
             FlushOverlays();
             if (_modelButton != null)
                 _modelButton.IsVisible = _options.ShowModelPicker;
+            HookHeaderRows();
             if (_chatsButton != null)
                 _chatsButton.IsVisible = _options.History != null;
             SemanticProperties.SetDescription(_modelButton, "Choose the model");
@@ -303,6 +304,64 @@ namespace Emgu.LiteRT.LM.Maui
         }
 
         // Wide: the chats, the models and the settings sit in the side panel; narrow: they open in sheets.
+        // The model button beside the header's buttons, or on a row of its own under them when its name doesn't fit there:
+        // on a narrow phone it was shortened to "Qw…", and at the largest text sizes to nothing. Only for the template's
+        // own layout - the model button in a Grid inside the header's two-row Grid; another template keeps its own.
+        private Grid _headerGrid, _headerStart;
+        private int _modelColumn;
+        private bool _modelOnOwnRow;
+
+        private void HookHeaderRows()
+        {
+            _headerStart = _modelButton?.Parent as Grid;
+            _headerGrid = _headerStart?.Parent as Grid;
+            if (_headerGrid == null || _headerGrid.RowDefinitions.Count < 2)
+            {
+                _headerStart = _headerGrid = null;
+                return;
+            }
+            _modelColumn = Grid.GetColumn(_modelButton);
+            _headerGrid.SizeChanged += (s, e) => UpdateHeaderRows();
+            _modelButton.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == Button.TextProperty.PropertyName || e.PropertyName == VisualElement.IsVisibleProperty.PropertyName)
+                    UpdateHeaderRows();
+            };
+        }
+
+        private void UpdateHeaderRows()
+        {
+            if (_headerGrid == null || _headerGrid.Width <= 0)
+                return;
+            static double WidthOf(View view) => ((IView)view).Measure(double.PositiveInfinity, double.PositiveInfinity).Width + view.Margin.HorizontalThickness;
+            // The room left beside the other parts of the header, and what the model's name needs.
+            double room = _headerGrid.Width - _headerGrid.Padding.HorizontalThickness;
+            foreach (IView child in _headerGrid.Children)
+                if (child is View view && view != _headerStart && view != _modelButton && view.IsVisible)
+                    room -= WidthOf(view) + _headerGrid.ColumnSpacing;
+            foreach (IView child in _headerStart.Children)
+                if (child is View view && view != _modelButton && view.IsVisible)
+                    room -= WidthOf(view);
+            bool ownRow = _modelButton.IsVisible && ((IView)_modelButton).Measure(double.PositiveInfinity, double.PositiveInfinity).Width > room;
+            if (ownRow == _modelOnOwnRow)
+                return;
+            _modelOnOwnRow = ownRow;
+            if (ownRow)
+            {
+                _headerStart.Remove(_modelButton);
+                _modelButton.Margin = new Thickness(0, 6, 0, 0);
+                _headerGrid.Add(_modelButton, 0, 1);
+                Grid.SetColumnSpan(_modelButton, _headerGrid.ColumnDefinitions.Count);
+            }
+            else
+            {
+                _headerGrid.Remove(_modelButton);
+                _modelButton.Margin = new Thickness(0);
+                Grid.SetColumnSpan(_modelButton, 1);
+                _headerStart.Add(_modelButton, _modelColumn, 0);
+            }
+        }
+
         private void ApplyLayout(bool wide)
         {
             if (_sidePanel != null)

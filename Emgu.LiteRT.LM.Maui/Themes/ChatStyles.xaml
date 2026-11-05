@@ -76,7 +76,9 @@
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="CornerRadius" Value="18" />
         <Setter Property="Padding" Value="18,0" />
-        <Setter Property="HeightRequest" Value="36" />
+        <!-- Also the settings' action buttons ("Apply and reload models"): taller and on two lines when the text is large. -->
+        <Setter Property="MinimumHeightRequest" Value="36" />
+        <Setter Property="LineBreakMode" Value="WordWrap" />
         <Setter Property="VerticalOptions" Value="End" />
     </Style>
 
@@ -136,6 +138,8 @@
         <Setter Property="Padding" Value="14,0" />
         <Setter Property="HeightRequest" Value="36" />
         <Setter Property="VerticalOptions" Value="Center" />
+        <!-- A bar's buttons keep their size, as iOS's own bars do: at the largest text sizes they ran off a phone's screen. -->
+        <Setter Property="FontAutoScalingEnabled" Value="False" />
     </Style>
 
     <Style x:Key="ChatModelButtonStyle" TargetType="Button">
@@ -147,7 +151,7 @@
         <Setter Property="BorderWidth" Value="1" />
         <Setter Property="CornerRadius" Value="18" />
         <Setter Property="Padding" Value="14,0" />
-        <Setter Property="HeightRequest" Value="36" />
+        <Setter Property="MinimumHeightRequest" Value="36" />
         <Setter Property="HorizontalOptions" Value="Start" />
         <Setter Property="VerticalOptions" Value="Center" />
         <Setter Property="LineBreakMode" Value="TailTruncation" />
@@ -162,9 +166,10 @@
         <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource ChatRowBorderLight}, Dark={StaticResource ChatRowBorderDark}}" />
         <Setter Property="BorderWidth" Value="1" />
         <Setter Property="CornerRadius" Value="15" />
-        <Setter Property="Padding" Value="12,0" />
-        <Setter Property="HeightRequest" Value="30" />
+        <!-- At least 30 high, taller and on two lines when the text is large (the largest sizes cut the settings' choices off). -->
+        <Setter Property="Padding" Value="12,4" />
         <Setter Property="MinimumHeightRequest" Value="30" />
+        <Setter Property="LineBreakMode" Value="WordWrap" />
     </Style>
 
     <Style x:Key="ChatChipOnStyle" TargetType="Button">
@@ -175,9 +180,10 @@
         <Setter Property="BorderColor" Value="{StaticResource ChatAccent}" />
         <Setter Property="BorderWidth" Value="1" />
         <Setter Property="CornerRadius" Value="15" />
-        <Setter Property="Padding" Value="12,0" />
-        <Setter Property="HeightRequest" Value="30" />
+        <!-- At least 30 high, taller and on two lines when the text is large (the largest sizes cut the settings' choices off). -->
+        <Setter Property="Padding" Value="12,4" />
         <Setter Property="MinimumHeightRequest" Value="30" />
+        <Setter Property="LineBreakMode" Value="WordWrap" />
     </Style>
 
     <!-- A BottomSheet: its card, title and closing button. -->
@@ -318,13 +324,17 @@
     <!-- ChatPage: a header, the chat (with its status line), a side panel on wide screens, and the bottom sheet over all. -->
     <ControlTemplate x:Key="ChatPageTemplate">
         <Grid RowDefinitions="Auto,*">
-            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8" Padding="12,8,12,4">
-                <HorizontalStackLayout Spacing="10">
-                    <Button x:Name="PART_Back" Text="‹" FontSize="22" IsVisible="False" WidthRequest="36" Padding="0" />
-                    <Label x:Name="PART_Title" FontFamily="{StaticResource ChatTitleFont}" FontSize="20" FontAttributes="Bold" VerticalOptions="Center" IsVisible="False"
+            <!-- The second row: the model button, when its name doesn't fit beside the buttons (a phone; ChatPage moves it). -->
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" Padding="12,8,12,4">
+                <!-- A Grid, not a stack: the model button gets the width the other buttons leave, and shortens its name to
+                     fit (a stack let it run under Chats on a narrow phone). The margins space only the parts shown. -->
+                <Grid ColumnDefinitions="Auto,Auto,*">
+                    <Button x:Name="PART_Back" Text="‹" FontSize="22" IsVisible="False" WidthRequest="36" Padding="0" Margin="0,0,10,0" />
+                    <Label x:Name="PART_Title" Grid.Column="1" FontFamily="{StaticResource ChatTitleFont}" FontSize="20" FontAttributes="Bold" VerticalOptions="Center" IsVisible="False"
+                           LineBreakMode="TailTruncation" Margin="0,0,10,0"
                            TextColor="{AppThemeBinding Light={StaticResource ChatPrimaryTextLight}, Dark={StaticResource ChatPrimaryTextDark}}" />
-                    <Button x:Name="PART_Model" />
-                </HorizontalStackLayout>
+                    <Button x:Name="PART_Model" Grid.Column="2" />
+                </Grid>
                 <Button x:Name="PART_Chats" Grid.Column="1" Text="Chats" />
                 <Button x:Name="PART_NewChat" Grid.Column="2" Text="New" />
                 <Button x:Name="PART_Settings" Grid.Column="3" Text="Settings" />

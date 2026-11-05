@@ -81,8 +81,9 @@ public partial class MainPage : ContentPage
             }
         }
 
-        // The tab pills: the selected one filled with the accent colour. The last tab used is opened again.
-        var pills = new HorizontalStackLayout { Spacing = 12 };
+        // The tab pills: the selected one filled with the accent colour. The last tab used is opened again. They wrap onto
+        // a second line when they don't fit (the largest text sizes on a phone ran the second off the screen).
+        var pills = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Margin = new Thickness(0, 0, 0, -8) };
         var pillCards = new List<(Border Card, Label Label, Image Icon, string Glyph)>();
         void SelectTab(int index)
         {
@@ -111,6 +112,7 @@ public partial class MainPage : ContentPage
                 StrokeThickness = 1,
                 BackgroundColor = Theme.CardBackground,
                 Padding = new Thickness(18, 12),
+                Margin = new Thickness(0, 0, 12, 8),
                 Content = new HorizontalStackLayout { Spacing = 8, VerticalOptions = LayoutOptions.Center, Children = { icon, label } }
             };
             card.OnTap(() => SelectTab(index));
@@ -155,7 +157,8 @@ public partial class MainPage : ContentPage
             VerticalOptions = LayoutOptions.Center,
             Children =
             {
-                new Label { Text = "Emgu LiteRT", FontFamily = Theme.TitleFont, FontSize = 28, TextColor = Theme.PrimaryText },
+                // Already large: it keeps its size, as the largest text sizes broke it in the middle of a word on a phone.
+                new Label { Text = "Emgu LiteRT", FontFamily = Theme.TitleFont, FontSize = 28, TextColor = Theme.PrimaryText, FontAutoScalingEnabled = false },
                 new Label { Text = "On-device machine learning demos", FontFamily = Theme.BodyFont, FontSize = 15, TextColor = Theme.SecondaryText }
             }
         }, 1, 0);

@@ -229,7 +229,8 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             return new ContentView();
         var title = new Label { Text = "Image model" };
         ChatResources.ApplyStyle(title, "ChatSectionTextStyle");
-        _modelButton = new Button { Text = _option.Name, HorizontalOptions = LayoutOptions.Fill };
+        // The model's name wraps rather than being cut at the edge (large text on a phone).
+        _modelButton = new Button { Text = _option.Name, HorizontalOptions = LayoutOptions.Fill, LineBreakMode = LineBreakMode.WordWrap };
         _modelButton.Clicked += OnChooseModelClicked;
         SemanticProperties.SetDescription(_modelButton, "Choose the model that draws pictures");
         return new VerticalStackLayout { Spacing = 6, Children = { title, _modelButton } };
