@@ -40,8 +40,11 @@ namespace Emgu.LiteRT.LM.Maui
             Microsoft.Maui.Platform.KeyboardAutoManagerScroll.Connect();
         }
 
-        // How much of the page the keyboard covers, above the bottom safe area the page keeps clear anyway. None for the
-        // iPad's floating keyboard, which isn't docked at the bottom.
+        // How much of the page the keyboard covers, from the page's bottom: the bottom padding replaces the safe area the
+        // page otherwise keeps clear, it doesn't add to it. With the safe area taken off first, the chat ended that much
+        // too low - on an iPhone X (34 pt) the message box stayed half under the keyboard's Done bar: a 301 pt padding
+        // made the chat only 267 pt shorter (2026-11-05). None for the iPad's floating keyboard, which isn't docked at the
+        // bottom.
         private double KeyboardOverlap(CoreGraphics.CGRect keyboard)
         {
             if (Handler?.PlatformView is not UIView view || view.Window == null)
@@ -50,7 +53,7 @@ namespace Emgu.LiteRT.LM.Maui
             CoreGraphics.CGRect bounds = view.Bounds;
             if (frame.Height <= 0 || frame.Bottom < bounds.Bottom - 1)
                 return 0;
-            return Math.Max(0, bounds.Bottom - frame.Top - view.SafeAreaInsets.Bottom);
+            return Math.Max(0, bounds.Bottom - frame.Top);
         }
 
         private void SetKeyboardInset(double inset)
