@@ -45,8 +45,39 @@ cp -f litertextern/tfliteextern/tfliteextern.cc $WORKSPACE_DIR/tfliteextern/tfli
 cp -f litertextern/tfliteextern/tfliteextern.h $WORKSPACE_DIR/tfliteextern/tfliteextern.h
 cp -f litertextern/imgproc/imgproc.cc $WORKSPACE_DIR/tfliteextern/imgproc.cc
 cp -f litertextern/imgproc/imgproc.h $WORKSPACE_DIR/tfliteextern/imgproc.h
+# omniextern, our C API over LiteRT-LM's OmniEngine (omni/), staged the same way; its labels are LiteRT-LM's.
+mkdir -p $WORKSPACE_DIR/omniextern
+cp -f litertextern/omniextern/bazel/BUILD $WORKSPACE_DIR/omniextern/BUILD || exit 1
+cp -f litertextern/omniextern/omniextern.cc litertextern/omniextern/omniextern.h $WORKSPACE_DIR/omniextern/ || exit 1
+
+# liblitert-lm.so (LiteRT-LM's C API) needs LiteRT-LM's prebuilt libGemmaModelConstraintProvider.so and Dawn's
+# libwebgpu_dawn.so (Git LFS), deployed next to it. They only exist for arm64, so armhf gets no LiteRT-LM.
+BUILD_LITERT_LM=false
+if [ $SYSTEM_ARCH == "64" ]; then
+    BUILD_LITERT_LM=true
+    GEMMA_PREBUILT=prebuilt/linux_arm64/libGemmaModelConstraintProvider.so
+    DAWN_PREBUILT=prebuilt/linux_arm64/libwebgpu_dawn.so
+    for PREBUILT in $GEMMA_PREBUILT $DAWN_PREBUILT; do
+        if ! head -c 4 "$WORKSPACE_DIR/$PREBUILT" | grep -q ELF; then
+            echo "$WORKSPACE_DIR/$PREBUILT is not an ELF library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
+            exit 1
+        fi
+    done
+fi
 
 cd $WORKSPACE_DIR
+
+# --define=litert_runtime_link_mode=dynamic makes liblitert-lm.so and libomniextern.so link against the
+# libLiteRt.so built below; --platform_suffix keeps this build's outputs apart from it (see the Ubuntu script).
+if [ $BUILD_LITERT_LM == "true" ]; then
+    bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS --repo_env=CC=/usr/bin/clang --repo_env=CXX=/usr/bin/clang++ \
+        --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic "${@:1}" \
+        //c:litert-lm //omniextern:omniextern || exit 1
+    cp -f bazel-bin/c/liblitert-lm.so ../lib/$OUT_FOLDER/liblitert-lm.so || exit 1
+    cp -f bazel-bin/omniextern/libomniextern.so ../lib/$OUT_FOLDER/libomniextern.so || exit 1
+    cp -f $GEMMA_PREBUILT ../lib/$OUT_FOLDER/libGemmaModelConstraintProvider.so || exit 1
+    cp -f $DAWN_PREBUILT ../lib/$OUT_FOLDER/libwebgpu_dawn.so || exit 1
+fi
 
 # LiteRT-LM's .bazelrc auto-applies build:linux via --enable_platform_specific_config on this
 # host, but --config=linux is passed explicitly for clarity, same as the other platforms'
@@ -77,6 +108,13 @@ cd ..
 
 for LIB in libtfliteextern libLiteRt; do
     cp -f $WORKSPACE_DIR/bazel-bin/tfliteextern/$LIB.so lib/$OUT_FOLDER/$LIB.so
+done
+# Strip debug info; --strip-unneeded keeps the dynamic symbol table, so the exported functions are unaffected.
+for LIB in libLiteRt libtfliteextern liblitert-lm libomniextern; do
+    if [ -f lib/$OUT_FOLDER/$LIB.so ]; then
+        chmod u+w lib/$OUT_FOLDER/$LIB.so
+        strip --strip-unneeded lib/$OUT_FOLDER/$LIB.so || exit 1
+    fi
 done
 
 echo Files copied to lib/$OUT_FOLDER

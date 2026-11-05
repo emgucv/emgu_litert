@@ -1,6 +1,6 @@
 #!/bin/bash -v
 
-sudo apt-get install build-essential protobuf-compiler libopengl-dev libgdiplus clang \
+sudo apt-get install build-essential protobuf-compiler libopengl-dev libgdiplus clang git-lfs \
 	mono-runtime mono-complete
 	
 #	libmono-system-net-http4.0-cil libmono-system-io-compression4.0-cil \
