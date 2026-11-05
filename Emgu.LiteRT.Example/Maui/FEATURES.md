@@ -820,6 +820,14 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   by process ("extract the text", "measure", "calculate"...), the later steps worked from the earlier ones' 700-character
   results, and the answer had questions 10 and 11, half of 12 and called 13 and 14 "not found". After: the plan was "Solve
   question 10" ... "Solve question 14", and all five were answered correctly (24 minutes).
+- The chat before the request (2026-11-05): the plan and each step are requests of their own, which saw only the request,
+  so "plan the same trip but cheaper" had nothing to go on. They now get the earlier chat's latest messages - their text
+  only, not tool calls or thinking, at most 1,600 characters (about 400 tokens, which a phone's 8k window holds beside the
+  step prompts) - with the request; the planner is asked to name in each step what it is about, so the steps make sense
+  on their own. On the Mac with Gemma 4 E2B, after "Plan a weekend in Rome for two in May, staying at a hotel near the
+  Pantheon", the planned "Plan the same trip but cheaper." became steps such as "Search for current flight and hotel
+  prices to find cheaper accommodation options in Rome for two people in May", and the answer a cheaper Rome weekend
+  near the Pantheon (122 s).
 
 ## Research mode
 

@@ -1,6 +1,8 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+using System.Collections.Generic;
 using System.Linq;
 using Emgu.LiteRT.LM.Agents;
+using Microsoft.Extensions.AI;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
@@ -52,6 +54,49 @@ public class UnitTestTaskPlan
         Assert.That(prompt, Does.Not.Contain("Step 2:"));
         Assert.That(prompt, Does.Contain("Now do step 3: Write the list"));
         Assert.That(plan.StepPrompt("x", 0), Does.Not.Contain("Results of the earlier steps"));
+    }
+
+    // "Plan the same trip but cheaper" had no "same trip" to go on: the plan and its steps saw only the request.
+    [Test]
+    public void TheChatBeforeTheRequestIsGivenShortAndWithoutTools()
+    {
+        var messages = new List<ChatMessage>
+        {
+            new ChatMessage(ChatRole.System, "You are a helpful assistant."),
+            new ChatMessage(ChatRole.User, "Plan a weekend in Rome for two in May."),
+            new ChatMessage(ChatRole.Assistant, new List<AIContent> { new FunctionCallContent("1", "search_web", new Dictionary<string, object> { ["query"] = "Rome hotels" }) }),
+            new ChatMessage(ChatRole.Tool, new List<AIContent> { new FunctionResultContent("1", "Hotel Artemide, 240 EUR a night") }),
+            new ChatMessage(ChatRole.Assistant, "<think>They want a plan.</think>Day 1: the Colosseum. Stay at Hotel Artemide, 240 EUR a night."),
+            new ChatMessage(ChatRole.User, "Plan the same trip but cheaper."),
+        };
+        string earlier = TaskPlan.EarlierChatText(messages);
+        Assert.That(earlier, Is.EqualTo("User: Plan a weekend in Rome for two in May.\nAssistant: Day 1: the Colosseum. Stay at Hotel Artemide, 240 EUR a night."));
+        Assert.That(TaskPlan.EarlierChatText(new[] { new ChatMessage(ChatRole.User, "Plan a trip") }), Is.Null);
+        Assert.That(TaskPlan.EarlierChatText(null), Is.Null);
+
+        // The latest messages, each cut short and all of them capped.
+        var long_ = Enumerable.Range(1, 20).Select(i => new ChatMessage(i % 2 == 1 ? ChatRole.User : ChatRole.Assistant, "message " + i + " " + new string('x', 1000))).ToList();
+        long_.Add(new ChatMessage(ChatRole.User, "the request"));
+        string capped = TaskPlan.EarlierChatText(long_);
+        string[] lines = capped.Split('\n');
+        Assert.That(lines.Length, Is.LessThanOrEqualTo(TaskPlan.EarlierMessages));
+        Assert.That(capped.Length, Is.LessThanOrEqualTo(TaskPlan.EarlierChatLength + lines.Length));
+        Assert.That(lines.Last(), Does.StartWith("Assistant: message 20 "));
+        Assert.That(lines.All(l => l.Length <= "Assistant: ".Length + TaskPlan.EarlierMessageLength), Is.True);
+        Assert.That(capped, Does.Not.Contain("the request"));
+
+        // The planner names what a step is about; every step and the answer have the chat.
+        Assert.That(TaskPlan.PlanPrompt("Plan the same trip but cheaper", "tools", false, earlier),
+            Does.Contain("The chat before the request").And.Contain("Hotel Artemide").And.Contain("so it makes sense without the chat"));
+        Assert.That(TaskPlan.PlanPrompt("Plan a trip", "tools"), Does.Not.Contain("The chat before"));
+        Assert.That(TaskPlan.ResearchPlanPrompt("Is it cheaper in June?", null, earlier), Does.Contain("The chat before the question"));
+        var plan = new TaskPlan(new[] { "Find cheaper hotels in Rome", "Write the plan" }) { EarlierChat = earlier };
+        Assert.That(plan.StepPrompt("Plan the same trip but cheaper", 0), Does.Contain("Hotel Artemide"));
+        Assert.That(plan.FinalPrompt("Plan the same trip but cheaper"), Does.Contain("Hotel Artemide"));
+        var research = new TaskPlan(new[] { "Rome hotel prices in June" }, true) { EarlierChat = earlier };
+        Assert.That(research.StepPrompt("Is it cheaper in June?", 0), Does.Contain("Hotel Artemide"));
+        Assert.That(research.FinalPrompt("Is it cheaper in June?"), Does.Contain("Hotel Artemide"));
+        Assert.That(new TaskPlan(new[] { "a" }).StepPrompt("x", 0), Does.Not.Contain("The chat before"));
     }
 
     [Test]

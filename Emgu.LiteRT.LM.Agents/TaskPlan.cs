@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.AI;
 
 namespace Emgu.LiteRT.LM.Agents;
 
@@ -40,6 +41,56 @@ public sealed class TaskPlan
 
     // The request came with attachments (pictures, a page...), given again with every step and the final answer.
     public bool WithAttachments { get; set; }
+
+    // The chat before the request (EarlierChatText), or null: given to every step and the final answer, since a request
+    // can refer to it ("plan the same trip but cheaper").
+    public string EarlierChat { get; set; }
+
+    // How much of the chat before a request the plan and its steps are given: the latest messages, each cut to
+    // EarlierMessageLength characters, at most EarlierChatLength in all (about 400 tokens: a phone's 8k window holds the
+    // step prompts, 1-1.5k tokens with the tool definitions, and this).
+    public const int EarlierMessages = 6;
+    public const int EarlierMessageLength = 400;
+    public const int EarlierChatLength = 1600;
+
+    /// <summary>
+    /// The chat before the request, as "User: ..." and "Assistant: ..." lines, from the messages a request is sent with
+    /// (an earlier summary, the earlier messages, then the request itself, which is left out): only their text - not tool
+    /// calls, results or thinking - the latest <see cref="EarlierMessages"/>, each cut to <see cref="EarlierMessageLength"/>
+    /// characters and at most <see cref="EarlierChatLength"/> in all. Null when there is nothing before the request.
+    /// </summary>
+    /// <param name="messages">The messages, the request last</param>
+    public static string EarlierChatText(IEnumerable<ChatMessage> messages)
+    {
+        List<ChatMessage> all = (messages ?? Enumerable.Empty<ChatMessage>()).ToList();
+        if (all.Count > 0 && all[all.Count - 1].Role == ChatRole.User)
+            all.RemoveAt(all.Count - 1);
+        var lines = new List<string>();
+        int length = 0;
+        for (int i = all.Count - 1; i >= 0 && lines.Count < EarlierMessages; i--)
+        {
+            ChatMessage message = all[i];
+            if (message.Role != ChatRole.User && message.Role != ChatRole.Assistant)
+                continue;
+            string text = string.Concat(message.Contents.OfType<TextContent>().Select(t => t.Text));
+            text = Regex.Replace(Regex.Replace(text, @"<think>.*?(</think>|$)", " ", RegexOptions.Singleline), @"\s+", " ").Trim();
+            if (text.Length == 0 || text == "…")
+                continue;
+            if (text.Length > EarlierMessageLength)
+                text = text.Substring(0, EarlierMessageLength - 1).TrimEnd() + "…";
+            string line = (message.Role == ChatRole.User ? "User: " : "Assistant: ") + text;
+            if (lines.Count > 0 && length + line.Length > EarlierChatLength)
+                break;
+            lines.Insert(0, line);
+            length += line.Length;
+        }
+        return lines.Count == 0 ? null : string.Join("\n", lines);
+    }
+
+    // The earlier chat in a prompt: before the request, with what to make of it.
+    private static string EarlierChatSection(string earlierChat, string what) =>
+        string.IsNullOrEmpty(earlierChat) ? string.Empty
+            : "The chat before the " + what + " (the " + what + " may refer to it - \"the same trip\", \"that list\"):\n" + earlierChat + "\n\n";
 
     public sealed class Source
     {
@@ -119,7 +170,8 @@ public sealed class TaskPlan
     /// <summary>What the model is asked to break a question into sub-questions to research.</summary>
     /// <param name="question">The user's question</param>
     /// <param name="toolNames">The tools the research will have, or null</param>
-    public static string ResearchPlanPrompt(string question, IEnumerable<string> toolNames = null)
+    /// <param name="earlierChat">The chat before the question (<see cref="EarlierChatText"/>), or null</param>
+    public static string ResearchPlanPrompt(string question, IEnumerable<string> toolNames = null, string earlierChat = null)
     {
         var tools = new HashSet<string>(toolNames ?? Enumerable.Empty<string>());
         string direct = tools.Contains("get_stock_quote")
@@ -129,7 +181,10 @@ public sealed class TaskPlan
             "itself (\"What was Intel's closing price yesterday?\"), never how or where to find it - from 1 to " + MaxResearchSteps +
             ": 1 or 2 for a simple question (one price, one date, one fact), about 4 for a comparison (each item's " +
             "specifications, then price and availability, then what reviews say)." + direct + " Write them in the language of " +
-            "the question. Reply with only the numbered list, one line per sub-question, nothing else.\n\nQuestion: " + question;
+            "the question. " + (string.IsNullOrEmpty(earlierChat) ? string.Empty
+                : "Name in each sub-question what it is about, so it makes sense without the chat. ") +
+            "Reply with only the numbered list, one line per sub-question, nothing else.\n\n" +
+            EarlierChatSection(earlierChat, "question") + "Question: " + question;
     }
 
     private static readonly Regex ListLine = new Regex(@"^\s*(?:\d{1,2}\s*[.)]|[-*•])\s+(?<text>\S.*)$", RegexOptions.CultureInvariant);
@@ -178,7 +233,12 @@ public sealed class TaskPlan
     /// process ("read the page", "calculate") lost questions - a 12B model planning a five-question worksheet that way
     /// answered three.
     /// </summary>
-    public static string PlanPrompt(string request, string tools, bool attachments = false) =>
+    /// <param name="request">The request</param>
+    /// <param name="tools">The tools the steps will have, in words</param>
+    /// <param name="attachments">Whether the request came with attachments (sent with the prompt)</param>
+    /// <param name="earlierChat">The chat before the request (<see cref="EarlierChatText"/>), or null: a step names what it
+    /// is about, so "the same trip" becomes the trip</param>
+    public static string PlanPrompt(string request, string tools, bool attachments = false, string earlierChat = null) =>
         "You plan tasks for an assistant. Break the request below into 3 to 7 short steps, each one concrete action the " +
         "assistant can do with its tools (" + tools + ") or by writing, whose result the next steps or the answer need. " +
         "Put research and checks first, and last the step that produces what the user asked for (the document, the list, the " +
@@ -188,8 +248,10 @@ public sealed class TaskPlan
               "questions or exercises, make each step one of them, in their order (\"Solve question 10\"), up to " + MaxSteps +
               " steps, and nothing else. "
             : string.Empty) +
+        (string.IsNullOrEmpty(earlierChat) ? string.Empty
+            : "Name in each step what it is about (the trip, the dates, the budget...), so it makes sense without the chat. ") +
         "Write the steps in the language of the request. Reply with only the numbered list, one line per " +
-        "step, nothing else.\n\nRequest: " + request;
+        "step, nothing else.\n\n" + EarlierChatSection(earlierChat, "request") + "Request: " + request;
 
     /// <summary>The message for the step at this index (0-based): the task, the plan, the results so far and the step.</summary>
     public string StepPrompt(string request, int index)
@@ -198,6 +260,7 @@ public sealed class TaskPlan
             return ResearchStepPrompt(request, index);
         var text = new StringBuilder();
         text.AppendLine("You are carrying out a task one step at a time.");
+        text.Append(EarlierChatSection(EarlierChat, "task"));
         text.AppendLine("Task: " + request);
         text.AppendLine("Plan:");
         for (int i = 0; i < Steps.Count; i++)
@@ -224,6 +287,7 @@ public sealed class TaskPlan
     {
         var text = new StringBuilder();
         text.AppendLine("You are researching a question on the web, one part at a time.");
+        text.Append(EarlierChatSection(EarlierChat, "question"));
         text.AppendLine("Question: " + question);
         text.AppendLine("Parts:");
         for (int i = 0; i < Steps.Count; i++)
@@ -254,6 +318,7 @@ public sealed class TaskPlan
         if (Research)
             return ResearchFinalPrompt(request);
         var text = new StringBuilder();
+        text.Append(EarlierChatSection(EarlierChat, "request"));
         text.AppendLine("The user asked: " + request);
         text.AppendLine("These steps were carried out, with their results:");
         for (int i = 0; i < Steps.Count; i++)
@@ -273,6 +338,7 @@ public sealed class TaskPlan
     private string ResearchFinalPrompt(string question)
     {
         var text = new StringBuilder();
+        text.Append(EarlierChatSection(EarlierChat, "question"));
         text.AppendLine("The user asked: " + question);
         text.AppendLine("Notes from web research, part by part, with the numbers of the pages they came from:");
         for (int i = 0; i < Steps.Count; i++)

@@ -184,9 +184,12 @@ public sealed class TaskFeature : ChatFeature
                 yield break;
             }
             Host.SetStatus(_research ? "Planning the research..." : "Planning...");
+            // The chat before the request, for a request that refers to it ("plan the same trip but cheaper"): the plan and
+            // every step are requests of their own, which saw only the request.
+            string earlierChat = TaskPlan.EarlierChatText(messages);
             List<string> steps = _research
-                ? TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.ResearchPlanPrompt(_request, ToolNames(options)), 400), TaskPlan.MaxResearchSteps)
-                : TaskPlan.Parse(await PlanWithAttachmentsAsync(client, token));
+                ? TaskPlan.Parse(await Host.AskModelOnceAsync(TaskPlan.ResearchPlanPrompt(_request, ToolNames(options), earlierChat), 400), TaskPlan.MaxResearchSteps)
+                : TaskPlan.Parse(await PlanWithAttachmentsAsync(client, earlierChat, token));
             bool run = false;
             TaskPlan plan = null;
             TaskCard card = null;
@@ -195,7 +198,7 @@ public sealed class TaskFeature : ChatFeature
                 // A task's steps (and its final answer) all see the attachments: a step's result is short, and a later
                 // step that only had the earlier ones' results lost what the picture showed. Research gives them to the
                 // first part only (its parts are web searches).
-                plan = new TaskPlan(steps, _research) { ToolNames = ToolNames(options), WithAttachments = !_research && _attachments.Count > 0 };
+                plan = new TaskPlan(steps, _research) { ToolNames = ToolNames(options), WithAttachments = !_research && _attachments.Count > 0, EarlierChat = earlierChat };
                 _feature._taskPlan = plan;
                 var decision = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _feature._taskDecision = decision;
@@ -418,11 +421,11 @@ public sealed class TaskFeature : ChatFeature
 
         // The plan, asked once outside the conversation; with attachments the planner sees them too (a page of numbered
         // questions is planned as a step per question).
-        private async Task<string> PlanWithAttachmentsAsync(IChatClient client, CancellationToken token)
+        private async Task<string> PlanWithAttachmentsAsync(IChatClient client, string earlierChat, CancellationToken token)
         {
             if (_attachments.Count == 0)
-                return await Host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary), 400, token);
-            var contents = new List<AIContent>(_attachments) { new TextContent(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary, true)) };
+                return await Host.AskModelOnceAsync(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary, false, earlierChat), 400, token);
+            var contents = new List<AIContent>(_attachments) { new TextContent(TaskPlan.PlanPrompt(_request, _feature.PlannerToolSummary, true, earlierChat)) };
             ChatResponse response = await client.GetResponseAsync(new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, contents) },
                 new ChatOptions { MaxOutputTokens = 400, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } }, token);
             return new ChatReply(response.Text ?? string.Empty).Text.Trim();

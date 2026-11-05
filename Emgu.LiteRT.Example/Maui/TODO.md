@@ -227,7 +227,11 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [x] The plan card is saved with the chat (2026-10-27): kept with the reply as a saved file of kind `task_plan` (JSON: the steps with their state and result, and how it ended) when the card closes, and shown again, closed, when the chat is reopened (`TaskFeature.RestoreSavedFile`).
-- [ ] The steps don't see the earlier chat (only the request): "plan the same trip but cheaper" has no "same trip" to go on.
+- [x] The steps didn't see the earlier chat (only the request): "plan the same trip but cheaper" had no "same trip" to go
+      on. Since 2026-11-05 the planner, every step and the final answer (research too) are given the chat before the
+      request - its last 6 messages' text, each cut to 400 characters, at most 1,600 in all (`TaskPlan.EarlierChatText`),
+      and the planner names in each step what it is about; tested in `UnitTestTaskPlan`, and on the Mac with Gemma 4 E2B
+      (see FEATURES.md, "Task mode").
 - [ ] Proposed by the model for long requests (now only the chip); the planner's steps are sometimes redundant (a "review" step at the end).
 - [ ] Try it on phones (E2B on a phone's 8k window with the tool definitions: the step prompts are ~1-1.5k tokens) and with a server model.
 
