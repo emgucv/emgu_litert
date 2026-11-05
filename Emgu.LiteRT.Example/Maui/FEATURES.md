@@ -1036,7 +1036,8 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   detector frames aren't. New chat goes back to the back camera.
 - On iOS the live camera runs through AVFoundation since 2026-11-04 (`LiveCamera.AVFoundation.cs`, TODO item 59): the same
   frames, selfie camera, photos (`AVCapturePhotoOutput`, the frames never pause), clips (`AVAssetWriter` fed the camera's
-  own buffers, the microphone added to the session for a clip with sound) and the same cards, thumbnails through ImageIO
+  own buffers, the microphone in a capture session of its own for a clip with sound - added to the camera's, it made the
+  camera restart and the clip begin black and fade in over half a second, fixed 2026-11-05) and the same cards, thumbnails through ImageIO
   and `AVAssetImageGenerator`, Save to Photos. The preview is an `AVSampleBufferDisplayLayer` (`LiveCameraPreviewHandler`,
   registered by `UseLiveCamera()` in `MauiProgram.cs`). The iPad Air M4 numbers - 30 fps, photos in 0.06 s, clips
   with AAC, the detectors on Metal - are in TODO item 59; since 2026-11-05 the camera runs a 4:3 format (4032x3024

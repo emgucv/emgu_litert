@@ -618,8 +618,5 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] Not done: a real detection triggering a photo or a clip, Mac Catalyst on this path (it keeps OpenCV's capture).
-- [ ] A clip's first frame is black (0.00 brightness, then 0.52-0.59 from 0.23 s; seen in a chat clip, 2026-11-05): the
-  writer starts its session before the first camera buffer, or writes an empty one. iOS only: a Galaxy S10's clip
-  (Camera2) is normal from its first frame, so Android's thumbnail - the sync frame nearest 0.5 s, its first - is right.
 - [ ] The iPad's USB tunnel reset four times in 35 minutes on 2026-11-05, each time soon after the camera or the
   microphone started (it ended WebDriverAgent's runner each time; the app went on). The cable, or the camera's draw?

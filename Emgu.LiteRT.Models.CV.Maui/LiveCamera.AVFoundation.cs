@@ -471,7 +471,9 @@ public sealed partial class LiveCamera
 
     // The AVFoundation clip (RecordClipAsync holds the gate and deletes the file unless the clip finished): an AVAssetWriter fed the camera's own
     // buffers (the 4:3 format's, e.g. 1920x1440, or 1280x720) from the frame callback (H.264 at 6 Mbps, the frames to the preview and the detectors go on), and the microphone's
-    // samples (AAC) through an audio input and output added to the session for the clip. The buffers are upright already, so the file needs no
+    // samples (AAC) through an audio input and output in a capture session of their own for the clip: added to the camera's session they
+    // made the camera restart, and a clip with sound began black and faded in over half a second (an iPad, 2026-11-05). Both sessions
+    // time their samples on the host clock, so the sound lines up with the picture. The buffers are upright already, so the file needs no
     // transform; the orientation is frozen while the clip records. The camera stopping ends the clip early and keeps it; cancelling discards it.
     private async Task<ClipResult> RecordClipAvFoundationAsync(int seconds, string path, bool withAudio, CancellationToken token)
     {
@@ -483,6 +485,7 @@ public sealed partial class LiveCamera
         AVCaptureAudioDataOutput audioOutput = null;
         AudioDelegate audioDelegate = null;
         DispatchQueue audioQueue = null;
+        AVCaptureSession audioSession = null;
         Recording recording = null;
         try
         {
@@ -524,15 +527,14 @@ public sealed partial class LiveCamera
             {
                 audioDelegate = new AudioDelegate(recording);
                 audioOutput.SetSampleBufferDelegate(audioDelegate, audioQueue);
-                session.BeginConfiguration();
-                try
-                {
-                    if (!session.CanAddInput(audioInput)) throw new InvalidOperationException("The microphone can't join the camera session.");
-                    session.AddInput(audioInput);
-                    if (!session.CanAddOutput(audioOutput)) throw new InvalidOperationException("The camera session can't deliver sound.");
-                    session.AddOutput(audioOutput);
-                }
-                finally { session.CommitConfiguration(); }
+                // The app's audio session is set up above (PrepareAudioSessionForRecording).
+                audioSession = new AVCaptureSession { AutomaticallyConfiguresApplicationAudioSession = false };
+                if (!audioSession.CanAddInput(audioInput)) throw new InvalidOperationException("The microphone can't be recorded.");
+                audioSession.AddInput(audioInput);
+                if (!audioSession.CanAddOutput(audioOutput)) throw new InvalidOperationException("The microphone's sound can't be delivered.");
+                audioSession.AddOutput(audioOutput);
+                AVCaptureSession starting = audioSession;
+                await Task.Run(starting.StartRunning);
             }
             if (!writer.StartWriting()) throw new InvalidOperationException("The clip couldn't be started" + (writer.Error != null ? ": " + writer.Error.LocalizedDescription : "."));
             _recording = recording;
@@ -569,24 +571,17 @@ public sealed partial class LiveCamera
             _recording = null;
             if (audioInput != null || audioOutput != null)
             {
-                // Not when the camera is stopping: the release disposes the session, microphone and all (a configuration change beside its
-                // StopRunning took 9 s on an iPad).
-                lock (_sessionLock)
+                // The microphone's own session: the camera's goes on untouched.
+                if (audioSession != null)
                 {
-                    if (!_stop.IsCancellationRequested)
+                    try { audioSession.StopRunning(); } catch (Exception) { }
+                    try
                     {
-                        try
-                        {
-                            session.BeginConfiguration();
-                            try
-                            {
-                                if (audioOutput != null) session.RemoveOutput(audioOutput);
-                                if (audioInput != null) session.RemoveInput(audioInput);
-                            }
-                            finally { session.CommitConfiguration(); }
-                        }
-                        catch (Exception) { }
+                        if (audioOutput != null) audioSession.RemoveOutput(audioOutput);
+                        if (audioInput != null) audioSession.RemoveInput(audioInput);
                     }
+                    catch (Exception) { }
+                    audioSession.Dispose();
                 }
                 try { audioOutput?.SetSampleBufferDelegate(null, null); } catch (Exception) { }
                 try { audioQueue?.DispatchSync(() => { }); } catch (Exception) { }

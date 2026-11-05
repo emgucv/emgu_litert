@@ -1765,3 +1765,9 @@ The camera feature's clips, photos, camera switch, shutter click and sound-trigg
   out again; the chips, the settings' action buttons and the model buttons keep it) and "Full screen" was squeezed to
   "Full screer" by its FlexLayout row (the buttons don't shrink now: it goes to the next line); the clip thumbnails were
   black (the nearest keyframe to 0.5 s, sometimes the black first frame; now exactly 1 s, checked with a self-test).
+- [x] A clip with sound began black (2026-11-05): adding the microphone to the camera's running session for the clip made
+  the camera restart - the first frames 0.00, then a fade-in (0.06 to 0.17 by 0.3 s), while a silent clip was 0.42 from
+  its first frame. The microphone now has a capture session of its own for the clip (both sessions time their samples on
+  the host clock), so the camera's is never reconfigured: a clip with sound is 0.42 from its first frame, its sound track
+  starts at 0 and lasts the clip, and an alarm played from the Mac raised its level 2.5 times (self-tests on the iPad,
+  the frames measured on the Mac). Android (Camera2) never had it: a Galaxy S10's clip is normal from its first frame.
