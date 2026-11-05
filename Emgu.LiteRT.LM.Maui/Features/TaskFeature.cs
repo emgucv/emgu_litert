@@ -113,14 +113,36 @@ public sealed class TaskFeature : ChatFeature
         }
     }
 
-    /// <summary>The task-mode client for a message with the Plan chip on (a model with tools, not hands-free); null otherwise.</summary>
+    /// <summary>The setting that offers a plan for a message that looks like a task, without the Plan chip.</summary>
+    public const string OfferPlansKey = "offer_plans";
+
+    /// <summary>Whether a message that looks like a task (<see cref="TaskPlan.LooksLikeATask"/>) gets a plan offered without the chip; on by default.</summary>
+    public bool OfferPlans
+    {
+        get => Host?.Settings.Get(OfferPlansKey, true) ?? true;
+        set => Host?.Settings.Set(OfferPlansKey, value);
+    }
+
+    /// <inheritdoc/>
+    public override View BuildSettingsSection() => ChatPage.SwitchRow("Offer a plan for long tasks",
+        "A message that lists several steps (\"find ..., then compare ..., and after that write ...\") first gets a plan you can " +
+        "run, edit, or skip with \"Just answer\". The \U0001F4CB Plan chip plans any message.", OfferPlans, on => OfferPlans = on);
+
+    /// <summary>
+    /// The task-mode client for a message with the Plan chip on, or one that looks like a task with Settings > "Offer a plan
+    /// for long tasks" on (a model with tools, not hands-free); null otherwise.
+    /// </summary>
     /// <param name="request">The message, as prepared</param>
     public override IChatClient CreateMessageClient(ChatSendRequest request)
     {
         bool research = TakeResearch();
-        if (!(TakePlan() || research) || Host?.Model?.CanUseTools != true || Host.HandsFree)
+        bool plan = TakePlan();
+        if (Host?.Model?.CanUseTools != true || Host.HandsFree)
             return null;
-        return CreateClient(request.Text ?? string.Empty, request.Attachments.ToList(), research);
+        bool proposed = !plan && !research && OfferPlans && TaskPlan.LooksLikeATask(request.Text);
+        if (!(plan || research || proposed))
+            return null;
+        return new TaskModeClient(this, request.Text ?? string.Empty, request.Attachments.ToList(), research, proposed);
     }
 
     /// <summary>The chat client of a message to plan and run step by step.</summary>
@@ -153,13 +175,15 @@ public sealed class TaskFeature : ChatFeature
         private readonly string _request;
         private readonly IList<DataContent> _attachments;
         private readonly bool _research;
+        private readonly bool _proposed;
 
-        public TaskModeClient(TaskFeature feature, string request, IList<DataContent> attachments, bool research)
+        public TaskModeClient(TaskFeature feature, string request, IList<DataContent> attachments, bool research, bool proposed = false)
         {
             _feature = feature;
             _request = request;
             _attachments = attachments ?? new List<DataContent>();
             _research = research;
+            _proposed = proposed;
         }
 
         private IChatPageHost Host => _feature.Host;
@@ -199,7 +223,7 @@ public sealed class TaskFeature : ChatFeature
                 // A task's steps (and its final answer) all see the attachments: a step's result is short, and a later
                 // step that only had the earlier ones' results lost what the picture showed. Research gives them to the
                 // first part only (its parts are web searches).
-                plan = new TaskPlan(steps, _research) { ToolNames = ToolNames(options), WithAttachments = !_research && _attachments.Count > 0, EarlierChat = earlierChat };
+                plan = new TaskPlan(steps, _research) { ToolNames = ToolNames(options), WithAttachments = !_research && _attachments.Count > 0, EarlierChat = earlierChat, Proposed = _proposed };
                 _feature._taskPlan = plan;
                 var decision = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _feature._taskDecision = decision;
@@ -210,7 +234,8 @@ public sealed class TaskFeature : ChatFeature
                     return created;
                 });
                 _feature._taskCard = card;
-                Host.SetStatus(_research ? "Review the research plan, then start it." : "Review the plan, then run it.");
+                Host.SetStatus(_research ? "Review the research plan, then start it."
+                    : _proposed ? "This looks like a task with steps: run it as a plan, or just answer." : "Review the plan, then run it.");
                 using (token.Register(() => decision.TrySetCanceled(token)))
                     run = await decision.Task;
                 _feature._taskDecision = null;
@@ -657,7 +682,7 @@ public sealed class TaskFeature : ChatFeature
         };
 
         var content = new VerticalStackLayout { Spacing = 8 };
-        var heading = new Label { Text = plan.Research ? "\U0001F50E  Research" : "\U0001F4CB  Plan", FontFamily = titleFont, FontSize = 15, TextColor = primaryText };
+        var heading = new Label { Text = plan.Research ? "\U0001F50E  Research" : plan.Proposed ? "\U0001F4CB  A plan for this?" : "\U0001F4CB  Plan", FontFamily = titleFont, FontSize = 15, TextColor = primaryText };
         // On the heading, not the card: a description on the card makes it one element on iOS, which hides the steps' Skip
         // and the buttons from VoiceOver.
         SemanticProperties.SetDescription(heading, plan.Research ? "The research plan" : "The plan for this task");

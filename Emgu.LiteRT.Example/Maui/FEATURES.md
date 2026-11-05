@@ -844,6 +844,10 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   known". `PlaceSearchService` now searches in a capitalised town at the end of the query ("... in Rome") when `near` is
   empty and the town is found (else near the user, as before), and the step line says "in Rome"; the step then found Via
   del Pantheon. Apple Maps' answers to such long phrases are thin (one hotel, no vegetarian restaurant).
+- Offered without the chip (2026-11-05): a message that looks like a task - 20 to 300 words with a list of two or more
+  items, or two sequencing words ("then", "after that", "finally"; not "next" or "first") - goes through the planner, and
+  the card asks "A plan for this?" with Run, Edit and "Just answer"; Settings > "Offer a plan for long tasks" turns it
+  off. On the Mac with Gemma 4 E2B the card came in 7 s for a three-part hotel request, and a plain question got none.
 
 ## Research mode
 

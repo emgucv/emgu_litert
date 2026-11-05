@@ -101,6 +101,26 @@ public class UnitTestTaskPlan
         Assert.That(new TaskPlan(new[] { "a" }).StepPrompt("x", 0), Does.Not.Contain("The chat before"));
     }
 
+    // A plan offered without the Plan chip: only for a message that clearly has steps.
+    [TestCase("Find three hotels near the Pantheon in Rome for May, then compare their prices and reviews, and after that write me a short recommendation.", true)]
+    [TestCase("Please help me get ready for the trip:\n1. Check the weather in Lisbon for next weekend\n2. Make a packing list for three days\n3. Find a cafe near the hotel", true)]
+    [TestCase("Plan a weekend in Rome then send it.", false)]
+    [TestCase("Can you explain in detail how photosynthesis works in plants and why the leaves of many trees change colour in the autumn?", false)]
+    [TestCase("What will the weather be like next week in Paris, and is it the first time this year that it will rain there on a weekend?", false)]
+    [TestCase("Tell me about the history of Rome and then about the history of Florence, in a few paragraphs each if you can please do it.", false)]
+    [TestCase("", false)]
+    public void ARequestWithStepsLooksLikeATask(string request, bool task)
+    {
+        Assert.That(TaskPlan.LooksLikeATask(request), Is.EqualTo(task));
+    }
+
+    [Test]
+    public void PastedTextIsNotATask()
+    {
+        string pasted = "Summarize this:\n1. " + string.Join(" ", Enumerable.Repeat("word", 200)) + "\n2. " + string.Join(" ", Enumerable.Repeat("word", 150));
+        Assert.That(TaskPlan.LooksLikeATask(pasted), Is.False);
+    }
+
     [Test]
     public void TheFinalPromptListsEveryStepsFate()
     {

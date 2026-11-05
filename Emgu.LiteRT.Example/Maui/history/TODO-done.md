@@ -650,6 +650,11 @@ speak again.
       `UnitTestVoiceLanguages` (the tags, Android's Mandarin names, matching a recognizer's list).
 - [ ] An automatic mode (Android 13+ `EXTRA_ENABLE_LANGUAGE_DETECTION` with the languages the user speaks); the language pack download isn't shown to the user
       (only the message to try again); the voice chat (hands-free) uses the same setting but has no way to change it on its full-screen view.
+- [x] Speech-to-text on Mac Catalyst (2026-11-05, a temporary self-test in the demo): macOS asked for speech
+      recognition, then the microphone, for the app; Apple's recognizer wrote down a WAV the Mac's `say` made exactly
+      ("Please remind me to call the dentist on Friday afternoon"), and 9 s from the microphone (a USB webcam's) while
+      the Mac spoke, in 0.5 s ("What is the weather going to be in Boston tomorrow morning?" - "like" missed, through
+      the Mac's speakers).
 
 ## 23. Task mode: multi-step tasks with a visible plan — implemented; verified on Mac Catalyst with Gemma 4 E2B
 
@@ -695,6 +700,14 @@ Moved from TODO.md on 2026-11-05:
       Rome weekend - a 5-6 step plan naming Rome, run in 196-222 s, a Word document at the end. It showed `search_places`
       searching near the user (not shared) for "hotels near the Pantheon in Rome": a town at the end of the query is now
       searched in (`PlaceSearchService`, `UnitTestPlaceSearch`). Still to try: a phone, and a server model.
+- [x] Offered for long requests (2026-11-05): with the Plan chip off, a message that looks like a task
+      (`TaskPlan.LooksLikeATask`: 20-300 words with a list of two or more items, or two sequencing words - "then",
+      "after that", "finally"... - not "next" or "first", which ordinary questions have) goes through the planner, and
+      its card, "A plan for this?", has Run, Edit and "Just answer"; under 2 steps it is answered as usual. Settings >
+      "Offer a plan for long tasks" (`offer_plans`, on by default). Unit-tested (`UnitTestTaskPlan`); on the Mac with Gemma
+      4 E2B: "Find three hotels near the Pantheon in Rome for May, then compare their prices and reviews, and after that
+      write me a short recommendation" got the card in 7 s with three steps, "Just answer" answered with the place and web
+      searches, and "What is 12 times 7?" got no card (8 s).
 
 ## 24. Agent tools: device actions, confirmed by the user — implemented; Android verified, iOS/Mac Catalyst untested
 
@@ -798,6 +811,9 @@ Moved from TODO.md on 2026-11-05:
       with temporary goals (6 weeks of runs: reached, reached, reached, missed, reached, 1 so far -> "1-week streak (best: 3)" and the matching strip;
       a daily goal over 10 days likewise), deleted afterwards. `UnitTestGoalHistory` (weeks Monday to Sunday, days, months, the current period, breaks
       and the best, progress before the goal was set, no history without a target or period).
+- [x] Gemma 4 E4B (2026-11-05, on the Mac's GPU, a temporary self-test): "Add a goal: ... read 12 books this year" saved
+      it with its target (12 books), "I finished a book today ..." logged progress, and "How am I doing on my goals?"
+      said 1 of 12 - about 20 s each. The test goal and chat were deleted.
 
 ## 26. Agent tool: clipboard (`read_clipboard`) — implemented
 

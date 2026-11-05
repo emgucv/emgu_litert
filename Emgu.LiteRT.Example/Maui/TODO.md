@@ -105,8 +105,8 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Speech-to-text on Mac Catalyst and an iPhone; Windows has none (its recorder has no level for the voice chat
-      either, but voice messages could use `Windows.Media.SpeechRecognition`).
+- [ ] Speech-to-text on an iPhone; Windows has none (its recorder has no level for the voice chat either, but voice
+      messages could use `Windows.Media.SpeechRecognition`).
 - [ ] An iPhone with a real microphone, and any device with headphones (speaking over the reply).
 - [ ] Headphone detection (`VoiceRecorder.HeadphonesConnected`: the audio route on iOS/Mac Catalyst, output devices
       on Android) is untested; so is recording while text-to-speech plays on iOS.
@@ -118,7 +118,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Proposed by the model for long requests (now only the chip).
 - [ ] On a phone (the iPad ran it on 2026-11-05: an 8k window, 5-6 steps in 196-222 s), and with a server model.
 
 ## 24. Agent tools: device actions, confirmed by the user — implemented; Android, iOS and Mac Catalyst verified
@@ -132,7 +131,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number (the reminders and the end dates since
 2026-10-29). Still open:
 
-- [ ] Gemma 4 E4B.
 - [ ] Reminders on a real iPhone and the Mac, Snooze, and after a phone restart (only the Pixel Fold's first reminder
       was seen).
 - [ ] A "Done" on the reminder itself: the goal database is the app's, out of a notification receiver's reach; for

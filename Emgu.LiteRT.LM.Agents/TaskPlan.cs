@@ -42,6 +42,31 @@ public sealed class TaskPlan
     // The request came with attachments (pictures, a page...), given again with every step and the final answer.
     public bool WithAttachments { get; set; }
 
+    // Offered by the app for a request that looks like a task (LooksLikeATask), not asked for with the Plan chip: the card
+    // says so, and "Just answer" answers it as usual.
+    public bool Proposed { get; set; }
+
+    // A request that looks like a task with steps, to offer a plan for without the Plan chip: at least ProposeMinWords
+    // words (at most ProposeMaxWords: longer is pasted text) and a list of two or more items, or two sequencing words
+    // ("first find ..., then compare ..., and after that write ..."). Not "next" or "first" alone: "next week", "the first time".
+    public const int ProposeMinWords = 20;
+    public const int ProposeMaxWords = 300;
+    private static readonly Regex SequenceWord = new Regex(@"\b(then|after that|afterwards|finally|lastly|and also|once that'?s done)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    /// <summary>Whether a request looks like a task with several steps (see <see cref="ProposeMinWords"/>).</summary>
+    /// <param name="request">The user's message</param>
+    public static bool LooksLikeATask(string request)
+    {
+        if (string.IsNullOrWhiteSpace(request))
+            return false;
+        int words = Regex.Matches(request, @"\S+").Count;
+        if (words < ProposeMinWords || words > ProposeMaxWords)
+            return false;
+        int items = request.Replace("\r", "").Split('\n').Count(l => ListLine.IsMatch(l));
+        return items >= 2 || SequenceWord.Matches(request).Count >= 2;
+    }
+
     // The chat before the request (EarlierChatText), or null: given to every step and the final answer, since a request
     // can refer to it ("plan the same trip but cheaper").
     public string EarlierChat { get; set; }
