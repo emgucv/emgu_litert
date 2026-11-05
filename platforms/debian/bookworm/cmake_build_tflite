@@ -21,6 +21,11 @@ echo Compiled binary will be placed in lib/$OUT_FOLDER
 cd "$(dirname "$0")"
 cd ../../..
 
+# Record the Debian release (trixie, bookworm...). The top level CMakeLists.txt puts it in the nuget package ids
+# (Emgu.LiteRT.runtime.debian-<release>-arm64), so the binaries can be packaged on another machine.
+mkdir -p lib/$OUT_FOLDER
+(. /etc/os-release && echo $VERSION_CODENAME) > lib/$OUT_FOLDER/debian_version.txt
+
 # litertextern/tfliteextern's CMakeLists.txt links directly against litert/tflite (the
 # google-ai-edge/LiteRT submodule) - there is no tensorflow/ submodule to build from
 # anymore. It auto-detects linux-arm vs linux-arm64 from the compiler's predefined

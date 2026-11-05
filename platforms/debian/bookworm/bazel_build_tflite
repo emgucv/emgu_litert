@@ -141,4 +141,8 @@ for LIB in libLiteRt libtfliteextern liblitert-lm libomniextern; do
     fi
 done
 
+# Record the Debian release (trixie, bookworm...). The top level CMakeLists.txt puts it in the nuget package ids
+# (Emgu.LiteRT.runtime.debian-<release>-arm64), so the binaries can be packaged on another machine.
+(. /etc/os-release && echo $VERSION_CODENAME) > lib/$OUT_FOLDER/debian_version.txt
+
 echo Files copied to lib/$OUT_FOLDER

@@ -63,6 +63,8 @@ Directory.Build.props
 /Emgu.LiteRT.Runtime/Maui/OpenCL/Android/docs/
 /Emgu.LiteRT.Runtime/Maui/Metal/Mac/docs/
 /platforms/nuget/*/Package.nuspec
+# Generated from cmake/UseRidGraph.props.in for the Linux packages
+/platforms/nuget/*/*.props
 /platforms/nuget/Emgu.LiteRT.runtime.windows/README.md
 /platforms/nuget/Emgu.TF.Lite.runtime.windows/README.md
 /platforms/nuget/Emgu.LiteRT.LM.runtime.windows/README.md

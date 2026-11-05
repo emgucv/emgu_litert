@@ -118,6 +118,9 @@ done
 # Record the tflite_with_xnnpack define next to the library. The top level CMakeLists.txt reads it
 # to set EMGU_TF_LITE_UBUNTU_XNNPACK, and it travels with the binary in the zip package.
 echo $TFLITE_WITH_XNNPACK > lib/$OUT_FOLDER/tflite_with_xnnpack.txt
+# Record the Ubuntu version (e.g. 26.04). The top level CMakeLists.txt puts it in the nuget package ids
+# (Emgu.LiteRT.runtime.ubuntu-<version>-<arch>), so the binaries can be packaged on another machine.
+(. /etc/os-release && echo $VERSION_ID) > lib/$OUT_FOLDER/ubuntu_version.txt
 
 # What liblitert-lm.so loads, for the log (a library "not found" here has to be next to it or on the loader's path).
 ldd lib/$OUT_FOLDER/liblitert-lm.so || true

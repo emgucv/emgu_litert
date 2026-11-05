@@ -131,15 +131,6 @@ ELSE()
   ENDIF()
 ENDIF()
 
-IF ( IS_UBUNTU )
-  #MESSAGE(STATUS "TARGET_ARCH_64: ${TARGET_ARCH_64}")
-  SET(NUGET_NATIVE_PLATFORM_ID_UBUNTU "${LSB_RELEASE_ID_SHORT}.${LSB_RELEASE_RELEASE_SHORT}-${NUGET_NATIVE_PLATFORM_ID_ARCH}")
-  STRING(TOLOWER "${NUGET_NATIVE_PLATFORM_ID_UBUNTU}" NUGET_NATIVE_PLATFORM_ID_UBUNTU)
-  MESSAGE(STATUS "NUGET_NATIVE_PLATFORM_ID_UBUNTU: ${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
-ELSE()
-  SET(NUGET_NATIVE_PLATFORM_ID_UBUNTU "ubuntu.24.04-x64")
-ENDIF()
-
 IF (WIN32)
   MESSAGE(STATUS "CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
   IF(TARGET_ARCH_64)
@@ -282,6 +273,53 @@ ELSE()
     STRING(TOLOWER "${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}" NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64)
   ENDIF()
 ENDIF()
+
+# The Linux nuget package ids carry the distro version, as Emgu CV's do: Emgu.LiteRT.runtime.ubuntu-<version>-<arch>
+# and Emgu.LiteRT.runtime.debian-<release>-<arch>; the folders inside the packages don't. The native build scripts
+# record the version next to the binaries (ubuntu_version.txt, debian_version.txt), so another machine can package
+# them. Without that file, the version of this machine is used when it runs that distro.
+FUNCTION(EMGU_READ_DISTRO_VERSION version_file host_is_distro lsb_release_flag result)
+  SET(_version "")
+  IF(EXISTS "${version_file}")
+    FILE(STRINGS "${version_file}" _version LIMIT_COUNT 1)
+  ELSEIF(${host_is_distro} AND LSB_RELEASE_EXEC)
+    EXECUTE_PROCESS(COMMAND ${LSB_RELEASE_EXEC} ${lsb_release_flag} OUTPUT_VARIABLE _version OUTPUT_STRIP_TRAILING_WHITESPACE)
+  ENDIF()
+  STRING(STRIP "${_version}" _version)
+  STRING(TOLOWER "${_version}" _version)
+  SET(${result} "${_version}" PARENT_SCOPE)
+ENDFUNCTION()
+
+# One Ubuntu package, named after the architecture it holds (x64 if both folders exist).
+IF(HAVE_UBUNTU_X86_64_LITE OR NOT HAVE_UBUNTU_ARM64_LITE)
+  SET(UBUNTU_LITE_ARCH "x64")
+ELSE()
+  SET(UBUNTU_LITE_ARCH "arm64")
+ENDIF()
+EMGU_READ_DISTRO_VERSION("${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-${UBUNTU_LITE_ARCH}/native/ubuntu_version.txt" IS_UBUNTU "-rs" UBUNTU_LITE_VERSION)
+IF(UBUNTU_LITE_VERSION)
+  SET(NUGET_NATIVE_PLATFORM_ID_UBUNTU "ubuntu-${UBUNTU_LITE_VERSION}-${UBUNTU_LITE_ARCH}")
+ELSE()
+  SET(NUGET_NATIVE_PLATFORM_ID_UBUNTU "ubuntu-${UBUNTU_LITE_ARCH}")
+  IF(HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
+    MESSAGE(WARNING "lib/runtimes/ubuntu-${UBUNTU_LITE_ARCH}/native/ubuntu_version.txt not found: the Ubuntu nuget package ids carry no Ubuntu version. Rebuild the native libraries with platforms/ubuntu/<version>/bazel_build_tflite.")
+  ENDIF()
+ENDIF()
+MESSAGE(STATUS "NUGET_NATIVE_PLATFORM_ID_UBUNTU: ${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
+
+FOREACH(DEBIAN_LITE_ARCH "arm" "arm64")
+  EMGU_READ_DISTRO_VERSION("${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/linux-${DEBIAN_LITE_ARCH}/native/debian_version.txt" IS_DEBIAN "-cs" DEBIAN_LITE_VERSION)
+  STRING(TOUPPER "${DEBIAN_LITE_ARCH}" DEBIAN_LITE_ARCH_UPPER)
+  IF(DEBIAN_LITE_VERSION)
+    SET(EMGU_LITERT_DEBIAN_ID_${DEBIAN_LITE_ARCH_UPPER} "debian-${DEBIAN_LITE_VERSION}-${DEBIAN_LITE_ARCH}")
+  ELSE()
+    SET(EMGU_LITERT_DEBIAN_ID_${DEBIAN_LITE_ARCH_UPPER} "debian-${DEBIAN_LITE_ARCH}")
+    IF(HAVE_LINUX_${DEBIAN_LITE_ARCH_UPPER}_LITE)
+      MESSAGE(WARNING "lib/runtimes/linux-${DEBIAN_LITE_ARCH}/native/debian_version.txt not found: the Debian ${DEBIAN_LITE_ARCH} nuget package ids carry no Debian release. Rebuild the native libraries with platforms/debian/<release>/bazel_build_tflite.")
+    ENDIF()
+  ENDIF()
+ENDFOREACH()
+MESSAGE(STATUS "EMGU_LITERT_DEBIAN_ID_ARM64: ${EMGU_LITERT_DEBIAN_ID_ARM64}")
 
 SET(HAVE_LINUX_LITE OFF)
 IF(HAVE_LINUX_X86_64_LITE OR HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
@@ -1079,16 +1117,16 @@ IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
   # *.so glob - they ship in ${EMGU_LITERT_LM_UBUNTU_NUGET_ID} instead, see below.
   IF (HAVE_UBUNTU_X86_64_LITE)
     SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
-      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libwebgpu_dawn.so\" target=\"runtimes\\runtimes\\ubuntu-x64\\native\" />")
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libwebgpu_dawn.so\" target=\"runtimes\\ubuntu-x64\\native\" />")
   ENDIF()
   IF (HAVE_UBUNTU_ARM64_LITE)
     SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
-      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libwebgpu_dawn.so\" target=\"runtimes\\runtimes\\ubuntu-arm64\\native\" />")
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libwebgpu_dawn.so\" target=\"runtimes\\ubuntu-arm64\\native\" />")
   ENDIF()
   SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
-	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />")
-	#<file src=\"Emgu.TF.Lite.runtime.ubuntu.targets\" target=\"build\\${EMGU_LITERT_UBUNTU_NUGET_ID}.targets\" />")
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
+	<file src=\"${EMGU_LITERT_UBUNTU_NUGET_ID}.props\" target=\"build\" />")
   SET(EMGU_LITERT_UBUNTU_NUGET_DEPENDENCY "${EMGU_LITERT_UBUNTU_NUGET_DEPENDENCY}
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
@@ -1123,7 +1161,8 @@ ENDIF()
 IF(NOT "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}" STREQUAL "")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
-	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />")
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
+	<file src=\"${EMGU_LITERT_LM_UBUNTU_NUGET_ID}.props\" target=\"build\" />")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_DEPENDENCY "${EMGU_LITERT_LM_UBUNTU_NUGET_DEPENDENCY}
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_UBUNTU_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
@@ -1137,22 +1176,49 @@ IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
     </dependencies>")	
 	
   IF(HAVE_LINUX_ARM_LITE)
-    SET(EMGU_LITERT_DEBIAN_ARM_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.debian-arm")
+    SET(EMGU_LITERT_DEBIAN_ARM_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.${EMGU_LITERT_DEBIAN_ID_ARM}")
     SET(EMGU_LITERT_DEBIAN_ARM_NUGET_TITLE "Native ARM runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")
-    SET(EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST "${EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST} 
+    SET(EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST "${EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\\*.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\" />
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
-	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"${EMGU_LITERT_DEBIAN_ARM_NUGET_ID}.props\" target=\"build\" />")
   ENDIF()
 
   IF(HAVE_LINUX_ARM64_LITE)
-    SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.debian-arm64")
-    SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_TITLE "Native ARM64 runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")  
-    SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST "${EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST} 
-    <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\*.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\" />
+    # LiteRT-LM's libraries (when present) are excluded from this package's *.so glob - they ship in
+    # ${EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID} instead, see below.
+    SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.${EMGU_LITERT_DEBIAN_ID_ARM64}")
+    SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_TITLE "Native ARM64 runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")
+    SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST "${EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\libwebgpu_dawn.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\" />
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
-	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
-  ENDIF()  
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"${EMGU_LITERT_DEBIAN_ARM64_NUGET_ID}.props\" target=\"build\" />")
+  ENDIF()
+ENDIF()
+
+# Emgu.LiteRT.LM.runtime.debian-<release>-arm64: liblitert-lm.so and libomniextern.so from
+# platforms/debian/<release>/bazel_build_tflite, as Emgu.LiteRT.LM.runtime.ubuntu-* above. By default they are built
+# without LiteRT-LM's prebuilt libGemmaModelConstraintProvider.so and libwebgpu_dawn.so (which need AES, so not
+# a Raspberry Pi 4); a LITERT_LM_PREBUILTS=1 build has them, so each file is guarded on EXISTS.
+SET(EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM.runtime.${EMGU_LITERT_DEBIAN_ID_ARM64}")
+SET(EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_TITLE "Native ARM64 runtime (liblitert-lm) of ${EMGU_LITERT_NUGET_TITLE} for Debian (including Raspberry Pi OS)")
+IF(HAVE_LINUX_ARM64_LITE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/linux-arm64/native/liblitert-lm.so")
+  FOREACH(LM_LIB liblitert-lm libomniextern libGemmaModelConstraintProvider libwebgpu_dawn)
+    IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/linux-arm64/native/${LM_LIB}.so")
+      SET(EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_FILE_LIST "${EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\linux-arm64\\native\\${LM_LIB}.so\" target=\"runtimes\\linux-arm64\\native\" />")
+    ENDIF()
+  ENDFOREACH()
+  SET(EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_FILE_LIST "${EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_FILE_LIST}
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
+	<file src=\"${EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID}.props\" target=\"build\" />")
+  SET(EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_DEPENDENCY "
+    <dependencies>
+		<dependency id=\"${EMGU_LITERT_DEBIAN_ARM64_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+    </dependencies>")
 ENDIF()
 
   #Sign Binary
@@ -1467,6 +1533,24 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.ubuntu.Pack
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.ubuntu.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.ubuntu/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.debian-arm/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm64.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.debian-arm64/Package.nuspec)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.debian-arm64.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.debian-arm64/Package.nuspec)
+
+# The Linux packages' native files are under distro RIDs (ubuntu-x64...), which .NET 8+ only matches with the full RID
+# graph: each package's build/<id>.props turns it on in the projects that reference it, as Emgu CV's packages do.
+FOREACH(LINUX_PACKAGE
+    "Emgu.LiteRT.runtime.ubuntu|EMGU_LITERT_UBUNTU_NUGET_ID|EMGU_LITERT_UBUNTU_NUGET_FILE_LIST"
+    "Emgu.LiteRT.LM.runtime.ubuntu|EMGU_LITERT_LM_UBUNTU_NUGET_ID|EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST"
+    "Emgu.LiteRT.runtime.debian-arm|EMGU_LITERT_DEBIAN_ARM_NUGET_ID|EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST"
+    "Emgu.LiteRT.runtime.debian-arm64|EMGU_LITERT_DEBIAN_ARM64_NUGET_ID|EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST"
+    "Emgu.LiteRT.LM.runtime.debian-arm64|EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID|EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_FILE_LIST")
+  STRING(REPLACE "|" ";" LINUX_PACKAGE "${LINUX_PACKAGE}")
+  LIST(GET LINUX_PACKAGE 0 LINUX_PACKAGE_FOLDER)
+  LIST(GET LINUX_PACKAGE 1 LINUX_PACKAGE_ID_VAR)
+  LIST(GET LINUX_PACKAGE 2 LINUX_PACKAGE_FILE_LIST_VAR)
+  IF(NOT "${${LINUX_PACKAGE_FILE_LIST_VAR}}" STREQUAL "")
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/UseRidGraph.props.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/${LINUX_PACKAGE_FOLDER}/${${LINUX_PACKAGE_ID_VAR}}.props)
+  ENDIF()
+ENDFOREACH()
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.Test.Net.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Test/Emgu.TF.Lite.Test/Emgu.TF.Lite.Test.Net/Directory.Build.props)
 

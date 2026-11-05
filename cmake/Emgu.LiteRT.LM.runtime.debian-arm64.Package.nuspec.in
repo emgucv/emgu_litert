@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>${EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID}</id>
+	<title>${EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_TITLE}</title>
+    <version>${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</version>
+    <authors>${CPACK_PACKAGE_VENDOR}</authors>
+    <owners>${CPACK_PACKAGE_VENDOR}</owners>
+    <license type="file">${EMGU_LITERT_LICENSE_FILE}</license>
+    <projectUrl>${EMGUTF_MAIN_WEB_URL}</projectUrl>
+	<repository type="git" url="${GITHUB_REPO_URL}" />
+	<icon>icon.png</icon>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+	<summary>ARM64 native runtime (liblitert-lm) of Emgu LiteRT-LM for Debian (including Raspberry Pi OS)</summary>
+    <description>This package contains liblitert-lm.so, LiteRT-LM's own C API (used by Emgu.LiteRT.LM), and libomniextern.so, for ARM64 Debian (including Raspberry Pi OS). It depends on ${EMGU_LITERT_DEBIAN_ARM64_NUGET_ID} (libLiteRt.so), which they link against.</description>
+    <releaseNotes>This is the ${EMGU_LITERT_LM_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX} release of Emgu LiteRT LM for ARM64 Debian, built on LiteRT-LM ${LITERT_LM_VERSION}, part of the ${CPACK_PACKAGE_VERSION} release of Emgu LiteRT. For online documentation please visit
+http://www.emgu.com/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/</releaseNotes>
+	${EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_DEPENDENCY}
+    <copyright>© ${CPACK_PACKAGE_VENDOR} ${CURRENT_YEAR}. All rights reserved.</copyright>
+    <tags>tensorflow lite litert-lm emgu emgutf ai debian raspberrypi</tags>
+  </metadata>
+  <files>
+  ${EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_FILE_LIST}
+  </files>
+</package>
