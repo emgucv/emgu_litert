@@ -273,6 +273,21 @@ namespace Emgu.LiteRT.LM.Agents
             }
         }
 
+        /// <summary>
+        /// The piece with silence before and after it, starting at the same time. For Apple's recognizer: given a meeting's
+        /// piece that began with its first word (a chunker cuts at the pause before it), it wrote down nothing, and with a
+        /// second of silence on each side nearly every word (an iPad Air, 2026-11-05; synthetic speech came out the same
+        /// either way, a room's recording didn't).
+        /// </summary>
+        /// <param name="seconds">How much silence on each side</param>
+        public MeetingAudioChunk WithSilence(double seconds)
+        {
+            int pad = Math.Max(0, (int)Math.Round(seconds * SampleRate));
+            var samples = new float[Samples.Length + 2 * pad];
+            Array.Copy(Samples, 0, samples, pad, Samples.Length);
+            return new MeetingAudioChunk(Start, samples, SampleRate);
+        }
+
         /// <summary>A piece from a WAV file as <see cref="ToWav"/> writes it (a piece set aside on disk until later).</summary>
         /// <param name="start">Where it starts in the recording</param>
         /// <param name="wav">The file: mono 16-bit PCM with a 44-byte header</param>

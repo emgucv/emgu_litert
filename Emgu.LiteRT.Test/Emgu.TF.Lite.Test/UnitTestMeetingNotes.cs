@@ -64,6 +64,19 @@ public class UnitTestMeetingNotes
     }
 
     [Test]
+    public void PadsAPieceWithSilenceForTheRecognizer()
+    {
+        // Apple's recognizer wrote down nothing from a piece that began with its first word, and nearly all of it padded.
+        var spoken = new MeetingAudioChunk(TimeSpan.FromSeconds(62), Speech(2), Rate);
+        MeetingAudioChunk padded = spoken.WithSilence(1);
+        Assert.That(padded.Start, Is.EqualTo(spoken.Start));
+        Assert.That(padded.Duration, Is.EqualTo(TimeSpan.FromSeconds(4)));
+        Assert.That(padded.Samples.Take(Rate).Concat(padded.Samples.Skip(Rate * 3)).All(v => v == 0), Is.True);
+        Assert.That(padded.Samples.Skip(Rate).Take(Rate * 2), Is.EqualTo(spoken.Samples));
+        Assert.That(MeetingAudioChunk.FromWav(TimeSpan.Zero, padded.ToWav()).Duration, Is.EqualTo(padded.Duration));
+    }
+
+    [Test]
     public void KeepsThePiecesInOrderAndSplitsIntoSections()
     {
         var transcript = new MeetingTranscript();

@@ -944,7 +944,8 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   messages indexed" on the iPad) and the sound monitors' microphone start and stop (on the main thread, as the
   meeting recorder does). Gemma 4 E4B also ran on the iPad's GPU (a reply with a tool in 36 s, with Wikipedia 65 s).
   Seen: the plan card's, the confirmation cards' and the translation row's buttons aren't in the accessibility tree
-  (VoiceOver, item 21); a meeting started 5 minutes before anyone spoke kept only 6 words of the first sentence.
+  (VoiceOver, item 21, fixed the same day); a meeting started 5 minutes before anyone spoke kept only 6 words of the
+  first sentence (fixed the same day: see "Meeting notes", Apple's recognizer and a piece's first word).
 - On iOS, creating a sound monitor failed until 2026-11-04 whenever YAMNet still had to load: its loading progress
   set the page's status label from the worker thread, a UIKit consistency error on iOS (Android tolerates it), and
   the tool answered "Could not create the sound monitor". `ChatPage.SetStatus` marshals to the main thread now (70
@@ -1161,6 +1162,18 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   words through the speakers and one whole turn. Not yet tried with real people. Speaker changes without a pause, and a
   turn of under 2 s, go with the piece around them.
 - Tested by `UnitTestMeetingNotes`; not yet tried with a real meeting.
+
+- Apple's recognizer and a piece's first word (2026-11-05, an iPad Air): a meeting with a minute of quiet, then the
+  Mac saying two sentences across the room, kept only the first sentence. The pieces end at pauses, so the piece with
+  the second sentence (5.7 s) began with its first word, and Apple's recognizer gave back nothing for it, twice in a
+  row; the same piece with a second of silence on each side came back as "We agreed on Friday and will update the
+  documentation by Thursday" (louder, only "Thursday": the 6 words of the first run were the first sentence and that).
+  Synthetic speech cut the same way came out whole either way, and neither the microphone running nor a piece's float
+  path changed it. So every recording given to Apple's recognizer gets a second of silence on each side
+  (`MeetingAudioChunk.WithSilence`, in `SpeechRecognizer`); the meeting then kept 16 of the 23 words (the rest misheard
+  through the Mac's speakers, not lost). Seen meanwhile: a piece that ends with the first second or two of speech after
+  a long quiet stretch isn't `HasSpeech` (its loud 5% is the room), which only matters when the chat model writes the
+  meeting down (it skips such pieces): not changed.
 
 ## The TF Lite pages, the live camera and the About page
 

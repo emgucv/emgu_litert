@@ -449,6 +449,9 @@ namespace Emgu.LiteRT.LM.Maui
             if (!recognizer.Available)
                 throw new InvalidOperationException("Speech recognition isn't available for " + (tag != null ? VoiceLanguages.NameOf(tag) : "this language") + " right now.");
 
+            // A second of silence on each side: without it a meeting's piece that began with its first word came back empty.
+            try { wav = Emgu.LiteRT.LM.Agents.MeetingAudioChunk.FromWav(TimeSpan.Zero, wav).WithSilence(1).ToWav(); }
+            catch (ArgumentException) { }
             string path = Path.Combine(Path.GetTempPath(), "speech-" + Guid.NewGuid().ToString("N") + ".wav");
             await File.WriteAllBytesAsync(path, wav, token);
             var done = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
