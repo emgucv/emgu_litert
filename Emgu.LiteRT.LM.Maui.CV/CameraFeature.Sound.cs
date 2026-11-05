@@ -207,7 +207,9 @@ public sealed partial class CameraFeature
                     source = _soundSourceFactory != null ? _soundSourceFactory() : new MicrophoneSoundSource();
                     source.Samples += OnSoundSamples;
                     _soundWindower.Reset();
-                    if (await source.StartAsync()) { _soundSource = source; _soundStatus = "Listening through the microphone."; }
+                    // On the main thread, as the meeting recorder does: the permission request and the audio engine's start are
+                    // UIKit/AVFoundation calls, and a sound monitor's tool runs on a worker thread.
+                    if (await MainThread.InvokeOnMainThreadAsync(source.StartAsync)) { _soundSource = source; _soundStatus = "Listening through the microphone."; }
                     else { source.Dispose(); _soundStatus = "The microphone permission was denied, so it can't listen. The user can allow it in the system settings."; }
                 }
                 catch (Exception ex)
@@ -221,7 +223,7 @@ public sealed partial class CameraFeature
                 ISoundSource source = _soundSource;
                 _soundSource = null;
                 source.Samples -= OnSoundSamples;
-                try { await source.StopAsync(); } catch (Exception) { }
+                try { await MainThread.InvokeOnMainThreadAsync(source.StopAsync); } catch (Exception) { }
                 source.Dispose();
                 _soundStatus = _soundPaused ? "Paused while the microphone is used for a voice message." : null;
             }

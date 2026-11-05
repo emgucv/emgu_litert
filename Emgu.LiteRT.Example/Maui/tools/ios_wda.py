@@ -29,7 +29,14 @@ Usage: ios_wda.py <server> <command> [args]
   source [file.xml]
   home
   launch <bundleId>
+  active                        -> the app in front (bundle id)
+  alert [accept|dismiss|<button>]  -> the system alert's text, or answer it (a permission prompt)
+  wait <text> <seconds>         -> waits until a label, name or value contains the text; exit 1 on timeout
+  steps                         -> the chat's step lines ("🔎 ...", "... - failed: ...") and the last reply's text
+  texts [filter]                -> every static text's label (optionally only those containing filter)
+  clipboard <text>              -> sets the device's clipboard
 """
+import re, time
 import base64, json, os, sys, urllib.request
 
 SESSION_FILE = os.path.expanduser("~/.wda_session")
@@ -116,6 +123,50 @@ def main():
             open(args[0], "w").write(xml); print(args[0], len(xml), "chars")
         else:
             print(xml[:4000])
+    elif command == "active":
+        print(call(server, "GET", "/wda/activeAppInfo")["value"].get("bundleId"))
+    elif command == "alert":
+        if not args:
+            try:
+                print(call(server, "GET", f"/session/{sid}/alert/text")["value"])
+            except Exception:
+                print("(no alert)")
+        elif args[0] in ("accept", "dismiss"):
+            call(server, "POST", f"/session/{sid}/alert/{args[0]}", {})
+            print(args[0] + "ed")
+        else:
+            call(server, "POST", f"/session/{sid}/alert/accept", {"name": args[0]})
+            print("pressed", args[0])
+    elif command == "wait":
+        text, seconds = args[0], float(args[1])
+        deadline = time.time() + seconds
+        while time.time() < deadline:
+            xml = call(server, "GET", f"/session/{sid}/source")["value"]
+            if text in xml:
+                print("found", text)
+                return 0
+            time.sleep(2)
+        print("timed out waiting for", text)
+        return 1
+    elif command in ("steps", "texts"):
+        xml = call(server, "GET", f"/session/{sid}/source")["value"]
+        labels = []
+        for m in re.finditer(r'<XCUIElementTypeStaticText [^>]*?label="([^"]*)"', xml):
+            t = m.group(1).replace("&quot;", '"').replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&#10;", " ")
+            if t and (not labels or labels[-1] != t):
+                labels.append(t)
+        if command == "texts":
+            for t in labels:
+                if not args or args[0].lower() in t.lower():
+                    print(t)
+        else:
+            for t in labels:
+                if t.startswith("🔎") or " - failed" in t or " - done" in t or " - cancelled" in t or t.startswith("Error:"):
+                    print("STEP", t)
+    elif command == "clipboard":
+        call(server, "POST", f"/session/{sid}/wda/setPasteboard",
+             {"content": base64.b64encode(args[0].encode()).decode(), "contentType": "plaintext"})
+        print("clipboard set")
     elif command == "home":
         call(server, "POST", f"/wda/homescreen", {})
         print("home")

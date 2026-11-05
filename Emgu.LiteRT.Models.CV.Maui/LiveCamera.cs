@@ -309,7 +309,7 @@ public sealed partial class LiveCamera
     }
 
     /// <summary>
-    /// Records <paramref name="seconds"/> of video (H.264, 720p, with sound from the microphone if asked) into an MP4 file while the preview and the
+    /// Records <paramref name="seconds"/> of video (H.264: 720p on Android, the camera format's 4:3 size on iOS, with sound from the microphone if asked) into an MP4 file while the preview and the
     /// detectors go on. The camera closing ends the clip early (what was recorded is kept); cancelling stops the recording and deletes the file.
     /// </summary>
     public async Task<ClipResult> RecordClipAsync(int seconds, string path, bool withAudio, CancellationToken token)

@@ -27,6 +27,23 @@ public sealed class LiveCameraPreview : PreviewBase
     private byte[] _pixels;
 #endif
 
+    /// <summary>
+    /// True when <see cref="Present"/> may be called from any thread, the camera's included, and copies the frame before it returns (iOS with
+    /// <c>LiveCameraPreviewHandler</c>, until it falls back to UIImages): a caller then presents each frame where it gets it, with no hop to
+    /// the main thread. Otherwise present from the UI thread and keep the Mat until the next frame.
+    /// </summary>
+    public bool PresentsFromAnyThread
+    {
+        get
+        {
+#if IOS && !MACCATALYST
+            return Handler is LiveCameraPreviewHandler fast && fast.UseDisplayLayer && !fast.UsingFallback;
+#else
+            return false;
+#endif
+        }
+    }
+
     /// <summary>Show a frame. Keep the Mat unchanged until the next one is presented (CvImageView also keeps it for handler changes).</summary>
     public void Present(Mat frame)
     {

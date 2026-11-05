@@ -551,6 +551,12 @@ public sealed partial class CameraFeature : CvFeature
             Exercises?.DrawPose(camera, _previewFrame);
             // A selfie preview is a mirror; the frames the detectors, photos and clips get are not mirrored.
             if (_cameraFront) CvInvoke.Flip(_previewFrame, _previewFrame, Emgu.CV.CvEnum.FlipType.Horizontal);
+            // iOS's display layer takes the frame here, on the camera's thread, and copies it: no hop to the main thread.
+            if (_cameraPreview.PresentsFromAnyThread)
+            {
+                if (_cameraPanel.IsVisible) _cameraPreview.Present(_previewFrame);
+                return;
+            }
             if (_previewQueued) return;
             _previewQueued = true;
             version = _previewVersion;

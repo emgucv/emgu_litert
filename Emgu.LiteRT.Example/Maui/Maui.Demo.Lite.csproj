@@ -42,6 +42,14 @@
 		<CodesignEntitlements Condition="'$(CodesignEntitlements)' == ''">Platforms/iOS/Memory.entitlements.plist</CodesignEntitlements>
 	</PropertyGroup>
 
+	<!-- The privacy manifests an App Store build needs (TODO item 35), at the bundle's root. -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+		<BundleResource Include="Platforms\iOS\PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
+	</ItemGroup>
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+		<BundleResource Include="Platforms\MacCatalyst\PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
+	</ItemGroup>
+
 	<!-- iOS: compile ahead of time in Debug too, without Mono's interpreter (which Debug builds otherwise use for hot
 	     reload). In the interpreter, image generation (Z-Image-Turbo through Emgu.LiteRT) crashed at the start of a
 	     second picture - an ArrayTypeMismatchException, and once that was worked around a SIGSEGV in

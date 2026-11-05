@@ -43,6 +43,25 @@ public class UnitTestDownloads
         Directory.Delete(_directory, true);
     }
 
+    [Test]
+    public void ACopyKeepingTheTimeToTheSecondStaysVerifiedAndAStalePartGoes()
+    {
+        // A file copied with its marker by a tool that keeps the time to the second (devicectl to an iOS app): the marker's ticks have
+        // a fraction the copy lost. It is verified without hashing again, and checking it removes a .part left beside it.
+        var file = new DownloadableFile("http://127.0.0.1:9/model.bin", "", Hash(Data)) { LocalFile = Path.Combine(_directory, "model.bin") };
+        File.WriteAllBytes(file.LocalFile, Data);
+        var exact = new DateTime(2026, 10, 13, 8, 37, 10, DateTimeKind.Utc).AddTicks(4302718);
+        File.WriteAllText(file.LocalFile + ".sha256ok", Data.Length + "|" + exact.Ticks + "|" + Hash(Data));
+        File.SetLastWriteTimeUtc(file.LocalFile, exact.AddTicks(-4302718));
+        File.WriteAllBytes(file.PartialFile, new byte[100]);
+        Check(file.IsLocalFileVerified, "a copy within a second of the marker's time should count as verified");
+        Check(file.IsLocalFileValid, "the copy is valid");
+        Check(!File.Exists(file.PartialFile), "the stale partial download should be removed once the file is verified");
+        // More than a second off: not the marked file any more.
+        File.SetLastWriteTimeUtc(file.LocalFile, exact.AddSeconds(5));
+        Check(!file.IsLocalFileVerified, "a file changed seconds later isn't the marked one");
+    }
+
     private DownloadableFile FileFor(Server server, byte[] expected = null) => new DownloadableFile(server.Url, "", Hash(expected ?? Data))
     { LocalFile = Path.Combine(_directory, "model.bin") };
     private static string Hash(byte[] data) => Convert.ToHexString(SHA256.HashData(data));

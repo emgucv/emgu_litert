@@ -209,7 +209,19 @@ namespace Emgu.LiteRT.Util
         {
             try
             {
-                return File.Exists(MarkerFile) && File.ReadAllText(MarkerFile).Trim() == MarkerContent(fi);
+                if (!File.Exists(MarkerFile))
+                    return false;
+                String marker = File.ReadAllText(MarkerFile).Trim();
+                if (marker == MarkerContent(fi))
+                    return true;
+                // A copy that keeps the modification time to the second only (devicectl's copy to an iOS app, many tools): the
+                // same size and hash, and the time within a second of the marker's, is the same file.
+                String[] parts = marker.Split('|');
+                long ticks;
+                return parts.Length == 3 && parts[0] == fi.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    && parts[2] == _sha256Hash
+                    && long.TryParse(parts[1], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out ticks)
+                    && Math.Abs(fi.LastWriteTimeUtc.Ticks - ticks) < TimeSpan.TicksPerSecond;
             }
             catch (Exception)
             {

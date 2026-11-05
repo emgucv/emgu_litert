@@ -42,6 +42,8 @@ public sealed class LiveCameraPreviewHandler : ViewHandler<LiveCameraPreview, UI
     private bool _fallback;
     private UIImage _fallbackImage;
     private long _presented, _dropped;
+    // Present runs on the camera's thread; Clear and the disconnect on the main thread: the pool and the layer's state are shared.
+    private readonly object _lock = new object();
 
     /// <summary>Create the handler.</summary>
     public LiveCameraPreviewHandler() : base(Mapper) { }
@@ -72,7 +74,7 @@ public sealed class LiveCameraPreviewHandler : ViewHandler<LiveCameraPreview, UI
     protected override void DisconnectHandler(UIView platformView)
     {
         Clear();
-        ReleasePool();
+        lock (_lock) ReleasePool();
         base.DisconnectHandler(platformView);
     }
 
@@ -93,11 +95,20 @@ public sealed class LiveCameraPreviewHandler : ViewHandler<LiveCameraPreview, UI
         };
     }
 
-    /// <summary>Show a frame (8-bit BGR, BGRA or gray). Thread-safe: the layer takes frames from any thread.</summary>
+    /// <summary>
+    /// Show a frame (8-bit BGR, BGRA or gray). Thread-safe: the layer takes frames from any thread, and the frame is converted into a buffer of
+    /// the pool before this returns, so the caller may reuse the Mat at once.
+    /// </summary>
     public void Present(Mat frame)
     {
         if (frame == null || frame.IsEmpty || PlatformView is not DisplayView view) return;
         if (_fallback || !UseDisplayLayer) { PresentFallback(view, frame); return; }
+        lock (_lock) PresentLocked(view, frame);
+    }
+
+    private void PresentLocked(DisplayView view, Mat frame)
+    {
+        if (PlatformView != view) return;
         try
         {
             AVSampleBufferDisplayLayer layer = view.VideoLayer;
@@ -107,6 +118,13 @@ public sealed class LiveCameraPreviewHandler : ViewHandler<LiveCameraPreview, UI
                 if (layer.Status == AVQueuedSampleBufferRenderingStatus.Failed)
                 {
                     if (++_failures >= 2) { _fallback = true; PresentFallback(view, frame); return; }
+                    // The view is UIKit's: replaced on the main thread, and this frame dropped when it came from another.
+                    if (!MainThread.IsMainThread)
+                    {
+                        MainThread.BeginInvokeOnMainThread(() => { lock (_lock) { view.ReplaceLayer(); if (VirtualView != null) ApplyAspect(VirtualView.Aspect); } });
+                        Interlocked.Increment(ref _dropped);
+                        return;
+                    }
                     view.ReplaceLayer();
                     layer = view.VideoLayer;
                     if (VirtualView != null) ApplyAspect(VirtualView.Aspect);
@@ -156,6 +174,11 @@ public sealed class LiveCameraPreviewHandler : ViewHandler<LiveCameraPreview, UI
     public void Clear()
     {
         if (PlatformView is not DisplayView view) return;
+        lock (_lock) ClearLocked(view);
+    }
+
+    private void ClearLocked(DisplayView view)
+    {
         try { view.VideoLayer.FlushAndRemoveImage(); } catch (Exception) { }
         view.VideoLayer.Hidden = false;
         view.Fallback.Image = null;

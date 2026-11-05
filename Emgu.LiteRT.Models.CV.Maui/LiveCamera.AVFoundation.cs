@@ -15,7 +15,8 @@ using UIKit;
 
 namespace Emgu.LiteRT.Models.CV.Maui;
 
-// The iOS live camera through AVFoundation, the counterpart of Camera2 on Android: an AVCaptureSession at 1280x720 with a BGRA video data
+// The iOS live camera through AVFoundation, the counterpart of Camera2 on Android: an AVCaptureSession in a 4:3 format (1920x1440 on an
+// iPad Air M4, for full-sensor photos; the 720p preset where there is none) with a BGRA video data
 // output on its own queue. Each frame's pixel buffer is wrapped as a Mat without a copy, scaled down to 960 px and converted to BGR into reused
 // Mats (about a millisecond), then given to FrameReady. The frames come upright from AVFoundation itself (the connection's orientation follows
 // the interface's, so no CvInvoke.Rotate is needed: FrameRotation stays null here) and unmirrored from the selfie camera, as on Android. Late
@@ -156,6 +157,10 @@ public sealed partial class LiveCamera
                 if (_videoInput == null || !_session.CanAddInput(_videoInput))
                     throw new InvalidOperationException("The camera couldn't be opened" + (error != null ? ": " + error.LocalizedDescription : "."));
                 _session.AddInput(_videoInput);
+                // A 4:3 format, so photos are the full sensor (4032x3024 on an iPad Air M4) rather than the 720p format's
+                // 16:9 crop; the session's preset becomes "input priority". The frames follow (960x720 after the
+                // MaxFrameSide scale) and so do the clips (the format's video size). Kept at 720p without one.
+                FormatChosen = UseFourByThreeFormat(device);
                 _videoOutput = new AVCaptureVideoDataOutput
                 {
                     UncompressedVideoSetting = new AVVideoSettingsUncompressed { PixelFormatType = CVPixelFormatType.CV32BGRA },
@@ -332,7 +337,53 @@ public sealed partial class LiveCamera
         }
     }
 
-    // After the session is configured (the active format is the preset's by then): stills at the largest size that format offers - with the
+    /// <summary>The 4:3 capture format chosen for the camera (e.g. "1920x1440, photos 4032x3024"), or null when it kept the 720p preset.</summary>
+    public string FormatChosen { get; private set; }
+
+    // The 4:3 format that takes the largest photos, with video of at least 1280x960 at 30 fps, the smallest such video (cheaper buffers and
+    // clips), in 8-bit 4:2:0 (what the video output converts to BGRA in hardware). Null (the 720p preset stays) when there is none or iOS
+    // is older than 16 (no SupportedMaxPhotoDimensions).
+    private static string UseFourByThreeFormat(AVCaptureDevice device)
+    {
+        if (!OperatingSystem.IsIOSVersionAtLeast(16)) return null;
+        try
+        {
+            AVCaptureDeviceFormat best = null;
+            long bestPhoto = 0, bestVideo = long.MaxValue;
+            CMVideoDimensions bestSize = default, bestPhotoSize = default;
+            foreach (AVCaptureDeviceFormat format in device.Formats)
+            {
+                if (format.FormatDescription is not CMVideoFormatDescription description) continue;
+                uint subtype = description.MediaSubType;
+                if (subtype != (uint)CVPixelFormatType.CV420YpCbCr8BiPlanarFullRange && subtype != (uint)CVPixelFormatType.CV420YpCbCr8BiPlanarVideoRange) continue;
+                CMVideoDimensions size = description.Dimensions;
+                if (size.Width * 3 != size.Height * 4 || size.Width < 1280) continue;
+                if (format.VideoSupportedFrameRateRanges == null || !format.VideoSupportedFrameRateRanges.Any(range => range.MaxFrameRate >= 30)) continue;
+                CMVideoDimensions[] photos = format.SupportedMaxPhotoDimensions;
+                if (photos == null || photos.Length == 0) continue;
+                CMVideoDimensions photo = photos.MaxBy(p => (long)p.Width * p.Height);
+                long photoArea = (long)photo.Width * photo.Height, videoArea = (long)size.Width * size.Height;
+                if (photoArea > bestPhoto || (photoArea == bestPhoto && videoArea < bestVideo))
+                {
+                    best = format; bestPhoto = photoArea; bestVideo = videoArea; bestSize = size; bestPhotoSize = photo;
+                }
+            }
+            if (best == null || !device.LockForConfiguration(out NSError error) || error != null) return null;
+            try
+            {
+                device.ActiveFormat = best;
+                // 30 fps, as the 720p preset gave.
+                var frame = new CMTime(1, 30);
+                device.ActiveVideoMinFrameDuration = frame;
+                device.ActiveVideoMaxFrameDuration = frame;
+            }
+            finally { device.UnlockForConfiguration(); }
+            return bestSize.Width + "x" + bestSize.Height + ", photos " + bestPhotoSize.Width + "x" + bestPhotoSize.Height;
+        }
+        catch (Exception) { return null; }
+    }
+
+    // After the session is configured (the active format is the preset's, or the 4:3 one, by then): stills at the largest size that format offers - with the
     // 720p preset alone they would be 720p - at the balanced quality (the full quality can hold the video output up), and with the quicker
     // shutter where iOS 17 offers it.
     private void ConfigurePhotoOutput(AVCaptureDevice device)
@@ -419,7 +470,7 @@ public sealed partial class LiveCamera
     }
 
     // The AVFoundation clip (RecordClipAsync holds the gate and deletes the file unless the clip finished): an AVAssetWriter fed the camera's own
-    // 1280x720 buffers from the frame callback (H.264 at 6 Mbps, the frames to the preview and the detectors go on), and the microphone's
+    // buffers (the 4:3 format's, e.g. 1920x1440, or 1280x720) from the frame callback (H.264 at 6 Mbps, the frames to the preview and the detectors go on), and the microphone's
     // samples (AAC) through an audio input and output added to the session for the clip. The buffers are upright already, so the file needs no
     // transform; the orientation is frozen while the clip records. The camera stopping ends the clip early and keeps it; cancelling discards it.
     private async Task<ClipResult> RecordClipAvFoundationAsync(int seconds, string path, bool withAudio, CancellationToken token)

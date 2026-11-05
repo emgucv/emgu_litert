@@ -283,17 +283,22 @@ internal sealed class LiveDemoPage : ContentPage
             long now = Stopwatch.GetTimestamp();
             int version;
             double fps;
+            // iOS's display layer takes the drawn frame here, on the camera's thread, and copies it: only the labels go to the main thread.
+            bool direct = _preview.PresentsFromAnyThread;
+            if (direct && _camera == camera)
+                _preview.Present(render);
             lock (_gate)
             {
-                // The newest drawn frame replaces one not shown yet (whose Mat is used for the next frame).
-                _work = _pending;
-                _pending = render;
+                // The newest drawn frame replaces one not shown yet (whose Mat is used for the next frame); presented
+                // already, it is the next frame's Mat itself.
+                _work = direct ? render : _pending;
+                if (!direct) _pending = render;
                 _frameTimes.Enqueue(now);
                 while (_frameTimes.Count > 0 && Stopwatch.GetElapsedTime(_frameTimes.Peek(), now) > TimeSpan.FromSeconds(1))
                     _frameTimes.Dequeue();
                 fps = _frameTimes.Count;
                 version = _version;
-                if (_presentQueued)
+                if (direct || _presentQueued)
                     render = null;
                 else
                     _presentQueued = true;

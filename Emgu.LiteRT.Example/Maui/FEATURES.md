@@ -935,6 +935,16 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   and `TakePhoto`, `create_sound_monitor`'s `clipSeconds` and `takePhoto` when `SoundMonitorTools.Create` gets
   `cameraActions`): the live camera opens when the monitor is created, the photo comes first, one capture per 30 s plus the
   clip, through the same `TakePhotoAsync`/`RecordClipAsync` as the camera monitors.
+- An iOS sweep of the chat's features (2026-11-05, an iPad Air, through WebDriverAgent and `tools/ios_wda.py`, Gemma 4
+  E2B on the GPU) found no other UIKit errors: the calculator, the date, memory, weather, Wikipedia, places, the
+  clipboard (after iOS's "Allow Paste"), the camera, a camera monitor, the exercise counter, Bonsai Image 4B 512, the
+  background blur, past chats, a Word document, goals, task mode (a seven-step plan in 4 minutes), the thinking's
+  translation row, device actions, a voice message, hands-free voice chat and a meeting all worked. Two more UI calls
+  off the main thread were fixed first: the past chats' indexing status (`PastChatsFeature.IndexStatus`, now "102
+  messages indexed" on the iPad) and the sound monitors' microphone start and stop (on the main thread, as the
+  meeting recorder does). Gemma 4 E4B also ran on the iPad's GPU (a reply with a tool in 36 s, with Wikipedia 65 s).
+  Seen: the plan card's, the confirmation cards' and the translation row's buttons aren't in the accessibility tree
+  (VoiceOver, item 21); a meeting started 5 minutes before anyone spoke kept only 6 words of the first sentence.
 - On iOS, creating a sound monitor failed until 2026-11-04 whenever YAMNet still had to load: its loading progress
   set the page's status label from the worker thread, a UIKit consistency error on iOS (Android tolerates it), and
   the tool answered "Could not create the sound monitor". `ChatPage.SetStatus` marshals to the main thread now (70
@@ -997,8 +1007,9 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   frames, selfie camera, photos (`AVCapturePhotoOutput`, the frames never pause), clips (`AVAssetWriter` fed the camera's
   own buffers, the microphone added to the session for a clip with sound) and the same cards, thumbnails through ImageIO
   and `AVAssetImageGenerator`, Save to Photos. The preview is an `AVSampleBufferDisplayLayer` (`LiveCameraPreviewHandler`,
-  registered by `UseLiveCamera()` in `MauiProgram.cs`). The iPad Air M4 numbers - 30 fps, photos in 0.06 s, 720p clips
-  with AAC, the detectors on Metal - are in TODO item 59. Not looked at yet: the preview, a photo or a clip (the checks
+  registered by `UseLiveCamera()` in `MauiProgram.cs`). The iPad Air M4 numbers - 30 fps, photos in 0.06 s, clips
+  with AAC, the detectors on Metal - are in TODO item 59; since 2026-11-05 the camera runs a 4:3 format (4032x3024
+  photos, 1440x1920 clips) and the preview takes frames on the camera's thread (`LiveCameraPreview.PresentsFromAnyThread`). Not looked at yet: the preview, a photo or a clip (the checks
   are the user's).
 - Each camera and sound monitor's card shows the user's request that created it (`CameraFeature.MonitorInfo.cs`, TODO item
   45: kept in memory, not in private chats; tap to expand), and the camera preview's label says what the camera is doing

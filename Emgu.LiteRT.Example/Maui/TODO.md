@@ -184,6 +184,9 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] Screen-reader labels for the newer controls: image tiles, step lines, thinking headers, the settings switches and
       download states, photo thumbnails (`SemanticProperties`).
+- [ ] Buttons inside cards aren't in iOS's accessibility tree (found 2026-11-05 driving the iPad with WebDriverAgent): the
+      plan card's Run plan / Edit / Just answer, the confirmation cards' confirm and Cancel, the meeting card's Stop,
+      the thinking's "Translate to" row. VoiceOver can't reach them, and WebDriverAgent had to tap them by position.
 - [ ] Large text: check the chat, settings and sheets with the largest font sizes on Android and iOS.
 - [ ] Contrast of the secondary text in light and dark mode.
 
@@ -209,11 +212,18 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] Proposed by the model for long requests (now only the chip); the planner's steps are sometimes redundant (a "review" step at the end).
 - [ ] Try it on phones (E2B on a phone's 8k window with the tool definitions: the step prompts are ~1-1.5k tokens) and with a server model.
 
-## 24. Agent tools: device actions, confirmed by the user — implemented; Android verified, iOS/Mac Catalyst untested
+## 24. Agent tools: device actions, confirmed by the user — implemented; Android and iOS verified, Mac Catalyst untested
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] iOS / Mac Catalyst: EventKit events and reminders, Apple Maps (built, not run; the first use asks for access).
+- [x] iOS (2026-11-05, an iPad Air, driven through WebDriverAgent with Gemma 4 E2B on the GPU): "Add Emgu test event on
+      Friday at 3 pm to my calendar" showed the card (Friday, November 6, 3:00-4:00 PM), "Add event" brought iOS's
+      calendar prompt (the write-only one), and the step read "- done"; a reminder "tomorrow at 9 am" the same, with
+      the Reminders prompt; "Get walking directions to Boston Common" opened Apple Maps; Cancel gave "- cancelled" and a
+      reply saying so. The test entries were removed by a temporary self-test with full access. Seen meanwhile: the
+      model sometimes passes a date `WhenParser` can't read ("This Saturday, November 7") and the step line then still
+      reads "Added ..." over the failure text; the card's buttons aren't in the accessibility tree (item 21).
+- [ ] Mac Catalyst: EventKit events and reminders, Apple Maps (built, not run; the first use asks for access).
 - [ ] Alarms more than 24 hours ahead (a calendar event is suggested instead); timers/alarms on iOS (no public API).
 
 ## 25. Goals and check-ins — goals, reminders and end dates implemented; verified on Android
@@ -471,21 +481,29 @@ Apple asks App Store apps, and SDKs that use "required-reason" APIs, to declare 
 them in a `PrivacyInfo.xcprivacy`. The demo has none yet, and neither do the iOS frameworks it embeds
 (`LiteRt`, `tfliteextern`, `LiteRtLm` and `GemmaModelConstraintProvider`, item 36).
 
-- [ ] Check which required-reason APIs the app and its frameworks use: `nm -u` on each framework and the app binary
+- [x] (2026-11-05) Check which required-reason APIs the app and its frameworks use: `nm -u` on each framework and the app binary
       for file timestamps (`stat`/`fstat`/`getattrlist`, `NSFileModificationDate`), disk space (`statfs`,
       `NSFileSystemFreeSize`), system boot time (`systemUptime`), user defaults (`NSUserDefaults`) and active
       keyboards. The demo itself uses `Preferences` (user defaults) and file modification times (`DownloadableFile`'s
       `.sha256ok` markers); Microsoft's guidance for .NET MAUI apps also lists the .NET runtime's file timestamp,
       boot time and disk space uses.
-- [ ] Add a `PrivacyInfo.xcprivacy` to the demo (`Platforms/iOS`, and Mac Catalyst's, as a bundle resource) declaring
+- [x] (2026-11-05) Add a `PrivacyInfo.xcprivacy` to the demo (`Platforms/iOS`, and Mac Catalyst's, as a bundle resource) declaring
       those APIs with their reason codes. Decide whether the frameworks get their own manifests (needed if they are
       shipped to other apps through the NuGet packages): the runtime packages could carry one per framework.
-- [ ] Data collection (`NSPrivacyCollectedDataTypes`) and the App Store privacy labels: the models run on the device
+- [x] (2026-11-05) Data collection (`NSPrivacyCollectedDataTypes`) and the App Store privacy labels: the models run on the device
       and chats stay local, but the web tools send queries (and, with location shared, the place) to Open-Meteo,
       Wikipedia, Frankfurter and Tavily; none track the user (`NSPrivacyTracking` false).
 - [ ] Confirm by uploading a Release build to App Store Connect (or `xcrun altool --validate-app`) and fixing what
       validation reports - also the embedded frameworks' `Info.plist` and `MinimumOSVersion` (the Gemma library needs
       iOS 26.4).
+- Found and done (2026-11-05): `nm -u` on the iOS Debug app and its six frameworks: the app binary (with the .NET
+  runtime) uses `stat`/`fstat`/`lstat`, `fstatfs`, `mach_absolute_time` and `NSUserDefaults`; LiteRt, LiteRtLm and
+  GemmaModelConstraintProvider `stat`/`fstat`(/`lstat`, LiteRtLm also `mach_absolute_time`); LiteRtMetalAccelerator
+  `fstat` and `NSUserDefaults`; omniextern and tfliteextern none. `Platforms/iOS/PrivacyInfo.xcprivacy` and
+  `Platforms/MacCatalyst/PrivacyInfo.xcprivacy` (bundle resources in the csproj, at the bundle's root) declare file
+  timestamps C617.1, disk space E174.1, boot time 35F9.1 and user defaults CA92.1, no tracking and no collected data
+  (the web tools send the user's own queries to the services asked about). The frameworks get no manifests of their
+  own: none is on Apple's list of SDKs that need one; revisit if they ship to other apps.
 
 ## 36. Split the iOS natives into frameworks — implemented; verified in the simulator
 
@@ -883,7 +901,15 @@ The camera feature's clips, photos, camera switch, shutter click and sound-trigg
   a 1.3 MB photo (deleted by the test, not looked at). It first failed with "Could not create the sound monitor":
   YAMNet's loading progress set the page's status label from a worker thread, a UIKit error on iOS; `ChatPage.SetStatus`
   marshals to the main thread now (FEATURES.md), so sound monitors work on iOS at all.
-- [ ] Not done: the rest of the visual checks (a photo and a clip looked at; Save to Photos), a real detection
-  triggering a photo or a clip, a sound-triggered clip, the photo's 4:3 full-sensor size (the 720p format offers
-  16:9), the preview presented from the detector thread (the layer allows it), Mac Catalyst on this path (it keeps
-  OpenCV's capture).
+- [x] 2026-11-05: a sound-triggered clip ("Record a 10 second video clip when you hear an alarm", the Mac playing the
+  alarm): a 10.0 s clip with sound, deleted unseen.
+- [x] 2026-11-05: 4:3 photos. The session now runs a 4:3 format (`UseFourByThreeFormat`: the largest photos, then the
+  smallest video of at least 1280x960 at 30 fps; `LiveCamera.FormatChosen`): back 1920x1440 with 4032x3024 photos in
+  0.10 s, front 2016x1512 with 3088x2316 photos in 0.27 s; frames 720x960 (portrait) at 30 fps; a 5 s clip 1440x1920 at
+  30 fps with the frames at 30 fps meanwhile. The 720p preset stays where no such format exists.
+- [x] 2026-11-05: the preview from the camera thread. `LiveCameraPreview.PresentsFromAnyThread` (iOS with the handler,
+  until it falls back); the chat's camera and the Vision pages present each frame where they get it, with no hop to
+  the main thread (the handler converts it into its pool and takes a lock against Clear and the disconnect). On the
+  camera thread `Present` took 1.18 ms a frame (back) and 0.43 ms (front); the main thread does no per-frame work.
+- [ ] Not done: the rest of the visual checks (a photo and a clip looked at, the 4:3 preview looked at; Save to
+  Photos), a real detection triggering a photo or a clip, Mac Catalyst on this path (it keeps OpenCV's capture).

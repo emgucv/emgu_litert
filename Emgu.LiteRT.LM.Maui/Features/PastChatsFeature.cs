@@ -198,6 +198,13 @@ namespace Emgu.LiteRT.LM.Maui.Features
         {
             if (_status == null)
                 return;
+            // The index reports from its worker (a Progress made there, a callback after ConfigureAwait(false)): on iOS a
+            // label set off the main thread is a UIKit consistency error, which would stop the indexing.
+            if (!MainThread.IsMainThread)
+            {
+                MainThread.BeginInvokeOnMainThread(() => IndexStatus(text));
+                return;
+            }
             _status.IsVisible = On;
             _status.Text = text;
         }
