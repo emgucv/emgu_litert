@@ -560,6 +560,14 @@ the Windows share sheet opens and the shared ZIP holds chat.md. Import remains o
       new blue in its `Theme`, templates and `ReplyView`'s link colour. Checked in the iPhone simulator: the demo; the
       sample with its green in both themes; the sample without it, #3D7BF7 in dark mode and #2563EB after a live switch
       to light.
+- [x] The status colours (2026-11-05): ChatSuccess #2BA84A was 2.7-3.1:1 on the light surfaces and ChatDanger #D93B3B
+      3.9-4.5 there and 3.2-4.1 on the dark ones. Both follow the theme now, like the accent: `ChatSuccessLight` #207B36
+      (4.6-5.3) / `ChatSuccessDark` #2BA84A (4.6-6.0), `ChatDangerLight` #D02828 (4.5-5.2) / `ChatDangerDark` #E36C6C
+      (4.5-5.9), the styles' red text a `DynamicResource`, the voice recording's stop button the darker red in both (a
+      graphic under white). Found on the way: the confirmation card's "✓ Added ..." and an MCP server's "Connected" asked
+      `SetThemeColor` for a "ChatSuccess" pair that didn't exist, so they were transparent - visible now; the stock chart's
+      price follows the theme, a failed task step uses the theme's red (was `Colors.IndianRed`). Checked in the iPhone
+      simulator with a temporary page of cards and labels: light, dark, and a live switch.
 
 ## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst
 

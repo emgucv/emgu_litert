@@ -120,7 +120,7 @@
                                     QuoteMarkColor="#C2C7D6" />
                     <Label Text="…" IsVisible="{Binding IsInterrupted}" FontFamily="InterRegular" FontSize="15" TextColor="#656B81" />
                     <Label Text="{Binding Error, StringFormat='Error: {0}'}" IsVisible="{Binding IsFailed}" FontFamily="InterRegular"
-                           FontSize="14" TextColor="#D93B3B" />
+                           FontSize="14" TextColor="#D02828" />
                 </VerticalStackLayout>
             </Border>
             <!-- Copies the reply's answer (ChatView.CopyMessageCommand), once it is written: a small icon; the text itself can be selected on Windows. -->

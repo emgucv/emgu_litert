@@ -117,7 +117,8 @@
     <Style x:Key="ChatTalkStopButtonStyle" TargetType="Button">
         <Setter Property="Text" Value="&#x25A0;" />
         <Setter Property="FontSize" Value="15" />
-        <Setter Property="BackgroundColor" Value="{StaticResource ChatDanger}" />
+        <!-- The darker red in both themes: a graphic under white, which the dark theme's lighter red would wash out. -->
+        <Setter Property="BackgroundColor" Value="{StaticResource ChatDangerLight}" />
         <Setter Property="TextColor" Value="White" />
         <Setter Property="CornerRadius" Value="18" />
         <Setter Property="Padding" Value="0" />
@@ -376,7 +377,7 @@
                 <Label x:Name="PART_Status" FontSize="14" FontFamily="{StaticResource ChatBodyFont}"
                        TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
                 <ProgressBar x:Name="PART_Progress" ProgressColor="{DynamicResource ChatAccent}" />
-                <Label x:Name="PART_Note" FontSize="13" FontFamily="{StaticResource ChatBodyFont}" TextColor="{StaticResource ChatDanger}" />
+                <Label x:Name="PART_Note" FontSize="13" FontFamily="{StaticResource ChatBodyFont}" TextColor="{DynamicResource ChatDanger}" />
                 <HorizontalStackLayout Spacing="8">
                     <Button x:Name="PART_Download" Text="Download" Style="{StaticResource ChatSendButtonStyle}" />
                     <Button x:Name="PART_Retry" Text="Retry" Style="{StaticResource ChatSendButtonStyle}" />
@@ -481,7 +482,7 @@
                     <Label Text="…" IsVisible="{Binding IsInterrupted}" FontSize="15"
                            TextColor="{AppThemeBinding Light={StaticResource ChatSecondaryTextLight}, Dark={StaticResource ChatSecondaryTextDark}}" />
                     <Label Text="{Binding Error, StringFormat='Error: {0}'}" IsVisible="{Binding IsFailed}" FontSize="14" FontFamily="{StaticResource ChatBodyFont}"
-                           TextColor="{StaticResource ChatDanger}" />
+                           TextColor="{DynamicResource ChatDanger}" />
                 </VerticalStackLayout>
             </Border>
             <!-- Copies the reply's answer (ChatView.CopyMessageCommand), once it is written: a small icon; the text itself can be selected on Windows. -->

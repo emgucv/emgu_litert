@@ -22,8 +22,8 @@ internal static class Theme
     public static readonly Color TileBackground = Color.FromArgb("#E8EFFE");
     public static readonly Color ImageBackground = Color.FromArgb("#F2F2F7");
     public static readonly Color Chevron = Color.FromArgb("#C2C7D6");
-    public static readonly Color Success = Color.FromArgb("#2BA84A");
-    public static readonly Color Danger = Color.FromArgb("#D93B3B");
+    public static readonly Color Success = Color.FromArgb("#207B36");
+    public static readonly Color Danger = Color.FromArgb("#D02828");
 
     public const string BodyFont = "InterRegular";
     public const string TitleFont = "InterSemiBold";

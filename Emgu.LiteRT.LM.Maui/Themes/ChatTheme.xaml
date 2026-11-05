@@ -15,8 +15,14 @@
     <Color x:Key="ChatAccent">#2563EB</Color>
     <Color x:Key="ChatAccentLight">#2563EB</Color>
     <Color x:Key="ChatAccentDark">#3D7BF7</Color>
-    <Color x:Key="ChatDanger">#D93B3B</Color>
-    <Color x:Key="ChatSuccess">#2BA84A</Color>
+    <!-- The status colours follow the theme too, at least 4.5:1 as text on its surfaces: in light mode a darker green
+         (#2BA84A was 2.7-3.1) and red (#D93B3B 3.9-4.5), in dark mode a lighter red (#D93B3B was 3.2-4.1). -->
+    <Color x:Key="ChatDanger">#D02828</Color>
+    <Color x:Key="ChatDangerLight">#D02828</Color>
+    <Color x:Key="ChatDangerDark">#E36C6C</Color>
+    <Color x:Key="ChatSuccess">#207B36</Color>
+    <Color x:Key="ChatSuccessLight">#207B36</Color>
+    <Color x:Key="ChatSuccessDark">#2BA84A</Color>
     <Color x:Key="ChatPrimaryTextLight">#1A1C2E</Color>
     <Color x:Key="ChatPrimaryTextDark">#E8EAF2</Color>
     <!-- At least 4.5:1 (WCAG AA) on the light surfaces: 5.3 on white, 4.6 on the page and the reply bubble (#8A8FA3 was 2.8-3.2). -->

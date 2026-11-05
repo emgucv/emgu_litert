@@ -34,8 +34,8 @@ namespace Emgu.LiteRT.LM.Maui
                     + " (" + (percent >= 0 ? "+" : "") + percent.ToString("0.00", CultureInfo.InvariantCulture) + "%)",
                 FontSize = 14
             };
-            // One colour for both themes (no Light/Dark pair: SetThemeColor would find none and leave the text transparent).
-            price.TextColor = ChatResources.FindColor(change >= 0 ? "ChatSuccess" : "ChatDanger");
+            // The theme's pair, readable on either surface (before the pairs existed this was one colour for both themes).
+            ChatResources.SetThemeColor(price, Label.TextColorProperty, change >= 0 ? "ChatSuccess" : "ChatDanger");
             var period = ChatPage.Note(chart.Intraday ? chart.Period + ", every 5 minutes" : chart.Period);
             var plot = new GraphicsView { Drawable = new Drawable(chart), HeightRequest = 170, HorizontalOptions = LayoutOptions.Fill };
             var card = new Border

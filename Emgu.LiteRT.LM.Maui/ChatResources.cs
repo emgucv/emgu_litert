@@ -50,23 +50,30 @@ namespace Emgu.LiteRT.LM.Maui
                 else
                     appResources.MergedDictionaries.Add(_theme);
             }
-            UpdateAccent();
-            Application.Current.RequestedThemeChanged += (s, e) => UpdateAccent();
+            UpdateThemeColors();
+            Application.Current.RequestedThemeChanged += (s, e) => UpdateThemeColors();
         }
 
         private static ChatTheme _theme;
 
-        // The theme's ChatAccent for the app's current theme, from "ChatAccentLight" / "ChatAccentDark" (the app's, if it
-        // defines them): a darker blue in light mode, for text that reads. An app's own ChatAccent is found before the
-        // theme's, so it is used in both. The styles take it as a DynamicResource and follow a switch; views built in code
-        // take the colour of the theme at the time.
-        private static void UpdateAccent()
+        // The colours that follow the theme under one key - the accent and the status colours - and their "...Light" /
+        // "...Dark" pairs.
+        private static readonly string[] ThemedColors = { "ChatAccent", "ChatSuccess", "ChatDanger" };
+
+        // The theme's ChatAccent, ChatSuccess and ChatDanger for the app's current theme, from their "...Light" / "...Dark"
+        // keys (the app's, if it defines them): darker in light mode, lighter red in dark mode, for text that reads. An
+        // app's own ChatAccent (or ChatSuccess, ChatDanger) is found before the theme's, so it is used in both. The styles
+        // take them as a DynamicResource and follow a switch; views built in code take the colour of the theme at the time.
+        private static void UpdateThemeColors()
         {
             if (_theme == null)
                 return;
-            Color accent = ThemeColor("ChatAccent");
-            if (accent != Colors.Transparent)
-                _theme["ChatAccent"] = accent;
+            foreach (string name in ThemedColors)
+            {
+                Color color = ThemeColor(name);
+                if (color != Colors.Transparent)
+                    _theme[name] = color;
+            }
         }
 
         /// <summary>A resource by key: the app's, else the built-in; null if neither has it.</summary>

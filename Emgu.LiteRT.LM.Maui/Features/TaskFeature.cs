@@ -593,7 +593,7 @@ public sealed class TaskFeature : ChatFeature
                         FontFamily = bodyFont,
                         FontSize = 12,
                         FontAttributes = FontAttributes.Italic,
-                        TextColor = step.State == TaskPlan.State.Failed ? Colors.IndianRed : secondaryText,
+                        TextColor = step.State == TaskPlan.State.Failed ? ChatResources.FindColor("ChatDanger") : secondaryText,
                         MaxLines = 3,
                         LineBreakMode = LineBreakMode.TailTruncation
                     });
