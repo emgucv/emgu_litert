@@ -18,6 +18,7 @@ Their full write-ups are in [history/TODO-done.md](history/TODO-done.md):
 
 - 1. Resume partial downloads — completed (.NET / MAUI)
 - 2. Show which models are downloaded
+- 5. A new app icon — completed (the Windows check done 2026-10-29)
 - 6. Run the model-free tests in CI — completed
 - 7. An agent regression test — implemented
 - 8. A Storage page in settings
@@ -32,25 +33,6 @@ Their full write-ups are in [history/TODO-done.md](history/TODO-done.md):
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [x] Z-Image-Turbo on the Windows GPU (2026-11-02): `ZImageTurbo.Backend = "gpu"`, "Z-Image-Turbo · GPU" in the demo, 4.3-4.7 s a picture instead of 120-133 s (RTX 3070, all 9 per-step graphs, ~5.5 GB of video memory, PSNR 28.2 dB), a free-video-memory budget (`GpuMemory`, DXGI) with the rest on the CPU, a release when the chat model changes (`MODELS.md`, `FEATURES.md`). Open: Mac Catalyst (Metal) and Android are untested; what a card with less than ~3 GB does (the budget logic is tested with `ChooseGpuGraphs` only); the compute precision and the int8 option were measured on one block (FP16 gives NaN; the option unset wasn't measured for memory).
-- [x] Windows image generation on the GPU (2026-11-02): Bonsai Image 4B and FLUX.2-klein 4B draw on the RTX 3070 through WebGPU (3.8-4 s and 9.5-18 s a picture against 48 and 55 s on the CPU; `BonsaiDrawsOnTheGpu`, `Flux2KleinDrawsOnTheGpu`), offered in the demo when the GPU runtime is in the build, and the first load of an image model (about 10 minutes of compiling on the GPU) is no longer silent: the picture's tile and Settings count it with an estimate, Stop works, and a choice is loaded in the background when it is chosen (`FEATURES.md`). Open: Bonsai 512 x 512 on Windows (Mac Catalyst only now; another 4.3 GB download), a picture beside a GPU chat model takes 18-38 s here (shared 8 GB), the first-load estimate is measured on one GPU.
-- [x] Windows image generation, the model itself (2026-10-29): `TestZImageTurbo` passes on Windows x64 (CPU, models already on disk):
-      step 0 matches the reference (cosine 0.995), 8 steps in 64-69 s (23 s on an M1), a good apple picture, deterministic between
-      runs. Its PSNR against the reference is 17.9 dB (35.1 on the M1: other CPU kernels, same scene, different details), so the
-      test's minimum is 15 dB on Windows.
-- [x] Windows image generation inside the app (2026-10-29, driven through UI Automation, the Save and reopen steps by hand): with Gemma 4 E2B on the CPU and
-      the 10.6 GB model and its caches already on disk, "Draw a red fox sitting in fresh snow, in watercolor style." called `generate_image` and drew
-      a good picture in 87 s (the stages and steps show: encoding, step 1-8 of 8, decoding), answered "Here is a red fox sitting in fresh snow...",
-      saved it with the chat (kind `generated`), enlarged it, saved it as a file and showed it again on reopening the chat. Not run: the very first
-      picture on a machine without the caches (about 9 GB are written then).
-- [x] Recording a voice message live on Windows (2026-10-29): `VoiceRecorder` in the packaged app (the MAUI permission, then
-      MediaCapture) wrote a 16 kHz mono 16-bit WAV of the right length, and Gemma 4 E2B transcribed it (`UnitTestAudioFile`,
-      opt-in with `EMGU_AUDIO_FILE`): clear speech picked up by the StreamCam's microphone. It first recorded only zeros: the
-      one active input was NVIDIA Broadcast with no source behind it. Android capture/model input passed earlier
-      (Mac Catalyst is the next line).
-- [x] Windows PDF page renderer (`Emgu.LiteRT.LM.Maui`'s `PdfPageRenderer`, `Windows.Data.Pdf`), checked 2026-10-29 in a test
-      harness on the EGL 1.5 spec (pages render, an out-of-range page gives null). Found: the renderer multiplies the
-      destination size by the display scale (150% gave 1536 px for 1024), so the first page is measured and redrawn.
 - [ ] Windows: the photo library (`StorageFile` details; its thumbnails now use `StorageFile.GetThumbnailAsync` - the library's
       Windows build had broken on Emgu CV and an ambiguous `Path`, fixed 2026-10-29).
 - [ ] Photo search on a real phone's library (only the emulator's test photos so far), on a phone whose owner agrees
@@ -64,73 +46,18 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] Foldable inner-screen UI check (Z Fold3 installed; initially locked, then wireless debugging disconnected).
 
-## 5. A new app icon — implemented; Windows visual check remains
+## 9. Update to the next LiteRT-LM release — v0.19.0 done on macOS, Mac Catalyst, iOS and Android; Windows pending
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [x] Windows taskbar and Start menu visual check (2026-10-29, Windows 11, 150% scaling): the taskbar button and the Start search result (list and the large preview) show
-      the icon - a blue square with a white chat bubble and a sparkle, legible at the taskbar's size, but a hard-edged square beside the neighbouring
-      rounded icons. It first showed a grey placeholder: the demo is run by registering the build output folder (`Add-AppxPackage -Register`), which
-      never gets the icons MAUI generates into `obj/.../resizetizer/r/` (`appicon*.png`) - copy them to the folder's root, like `Resources/Raw`, then
-      register again. A real MSIX package has them.
-
-## 9. Update to the next LiteRT-LM release — v0.19.0 done on macOS, Mac Catalyst, iOS and Android; Windows pending
-
-**Moved to LiteRT-LM v0.19.0 (2026-11-01)**, with `litert` at its `LITERT_REF` `dcb657e8` (LiteRT 2.4.0, TFLite 2.23.0); the
-code before it is tagged `v0.18.0`. The plan, with what changed and why: `history/LITERT_LM_V019_PLAN.md`. In short:
-- C API 1.0.0: every `Emgu.LiteRT.LM` import ported to status codes and `out` results (`size_t` as `UIntPtr`, borrowed stop
-  tokens), the 28 functions never imported are wrapped too (speculative decoding, `Session.Clone`, the model-info queries,
-  file descriptors, single-threaded execution, the experimental header), and `LiteRtLmException` carries `Status`,
-  `FunctionName` and `ErrorMessage`. Errors follow Emgu CV's pattern everywhere (CLAUDE.md, "Error handling"), including a
-  fix for TFLite's error callback, which threw through native frames.
-- Speech: `omni/asr` became `omni/speech2text` on `OmniEngine`; `asrextern` was rewritten and renamed `omniextern`
-  (`SpeechToTextEngine`/`Session`), and Parakeet is one `.litertlm`. The merger fix took the noisy turns from 15.2% to 1.3%
-  of words wrong (docs/litert-lm.md).
-- The embedding models run on the GPU (item 11), and the thinking-with-images workaround is gone (fixed upstream).
-- `liblitert-lm` on macOS needs Google's `libwebgpu_dawn.dylib` (packaged next to it); the Gemma constraint provider's iOS
-  simulator prebuilt has no header room for an rpath (`ios_frameworks.sh` adds one only when needed); CMake's TFLite
-  version now falls back to the Bazel builds' `tflite_version.txt`.
-- Tests: 685 model-free, 50 Native (with new exception tests) and the LiteRT-LM model tests on the Mac, the speech tests,
-  and the demo on Mac Catalyst, a Galaxy S10 and the Pixel Fold (Gemma 4 E2B on the GPU, Parakeet downloaded and run, the
-  embedding GPU).
-  Qwen3.5-0.8B's files had been replaced on Hugging Face: now pinned to a revision. `TestVideoMomentIndex` searches with
-  the feature's top 5 (a near tie decided its top 2).
-
-Still to do:
-- [x] Windows x64 natives (2026-11-01): `bazel_build_litert.ps1 64` and `cmake_build_litert.ps1` build; `litert_windows_exports.def`
-      regenerated (the old one named two symbols LiteRT dropped: LNK2001), `LiteRtGetStatusString` and the delegate wrapper
-      functions forced into `libLiteRt.dll` with `/INCLUDE`; `omniextern` (Kokoro and all) builds with MSVC given `/utf-8`;
-      `liblitert-lm.dll` now delay-loads `webgpu_dawn.dll` (needed for the GPU only; shipped in the GPU package since 2026-11-03); packages 0.19.0 / LiteRT 2.4.0 / TFLite 2.23.0 build.
-      Model-free and Native tests: 741 passed, 0 failed. Details: `docs/native-builds.md`.
-- [x] Windows GPU (2026-11-02): the accelerator builds unpatched on v0.19.0 in the same Bazel invocation as `liblitert-lm.dll`
-      (`bazel_build_litert.ps1 64 -Gpu`; the LiteRT-LM workspace downloads ML Drift and links its prebuilt `webgpu_dawn.dll`), and
-      `bazel_build_windows_gpu.ps1` is a thin wrapper that collects the six-DLL bundle (the ML-Drift clone, Dawn CMake build and
-      `gpu_source_patches/` are gone). Google's prebuilt accelerator does not work with our `liblitert-lm.dll` (SEHException in
-      `litert_lm_embedding_engine_create`): the accelerator must be compiled like the TFLite objects it is handed. On the RTX 3070:
-      `TestGemma4E2BChatGpu` (new) and both `...GpuMatchesCpu` embedding tests pass (cosine 0.998 to 0.999, audio included);
-      `Emgu.LiteRT.GPU.runtime.windows` 2.4.0 builds. Details: `platforms/windows/README.windows-gpu.md`, `INVESTIGATION.md`.
-- [x] Windows: thinking with tools aborted the process (found 2026-11-02 driving the packaged demo: Think on, the default, crashed on the first message). `ThinkingBudgetConstraint::ComputeMask` read the prebuilt `libGemmaModelConstraintProvider.dll`'s mask words inline, and that DLL's `std::vector` layout ({data, size, capacity}) differs from our MSVC-built `liblitert-lm.dll`'s ({first, last, end}): `length_error`, uncaught. Fixed (2026-11-02) by a patched copy of LiteRT-LM that `bazel_build_litert.ps1` builds from (`platforms/windows/litert_lm_patches`); details in `docs/litert-lm.md`. Still to do: report it to LiteRT-LM, then drop the patch when it is fixed.
-- [x] The camera tools on v0.19.0 (2026-11-02): v0.19.0 rejects a JSON array in `SendMessage(Stream)`, so the chat client's batch (a media tool result's acknowledgement and image turn) failed; it now rebuilds the conversation with all but the last message as history. `GemmaDescribesImageReturnedByCameraTool` (both settings) passes; `docs/litert-lm.md`. The router test's "Beep when a bird lands on the feeder" case (Gemma 4 E2B and E4B ask for the sound monitors, or for a visual agent) is skipped since the sound group arrived (2026-10-26): it needs the camera instructions reworked.
 - [ ] The agent regression test (item 7) with v0.19.0.
-- [x] The demo: offer the GPU search models on Mac Catalyst and Android too (item 11, 2026-11-01).
 - [ ] Ubuntu/Debian natives (CI builds them).
 
 ## 11. GPU for the embedding models — Windows, Mac (Metal), a Galaxy S10 and the Pixel Fold (OpenCL) checked; the demo offers it on Windows, Mac Catalyst and Android
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [x] Update LiteRT-LM/LiteRT together for matching prebuilt Metal/OpenCL accelerators (item 9; 2026-11-01): `EmbeddingModel.Init`
-      no longer refuses the GPU.
-- [x] CPU/GPU embeddings on a Mac (Metal: text, image and audio, cosine above 0.99, search unchanged, ~3x faster), a Galaxy
-      S10 and the Pixel Fold (OpenCL: text, cosine above 0.997, 3-5x faster); docs/litert-lm.md.
-- [x] Offer the GPU search models in the demo on Mac Catalyst and Android (2026-11-01), and check images, audio and search on
-      a phone's GPU: on the S10, image cosines 0.9896-0.9983, audio 0.9982, 4/4 searches; docs/litert-lm.md.
-- [x] Simultaneous chat/search GPU memory and indexing speed on the S10 (2026-11-01): Gemma 4 E2B and the 740M model both on
-      the GPU, PSS 4.1 GB with 1.1 GB left, no kill; 4 photos in 6.2 s (CPU 29.0 s), a 20 s video in 15.8 s (CPU 72.5 s).
 - [ ] The same on the Pixel Fold (it was off adb), and the GPU options in the Catalyst demo's list.
-- [x] iOS (2026-11-04, an iPad Air M4, a temporary self-test): the text+vision 440M model on the CPU loaded in 0.6 s, 48 ms a
-  text and 412 ms an image, each text closest to its picture (0.80 against 0.53-0.56); on the GPU the engine isn't created
-  (`litert_lm_embedding_engine_create`: iOS has no GPU accelerator in this build), and the demo doesn't offer it there.
 
 ## 12. Pixel Fold freeze — rendering stalls fixed; original ANR unconfirmed
 
@@ -152,12 +79,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] Extended screen-off / battery-policy checks on physical Android and iOS devices.
-- [x] Stalled connections (2026-11-01): on a Pixel Fold the 615 MB Parakeet download hung three times (47, 309 and 527 MB;
-      once when its Wi-Fi reconnected), since a body read had no time limit. `FileDownloadManager` now races each read
-      against `HttpClientWithProgress.StallTimeout` (60 s; Android's stream ignores cancellation), closes the stuck
-      stream, response and client in the background (`ConnectionStalledException`), and the retry resumes from the bytes
-      saved; `BackgroundDownloads` retries 3 times. `TestStalledDownloadResumesAfterTheStallTimeout`; the Fold then
-      finished from 527 MB in 67 s.
 
 ## 17. Image generation extras — implemented; verified on Mac Catalyst (draw again) and a Galaxy S10 (gallery)
 
@@ -182,31 +103,10 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 ## 21. Accessibility
 
+Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
+
 - [ ] Screen-reader labels for the newer controls: image tiles, step lines, thinking headers, the settings switches and
       download states, photo thumbnails (`SemanticProperties`).
-- [x] Buttons inside cards weren't in iOS's accessibility tree (found 2026-11-05 driving the iPad with WebDriverAgent):
-      the plan card, the confirmation cards and the written-document card had a `SemanticProperties.Description` on the
-      card's Border, which makes it one element on iOS, so VoiceOver couldn't reach the buttons inside. Fixed the same
-      day: the description is on the card's title (noted on `IChatPageHost.AddCardToReply`); on the iPad, Open maps /
-      Cancel and Run plan / Edit / Just answer / Skip are buttons in the tree, and tapping Cancel and Just answer by name
-      worked. Not a problem: the meeting card's button is "Stop and write notes" (the search for "Stop" found the
-      chat's), and the "Translate to" row shows only while the thinking is expanded (then found and tapped by name).
-      The image, photo and video tiles stay one element each (a picture to tap, nothing inside).
-- [x] Large text on iOS (2026-11-05, the iPhone 17e simulator - the narrowest phone - at the default size, the largest
-      standard size and the largest accessibility size, driven through WebDriverAgent): the chat, its reply and thinking,
-      Settings to the end, the model list, the chats sheet and the home page. Fixed: the chat header's model button ran
-      under Chats on a narrow phone at any size (a stack never shortened it; now a Grid, and when its name doesn't fit
-      beside the buttons it goes on a second header row - `ChatPage.UpdateHeaderRows`; one row in landscape and on wider
-      screens); the header's buttons keep their size, as iOS's own bars do (at the largest sizes they ran off the screen);
-      the settings' action buttons ("Apply and reload models"), the option chips and the demo's buttons wrap and grow
-      rather than cutting their text off; the embedding and image model buttons wrap the model's name; the home page's
-      tabs wrap onto a second line, and its 28 pt title keeps its size (it broke mid-word). Placeholders in the API key
-      fields stay small (iOS's own).
-- [x] Large text on Android (2026-11-05, the Pixel 8 emulator, API 35, font scale 200%): the home page, the chat with a
-      reply and its thinking, and Settings to the end work with the iOS fixes (the header's second row, the wrapped
-      buttons). One more: an option chip on two lines was cut off at the bottom - its row (a FlexLayout) measures the
-      chips at any width, i.e. as one line - so `ToggleChip` is measured at most as wide as its row; checked on Android
-      and again on iOS.
 - [ ] Contrast of the secondary text in light and dark mode.
 
 ## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst
@@ -226,41 +126,13 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [x] The plan card is saved with the chat (2026-10-27): kept with the reply as a saved file of kind `task_plan` (JSON: the steps with their state and result, and how it ended) when the card closes, and shown again, closed, when the chat is reopened (`TaskFeature.RestoreSavedFile`).
-- [x] The steps didn't see the earlier chat (only the request): "plan the same trip but cheaper" had no "same trip" to go
-      on. Since 2026-11-05 the planner, every step and the final answer (research too) are given the chat before the
-      request - its last 6 messages' text, each cut to 400 characters, at most 1,600 in all (`TaskPlan.EarlierChatText`),
-      and the planner names in each step what it is about; tested in `UnitTestTaskPlan`, and on the Mac with Gemma 4 E2B
-      (see FEATURES.md, "Task mode").
 - [ ] Proposed by the model for long requests (now only the chip).
-- [x] The planner's steps were sometimes redundant (2026-11-05): its tool list named tools twice ("calculator",
-      "weather"...), which `ChatSkillSet.ToolSummary` and task mode now name once, and the prompt asks for 2 to 7 steps that
-      each do something different, tools only where the request needs them, and 2 steps for a question with one answer.
-      Gemma 4 E2B on the Mac, five requests with the old prompt and the new: 26 steps then 22, and no more stock prices for
-      a trip or the user's location for a named city - still variable from run to run (FEATURES.md, "Task mode").
-- [x] On a tablet (2026-11-05, the iPad Air, Gemma 4 E2B on the GPU, 8k window): "Plan the same trip but cheaper" after a
-      Rome weekend - a 5-6 step plan naming Rome, run in 196-222 s, a Word document at the end. It showed `search_places`
-      searching near the user (not shared) for "hotels near the Pantheon in Rome": a town at the end of the query is now
-      searched in (`PlaceSearchService`, `UnitTestPlaceSearch`). Still to try: a phone, and a server model.
+- [ ] On a phone (the iPad ran it on 2026-11-05: an 8k window, 5-6 steps in 196-222 s), and with a server model.
 
 ## 24. Agent tools: device actions, confirmed by the user — implemented; Android, iOS and Mac Catalyst verified
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [x] iOS (2026-11-05, an iPad Air, driven through WebDriverAgent with Gemma 4 E2B on the GPU): "Add Emgu test event on
-      Friday at 3 pm to my calendar" showed the card (Friday, November 6, 3:00-4:00 PM), "Add event" brought iOS's
-      calendar prompt (the write-only one), and the step read "- done"; a reminder "tomorrow at 9 am" the same, with
-      the Reminders prompt; "Get walking directions to Boston Common" opened Apple Maps; Cancel gave "- cancelled" and a
-      reply saying so. The test entries were removed by a temporary self-test with full access. Seen meanwhile: the
-      model sometimes passes a date `WhenParser` can't read ("This Saturday, November 7") and the step line then still
-      read "Added ..." over the failure text - fixed the same day: any result but "Done:" or "CANCELLED" (the tool's
-      own "I couldn't read the date ...", a missing title, a time that has passed) ends the line with " - failed"
-      (`AgentTools.DeviceActionStepOutcome`, tested in `UnitTestDeviceActions`); the card's buttons weren't in the
-      accessibility tree (item 21, fixed).
-- [x] Mac Catalyst (2026-11-05): an event, a reminder and walking directions in Apple Maps through
-      `DeviceActions.PerformAsync` from a temporary self-test, after macOS's prompts for the app (see FEATURES.md,
-      "Device actions"); the test entries removed again. The chat's card on the Mac wasn't driven (the same code as
-      on the iPad).
 - [ ] Alarms more than 24 hours ahead (a calendar event is suggested instead); timers/alarms on iOS (no public API).
 
 ## 25. Goals and check-ins — goals, reminders and end dates implemented; verified on Android
@@ -296,7 +168,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] stdio on Mac Catalyst and Windows is untested (a program such as `npx -y <server>`); OAuth for servers that need it (the SDK has
       a client for it) - only a static header now; resources and prompts of servers aren't used, only tools.
-- [x] A reusable package: `Emgu.LiteRT.LM.Agents.Mcp` (the servers as agent tools) and `Emgu.LiteRT.LM.Maui.Mcp` (`McpFeature` for any `ChatPage`, phase C, 2026-10-26).
 
 ## 29. Serve the Mac's models to phones ("Server" option)
 
@@ -388,26 +259,7 @@ agent runs on a schedule, with a notification when there is something to say.
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [x] On a device (2026-11-04, an iPad Air M4, a temporary self-test through `ZImageTurboImageModel`): 48 s for the
-      first picture (its 9.8 GB of caches built), then 19 s - the simulator's 205-225 s weren't the device's.
-- [x] Memory: the omni models' first picture failed without more address space ("could not mmap ... xnnpack_cache:
-      Cannot allocate memory" with 4.9 GB still allowed); with `Platforms/iOS/Memory.entitlements.plist` (Extended
-      Virtual Addressing, Increased Memory Limit; the App ID `com.emgu.litert` has both) iOS allowed 12.2 GB, and
-      every model drew with at least 10.5 GB left.
 - [ ] An 8 GB iPhone (the model cards' floor): the iPad has more memory.
-- [x] The GPU on iOS (2026-11-04): LiteRT-LM's prebuilt Metal accelerator, wrapped as `LiteRtMetalAccelerator.framework`
-  and found through an rpath on `LiteRt.framework` (`docs/native-builds.md`). On an iPad Air M4: Gemma 4 E2B loaded in
-  6.6 s and wrote 52 tokens/s; EmbeddingGemma 2 the same scores, no faster (text 43 ms, image 417 ms); Qwen3-ASR 26 s in
-  3.2 s (the CPU 4.3 s). No Metal sampler library (the CPU samples, as on Android).
-- [x] "· GPU" on iOS where it helps (2026-11-04, measured on the iPad Air M4 in temporary self-tests): Gemma 4 E2B (55
-  tokens/s on the GPU, 29 on the CPU) and E4B (30 and 13) in `ChatModelCatalog`; Bonsai Image 4B (8-9 s a picture, the
-  CPU 21 s; 19 s for the first load) and FLUX.2-klein (10 s, the CPU 22 s) in the demo's image list; Qwen3-ASR's "Run on
-  the GPU" switch (`OmniSpeech.GpuAvailable`; 3.2 s against 4.3 s for 26 s). Not Z-Image-Turbo: iOS killed the app
-  compiling its graphs for the GPU, alone too (signal 9, before the load returned); not the embedding models (no faster).
-- [x] Bonsai 512 on iOS (2026-11-04, the iPad Air M4): on the GPU loaded in 11.2 s and drew in 21-26 s (an M1's GPU ~25 s),
-  9.2 GB still allowed; on the CPU 56-69 s. Offered as "Bonsai Image 4B 512 · GPU" on iOS devices with 12 GB of memory
-  or more (`LiteRtLmChatPage.LargeMemoryDevice`: `NSProcessInfo.PhysicalMemory` >= 11e9 bytes; the iPad reports 12.44e9),
-  not the CPU choice (a minute a picture).
 - [ ] Through the UI on the iPad (choosing "· GPU" in the lists, a long chat on the GPU), an 8 GB iPhone (Bonsai 512 is
   hidden there), and a Metal add-on package for iOS, as on macOS.
 
@@ -512,35 +364,15 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] Obtain/train a V5 detection head before attempting LiteRT export and a same-device V3/V5 detection comparison.
 
-## 35. Privacy manifests for an App Store release (iOS, Mac Catalyst)
+## 35. Privacy manifests for an App Store release (iOS, Mac Catalyst) — the demo's written; validation remains
 
 Apple asks App Store apps, and SDKs that use "required-reason" APIs, to declare those APIs and the reasons for using
-them in a `PrivacyInfo.xcprivacy`. The demo has none yet, and neither do the iOS frameworks it embeds
-(`LiteRt`, `tfliteextern`, `LiteRtLm` and `GemmaModelConstraintProvider`, item 36).
+them in a `PrivacyInfo.xcprivacy`. The demo's, for iOS and Mac Catalyst, are in since 2026-11-05 (the scan and the reasons:
+[history/TODO-done.md](history/TODO-done.md), same number). Still open:
 
-- [x] (2026-11-05) Check which required-reason APIs the app and its frameworks use: `nm -u` on each framework and the app binary
-      for file timestamps (`stat`/`fstat`/`getattrlist`, `NSFileModificationDate`), disk space (`statfs`,
-      `NSFileSystemFreeSize`), system boot time (`systemUptime`), user defaults (`NSUserDefaults`) and active
-      keyboards. The demo itself uses `Preferences` (user defaults) and file modification times (`DownloadableFile`'s
-      `.sha256ok` markers); Microsoft's guidance for .NET MAUI apps also lists the .NET runtime's file timestamp,
-      boot time and disk space uses.
-- [x] (2026-11-05) Add a `PrivacyInfo.xcprivacy` to the demo (`Platforms/iOS`, and Mac Catalyst's, as a bundle resource) declaring
-      those APIs with their reason codes. Decide whether the frameworks get their own manifests (needed if they are
-      shipped to other apps through the NuGet packages): the runtime packages could carry one per framework.
-- [x] (2026-11-05) Data collection (`NSPrivacyCollectedDataTypes`) and the App Store privacy labels: the models run on the device
-      and chats stay local, but the web tools send queries (and, with location shared, the place) to Open-Meteo,
-      Wikipedia, Frankfurter and Tavily; none track the user (`NSPrivacyTracking` false).
 - [ ] Confirm by uploading a Release build to App Store Connect (or `xcrun altool --validate-app`) and fixing what
       validation reports - also the embedded frameworks' `Info.plist` and `MinimumOSVersion` (the Gemma library needs
       iOS 26.4).
-- Found and done (2026-11-05): `nm -u` on the iOS Debug app and its six frameworks: the app binary (with the .NET
-  runtime) uses `stat`/`fstat`/`lstat`, `fstatfs`, `mach_absolute_time` and `NSUserDefaults`; LiteRt, LiteRtLm and
-  GemmaModelConstraintProvider `stat`/`fstat`(/`lstat`, LiteRtLm also `mach_absolute_time`); LiteRtMetalAccelerator
-  `fstat` and `NSUserDefaults`; omniextern and tfliteextern none. `Platforms/iOS/PrivacyInfo.xcprivacy` and
-  `Platforms/MacCatalyst/PrivacyInfo.xcprivacy` (bundle resources in the csproj, at the bundle's root) declare file
-  timestamps C617.1, disk space E174.1, boot time 35F9.1 and user defaults CA92.1, no tracking and no collected data
-  (the web tools send the user's own queries to the services asked about). The frameworks get no manifests of their
-  own: none is on Apple's list of SDKs that need one; revisit if they ship to other apps.
 
 ## 36. Split the iOS natives into frameworks — implemented; verified in the simulator
 
@@ -621,10 +453,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] Combined camera + sound conditions, a camera snapshot as a sound alert, and sound monitors listed beside the camera monitors.
 - [ ] Windows microphone stream (`Emgu.LiteRT.LM.Maui`'s `MicrophoneSoundSource`, `IsSupported` false on Windows); listening in the background (Android foreground service, iOS background audio).
 - [ ] Run with the camera loop and Gemma together on a phone (heat, battery) - nothing was timed together.
-- [x] iOS (2026-11-04, an iPad Air M4 beside a Mac playing sounds on cue, a temporary self-test; only class names were
-  logged): the `AVAudioEngine` tap gave 16 kHz audio, YAMNet 3-4 ms a window; speech -> Speech 0.99, a 1 kHz tone ->
-  Beep 0.94, white noise -> Hiss/White noise, a synthetic two-tone chime -> Music/Glockenspiel (not Doorbell: try a real
-  doorbell recording). The microphone gate and a monitor's alert weren't run.
 
 ## 43. Video clips as a visual-alert action — `record_clip` built for Android (Camera2); tested on a Galaxy S10 and a Pixel Fold
 
@@ -719,59 +547,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 ## 55. The demo on the library's `ChatPage` - one chat page for every app, with skills
 
-`Emgu.LiteRT.LM.Maui`'s `ChatPage` (2026-10-26, phase A of the plan: the page, `ChatFeature`/`ChatSkill`, the built-in features, the `MauiChat` sample on it; see `ARCHITECTURE.md` and `docs/agents.md`) is what other MAUI apps drop in. The demo's `LiteRtLmChatPage` derives from it since phase B, and since phase C (2026-10-27) every feature an app would want is the library's or one of its packages'.
-
-- [x] Phase B (done 2026-10-26, in the B1, B2.1, B2.2, B2.4, B2.5 and B2.6 commits below; the plan as written, the outcome in the lines after it): `LiteRtLmChatPage : ChatPage` - the model catalog as `ChatModelOption`s (`Choice.ToString()` as the id, so saved chats and the `model` setting carry over), `ChatStore` as the `IChatHistoryStore`, `AppSettings.Chat` behind `IChatPageSettings` (same keys), the server as `ConfigureClient`; delete `.Layout`, `.Settings`, `.ModelList`, `.Loading`, `.SavedChats`, `.Memories`, `.Private`, `.Agent`, `.Tools`, `.Keyboard` and `ChatAgentTools`; a `DemoChatHost : IChatHost` adapter over `IChatPageHost` and the demo's services (`ChatStore`, `SearchEmbedder`, camera, sound mute, workload, the background service) so `Chat/Features/*` compile unchanged, with thin `ChatFeature` wrappers for the chips (Plan, Voice), the extra settings sections, the context-window chips, CPU threads, storage and export. Check on Mac Catalyst (the side panel at 820 px, Enter to send) and the Fold: saved chats, memories and goals from the same `chats.db3`, private mode, server mode, MCP groups, the camera overlay, background recording.
-- [x] Phase B1 (2026-10-26): the library grew what the demo has and any app wants - `ReloadModelAsync` with the chat kept, the GPU-to-CPU prompt, resumable downloads with Continue/Not now, the context chips, CPU threads, overlays, hands-free, remote models, and the virtuals a derived page needs (`docs/agents.md`); checked on the Fold.
-- [x] Phase B2.1 (2026-10-26): the demo prepared with the old page still running - `UseLiteRtChat()`, `MenuSheet`, `ChatModelOptions.FromCatalog`, `ChatSettingsAdapter`.
-- [x] Phase B2.2 (2026-10-26): the `ChatFeature` wrappers of the demo's partials, compiled but unused until the swap - `DemoFeature`, `IDemoHost`, `DemoChatHost`, `CameraFeature` (ten partials), `DocumentsFeature`, `McpFeature`, `VoiceModeFeature`, `ServerFeature`, `TranscriptFeature`, `ExportFeature`, `StorageFeature`, `ModelSettingsFeature`, `TaskChipFeature`, `DemoToolsFeature`, `WorkloadService`, `AlertAudioReplySpeaker` (`ARCHITECTURE.md`). Next: B2.3/B2.4, the swap (`LiteRtLmChatPage : ChatPage`, the template override removed, the partials deleted), then the shrink commits and the docs.
-- [x] Phase B2.4 (2026-10-26): the swap - `LiteRtLmChatPage : ChatPage` in one file over the wrappers (`ARCHITECTURE.md`), the `ChatViewTemplate` and `ChatAttachmentViewTemplate` overrides gone from `ChatTemplates.xaml` (the transcript binds the item's `Transcript`), the demo's 39 page partials, `ChatAgentTools` and its `CpuThreadsView` deleted, the `Microsoft.Agents.AI` reference dropped; the app pins the light theme (the demo's sections are drawn in fixed light colours, invisible on the library's dark page). Checked on Mac Catalyst (driven by CGEvent clicks - `screencapture -o`, without the window shadow, is what maps to the window): Return sent a calculator question that Gemma 4 E2B answered on Metal with `calculate` and the exchange appeared in the chat list; a saved chat opened with its voice messages and step lines; the "+" menu attached the surfers sample and the model ran `analyze_visual_image` on it; the CPU row reloaded the model with the chat kept ("Reading the conversation so far...", then "3 surfboards" from the picture); private mode on and off. Conscious losses: the collapsible CPU/GPU model groups, the header Export button (a row action and a settings button now), "Writing down what you said..." under a voice message while it is transcribed, the CPU-threads reload of the search and image models (only the chat model reloads), the per-feature memory count line in the old place. Not yet: a voice message on the Mac (no microphone to drive). On the Pixel Fold (2026-10-26, `tools/deploy_android`, driven by uiautomator): `calculate` on the GPU (OpenCL, thought 28 s), the chats sheet with the Export actions and the server's chats named, a saved chat opened with its memory step line, the CPU row mid-chat ("Reading the conversation so far...", then the name spelled backwards), and "Open the camera" - which found a bug: the camera streamed but its panel never showed, because `CameraFeature` adds its panels in `OnAttached`, which the base constructor runs before the template is applied, so `AddOverlay` had no `PART_Overlay`; the library now queues overlays and layers added before the template (`FlushOverlays` in `OnApplyTemplate`), and the preview panel with Selfie camera / Close / Maximize showed on the retest.
-- [x] Phase B2.5 (2026-10-26): the shrink - the ten feature classes that still took the old `IChatHost` (`TranslationFeature`, `DeviceActionsFeature`, `WrittenDocumentsFeature`, `GoalsFeature`, `PastChatsFeature`, `PhotoSearchFeature`, `MeetingFeature`, `ExerciseFeature`, `TaskFeature` with the Plan chip merged in, `ImageFeature`) are `DemoFeature`s with their own tool groups, sections, chips and hooks (`ARCHITECTURE.md`); `IChatHost`, `DemoChatHost`, `DemoToolsFeature`, `DemoSectionsFeature` and `TaskChipFeature` deleted, `IDemoHost` down to the store, the workload policy and the page's actions. Also fixed: the features' progress during a reply ("Step 2 of 3", "Writing the answer...") stayed on the page's status line after the reply, as the send cleared only the view's. Checked on Mac Catalyst: the settings sheet with every section in its place (the image section after the embedding model, then storage, export, goals, past chats, photos, conversation memory, developer mode), `calculate` on Metal, and a plan ("convert 5 miles to kilometres, then multiply by 3") reviewed, run - `convert_units` and `calculate` as step lines, the results in the card - and answered.
-- [x] Phase B2.6 (2026-10-26): the docs - `ARCHITECTURE.md` (the page, its features, how to add one), `FEATURES.md` (the layout and agent sections, the features' file names), `README.md`, `docs/agents.md`, `CLAUDE.md`.
-- [x] Phase C, goals (2026-10-26): the library's `GoalsFeature` gained Undo last (`IAgentGoalStore.DeleteLastProgressAsync`, on the SQLite and in-memory stores, tested) and registers itself as a service; `GoalsSkill.ExtraSummary` names the extra tools in the group's summary; the demo's `GoalsFeature` is deleted, `ExerciseFeature` wires its tools, words and summary into the skill in `OnAttached`, and `ChatToolGroups` keeps only the group's name. `UnitTestToolRouting` builds the group from the skill. Checked on Mac Catalyst with Gemma 4 E2B: "I want to read 20 pages a day, and I read 25 pages today" ran `add_goal` and `log_progress` through the library's group, the settings' goals sheet showed the goal, Undo last emptied its progress (the `GoalProgress` table went from 1 row to 0) and Delete removed it. It found a library bug: `ChatPage.Link(text, null)` added a tap handler that threw on the null action, silently, so the library's goals rows (Edit, Delete, and the new Undo last, which added their own handlers after it) did nothing when tapped - `Link` now skips the handler for a null action and the rows pass theirs to it.
-- [x] Phase C, past chats (2026-10-26): the search_chats group is the library's `PastChatsFeature` over `Emgu.LiteRT.LM.Chat`'s new `ChatSearchIndex` and `IChatSearchStore` (which `ChatHistoryStore` implements - the `ChatEmbedding` table moved there, with the demo's `ChatStore` losing its copy) and a `SearchServices` (`SearchEmbedder` and `ISearchModelChoice` moved to the library, `IIndexingWorkload` with `DeviceIndexingWorkload`, the model's key, the deleted-model notice); the demo's `PastChatsFeature`, `SearchEmbedder` and Core's `ChatSearchIndex`, past-chats constants and chat-search instructions are gone, `WorkloadService` is the demo's `IIndexingWorkload`, and `ChatFeature` gained `OnAppResumed`/`OnAppStopped` (the page watches its window; `DemoFeature` dropped its own). Found on Catalyst: the page's workload was read through `_parts` while the base constructor built the settings, so the photo section threw - a `[ThreadStatic]` `_building` covers that window. Checked on Catalyst: the section (35 messages indexed), and a question about an earlier chat ran `search_chats` with its links card.
-- [x] Phase C, documents (2026-10-26): the library's `DocumentsFeature`, in a new package `Emgu.LiteRT.LM.Maui.Documents` (so `Emgu.LiteRT.LM.Maui` doesn't depend on PdfPig; its csproj, shared items, `CMakeLists.txt`, `cmake/*.in`, the root CMake, the solution and the demo's reference), over `Emgu.LiteRT.LM.Chat`'s new `IChatDocumentStore` (which `ChatHistoryStore` implements - the `Document` and `DocumentItem` tables and the chat's `DocumentId` moved there from the demo's `ChatStore`, whose record-typed methods stay as the base's) and the `SearchServices`; `ChatFeature` gained `PrepareMessageAsync`/`RefreshMessageAsync` (`ChatMessageAddition`: a message's context, attachments and step line; the page's `PrepareRequestAsync`, `AddCardToNextReply`, `StepLine`) and `OnChatSaved`; the demo's `DocumentsFeature`, its document records and methods, constants and instructions are gone, and its `SendCoreAsync` runs the features' additions through `PrepareRequestAsync` (the image references go in the request's context first, so a refresh after compacting keeps them). Checked on Catalyst with Gemma 4 E2B: a text file attached through "+" > Document (the chip: "1 passage", "Ask about the document."), a question answered from its excerpt with the "Looked in orchard_notes.txt: 1 excerpt" step line, and the saved chat recorded the document.
-- [x] Phase C, photo search (2026-10-26): `PhotoSearchFeature`, `PhotoIndex` and `PhotoLibrary` moved into `Emgu.LiteRT.LM.Maui` (as files, with their history), the place list `places.tsv.gz` as the library's embedded resource and the Android photo permissions declared by its assembly; `Emgu.LiteRT.LM.Chat` gained `IPhotoIndexStore`/`ChatPhotoEmbedding` and the `ChatPhotos` constants, `ChatHistoryStore` the `PhotoEmbedding` table (from the demo's `ChatStore`); `IIndexingWorkload` gained the `onlyWhileCharging` parameter the feature's "Index photos only while charging" setting drives, so the demo's `WorkloadService` is deleted and the page uses `DeviceIndexingWorkload` (the old charging key is read as the new one's default by `ChatSettingsAdapter`). Checked on Catalyst: the settings section with its switch, charging row and count; a photo search itself wasn't run (the user's photos).
-- [x] Phase C, written documents and meetings (2026-10-26): `WrittenDocumentsFeature` and `MeetingFeature` moved into `Emgu.LiteRT.LM.Maui` as files; the write_document group's constants are `Emgu.LiteRT.LM.Chat`'s `ChatWrittenDocuments`; the meeting feature's two demo dependencies became hooks the page sets (`SyncBackgroundService` for the camera feature's foreground service, `TranscriptAttacher` for `DocumentsFeature.AttachDocument`). The library's own AutoSave path doesn't keep written documents (nor generated pictures) with the reply yet - a saved-decorations step for later; the demo's page saves and restores them as before.
-- [x] Phase C, MCP (2026-10-26): `McpFeature` moved as a file into a new package `Emgu.LiteRT.LM.Maui.Mcp` (so `Emgu.LiteRT.LM.Maui` doesn't depend on the MCP SDK; the same wiring as the Documents package), its servers in the "mcp_servers" setting (the demo's key); the device actions' Confirm / Cancel card became the library's `ConfirmationCard`, which the demo's `DeviceActionsFeature` uses too. Checked on Catalyst: a reminder request's confirmation card (the demo offers no timers on a Mac), cancelled, and the MCP settings section.
-- [x] Phase C, the camera (2026-10-26): the camera cluster moved as files into a new package `Emgu.LiteRT.LM.Maui.CV` (`CameraFeature`'s ten partials, `ExerciseFeature`, the camera actions, `AlertAudioReplySpeaker`, the Android `MonitoringForegroundService` with its permissions declared by the assembly, `PoseDrawing`, `SoundWindower`, the four alert sounds as embedded resources; `CvFeature` as their base, `VisualDetectors` for the app's detector factories, `CameraFeature.SnapshotSaver` for an app's Save As dialog), the pure parts into `Emgu.LiteRT.LM.Agents.CV` (`VisualHostCatalog`, the snapshot and play_file actions, the `ChatCamera` constants - from the demo's Core, with the tests following), `PictureGallery` into `Emgu.LiteRT.LM.Maui` (with `FolderName` and `SaveWasCancelled`, used by the demo's image feature too) and `ChatResources.ThemeColor`. The demo keeps `DetectorFactory` (its GPU-check pictures) and the vision pages; the camera-sound and count-aloud settings are the library's keys (the demo's, through its prefix). Checked on Catalyst: the camera group answered a question about its agents and actions from `list_visual_agents`/`list_visual_actions` without opening the camera, and the alert-sounds section; the camera itself and the monitors weren't run (the user's camera and microphone). CPU threads and the workload were already the library's.
-- [x] Phase C, the server (2026-10-26): `ServerFeature` moved as a file into a new package `Emgu.LiteRT.LM.Maui.OpenAI` (so `Emgu.LiteRT.LM.Maui` doesn't depend on the OpenAI SDK; the same wiring as the MCP package), its address and model in the "server_url"/"server_model" settings (the demo's keys). The page's remote-model seams became generic: `Emgu.LiteRT.LM.Chat`'s `IRemoteChatModel` on `ChatModelOption.Remote` (connect, client, adjust/resend options, summary options, one-off questions), which the library's `ChatPage` uses by default in `CreateChatClient`, `ConnectRemoteAsync`, `ComposeOptionsAsync`, `ConfigureConversation` and `AskModelOnceAsync`; `ChatView.ResendRequested` and the page's `ShouldResend` for the message sent again after a refused request; `IChatPageHost.ResetRemote`/`ModelCapabilitiesChanged`/`RefreshModelList`/`StartNewChat`. The demo's page lost its five server overrides and `IDemoHost` its four model members. Checked on Catalyst against a mock OpenAI-compatible server (see `FEATURES.md`, "Your own server").
-- [x] Phase C, export (2026-10-26; before storage, which waits for an export in progress): `ExportFeature` moved as a file into `Emgu.LiteRT.LM.Maui` (it takes the app's exporter delegate, so the MAUI package stays free of SQLite; `ExportFolder` is the ZIPs' cache folder the storage catalog clears) and `ChatExporter` into `Emgu.LiteRT.LM.Chat.Sqlite`, over `ChatHistoryStore` (`GetChatAsync`, `GetMessagesAsync<ChatMessageRecord>`, the attachments and the document records; `UnitTestChatExport` unchanged). Found on the way: `ChatSearchIndex` used `ToHashSet`, which netstandard2.0 lacks, so `Emgu.LiteRT.LM.Chat`'s netstandard target hadn't built since the past-chats move (the MAUI and test builds use net10) - fixed. Checked on Catalyst: the Export button on a chat row opened the share sheet with the ZIP.
-- [x] Phase C, storage (2026-10-26): `StorageFeature` and `StoragePage` moved as files into `Emgu.LiteRT.LM.Maui` (the page styled with the chat's theme keys), `StorageCatalog` and `StorageFiles` into `Emgu.LiteRT.LM.Chat` (public; the catalog takes `StorageModel`s - a search model with its `Download` for the page's Download button - and `StorageFolder`s for the app's own folders, the image model's included, in place of the ImageModel kind; the store's part is the new `IChatStorageStore`, which `ChatHistoryStore` implements in `ChatHistoryStore.Storage.cs`, from the demo's `ChatStore.Storage.cs`). The feature's couplings became generic: `IStorageParticipant` (in `LM.Maui`; `PrepareStorageDeleteAsync` before a deletion - every participant at once, cancel first and wait after - and `StorageChanged` after one, after a download, or when the search model's availability changed), implemented by `PhotoSearchFeature`, `PastChatsFeature`, `DocumentsFeature` and the demo's `ImageFeature`, found through the new `ChatFeatureServices.GetAll<T>`; `SearchServices.Choice` (the `ISearchModelChoice`, for the model's name and download) and the deleted-model check and notice the storage feature adds to the services on attach (`search_deleted_<file>`, the demo's key); `IChatPageHost.RunReloadAsync`/`ReleaseModelAsync` (`ChatPage.RunReloadAsync`/`PendingReload`), so `IDemoHost` lost them. The searches start indexing again themselves when a private chat ends. Checked on Catalyst: the Storage section, the page with every entry and the free space, deleting the shared exports (the confirmation, the entry "Not on this device" after), Back.
-- [x] Phase C, the saved decorations (2026-10-26): a reply's own files are `ChatMessageItem.SavedFiles` (`ChatSavedFile`, in `Emgu.LiteRT.LM.Chat`), which a feature keeps with the reply through `IChatPageHost.AddCardToReply(card, file)` (the written documents feature at once, the demo's image feature once the picture is drawn, with a null card); `ChatHistoryStore` saves them with the reply by default (so the library's AutoSave binding keeps them) and reads them back into the loaded reply, and the page's `RestoreSavedFiles` asks the features for the cards (`ChatFeature.RestoreSavedFile`) when a chat is opened - the demo's page calls it too, so its `Drawn()`/`Take()`/`ClearDrawn()` bookkeeping is gone. `WrittenDocumentsFeature` is on the sample's page now. Checked on Catalyst: the demo (a Markdown document written by Gemma 4 E2B on the GPU, New, reopened with its card) and the sample (the same through AutoSave, on the CPU - the sample has no Metal package, and the GPU-to-CPU prompt worked; `UnitTestChatHistoryStore.SavesAReplysOwnFilesWithoutBeingGivenThem`).
-- [x] Phase C, device actions (2026-10-26; the first of the review): `DeviceActionsFeature` and `DeviceActions` (the platform code) moved as files into `Emgu.LiteRT.LM.Maui`, the group's constants into `Emgu.LiteRT.LM.Chat`'s `ChatDeviceActions` (from the demo's `ChatToolGroups`, with the routing test following). Checked on Catalyst: a reminder request's confirmation card, cancelled.
-- [x] Phase C, task mode (2026-10-26): `TaskFeature` moved as a file into `Emgu.LiteRT.LM.Maui` (the card with the theme's fonts and colours, `ChatPage.Link` for Skip/Undo); the per-message client it needs is the new `ChatFeature.CreateMessageClient(request)` - the page's `CreateMessageClient` asks the features after preparing the message (the default `SendCoreAsync` and the demo's), `ChatView.DefaultSendAsync` takes the client. Checked on Catalyst: a planned two-step question with Gemma 4 E2B on the GPU - the plan card, Run, the steps' results, the answer.
-- [x] Phase C, the voice language (2026-10-27): `VoiceLanguageFeature` moved as a file into `Emgu.LiteRT.LM.Maui` (the "voice_language" setting, the demo's key; the recognizer's language set in `OnAttached`). Checked on Catalyst: the picker in the settings.
-- [x] Phase C, the voice chat (2026-10-27): `VoiceModeFeature` moved as a file into `Emgu.LiteRT.LM.Maui`; `IReplySpeaker` gained the `Speaking` event and `Completion` task it follows (`TextToSpeechReplySpeaker` implements them now, as the CV package's `AlertAudioReplySpeaker` did), `IChatPageHost` gained `ReplySpeaker`, `IsRecording`, `StopReply` and `SendVoiceMessageAsync`, so `IDemoHost` is down to the store, the workload and whether the page is shown. Found on the way: features are attached before the page's template is applied, so a host member that reads the view (`ReplySpeaker`, `IsRecording`) is null-safe and the feature follows the speaker again in `OnAppearing`. Checked on Catalyst: the chat page opens with the chip; the layer itself wasn't started (the microphone).
-- [x] Phase C, the review (done 2026-10-27): the demo-only features were reviewed one by one for what an app would want - `DeviceActionsFeature`, `TaskFeature`, `VoiceLanguageFeature` and `VoiceModeFeature` moved (above); `TranslationFeature` and `TranscriptFeature` stay (they work on the demo's message templates - `StreamingBubble`, `UserMessageInfo` - and its own saving, which an app on AutoSave gets from the binding's transcript watch), as does `ModelSettingsFeature` (the demo's embedding-model choice); `ImageFeature` became a package of its own the next day (below). Phase C is complete: the demo's page is a `ChatPage` with the library's features plus its own three, `IDemoHost` holds the store, the workload and whether the page is shown. The plan is in `history/CHAT_PAGE_PLAN.md`.
-- [x] The follow-ups (2026-10-27): `ImageFeature` moved as a file into a new package `Emgu.LiteRT.LM.Maui.Images` (depends on `Emgu.LiteRT.LM.Maui` and `Emgu.LiteRT.Models`; the same wiring as the other packages), with `ModelSelector` and `PictureSaver` hooks for the demo's model selector and Save As dialog, the "image_generation" setting (the demo's key), the workload from the constructor, and its PNG written by `Emgu.LiteRT.Models`' new `PngEncoder` (8-bit RGB, zlib over deflate; `UnitTestPngEncoder` decodes it with Emgu CV and round-trips `PngMetadata`) instead of Emgu CV; the group's constants and instructions are `Emgu.LiteRT.LM.Chat`'s `ChatImageGeneration`. And the Windows CI follow-up: `TestCocoSsdMobilenetV1` compared the CompiledModel and Interpreter detections exactly, and on Windows the CompiledModel found a surfboard at 0.57 the Interpreter didn't - the sure detections (0.6 and up) must match one to one now, weaker ones may differ. Checked on Catalyst: the Image generation section (the model isn't on this Mac).
-- [x] A live reply through the sample's `ChatPage` on a phone: done on the Pixel Fold on 2026-10-26 (Qwen3; Gemma 4 E2B calling `roll_die`, `remember` and `get_weather`; the chats, memories and settings sheets; reopening a chat with a model switch) - two bugs fixed, see `docs/agents.md`.
-- [x] The rerun-after-stub groups (`ChatView.RerunRequested`, `ChatSkillSet.TakeRerun`) and the thinking duration saved with a reply (`ChatMessageRecord.ThinkingSeconds`, so a reopened reply says "Thought for N s"): done 2026-10-26.
-- [x] A live reply on Mac Catalyst: done 2026-10-26 (typed with System Events; Enter sent through `ChatPromptEditor`'s handler, Qwen3 thought and answered). It showed that a model without tools was still given the tool instructions and mused about "the remember tool": `ChatPageOptions.InstructionsWithoutTools` now.
-- [x] The Core project's cleanup and the model catalog (2026-10-27): `ChatToolGroups` gone (the groups' names are the features'), `ChatSessionTools` a test fixture, `ChatModelCatalog` the library's (`Emgu.LiteRT.LM.Chat`, `ChatModelCatalog.For(ChatPlatform)`; `ChatDevicePlatform.Current` in `Emgu.LiteRT.LM.Maui`), which the demo and the `MauiChat` sample both use; `ChatSettings`/`AppSettings` gone (`ModelSettingsFeature` reads its keys through `Host.Settings`).
-- [x] The thinking translation into the library (2026-10-27): `TranslationFeature` moved as a file into `Emgu.LiteRT.LM.Maui`, `LanguageText` into `Emgu.LiteRT.LM.Chat`. `ChatMessageItem` gained `Language`, `ThinkingTranslation`, `ShowThinkingTranslation`, `ThinkingDisplayText` and `ThinkingAccessory` (the library's and the demo's reply templates bind the last two to the thinking view), `ChatHistoryStore` the two columns (the demo's names, so old chats keep them) and `SaveMessageChangesAsync`, `IChatPageHost` `SaveMessageChangesAsync`. The `MauiChat` sample has it too. Checked on Catalyst (Spanish, Gemma 4 E2B on the GPU): the row, the translation, the chat reopened with it, back to the English.
-- [x] The `Maui.Demo.Lite.Core` project removed (2026-10-27): its `ChatStore` only renamed `ChatHistoryStore`'s methods and its records were empty, and `ChatPlannerInstructions.Agent` was the library's `ChatSkillSet.DefaultInstructions` word for word. The page uses `ChatHistoryStore` with a `SqliteAgentMemoryStore` and a `SqliteAgentGoalStore`, the tests the library's names; the same database and tables, so saved chats open unchanged.
-- [x] The voice message transcript into the library (2026-10-27): the demo's `TranscriptFeature` is gone; the base `ChatPage` keeps a voice message's words when the app saves the chats itself (`AutoSave` off), `SaveMessageChangesAsync` titles a "Voice message" chat, `SaveExchangeAsync` keeps words written down during the save, and `TitleOf` uses words written down before it. `IDemoHost` lost its last user and was removed. The demo's only feature of its own is `ModelSettingsFeature`. The store's side is unit-tested. Checked on the Pixel Fold the same day (a voice message spoken by the Mac's `say`, Gemma 4 E2B on the GPU): the words under the message, the chat titled with them, both back after reopening. There the words came before the save (Gemma thought for 31 s), so the page's watch for words that come after it was checked separately the same day: with the words held back 90 s in a test build, the exchange was saved without them, the page's watch saved them 66 s later, the chat was renamed with them, and they came back on reopening.
-- [x] A reopened voice message showed its saved file's name ("294_0.wav · 8 s") instead of "Voice message (0:08)": the store now keeps the name an attachment was shown with as a fourth part of the `Attachments` line (`ChatSavedAttachment.Name`; older rows read as before; `KeepsTheNameAnAttachmentWasShownWith`). Found on the Fold, 2026-10-27.
-- [x] The embedding-model choice into the library (2026-10-27): the demo's `ModelSettingsFeature` became `Emgu.LiteRT.LM.Maui`'s `SearchModelFeature` (`SearchModelOption`s, the "search_model" setting, a GPU option's `CpuFallback`, `CreateServices`), with `ISearchModelParticipant` for the photo, past-chat and document features; the page keeps its Windows GPU options, moves the old "embedding_model"/"embedding_windows_gpu" settings over, and keeps the image-model selector. `DemoFeature` and `Chat/Features/` are gone. Checked on Mac Catalyst: the section, the saved choice, the list (Cancel). Checked on the Pixel Fold (2026-10-27): Text Vision to Multimodal (the 485 MB download, "Embedding model ready" in about 30 s) and back. It found a bug: the searches were restarted from inside the reload, where they refuse to start, so the cleared photo index stayed at 0 until the page opened again - they are restarted after the reload now, and after the switch back the photos were being indexed again at once (about 9 s a photo). The Windows GPU options are still to be tried on Windows.
-- [x] Photo search said "0 photos indexed" on the Pixel Fold with 200 saved (2026-10-27): the saved index was read only once a pass got going - after waiting for the device (there: "only while charging", unplugged) and loading the search model - so until then the count was 0. `PhotoSearchFeature` now reads it (`PhotoIndex.EnsureLoadedAsync`) when the page first appears, and an indexing error stays on screen with the count (it was replaced at once by the count). Checked on the Fold: "Photo indexing paused: waiting for a charger. 200 photos indexed." No place on any photo there: the app hasn't been granted ACCESS_MEDIA_LOCATION, so Android strips the GPS positions.
-- [x] "Allow photo locations…" in Settings > Search my photos on Android (2026-10-27), while ACCESS_MEDIA_LOCATION is missing: the request, or the app's settings page; once allowed, the photos' details are read again for their places, embeddings kept. On the Fold the permission was granted without a dialog; the places pass waited for a charger (only while charging, unplugged) - check the place count once it has run.
-- [x] "Photos to index" in Settings > Search my photos (2026-10-27): 200, 1,000, 5,000 or All (the "photos_to_index" setting, 0 for all; `MaxIndexedPhotos` stays the default). Checked on Mac Catalyst: the chips, 1,000 chosen. The Mac's status said "0 photos indexed" with no error: check whether this build has Photos access (System Settings > Privacy & Security > Photos) - a library the app can't read gives no photos and no message.
-- [x] "Show me cat photos" showed eight photos of walls on the Pixel Fold, which has no cat photos (2026-10-27): a photo must now stand out against "a photo" (`ChatPhotos.SelectMatches`: a lift of 0.035, measured on 18 photos; `UnitTestPhotoMatches`). Checked on the Fold: none found. The threshold was measured with Text Vision only - check it with Multimodal, and on a real library with a few positives (e.g. "my car" where there is one).
-- [x] The Windows build of `ChatPromptEditor`: checked by hand 2026-10-29 - Enter sends, Shift+Enter adds a new line.
-- [x] The search model's Windows GPU options in the app (2026-10-29): Text Vision GPU then Multimodal 740M · GPU chosen in Settings > Embedding model,
-      "ready" on the GPU, past chats re-indexed (16 messages) and all 45 photos of the Pictures folder re-embedded by the new model (140 vision
-      tokens). The models: `TestEmbeddingGemma2MultimodalGpuMatchesCpu` (GPU/CPU cosine 0.998-0.999 for texts, an image and a spoken sentence).
-      Found: the Windows photo loader (shell thumbnails) returned empty images for OneDrive's Pictures, so nothing was indexed and no message
-      said why - it decodes and re-encodes the file now; the index still skips a photo that can't be loaded without telling the user.
-- [x] A photo question answered from the GPU-embedded index (2026-10-29): "Show me a screenshot of a web page" first got "I can't take screenshots" (no tool
-      call; `find_photos` only said "photos or pictures"), fixed in its description (regression scenario `screenshot-photos`), then showed the
-      Pictures folder's screenshots.
-- [x] The CPU fallback when a GPU search-model load fails (2026-10-29, driven through UI Automation with `libLiteRtWebGpuAccelerator.dll` moved aside):
-      "GPU embedding model could not load - litert_lm_embedding_engine_create failed ... Run this model on CPU instead?" appeared; "Run on CPU"
-      chose "Multimodal 740M · CPU", kept the embeddings (45 photos, 26 messages) and carried on; choosing the GPU option again after putting the
-      DLL back loaded it. Not run: the dialog's Cancel.
-- [x] Photos the library can't load are counted in the status ("; 1 couldn't be read", checked with a corrupt PNG, removed afterwards).
+Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] Places search (`search_places`, 2026-10-29; see `docs/agents.md`): built and unit-tested, checked on Windows with OpenStreetMap and a named town. Still to check: the device-position path ("nearest ..." with Share my location on) on the Fold and an iPhone, Google Places with a real key (the request is written from Google's documentation, never sent), Apple Maps on Mac Catalyst (`AppleMapsPlaceSearch`; on iOS it ran on an iPad Air on 2026-11-04: 25 libraries near a fixed point in 0.9 s, the nearest not first).
 - [ ] Video moments (`VideoMomentsFeature`, 2026-10-29; see FEATURES.md, "Video moments"). It was checked in the iOS simulator, on Mac Catalyst, the Galaxy S10 and the Galaxy Z Fold 3 with a synthetic 30 s video, and on an iPad Air M4 (2026-11-04: watched with sound in 7.8 s, the simulator 19.6 s; every query's first moment its scene, the spoken phrase at 00:20-00:22; searches ~50 ms). Still to check:
@@ -808,145 +584,39 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 ## 56. Text to image through LiteRT-LM's omni engine (Bonsai Image 4B, FLUX.2-klein 4B)
 
-`libomniextern` draws with LiteRT-LM's two text-to-image models (2026-11-01): `TextToImageEngine`, `TextToImageModel` with `BonsaiImage4B` and `Flux2Klein4B`, `ImageFeature` over `IImageModel` with Settings > Image model (Bonsai on the CPU the default, Z-Image-Turbo kept), one Storage row per model. Measured on an M1 and a Galaxy S10 (`Emgu.LiteRT.Models/MODELS.md`).
+Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [x] Mac: both models on the CPU and Metal through `omni_runner` and the C# tests (`UnitTestTextToImage`, `TEST_MODELS`); macOS, iOS and Android natives rebuilt; the demo builds for Catalyst, the iOS simulator and Android.
-- [x] Galaxy S10: Bonsai on the CPU (260-285 s a picture) beside Gemma 4 E2B on the GPU (no kill); the GPU (Adreno 640) runs out of memory, falling back to the CPU; a picture drawn through the chat.
 - [ ] Pixel Fold and Z Fold 3 (12 GB): Bonsai and FLUX.2-klein on the GPU (OpenCL) - does a 12 GB phone's GPU fit the FP32 graphs? - and FLUX.2-klein on the CPU.
 - [ ] Mac Catalyst through the UI (choose a model, draw, Stop during a picture, delete a model in Storage); not driven (no clicks on this Mac).
-- [x] Regenerate `Resources/Raw/licenses.json.gz` with `tools/make_licenses.py` (Bonsai Image and FLUX.2-klein added to its list; 2026-11-01).
 - [ ] Windows: `libomniextern` isn't built there yet, so the demo offers Z-Image-Turbo only.
-- [x] iOS on a device (2026-11-04, an iPad Air M4, with the memory entitlements; see item 31): Bonsai on the CPU loaded
-  in 5.9 s and drew in 21 s, FLUX.2-klein in 9.0 s and 22 s, 3.9 GB of caches each, the pictures right. Not yet on an
-  8 GB iPhone, nor through the chat's UI.
-- [x] Bonsai at 512 x 512 (2026-11-01): Emgu's repackaging with a GPU-friendly VAE decoder (`tools/export_flux2_vae_decoder.py`, `MODELS.md`), on Emgu's public S3; `BonsaiImage4B512`, offered on Mac Catalyst (CPU and GPU); 66 s / 25 s on an M1.
 - [ ] Bonsai 512 on phones: on the Pixel Fold's GPU (2026-11-01) it loads in 159 s and draws in 201 s, but at 7.0 GB PSS (about 5 GB of GPU memory) Android closed the other apps and then killed the demo (in the background) before a second picture. To offer it on 12 GB phones: try with the demo in front, release the chat model while drawing, and limit it to phones with 12 GB or more.
 - [ ] Maybe: prune caches of an older copy of the model file (their names carry the file's time and size) when it is downloaded again.
 
 ## 57. Kokoro text to speech through LiteRT-LM's omni engine
 
-`libomniextern` speaks with LiteRT-LM's Kokoro 82M (2026-11-01): `TextToSpeechEngine`, `TextToSpeechModel` with `Kokoro82M`, the chat's `ChatVoice` (read-aloud, the voice chat, alerts, exercise counts) and Settings > Voice (`VoiceFeature`: the choice, a voice per language, "Try it"), one Storage row. Measured on an M1 and a Galaxy S10 (`docs/litert-lm.md`, `FEATURES.md` "Voice").
+Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [x] Mac: the 9 languages, the 54 voices, Parakeet hearing Kokoro word for word, packing sentences (`UnitTestTextToSpeech`, `TEST_MODELS`); macOS, iOS and Android natives rebuilt.
-- [x] Galaxy S10: Settings > Voice and "Try it" through the UI; about 2.2 s a run on its GPU; three sentences said in 15.6 s for 12.8 s of speech.
 - [ ] On a phone: a hands-free voice-chat turn with Kokoro (the microphone pausing and resuming around its playback), a camera alert's `speak_text`, and memory beside Gemma 4 E2B on the GPU.
 - [ ] Shorter pauses: play the pieces gaplessly (AudioTrack, AVAudioEngine, AudioGraph) instead of a WAV file and a player each; start the first sound sooner by cutting the first sentence at a comma.
 - [ ] Mac Catalyst through the UI (the section, "Try it", a reply read aloud).
-- [x] iOS on a device (2026-11-04, an iPad Air M4, the CPU file): loaded in 0.8 s, 4.0 s and 6.6 s of speech in 0.6 s
-  (0.09-0.16 of real time); Qwen3-ASR on the Mac wrote both back word for word. Not through the UI (a reply read aloud).
-- [x] Next omni models: Qwen3-ASR 0.6B (Chinese, Japanese and the other languages Parakeet lacks) - item 58.
 
 ## 58. Qwen3-ASR speech recognition through LiteRT-LM's omni engine
 
-`libomniextern` writes down speech with Alibaba Qwen's Qwen3-ASR-0.6B too (2026-11-02): `Qwen3Asr06B` (30 languages,
-960 MB), `SpeechEngine.Qwen3Asr` and its routing in `SpeechEngines.Choose` (the chosen model when it has the language,
-else the other downloaded one, else the device's recognizer), `OmniSpeech` (was `ParakeetSpeech`) for both models, a
-third chip in Settings > Speech recognition, a Storage row, and no spaces at Chinese and Japanese window seams
-(`SpeechToTextModel.Append`). Measurements in `docs/litert-lm.md`, "Speech recognition".
+Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [x] Mac: `omni_runner` on 12 synthetic clips in 8 languages (CPU and GPU, both mergers, overlaps 0.4 and 0.75);
-  `UnitTestQwen3Asr` (English, Chinese, Japanese, 24 s of Chinese across windows) and the model-free routing tests.
-- [x] macOS, iOS and Android natives rebuilt; the demo builds for Android.
-- [x] Galaxy S10 (2026-11-03, a temporary self-test with `say` clips through `SpeechRecognizer`, `MODELS_OVERRIDE`):
-  Japanese, Chinese, Korean and English as on the Mac, about real time on long clips; Parakeet chosen with Chinese used
-  Qwen3-ASR; a 77 s meeting cut into pieces kept up one piece behind; beside Gemma 4 E2B on the GPU both worked; the
-  Settings section shown (FEATURES.md).
-- [x] Through the microphone on the S10 (2026-11-03, clips from the Mac's speakers): voice messages (Japanese, Chinese,
-  Parakeet chosen with Japanese) and a meeting card; the meeting was first dropped as silence, fixed (quiet pieces to
-  the speech model, `SpeechEngines.Boost`; FEATURES.md).
-- [x] Japanese through a microphone near the speaker (2026-11-04, an iPad Air M4 beside a Mac mini's speakers, a temporary
-  self-test through `MicrophoneSoundSource`, nothing saved): recorded at -14 to -19 dBFS peak, Qwen3-ASR wrote 4 s of
-  Japanese word for word and 26 s with 8.7% of the characters wrong (5.1% from the file), Chinese 1.0%, English 1.4%,
-  each in 1-4 s; so the S10's 21-45% came from the distance (-43 dBFS). It added a word from the 2.5 s of room after
-  two clips ("空。", "Stream.").
-- [x] The GPU on the S10 (2026-11-03): about 1.6 times as fast (0.4-0.6 of real time), the same text, but 12.8 s to create
-  and ~1.2 GB of free memory against ~0.4 GB; `SpeechToTextModel.Init("gpu")` allowed, the app stays on the CPU.
-- [x] A GPU choice for Qwen3-ASR (2026-11-04): Settings > Speech recognition > "Run Qwen3-ASR on the GPU", off by default
-  (`OmniSpeech.UseGpu`, Android and Mac Catalyst; the CPU when the GPU fails). On the S10 beside Gemma 4 E2B on the GPU:
-  26 s in 16.9 s (the CPU 26.4 s), 1.2 GB left available (the CPU 2.0 GB), Gemma kept answering. In the Mac Catalyst
-  demo (M1, Metal): about 1.4 times as fast (26 s in 5.1 s, the CPU 7.3 s; 8.0 s beside Gemma 4 E2B on the GPU), 10.2 s
-  for the first clip with the load (the CPU 1.8 s).
 - [ ] Maybe: fewer windows' overlap on the CPU.
-- [x] Qwen3.5-2B on the S10 (2026-11-03): CPU 7.2 tokens/s, 2.7-3.6 GB; its GPU slower and 6 GB, so the catalog keeps the CPU.
 - [ ] Mac Catalyst and iOS: the Catalyst builds again since the demo and MauiChat need Mac Catalyst 17.0 (the new SDK
   pack's lowest, 2026-11-03), not run with Qwen3-ASR yet. The iOS simulator build failed to link
   (`_xamarin_initialize_dynamic_registrar` undefined) after the iOS SDK pack moved to 27.1: `obj/.../nativelibraries`
   kept the old pack's `libxamarin-dotnet-debug.dylib`, which the link searches first; it builds again with the
   platform's `bin`/`obj` deleted (2026-11-03, the demo and MauiChat).
-- [x] iOS simulator (iPhone 18 Pro, iOS 27.2, 2026-11-03): the demo starts; Qwen3-ASR through `SpeechRecognizer` (a
-  temporary self-test, `EMGU_LM_SELFTEST=1`) wrote down the clips as on the Mac (4.2 s with the load, then 0.2 of real
-  time), and a clip at 1% volume word for word (`SpeechEngines.Boost`).
-- [x] iOS: `omniextern.framework` and `LiteRtLm.framework` both registered miniaudio's Objective-C class
-  `ma_ios_notification_handler` (both link LiteRT-LM's miniaudio; omniextern also exports its 1,077 `ma_*` symbols), and
-  iOS warns at launch that this "may cause spurious casting failures and mysterious crashes". The same source, so far
-  harmless. Fixed 2026-11-04: omniextern links against LiteRtLm (`//omniextern_ios`, two `cc_shared_library`s; 2.4 MB
-  instead of 22.5 MB; `docs/native-builds.md`); no warning in the simulator, Qwen3-ASR and a Qwen3 chat work.
-- [x] On an iPad Air (M4, iPadOS 27.2; 2026-11-04), the same frameworks (a temporary self-test): no warning; Qwen3-ASR
-  4 s clips in 0.45-0.5 s and 21-26 s ones in 3.1-4.3 s (0.13-0.16 of real time), the same text, a 1%-volume clip word
-  for word; Qwen3 0.6B in 1.0 s; Gemma 4 E2B on the CPU called a tool with constrained decoding (one call, 2.5 s), used
-  its result in a follow-up, and again with thinking (6.1 s); iOS allowed at least 3.9 GB more throughout.
 - [ ] Maybe: pass the language Qwen3-ASR detects back (its decoder skips it; a LiteRT-LM change), and the 1.7B model on
   computers.
 - [ ] Next omni models: maybe Moonshine tiny (English, 52 MB) or Whisper tiny for older phones.
 
 ## 59. The live camera on iOS — AVFoundation, at parity with Android's Camera2; measured on an iPad Air M4
 
-`LiveCamera` runs on iOS since 2026-11-04 (`Emgu.LiteRT.Models.CV.Maui/LiveCamera.AVFoundation.cs`): an `AVCaptureSession` at
-1280x720 with a BGRA video data output on its own queue, each buffer wrapped as a `Mat` without a copy, scaled to 960 px and
-converted to BGR (about a millisecond); the frames come upright from the connection's `VideoOrientation` (no `Rotate`,
-`FrameRotation` stays null) and unmirrored from the selfie camera; the back or the front camera (`Front`, the cross-platform
-`HasFrontCamera`); full-resolution photos from an `AVCapturePhotoOutput` in the same session (`TakePhotoAsync`: JPEG q0.95 at the
-active format's largest size, upright through the orientation tag, the frames never pause) and clips from an `AVAssetWriter`
-fed the camera's own buffers (`RecordClipAsync`: H.264 720p 30 fps MP4, AAC 44.1 kHz mono when `withAudio`, the microphone
-added to the session for the clip, the orientation frozen meanwhile). The shared parts of photos and clips (one at a time,
-a photo before a clip, no file on failure) moved from `LiveCamera.Camera2.cs` into `LiveCamera.cs`. The preview on iOS is a
-`LiveCameraPreviewHandler` (`AVSampleBufferDisplayLayer` fed IOSurface-backed pixel buffers from a pool, one BGR-to-BGRA
-conversion a frame, `ReadyForMoreMediaData` backpressure, the UIImage path as the fallback) registered by `UseLiveCamera()`.
-The camera feature's clips, photos, camera switch, shutter click and sound-triggered camera alerts are gated
-`ANDROID || (IOS && !MACCATALYST)`; the thumbnails come from ImageIO and `AVAssetImageGenerator`, Save goes to Photos
-(`PictureGallery.SavePhotoAsync`/`SaveVideoAsync`). The detectors try the Metal GPU on iOS (`CocoDetector.CanTryGpu`).
+Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [x] Frames (iPad Air M4, iPadOS 27.2, a temporary self-test, numbers only): 30.0 fps from the back and the front camera,
-  960x540 in landscape and 540x960 in portrait, the camera started in 0.14-0.24 s and stopped in 0.05 s, a restart fine,
-  0.1 ms to copy a frame, snapshots 10-22 KB in 0.03 s, no frame dropped by the preview.
-- [x] The renderer: `Present` 0.84 ms a frame on the main thread against 0.87 ms through a UIImage a frame, both at 30 fps
-  with a gen-0 collection every 12 s: no main-thread time saved on this device at this size. Kept for what it does
-  save - no image object, CGImage or texture upload a frame - and because the layer takes frames from any thread
-  (the consumers still present from the main thread).
-- [x] The detectors on the live frames, GPU (Metal) against CPU, a frame: hands 2.9 ms against 3.7, YOLOX 8.6 against
-  10.7, face 1.3 either way, COCO 2.7 either way ("GPU + CPU"); pose and holistic kept the CPU by their own checks
-  (4.3 ms each; the pose models don't compile fully, the holistic GPU wasn't faster). GPU loads 0.6-1.2 s. The camera
-  and the preview held 30 fps while each detector ran.
-- [x] Photos: the back camera 4224x2376 (the 720p format's largest, 16:9; 1.27 MB) in 0.06-0.08 s, the front 2304x1296 in
-  0.05 s, the frames at 30 fps through and after them, the orientation tag set (TopLeft in landscape, the sensor's
-  pixels); a cancelled photo and one cut by a stop leave no file.
-- [x] Clips: 5 s H.264 1280x720 30 fps, 292 KB silent and 343 KB with AAC 44.1 kHz mono 95 kbps, the preview at 30 fps
-  (29.1 while the microphone joined), a clip with sound while `MicrophoneSoundSource`'s tap listened (16,000 samples/s
-  before, during and after: no clash, no interruption); a cancelled clip leaves no file; the camera stopping 1.5 s into
-  a clip kept the 1.2 s recorded - and returned 9 s after the stop at first: removing the microphone from the session
-  beside the stop's `StopRunning` blocked that long, so the clip's teardown and the camera's release share a lock and
-  the teardown leaves a stopping session alone (6 ms now).
-- [x] 2026-11-03: the user checked the camera view on the iPad: it works.
-- [x] 2026-11-04: the shutter click not heard on the iPad when a monitor took a picture. A self-test played
-  `camera_click.wav` through the same AVAudioPlayer path four times (alone, with the camera running, beside a photo, under
-  the Playback category) and the user heard all four; the app's console then showed the monitor ("take a photo when you
-  see a person") ran `take_snapshot`, which was silent by design (item 50 clicked for `take_photo` only), because the
-  planner keeps `take_photo` for a full-resolution or high-quality photo. Now `take_snapshot` plays the click too, under
-  the same "Camera sounds" setting (`CameraFeature.Snapshots.cs`), on Android and iOS; clips stay silent.
-- [x] 2026-11-04: a sound-triggered photo on the iPad, through the real chat page from a self-test ("Take a photo when
-  you hear an alarm", the Mac playing a smoke-alarm pattern): the monitor heard it within a second and the camera took
-  a 1.3 MB photo (deleted by the test, not looked at). It first failed with "Could not create the sound monitor":
-  YAMNet's loading progress set the page's status label from a worker thread, a UIKit error on iOS; `ChatPage.SetStatus`
-  marshals to the main thread now (FEATURES.md), so sound monitors work on iOS at all.
-- [x] 2026-11-05: a sound-triggered clip ("Record a 10 second video clip when you hear an alarm", the Mac playing the
-  alarm): a 10.0 s clip with sound, deleted unseen.
-- [x] 2026-11-05: 4:3 photos. The session now runs a 4:3 format (`UseFourByThreeFormat`: the largest photos, then the
-  smallest video of at least 1280x960 at 30 fps; `LiveCamera.FormatChosen`): back 1920x1440 with 4032x3024 photos in
-  0.10 s, front 2016x1512 with 3088x2316 photos in 0.27 s; frames 720x960 (portrait) at 30 fps; a 5 s clip 1440x1920 at
-  30 fps with the frames at 30 fps meanwhile. The 720p preset stays where no such format exists.
-- [x] 2026-11-05: the preview from the camera thread. `LiveCameraPreview.PresentsFromAnyThread` (iOS with the handler,
-  until it falls back); the chat's camera and the Vision pages present each frame where they get it, with no hop to
-  the main thread (the handler converts it into its pool and takes a lock against Clear and the disconnect). On the
-  camera thread `Present` took 1.18 ms a frame (back) and 0.43 ms (front); the main thread does no per-frame work.
 - [ ] Not done: the rest of the visual checks (a photo and a clip looked at, the 4:3 preview looked at; Save to
   Photos), a real detection triggering a photo or a clip, Mac Catalyst on this path (it keeps OpenCV's capture).
