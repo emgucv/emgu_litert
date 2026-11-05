@@ -93,6 +93,16 @@ and the team's latest Program License Agreement accepted). Models can be copied 
 self-test gets its environment from `DEVICECTL_CHILD_EMGU_LM_SELFTEST=1 xcrun devicectl device process launch --console
 ...`, which also shows the app's console.
 
+Driving the app on the device - taps, typing, screenshots and the view tree, as adb and uiautomator do on Android - goes
+through Appium's [WebDriverAgent](https://github.com/appium/WebDriverAgent) (cloned beside this repo, v16.15.3), an
+XCUITest runner the team signs with its wildcard profile and `xcodebuild ... test` keeps running on the device; its HTTP
+server (port 8100) is reached over USB at the device's CoreDevice tunnel address (`devicectl device info details`,
+"Tunnel IP Address"; no port forwarder needed: a status call took 10 ms, against 2.3 s for the first one over Wi-Fi) or
+over Wi-Fi. `tools/ios_wda.py` is a small client (session, find, click, setvalue, tap, type, screenshot, source) with
+the start command and the device settings it needs (Developer Mode; UI Automation on iOS 17+) in its header. Checked on
+the iPad Air (2026-11-04): it opened the chat, typed "What is 12 times 7?", sent it, and the view tree showed
+"Called calculate" and "12 times 7 is 84."
+
 ### Android
 
 Start an emulator or connect a device, then:
