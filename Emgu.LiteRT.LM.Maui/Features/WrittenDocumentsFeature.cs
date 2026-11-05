@@ -141,8 +141,15 @@ public sealed class WrittenDocumentsFeature : ChatFeature
             try
             {
                 string path = await WriteDocumentFileAsync(fileName, data);
+#if MACCATALYST
+                // In the Mac's app for it (Pages, TextEdit...): MAUI's file opener showed iOS's "open in" sheet - AirDrop, Mail,
+                // Notes - with no app that edits it, the same as Share.
+                if (!await UIKit.UIApplication.SharedApplication.OpenUrlAsync(Foundation.NSUrl.FromFilename(path), new UIKit.UIApplicationOpenUrlOptions()))
+                    throw new InvalidOperationException("No app can open it.");
+#else
                 if (!await Launcher.Default.OpenAsync(new OpenFileRequest(fileName, new ReadOnlyFile(path, mediaType))))
                     throw new InvalidOperationException("No app can open it.");
+#endif
             }
             catch (Exception ex)
             {

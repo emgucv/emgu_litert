@@ -38,7 +38,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       Windows build had broken on Emgu CV and an ambiguous `Path`, fixed 2026-10-29).
 - [ ] Photo search on a real phone's library (only the emulator's test photos so far), on a phone whose owner agrees
       to have their photos indexed for the test.
-- [ ] Mac live recording reached the OS microphone permission request; no completed capture is claimed.
 - [ ] Real-library photo indexing awaits owner agreement; Windows runtime checks await a Windows device/VM.
 
 ## 4. Collapsible "Model" section in settings — implemented; foldable UI check pending
@@ -91,7 +90,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Open and Share not yet tapped on a device (Mac Catalyst opens Pages/Preview, Android the user's apps).
+- [ ] Open and Share on Android (the user's apps) not yet tapped; on the Mac both work (2026-11-05).
 - [ ] Long content: the model writes it in its reply budget (1,024 tokens by default in `LiteRtLmChatClient`); for
       longer documents, ask it to write section by section.
 
@@ -131,8 +130,8 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number (the reminders and the end dates since
 2026-10-29). Still open:
 
-- [ ] Reminders on a real iPhone and the Mac, Snooze, and after a phone restart (only the Pixel Fold's first reminder
-      was seen).
+- [ ] Reminders on a real iPhone, Snooze (Android only: Apple's have no Snooze action), and after a phone restart (the
+      Pixel Fold's first reminder and the Mac's were seen).
 - [ ] A "Done" on the reminder itself: the goal database is the app's, out of a notification receiver's reach; for
       now tapping it opens the app.
 

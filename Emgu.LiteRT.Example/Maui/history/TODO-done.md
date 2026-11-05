@@ -104,6 +104,12 @@ Moved from TODO.md on 2026-11-05:
       harness on the EGL 1.5 spec (pages render, an out-of-range page gives null). Found: the renderer multiplies the
       destination size by the display scale (150% gave 1536 px for 1024), so the first page is measured and redrawn.
 
+Moved from TODO.md on 2026-11-05:
+
+- [x] Mac live recording (it had reached the OS microphone permission request, no completed capture): on 2026-11-05 the
+      demo on Mac Catalyst got the microphone permission and recorded 9 s from it (`VoiceRecorder`, a USB webcam's
+      microphone) while the Mac spoke, and Apple's recognizer wrote the sentence down (item 22).
+
 ## 4. Collapsible "Model" section in settings — implemented; foldable UI check pending
 
 In wide windows (desktop, a foldable's inner screen) the side panel shows Chats, Model and Settings
@@ -482,6 +488,10 @@ gallery / the Pictures folder), "Share..." and "Save image...".
 - [ ] Open and Share not yet tapped on a device (Mac Catalyst opens Pages/Preview, Android the user's apps).
 - [ ] Long content: the model writes it in its reply budget (1,024 tokens by default in `LiteRtLmChatClient`); for
       longer documents, ask it to write section by section.
+- [x] Open and Share on Mac Catalyst (2026-11-05, Gemma 4 E2B, a temporary self-test): MAUI's file opener showed iOS's
+      "open in" sheet (AirDrop, Mail, Notes...) with no app that edits the file, so Open now hands it to
+      `UIApplication.OpenUrlAsync`, which opened the packing list in TextEdit (the Mac's app for .docx there); Share
+      shows the share sheet. The test chat was deleted.
 
 ## 19. A private chat
 
@@ -814,6 +824,9 @@ Moved from TODO.md on 2026-11-05:
 - [x] Gemma 4 E4B (2026-11-05, on the Mac's GPU, a temporary self-test): "Add a goal: ... read 12 books this year" saved
       it with its target (12 books), "I finished a book today ..." logged progress, and "How am I doing on my goals?"
       said 1 of 12 - about 20 s each. The test goal and chat were deleted.
+- [x] A reminder on the Mac (2026-11-05, a temporary self-test): after the notification permission was allowed, a daily
+      reminder scheduled a minute ahead was delivered at its time (in Notification Center: no banner, as the Mac's
+      Focus was on), and cancelling it left nothing pending.
 
 ## 26. Agent tool: clipboard (`read_clipboard`) — implemented
 
