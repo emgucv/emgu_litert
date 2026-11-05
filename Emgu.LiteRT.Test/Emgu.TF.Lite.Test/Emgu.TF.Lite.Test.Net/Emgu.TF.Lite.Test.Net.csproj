@@ -185,6 +185,8 @@
   <Import Project="..\..\..\Emgu.LiteRT.Runtime\Windows\Emgu.TF.Lite.Runtime.Windows.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
   <Import Project="..\..\..\Emgu.LiteRT.Runtime\Mac\Emgu.TF.Lite.Runtime.Mac.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
   <Import Project="..\..\..\Emgu.LiteRT.Runtime\Ubuntu\Emgu.TF.Lite.Runtime.Ubuntu.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('linux'))" />
+  <!-- The Debian (linux-arm/linux-arm64) natives, only when they have been built: the shared project warns otherwise. -->
+  <Import Project="..\..\..\Emgu.LiteRT.Runtime\Debian\Emgu.TF.Lite.Runtime.Debian.projitems" Label="Shared" Condition="$([MSBuild]::IsOSPlatform('linux')) AND (Exists('$(MSBuildThisFileDirectory)..\..\..\lib\runtimes\linux-arm64\native\libtfliteextern.so') OR Exists('$(MSBuildThisFileDirectory)..\..\..\lib\runtimes\linux-arm\native\libtfliteextern.so'))" />
 
   <!-- Microsoft Agent Framework (brings Microsoft.Extensions.AI), for the IChatClient / agent tests of
        Emgu.LiteRT.LM.Extensions.AI in UnitTestLiteRtLm.cs. -->
