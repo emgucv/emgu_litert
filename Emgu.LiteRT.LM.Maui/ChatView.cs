@@ -389,7 +389,11 @@ namespace Emgu.LiteRT.LM.Maui
             if (_input is Entry entry)
                 entry.Completed += (s, e) => _ = SendAsync();
             if (_scroll != null)
+            {
                 _scroll.Scrolled += (s, e) => _atEnd = e.ScrollY >= _scroll.ContentSize.Height - _scroll.Height - 40;
+                // Made shorter (the keyboard on iOS): the end stays in view if it was.
+                _scroll.SizeChanged += (s, e) => { if (_atEnd) ScrollToEnd(); };
+            }
             if (_transcript != null)
                 _transcript.SizeChanged += (s, e) => { if (_atEnd) ScrollToEnd(); };
             if (_loadCard != null)

@@ -259,6 +259,7 @@ namespace Emgu.LiteRT.LM.Maui
                 _started = true;
                 SelectInitialModel();
             }
+            StartKeyboardTracking();
             foreach (ChatFeature feature in _features)
                 feature.OnAppearing();
         }
@@ -283,6 +284,7 @@ namespace Emgu.LiteRT.LM.Maui
         protected override void OnDisappearing()
         {
             base.OnDisappearing();
+            StopKeyboardTracking();
             foreach (ChatFeature feature in _features)
                 feature.OnDisappearing();
         }
