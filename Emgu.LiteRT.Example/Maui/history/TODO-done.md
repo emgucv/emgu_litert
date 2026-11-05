@@ -1736,3 +1736,13 @@ The camera feature's clips, photos, camera switch, shutter click and sound-trigg
   until it falls back); the chat's camera and the Vision pages present each frame where they get it, with no hop to
   the main thread (the handler converts it into its pool and takes a lock against Clear and the disconnect). On the
   camera thread `Present` took 1.18 ms a frame (back) and 0.43 ms (front); the main thread does no per-frame work.
+
+- [x] The visual checks (2026-11-05, looked at, through WebDriverAgent and screenshots): the 4:3 preview - maximized, the
+  selfie frame exactly 3:4 in portrait, upright and sharp (the back camera was black: the iPad lay face up); photos
+  through "Take a photo when you hear an alarm" (the Mac playing the alarm): back 4032x3024 (2.4 MB), selfie 3088x2316
+  (1.7 MB), the selfie one upright; a 5 s clip with sound (about 4 MB) played inline, upright and sharp; "Save to
+  gallery" saved both to Photos after iOS's add-only prompt (its text now names camera photos and clips too).
+  Found and fixed: the clip card's buttons broke words ("Paus|e") since the demo's default button style wrapped (taken
+  out again; the chips, the settings' action buttons and the model buttons keep it) and "Full screen" was squeezed to
+  "Full screer" by its FlexLayout row (the buttons don't shrink now: it goes to the next line); the clip thumbnails were
+  black (the nearest keyframe to 0.5 s, sometimes the black first frame; now exactly 1 s, checked with a self-test).

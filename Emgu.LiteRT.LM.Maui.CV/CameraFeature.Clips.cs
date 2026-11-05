@@ -144,7 +144,14 @@ public sealed partial class CameraFeature
                 catch (Exception ex) { await Host.AskAsync("Couldn't save the clip", ex.Message, "OK"); save.IsEnabled = true; }
             };
             var buttons = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, MaximumWidthRequest = 300, HorizontalOptions = LayoutOptions.Start };
-            foreach (Button button in new[] { play, fullScreen, share, save }) { button.Margin = new Thickness(0, 0, 6, 4); buttons.Children.Add(button); }
+            // Not shrunk to fit a line (FlexLayout's default): a squeezed "Full screen" was cut to "Full screer" on an iPad; it
+            // goes to the next line instead.
+            foreach (Button button in new[] { play, fullScreen, share, save })
+            {
+                button.Margin = new Thickness(0, 0, 6, 4);
+                FlexLayout.SetShrink(button, 0);
+                buttons.Children.Add(button);
+            }
             var row = new VerticalStackLayout
             {
                 Spacing = 4, Margin = new Thickness(6, 4), HorizontalOptions = LayoutOptions.Start,
@@ -170,8 +177,16 @@ public sealed partial class CameraFeature
         {
 #if IOS
             using var asset = AVFoundation.AVAsset.FromUrl(Foundation.NSUrl.FromFilename(path));
-            using var generator = new AVFoundation.AVAssetImageGenerator(asset) { AppliesPreferredTrackTransform = true, MaximumSize = new CoreGraphics.CGSize(640, 640) };
-            using var frame = generator.CopyCGImageAtTime(CoreMedia.CMTime.FromSeconds(0.5, 600), out _, out Foundation.NSError error)
+            // The frame at one second exactly. A clip's first frame is black, and without a zero tolerance the nearest
+            // keyframe to 0.5 s was taken - the first one when the next came after 1 s (black thumbnails on an iPad).
+            using var generator = new AVFoundation.AVAssetImageGenerator(asset)
+            {
+                AppliesPreferredTrackTransform = true,
+                MaximumSize = new CoreGraphics.CGSize(640, 640),
+                RequestedTimeToleranceBefore = CoreMedia.CMTime.Zero,
+                RequestedTimeToleranceAfter = CoreMedia.CMTime.Zero
+            };
+            using var frame = generator.CopyCGImageAtTime(CoreMedia.CMTime.FromSeconds(1.0, 600), out _, out Foundation.NSError error)
                 ?? generator.CopyCGImageAtTime(CoreMedia.CMTime.Zero, out _, out error);
             if (frame == null) return null;
             using var image = UIKit.UIImage.FromImage(frame);
