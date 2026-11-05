@@ -165,6 +165,8 @@ public sealed class WrittenDocumentsFeature : ChatFeature
         };
         var title = new Label { Text = "\U0001F4C4  " + fileName };
         ChatResources.ApplyStyle(title, "ChatListTitleStyle");
+        // On the title, not the card, which would hide Open and Share from VoiceOver on iOS (see ConfirmationCard).
+        SemanticProperties.SetDescription(title, "Document " + fileName);
         var detail = new Label { Text = format + " · " + SizeText(data.Length) };
         ChatResources.ApplyStyle(detail, "ChatListDetailStyle");
         var content = new VerticalStackLayout
@@ -190,7 +192,6 @@ public sealed class WrittenDocumentsFeature : ChatFeature
         };
         ChatResources.SetThemeColor(card, VisualElement.BackgroundColorProperty, "ChatSurface");
         ChatResources.SetThemeColor(card, Border.StrokeProperty, "ChatRowBorder");
-        SemanticProperties.SetDescription(card, "Document " + fileName + ", " + format);
         return card;
     }
 

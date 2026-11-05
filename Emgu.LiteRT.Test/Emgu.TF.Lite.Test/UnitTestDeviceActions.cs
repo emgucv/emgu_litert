@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Chat;
 using Microsoft.Extensions.AI;
 using NUnit.Framework;
 
@@ -140,6 +141,22 @@ public class UnitTestDeviceActions
         Assert.That(await Call("set_alarm", ("time", "today at 9am")), Does.StartWith("That time has passed"));
         Assert.That(await Call("set_timer", ("duration", "3 days")), Does.StartWith("I couldn't read"));
         Assert.That(requests.Count, Is.EqualTo(asked));
+
+        // The step line says what came of it: "Added" only when it was added (it read "Added ..." over a date the tool
+        // couldn't read, on an iPad).
+        string unread = await Call("add_calendar_event", ("title", "Dentist"), ("when", "This Saturday, November 7"));
+        Assert.That(unread, Does.StartWith("I couldn't read the date"));
+        Assert.That(requests.Count, Is.EqualTo(asked));
+        string adding = "Adding \u201CDentist\u201D to your calendar";
+        Assert.That(ChatToolStep.Done(adding + AgentTools.DeviceActionStepOutcome(unread)), Is.EqualTo(adding + " - failed"));
+        Assert.That(ChatToolStep.Done(adding + AgentTools.DeviceActionStepOutcome(await Call("add_calendar_event", ("title", ""), ("when", "Friday at 2")))),
+            Is.EqualTo(adding + " - failed"));
+        Assert.That(ChatToolStep.Done(adding + AgentTools.DeviceActionStepOutcome(AgentTools.DeviceActionFailed("no calendar"))),
+            Is.EqualTo(adding + " - failed"));
+        Assert.That(ChatToolStep.Done(adding + AgentTools.DeviceActionStepOutcome(AgentTools.DeviceActionDone("added"))),
+            Is.EqualTo("Added \u201CDentist\u201D to your calendar - done"));
+        Assert.That(AgentTools.DeviceActionStepOutcome(AgentTools.DeviceActionCancelled), Is.EqualTo(" - cancelled"));
+        Assert.That(AgentTools.DeviceActionStepOutcome(null), Is.Empty);
 
         confirm = false;
         Assert.That(await Call("set_alarm", ("time", "7am")), Does.StartWith("CANCELLED"));

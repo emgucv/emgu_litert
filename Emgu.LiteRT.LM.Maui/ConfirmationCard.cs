@@ -61,6 +61,9 @@ namespace Emgu.LiteRT.LM.Maui
             var content = new VerticalStackLayout { Spacing = 4 };
             var title = new Label { Text = (icon ?? DefaultIcon(request)) + "  " + request.Title };
             ChatResources.ApplyStyle(title, "ChatListTitleStyle");
+            // On the title, not the card: a description on a layout makes it one element on iOS, and VoiceOver can't
+            // reach the buttons inside.
+            SemanticProperties.SetDescription(title, request.Title);
             content.Children.Add(title);
             foreach (string detail in request.Details)
             {
@@ -109,7 +112,6 @@ namespace Emgu.LiteRT.LM.Maui
             };
             ChatResources.SetThemeColor(card.View, VisualElement.BackgroundColorProperty, "ChatSurface");
             ChatResources.SetThemeColor(card.View, Border.StrokeProperty, "ChatRowBorder");
-            SemanticProperties.SetDescription(card.View, request.Title + ": " + string.Join(", ", request.Details));
             return card;
         }
     }

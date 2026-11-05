@@ -184,9 +184,14 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] Screen-reader labels for the newer controls: image tiles, step lines, thinking headers, the settings switches and
       download states, photo thumbnails (`SemanticProperties`).
-- [ ] Buttons inside cards aren't in iOS's accessibility tree (found 2026-11-05 driving the iPad with WebDriverAgent): the
-      plan card's Run plan / Edit / Just answer, the confirmation cards' confirm and Cancel, the meeting card's Stop,
-      the thinking's "Translate to" row. VoiceOver can't reach them, and WebDriverAgent had to tap them by position.
+- [x] Buttons inside cards weren't in iOS's accessibility tree (found 2026-11-05 driving the iPad with WebDriverAgent):
+      the plan card, the confirmation cards and the written-document card had a `SemanticProperties.Description` on the
+      card's Border, which makes it one element on iOS, so VoiceOver couldn't reach the buttons inside. Fixed the same
+      day: the description is on the card's title (noted on `IChatPageHost.AddCardToReply`); on the iPad, Open maps /
+      Cancel and Run plan / Edit / Just answer / Skip are buttons in the tree, and tapping Cancel and Just answer by name
+      worked. Not a problem: the meeting card's button is "Stop and write notes" (the search for "Stop" found the
+      chat's), and the "Translate to" row shows only while the thinking is expanded (then found and tapped by name).
+      The image, photo and video tiles stay one element each (a picture to tap, nothing inside).
 - [ ] Large text: check the chat, settings and sheets with the largest font sizes on Android and iOS.
 - [ ] Contrast of the secondary text in light and dark mode.
 
@@ -222,7 +227,10 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       the Reminders prompt; "Get walking directions to Boston Common" opened Apple Maps; Cancel gave "- cancelled" and a
       reply saying so. The test entries were removed by a temporary self-test with full access. Seen meanwhile: the
       model sometimes passes a date `WhenParser` can't read ("This Saturday, November 7") and the step line then still
-      reads "Added ..." over the failure text; the card's buttons aren't in the accessibility tree (item 21).
+      read "Added ..." over the failure text - fixed the same day: any result but "Done:" or "CANCELLED" (the tool's
+      own "I couldn't read the date ...", a missing title, a time that has passed) ends the line with " - failed"
+      (`AgentTools.DeviceActionStepOutcome`, tested in `UnitTestDeviceActions`); the card's buttons weren't in the
+      accessibility tree (item 21, fixed).
 - [ ] Mac Catalyst: EventKit events and reminders, Apple Maps (built, not run; the first use asks for access).
 - [ ] Alarms more than 24 hours ahead (a calendar event is suggested instead); timers/alarms on iOS (no public API).
 

@@ -653,7 +653,11 @@ public sealed class TaskFeature : ChatFeature
         };
 
         var content = new VerticalStackLayout { Spacing = 8 };
-        content.Children.Add(new Label { Text = plan.Research ? "\U0001F50E  Research" : "\U0001F4CB  Plan", FontFamily = titleFont, FontSize = 15, TextColor = primaryText });
+        var heading = new Label { Text = plan.Research ? "\U0001F50E  Research" : "\U0001F4CB  Plan", FontFamily = titleFont, FontSize = 15, TextColor = primaryText };
+        // On the heading, not the card: a description on the card makes it one element on iOS, which hides the steps' Skip
+        // and the buttons from VoiceOver.
+        SemanticProperties.SetDescription(heading, plan.Research ? "The research plan" : "The plan for this task");
+        content.Children.Add(heading);
         content.Children.Add(rows);
         if (plan.Research)
         {
@@ -681,7 +685,6 @@ public sealed class TaskFeature : ChatFeature
             MaximumWidthRequest = 420,
             Content = content
         };
-        SemanticProperties.SetDescription(card.View, plan.Research ? "The research plan" : "The plan for this task");
         card.Refresh = Refresh;
         card.Begin = () =>
         {

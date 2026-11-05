@@ -161,7 +161,11 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>Mark the page busy with a feature's work (the message box waits), or done.</summary>
         void SetBusy(bool busy);
 
-        /// <summary>Show a card above the reply being written (or the latest reply); on the UI thread.</summary>
+        /// <summary>
+        /// Show a card above the reply being written (or the latest reply); on the UI thread. A card with buttons
+        /// keeps its SemanticProperties.Description off the card itself (put it on its title): on iOS a description on
+        /// a layout makes it one element, and VoiceOver can't reach the buttons inside.
+        /// </summary>
         void AddCardToReply(View card);
 
         /// <summary>

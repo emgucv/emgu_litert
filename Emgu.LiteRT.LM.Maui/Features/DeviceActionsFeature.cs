@@ -62,18 +62,9 @@ public sealed class DeviceActionsFeature : ChatFeature
     public static string InstructionsForMessage(bool handsFree) =>
         handsFree ? null : AgentTools.DeviceActionInstructions(DeviceActions.Supported);
 
-    /// <summary>The step line's ending for a device action's result: what the user chose (" - done", " - cancelled", " - failed").</summary>
+    /// <summary>The step line's ending for a device action's result: " - done", " - cancelled", or " - failed" for anything else (see <see cref="AgentTools.DeviceActionStepOutcome"/>).</summary>
     /// <param name="result">The tool's result</param>
-    public static string StepOutcome(string result)
-    {
-        if (result.StartsWith("Done:", StringComparison.Ordinal))
-            return " - done";
-        if (result.StartsWith("CANCELLED", StringComparison.Ordinal))
-            return " - cancelled";
-        if (result.StartsWith("It couldn't be done", StringComparison.Ordinal))
-            return " - failed";
-        return string.Empty;
-    }
+    public static string StepOutcome(string result) => AgentTools.DeviceActionStepOutcome(result);
 
     // A device action done: what the user chose on its step line, also in the saved chat.
     /// <inheritdoc/>

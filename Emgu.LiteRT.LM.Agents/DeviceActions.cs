@@ -404,6 +404,25 @@ namespace Emgu.LiteRT.LM.Agents
             return "It couldn't be done: " + reason + ". Tell the user.";
         }
 
+        /// <summary>
+        /// The ending of a device action's step line for the tool's result: " - done" only when it was done, " - cancelled"
+        /// when the user cancelled it, and " - failed" for anything else - a failure, or an argument the tool sent back
+        /// to the model ("I couldn't read the date ..."), when nothing was asked or done. Without it the line read
+        /// "Added ... to your calendar" over a date the tool couldn't read.
+        /// </summary>
+        /// <param name="result">The tool's result</param>
+        /// <returns>The ending, or an empty string when there is no result</returns>
+        public static string DeviceActionStepOutcome(string result)
+        {
+            if (string.IsNullOrEmpty(result))
+                return string.Empty;
+            if (result.StartsWith("Done:", StringComparison.Ordinal))
+                return " - done";
+            if (result.StartsWith("CANCELLED", StringComparison.Ordinal))
+                return " - cancelled";
+            return " - failed";
+        }
+
         private static string Clean(string text)
         {
             return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
