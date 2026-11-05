@@ -154,6 +154,33 @@ namespace Emgu.LiteRT.LM
             }
         }
 
+        private static bool? _isAvailable;
+
+        /// <summary>
+        /// True if liblitert-lm is in the app and loads: an app may be built without it, e.g. for iOS on an Intel Mac,
+        /// where LiteRT-LM can't be built, and then offers only remote models. The first check loads it.
+        /// </summary>
+        public static bool IsAvailable
+        {
+            get
+            {
+                if (_isAvailable == null)
+                {
+                    try
+                    {
+                        int major, minor, patch;
+                        litert_lm_get_api_version(out major, out minor, out patch);
+                        _isAvailable = true;
+                    }
+                    catch (Exception ex) when (ex is DllNotFoundException || ex is EntryPointNotFoundException || ex is BadImageFormatException)
+                    {
+                        _isAvailable = false;
+                    }
+                }
+                return _isAvailable.Value;
+            }
+        }
+
         /// <summary>
         /// True if the loaded liblitert-lm is LiteRT-LM v0.18.0 or later. Loads liblitert-lm.
         /// </summary>

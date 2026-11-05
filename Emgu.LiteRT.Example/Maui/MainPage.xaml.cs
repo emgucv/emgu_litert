@@ -21,7 +21,10 @@ public partial class MainPage : ContentPage
         var tabs = new List<(string Name, string Glyph, string Title, List<(string Glyph, string Title, string Subtitle, Func<Page> Create)> Rows)>();
         tabs.Add(("LiteRT-LM", Theme.GlyphText, "LiteRT-LM Demos", new List<(string, string, string, Func<Page>)>
         {
-            (Theme.GlyphText, "Chat", "Chat with Gemma 4 or Qwen on this device - images, voice and web search too", () => new LiteRtLmChatPage()),
+            // A build without LiteRT-LM (iOS from an Intel Mac) offers only the remote models.
+            (Theme.GlyphText, "Chat", Emgu.LiteRT.LM.LiteRtLmInvoke.IsAvailable
+                ? "Chat with Gemma 4 or Qwen on this device - images, voice and web search too"
+                : "Chat with Claude or your own server - images, voice and web search too", () => new LiteRtLmChatPage()),
         }));
         tabs.Add(("TF Lite", Theme.GlyphImage, "TF Lite Demos", new List<(string, string, string, Func<Page>)>
         {

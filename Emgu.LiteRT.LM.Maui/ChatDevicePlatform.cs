@@ -2,6 +2,7 @@
 //  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 //----------------------------------------------------------------------------
 
+using System.Collections.Generic;
 using Emgu.LiteRT.LM.Chat;
 
 namespace Emgu.LiteRT.LM.Maui
@@ -20,5 +21,13 @@ namespace Emgu.LiteRT.LM.Maui
 #else
             ChatPlatform.Windows;
 #endif
+
+        /// <summary>
+        /// The catalog's models (<see cref="ChatModelCatalog.For"/>) this app can run: none when LiteRT-LM isn't in the app
+        /// (<see cref="LiteRtLmInvoke.IsAvailable"/>; e.g. an iOS build from an Intel Mac, where LiteRT-LM can't be built), so
+        /// the app offers only its remote models.
+        /// </summary>
+        public static IList<ChatModelOption> AvailableModels() =>
+            LiteRtLmInvoke.IsAvailable ? ChatModelCatalog.For(Current) : new List<ChatModelOption>();
     }
 }

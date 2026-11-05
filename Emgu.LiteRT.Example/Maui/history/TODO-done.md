@@ -898,6 +898,9 @@ Moved from TODO.md on 2026-11-05:
   9.2 GB still allowed; on the CPU 56-69 s. Offered as "Bonsai Image 4B 512 · GPU" on iOS devices with 12 GB of memory
   or more (`LiteRtLmChatPage.LargeMemoryDevice`: `NSProcessInfo.PhysicalMemory` >= 11e9 bytes; the iPad reports 12.44e9),
   not the CPU choice (a minute a picture).
+- [x] The first iPhone (2026-11-05): an iPhone X (iOS 16.7, 3 GB), with the minimum iOS lowered to 15.0 (it was 17.2)
+  and built on the Intel Mac mini (Xcode 26.3), so without LiteRT-LM, which can't be built there: the chat offers only
+  Claude and the user's server, and Claude answered. Not the image models (no LiteRT-LM, and too little memory).
 
 ## 32. Live camera tools — first version implemented
 

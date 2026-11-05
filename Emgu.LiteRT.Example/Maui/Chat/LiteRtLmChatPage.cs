@@ -109,7 +109,8 @@ public sealed class LiteRtLmChatPage : ChatPage
 
     private static Parts Build()
     {
-        IList<ChatModelOption> models = ChatModelCatalog.For(ChatDevicePlatform.Current);
+        // No device models in a build without LiteRT-LM: then only Claude and the user's server (below).
+        IList<ChatModelOption> models = ChatDevicePlatform.AvailableModels();
         var parts = new Parts
         {
             Camera = new CameraFeature(new VisualDetectors(FileSystem.CacheDirectory, DetectorFactory.ValidationImage)),
@@ -352,7 +353,7 @@ public sealed class LiteRtLmChatPage : ChatPage
     // speech model, the image model's folder, the searched videos' folder, and the store's documents, indexes and attachments.
     private static StorageCatalog CreateStorageCatalog()
     {
-        IList<ChatModelOption> catalog = ChatModelCatalog.For(ChatDevicePlatform.Current);
+        IList<ChatModelOption> catalog = ChatDevicePlatform.AvailableModels();
         var models = catalog.Select(m => new StorageModel(m.DisplayName, System.IO.Path.GetFileName(m.ModelFile.LocalFile))).ToList();
         using var vision = new EmbeddingGemma2TextVision();
         using var multimodal = new EmbeddingGemma2Multimodal();

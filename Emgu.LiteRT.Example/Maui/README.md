@@ -111,6 +111,27 @@ the start command and the device settings it needs (Developer Mode; UI Automatio
 the iPad Air (2026-11-04): it opened the chat, typed "What is 12 times 7?", sent it, and the view tree showed
 "Called calculate" and "12 times 7 is 84."
 
+### iOS device from an Intel Mac, or an iOS 16 device
+
+LiteRT-LM can't be built on an Intel Mac (see `docs/native-builds.md`, "LiteRT-LM on iOS"), so there only
+`bazel_build_tflite_ios_frameworks` runs. Without `lib/ios/LiteRtLm.xcframework` the csproj builds the app without
+LiteRT-LM (`EmguWithoutLiteRtLm`): the chat offers only Claude and the user's server (`ChatDevicePlatform.AvailableModels`),
+and speech recognition, Kokoro and the omni image models are left out; the build prints "Building without LiteRT-LM".
+The app needs iOS 15 (`cmake/ios_min_version.txt`). `devicectl` only works with iOS 17 and later; for an older device
+install and start the app with the .NET SDK's `mlaunch` (the identifier from `xcrun xctrace list devices`):
+
+```bash
+M=$(ls /usr/local/share/dotnet/packs/Microsoft.iOS.Sdk.net10.0_$V/*/tools/bin/mlaunch | tail -1)
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios$V -c Debug -p:RuntimeIdentifier=ios-arm64 \
+  -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: <name> (<id>)"
+$M --installdev Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios$V/ios-arm64/Maui.Demo.Lite.app --devname <identifier>
+$M --launchdev Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios$V/ios-arm64/Maui.Demo.Lite.app --devname <identifier>
+```
+
+Without `CodesignProvision` the build has no memory entitlements and takes any matching profile (the wildcard
+`com.emgu.*` one). Verified on an iPhone X (iOS 16.7, 3 GB) on 2026-11-05, built on the Intel Mac mini with Xcode 26.3:
+the app starts, and Claude answered.
+
 ### Android
 
 Start an emulator or connect a device, then:

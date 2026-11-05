@@ -57,6 +57,22 @@
 		<UseInterpreter>false</UseInterpreter>
 	</PropertyGroup>
 
+	<!-- iOS without LiteRT-LM (lib/ios/LiteRtLm.xcframework not built: bazel_build_litert_lm_ios needs an Apple Silicon
+	     Mac): the trimmer still lists LiteRtLm and omniextern, the frameworks Emgu.LiteRT.LM's DllImports name, for the
+	     native link, which then fails ("framework 'LiteRtLm' not found"). Leave them out of the link and look
+	     Emgu.LiteRT.LM's functions up at run time, where LiteRtLmInvoke.IsAvailable is false and the chat offers only
+	     Claude and the user's server (ChatDevicePlatform.AvailableModels). -->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' and !Exists('$(MSBuildThisFileDirectory)..\..\lib\ios\LiteRtLm.xcframework')">
+		<EmguWithoutLiteRtLm>true</EmguWithoutLiteRtLm>
+		<MtouchExtraArgs>$(MtouchExtraArgs) --dlsym:+Emgu.LiteRT.LM.dll</MtouchExtraArgs>
+	</PropertyGroup>
+	<Target Name="EmguLinkWithoutLiteRtLm" AfterTargets="_LoadLinkerOutput" Condition="'$(EmguWithoutLiteRtLm)' == 'true'">
+		<ItemGroup>
+			<_LinkerFrameworks Remove="LiteRtLm;omniextern" />
+		</ItemGroup>
+		<Message Text="Building without LiteRT-LM: only remote chat models (Claude, the user's server) are offered." Importance="high" />
+	</Target>
+
 	<!--
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0-ios|AnyCPU'">
 	  <CreatePackage>false</CreatePackage>
