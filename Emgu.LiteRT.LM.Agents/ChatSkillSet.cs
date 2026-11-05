@@ -252,7 +252,7 @@ namespace Emgu.LiteRT.LM.Agents
 
         /// <summary>
         /// What the enabled skills' tools do, in words, for a planner: their <see cref="ChatSkill.ToolSummary"/> and their
-        /// groups' names.
+        /// groups' names, each once (a group's name can be another skill's summary: the planner got "calculator" twice).
         /// </summary>
         public string ToolSummary
         {
@@ -268,7 +268,7 @@ namespace Emgu.LiteRT.LM.Agents
                     foreach (ToolGroup group in skill.ToolGroups())
                         parts.Add(group.Name.Replace('_', ' '));
                 }
-                return string.Join(", ", parts);
+                return string.Join(", ", parts.Distinct(StringComparer.OrdinalIgnoreCase));
             }
         }
     }

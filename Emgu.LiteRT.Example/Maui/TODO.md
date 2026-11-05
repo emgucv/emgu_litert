@@ -232,8 +232,16 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       request - its last 6 messages' text, each cut to 400 characters, at most 1,600 in all (`TaskPlan.EarlierChatText`),
       and the planner names in each step what it is about; tested in `UnitTestTaskPlan`, and on the Mac with Gemma 4 E2B
       (see FEATURES.md, "Task mode").
-- [ ] Proposed by the model for long requests (now only the chip); the planner's steps are sometimes redundant (a "review" step at the end).
-- [ ] Try it on phones (E2B on a phone's 8k window with the tool definitions: the step prompts are ~1-1.5k tokens) and with a server model.
+- [ ] Proposed by the model for long requests (now only the chip).
+- [x] The planner's steps were sometimes redundant (2026-11-05): its tool list named tools twice ("calculator",
+      "weather"...), which `ChatSkillSet.ToolSummary` and task mode now name once, and the prompt asks for 2 to 7 steps that
+      each do something different, tools only where the request needs them, and 2 steps for a question with one answer.
+      Gemma 4 E2B on the Mac, five requests with the old prompt and the new: 26 steps then 22, and no more stock prices for
+      a trip or the user's location for a named city - still variable from run to run (FEATURES.md, "Task mode").
+- [x] On a tablet (2026-11-05, the iPad Air, Gemma 4 E2B on the GPU, 8k window): "Plan the same trip but cheaper" after a
+      Rome weekend - a 5-6 step plan naming Rome, run in 196-222 s, a Word document at the end. It showed `search_places`
+      searching near the user (not shared) for "hotels near the Pantheon in Rome": a town at the end of the query is now
+      searched in (`PlaceSearchService`, `UnitTestPlaceSearch`). Still to try: a phone, and a server model.
 
 ## 24. Agent tools: device actions, confirmed by the user — implemented; Android, iOS and Mac Catalyst verified
 

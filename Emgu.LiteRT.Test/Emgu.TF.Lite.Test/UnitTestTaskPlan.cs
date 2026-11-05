@@ -89,6 +89,8 @@ public class UnitTestTaskPlan
         Assert.That(TaskPlan.PlanPrompt("Plan the same trip but cheaper", "tools", false, earlier),
             Does.Contain("The chat before the request").And.Contain("Hotel Artemide").And.Contain("so it makes sense without the chat"));
         Assert.That(TaskPlan.PlanPrompt("Plan a trip", "tools"), Does.Not.Contain("The chat before"));
+        // Steps that each do something different, as few as needed (Gemma 4 E2B searched for the same prices twice).
+        Assert.That(TaskPlan.PlanPrompt("Plan a trip", "tools"), Does.Contain("2 to 7 short steps").And.Contain("never search for the same thing twice"));
         Assert.That(TaskPlan.ResearchPlanPrompt("Is it cheaper in June?", null, earlier), Does.Contain("The chat before the question"));
         var plan = new TaskPlan(new[] { "Find cheaper hotels in Rome", "Write the plan" }) { EarlierChat = earlier };
         Assert.That(plan.StepPrompt("Plan the same trip but cheaper", 0), Does.Contain("Hotel Artemide"));

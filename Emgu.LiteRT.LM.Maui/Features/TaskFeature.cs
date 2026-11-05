@@ -99,7 +99,8 @@ public sealed class TaskFeature : ChatFeature
         return true;
     }
 
-    // The tools the plan may use, by name, for the planner: the core tools and the skills' (their groups' names).
+    // The tools the plan may use, by name, for the planner: the core tools and the skills' (their groups' names), each once
+    // (the skills' list repeated "date and time", "calculator", "weather" and "Wikipedia").
     private string PlannerToolSummary
     {
         get
@@ -107,8 +108,8 @@ public sealed class TaskFeature : ChatFeature
             var tools = new List<string> { "date and time", "calculator", "unit and currency conversion", "weather", "Wikipedia" };
             string skills = Host.Skills.ToolSummary;
             if (!string.IsNullOrEmpty(skills))
-                tools.Add(skills);
-            return string.Join(", ", tools);
+                tools.AddRange(skills.Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries));
+            return string.Join(", ", tools.Distinct(StringComparer.OrdinalIgnoreCase));
         }
     }
 

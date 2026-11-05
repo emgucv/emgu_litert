@@ -71,7 +71,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
         /// <inheritdoc/>
         public override Task<string> InstructionsAsync(ChatMessageContext context) => Task.FromResult(
             "For shops, restaurants and other places near the user (\"what is the nearest Halloween store?\", \"where can I buy a charger?\"), use search_places with what they want: " +
-            "it knows where the user is, so don't put a town in the query or in near unless the user named it in this message. Give the closest few with their addresses and distances, each name as a Markdown link to the place's map link.");
+            "it knows where the user is, so put a town or landmark in near only when the message names one (\"in Rome\", \"near the Pantheon\" - in task mode a step names it), never a guessed one. Give the closest few with their addresses and distances, each name as a Markdown link to the place's map link.");
 
         /// <inheritdoc/>
         public override View BuildSettingsSection()

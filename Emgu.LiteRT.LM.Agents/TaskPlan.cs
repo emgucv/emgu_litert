@@ -228,7 +228,9 @@ public sealed class TaskPlan
             .Where(l => l.Length > 0).Take(MaxSteps).ToList();
 
     /// <summary>
-    /// What the model is asked to write the plan: the tools it will have, then the request. With attachments (sent with
+    /// What the model is asked to write the plan: the tools it will have, then the request. Each step does something
+    /// different, as few as the request needs: asked for 3 to 7 with "research and checks first", Gemma 4 E2B searched for
+    /// the same prices twice and added a step to "calculate the savings" (2026-11-05). With attachments (sent with
     /// this prompt), a page of numbered questions becomes a step per question: a step's result is short, so steps by
     /// process ("read the page", "calculate") lost questions - a 12B model planning a five-question worksheet that way
     /// answered three.
@@ -239,10 +241,12 @@ public sealed class TaskPlan
     /// <param name="earlierChat">The chat before the request (<see cref="EarlierChatText"/>), or null: a step names what it
     /// is about, so "the same trip" becomes the trip</param>
     public static string PlanPrompt(string request, string tools, bool attachments = false, string earlierChat = null) =>
-        "You plan tasks for an assistant. Break the request below into 3 to 7 short steps, each one concrete action the " +
-        "assistant can do with its tools (" + tools + ") or by writing, whose result the next steps or the answer need. " +
-        "Put research and checks first, and last the step that produces what the user asked for (the document, the list, the " +
-        "recommendation). " +
+        "You plan tasks for an assistant. Break the request below into 2 to 7 short steps - as few as it needs - each one " +
+        "concrete action the assistant can do with its tools (" + tools + ") or by writing, whose result the next steps or the " +
+        "answer need. Use a tool only where the request needs it. Every step does something different: never search for the " +
+        "same thing twice, and no step only to review, check or summarize the others, or to calculate when nothing needs " +
+        "calculating. A question with one answer takes 2 steps (look it up, then answer). Put research first, and last the step " +
+        "that produces what the user asked for (the document, the list, the recommendation). " +
         (attachments
             ? "The request comes with the attachments above, and every step will see them. If they hold several numbered " +
               "questions or exercises, make each step one of them, in their order (\"Solve question 10\"), up to " + MaxSteps +

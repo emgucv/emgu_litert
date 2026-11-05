@@ -828,6 +828,22 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   Pantheon", the planned "Plan the same trip but cheaper." became steps such as "Search for current flight and hotel
   prices to find cheaper accommodation options in Rome for two people in May", and the answer a cheaper Rome weekend
   near the Pantheon (122 s).
+- Fewer, different steps (2026-11-05): the planner's list of tools named several twice (the core tools and the skills'
+  groups: "date and time, calculator, ... date and time, calculator") and the prompt asked for 3 to 7 steps with "research
+  and checks first"; Gemma 4 E2B planned searches for the same prices twice, a "calculate the savings" step, stock prices for
+  a trip and the user's location for restaurants in a named city. The list now names each tool once and the prompt asks for
+  2 to 7 steps that each do something different, a tool only where the request needs it, and 2 steps for a question with
+  one answer. Five requests on the Mac, old prompt then new: the cheaper trip 6 steps (stock prices, currency, a savings
+  calculation) then 5 (Rome hotels near the Pantheon, budget activities, compare, write); phones 6 and 6; packing list 5
+  and 4; Paris weather 3 and 3 (the weather tool once, not twice); vegetarian restaurants 6 (the user's location, the same
+  search twice) and 4. One sample each, and Gemma varies: with the duplicated list the new prompt once gave the weather 6
+  steps.
+- On the iPad (Gemma 4 E2B on the GPU): the same two messages gave a 5-6 step plan naming Rome, two people and May, run in
+  196-222 s with a Word document. Its first step searched places for "budget-friendly hotels near the Pantheon in Rome"
+  with the town in the query and none in `near`, so near the user, whose location wasn't shared: "your location is not
+  known". `PlaceSearchService` now searches in a capitalised town at the end of the query ("... in Rome") when `near` is
+  empty and the town is found (else near the user, as before), and the step line says "in Rome"; the step then found Via
+  del Pantheon. Apple Maps' answers to such long phrases are thin (one hotel, no vegetarian restaurant).
 
 ## Research mode
 

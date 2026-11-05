@@ -176,6 +176,39 @@ public class UnitTestPlaceSearch
         Assert.That(geocoder.Requests.Single().Request.RequestUri.AbsoluteUri, Does.Contain("name=Ottawa"));
     }
 
+    // A task's step, "Search for hotels near the Pantheon in Rome", put the town in the query and searched near the user.
+    [Test]
+    public async Task ATownAtTheEndOfTheQueryIsSearchedInWhenNearIsEmpty()
+    {
+        Handler geocoder = new Handler
+        {
+            Reply = (request, _) => (HttpStatusCode.OK, request.RequestUri.AbsoluteUri.Contains("name=Rome")
+                ? "{\"results\":[{\"name\":\"Rome\",\"admin1\":\"Lazio\",\"country\":\"Italy\",\"latitude\":41.89,\"longitude\":12.51}]}"
+                : "{}")
+        };
+        var searches = new List<(string Query, double Lat)>();
+        bool askedDevice = false;
+        PlaceSearchService service = new PlaceSearchService(new Fake("Fake", (query, lat, lon) =>
+        {
+            searches.Add((query, lat));
+            return new List<PlaceResult> { new PlaceResult { Name = "Hotel Abruzzi", Latitude = lat, Longitude = lon } };
+        }), deviceLocation: _ => { askedDevice = true; return Task.FromResult(Home); }, http: new HttpClient(geocoder));
+
+        string text = await service.SearchAsync("budget-friendly hotels near the Pantheon in Rome", "", CancellationToken.None);
+        Assert.That(searches.Last(), Is.EqualTo(("budget-friendly hotels near the Pantheon", 41.89)));
+        Assert.That(text, Does.Contain("Rome, Lazio, Italy").And.Contain("Hotel Abruzzi"));
+        Assert.That(askedDevice, Is.False);
+
+        // Not a town ("in stock" isn't capitalised), or no town of that name: near the user, with the whole query.
+        int lookups = geocoder.Requests.Count;
+        await service.SearchAsync("phone chargers in stock", "", CancellationToken.None);
+        Assert.That(searches.Last(), Is.EqualTo(("phone chargers in stock", Home.Latitude)));
+        Assert.That(geocoder.Requests.Count, Is.EqualTo(lookups));
+        await service.SearchAsync("pizza in Atlantis", "", CancellationToken.None);
+        Assert.That(searches.Last(), Is.EqualTo(("pizza in Atlantis", Home.Latitude)));
+        Assert.That(askedDevice, Is.True);
+    }
+
     [Test]
     public async Task WithoutAPositionTheModelIsToldToAskForATown()
     {
@@ -237,6 +270,8 @@ public class UnitTestPlaceSearch
             Is.EqualTo("Looking for “pharmacy” near you"));
         Assert.That(AgentTools.Describe(new FunctionCallContent("2", "search_places", new Dictionary<string, object> { ["query"] = "pharmacy", ["near"] = "Ottawa" })),
             Is.EqualTo("Looking for “pharmacy” in Ottawa"));
+        Assert.That(AgentTools.Describe(new FunctionCallContent("3", "search_places", new Dictionary<string, object> { ["query"] = "hotels near the Pantheon in Rome" })),
+            Is.EqualTo("Looking for “hotels near the Pantheon” in Rome"));
     }
 
 #if TEST_MODELS

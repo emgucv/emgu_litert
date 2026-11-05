@@ -82,6 +82,24 @@ public class UnitTestChatSkills
         Assert.That(skills.Find<FakeSkill>(), Is.SameAs(a));
     }
 
+    // The planner got the same tools by several names ("calculator" twice): each is named once.
+    [Test]
+    public void ThePlannersToolSummaryNamesEachToolOnce()
+    {
+        var skills = new ChatSkillSet();
+        skills.AddRange(new ChatSkill[] { new FakeSkill("a"), new SummarySkill("c", "a group"), new SummarySkill("d", "A Summary") });
+        Assert.That(skills.ToolSummary, Is.EqualTo("a summary, a group"));
+    }
+
+    private sealed class SummarySkill : ChatSkill
+    {
+        private readonly string _name, _summary;
+        public SummarySkill(string name, string summary) { _name = name; _summary = summary; }
+        public override string Name => _name;
+        public override IEnumerable<AITool> Tools(ChatMessageContext context) => Array.Empty<AITool>();
+        public override string ToolSummary => _summary;
+    }
+
     [Test]
     public async Task DisabledSkillsAddOnlyTheirOffLine()
     {

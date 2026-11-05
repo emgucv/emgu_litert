@@ -561,10 +561,10 @@ namespace Emgu.LiteRT.LM.Agents
                 throw new ArgumentNullException("search");
             return AIFunctionFactory.Create(
                 ([Description("What to look for, e.g. \"Halloween store\", \"pharmacy\", \"ramen restaurant\"")] string query,
-                 [Description("A town or area to search in - only when the user names one in this message; empty to search near the user")] string near = null,
+                 [Description("The town, area or landmark to search around when the message names one (\"in Rome\", \"near the Pantheon\"); empty to search near the user")] string near = null,
                  CancellationToken cancellationToken = default(CancellationToken)) => search(query ?? string.Empty, near ?? string.Empty, cancellationToken),
                 "search_places",
-                "Finds places - shops, restaurants, services - near the user, or in a town they name, closest first, with address, distance and, where known, opening hours, rating and phone. Use it for \"nearest\", \"near me\" and \"where can I buy\" questions. It knows where the user is: don't ask for or guess a town. Each place has a Google Maps link: make its name a Markdown link to it.");
+                "Finds places - shops, restaurants, services - near the user, or in a town they name, closest first, with address, distance and, where known, opening hours, rating and phone. Use it for \"nearest\", \"near me\" and \"where can I buy\" questions. It knows where the user is: don't ask for or guess a town the message doesn't name. Each place has a Google Maps link: make its name a Markdown link to it.");
         }
 
         /// <summary>
@@ -1046,6 +1046,9 @@ namespace Emgu.LiteRT.LM.Agents
                 case "search_documents": return "Searching your documents for “" + Argument("request") + "”";
                 case "search_places":
                     string area = Argument("near");
+                    // A town at the end of the query is where it searches (PlaceSearchService), not near the user.
+                    if (area.Length == 0 && PlaceSearchService.TownInQuery(Argument("query"), out string what, out string town))
+                        return "Looking for “" + what + "” in " + town;
                     return "Looking for “" + Argument("query") + "” " + (area.Length > 0 ? "in " + area : "near you");
                 case "generate_image": return "Drawing \u201C" + Argument("prompt") + "\u201D";
                 case "get_weather":

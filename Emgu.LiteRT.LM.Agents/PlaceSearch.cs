@@ -10,6 +10,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -408,14 +409,24 @@ namespace Emgu.LiteRT.LM.Agents
         {
             if (string.IsNullOrWhiteSpace(query))
                 return "Say what to look for, e.g. \"pharmacy\".";
-            GeoPoint center;
+            GeoPoint center = null;
             if (!string.IsNullOrWhiteSpace(near))
             {
                 center = await FindTownAsync(near, cancellationToken).ConfigureAwait(false);
                 if (center == null)
                     return "Couldn't find a place called \"" + near.Trim() + "\".";
             }
-            else
+            else if (TownInQuery(query, out string what, out string town))
+            {
+                // A town at the end of the query and none in near: the model put it there (a task's step, "Search for
+                // hotels near the Pantheon in Rome", searched near the user, whose position wasn't shared). That town when
+                // it is one; else near the user, with the whole query.
+                try { center = await FindTownAsync(town, cancellationToken).ConfigureAwait(false); }
+                catch (HttpRequestException) { }
+                if (center != null)
+                    query = what;
+            }
+            if (center == null)
             {
                 center = DeviceLocation == null ? null : await DeviceLocation(cancellationToken).ConfigureAwait(false);
                 if (center == null)
@@ -512,6 +523,19 @@ namespace Emgu.LiteRT.LM.Agents
         }
 
         // A town by name, with Open-Meteo's geocoder (the whole text, then its first comma-separated part).
+        // "hotels near the Pantheon in Rome": what to look for, and the town after the last "in" - a capitalised name, so
+        // "chargers in stock" or "cafes in the area" aren't towns.
+        private static readonly Regex QueryTown = new Regex(@"^(?<what>.+)\s+in\s+(?<town>\p{Lu}[^,.?!]*(?:,\s*\p{Lu}[^,.?!]*)?)[.?!]?\s*$",
+            RegexOptions.CultureInvariant);
+
+        internal static bool TownInQuery(string query, out string what, out string town)
+        {
+            Match match = QueryTown.Match(query?.Trim() ?? string.Empty);
+            what = match.Success ? match.Groups["what"].Value.Trim() : query;
+            town = match.Success ? match.Groups["town"].Value.Trim() : null;
+            return match.Success;
+        }
+
         private async Task<GeoPoint> FindTownAsync(string place, CancellationToken cancellationToken)
         {
             foreach (string candidate in new[] { place.Trim(), place.Split(',')[0].Trim() })
