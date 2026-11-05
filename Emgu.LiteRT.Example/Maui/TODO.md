@@ -201,8 +201,12 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       the settings' action buttons ("Apply and reload models"), the option chips and the demo's buttons wrap and grow
       rather than cutting their text off; the embedding and image model buttons wrap the model's name; the home page's
       tabs wrap onto a second line, and its 28 pt title keeps its size (it broke mid-word). Placeholders in the API key
-      fields stay small (iOS's own); Android not checked.
-- [ ] Large text on Android (the font scale at 200%).
+      fields stay small (iOS's own).
+- [x] Large text on Android (2026-11-05, the Pixel 8 emulator, API 35, font scale 200%): the home page, the chat with a
+      reply and its thinking, and Settings to the end work with the iOS fixes (the header's second row, the wrapped
+      buttons). One more: an option chip on two lines was cut off at the bottom - its row (a FlexLayout) measures the
+      chips at any width, i.e. as one line - so `ToggleChip` is measured at most as wide as its row; checked on Android
+      and again on iOS.
 - [ ] Contrast of the secondary text in light and dark mode.
 
 ## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst

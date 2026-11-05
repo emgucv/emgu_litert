@@ -51,6 +51,16 @@ namespace Emgu.LiteRT.LM.Maui
             Update();
         }
 
+        // A FlexLayout row measures its chips at any width, so a chip wider than the row was measured as one line and its
+        // second line was cut off (Android at the largest text sizes): it is measured at most as wide as its row.
+        /// <inheritdoc/>
+        protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+        {
+            if (Parent is Layout row && row.Width > 0)
+                widthConstraint = Math.Min(widthConstraint, Math.Max(0, row.Width - row.Padding.HorizontalThickness - Margin.HorizontalThickness));
+            return base.MeasureOverride(widthConstraint, heightConstraint);
+        }
+
         private void Update()
         {
             Style = _isToggled ? OnStyle ?? ChatResources.Find<Style>("ChatChipOnStyle") : OffStyle ?? ChatResources.Find<Style>("ChatChipStyle");
