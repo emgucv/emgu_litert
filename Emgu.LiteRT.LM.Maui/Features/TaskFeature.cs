@@ -534,7 +534,7 @@ public sealed class TaskFeature : ChatFeature
     {
         var card = new TaskCard();
         bool running = false, finished = false;
-        Color accent = Accent, primaryText = PrimaryText, secondaryText = SecondaryText, success = ChatResources.FindColor("ChatSuccess");
+        Color accent = Accent, accentText = ChatResources.FindColor("ChatAccentText"), primaryText = PrimaryText, secondaryText = SecondaryText, success = ChatResources.FindColor("ChatSuccess");
         string titleFont = TitleFont, bodyFont = BodyFont;
         var rows = new VerticalStackLayout { Spacing = 6 };
         var editor = new Editor { IsVisible = false, AutoSize = EditorAutoSizeOption.TextChanges, FontFamily = bodyFont, FontSize = 14, TextColor = primaryText, MinimumHeightRequest = 100 };
@@ -545,7 +545,7 @@ public sealed class TaskFeature : ChatFeature
             FontFamily = titleFont,
             FontSize = 13,
             BackgroundColor = primary ? accent : Colors.Transparent,
-            TextColor = primary ? Colors.White : accent,
+            TextColor = primary ? Colors.White : accentText,
             BorderColor = accent,
             BorderWidth = primary ? 0 : 1,
             CornerRadius = 12,
@@ -572,7 +572,7 @@ public sealed class TaskFeature : ChatFeature
                 {
                     Text = TaskStateIcon(step.State),
                     FontSize = 15,
-                    TextColor = step.State == TaskPlan.State.Done ? success : step.State == TaskPlan.State.Running ? accent : secondaryText,
+                    TextColor = step.State == TaskPlan.State.Done ? success : step.State == TaskPlan.State.Running ? accentText : secondaryText,
                     VerticalOptions = LayoutOptions.Start,
                     WidthRequest = 18
                 }, 0, 0);

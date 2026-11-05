@@ -86,7 +86,7 @@ namespace Emgu.LiteRT.LM.Maui
                 Text = "Cancel",
                 FontSize = 14,
                 BackgroundColor = Colors.Transparent,
-                TextColor = accent,
+                TextColor = ChatResources.FindColor("ChatAccentText"),
                 BorderColor = accent,
                 BorderWidth = 1,
                 CornerRadius = 12,

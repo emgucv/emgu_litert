@@ -42,9 +42,9 @@ namespace Emgu.LiteRT.LM.Maui
         public static readonly BindableProperty MonospaceFontFamilyProperty = BindableProperty.Create(
             nameof(MonospaceFontFamily), typeof(string), typeof(ReplyView), DefaultMonospaceFont, propertyChanged: Restyle);
 
-        /// <summary>The colour of links.</summary>
+        /// <summary>The colour of links, or null for the theme's "ChatAccentText" (light and dark).</summary>
         public static readonly BindableProperty LinkColorProperty = BindableProperty.Create(
-            nameof(LinkColor), typeof(Color), typeof(ReplyView), Color.FromArgb("#2563EB"), propertyChanged: Restyle);
+            nameof(LinkColor), typeof(Color), typeof(ReplyView), null, propertyChanged: Restyle);
 
         /// <summary>The colour of quotes and rules.</summary>
         public static readonly BindableProperty SecondaryTextColorProperty = BindableProperty.Create(
@@ -129,7 +129,7 @@ namespace Emgu.LiteRT.LM.Maui
             set => SetValue(MonospaceFontFamilyProperty, value);
         }
 
-        /// <summary>The colour of links.</summary>
+        /// <summary>The colour of links, or null for the theme's "ChatAccentText" (light and dark).</summary>
         public Color LinkColor
         {
             get => (Color)GetValue(LinkColorProperty);
@@ -444,7 +444,8 @@ namespace Emgu.LiteRT.LM.Maui
             ReplyLinkSpan link = new ReplyLinkSpan
             {
                 Text = run.Text,
-                TextColor = LinkColor,
+                // A fixed blue was dark blue on the dark reply bubble.
+                TextColor = LinkColor ?? ChatResources.FindColor("ChatAccentText"),
                 TextDecorations = TextDecorations.Underline,
                 FontAttributes = attributes
             };

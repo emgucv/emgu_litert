@@ -191,12 +191,12 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         ChatResources.ApplyStyle(title, "ChatSectionTextStyle");
         row.Add(title, 0, 0);
         row.Add(_imageSwitch, 1, 0);
-        _imageStatus = new Label { FontSize = 13, TextColor = Accent, IsVisible = false };
+        _imageStatus = new Label { FontSize = 13, TextColor = ChatResources.FindColor("ChatAccentText"), IsVisible = false };
         _imageDeleteButton = new Button
         {
             Text = "Manage image model storage...",
             FontSize = 13,
-            TextColor = Accent,
+            TextColor = ChatResources.FindColor("ChatAccentText"),
             BackgroundColor = Colors.Transparent,
             Padding = new Thickness(0),
             HorizontalOptions = LayoutOptions.Start,

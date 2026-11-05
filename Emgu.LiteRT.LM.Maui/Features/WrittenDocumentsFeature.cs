@@ -122,7 +122,7 @@ public sealed class WrittenDocumentsFeature : ChatFeature
                 Text = text,
                 FontSize = 14,
                 BackgroundColor = Colors.Transparent,
-                TextColor = accent,
+                TextColor = ChatResources.FindColor("ChatAccentText"),
                 BorderColor = accent,
                 BorderWidth = 1,
                 CornerRadius = 12,

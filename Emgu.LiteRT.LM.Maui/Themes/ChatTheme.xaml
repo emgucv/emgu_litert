@@ -15,6 +15,12 @@
     <Color x:Key="ChatAccent">#2563EB</Color>
     <Color x:Key="ChatAccentLight">#2563EB</Color>
     <Color x:Key="ChatAccentDark">#3D7BF7</Color>
+    <!-- The accent as text (links, header and outlined buttons, status lines): in dark mode a lighter blue, 4.6-5.9:1 on the
+         dark surfaces (#3D7BF7 was 3.7-4.8), where ChatAccent stays the darker one white text needs. An app that defines
+         only its own ChatAccent gets that as its text accent too. -->
+    <Color x:Key="ChatAccentText">#2563EB</Color>
+    <Color x:Key="ChatAccentTextLight">#2563EB</Color>
+    <Color x:Key="ChatAccentTextDark">#5A8FF8</Color>
     <!-- The status colours follow the theme too, at least 4.5:1 as text on its surfaces: in light mode a darker green
          (#2BA84A was 2.7-3.1) and red (#D93B3B 3.9-4.5), in dark mode a lighter red (#D93B3B was 3.2-4.1). -->
     <Color x:Key="ChatDanger">#D02828</Color>

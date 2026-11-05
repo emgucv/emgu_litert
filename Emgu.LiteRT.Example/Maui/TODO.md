@@ -26,6 +26,7 @@ Their full write-ups are in [history/TODO-done.md](history/TODO-done.md):
 - 15. Agent tool: search documents (`search_documents`)
 - 16. Agent tool: search past chats (`search_chats`)
 - 19. A private chat
+- 21. Accessibility — completed (labels, large text and contrast, 2026-11-05)
 - 43. (Notes from the feasibility checks, before it was built)
 - 50. A shutter click for photos taken by an alert
 
@@ -99,14 +100,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] Optionally import it back.
-
-## 21. Accessibility
-
-Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
-
-- [ ] The dark mode's accent #3D7BF7 is 3.7-4.8:1 as text on the dark surfaces (header buttons, links). A lighter blue
-      would read better as text but worse under white (the Send button, the chips that are on): a text-only accent key
-      for links and header buttons, if it matters.
 
 ## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst
 

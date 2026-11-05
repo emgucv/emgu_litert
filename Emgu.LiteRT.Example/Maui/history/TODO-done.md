@@ -516,7 +516,7 @@ MAUI's native share sheet; ZIPs remain in a dedicated cache folder so recipients
 closes, with old exports removed on a later export. Automated archive tests and a Windows build verify the export;
 the Windows share sheet opens and the shared ZIP holds chat.md. Import remains optional follow-up work.
 
-## 21. Accessibility
+## 21. Accessibility — completed (labels, large text and contrast, 2026-11-05)
 
 - [x] Buttons inside cards weren't in iOS's accessibility tree (found 2026-11-05 driving the iPad with WebDriverAgent):
       the plan card, the confirmation cards and the written-document card had a `SemanticProperties.Description` on the
@@ -568,6 +568,15 @@ the Windows share sheet opens and the shared ZIP holds chat.md. Import remains o
       `SetThemeColor` for a "ChatSuccess" pair that didn't exist, so they were transparent - visible now; the stock chart's
       price follows the theme, a failed task step uses the theme's red (was `Colors.IndianRed`). Checked in the iPhone
       simulator with a temporary page of cards and labels: light, dark, and a live switch.
+- [x] The accent as text in dark mode (2026-11-05): #3D7BF7 was 3.7-4.8:1 on the dark surfaces, but it is also the fill
+      white text sits on. A text accent of its own now, `ChatAccentText` (`ChatAccentTextLight` #2563EB /
+      `ChatAccentTextDark` #5A8FF8, 4.6-5.9 on the dark surfaces), set by `ChatResources` like the others: the styles'
+      text (header, sheet close, Stop, attach and voice buttons, links, the status lines), the outlined buttons and status
+      lines built in code (the card's Cancel, Storage's Download, the document card, the meeting's Play and Pause, the
+      task card, the image feature) and a reply's links - `ReplyView.LinkColor` is null by default now and takes it (a
+      fixed blue was dark blue on the dark reply bubble). An app that defines only its own `ChatAccent` gets that as its
+      text accent too. Checked in the iPhone simulator: the sample's green as text in both themes, and without it
+      #2563EB / #5A8FF8 text with the Send button's #3D7BF7 fill.
 
 ## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst
 

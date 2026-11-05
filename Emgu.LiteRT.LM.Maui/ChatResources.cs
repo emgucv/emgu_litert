@@ -58,7 +58,7 @@ namespace Emgu.LiteRT.LM.Maui
 
         // The colours that follow the theme under one key - the accent and the status colours - and their "...Light" /
         // "...Dark" pairs.
-        private static readonly string[] ThemedColors = { "ChatAccent", "ChatSuccess", "ChatDanger" };
+        private static readonly string[] ThemedColors = { "ChatAccent", "ChatAccentText", "ChatSuccess", "ChatDanger" };
 
         // The theme's ChatAccent, ChatSuccess and ChatDanger for the app's current theme, from their "...Light" / "...Dark"
         // keys (the app's, if it defines them): darker in light mode, lighter red in dark mode, for text that reads. An
@@ -74,6 +74,20 @@ namespace Emgu.LiteRT.LM.Maui
                 if (color != Colors.Transparent)
                     _theme[name] = color;
             }
+            // An app that recoloured the accent but not its text: the text in the app's colour too.
+            if (AppDefines("ChatAccent") && !AppDefines("ChatAccentText") && !AppDefines("ChatAccentTextLight"))
+                _theme["ChatAccentText"] = FindColor("ChatAccent");
+        }
+
+        // Whether the app's own resources (not the built-in theme) have a key.
+        private static bool AppDefines(string key)
+        {
+            ResourceDictionary resources = Application.Current?.Resources;
+            if (resources == null)
+                return false;
+            if (resources.Keys.Contains(key))
+                return true;
+            return resources.MergedDictionaries.Any(d => d != _theme && d.ContainsKey(key));
         }
 
         /// <summary>A resource by key: the app's, else the built-in; null if neither has it.</summary>

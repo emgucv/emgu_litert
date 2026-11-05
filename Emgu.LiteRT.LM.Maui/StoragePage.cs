@@ -105,7 +105,7 @@ namespace Emgu.LiteRT.LM.Maui
                 if (entry.CanDelete && hasData) row.Add(remove, 1, 0);
                 if (entry.CanDownload)
                 {
-                    var download = new Button { Text = "Download", BackgroundColor = Colors.Transparent, TextColor = accent };
+                    var download = new Button { Text = "Download", BackgroundColor = Colors.Transparent, TextColor = ChatResources.FindColor("ChatAccentText") };
                     SemanticProperties.SetDescription(download, "Download " + entry.Name);
                     download.Clicked += async (_, _) => await DownloadAsync(entry);
                     row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));

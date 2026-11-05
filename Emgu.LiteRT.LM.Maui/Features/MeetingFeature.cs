@@ -757,7 +757,7 @@ public sealed class MeetingFeature : ChatFeature
         Color accent = ChatResources.FindColor("ChatAccent");
         var title = new Label { Text = "\U0001F50A  Meeting audio" +(length.HasValue ? " · " + MeetingNotes.FormatTime(length.Value) : "") + " · " + SizeText(bytes.Length) };
         ChatResources.ApplyStyle(title, "ChatListDetailStyle");
-        var play = new Button { Text = "Play", FontSize = 14, BackgroundColor = Colors.Transparent, TextColor = accent, BorderColor = accent,
+        var play = new Button { Text = "Play", FontSize = 14, BackgroundColor = Colors.Transparent, TextColor = ChatResources.FindColor("ChatAccentText"), BorderColor = accent,
             BorderWidth = 1, CornerRadius = 12, Padding = new Thickness(16, 6), MinimumHeightRequest = 40, VerticalOptions = LayoutOptions.Center };
         var progress = new ProgressBar { WidthRequest = 150, ProgressColor = accent, VerticalOptions = LayoutOptions.Center };
         var time = new Label { Text = "", VerticalOptions = LayoutOptions.Center };
@@ -1010,7 +1010,7 @@ public sealed class MeetingFeature : ChatFeature
         ChatResources.ApplyStyle(session.Status, "ChatListDetailStyle");
         session.Preview = new Label { IsVisible = false, LineBreakMode = LineBreakMode.WordWrap };
         ChatResources.ApplyStyle(session.Preview, "ChatSectionTextStyle");
-        session.Pause = new Button { Text = "Pause", FontSize = 14, BackgroundColor = Colors.Transparent, TextColor = accent,
+        session.Pause = new Button { Text = "Pause", FontSize = 14, BackgroundColor = Colors.Transparent, TextColor = ChatResources.FindColor("ChatAccentText"),
             BorderColor = accent, BorderWidth = 1, CornerRadius = 12, Padding = new Thickness(16, 6), MinimumHeightRequest = 40 };
         session.Pause.Clicked += (_, _) =>
         {
