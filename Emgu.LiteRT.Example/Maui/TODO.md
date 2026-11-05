@@ -217,7 +217,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] Proposed by the model for long requests (now only the chip); the planner's steps are sometimes redundant (a "review" step at the end).
 - [ ] Try it on phones (E2B on a phone's 8k window with the tool definitions: the step prompts are ~1-1.5k tokens) and with a server model.
 
-## 24. Agent tools: device actions, confirmed by the user — implemented; Android and iOS verified, Mac Catalyst untested
+## 24. Agent tools: device actions, confirmed by the user — implemented; Android, iOS and Mac Catalyst verified
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
@@ -231,7 +231,10 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       own "I couldn't read the date ...", a missing title, a time that has passed) ends the line with " - failed"
       (`AgentTools.DeviceActionStepOutcome`, tested in `UnitTestDeviceActions`); the card's buttons weren't in the
       accessibility tree (item 21, fixed).
-- [ ] Mac Catalyst: EventKit events and reminders, Apple Maps (built, not run; the first use asks for access).
+- [x] Mac Catalyst (2026-11-05): an event, a reminder and walking directions in Apple Maps through
+      `DeviceActions.PerformAsync` from a temporary self-test, after macOS's prompts for the app (see FEATURES.md,
+      "Device actions"); the test entries removed again. The chat's card on the Mac wasn't driven (the same code as
+      on the iPad).
 - [ ] Alarms more than 24 hours ahead (a calendar event is suggested instead); timers/alarms on iOS (no public API).
 
 ## 25. Goals and check-ins — goals, reminders and end dates implemented; verified on Android

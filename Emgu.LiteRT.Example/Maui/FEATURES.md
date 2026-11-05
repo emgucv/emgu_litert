@@ -718,9 +718,15 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   told the user the alarm was set.
 - Android does timers and alarms through `AlarmClock` intents (`EXTRA_SKIP_UI`; alarms within 24 hours), events through the
   calendar's insert intent (the user saves there), and directions through a Google Maps URL. iOS and Mac Catalyst save
-  events and reminders with EventKit and open Apple Maps (built, not run). Windows only does directions.
+  events and reminders with EventKit and open Apple Maps. Windows only does directions.
 - Verified on a Galaxy S10 (Android 12) with Gemma 4 E2B (a timer) and LM Studio's Gemma 4 26B-A4B with thinking on (an
-  alarm cancelled, a calendar event, directions on foot, by car and by transit).
+  alarm cancelled, a calendar event, directions on foot, by car and by transit); on an iPad Air through the chat
+  (2026-11-05, TODO item 24); and on the Mac (Mac Catalyst, 2026-11-05) through `DeviceActions.PerformAsync` from a
+  temporary self-test, as the card calls it: macOS asked for the app's calendar (add only) and Reminders access with
+  the app's own texts, an event tomorrow at 15:00 and a reminder at 9:00 were saved ("Added to the calendar",
+  "Reminder added"), and Apple Maps opened with walking directions to Boston Common; a full-access step then removed
+  both. Started from a terminal (`run_catalyst` runs the binary directly to pass the environment), macOS asked whether
+  *Terminal* could use the calendar: start such a test with `open --env NAME=value` instead.
 
 ## The clipboard
 
