@@ -184,6 +184,8 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         bool on = Host.Settings.Get(SettingKey, false);
         _imageSwitch = new Switch { IsToggled = on, OnColor = Accent, VerticalOptions = LayoutOptions.Center };
         _imageSwitch.Toggled += OnImageGenerationToggled;
+        // Named for screen readers: VoiceOver read it only as "switch, on".
+        SemanticProperties.SetDescription(_imageSwitch, "Image generation");
         var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
         var title = new Label { Text = "Image generation", VerticalOptions = LayoutOptions.Center };
         ChatResources.ApplyStyle(title, "ChatSectionTextStyle");

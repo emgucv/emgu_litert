@@ -304,6 +304,7 @@ public sealed class McpFeature : ChatFeature
         foreach (McpServerConfig config in McpConfigs.ToList())
         {
             var toggle = new Switch { IsToggled = config.Enabled, OnColor = ChatResources.FindColor("ChatAccent"), VerticalOptions = LayoutOptions.Center };
+            SemanticProperties.SetDescription(toggle, "Use the tool server " + config.Name);
             toggle.Toggled += (s, e) =>
             {
                 config.Enabled = e.Value;

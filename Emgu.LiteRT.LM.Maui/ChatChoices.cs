@@ -46,7 +46,10 @@ public static class ChatChoices
             var tap = new TapGestureRecognizer();
             tap.Tapped += (s, e) => host.DismissSheet(id);
             row.GestureRecognizers.Add(tap);
-            SemanticProperties.SetDescription(row, choice.Title + (choice.Id == selectedId ? ", chosen" : ""));
+            // The row is one element for a screen reader: its description says all of it, the detail too (a model's
+            // download state and size were not read).
+            SemanticProperties.SetDescription(row, choice.Title + (choice.Id == selectedId ? ", chosen" : "")
+                + (string.IsNullOrEmpty(choice.Detail) ? "" : ". " + choice.Detail));
             list.Children.Add(row);
         }
         return host.ShowSheetAsync(title, list, cancel);

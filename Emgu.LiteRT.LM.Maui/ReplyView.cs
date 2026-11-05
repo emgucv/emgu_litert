@@ -48,7 +48,7 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>The colour of quotes and rules.</summary>
         public static readonly BindableProperty SecondaryTextColorProperty = BindableProperty.Create(
-            nameof(SecondaryTextColor), typeof(Color), typeof(ReplyView), Color.FromArgb("#8A8FA3"), propertyChanged: Restyle);
+            nameof(SecondaryTextColor), typeof(Color), typeof(ReplyView), Color.FromArgb("#656B81"), propertyChanged: Restyle);
 
         /// <summary>The colour of the bar in front of a quote.</summary>
         public static readonly BindableProperty QuoteMarkColorProperty = BindableProperty.Create(

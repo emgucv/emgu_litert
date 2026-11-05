@@ -54,6 +54,7 @@ external service integrations.
 | --- | --- | --- | --- |
 | 2026-10-15, before memory-result fix | LiteRT-LM v0.18.0, Gemma 4 E2B CPU | 8 × 3 | 21/24 (87.5%); all selected tools correctly, but every `remember` reply was empty |
 | 2026-10-15, with acknowledgement instruction | Same runtime/model | 8 × 3 | 24/24 (100%); final replies present, including all three memory acknowledgements |
+| 2026-11-05, after the move to v0.19.0 | LiteRT-LM v0.19.0, Gemma 4 E2B CPU | 10 × 3 | 30/30 (100%) in 3 min 23 s |
 
 Both runs used macOS 27.0.1 arm64, .NET 10.0.12, Microsoft Agent Framework 1.24.0 and constrained decoding. The
 passing run took about 141 seconds for the 24 scenarios. All three model-free harness tests and the existing
@@ -65,6 +66,13 @@ Source pins: LiteRT-LM `b2f686e2`, LiteRT `26895c9fb`.
 - Model SHA-256: `181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c`.
 - Tool-contract SHA-256: `E7DE0C564147DD4C4D61F21868B973BC3597FD7105D3E1835205053A562ADD60`.
 - Tested `liblitert-lm.dylib` SHA-256: `4186154175ca04bbcf8051dde022baf4a851b0982fa887348f836db7360798f1`.
+
+The 2026-11-05 run (TODO item 9: the regression test after the move to LiteRT-LM v0.19.0, C API 1.0.0) had ten
+scenarios - the eight above, a saved-document question (`search_documents`) and a request with no matching tool ("Show
+me a screenshot of a web page") - on macOS 27.2.0 arm64, .NET 10.0.14, Microsoft Agent Framework 1.24.0 and constrained
+decoding. Source pins: LiteRT-LM `771b06e1`, LiteRT `dcb657e8a`; tool-contract SHA-256
+`8700A374C0414D20DE52CD432FDA2560F50817F9C8D4263126C18E227482B81A`; tested `liblitert-lm.dylib` SHA-256
+`74726b435f1c91297f9bbb864108c04a9f6694330e4090afdb7fdfc74eaf3fa3`; the same model hash as above.
 
 The failure was corrected in the production `remember` result by asking the model to acknowledge the saved fact in
 one short sentence. Memory storage and duplicate detection are unchanged; the result also carries that instruction

@@ -384,6 +384,15 @@ namespace Emgu.LiteRT.LM.Maui
             Hook(_send, "ChatSendButtonStyle", () => _ = SendAsync());
             Hook(_stop, "ChatStopButtonStyle", StopReply);
             Hook(_attach, "ChatAttachButtonStyle", () => _ = AttachAsync());
+            // Names for screen readers, unless the template gave its own: VoiceOver read the attach button as "+" and the
+            // message box with no name (its placeholder isn't one). Android's TalkBack reads the placeholder already, and a
+            // description there could hide what was typed.
+            if (_attach != null && string.IsNullOrEmpty(SemanticProperties.GetDescription(_attach)))
+                SemanticProperties.SetDescription(_attach, "Add an attachment");
+#if IOS || MACCATALYST
+            if (_input != null && string.IsNullOrEmpty(SemanticProperties.GetDescription(_input)))
+                SemanticProperties.SetDescription(_input, "Message");
+#endif
             UpdateAttach();
             ShowPendingAttachments();
             if (_input is Entry entry)

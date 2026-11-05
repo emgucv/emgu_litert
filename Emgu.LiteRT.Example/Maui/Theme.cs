@@ -16,7 +16,7 @@ internal static class Theme
     public static readonly Color PageBackground = Color.FromArgb("#EEF1F8");
     public static readonly Color CardBackground = Colors.White;
     public static readonly Color PrimaryText = Color.FromArgb("#1A1C2E");
-    public static readonly Color SecondaryText = Color.FromArgb("#8A8FA3");
+    public static readonly Color SecondaryText = Color.FromArgb("#656B81");
     public static readonly Color Accent = Color.FromArgb("#3D7BF7");
     public static readonly Color RowBorder = Color.FromArgb("#ECEEF5");
     public static readonly Color TileBackground = Color.FromArgb("#E8EFFE");

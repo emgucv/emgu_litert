@@ -50,7 +50,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] The agent regression test (item 7) with v0.19.0.
 - [ ] Ubuntu/Debian natives (CI builds them).
 
 ## 11. GPU for the embedding models — Windows, Mac (Metal), a Galaxy S10 and the Pixel Fold (OpenCL) checked; the demo offers it on Windows, Mac Catalyst and Android
@@ -105,9 +104,11 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Screen-reader labels for the newer controls: image tiles, step lines, thinking headers, the settings switches and
-      download states, photo thumbnails (`SemanticProperties`).
-- [ ] Contrast of the secondary text in light and dark mode.
+- [ ] Contrast of the other colours under WCAG's 4.5:1 for text (2026-11-05): the accent #3D7BF7 as text 3.4-3.9 on the
+      light surfaces and 3.7-4.8 on the dark ones (header buttons, links, chip text) and white on it 3.9 (fine for the
+      bold Send, not for 13 pt text); ChatSuccess #2BA84A on white 3.1 (prices, "✓ Added"); ChatDanger #D93B3B on the
+      dark surface 3.7. The accent is the brand colour, so the user's call: a darker light-mode accent (~#2563EB, 5.2 on
+      white) with the current one kept for dark mode would need ChatAccent as a Light/Dark pair.
 
 ## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst
 

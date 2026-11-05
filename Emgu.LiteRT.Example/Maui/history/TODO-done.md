@@ -253,6 +253,9 @@ code before it is tagged `v0.18.0`. The plan, with what changed and why: `histor
 - [x] The camera tools on v0.19.0 (2026-11-02): v0.19.0 rejects a JSON array in `SendMessage(Stream)`, so the chat client's batch (a media tool result's acknowledgement and image turn) failed; it now rebuilds the conversation with all but the last message as history. `GemmaDescribesImageReturnedByCameraTool` (both settings) passes; `docs/litert-lm.md`. The router test's "Beep when a bird lands on the feeder" case (Gemma 4 E2B and E4B ask for the sound monitors, or for a visual agent) is skipped since the sound group arrived (2026-10-26): it needs the camera instructions reworked.
 - [x] The demo: offer the GPU search models on Mac Catalyst and Android too (item 11, 2026-11-01).
 
+- [x] The agent regression test (item 7) with v0.19.0 (2026-11-05): 30/30 scenarios (10 × 3) on the Mac's CPU with
+      Gemma 4 E2B, in 3 min 23 s; recorded in `Emgu.LiteRT.Test/Emgu.TF.Lite.Test/AgentRegression.md`.
+
 ## 10. GPU on Windows — core support completed; follow-ups remain
 
 The original prebuilt accelerator did not match our core's private C++ ABI. A reproducible source build now supplies
@@ -538,6 +541,17 @@ the Windows share sheet opens and the shared ZIP holds chat.md. Import remains o
       buttons). One more: an option chip on two lines was cut off at the bottom - its row (a FlexLayout) measures the
       chips at any width, i.e. as one line - so `ToggleChip` is measured at most as wide as its row; checked on Android
       and again on iOS.
+
+- [x] Screen-reader labels for the newer controls (2026-11-05, read from the iPad's accessibility tree through
+      WebDriverAgent): the image, photo and camera tiles, the thinking header, the step lines (their text), the model
+      list's download states (separate texts) and every settings switch were readable already, except the "Image
+      generation" switch, read only as "switch, on" - named now, as is each MCP server's switch ("Use the tool server
+      ..."). In the chat the attach button was read as "+" and the message box had no name: "Add an attachment" and
+      "Message" now (the message box on iOS and Mac only: TalkBack reads the placeholder). A `ChatChoices` sheet's rows
+      (the image and search models) were read by name only: their detail line now too.
+- [x] Contrast of the secondary text (2026-11-05): the light theme's #8A8FA3 was 3.2:1 on white, 2.8 on the page and the
+      reply bubble, under WCAG AA's 4.5:1; now #656B81 (the same blue-grey, darker): 5.3, 4.6 and 4.6 - in the chat's
+      theme, `ReplyView`'s default, the demo's templates and `Theme`. The dark theme's #9AA0B4 was 5.5-7.1 already.
 
 ## 22. Hands-free voice conversation — implemented; verified on a Pixel Fold and on Mac Catalyst
 
