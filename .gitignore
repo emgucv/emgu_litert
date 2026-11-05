@@ -19,6 +19,8 @@ obj/
 /u/
 /p/
 /q/
+# Patched copy of the LiteRT-LM tree used by the Debian Bazel build scripts
+/litert_lm_patched/
 # Source staging, downloads, and native outputs for the Windows GPU build script.
 /.tmp/wgpu/
 

@@ -1,0 +1,14 @@
+Link LiteRT-LM's CPU-only engine into the C API: the default engine links the WebGPU
+sampler, and with it Google's prebuilt libwebgpu_dawn.so, which is built with AES and
+crashes on CPUs without the ARMv8 crypto extension (Raspberry Pi 4).
+
+--- a/runtime/engine/BUILD
++++ b/runtime/engine/BUILD
+@@ -101,6 +101,6 @@
+ # The selected engine implementations based on the build flags.
+ cc_library(
+     name = "engine_impl_selected",
+-    deps = ["//runtime/core:engine_advanced_impl"],
++    deps = ["//runtime/core:engine_advanced_impl_cpu_only"],
+     alwayslink = 1,
+ )

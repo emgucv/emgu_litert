@@ -50,34 +50,58 @@ mkdir -p $WORKSPACE_DIR/omniextern
 cp -f litertextern/omniextern/bazel/BUILD $WORKSPACE_DIR/omniextern/BUILD || exit 1
 cp -f litertextern/omniextern/omniextern.cc litertextern/omniextern/omniextern.h $WORKSPACE_DIR/omniextern/ || exit 1
 
-# liblitert-lm.so (LiteRT-LM's C API) needs LiteRT-LM's prebuilt libGemmaModelConstraintProvider.so and Dawn's
-# libwebgpu_dawn.so (Git LFS), deployed next to it. They only exist for arm64, so armhf gets no LiteRT-LM.
+# liblitert-lm.so (LiteRT-LM's C API), arm64 only. By default LiteRT-LM links Google's prebuilt
+# libGemmaModelConstraintProvider.so and libwebgpu_dawn.so (Git LFS), which are built with AES and crash
+# ("Illegal instruction") on CPUs without the ARMv8 crypto extension, such as the Raspberry Pi 4. So by default
+# liblitert-lm.so is built without them, from a patched copy of the LiteRT-LM tree in litert_lm_patched/ (the
+# submodule is not edited): platforms/debian/litert_lm_patches/ links the CPU-only engine (no WebGPU sampler, so
+# no Dawn), and --//build_config:enable_fst_constraints=false makes constrained decoding use llguidance (built
+# from source) instead of the Gemma constraint provider. LITERT_LM_PREBUILTS=1 builds the unpatched tree with
+# the prebuilts instead (needs AES, e.g. a Raspberry Pi 5).
 BUILD_LITERT_LM=false
 if [ $SYSTEM_ARCH == "64" ]; then
     BUILD_LITERT_LM=true
-    GEMMA_PREBUILT=prebuilt/linux_arm64/libGemmaModelConstraintProvider.so
-    DAWN_PREBUILT=prebuilt/linux_arm64/libwebgpu_dawn.so
-    for PREBUILT in $GEMMA_PREBUILT $DAWN_PREBUILT; do
-        if ! head -c 4 "$WORKSPACE_DIR/$PREBUILT" | grep -q ELF; then
-            echo "$WORKSPACE_DIR/$PREBUILT is not an ELF library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
-            exit 1
-        fi
-    done
+    if [ "$LITERT_LM_PREBUILTS" == "1" ]; then
+        LM_WORKSPACE_DIR=$WORKSPACE_DIR
+        LM_FLAGS=
+        GEMMA_PREBUILT=prebuilt/linux_arm64/libGemmaModelConstraintProvider.so
+        DAWN_PREBUILT=prebuilt/linux_arm64/libwebgpu_dawn.so
+        for PREBUILT in $GEMMA_PREBUILT $DAWN_PREBUILT; do
+            if ! head -c 4 "$WORKSPACE_DIR/$PREBUILT" | grep -q ELF; then
+                echo "$WORKSPACE_DIR/$PREBUILT is not an ELF library (a Git LFS pointer?) - run 'git -C $WORKSPACE_DIR lfs pull'"
+                exit 1
+            fi
+        done
+    else
+        LM_WORKSPACE_DIR=litert_lm_patched
+        LM_FLAGS=--//build_config:enable_fst_constraints=false
+        rsync -a --delete --exclude=/.git --exclude='/bazel-*' --exclude=/tfliteextern \
+            $WORKSPACE_DIR/ $LM_WORKSPACE_DIR/ || exit 1
+        for PATCH in platforms/debian/litert_lm_patches/*.patch; do
+            git apply --directory=$LM_WORKSPACE_DIR "$PATCH" || { echo "Could not apply $PATCH to $LM_WORKSPACE_DIR"; exit 1; }
+        done
+    fi
 fi
-
-cd $WORKSPACE_DIR
 
 # --define=litert_runtime_link_mode=dynamic makes liblitert-lm.so and libomniextern.so link against the
 # libLiteRt.so built below; --platform_suffix keeps this build's outputs apart from it (see the Ubuntu script).
 if [ $BUILD_LITERT_LM == "true" ]; then
+    rm -f lib/$OUT_FOLDER/liblitert-lm.so lib/$OUT_FOLDER/libomniextern.so \
+        lib/$OUT_FOLDER/libGemmaModelConstraintProvider.so lib/$OUT_FOLDER/libwebgpu_dawn.so
+    cd $LM_WORKSPACE_DIR
     bazel build --verbose_failures -c opt $BAZEL_CONFIG_FLAGS --repo_env=CC=/usr/bin/clang --repo_env=CXX=/usr/bin/clang++ \
-        --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic "${@:1}" \
+        --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic $LM_FLAGS "${@:1}" \
         //c:litert-lm //omniextern:omniextern || exit 1
     cp -f bazel-bin/c/liblitert-lm.so ../lib/$OUT_FOLDER/liblitert-lm.so || exit 1
     cp -f bazel-bin/omniextern/libomniextern.so ../lib/$OUT_FOLDER/libomniextern.so || exit 1
-    cp -f $GEMMA_PREBUILT ../lib/$OUT_FOLDER/libGemmaModelConstraintProvider.so || exit 1
-    cp -f $DAWN_PREBUILT ../lib/$OUT_FOLDER/libwebgpu_dawn.so || exit 1
+    if [ "$LITERT_LM_PREBUILTS" == "1" ]; then
+        cp -f $GEMMA_PREBUILT ../lib/$OUT_FOLDER/libGemmaModelConstraintProvider.so || exit 1
+        cp -f $DAWN_PREBUILT ../lib/$OUT_FOLDER/libwebgpu_dawn.so || exit 1
+    fi
+    cd ..
 fi
+
+cd $WORKSPACE_DIR
 
 # LiteRT-LM's .bazelrc auto-applies build:linux via --enable_platform_specific_config on this
 # host, but --config=linux is passed explicitly for clarity, same as the other platforms'
