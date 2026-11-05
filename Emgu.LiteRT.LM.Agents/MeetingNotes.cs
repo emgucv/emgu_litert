@@ -205,7 +205,9 @@ namespace Emgu.LiteRT.LM.Agents
         /// cannot transcribe the speech in the recording". (The floor was -40 dBFS: a Pixel Fold across a room from the
         /// speakers recorded speech at -40 to -44 dBFS, 4-9 times its quiet parts, and the room before anyone spoke at -50 to
         /// -56 dBFS, 1.7-3 times - the whole meeting was taken for silence, though Gemma 4 E2B wrote it down with 12% of the
-        /// words wrong.)
+        /// words wrong.) In a piece longer than 10 s its loud parts are its loudest half second when that is louder: a piece
+        /// that is a long quiet stretch ending with the first words (it ends at the pause after them) was taken for the room,
+        /// and the model never heard them.
         /// </summary>
         public bool HasSpeech
         {
@@ -223,7 +225,7 @@ namespace Emgu.LiteRT.LM.Agents
                     rms[f] = Math.Sqrt(sum / frame);
                 }
                 Array.Sort(rms);
-                double loud = rms[(int)(0.95 * (frames - 1))], quiet = rms[(int)(0.1 * (frames - 1))];
+                double loud = rms[Math.Max((int)(0.95 * (frames - 1)), frames - 26)], quiet = rms[(int)(0.1 * (frames - 1))];
                 return loud >= 0.00316 && loud >= 4 * quiet;  // -50 dBFS
             }
         }

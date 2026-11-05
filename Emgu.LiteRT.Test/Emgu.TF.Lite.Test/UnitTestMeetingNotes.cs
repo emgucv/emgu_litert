@@ -340,6 +340,15 @@ public class UnitTestMeetingNotes
         Assert.That(new MeetingAudioChunk(TimeSpan.Zero, farSpeech, Rate).HasSpeech, Is.True, "far, quiet speech");
         Assert.That(new MeetingAudioChunk(TimeSpan.Zero, room, Rate).HasSpeech, Is.False, "the room alone");
         Assert.That(new MeetingAudioChunk(TimeSpan.Zero, room.Select(x => x * 4).ToArray(), Rate).HasSpeech, Is.False, "a louder room");
+
+        // A long piece of the room that ends with the first words after a long quiet stretch (the pieces end at the pause
+        // after them: an iPad, 2026-11-05) is speech, though they are under 5% of it; the room alone still isn't.
+        float[] longRoom = Enumerable.Range(0, Rate * 28).Select(_ => (float)((random.NextDouble() - 0.5) * 0.0045)).ToArray();
+        float[] firstWords = longRoom.Concat(syllables.Take(Rate * 8 / 5)).ToArray();
+        float[] farFirstWords = longRoom.Concat(farSpeech.Take(Rate * 8 / 5)).ToArray();
+        Assert.That(new MeetingAudioChunk(TimeSpan.Zero, firstWords, Rate).HasSpeech, Is.True, "the first words at the end");
+        Assert.That(new MeetingAudioChunk(TimeSpan.Zero, farFirstWords, Rate).HasSpeech, Is.True, "far first words at the end");
+        Assert.That(new MeetingAudioChunk(TimeSpan.Zero, longRoom, Rate).HasSpeech, Is.False, "a long piece of the room alone");
     }
 
     // The meeting's recording, written as it goes: a valid WAV once closed, the same bytes as a piece's ToWav.

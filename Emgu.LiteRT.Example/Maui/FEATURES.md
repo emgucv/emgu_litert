@@ -1178,8 +1178,13 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   path changed it. So every recording given to Apple's recognizer gets a second of silence on each side
   (`MeetingAudioChunk.WithSilence`, in `SpeechRecognizer`); the meeting then kept 16 of the 23 words (the rest misheard
   through the Mac's speakers, not lost). Seen meanwhile: a piece that ends with the first second or two of speech after
-  a long quiet stretch isn't `HasSpeech` (its loud 5% is the room), which only matters when the chat model writes the
-  meeting down (it skips such pieces): not changed.
+  a long quiet stretch wasn't `HasSpeech` (its loud 5% was the room), and the chat model, which is given only pieces
+  with speech, never heard those words. Fixed the same day: in a piece longer than 10 s the loud parts are its loudest
+  half second when that is louder (`UnitTestMeetingNotes.TellsSpeechFromRoomNoise`: 28 s of a room ending with 1.6 s of
+  speech, near or far, is speech; 28 s of the room alone isn't). On the Mac, Gemma 4 E2B writing down a synthetic
+  meeting (45 s of room noise at -55 dBFS, then "Good morning.", a pause and a long sentence, through a temporary clip
+  in place of the microphone): the piece with "Good morning." at the end of 25 s of noise was no speech by the old
+  rule and is now written down ("Good morning.", 19 words in all).
 
 ## The TF Lite pages, the live camera and the About page
 
