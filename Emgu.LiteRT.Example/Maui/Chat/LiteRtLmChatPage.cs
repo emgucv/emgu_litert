@@ -3,6 +3,7 @@
 //----------------------------------------------------------------------------
 
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Agents.Skills;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Chat.Sqlite;
 using Emgu.LiteRT.LM.Extensions.AI;
@@ -40,6 +41,41 @@ public sealed class LiteRtLmChatPage : ChatPage
     private static readonly SqliteAgentMemoryStore Memories = new SqliteAgentMemoryStore(SharedStore);
     private static readonly SqliteAgentGoalStore Goals = new SqliteAgentGoalStore(SharedStore);
 
+    // The scheduled tasks (TODO item 30), in the same database; their runs (ScheduledTaskRunner) save to it too.
+    private static readonly SqliteAgentTaskStore Tasks = new SqliteAgentTaskStore(SharedStore);
+
+    /// <summary>
+    /// Configure the scheduled tasks' runs (MauiProgram, when the app starts: a task's alarm can start the process with no
+    /// page): the chat's models and settings, the stores, and the run's skills - the date and calculator, the web (with
+    /// "Web search" on), the memories and goals; nothing that needs the screen or changes things outside the app.
+    /// </summary>
+    internal static void ConfigureScheduledTasks()
+    {
+        var options = new ScheduledTaskRunnerOptions
+        {
+            Tasks = Tasks,
+            Settings = new ChatSettingsAdapter(),
+            History = SharedStore,
+            SaveRunAsync = async (task, message, reply, model) =>
+            {
+                int chatId = await SharedStore.CreateChatAsync(ScheduledTaskRun.ChatTitle(task), model);
+                await SharedStore.SaveExchangeAsync(chatId, message, reply);
+                return chatId;
+            },
+            CreateSkills = task =>
+            {
+                var settings = new ChatSettingsAdapter();
+                var web = new WebSkill { Enabled = settings.Get("web_search", false) };
+                try { web.TavilyApiKey = SecureStorage.Default.GetAsync(WebFeature.KeyStorageName).GetAwaiter().GetResult(); }
+                catch (Exception) { }
+                return new ChatSkill[] { new CoreToolsSkill(), web, new MemorySkill(Memories), new GoalsSkill(Goals) };
+            }
+        };
+        foreach (ChatModelOption model in ChatDevicePlatform.AvailableModels())
+            options.Models.Add(model);
+        ScheduledTaskRunner.Configure(options);
+    }
+
     // The demo's features (made before the page, so the base constructor attaches them).
     private sealed class Parts
     {
@@ -67,6 +103,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         public MeetingFeature Meetings;
         public ExerciseFeature Exercises;
         public MemoryFeature Memory;
+        public ScheduledTasksFeature ScheduledTasks;
         public IIndexingWorkload Workload;
         public SearchServices Search;
     }
@@ -126,7 +163,8 @@ public sealed class LiteRtLmChatPage : ChatPage
             Goals = new GoalsFeature(Goals),
             Meetings = new MeetingFeature(),
             Exercises = new ExerciseFeature(),
-            Memory = new MemoryFeature(Memories)
+            Memory = new MemoryFeature(Memories),
+            ScheduledTasks = new ScheduledTasksFeature(Tasks)
         };
         // Claude through the Claude API with the user's key, then the user's own server: the remote options go last in the
         // model list ("Claude" and "Server", the ids saved chats have).
@@ -229,7 +267,7 @@ public sealed class LiteRtLmChatPage : ChatPage
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new PlacesFeature(), new ClipboardFeature(),
             parts.Camera, parts.PhotoEffects, parts.Claude, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
-            parts.WrittenDocuments, parts.Goals, parts.PastChats, parts.PhotoSearch, parts.VideoSearch, parts.Videos, parts.Meetings, parts.Exercises
+            parts.WrittenDocuments, parts.Goals, parts.ScheduledTasks, parts.PastChats, parts.PhotoSearch, parts.VideoSearch, parts.Videos, parts.Meetings, parts.Exercises
         })
             options.Features.Add(feature);
         parts.Options = options;

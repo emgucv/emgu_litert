@@ -1064,6 +1064,9 @@ namespace Emgu.LiteRT.LM.Agents
                 case "add_goal": return "Saving your goal: " + Argument("goal");
                 case "log_progress": return "Logging progress: " + Argument("goal");
                 case "get_goals": return "Checking your goals";
+                case "schedule_task": return "Scheduling: " + Argument("task");
+                case "list_tasks": return "Checking your scheduled tasks";
+                case "remove_task": return "Removing the scheduled task: " + Argument("task");
                 case "count_exercise": return "Counting your " + (Argument("exercise").Length > 0 ? Argument("exercise") : "jumping jacks");
                 case "create_document": return "Writing “" + Argument("title") + "”";
                 case "record_meeting": return "Recording " + (Argument("title").Length > 0 ? "“" + Argument("title") + "”" : "the meeting");

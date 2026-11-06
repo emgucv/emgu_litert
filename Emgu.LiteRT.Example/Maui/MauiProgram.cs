@@ -39,6 +39,9 @@ public static class MauiProgram
         TextLanguage.IdentifyLatin = MlKitLanguage.IdentifyAsync;
 #endif
 
+		// Scheduled tasks' runs (Chat/LiteRtLmChatPage.cs): before anything else, since a task's alarm can start the app's process.
+		LiteRtLmChatPage.ConfigureScheduledTasks();
+
 		return builder.Build();
 	}
 }

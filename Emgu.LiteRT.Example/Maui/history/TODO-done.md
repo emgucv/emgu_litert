@@ -911,6 +911,28 @@ Moved from TODO.md on 2026-11-05:
 
 - [x] A reusable package: `Emgu.LiteRT.LM.Agents.Mcp` (the servers as agent tools) and `Emgu.LiteRT.LM.Maui.Mcp` (`McpFeature` for any `ChatPage`, phase C, 2026-10-26).
 
+## 30. Background tasks and monitoring
+
+Implemented 2026-11-05 (the Android part; the plan split the item into shared, Android and iOS parts the same day):
+- [x] Tasks: a description, a schedule (daily at a time, every 3-168 hours) and an optional condition for notifying, made by
+      the model (`schedule_task`, `list_tasks`, `remove_task`; at most 10) and listed in Settings > Scheduled tasks with the
+      next and last runs, Run now, Pause/Resume, Open and Delete (`ScheduledTasksFeature`). `UnitTestScheduledTasks`.
+- [x] A run without the chat page (`ScheduledTaskRunner`): a new agent conversation with the task and the run's skills
+      (date, calculator, web with Web search on, memories, goals), saved as a chat "⏰ ...", a notification with the answer's
+      first sentences unless the model said "NOTHING TO REPORT" for a condition; tapping it opens the chat (`ChatLaunch`).
+      An open chat page lends its loaded model.
+- [x] Limits: every 3 hours at most; the web only with Web search on; no device actions, camera or clipboard in a run;
+      skipped when hot or low on battery.
+- [x] Android: an alarm clock (`SetAlarmClock`) starts `TaskRunService` (foreground, type specialUse, with its Play
+      subtype property) from the background. `SetExactAndAllowWhileIdle` at first: Samsung's process freezer held it for the
+      S10's frozen cached process until the app was opened (9:02 -> 9:07); the alarm clock unfroze the Z Fold3's frozen
+      process on time (22:03:01, screen off).
+- [x] Android 14+: "Run tasks on time" asks for "Alarms & reminders" with the first task; without it an inexact alarm posts
+      "Scheduled task due" with a Run button (the Fold3's came half an hour late with the screen off). Re-armed at a restart,
+      a change of time, an update and when the permission is given (`ScheduledTaskRestoreReceiver`; seen on the Fold3).
+- [x] Measured: S10, Gemma 4 E2B GPU loaded by the run 7.6 s, reply 46.7 s; with the page's model 52 s. Fold3, with the
+      page's model, 24.5 s and 30.6 s. The test tasks, alarms and chats were removed from both phones afterwards.
+
 ## 31. Image generation on iOS — implemented; untested on an iPhone
 
 - [x] On iOS `Emgu.LiteRT` loads `LiteRt.framework`, which `tfliteextern` and LiteRT-LM are linked to (item 36). (At

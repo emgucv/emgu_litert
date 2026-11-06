@@ -1052,6 +1052,43 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   45: kept in memory, not in private chats; tap to expand), and the camera preview's label says what the camera is doing
   ("Watching · 2 monitors", "● Recording clip · 7 s left").
 
+## Scheduled tasks
+
+- Since 2026-11-05 (TODO item 30, Android): "every morning at 7, tell me the weather in Toronto", "check every 6 hours
+  whether ... has a new release" - the model calls `schedule_task` (`Emgu.LiteRT.LM.Agents`' `AgentTasks.cs`: daily at a
+  time, or every 3 to 168 hours, at most 10 tasks; `list_tasks`, `remove_task`), the task is kept in the chat database
+  (`SqliteAgentTaskStore`, table `ScheduledTask`), and it runs on its own at its time with the app closed. The group
+  `schedule` comes for words like "every morning", "every day at", "daily", "tell me when", "keep an eye on" (not a bare
+  "every day", which is the goals'); not in a private chat.
+- A run (`ScheduledTaskRunner`, `Emgu.LiteRT.LM.Maui`): the task as a message ("⏰ ..."), with the run's skills - the date and
+  calculator, the web with Web search on, the memories and goals; nothing that needs the screen or changes things outside the
+  app - and instructions saying the user isn't there; a condition ("only if it will snow") is kept as `NotifyWhen`, and the
+  model starts its answer with "NOTHING TO REPORT" when it doesn't hold (no notification, the run still saved). The answer is
+  saved as a chat and its first sentences are the notification; tapping it opens that chat (`ChatLaunch`, the activity's
+  intent). A chat page with its model loaded lends it (no second engine; the page shows "Running a scheduled task..."); else
+  the run loads the chat's model ("model", "use_gpu_Android") without downloading, the GPU then the CPU, and frees it after.
+  Skipped when hot or low on battery (`WorkloadPolicy`); tried again in 5 minutes while the chat is replying, 15 while a
+  private chat is open (up to 4 times).
+- Android (`ScheduledTaskAlarms.cs`): an alarm clock (`SetAlarmClock`) starts `TaskRunService`, a foreground service of type
+  specialUse with a partial wake lock - an alarm is one of Android 12's exemptions for starting one from the background - which
+  runs the task, posts the answer and arms the next run. It was `SetExactAndAllowWhileIdle` at first: on a Galaxy S10 (Android 12,
+  2026-11-05) Samsung's process freezer had frozen the app's cached process (started at 9:00 by an unrelated Google job) and
+  held the 9:02 alarm ("Deferring alarm ... due to freecess") until the app was opened at 9:07. With an alarm clock the Galaxy
+  Z Fold3 (Android 15) unfroze the frozen process for it ("UFZ ... reason: Alarm") and the 22:03 run started at 22:03:01. The
+  price: Android's alarm icon, and the run shown as the next alarm.
+- Exact alarms: granted on Android 12 and 13; on 14 and later ("Alarms & reminders", off by default) the first task asks
+  ("Run tasks on time" > Open settings), and Settings > Scheduled tasks says so while it is off. Without it an inexact
+  alarm can't start the service, so it posts "Scheduled task due" with a Run button (a tap may start it): on the Z Fold3,
+  with the screen off, it came about half an hour late. Alarms are armed again at a restart, a change of time, an update and
+  when exact alarms are allowed (`ScheduledTaskRestoreReceiver`; the Fold3 re-armed both on an update and on the permission).
+- Settings > Scheduled tasks lists each task (its schedule, the next run and the last result) with Run now, Pause/Resume,
+  Open (its last run's chat) and Delete.
+- Measured (Gemma 4 E2B, GPU, the weather in Toronto through the web tools): Galaxy S10 - loaded by the run in 7.6 s, reply
+  46.7 s; with the chat page's model, reply 52 s. Galaxy Z Fold3 - with the chat page's model, reply 24.5 s (the frozen
+  process), 30.6 s (Run now).
+- Not yet: iOS (no run at a chosen time: TODO item 30), a run with the process gone and the model loaded by the service on
+  the Fold3, a run while hot or low on battery.
+
 ## Exercise counting
 
 - `count_exercise` (`Emgu.LiteRT.LM.Agents`' `ExerciseTools.cs`, part of the goals tool group; the library's `ExerciseFeature` in `Emgu.LiteRT.LM.Maui.CV` since 2026-10-26)

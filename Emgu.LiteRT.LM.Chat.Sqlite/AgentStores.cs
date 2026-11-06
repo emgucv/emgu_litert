@@ -77,6 +77,41 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
     }
 
     /// <summary>
+    /// A task the agent runs on a schedule ("every morning, the weather"), a row of <see cref="SqliteAgentTaskStore"/>'s table.
+    /// </summary>
+    [Table("ScheduledTask")]
+    public class AgentTaskRecord
+    {
+        /// <summary>The row's id</summary>
+        [PrimaryKey, AutoIncrement]
+        public int Id { get; set; }
+
+        /// <summary>What to do, in the user's words</summary>
+        public string Description { get; set; }
+
+        /// <summary>When it runs (<see cref="TaskSchedule.Serialize"/>)</summary>
+        public string Schedule { get; set; }
+
+        /// <summary>When to tell the user, or null for every time</summary>
+        public string NotifyWhen { get; set; }
+
+        /// <summary>When it was made (local time)</summary>
+        public DateTime Created { get; set; }
+
+        /// <summary>Whether it is paused</summary>
+        public bool Paused { get; set; }
+
+        /// <summary>When it last ran (local time), or null</summary>
+        public DateTime? LastRun { get; set; }
+
+        /// <summary>What happened the last time</summary>
+        public string LastResult { get; set; }
+
+        /// <summary>The saved chat of its last run, or null</summary>
+        public int? LastChatId { get; set; }
+    }
+
+    /// <summary>
     /// The agent's memories (Emgu.LiteRT.LM.Agents' <c>AgentTools.Memory</c>, remember and forget) in a <see cref="ChatHistoryStore"/>'s
     /// database, table <c>Memory</c>, so they last across chats. While the chats are private (<see cref="ChatHistoryStore.IsPrivate"/>),
     /// no memory is read or saved, and the database isn't opened.
@@ -269,6 +304,106 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 return false;
             await db.DeleteAsync(last).ConfigureAwait(false);
             return true;
+        }
+    }
+
+    /// <summary>
+    /// The scheduled tasks (Emgu.LiteRT.LM.Agents' <c>AgentTools.ScheduledTasks</c>) in a <see cref="ChatHistoryStore"/>'s database,
+    /// table <c>ScheduledTask</c>. While the chats are private (<see cref="ChatHistoryStore.IsPrivate"/>), nothing is read,
+    /// adding a task throws and the other changes do nothing - except saving a run (<see cref="UpdateTaskAsync"/>), which a
+    /// task's run does on its own and which isn't the private chat's.
+    /// </summary>
+    public sealed class SqliteAgentTaskStore : IAgentTaskStore
+    {
+        private readonly ChatHistoryStore _chats;
+        private SQLiteAsyncConnection _ready;
+
+        /// <summary>
+        /// Keep the tasks in a chat store's database.
+        /// </summary>
+        /// <param name="chats">The chat store</param>
+        public SqliteAgentTaskStore(ChatHistoryStore chats)
+        {
+            _chats = chats ?? throw new ArgumentNullException(nameof(chats));
+        }
+
+        private async Task<SQLiteAsyncConnection> DbAsync()
+        {
+            SQLiteAsyncConnection db = await _chats.GetConnectionAsync().ConfigureAwait(false);
+            if (!ReferenceEquals(db, _ready))
+            {
+                await db.CreateTableAsync<AgentTaskRecord>().ConfigureAwait(false);
+                _ready = db;
+            }
+            return db;
+        }
+
+        // A row whose schedule can't be read (written by a newer version) is left out.
+        private static ScheduledTask ToTask(AgentTaskRecord r)
+        {
+            TaskSchedule schedule = TaskSchedule.Parse(r.Schedule);
+            if (schedule == null)
+                return null;
+            return new ScheduledTask(r.Id.ToString(CultureInfo.InvariantCulture), r.Description, schedule, r.NotifyWhen, r.Created)
+            {
+                Paused = r.Paused, LastRun = r.LastRun, LastResult = r.LastResult, LastChatId = r.LastChatId
+            };
+        }
+
+        private static AgentTaskRecord ToRecord(ScheduledTask t, int id) => new AgentTaskRecord
+        {
+            Id = id, Description = t.Description, Schedule = t.Schedule.Serialize(), NotifyWhen = t.NotifyWhen, Created = t.Created,
+            Paused = t.Paused, LastRun = t.LastRun, LastResult = t.LastResult, LastChatId = t.LastChatId
+        };
+
+        private static bool TryId(string id, out int value) =>
+            int.TryParse(id, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+
+        /// <inheritdoc />
+        public async Task<IList<ScheduledTask>> GetTasksAsync()
+        {
+            if (_chats.IsPrivate) return new List<ScheduledTask>();
+            return (await (await DbAsync().ConfigureAwait(false)).Table<AgentTaskRecord>().OrderBy(t => t.Id).ToListAsync().ConfigureAwait(false))
+                .Select(ToTask).Where(t => t != null).ToList();
+        }
+
+        /// <summary>
+        /// A task, or null if it is gone - read while the chats are private too, for a run that is due.
+        /// </summary>
+        /// <param name="id">Its id</param>
+        public async Task<ScheduledTask> GetTaskAsync(string id)
+        {
+            if (!TryId(id, out int taskId))
+                return null;
+            AgentTaskRecord record = await (await DbAsync().ConfigureAwait(false)).Table<AgentTaskRecord>()
+                .Where(t => t.Id == taskId).FirstOrDefaultAsync().ConfigureAwait(false);
+            return record == null ? null : ToTask(record);
+        }
+
+        /// <inheritdoc />
+        /// <exception cref="InvalidOperationException">The chats are private</exception>
+        public async Task<string> AddTaskAsync(ScheduledTask task)
+        {
+            if (task == null) throw new ArgumentNullException(nameof(task));
+            if (_chats.IsPrivate) throw new InvalidOperationException("Tasks aren't scheduled from a private chat.");
+            AgentTaskRecord record = ToRecord(task, 0);
+            await (await DbAsync().ConfigureAwait(false)).InsertAsync(record).ConfigureAwait(false);
+            return record.Id.ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <inheritdoc />
+        public async Task UpdateTaskAsync(ScheduledTask task)
+        {
+            if (task == null) throw new ArgumentNullException(nameof(task));
+            if (!TryId(task.Id, out int id)) return;
+            await (await DbAsync().ConfigureAwait(false)).UpdateAsync(ToRecord(task, id)).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc />
+        public async Task DeleteTaskAsync(string id)
+        {
+            if (_chats.IsPrivate || !TryId(id, out int taskId)) return;
+            await (await DbAsync().ConfigureAwait(false)).DeleteAsync<AgentTaskRecord>(taskId).ConfigureAwait(false);
         }
     }
 }

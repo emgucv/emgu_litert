@@ -85,6 +85,8 @@ namespace Emgu.LiteRT.LM.Maui
                 feature.OnAttached(this);
             _skills.AddRange(_features);
             _client = new ChatPageClient(CreateInnerClient);
+            // A scheduled task's run may borrow the model while it is loaded (ChatPage.ScheduledTasks.cs).
+            ScheduledTaskRunner.Register(this);
             // The page's Window is set after it is pushed: the features hear the app come to the front or leave it.
             PropertyChanged += (s, e) => { if (e.PropertyName == nameof(Window)) WatchWindow(); };
             if (ControlTemplate == null)
@@ -263,6 +265,9 @@ namespace Emgu.LiteRT.LM.Maui
             StartKeyboardTracking();
             foreach (ChatFeature feature in _features)
                 feature.OnAppearing();
+            ChatLaunch.OpenChatRequested -= OnOpenChatRequested;
+            ChatLaunch.OpenChatRequested += OnOpenChatRequested;
+            OpenLaunchedChat();
         }
 
         /// <summary>
@@ -288,6 +293,7 @@ namespace Emgu.LiteRT.LM.Maui
             StopKeyboardTracking();
             foreach (ChatFeature feature in _features)
                 feature.OnDisappearing();
+            ChatLaunch.OpenChatRequested -= OnOpenChatRequested;
         }
 
         /// <inheritdoc/>
@@ -515,9 +521,13 @@ namespace Emgu.LiteRT.LM.Maui
             return new VerticalStackLayout { Spacing = 4, Children = { row, Note(note) } };
         }
 
-        /// <summary>A list row (a saved chat, a model, a memory): a title, a detail line and, optionally, action links and a delete cross.</summary>
+        /// <summary>
+        /// A list row (a saved chat, a model, a memory): a title, a detail line and, optionally, action links and a delete
+        /// cross. The links are beside the details, or under them (<paramref name="actionsBelow"/>: several links, which beside
+        /// a long detail on a phone's narrow screen left it a column a few words wide).
+        /// </summary>
         internal static Border ListRow(string title, string detail, bool selected, Action tapped, Action deleted, string deleteDescription,
-            IEnumerable<(string Text, Action Tapped)> actions = null)
+            IEnumerable<(string Text, Action Tapped)> actions = null, bool actionsBelow = false)
         {
             var titleLabel = new Label { Text = title };
             ChatResources.ApplyStyle(titleLabel, "ChatListTitleStyle");
@@ -532,10 +542,13 @@ namespace Emgu.LiteRT.LM.Maui
             row.Add(details, 0, 0);
             if (actions != null && actions.Any())
             {
-                var links = new HorizontalStackLayout { Spacing = 4, VerticalOptions = LayoutOptions.Center };
+                var links = new HorizontalStackLayout { Spacing = actionsBelow ? 12 : 4, VerticalOptions = LayoutOptions.Center };
                 foreach ((string text, Action action) in actions)
                     links.Children.Add(Link(text, action));
-                row.Add(links, 1, 0);
+                if (actionsBelow)
+                    details.Children.Add(links);
+                else
+                    row.Add(links, 1, 0);
             }
             if (deleted != null)
             {

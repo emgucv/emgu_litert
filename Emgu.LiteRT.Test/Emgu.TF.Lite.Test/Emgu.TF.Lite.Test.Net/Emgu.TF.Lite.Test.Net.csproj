@@ -74,6 +74,7 @@
     <Compile Include="..\UnitTestVoiceConversation.cs" Link="UnitTestVoiceConversation.cs" />
     <Compile Include="..\UnitTestDeviceActions.cs" Link="UnitTestDeviceActions.cs" />
     <Compile Include="..\UnitTestAgentGoals.cs" Link="UnitTestAgentGoals.cs" />
+    <Compile Include="..\UnitTestScheduledTasks.cs" Link="UnitTestScheduledTasks.cs" />
     <Compile Include="..\UnitTestToolRouting.cs" Link="UnitTestToolRouting.cs" />
     <Compile Include="..\UnitTestMemoriesUsed.cs" Link="UnitTestMemoriesUsed.cs" />
     <Compile Include="..\UnitTestVisualAgentsCV.cs" Link="UnitTestVisualAgentsCV.cs" />

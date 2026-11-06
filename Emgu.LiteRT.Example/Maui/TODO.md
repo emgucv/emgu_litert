@@ -227,22 +227,28 @@ local network, and phone apps - this demo, or any other - use it as if it were a
 - [ ] End to end: the Catalyst app serving Gemma 4 12B, the demo on a Pixel Fold / Galaxy Z Fold3 using it with its
       own tools (location, photos), over Wi-Fi and over Tailscale.
 
-## 30. Background tasks and monitoring
+## 30. Background tasks and monitoring — scheduled tasks implemented on Android; verified on a Galaxy S10 and a Z Fold3
 
 "Every morning, summarise the weather and my reminders", "tell me when this page mentions a new release": tasks the
-agent runs on a schedule, with a notification when there is something to say.
+agent runs on a schedule, with a notification when there is something to say. How it works and what was measured:
+FEATURES.md, "Scheduled tasks". Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Tasks: a description, a schedule (daily at a time, every N hours) and a condition for notifying; created by the
-      model (`schedule_task` tool) or in the settings, listed there with their last run and result.
-- [ ] A run: a new agent conversation with the task's description and its tools (web, weather, memories...), then a
-      local notification with the answer if the condition holds; the run is saved like a chat, tapping the
-      notification opens it.
+Shared:
+- [ ] An "Add task" form in Settings > Scheduled tasks (now made only through the chat).
 - [ ] Mac Catalyst: runs while the app is open (or a login item); the model is already loaded or loads for the run.
-- [ ] Phones: Android WorkManager / iOS `BGTaskScheduler` only give short, occasional runs, and loading a 2.6 GB model
-      on a phone's CPU takes most of that - so run tasks on the Mac when a phone is paired with it (item 29), or
-      limit phones to light tasks while charging.
-- [ ] Limits: at most a few runs a day per task; web tasks only with Web search allowed; nothing that changes things
-      outside the app without approval.
+
+Android:
+- [ ] A run with the app's process gone and the model loaded by the service on the Z Fold3 (the S10's was, 7.6 s + 46.7 s);
+      the CPU's times and the memory; a run skipped when hot or low on battery (implemented, not seen).
+- [ ] The S10 didn't re-arm the alarms after a debug reinstall (no `MY_PACKAGE_REPLACED` seen); the Fold3 did. Check
+      after a restart, and with a Release install.
+
+iOS: no run at a time the app picks.
+- [ ] `BGAppRefreshTask` gives ~30 s (too short); `BGProcessingTask` gives minutes when iOS chooses, usually overnight
+      while charging and idle: enough for "a summary ready by morning", not "at 7:00".
+- [ ] No GPU in the background (iOS refuses Metal work from a background app), so the CPU; and iOS kills background
+      apps first, so a 2.6 GB model is at risk even with the increased-memory entitlement - measure on the iPad.
+- [ ] Otherwise run the task on a paired Mac (item 29) and notify the phone.
 
 ## 31. Image generation on iOS — implemented; untested on an iPhone
 
