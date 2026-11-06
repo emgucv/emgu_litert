@@ -911,6 +911,26 @@ Moved from TODO.md on 2026-11-05:
 
 - [x] A reusable package: `Emgu.LiteRT.LM.Agents.Mcp` (the servers as agent tools) and `Emgu.LiteRT.LM.Maui.Mcp` (`McpFeature` for any `ChatPage`, phase C, 2026-10-26).
 
+## 29. Serve the Mac's models to phones
+
+Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page's model):
+- [x] Protocol: OpenAI-compatible `POST /v1/chat/completions` (streamed and not) and `GET /v1/models` (with the context
+      window and capabilities), LM Studio's `/api/v0/models`; text, images (data URIs), audio, tools as declarations (the
+      tool calls go back to the phone), `reasoning_effort`, `max_tokens`; the reply's text, `reasoning_content` and
+      `tool_calls` with their ids, so the model keeps its open conversation across a tool round.
+- [x] Server library: the new package `Emgu.LiteRT.LM.Server` (`ChatServer` on `HttpListener`, which works inside the
+      Catalyst app; `ServerPairing`; no LiteRT reference); one request at a time on the model (LiteRtLmChatClient's lock);
+      a client that goes away stops its reply. `UnitTestChatServer`.
+- [x] Mac: Settings > "Serve this model on the network" (the switch kept, the addresses incl. Tailscale's, Pair a phone,
+      the paired phones with their last request and Remove, Keep this Mac awake), Bonjour `_emgu-litert._tcp` by the Mac's
+      name, an `NSProcessInfo` activity; the page shows "Answering <phone>..." while it serves.
+- [x] Phone: Find a Mac (Android `NsdManager`, iOS `NSNetServiceBrowser` with `NSLocalNetworkUsageDescription` and
+      `NSBonjourServices`), the code, the token in the server key's storage, the capabilities from `/v1/models`, "<model> on
+      <Mac>" in the model list, the Mac found again by its name.
+- [x] Security: never without a token; tokens kept hashed; wrong codes end a code after 5, wrong tokens wait a minute after
+      10 from an address.
+- [x] Verified with a Galaxy S10 and the Mac's Gemma 4 E2B (FEATURES.md).
+
 ## 30. Background tasks and monitoring
 
 Implemented 2026-11-05 (the Android part; the plan split the item into shared, Android and iOS parts the same day):

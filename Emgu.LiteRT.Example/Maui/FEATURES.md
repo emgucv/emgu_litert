@@ -675,6 +675,23 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   stream") when Google Maps, opened by `open_directions`, came to the front, and the reply was lost. (The retry itself hasn't
   been seen to run.)
 
+## Serving the Mac's model
+
+- Since 2026-11-05 (TODO item 29): on the Mac, Settings > "Serve this model on the network" serves the chat's model (the
+  page's own client: the Mac's chat and the phones take turns) over an OpenAI-compatible API on port 11435
+  (`Emgu.LiteRT.LM.Server`), announced with Bonjour by the Mac's name. "Pair a phone" shows a 6-digit code for 5 minutes;
+  the settings list the paired phones with their last request, and Remove ends a phone's token ("This device isn't paired
+  with the server (any more)"). macOS asks the first time for Local Network (System Settings > Privacy & Security > Local
+  Network): without it the phones' connections opened but were never answered, while 127.0.0.1 worked.
+- On the phone: Settings > Your own server > Find a Mac lists the Macs serving (with their model), asks for the code, and
+  sets the server up (its address, the token); the model list then shows "Gemma 4 E2B on MacMini M1 2020 (7)". Tools run on
+  the phone. When the Mac's address changes, the phone finds it again by its name before giving up.
+- Verified (Mac mini M1 serving Gemma 4 E2B on Metal; a Galaxy S10 over Wi-Fi): Find a Mac found it, the code paired it, "What
+  is 12 times 7?" called `calculate` on the phone and answered 84 in 18 s (with the connection), the follow-up "divided by
+  4" in 5 s (the conversation carried over). `curl` from the Mac: a streamed reply in 4 s.
+- Not yet: an image or a voice message from the phone, a Mac on Tailscale, the iPad, a larger model (Gemma 4 12B), the
+  Mac's address changing, several phones at once.
+
 ## Claude
 
 - Settings > "Claude" (`ClaudeFeature`, the `Emgu.LiteRT.LM.Maui.Claude` package, since 2026-10-29; its remote option, id

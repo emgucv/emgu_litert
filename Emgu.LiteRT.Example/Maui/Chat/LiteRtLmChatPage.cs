@@ -86,6 +86,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         public McpFeature Mcp;
         public VoiceModeFeature VoiceMode;
         public ServerFeature Server;
+        public ServeModelsFeature ServeModels;
         public ClaudeFeature Claude;
         public ExportFeature Export;
         public StorageFeature Storage;
@@ -172,6 +173,8 @@ public sealed class LiteRtLmChatPage : ChatPage
         models.Add(parts.Claude.Option);
         parts.Server = new ServerFeature();
         models.Add(parts.Server.Option);
+        // The other side (Mac Catalyst): this Mac serving its chat's model to the phones (TODO item 29).
+        parts.ServeModels = new ServeModelsFeature();
         parts.Workload = new DeviceIndexingWorkload();
         // Pictures drawn with the demo's image models (Settings > Image model), and a Save As dialog.
         parts.Images = new ImageFeature(parts.Workload)
@@ -265,7 +268,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         {
             new SpeechEngineFeature(), new VoiceFeature(), new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new PlacesFeature(), new ClipboardFeature(),
-            parts.Camera, parts.PhotoEffects, parts.Claude, parts.Server, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
+            parts.Camera, parts.PhotoEffects, parts.Claude, parts.Server, parts.ServeModels, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
             parts.WrittenDocuments, parts.Goals, parts.ScheduledTasks, parts.PastChats, parts.PhotoSearch, parts.VideoSearch, parts.Videos, parts.Meetings, parts.Exercises
         })

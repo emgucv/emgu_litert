@@ -1,0 +1,418 @@
+// Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+using System;
+using System.ClientModel;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Emgu.LiteRT.LM.Server;
+using Microsoft.Extensions.AI;
+using NUnit.Framework;
+using OpenAI;
+
+namespace Emgu.TF.Lite.Test;
+
+// Emgu.LiteRT.LM.Server (TODO item 29): the OpenAI wire format both ways, pairing, and the server over loopback called
+// through Microsoft.Extensions.AI.OpenAI as a phone calls it, with a scripted model. No model or native library.
+[TestFixture]
+public class UnitTestChatServer
+{
+    // ---------- The protocol ----------
+
+    [Test]
+    public void ReadsARequestAsTheClientKeepsTheConversation()
+    {
+        string png = "data:image/png;base64," + Convert.ToBase64String(new byte[] { 0x89, 0x50, 0x4E, 0x47, 1, 2, 3 });
+        string json = @"{
+          ""model"": ""gemma-4-e4b"", ""stream"": true, ""max_completion_tokens"": 512, ""reasoning_effort"": ""none"",
+          ""messages"": [
+            { ""role"": ""system"", ""content"": ""You are helpful."" },
+            { ""role"": ""developer"", ""content"": [ { ""type"": ""text"", ""text"": ""Be brief."" } ] },
+            { ""role"": ""user"", ""content"": [ { ""type"": ""text"", ""text"": ""What is in it, and the time?"" }, { ""type"": ""image_url"", ""image_url"": { ""url"": """ + png + @""" } } ] },
+            { ""role"": ""assistant"", ""content"": ""Let me check."", ""tool_calls"": [
+                { ""id"": ""call_a"", ""type"": ""function"", ""function"": { ""name"": ""get_time"", ""arguments"": ""{\""zone\"":\""UTC\""}"" } },
+                { ""id"": ""call_b"", ""type"": ""function"", ""function"": { ""name"": ""get_place"", ""arguments"": """" } } ] },
+            { ""role"": ""tool"", ""tool_call_id"": ""call_a"", ""content"": ""12:00"" },
+            { ""role"": ""tool"", ""tool_call_id"": ""call_b"", ""content"": [ { ""type"": ""text"", ""text"": ""Lyon"" } ] }
+          ],
+          ""tools"": [ { ""type"": ""function"", ""function"": { ""name"": ""get_time"", ""description"": ""The time"", ""parameters"": { ""type"": ""object"", ""properties"": { ""zone"": { ""type"": ""string"" } } } } },
+                       { ""type"": ""function"", ""function"": { ""name"": ""get_place"" } } ],
+          ""tool_choice"": ""auto""
+        }";
+        ChatCompletionRequest request = OpenAIChatProtocol.ParseRequest(json);
+        Assert.That((request.Model, request.Stream), Is.EqualTo(("gemma-4-e4b", true)));
+        Assert.That(request.Options.Instructions, Is.EqualTo("You are helpful.\n\nBe brief."));
+        Assert.That(request.Options.MaxOutputTokens, Is.EqualTo(512));
+        Assert.That(request.Options.Reasoning.Effort, Is.EqualTo(ReasoningEffort.None));
+        Assert.That(request.Options.ToolMode, Is.EqualTo(ChatToolMode.Auto));
+        Assert.That(request.Options.Tools.Select(t => t.Name), Is.EqualTo(new[] { "get_time", "get_place" }));
+        Assert.That(request.Options.Tools[0], Is.InstanceOf<AIFunctionDeclaration>());
+        Assert.That(((AIFunctionDeclaration)request.Options.Tools[0]).JsonSchema.GetProperty("properties").TryGetProperty("zone", out _), Is.True);
+
+        Assert.That(request.Messages.Select(m => m.Role), Is.EqualTo(new[] { ChatRole.User, ChatRole.Assistant, ChatRole.Tool }));
+        DataContent image = request.Messages[0].Contents.OfType<DataContent>().Single();
+        Assert.That((image.MediaType, image.Data.Length), Is.EqualTo(("image/png", 7)));
+        // The text before the calls, with their ids; the arguments as JSON values.
+        ChatMessage assistant = request.Messages[1];
+        Assert.That(assistant.Contents[0], Is.InstanceOf<TextContent>());
+        Assert.That(assistant.Text, Is.EqualTo("Let me check."));
+        FunctionCallContent[] calls = assistant.Contents.OfType<FunctionCallContent>().ToArray();
+        Assert.That(calls.Select(c => (c.CallId, c.Name)), Is.EqualTo(new[] { ("call_a", "get_time"), ("call_b", "get_place") }));
+        Assert.That(((JsonElement)calls[0].Arguments["zone"]).GetString(), Is.EqualTo("UTC"));
+        Assert.That(calls[1].Arguments, Is.Empty);
+        // A round's two tool messages are one message.
+        FunctionResultContent[] results = request.Messages[2].Contents.OfType<FunctionResultContent>().ToArray();
+        Assert.That(results.Select(r => (r.CallId, r.Result as string)), Is.EqualTo(new[] { ("call_a", "12:00"), ("call_b", "Lyon") }));
+    }
+
+    [Test]
+    public void ReadsOptionsAndAudio()
+    {
+        string wav = Convert.ToBase64String(new byte[] { 1, 2, 3, 4 });
+        ChatCompletionRequest request = OpenAIChatProtocol.ParseRequest(@"{ ""messages"": [ { ""role"": ""user"", ""content"": [
+            { ""type"": ""input_audio"", ""input_audio"": { ""data"": """ + wav + @""", ""format"": ""wav"" } } ] } ],
+            ""max_tokens"": 100, ""reasoning_effort"": ""high"", ""tool_choice"": ""none"" }");
+        Assert.That(request.Stream, Is.False);
+        Assert.That(request.Messages.Single().Contents.OfType<DataContent>().Single().MediaType, Is.EqualTo("audio/wav"));
+        Assert.That(request.Options.MaxOutputTokens, Is.EqualTo(100));
+        Assert.That(request.Options.Reasoning.Effort, Is.EqualTo(ReasoningEffort.High));
+        Assert.That(request.Options.ToolMode, Is.EqualTo(ChatToolMode.None));
+        Assert.That(request.Options.Tools, Is.Null);
+        Assert.That(request.Options.Instructions, Is.Null);
+    }
+
+    [Test]
+    public void RefusesWhatItCantTake()
+    {
+        string[] bad =
+        {
+            "not json", "[]", @"{ ""messages"": [] }", @"{ ""messages"": [ { ""role"": ""wizard"", ""content"": ""hi"" } ] }",
+            @"{ ""messages"": [ { ""role"": ""user"", ""content"": [ { ""type"": ""image_url"", ""image_url"": { ""url"": ""https://example.com/a.png"" } } ] } ] }",
+            @"{ ""messages"": [ { ""role"": ""tool"", ""content"": ""x"" } ] }",
+            @"{ ""messages"": [ { ""role"": ""user"", ""content"": ""hi"" } ], ""tools"": [ { ""type"": ""retrieval"" } ] }",
+            @"{ ""messages"": [ { ""role"": ""assistant"", ""tool_calls"": [ { ""id"": ""c"", ""function"": { ""name"": ""f"", ""arguments"": ""{oops"" } } ] } ] }"
+        };
+        foreach (string json in bad)
+            Assert.That(Assert.Throws<ChatProtocolException>(() => OpenAIChatProtocol.ParseRequest(json)).Status, Is.EqualTo(400), json);
+    }
+
+    [Test]
+    public void WritesChunksAndWholeReplies()
+    {
+        int toolIndex = 0;
+        string first = OpenAIChatProtocol.Chunk(new ChatResponseUpdate(ChatRole.Assistant, new List<AIContent> { new TextReasoningContent("Hmm.") }), "chatcmpl-1", "m", 7, true, ref toolIndex);
+        using (JsonDocument doc = JsonDocument.Parse(first))
+        {
+            JsonElement delta = doc.RootElement.GetProperty("choices")[0].GetProperty("delta");
+            Assert.That(doc.RootElement.GetProperty("object").GetString(), Is.EqualTo("chat.completion.chunk"));
+            Assert.That(delta.GetProperty("role").GetString(), Is.EqualTo("assistant"));
+            Assert.That(delta.GetProperty("reasoning_content").GetString(), Is.EqualTo("Hmm."));
+        }
+        var call = new FunctionCallContent("call_x", "get_time", new Dictionary<string, object> { ["zone"] = "UTC" });
+        string calls = OpenAIChatProtocol.Chunk(new ChatResponseUpdate(ChatRole.Assistant, new List<AIContent> { new TextContent("Checking."), call }), "chatcmpl-1", "m", 7, false, ref toolIndex);
+        Assert.That(toolIndex, Is.EqualTo(1));
+        using (JsonDocument doc = JsonDocument.Parse(calls))
+        {
+            JsonElement delta = doc.RootElement.GetProperty("choices")[0].GetProperty("delta");
+            Assert.That(delta.GetProperty("content").GetString(), Is.EqualTo("Checking."));
+            JsonElement tool = delta.GetProperty("tool_calls")[0];
+            Assert.That((tool.GetProperty("index").GetInt32(), tool.GetProperty("id").GetString(), tool.GetProperty("function").GetProperty("name").GetString()),
+                Is.EqualTo((0, "call_x", "get_time")));
+            Assert.That(tool.GetProperty("function").GetProperty("arguments").GetString(), Is.EqualTo("{\"zone\":\"UTC\"}"));
+        }
+        Assert.That(OpenAIChatProtocol.Chunk(new ChatResponseUpdate(ChatRole.Assistant, new List<AIContent>()), "chatcmpl-1", "m", 7, false, ref toolIndex), Is.Null);
+        using (JsonDocument doc = JsonDocument.Parse(OpenAIChatProtocol.FinalChunk("chatcmpl-1", "m", 7, ChatFinishReason.ToolCalls)))
+            Assert.That(doc.RootElement.GetProperty("choices")[0].GetProperty("finish_reason").GetString(), Is.EqualTo("tool_calls"));
+
+        string whole = OpenAIChatProtocol.Completion(new[]
+        {
+            new ChatResponseUpdate(ChatRole.Assistant, new List<AIContent> { new TextReasoningContent("Think."), new TextContent("Hello ") }),
+            new ChatResponseUpdate(ChatRole.Assistant, "there.") { FinishReason = ChatFinishReason.Length }
+        }, "chatcmpl-2", "m", 9);
+        using (JsonDocument doc = JsonDocument.Parse(whole))
+        {
+            JsonElement choice = doc.RootElement.GetProperty("choices")[0];
+            Assert.That(choice.GetProperty("message").GetProperty("content").GetString(), Is.EqualTo("Hello there."));
+            Assert.That(choice.GetProperty("message").GetProperty("reasoning_content").GetString(), Is.EqualTo("Think."));
+            Assert.That(choice.GetProperty("finish_reason").GetString(), Is.EqualTo("length"));
+        }
+    }
+
+    [Test]
+    public void ListsTheModelWithItsCapabilities()
+    {
+        var model = new ServedModel("gemma-4-e4b", "Gemma 4 E4B") { ContextLength = 8192, Vision = true, Tools = true, Thinking = true };
+        using (JsonDocument doc = JsonDocument.Parse(OpenAIChatProtocol.Models(model, 1)))
+        {
+            JsonElement entry = doc.RootElement.GetProperty("data")[0];
+            Assert.That((entry.GetProperty("id").GetString(), entry.GetProperty("owned_by").GetString(), entry.GetProperty("context_length").GetInt32()),
+                Is.EqualTo(("gemma-4-e4b", "emgu-litert", 8192)));
+            JsonElement capabilities = entry.GetProperty("capabilities");
+            Assert.That((capabilities.GetProperty("vision").GetBoolean(), capabilities.GetProperty("audio").GetBoolean(), capabilities.GetProperty("tools").GetBoolean()),
+                Is.EqualTo((true, false, true)));
+        }
+        using (JsonDocument doc = JsonDocument.Parse(OpenAIChatProtocol.LmStudioModels(model)))
+        {
+            JsonElement entry = doc.RootElement.GetProperty("data")[0];
+            Assert.That((entry.GetProperty("type").GetString(), entry.GetProperty("state").GetString(), entry.GetProperty("loaded_context_length").GetInt32()),
+                Is.EqualTo(("vlm", "loaded", 8192)));
+        }
+        using (JsonDocument doc = JsonDocument.Parse(OpenAIChatProtocol.Models(null, 1)))
+            Assert.That(doc.RootElement.GetProperty("data").GetArrayLength(), Is.Zero);
+    }
+
+    // ---------- Pairing ----------
+
+    [Test]
+    public void PairsWithACodeOnceAndKeepsOnlyTheTokensHash()
+    {
+        DateTime now = new DateTime(2026, 11, 5, 12, 0, 0, DateTimeKind.Utc);
+        var store = new InMemoryServerTokenStore();
+        var pairing = new ServerPairing(store, () => now);
+        Assert.That(pairing.TryPair("123456", "Phone"), Is.Null, "No code shown yet.");
+        string code = pairing.NewCode();
+        Assert.That(code, Does.Match("^[0-9]{6}$"));
+        Assert.That(pairing.CurrentCode, Is.EqualTo(code));
+        string token = pairing.TryPair(" " + code + " ", "Galaxy S10");
+        Assert.That(token, Is.Not.Null.And.Length.GreaterThanOrEqualTo(40));
+        Assert.That(pairing.CurrentCode, Is.Null, "A code pairs one device.");
+        Assert.That(pairing.TryPair(code, "Another"), Is.Null);
+
+        PairedDevice device = store.Load().Single();
+        Assert.That(device.Name, Is.EqualTo("Galaxy S10"));
+        Assert.That(device.TokenHash, Does.Not.Contain(token));
+        Assert.That(pairing.Validate(token)?.Name, Is.EqualTo("Galaxy S10"));
+        Assert.That(pairing.Validate(token + "x"), Is.Null);
+        Assert.That(pairing.Validate(null), Is.Null);
+        // Read back by a new pairing (the app started again).
+        Assert.That(new ServerPairing(store, () => now).Validate(token)?.Name, Is.EqualTo("Galaxy S10"));
+        Assert.That(pairing.Remove(device.Id), Is.True);
+        Assert.That(pairing.Validate(token), Is.Null);
+        Assert.That(pairing.Remove(device.Id), Is.False);
+    }
+
+    [Test]
+    public void ACodeEndsAfterFiveWrongTriesOrFiveMinutes()
+    {
+        DateTime now = new DateTime(2026, 11, 5, 12, 0, 0, DateTimeKind.Utc);
+        var pairing = new ServerPairing(new InMemoryServerTokenStore(), () => now);
+        string code = pairing.NewCode();
+        string wrong = code == "000000" ? "111111" : "000000";
+        for (int i = 0; i < ServerPairing.MaxWrongCodes; i++)
+            Assert.That(pairing.TryPair(wrong, "Phone"), Is.Null);
+        Assert.That(pairing.TryPair(code, "Phone"), Is.Null, "Ended by the wrong ones.");
+
+        code = pairing.NewCode();
+        now += ServerPairing.CodeLifetime;
+        Assert.That(pairing.CurrentCode, Is.Null);
+        Assert.That(pairing.TryPair(code, "Phone"), Is.Null, "Expired.");
+        Assert.That(pairing.Devices, Is.Empty);
+    }
+
+    // ---------- The server over loopback ----------
+
+    [Test]
+    public async Task StreamsTextAndThinkingToAnOpenAIClient()
+    {
+        var model = new ScriptedModel();
+        model.Replies.Enqueue(new[] { Update(new TextReasoningContent("The user greets.")), Update(new TextContent("Hello")), Update(new TextContent(" there!")) });
+        using var host = await ServerHost.StartAsync(model);
+        IChatClient client = host.Client();
+        var text = new StringBuilder();
+        var reasoning = new StringBuilder();
+        await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync(new[] { new ChatMessage(ChatRole.User, "Hi") },
+            new ChatOptions { Instructions = "Be kind.", Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Medium } }))
+        {
+            text.Append(string.Concat(update.Contents.OfType<TextContent>().Select(c => c.Text)));
+            reasoning.Append(string.Concat(update.Contents.OfType<TextReasoningContent>().Select(c => c.Text)));
+        }
+        Assert.That(text.ToString(), Is.EqualTo("Hello there!"));
+        Assert.That(reasoning.ToString(), Is.EqualTo("The user greets."));
+        ScriptedModel.Request request = model.Requests.Single();
+        Assert.That(request.Options.Instructions, Is.EqualTo("Be kind."));
+        Assert.That(request.Options.Reasoning?.Effort, Is.Not.EqualTo(ReasoningEffort.None));
+        Assert.That(request.Messages.Single().Text, Is.EqualTo("Hi"));
+        Assert.That(host.Requests.Single().Device, Is.EqualTo("Test phone"));
+
+        // Not streamed.
+        model.Replies.Enqueue(new[] { Update(new TextContent("Fine.")) });
+        ChatResponse whole = await client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "How are you?") });
+        Assert.That(whole.Text, Is.EqualTo("Fine."));
+    }
+
+    [Test]
+    public async Task ARoundOfToolsComesBackAsTheModelKeepsIt()
+    {
+        var model = new ScriptedModel();
+        var call = new FunctionCallContent("call_0123456789ab", "get_time", new Dictionary<string, object> { ["zone"] = "UTC" });
+        model.Replies.Enqueue(new[] { Update(call) });
+        model.Replies.Enqueue(new[] { Update(new TextContent("It is noon.")) });
+        using var host = await ServerHost.StartAsync(model);
+        // The phone's side: the tool runs there.
+        int called = 0;
+        AIFunction getTime = AIFunctionFactory.Create((string zone) => { called++; return "12:00 " + zone; }, "get_time", "The time in a zone");
+        IChatClient client = new ChatClientBuilder(host.Client()).UseFunctionInvocation().Build();
+        ChatResponse response = await client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "What time is it?") }, new ChatOptions { Tools = new List<AITool> { getTime } });
+        Assert.That(response.Text, Is.EqualTo("It is noon."));
+        Assert.That(called, Is.EqualTo(1));
+
+        Assert.That(model.Requests.Count, Is.EqualTo(2));
+        Assert.That(model.Requests[0].Options.Tools.Single(), Is.InstanceOf<AIFunctionDeclaration>());
+        // The second request is the first, the model's own reply (the same call id and name), and one tool message.
+        IList<ChatMessage> second = model.Requests[1].Messages;
+        Assert.That(second.Select(m => m.Role), Is.EqualTo(new[] { ChatRole.User, ChatRole.Assistant, ChatRole.Tool }));
+        FunctionCallContent echoed = second[1].Contents.OfType<FunctionCallContent>().Single();
+        Assert.That((echoed.CallId, echoed.Name, second[1].Text), Is.EqualTo((call.CallId, call.Name, "")));
+        FunctionResultContent result = second[2].Contents.OfType<FunctionResultContent>().Single();
+        Assert.That(result.CallId, Is.EqualTo(call.CallId));
+        Assert.That(result.Result?.ToString(), Does.Contain("12:00 UTC"));
+    }
+
+    [Test]
+    public async Task NeedsATokenAndAModel()
+    {
+        var model = new ScriptedModel();
+        using var host = await ServerHost.StartAsync(model);
+        using var http = new HttpClient();
+        // GET / tells a device what it found, without a token.
+        string about = await http.GetStringAsync(host.Url);
+        Assert.That(about, Does.Contain("\"server\":\"emgu-litert\""));
+        HttpResponseMessage response = await http.GetAsync(host.Url + "v1/models");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("Pair with this server first"));
+
+        var request = new HttpRequestMessage(HttpMethod.Get, host.Url + "v1/models");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", host.Token);
+        Assert.That(await (await http.SendAsync(request)).Content.ReadAsStringAsync(), Does.Contain("\"context_length\":4096"));
+
+        // No model loaded: 503, which the OpenAI client throws.
+        host.Served = null;
+        Assert.ThrowsAsync<ClientResultException>(() => host.Client().GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "Hi") }));
+        Assert.That(host.Requests.Last().Status, Is.EqualTo(503));
+
+        // A wrong pairing code: 401.
+        HttpResponseMessage pair = await http.PostAsync(host.Url + "pair", new StringContent("{\"code\":\"999999x\",\"device\":\"Intruder\"}"));
+        Assert.That(pair.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+    }
+
+    [Test]
+    public async Task AClientThatGoesAwayStopsTheReply()
+    {
+        var model = new ScriptedModel { Slow = true };
+        model.Replies.Enqueue(Enumerable.Range(0, 200).Select(i => Update(new TextContent("word" + i + " "))).ToArray());
+        using var host = await ServerHost.StartAsync(model);
+        using var cancel = new CancellationTokenSource();
+        int received = 0;
+        Assert.CatchAsync<OperationCanceledException>(async () =>
+        {
+            await foreach (ChatResponseUpdate update in host.Client().GetStreamingResponseAsync(new[] { new ChatMessage(ChatRole.User, "Talk") }, null, cancel.Token))
+                if (++received == 3)
+                    cancel.Cancel();
+        });
+        // The server notices on its next write.
+        for (int i = 0; i < 100 && !model.Cancelled; i++)
+            await Task.Delay(50);
+        Assert.That(model.Cancelled, Is.True);
+        Assert.That(model.Yielded, Is.LessThan(200));
+    }
+
+    private static ChatResponseUpdate Update(AIContent content) => new ChatResponseUpdate(ChatRole.Assistant, new List<AIContent> { content });
+
+    // A model that answers from a script and records what it was asked.
+    private sealed class ScriptedModel : IChatClient
+    {
+        public sealed class Request
+        {
+            public IList<ChatMessage> Messages;
+            public ChatOptions Options;
+        }
+
+        public Queue<ChatResponseUpdate[]> Replies { get; } = new Queue<ChatResponseUpdate[]>();
+        public List<Request> Requests { get; } = new List<Request>();
+        public bool Slow { get; set; }
+        public volatile bool Cancelled;
+        public int Yielded;
+
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null, CancellationToken cancellationToken = default) =>
+            GetStreamingResponseAsync(messages, options, cancellationToken).ToChatResponseAsync(cancellationToken);
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            Requests.Add(new Request { Messages = messages.ToList(), Options = options });
+            ChatResponseUpdate[] reply = Replies.Dequeue();
+            bool calls = reply.Any(u => u.Contents.OfType<FunctionCallContent>().Any());
+            using (cancellationToken.Register(() => Cancelled = true))
+            {
+                foreach (ChatResponseUpdate update in reply)
+                {
+                    if (Slow)
+                        await Task.Delay(20, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Yielded++;
+                    yield return update;
+                }
+            }
+            yield return new ChatResponseUpdate(ChatRole.Assistant, new List<AIContent>()) { FinishReason = calls ? ChatFinishReason.ToolCalls : ChatFinishReason.Stop };
+        }
+
+        public object GetService(Type serviceType, object serviceKey = null) => null;
+
+        public void Dispose()
+        {
+        }
+    }
+
+    // A ChatServer on a free loopback port, with a phone paired.
+    private sealed class ServerHost : IDisposable
+    {
+        private readonly ChatServer _server;
+
+        private ServerHost(ChatServer server, string url)
+        {
+            _server = server;
+            Url = url;
+            server.RequestCompleted += (s, e) => { lock (Requests) Requests.Add(e); };
+        }
+
+        public string Url { get; }
+        public string Token { get; private set; }
+        public ServedChat Served { get; set; }
+        public List<ServerRequestInfo> Requests { get; } = new List<ServerRequestInfo>();
+
+        public static async Task<ServerHost> StartAsync(IChatClient model)
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            var pairing = new ServerPairing(new InMemoryServerTokenStore());
+            ServerHost host = null;
+            var server = new ChatServer(pairing, () => host.Served) { Name = "Test Mac" };
+            host = new ServerHost(server, "http://localhost:" + port + "/");
+            host.Served = new ServedChat(model, new ServedModel("test-model", "Test model") { ContextLength = 4096, Tools = true, Thinking = true });
+            server.Start(port);
+            using var http = new HttpClient();
+            HttpResponseMessage pair = await http.PostAsync(host.Url + "pair", new StringContent("{\"code\":\"" + pairing.NewCode() + "\",\"device\":\"Test phone\"}"));
+            using (JsonDocument doc = JsonDocument.Parse(await pair.Content.ReadAsStringAsync()))
+            {
+                Assert.That(doc.RootElement.GetProperty("server").GetString(), Is.EqualTo("Test Mac"));
+                host.Token = doc.RootElement.GetProperty("token").GetString();
+            }
+            lock (host.Requests) host.Requests.Clear();
+            return host;
+        }
+
+        // The OpenAI client a phone uses (Emgu.LiteRT.LM.Maui.OpenAI's ServerFeature).
+        public IChatClient Client() =>
+            new OpenAIClient(new ApiKeyCredential(Token), new OpenAIClientOptions { Endpoint = new Uri(Url + "v1") }).GetChatClient("test-model").AsIChatClient();
+
+        public void Dispose() => _server.Dispose();
+    }
+}

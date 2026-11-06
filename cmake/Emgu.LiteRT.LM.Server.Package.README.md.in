@@ -1,0 +1,25 @@
+## About this package
+
+This package is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. It contains:
+
+- `Emgu.LiteRT.LM.Server.dll`: an OpenAI-compatible HTTP server for any Microsoft.Extensions.AI `IChatClient` - in the Emgu LiteRT demo, the Mac's language model (`LiteRtLmChatClient` in `${EMGU_LITERT_LM_EXTENSIONS_AI_NUGET_ID}`), served to the phones on the same network.
+
+`ChatServer` listens with `System.Net.HttpListener` (no ASP.NET Core, which a Mac Catalyst app can't use) and answers:
+
+- `POST /v1/chat/completions`, streaming (server-sent events) and not: messages with text, images (`image_url` data URIs) and audio (`input_audio`), `tools` (declarations only: the client runs them, so a phone's tools - its location, photos, calendar - stay on the phone), `reasoning_effort` and `max_tokens`; the reply's text, thinking (`reasoning_content`) and `tool_calls`;
+- `GET /v1/models`: the model served, with its context window and what it accepts (images, audio, tools, thinking); LM Studio's `GET /api/v0/models` too;
+- `POST /pair`: a phone pairs with the 6-digit code the server shows (`ServerPairing.NewCode`, valid 5 minutes) and gets a token that every other request carries (`Authorization: Bearer ...`). Tokens are kept as hashes (`IServerTokenStore`) and can be revoked.
+
+```csharp
+using Emgu.LiteRT.LM.Server;
+
+var pairing = new ServerPairing(new InMemoryServerTokenStore());
+var server = new ChatServer(pairing, () => new ServedChat(chatClient, new ServedModel("gemma-4-e4b", "Gemma 4 E4B") { ContextLength = 8192, Vision = true, Tools = true, Thinking = true }));
+server.Start(11435);
+Console.WriteLine("Pair with " + pairing.NewCode());
+```
+
+Any OpenAI client works with it, e.g. `new OpenAIClient(new ApiKeyCredential(token), new OpenAIClientOptions { Endpoint = new Uri("http://mac:11435/v1") }).GetChatClient("gemma-4-e4b").AsIChatClient()`. One request runs at a time on a LiteRT-LM model; a request that only adds a message to the last one keeps the model's open conversation, so it doesn't read the whole chat again.
+
+For online documentation please visit
+http://www.emgu.com/wiki/files/emgutflite/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document/

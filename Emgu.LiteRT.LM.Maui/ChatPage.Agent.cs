@@ -25,7 +25,28 @@ namespace Emgu.LiteRT.LM.Maui
             IChatClient inner = CreateChatClient(_model, _chatView?.Model);
             if (_options.ConfigureClient != null)
                 inner = _options.ConfigureClient(inner) ?? inner;
+            _modelClient = inner;
             return new ChatClientBuilder(inner).UseFunctionInvocation().Build();
+        }
+
+        // The model's client under the function invocation (CreateInnerClient's), for ModelChatClient.
+        private IChatClient _modelClient;
+
+        /// <summary>
+        /// The model's client without the page's function invocation, for serving the model to other devices (e.g.
+        /// Emgu.LiteRT.LM.Maui.OpenAI's ServeModelsFeature): the client the page itself sends through, so the page's messages
+        /// and the other devices' take turns on the one model (LiteRtLmChatClient runs one request at a time). Null until a
+        /// model on the device is ready, and for a remote model. On the UI thread.
+        /// </summary>
+        public IChatClient ModelChatClient
+        {
+            get
+            {
+                if (_model == null || _model.IsRemote || !ModelReady)
+                    return null;
+                _client.EnsureCreated();
+                return _modelClient;
+            }
         }
 
         /// <summary>
@@ -313,6 +334,8 @@ namespace Emgu.LiteRT.LM.Maui
             }
 
             private IChatClient Current => _current ??= _create();
+
+            public void EnsureCreated() => _ = Current;
 
             public void Reset()
             {

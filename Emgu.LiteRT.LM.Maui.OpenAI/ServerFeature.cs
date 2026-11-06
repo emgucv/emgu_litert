@@ -35,6 +35,9 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
 
     private const string ServerKeyStorageName = "litert_lm_chat_server_key";
 
+    // A Mac paired through "Find a Mac" (its Bonjour name), so it is found again when its address changes.
+    private const string PairedMacSettingKey = "server_paired_mac";
+
     // Without a context length from the server, the conversation is kept within this (LM Studio's default).
     private const int DefaultServerContextTokens = 4096;
     private const int SummaryMaxTokens = 400;
@@ -47,6 +50,8 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
     private string _serverUrl = string.Empty;
     private string _serverModel = string.Empty;
     private string _serverKey = string.Empty;
+    private string _pairedMac = string.Empty;
+    private readonly string _defaultName;
     // The server refused reasoning_effort (some OpenAI-compatible servers reject what they don't know): not sent to it again.
     private bool _serverRejectsReasoning;
     private string _serverRejectsReasoningUrl;
@@ -69,6 +74,7 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             throw new ArgumentException("The server's option must be a remote one (no model on the device)", nameof(option));
         Option = option ?? new ChatModelOption(DefaultId, "Your own server") { CanUseTools = true, CanSummarize = true };
         Option.Remote = this;
+        _defaultName = Option.DisplayName;
         UpdateOptionDetail();
     }
 
@@ -111,6 +117,7 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         base.OnAttached(host);
         _serverUrl = host.Settings.Get(UrlSettingKey, string.Empty) ?? string.Empty;
         _serverModel = host.Settings.Get(ModelSettingKey, string.Empty) ?? string.Empty;
+        _pairedMac = host.Settings.Get(PairedMacSettingKey, string.Empty) ?? string.Empty;
         UpdateOptionDetail();
         _ = LoadServerKeyAsync();
     }
@@ -171,6 +178,9 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         _serverModelButton.Clicked += OnServerModelTapped;
         _serverStatus = new Label();
         ChatResources.ApplyStyle(_serverStatus, "ChatSectionNoteStyle");
+        var findMac = new Button { Text = "Find a Mac", IsVisible = LocalServerBrowser.IsSupported };
+        findMac.Clicked += (s, e) => _ = FindMacAsync();
+        SemanticProperties.SetHint(findMac, "Looks for a Mac on this network that serves its chat's model, and pairs with it");
         return new VerticalStackLayout
         {
             Spacing = 6,
@@ -181,6 +191,9 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
                     "API, such as LM Studio (turn on \"Serve on Local Network\") or Ollama. Then pick \"" + Option.DisplayName + "\" in the " +
                     "model list. Your messages, pictures and the tools' results go to that server. Tools need a model that " +
                     "supports tool calling."),
+                ChatPage.Note("A Mac running Emgu LiteRT can serve its model too (on the Mac: Settings > Serve this model on the network): " +
+                    "Find a Mac pairs with it using the code it shows."),
+                findMac,
                 _serverUrlEntry,
                 _serverKeyEntry,
                 connect,
@@ -239,6 +252,85 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             return;
         }
         Reconnect();
+    }
+
+    // "Find a Mac": the Macs serving their model on this network, the one chosen paired with the code it shows, and the chat
+    // set up to use it.
+    private async Task FindMacAsync()
+    {
+        if (Host == null || Host.IsBusy)
+            return;
+        _serverStatus.Text = "Looking for Macs on this network...";
+        IList<FoundServer> found;
+        try { found = await LocalServerBrowser.BrowseAsync(TimeSpan.FromSeconds(4)); }
+        catch (Exception ex)
+        {
+            _serverStatus.Text = "Couldn't look for Macs: " + ex.Message;
+            return;
+        }
+        if (found.Count == 0)
+        {
+            _serverStatus.Text = "No Mac found. On the Mac: Settings > Serve this model on the network, on the same Wi-Fi as this device" +
+                (DeviceInfo.Current.Platform == DevicePlatform.iOS ? " (and allow Local Network for this app in the iOS Settings)." : ".");
+            return;
+        }
+        _serverStatus.Text = string.Empty;
+        string picked = await Host.ChooseAsync("Pair with a Mac", found.Select(f => new ChatChoice(f.Name, f.Name,
+            string.IsNullOrEmpty(f.Model) ? f.ApiUrl : f.Model + " · " + f.ApiUrl)), null);
+        FoundServer mac = found.FirstOrDefault(f => f.Name == picked);
+        if (mac == null)
+            return;
+        string code = await Host.PromptAsync("Pair with " + mac.Name, "On the Mac, tap \"Pair a phone\" and type the 6-digit code it shows.", "Pair", "Cancel", null, 7);
+        if (string.IsNullOrWhiteSpace(code))
+            return;
+        _serverStatus.Text = "Pairing with " + mac.Name + "...";
+        string token;
+        try { token = await PairAsync(mac, code.Replace(" ", string.Empty)); }
+        catch (Exception ex)
+        {
+            _serverStatus.Text = "Couldn't pair: " + ex.Message;
+            return;
+        }
+        _pairedMac = mac.Name;
+        Host.Settings.Set(PairedMacSettingKey, _pairedMac);
+        _serverUrlEntry.Text = mac.ApiUrl;
+        _serverKeyEntry.Text = token;
+        SetServerModel(string.Empty);
+        await ApplyServerSettingsAsync(true);
+    }
+
+    private static async Task<string> PairAsync(FoundServer mac, string code)
+    {
+        string root = mac.ApiUrl.Substring(0, mac.ApiUrl.Length - 3);
+        string body = JsonSerializer.Serialize(new Dictionary<string, string> { ["code"] = code, ["device"] = DeviceInfo.Current.Name });
+        using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+        using HttpResponseMessage response = await ServerHttp.PostAsync(root + "/pair", content).ConfigureAwait(false);
+        string text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        using JsonDocument json = JsonDocument.Parse(text);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(json.RootElement.TryGetProperty("error", out JsonElement error) && error.TryGetProperty("message", out JsonElement message)
+                ? message.GetString() : "the Mac answered " + (int)response.StatusCode);
+        return json.RootElement.GetProperty("token").GetString();
+    }
+
+    // The paired Mac at a new address (its Wi-Fi reconnected): found by its name, and the address saved. True when it moved.
+    private async Task<bool> FindPairedMacAgainAsync(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(_pairedMac) || !LocalServerBrowser.IsSupported)
+            return false;
+        IList<FoundServer> found = await LocalServerBrowser.BrowseAsync(TimeSpan.FromSeconds(3), cancellationToken);
+        FoundServer mac = found.FirstOrDefault(f => f.Name == _pairedMac);
+        if (mac == null || mac.ApiUrl == _serverUrl)
+            return false;
+        _serverUrl = mac.ApiUrl;
+        await MainThread.InvokeOnMainThreadAsync(() =>
+        {
+            Host?.Settings.Set(UrlSettingKey, _serverUrl);
+            if (_serverUrlEntry != null)
+                _serverUrlEntry.Text = _serverUrl;
+            UpdateOptionDetail();
+        });
+        return true;
     }
 
     // The settings changed: the next message connects again (a conversation in progress is given to the server then).
@@ -325,9 +417,15 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         public string Id;
         public bool IsEmbedding;
         public bool Loaded;
-        // From LM Studio's own API; null when the server doesn't say.
+        // From LM Studio's own API, or an Emgu LiteRT Mac's list; null when the server doesn't say.
         public bool? Vision;
         public int? ContextTokens;
+        // An Emgu LiteRT Mac's (Emgu.LiteRT.LM.Server): its model's name and what it takes.
+        public bool IsEmguMac;
+        public string DisplayName;
+        public bool? Audio;
+        public bool? Tools;
+        public bool? Thinking;
     }
 
     private static HttpRequestMessage ServerRequest(string url, string key)
@@ -352,12 +450,32 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             if (json.RootElement.TryGetProperty("data", out JsonElement data) && data.ValueKind == JsonValueKind.Array)
                 foreach (JsonElement model in data.EnumerateArray())
                     if (model.TryGetProperty("id", out JsonElement id) && id.GetString() is string name)
-                        models.Add(new ServerModelInfo { Id = name, IsEmbedding = name.Contains("embed", StringComparison.OrdinalIgnoreCase) });
+                    {
+                        var info = new ServerModelInfo { Id = name, IsEmbedding = name.Contains("embed", StringComparison.OrdinalIgnoreCase) };
+                        // An Emgu LiteRT Mac says its context window and what its model takes (other servers may too).
+                        info.IsEmguMac = model.TryGetProperty("owned_by", out JsonElement owner) && owner.ValueKind == JsonValueKind.String && owner.GetString() == "emgu-litert";
+                        if (model.TryGetProperty("display_name", out JsonElement display) && display.ValueKind == JsonValueKind.String)
+                            info.DisplayName = display.GetString();
+                        if (model.TryGetProperty("context_length", out JsonElement length) && length.TryGetInt32(out int contextTokens) && contextTokens > 0)
+                            info.ContextTokens = contextTokens;
+                        if (model.TryGetProperty("capabilities", out JsonElement capabilities) && capabilities.ValueKind == JsonValueKind.Object)
+                        {
+                            info.Vision = Flag(capabilities, "vision");
+                            info.Audio = Flag(capabilities, "audio");
+                            info.Tools = Flag(capabilities, "tools");
+                            info.Thinking = Flag(capabilities, "thinking");
+                        }
+                        if (info.IsEmguMac)
+                            info.Loaded = true;
+                        models.Add(info);
+                    }
         }
         if (models.Count == 0)
             throw new InvalidOperationException("the server lists no models");
 
         string root = url.EndsWith("/v1", StringComparison.Ordinal) ? url.Substring(0, url.Length - 3) : url;
+        if (models.All(m => m.IsEmguMac))
+            return models;
         try
         {
             using HttpRequestMessage request = ServerRequest(root + "/api/v0/models", key);
@@ -389,6 +507,10 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         return models;
     }
 
+    private static bool? Flag(JsonElement element, string name) =>
+        element.TryGetProperty(name, out JsonElement value) && (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False)
+            ? value.GetBoolean() : null;
+
     // ---------- IRemoteChatModel ----------
 
     /// <summary>
@@ -405,7 +527,18 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         Host?.SetStatus("Connecting to " + url + "...");
         try
         {
-            List<ServerModelInfo> models = await FetchServerModelsAsync(url, _serverKey, cancellationToken);
+            List<ServerModelInfo> models = null;
+            Exception first = null;
+            try { models = await FetchServerModelsAsync(url, _serverKey, cancellationToken); }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested) { first = ex; }
+            if (models == null)
+            {
+                // The paired Mac moved to another address: once more there.
+                if (!await FindPairedMacAgainAsync(cancellationToken))
+                    throw first;
+                url = _serverUrl;
+                models = await FetchServerModelsAsync(url, _serverKey, cancellationToken);
+            }
             ChooseServerModel(models);
             ApplyServerModelInfo(models.First(m => m.Id == _serverModel));
         }
@@ -432,6 +565,19 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         _serverContextTokens = model.ContextTokens ?? DefaultServerContextTokens;
         Option.ContextWindow = _serverContextTokens;
         Option.AcceptsImages = model.Vision ?? true;
+        if (model.Audio is bool audio)
+            Option.AcceptsAudio = audio;
+        if (model.Tools is bool tools)
+            Option.CanUseTools = tools;
+        if (model.Thinking is bool thinking)
+            Option.CanThink = thinking;
+        // "Gemma 4 E4B on Canming's Mac mini" for a paired Mac; the option's own name otherwise.
+        string name = model.IsEmguMac && !string.IsNullOrEmpty(_pairedMac) ? (model.DisplayName ?? model.Id) + " on " + _pairedMac : _defaultName;
+        if (Option.DisplayName != name)
+        {
+            Option.DisplayName = name;
+            MainThread.BeginInvokeOnMainThread(() => Host?.RefreshModelList());
+        }
         // The page follows: what can be attached, the pending images a text-only model doesn't take, the context window.
         if (IsSelected)
             Host.ModelCapabilitiesChanged();

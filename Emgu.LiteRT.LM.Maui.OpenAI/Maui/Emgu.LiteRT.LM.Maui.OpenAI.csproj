@@ -22,11 +22,13 @@
 
 	<!--
 	Emgu.LiteRT.LM.Maui.OpenAI is ChatPage's ServerFeature: a model on a server of the user's own (LM Studio, Ollama,
-	llama.cpp, vLLM...) through its OpenAI-compatible API, as the chat's remote model option. Kept out of
+	llama.cpp, vLLM, or a Mac running this app) through its OpenAI-compatible API, as the chat's remote model option; and
+	ServeModelsFeature, the other side: a Mac serving its chat's model to phones (Emgu.LiteRT.LM.Server). Kept out of
 	Emgu.LiteRT.LM.Maui so that package doesn't depend on Microsoft.Extensions.AI.OpenAI and the OpenAI SDK.
 	-->
 	<ItemGroup>
 		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Maui\Maui\Emgu.LiteRT.LM.Maui.csproj" />
+		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Server\NetStandard\Emgu.LiteRT.LM.Server.csproj" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<!-- 10.10.1 turns the servers' reasoning_content into TextReasoningContent, so thinking shows as it does for local models. -->
 		<PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />

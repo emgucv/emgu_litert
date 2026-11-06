@@ -158,74 +158,22 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] stdio on Mac Catalyst and Windows is untested (a program such as `npx -y <server>`); OAuth for servers that need it (the SDK has
       a client for it) - only a static header now; resources and prompts of servers aren't used, only tools.
 
-## 29. Serve the Mac's models to phones ("Server" option)
+## 29. Serve the Mac's models to phones ("Server" option) — chat served and paired; verified with a Galaxy S10
 
-The Mac Catalyst app serves the model it runs (e.g. Gemma 4 12B on the Metal GPU, which no phone can hold) over the
-local network, and phone apps - this demo, or any other - use it as if it were a local language model.
+The Mac Catalyst app serves the model it runs over the local network, and phone apps use it as if it were a local model.
+How it works and what was verified: FEATURES.md, "Serving the Mac's model". Done so far: see
+[history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-### Protocol
-
-- [ ] OpenAI-compatible HTTP API, so any OpenAI client works with it (and our clients work with Ollama / LM Studio too):
-      `POST /v1/chat/completions` (streaming over server-sent events, and non-streaming), `GET /v1/models`; later
-      `POST /v1/embeddings` (the search model) and `POST /v1/images/generations` (Z-Image-Turbo, so a phone gets
-      pictures without the 21 GB model).
-- [ ] Map requests onto `LiteRtLmChatClient` (`IChatClient`): text, images and audio (`image_url` data URIs,
-      `input_audio`) as `DataContent`, thinking (`reasoning_effort`) as `ChatOptions.Reasoning`, `tools` /
-      `tool_choice` as function declarations, `max_tokens`; the reply's thinking, text and `tool_calls` back, with ids.
-- [ ] Tools stay on the phone: the server only returns tool calls and the phone runs them (location, photos, memories
-      and the calendar never leave it); only the model's input and output cross the network.
-
-### Server library
-
-- [ ] A new package, e.g. `Emgu.LiteRT.LM.Server`: serves any `IChatClient` (and optionally an embedding model and an
-      image generator) over that API; testable from a console app.
-- [ ] HTTP server: ASP.NET Core (Kestrel) isn't available to Mac Catalyst apps, so `System.Net.HttpListener` or a small
-      embedded server. First check `HttpListener` works inside the Catalyst app (listening on all interfaces, not just
-      localhost); if not, the fallback is a plain macOS console host with ASP.NET Core (losing the in-app switch).
-- [ ] One model, one conversation at a time: queue requests, and serve one active client at first (several phones
-      would take turns, or each need its own LiteRT-LM conversation and KV cache - more memory).
-- [ ] The API is stateless, so every request resends the whole conversation: keep the open conversation when a request
-      only adds to it (what `LiteRtLmChatClient` already does for one client), so the model doesn't re-read it.
-- [ ] Cancel generation when the client disconnects.
-
-### Mac Catalyst app
-
-- [ ] Settings: "Serve models on this network" switch, the model it serves (the chat's selected model), the address,
-      and a list of connected devices with their last request; turning it off stops the server.
-- [ ] Pairing: show a QR code with the address and a random access token; every request must carry the token
-      (`Authorization: Bearer ...`); a button to make a new token (unpairing every phone).
-- [ ] Discovery: announce the server with Bonjour (`_emgu-litert._tcp`, with the model's name), so paired phones find
-      the Mac again when its address changes.
-- [ ] Keep the Mac awake while serving (and say so in the settings); the app must stay running.
-- [ ] macOS asks whether the app may accept incoming connections the first time; a sandboxed build would also need the
-      `com.apple.security.network.server` entitlement.
-
-### Phone app (this demo on Android / iOS, or any app)
-
-- [ ] Client: `Microsoft.Extensions.AI.OpenAI` -
-      `new OpenAIClient(token, new() { Endpoint = macUrl }).GetChatClient(model).AsIChatClient()` - used exactly like a
-      local model, including `UseFunctionInvocation()` and `ChatClientAgent`; no LiteRT needed on the phone.
-- [ ] "Connect to a Mac": scan the QR code (or type the address and token); the token in `SecureStorage`.
-- [ ] The remote model in the model picker, e.g. "Gemma 4 12B on Studio Mac" (named after the Mac), with its state (connected, Mac asleep
-      or unreachable); its context window and capabilities (images, audio, thinking, tools) come from the server.
-- [ ] Find the Mac again with Bonjour: Android `NsdManager`; iOS needs `NSLocalNetworkUsageDescription` and
-      `NSBonjourServices` in `Info.plist`.
-- [ ] iOS allows plain HTTP to local addresses with `NSAllowsLocalNetworking` (App Transport Security); Android needs
-      cleartext allowed for local addresses (`network_security_config`).
-
-### Security and remote use
-
-- [ ] Plain HTTP on the home network, protected by the token; away from home, Tailscale (encrypted, and the Mac's
-      Tailscale address works like the local one, as with wireless adb); HTTPS with a self-signed certificate is
-      possible but fiddly on phones.
-- [ ] Never listen without a token; rate-limit failed tokens; log requests (device, time, size) for the settings list.
-
-### Tests
-
-- [ ] Library: a console host and a test that sends text, an image and a tool round through
-      `Microsoft.Extensions.AI.OpenAI` and compares with calling `LiteRtLmChatClient` directly.
-- [ ] End to end: the Catalyst app serving Gemma 4 12B, the demo on a Pixel Fold / Galaxy Z Fold3 using it with its
-      own tools (location, photos), over Wi-Fi and over Tailscale.
+- [ ] `POST /v1/embeddings` (the search model) and `POST /v1/images/generations` (Z-Image-Turbo, FLUX, Bonsai), so a phone
+      gets search and pictures without the models.
+- [ ] Try: an image and a voice message from a phone, Gemma 4 12B, the iPad (iOS's Local Network prompt), a phone on
+      Tailscale (the address typed by hand), the Mac's address changing (Find a Mac again by name), several phones at once.
+- [ ] A Mac asleep: the phone's message waits for a timeout; say "the Mac is asleep or unreachable" sooner, and show it in
+      the model list.
+- [ ] A `Native`/`TEST_MODELS` test: the server over a real `LiteRtLmChatClient` (Qwen3-0.6B) compared with calling it
+      directly, and the conversation kept across a tool round.
+- [ ] A sandboxed Mac build would need `com.apple.security.network.server`; HTTPS (a self-signed certificate) for use away
+      from home without Tailscale.
 
 ## 30. Background tasks and monitoring — scheduled tasks implemented on Android; verified on a Galaxy S10 and a Z Fold3
 

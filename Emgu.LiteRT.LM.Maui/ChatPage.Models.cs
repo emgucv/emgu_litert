@@ -33,6 +33,9 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>The model's instance on the device (loaded or loading), or null for a remote model.</summary>
         protected LanguageModel ModelInstance => _modelInstance;
 
+        /// <summary>The model's instance on the device once it is loaded (its context window and what it accepts), else null.</summary>
+        public LanguageModel LoadedModel => _model?.IsRemote == false && ModelReady ? _modelInstance : null;
+
         /// <summary>True while a model is being reloaded (CPU threads, the context window, a private chat...): no new work starts meanwhile.</summary>
         public bool IsReloadingModel => _reloadDepth > 0;
 
@@ -363,6 +366,8 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>List the models again (a row's detail changed, e.g. a server's address).</summary>
         protected void RefreshModelList()
         {
+            // The header's button too: a remote option may have changed its name ("... on Canming's Mac mini").
+            UpdateModelButton();
             if (_sideModelList == null || _wide != true)
                 return;
             _sideModelList.Children.Clear();

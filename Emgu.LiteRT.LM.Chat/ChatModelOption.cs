@@ -54,8 +54,11 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>A short, lasting id, e.g. "Gemma4E2B".</summary>
         public string Id { get; }
 
-        /// <summary>The name shown, e.g. "Gemma 4 E2B".</summary>
-        public string DisplayName { get; }
+        /// <summary>
+        /// The name shown, e.g. "Gemma 4 E2B". A remote option may change it once it knows what it reaches, e.g. "Gemma 4 E4B on
+        /// Canming's Mac mini" (the page shows it after <c>RefreshModelList</c>).
+        /// </summary>
+        public string DisplayName { get; set; }
 
         /// <summary>Creates a new, unloaded instance of the model; null for a remote model (<see cref="IsRemote"/>).</summary>
         public Func<LanguageModel> Create { get; }

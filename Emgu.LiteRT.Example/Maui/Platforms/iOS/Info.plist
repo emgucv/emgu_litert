@@ -57,6 +57,12 @@
 	<string>The LiteRT-LM chat adds reminders you ask for to Reminders, after you confirm them.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>The LiteRT-LM chat turns your voice into text for models that don't understand speech, such as a model on your own server.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>The chat finds a Mac on your network that serves its model (Settings &gt; Your own server &gt; Find a Mac), and talks to it.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_emgu-litert._tcp</string>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>The LiteRT-LM chat records your voice to send it to the on-device language model.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
