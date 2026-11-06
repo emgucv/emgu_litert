@@ -520,4 +520,33 @@ public class UnitTestChatConversation
         Assert.That(message.Transcript, Is.Null);
         Assert.That(message.HasTranscript, Is.False);
     }
+
+    [Test]
+    public async Task EmojiShortcodesBecomeEmojiInMessagesAndReplies()
+    {
+        FakeChatClient client = new FakeChatClient();
+        client.Reply(new TextContent("Sure :sm"), new TextContent("ile: and :partyparrot:"));
+        ChatConversation conversation = Conversation(client);
+        List<string> seen = new();
+        conversation.Messages.CollectionChanged += (s, e) =>
+        {
+            foreach (ChatMessageItem item in e.NewItems?.OfType<ChatMessageItem>() ?? Enumerable.Empty<ChatMessageItem>())
+                item.PropertyChanged += (o, p) =>
+                {
+                    if (p.PropertyName == nameof(ChatMessageItem.Text) && item.Role == ChatMessageRole.Assistant)
+                        seen.Add(item.Text);
+                };
+        };
+
+        ChatMessageItem reply = await conversation.SendAsync("Hello :+1:");
+
+        Assert.That(conversation.Messages[0].Text, Is.EqualTo("Hello 👍"));
+        Assert.That(client.Requests[0].Messages.Last().Text, Is.EqualTo("Hello 👍"));
+        Assert.That(seen, Is.EqualTo(new[] { "Sure :sm", "Sure 😄 and :partyparrot:" }));
+        Assert.That(reply.Text, Is.EqualTo("Sure 😄 and :partyparrot:"));
+
+        // A chat saved before the conversion shows its shortcodes as emoji when it is opened again.
+        conversation.Load(new[] { new ChatMessageItem(ChatMessageRole.User, "Old :tada:") });
+        Assert.That(conversation.Messages[0].Text, Is.EqualTo("Old 🎉"));
+    }
 }

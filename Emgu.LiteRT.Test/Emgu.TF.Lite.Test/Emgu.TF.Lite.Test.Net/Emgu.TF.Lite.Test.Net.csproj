@@ -43,6 +43,7 @@
     <Compile Include="..\UnitTestModelLoadState.cs" Link="UnitTestModelLoadState.cs" />
     <Compile Include="..\UnitTestChatContextWindow.cs" Link="UnitTestChatContextWindow.cs" />
     <Compile Include="..\UnitTestReplySpeechText.cs" Link="UnitTestReplySpeechText.cs" />
+    <Compile Include="..\UnitTestEmojiShortcodes.cs" Link="UnitTestEmojiShortcodes.cs" />
     <Compile Include="..\UnitTestGoalHistory.cs" Link="UnitTestGoalHistory.cs" />
     <Compile Include="..\UnitTestGoalReminders.cs" Link="UnitTestGoalReminders.cs" />
     <Compile Include="..\UnitTestVideoMoments.cs" Link="UnitTestVideoMoments.cs" />

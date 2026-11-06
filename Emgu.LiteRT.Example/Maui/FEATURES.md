@@ -93,6 +93,7 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - Expanded, the thinking is rendered like the answer: `Emgu.LiteRT.LM.Maui`'s `ThinkingView`, whose body is a `ReplyView`
     in the thinking colour at 13 pt, with Markdown, code blocks with Copy, and maths. Verified on Mac Catalyst with Gemma 4
     E2B.
+  - Emoji shortcodes (2026-11-05): text copied from Slack arrives as `:slightly_smiling_face:`, and `Emgu.LiteRT.LM.Chat`'s `EmojiShortcodes.Replace` turns the names it knows into the emoji, in the user's message (`ChatConversation.SendAsync`: shown, saved and sent as the emoji), in the model's reply (the whole reply so far on every update, since a shortcode can arrive in pieces; the model's own text stays in `ModelMessages`) and in chats saved earlier (`Load`). The table is iamcal/emoji-data's names with their aliases (MIT, Emoji 17, 1,980 names, 14 KB embedded as `emoji_shortcodes.tsv.gz`, made by `tools/make_emoji_shortcodes.py`); a name not in it (a workspace's own `:partyparrot:`), `10:30:45` and code blocks and spans stay as written. No .NET package was used: EmojiToolkit 17 is net10-only, EmojiNet has no replace API, Mojee is netstandard2.1, EmojiKit net11-only, EmojiOne stale (checked 2026-11-05), and the Chat library is netstandard2.0. `UnitTestEmojiShortcodes`, `UnitTestChatConversation`.
 
 ## Attachments and voice messages
 

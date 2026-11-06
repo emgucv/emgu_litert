@@ -248,7 +248,8 @@ namespace Emgu.LiteRT.LM.Chat
             if (_busy)
                 throw new InvalidOperationException("A message is already being sent.");
             _busy = true;
-            ChatMessageItem message = new ChatMessageItem(ChatMessageRole.User, text, attachments, context);
+            // Emoji shortcodes (":+1:", pasted from Slack) become the emoji, in what is shown, saved and sent.
+            ChatMessageItem message = new ChatMessageItem(ChatMessageRole.User, EmojiShortcodes.Replace(text), attachments, context);
             ChatMessageItem reply = new ChatMessageItem(ChatMessageRole.Assistant, string.Empty) { State = ChatMessageState.Streaming };
             try
             {
@@ -460,6 +461,8 @@ namespace Emgu.LiteRT.LM.Chat
             {
                 message.ModelMessages = null;
                 message.ExtraTokens = 0;
+                // A chat saved before shortcodes were converted shows them as emoji too.
+                message.Text = EmojiShortcodes.Replace(message.Text);
                 Messages.Add(message);
             }
             _summary = summary;
@@ -632,7 +635,8 @@ namespace Emgu.LiteRT.LM.Chat
                 if (answerText.Length > 0 && thinkingStarted != null && reply.ThinkingDuration == null)
                     reply.ThinkingDuration = DateTime.UtcNow - thinkingStarted.Value;
                 reply.Thinking = thinkingText;
-                reply.Text = answerText;
+                // The reply so far, all of it: a shortcode can arrive in pieces (":smi", then "ley:"). The model's own text stays in ModelMessages.
+                reply.Text = EmojiShortcodes.Replace(answerText);
             }
             foreach (ChatToolStep step in reply.Steps)
                 step.IsRunning = false;

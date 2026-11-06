@@ -10,5 +10,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)*.cs" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)emoji_shortcodes.tsv.gz" LogicalName="emoji_shortcodes.tsv.gz" />
   </ItemGroup>
 </Project>
