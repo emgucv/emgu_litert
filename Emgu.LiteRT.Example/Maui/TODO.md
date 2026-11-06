@@ -56,7 +56,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] The same on the Pixel Fold (it was off adb), and the GPU options in the Catalyst demo's list.
+- [ ] The same on the Pixel Fold (it was off adb).
 
 ## 12. Pixel Fold freeze — rendering stalls fixed; original ANR unconfirmed
 
@@ -90,7 +90,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Open and Share on Android (the user's apps) not yet tapped; on the Mac both work (2026-11-05).
 - [ ] Long content: the model writes it in its reply budget (1,024 tokens by default in `LiteRtLmChatClient`); for
       longer documents, ask it to write section by section.
 
@@ -139,7 +138,8 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number (the 
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Android and iOS: Android 12+ and iOS tell the user that the app read the clipboard (a toast / the paste banner); not tried on a phone.
+- [ ] Android 12+'s "pasted from your clipboard" toast not seen: the S10 has Settings > Privacy > "Show clipboard access" off
+      (`clipboard_show_access_notifications` 0); a phone with it on.
 
 ## 27. More models: Gemini Nano and Apple's on-device model
 

@@ -323,6 +323,10 @@ Moved from TODO.md on 2026-11-05:
 - [x] iOS (2026-11-04, an iPad Air M4, a temporary self-test): the text+vision 440M model on the CPU loaded in 0.6 s, 48 ms a
   text and 412 ms an image, each text closest to its picture (0.80 against 0.53-0.56); on the GPU the engine isn't created
   (`litert_lm_embedding_engine_create`: iOS has no GPU accelerator in this build), and the demo doesn't offer it there.
+- [x] The GPU choices in the Catalyst demo's list (2026-11-05, a temporary self-test): Settings > Embedding model lists
+      the two models on the CPU and on the GPU, with the Metal note; picking "Text Vision 440M · GPU" reloaded it on
+      Metal (about 6 s) and three texts embedded in 119 ms (768 dims; related sentences 0.80, unrelated 0.61). The
+      setting was put back.
 
 ## 12. Pixel Fold freeze — rendering stalls fixed; original ANR unconfirmed
 
@@ -492,6 +496,9 @@ gallery / the Pictures folder), "Share..." and "Save image...".
       "open in" sheet (AirDrop, Mail, Notes...) with no app that edits the file, so Open now hands it to
       `UIApplication.OpenUrlAsync`, which opened the packing list in TextEdit (the Mac's app for .docx there); Share
       shows the share sheet. The test chat was deleted.
+- [x] Open and Share on Android (2026-11-05, a Galaxy S10, Gemma 4 E2B on the GPU): Open shows Android's chooser of
+      the apps that open a .docx (Acrobat, Docs...), Share the share sheet (Quick Share, Drive, Email...). No app was
+      picked; the test chat was deleted.
 
 ## 19. A private chat
 
@@ -845,7 +852,11 @@ Moved from TODO.md on 2026-11-05:
       capital of Japan?" asked for the tool no clipboard (it wasn't offered). The first wording of the result ("The user's clipboard contains this
       text...") made E2B repeat the text for "Summarize"; ending it with "Now do what the user asked with this text ... don't just repeat it."
       fixed that. On translations E2B also made a pointless `convert_currency` call (a step line, no effect) - left as it is.
-- [ ] Android and iOS: Android 12+ and iOS tell the user that the app read the clipboard (a toast / the paste banner); not tried on a phone.
+- [x] On a phone (2026-11-05): on the Galaxy S10 (Gemma 4 E2B, GPU) "What is on my clipboard?" read a note cut in the
+      demo, and then "84" copied from the Calculator; Android's "pasted from your clipboard" toast didn't show, as the
+      S10 has "Show clipboard access" off (still open in TODO.md). On the iPad, iPadOS asked "Emgu LiteRT would like to
+      paste from ..." (Allow Paste / Don't Allow Paste) before the read, and the reply quoted the text once allowed. The
+      test chats were deleted.
 - [x] Tests: `UnitTestClipboardTool` (the wrapping, cutting, empty and failing reads, 10 phrasings that mention the clipboard and 9 that
       don't, the step line).
 
