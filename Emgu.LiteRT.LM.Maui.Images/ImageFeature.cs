@@ -73,6 +73,9 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     private ImageModelOption _option;
     private IImageModel _model;
     private Task _modelInit;
+    // Pictures being drawn, and the timer that lets an idle GPU model go (see GpuIdleRelease).
+    private int _drawing;
+    private CancellationTokenSource _idle;
     private CancellationTokenSource _download;
     private Task _downloadTask;
     private double _downloadFraction = -1;
@@ -378,6 +381,37 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     /// <inheritdoc/>
     public override Task OnModelReloadingAsync(ChatModelOption model) => ReleaseGpuModelAsync();
 
+    /// <summary>
+    /// How long a model on the GPU may sit idle, loaded, before it is let go of to free its video memory (Bonsai Image
+    /// 4B about 5 GB, Z-Image-Turbo about 5.5 GB); the next picture loads it again from its program cache (44 s for Bonsai
+    /// at 512 x 512 on an RTX 3070). Three minutes by default; null keeps it loaded.
+    /// </summary>
+    public TimeSpan? GpuIdleRelease { get; set; } = TimeSpan.FromMinutes(3);
+
+    private void ScheduleIdleRelease()
+    {
+        TimeSpan? after = GpuIdleRelease;
+        if (after == null || _model == null || _model.Backend != "gpu")
+            return;
+        var timer = new CancellationTokenSource();
+        Interlocked.Exchange(ref _idle, timer)?.Cancel();
+        _ = ReleaseWhenIdleAsync(after.Value, timer.Token);
+    }
+
+    private async Task ReleaseWhenIdleAsync(TimeSpan after, CancellationToken stop)
+    {
+        try
+        {
+            await Task.Delay(after, stop);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        if (Volatile.Read(ref _drawing) == 0)
+            await ReleaseGpuModelAsync();
+    }
+
     // An image model on the GPU holds video memory (Z-Image-Turbo about 5.5 GB of an 8 GB card): it is let go of when the chat
     // model changes, so the chat model's load has the room, and loads again - from its program cache - with the next picture.
     private async Task ReleaseGpuModelAsync()
@@ -477,6 +511,7 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         try
         {
             await model.InitAsync(CpuThreadSettings.Count);
+            ScheduleIdleRelease();
             // A GPU load that put nothing on the GPU (no video memory to spare) made no programs: the next one is the first.
             if (model.GpuFailure == null || model.CachesExist)
                 Host.Settings.Set(preparedKey, true);
@@ -597,6 +632,21 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     /// <param name="prompt">What to draw, in English</param>
     /// <param name="cancel">Stops the drawing</param>
     public async Task<string> GenerateAsync(string prompt, CancellationToken cancel)
+    {
+        Interlocked.Exchange(ref _idle, null)?.Cancel();
+        Interlocked.Increment(ref _drawing);
+        try
+        {
+            return await DrawAsync(prompt, cancel);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _drawing);
+            ScheduleIdleRelease();
+        }
+    }
+
+    private async Task<string> DrawAsync(string prompt, CancellationToken cancel)
     {
         if (!ImageGenerationOn)
             return string.Format(CultureInfo.InvariantCulture,
