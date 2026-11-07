@@ -63,6 +63,10 @@ public sealed class LiveCameraPreviewHandler : ViewHandler<LiveCameraPreview, UI
     /// <inheritdoc/>
     protected override UIView CreatePlatformView() => new DisplayView();
 
+    // The view, or null once disconnected. MAUI clears the handler's view before DisconnectHandler, and the typed PlatformView
+    // throws then ("PlatformView cannot be null here"): leaving a camera page ended the app.
+    private DisplayView View => ((IElementHandler)this).PlatformView as DisplayView;
+
     /// <inheritdoc/>
     protected override void ConnectHandler(UIView platformView)
     {
@@ -73,14 +77,15 @@ public sealed class LiveCameraPreviewHandler : ViewHandler<LiveCameraPreview, UI
     /// <inheritdoc/>
     protected override void DisconnectHandler(UIView platformView)
     {
-        Clear();
+        if (platformView is DisplayView view)
+            lock (_lock) ClearLocked(view);
         lock (_lock) ReleasePool();
         base.DisconnectHandler(platformView);
     }
 
     private void ApplyAspect(Aspect aspect)
     {
-        if (PlatformView is not DisplayView view) return;
+        if (View is not DisplayView view) return;
         view.VideoLayer.VideoGravity = aspect switch
         {
             Aspect.AspectFill => GravityAspectFill,
@@ -101,14 +106,14 @@ public sealed class LiveCameraPreviewHandler : ViewHandler<LiveCameraPreview, UI
     /// </summary>
     public void Present(Mat frame)
     {
-        if (frame == null || frame.IsEmpty || PlatformView is not DisplayView view) return;
+        if (frame == null || frame.IsEmpty || View is not DisplayView view) return;
         if (_fallback || !UseDisplayLayer) { PresentFallback(view, frame); return; }
         lock (_lock) PresentLocked(view, frame);
     }
 
     private void PresentLocked(DisplayView view, Mat frame)
     {
-        if (PlatformView != view) return;
+        if (View != view) return;
         try
         {
             AVSampleBufferDisplayLayer layer = view.VideoLayer;
@@ -173,7 +178,7 @@ public sealed class LiveCameraPreviewHandler : ViewHandler<LiveCameraPreview, UI
     /// <summary>Show nothing, and release the frames shown.</summary>
     public void Clear()
     {
-        if (PlatformView is not DisplayView view) return;
+        if (View is not DisplayView view) return;
         lock (_lock) ClearLocked(view);
     }
 
