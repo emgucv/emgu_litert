@@ -232,6 +232,20 @@ public class UnitTestSceneNarrator
     }
 
     [Test]
+    public async Task StoppingWhileTheModelAnswersIsAStopNotAnError()
+    {
+        // LiteRT-LM reports a cancelled reply as its own exception, not an OperationCanceledException.
+        using var stop = new CancellationTokenSource();
+        var model = new ScriptedModel(_ => "ok")
+        {
+            BeforeReply = () => { stop.Cancel(); throw new InvalidOperationException("CANCELLED: Task cancelled."); }
+        };
+        var narrator = new SceneNarrator(model, _ => Task.FromResult(new byte[] { 1 }), null) { Delay = NoDelay };
+
+        Assert.That(await narrator.RunAsync(stop.Token), Is.EqualTo(SceneNarrator.StoppedReason));
+    }
+
+    [Test]
     public void AudioWindowBufferKeepsTheNewestSamples()
     {
         var buffer = new AudioWindowBuffer(5);

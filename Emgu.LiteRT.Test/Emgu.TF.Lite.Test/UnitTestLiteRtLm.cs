@@ -1539,6 +1539,45 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // "Watch and listen" with the scene changing: each round's three frames are one picture, a different one each round
+        // with the same client (as the page does), and the reply must describe that round's picture, not an earlier one.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestGemma4E2BSceneFollowsNewPictures()
+        {
+            RequireLiteRtLm();
+            if (!UnitTest1.StageGpuPlugin())
+                Skip("No LiteRT GPU accelerator plugin next to libLiteRt");
+            var scenes = new (string File, string[] Words)[]
+            {
+                ("apple.jpg", new[] { "apple" }), ("tulips.jpg", new[] { "tulip", "flower" }), ("surfers.jpg", new[] { "surf", "wave", "ocean", "beach", "sea" }),
+                ("apple.jpg", new[] { "apple" })
+            };
+            using (Gemma4E2B model = new Gemma4E2B { VisionBackend = "gpu" })
+            {
+                await model.Init(backend: "gpu");
+                using (IChatClient client = model.AsIChatClient())
+                {
+                    ChatOptions options = new ChatOptions { MaxOutputTokens = 120, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } };
+                    foreach (var scene in scenes)
+                    {
+                        byte[] picture = System.IO.File.ReadAllBytes(scene.File);
+                        ChatResponse response = await client.GetResponseAsync(Emgu.LiteRT.LM.Agents.SceneNarrator.BuildRequest(
+                            new[] { picture, picture, picture }, null, true, Emgu.LiteRT.LM.Agents.SceneNarrationOptions.DefaultInstructions), options);
+                        Console.WriteLine("{0}: {1}", scene.File, response.Text);
+                        if (!scene.Words.Any(w => response.Text.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0))
+                            throw new Exception("The reply doesn't describe " + scene.File + ": " + response.Text);
+                    }
+                }
+            }
+        }
+
         private static async Task TestGemma4ImageAndAudio(Gemma4 gemma)
         {
             RequireLiteRtLm();

@@ -1284,7 +1284,11 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   pictures are the last 5 s before the request; the sound keeps arriving, so nothing said is missed between rounds. At
   first the next round's frames were taken right after a request was sent and then waited for the answer: on the iPad
   the user saw the delay, as a caption's pictures were 2L-3 to 2L s old when it showed (L the answer time; 33-36 s
-  on the S10), against L to L+3 s now (2026-11-07). It stops on Stop, when the page closes or the app goes to the background, after 10 minutes, and when the
+  on the S10), against L to L+3 s now (2026-11-07). Checked on the iPad Air the same day: each frame was 30 ms old when
+  taken (AVFoundation drops late frames and a snapshot is the next one), one every 1.7 s, and Gemma 4 E2B answered in
+  3-8 s (longer with speech), so a caption's pictures are at most ~11 s old when it shows. On the Mac a new picture
+  each round was described at once (`TestGemma4E2BSceneFollowsNewPictures`): no earlier image is carried over. Each
+  card shows its frames (the newest 10 cards), to tell an old picture from a description that missed a change. It stops on Stop, when the page closes or the app goes to the background, after 10 minutes, and when the
   device is hot or the battery low (`WorkloadPolicy`). The screen stays on while it runs. Nothing is saved: the
   descriptions stay on the page (newest first, with the time, how long the model took and a 🔇 when nothing was heard),
   with Copy.

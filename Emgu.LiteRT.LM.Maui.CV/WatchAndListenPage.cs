@@ -43,6 +43,9 @@ public sealed class WatchAndListenPage : ContentPage
     private readonly ModelLoadCard _loadCard;
     private readonly VerticalStackLayout _captions;
     private readonly List<SceneCaption> _captionList = new List<SceneCaption>();
+    // The newest cards' frame strips; older cards drop theirs, so 100 cards don't keep 300 JPEGs.
+    private readonly Queue<Layout> _frameStrips = new Queue<Layout>();
+    private const int CardsWithFrames = 10;
     private readonly object _gate = new object();
 
     private LiveCamera _camera;
@@ -391,12 +394,27 @@ public sealed class WatchAndListenPage : ContentPage
         ChatResources.SetThemeColor(time, Label.TextColorProperty, "ChatSecondaryText");
         var text = new Label { FontSize = 15, Text = caption.Text };
         ChatResources.SetThemeColor(text, Label.TextColorProperty, "ChatPrimaryText");
+        var content = new VerticalStackLayout { Spacing = 2, Children = { time, text } };
+        if (caption.Images.Count > 0)
+        {
+            // What the model saw, to tell an old picture from a wrong description.
+            var strip = new HorizontalStackLayout { Spacing = 4, Margin = new Thickness(0, 4, 0, 0) };
+            foreach (byte[] jpeg in caption.Images)
+                strip.Children.Add(new Image { HeightRequest = 72, Aspect = Aspect.AspectFit, Source = ImageSource.FromStream(() => new MemoryStream(jpeg)) });
+            content.Children.Add(strip);
+            _frameStrips.Enqueue(strip);
+            while (_frameStrips.Count > CardsWithFrames)
+            {
+                Layout old = _frameStrips.Dequeue();
+                (old.Parent as Layout)?.Children.Remove(old);
+            }
+        }
         var card = new Border
         {
             Padding = new Thickness(12, 8),
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
             Stroke = Colors.Transparent,
-            Content = new VerticalStackLayout { Spacing = 2, Children = { time, text } }
+            Content = content
         };
         ChatResources.SetThemeColor(card, Border.BackgroundColorProperty, "ChatSurface");
         _captions.Insert(0, card);

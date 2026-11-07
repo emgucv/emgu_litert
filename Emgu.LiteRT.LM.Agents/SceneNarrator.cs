@@ -58,7 +58,11 @@ public sealed class SceneNarrationOptions
 /// <param name="Frames">The frames sent</param>
 /// <param name="HeardSound">Whether sound was sent (not when there was none, or only silence)</param>
 public sealed record SceneCaption(int Round, string Text, DateTimeOffset Start, DateTimeOffset End, TimeSpan Latency, int Frames,
-    bool HeardSound);
+    bool HeardSound)
+{
+    /// <summary>The frames sent (JPEGs, oldest first), to show what the model saw.</summary>
+    public IReadOnlyList<byte[]> Images { get; init; } = Array.Empty<byte[]>();
+}
 
 /// <summary>
 /// The sound that arrived since it was last taken, 16 kHz mono, keeping at most the newest <c>maxSamples</c>. Samples are added on
@@ -235,12 +239,13 @@ public sealed class SceneNarrator
                     if (!string.IsNullOrEmpty(text))
                     {
                         LastCaption = text;
-                        Caption?.Invoke(new SceneCaption(round, text, windowStart, windowEnd, clock.Elapsed, frames.Count, heard));
+                        Caption?.Invoke(new SceneCaption(round, text, windowStart, windowEnd, clock.Elapsed, frames.Count, heard) { Images = frames });
                     }
                     windowStart = windowEnd;
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            // Stopping cancels the model's reply, which LiteRT-LM reports as its own error ("CANCELLED: Task cancelled.").
+            catch (Exception) when (cancellationToken.IsCancellationRequested)
             {
                 return StoppedReason;
             }
