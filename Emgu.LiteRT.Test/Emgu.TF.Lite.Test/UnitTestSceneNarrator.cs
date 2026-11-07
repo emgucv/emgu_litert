@@ -25,7 +25,7 @@ public class UnitTestSceneNarrator
         var narrator = new SceneNarrator(model, _ =>
         {
             sound.Push(Tone(0.5));
-            return Task.FromResult(new[] { (byte)++frameNumber });
+            return Task.FromResult(BitConverter.GetBytes(++frameNumber));
         }, sound) { Delay = NoDelay };
         var captions = new List<SceneCaption>();
         using var stop = new CancellationTokenSource();
@@ -48,14 +48,77 @@ public class UnitTestSceneNarrator
             Assert.That(request.Options.Reasoning.Effort, Is.EqualTo(ReasoningEffort.None));
         }
         // The frames are in order, the second round's taken after the first's.
-        Assert.That(model.Requests[0].Messages[0].Contents.OfType<DataContent>().Where(d => d.HasTopLevelMediaType("image"))
-            .Select(d => d.Data.Span[0]), Is.EqualTo(new byte[] { 1, 2, 3 }));
+        int[] FrameNumbers(int request) => model.Requests[request].Messages[0].Contents.OfType<DataContent>()
+            .Where(d => d.HasTopLevelMediaType("image")).Select(d => BitConverter.ToInt32(d.Data.ToArray(), 0)).ToArray();
+        int[] first = FrameNumbers(0), second = FrameNumbers(1);
+        Assert.That(first[1] == first[0] + 1 && first[2] == first[1] + 1, Is.True, string.Join(",", first));
+        Assert.That(second[0], Is.GreaterThan(first[2]));
         Assert.That(captions[0].Round, Is.EqualTo(1));
         Assert.That(captions[0].Frames, Is.EqualTo(3));
         Assert.That(captions[0].HeardSound, Is.True);
         Assert.That(captions[0].Text, Is.EqualTo("See: a desk.\nHear: \"hello\""));
         Assert.That(narrator.LastCaption, Is.EqualTo(captions[1].Text));
         Assert.That(sound.Subscribers, Is.EqualTo(0), "the microphone is let go");
+    }
+
+    [Test]
+    public async Task ASlowAnswerIsFollowedByTheNewestFrames()
+    {
+        // Round 1 sends frames 1-3; while it is answered the camera takes 4-12, and round 2 sends the newest three, 10-12, not
+        // the three taken right after round 1 was sent.
+        int frameNumber = 0;
+        var answering = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tookTwelve = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var model = new ScriptedModel(_ => "ok")
+        {
+            Answering = round =>
+            {
+                if (round != 1) return Task.CompletedTask;
+                answering.TrySetResult(true);
+                return tookTwelve.Task;
+            }
+        };
+        var narrator = new SceneNarrator(model, async token =>
+        {
+            if (frameNumber == 3) await answering.Task;
+            if (frameNumber == 12) await Task.Delay(Timeout.Infinite, token);
+            if (++frameNumber == 12) tookTwelve.TrySetResult(true);
+            return new[] { (byte)frameNumber };
+        }, null) { Delay = NoDelay };
+        using var stop = new CancellationTokenSource();
+        narrator.Caption += c => { if (c.Round == 2) stop.Cancel(); };
+
+        await narrator.RunAsync(stop.Token);
+
+        byte[] Frames(int request) => model.Requests[request].Messages[0].Contents.OfType<DataContent>().Select(d => d.Data.Span[0]).ToArray();
+        Assert.That(Frames(0), Is.EqualTo(new byte[] { 1, 2, 3 }));
+        Assert.That(Frames(1), Is.EqualTo(new byte[] { 10, 11, 12 }));
+    }
+
+    [Test]
+    public async Task ACameraWithoutFramesDoesNotStopTheRounds()
+    {
+        var model = new ScriptedModel(_ => "See: nothing.\nHear: nothing");
+        var narrator = new SceneNarrator(model, _ => Task.FromResult<byte[]>(null), null) { Delay = NoDelay };
+        using var stop = new CancellationTokenSource();
+        SceneCaption caption = null;
+        narrator.Caption += c => { caption = c; stop.Cancel(); };
+
+        await narrator.RunAsync(stop.Token);
+
+        Assert.That(caption.Frames, Is.EqualTo(0));
+    }
+
+    [Test]
+    public async Task ACameraErrorStops()
+    {
+        var model = new ScriptedModel(_ => "ok");
+        var narrator = new SceneNarrator(model, _ => throw new InvalidOperationException("the camera closed"), null) { Delay = NoDelay };
+
+        string reason = await narrator.RunAsync(CancellationToken.None);
+
+        Assert.That(reason, Is.EqualTo("Stopped: the camera closed"));
+        Assert.That(model.Requests, Is.Empty);
     }
 
     [Test]
@@ -217,11 +280,14 @@ public class UnitTestSceneNarrator
         public ScriptedModel(Func<int, string> reply) { _reply = reply; }
         public List<(IList<ChatMessage> Messages, ChatOptions Options)> Requests { get; } = new();
         public Action BeforeReply { get; set; }
+        public Func<int, Task> Answering { get; set; }
 
         public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null, CancellationToken cancellationToken = default)
         {
             Requests.Add((messages.ToList(), options));
             await Task.Yield();
+            if (Answering != null)
+                await Answering(Requests.Count);
             BeforeReply?.Invoke();
             cancellationToken.ThrowIfCancellationRequested();
             return new ChatResponse(new ChatMessage(ChatRole.Assistant, _reply(Requests.Count)));

@@ -1280,8 +1280,11 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   WAV, at most 15 s; left out when silent) in one request. It is a page of its own rather than part of the chat: the
   chat frees its model when it closes, and a round is ~1k tokens of images and sound that would fill a chat's context
   in a few rounds. Each request here is a fresh conversation.
-- The next round's frames are taken while the model answers, and the sound keeps arriving, so little is missed between
-  rounds. It stops on Stop, when the page closes or the app goes to the background, after 10 minutes, and when the
+- The camera keeps taking a frame every 1.7 s while the model answers, and each round sends the newest three, so the
+  pictures are the last 5 s before the request; the sound keeps arriving, so nothing said is missed between rounds. At
+  first the next round's frames were taken right after a request was sent and then waited for the answer: on the iPad
+  the user saw the delay, as a caption's pictures were 2L-3 to 2L s old when it showed (L the answer time; 33-36 s
+  on the S10), against L to L+3 s now (2026-11-07). It stops on Stop, when the page closes or the app goes to the background, after 10 minutes, and when the
   device is hot or the battery low (`WorkloadPolicy`). The screen stays on while it runs. Nothing is saved: the
   descriptions stay on the page (newest first, with the time, how long the model took and a 🔇 when nothing was heard),
   with Copy.

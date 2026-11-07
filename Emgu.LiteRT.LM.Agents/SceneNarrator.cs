@@ -27,7 +27,10 @@ public sealed class SceneNarrationOptions
     /// <summary>How long each round watches and listens; 5 s by default.</summary>
     public TimeSpan Window { get; init; } = TimeSpan.FromSeconds(5);
 
-    /// <summary>The frames sent each round, spread over the window; 3 by default (an image is about 270 tokens to Gemma 4).</summary>
+    /// <summary>
+    /// The frames sent each round, spread over the window; 3 by default (an image is about 270 tokens to Gemma 4). The camera keeps
+    /// taking them while the model answers, and a round sends the newest, so a slow model still sees the last seconds.
+    /// </summary>
     public int FramesPerRound { get; init; } = 3;
 
     /// <summary>
@@ -129,8 +132,9 @@ public sealed class AudioWindowBuffer
 /// "Tell me what you see and hear", over and over: each round takes a few frames from the camera over
 /// <see cref="SceneNarrationOptions.Window"/> and the sound since the last round, sends them in one request to a model that takes
 /// images and audio (Gemma 4; LiteRT-LM has no video input), and raises <see cref="Caption"/> with its description. Each request is
-/// a fresh conversation on its own, so nothing piles up in the model's context window. The next round's
-/// frames are taken while the model answers, and the sound keeps arriving, so little is missed between rounds. It stops when
+/// a fresh conversation on its own, so nothing piles up in the model's context window. Frames keep being taken while the model
+/// answers and each round sends the newest ones, so the pictures are the last seconds before the request, not the seconds after
+/// the previous one (with an 18 s answer they were 33-36 s old when shown); the sound keeps arriving, so nothing said is missed. It stops when
 /// cancelled, at <see cref="SceneNarrationOptions.TimeLimit"/>, when <see cref="PauseReason"/> gives a reason (a hot device, a low
 /// battery), or on an error. It has no device code: the page gives it the camera, the microphone and the model.
 /// </summary>
@@ -140,6 +144,7 @@ public sealed class SceneNarrator
     private readonly Func<CancellationToken, Task<byte[]>> _captureFrame;
     private readonly ISoundSource _sound;
     private readonly AudioWindowBuffer _audio;
+    private readonly LatestFrames _frames;
 
     /// <param name="client">The model: one that takes images and audio</param>
     /// <param name="captureFrame">Takes a camera frame as a JPEG (null to skip it)</param>
@@ -153,6 +158,7 @@ public sealed class SceneNarrator
         _sound = sound;
         Options = options ?? new SceneNarrationOptions();
         if (Options.FramesPerRound < 1) throw new ArgumentOutOfRangeException(nameof(options), "FramesPerRound must be at least 1");
+        _frames = new LatestFrames(Options.FramesPerRound);
         _audio = new AudioWindowBuffer(Math.Max(1, (int)(Options.MaxAudio.TotalSeconds * SoundInput.SampleRate)));
     }
 
@@ -191,14 +197,19 @@ public sealed class SceneNarrator
             _sound.Samples += _audio.Add;
         using (CancellationTokenSource stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
         {
-            Task<List<byte[]>> window = null;
+            Task watching = null;
             try
             {
                 DateTimeOffset began = Now(), windowStart = began;
-                window = WatchAsync(stop.Token);
+                _frames.Clear();
+                watching = WatchAsync(stop.Token);
                 for (int round = 1; ; round++)
                 {
-                    List<byte[]> frames = await window.ConfigureAwait(false);
+                    // The newest frames: already there when the model took longer than the window, else a window's worth.
+                    Task<List<byte[]>> newest = _frames.TakeWhenReadyAsync(stop.Token);
+                    if (await Task.WhenAny(newest, watching).ConfigureAwait(false) == watching)
+                        await watching.ConfigureAwait(false);
+                    List<byte[]> frames = await newest.ConfigureAwait(false);
                     // Stopped while the frames were taken (or by the last caption's handler): no new request.
                     stop.Token.ThrowIfCancellationRequested();
                     float[] sound = _audio.TakeSinceLastCut();
@@ -209,8 +220,6 @@ public sealed class SceneNarrator
                     if (reason != null)
                         return "Paused: " + reason;
 
-                    // The next round's frames, while the model answers this one.
-                    window = WatchAsync(stop.Token);
                     var chunk = new MeetingAudioChunk(TimeSpan.Zero, sound, SoundInput.SampleRate);
                     bool heard = sound.Length > 0 && !chunk.IsSilent;
                     Thinking?.Invoke(round);
@@ -244,9 +253,9 @@ public sealed class SceneNarrator
                 if (_sound != null)
                     _sound.Samples -= _audio.Add;
                 stop.Cancel();
-                if (window != null)
+                if (watching != null)
                 {
-                    try { await window.ConfigureAwait(false); }
+                    try { await watching.ConfigureAwait(false); }
                     catch (Exception) { }
                 }
             }
@@ -254,18 +263,81 @@ public sealed class SceneNarrator
     }
 
     // FramesPerRound frames spread over the window: at its start, then every Window / FramesPerRound.
-    private async Task<List<byte[]>> WatchAsync(CancellationToken token)
+    // Takes a frame every Window / FramesPerRound until stopped, keeping the newest FramesPerRound.
+    private async Task WatchAsync(CancellationToken token)
     {
-        var frames = new List<byte[]>();
         TimeSpan step = TimeSpan.FromTicks(Options.Window.Ticks / Options.FramesPerRound);
-        for (int i = 0; i < Options.FramesPerRound; i++)
+        while (true)
         {
-            byte[] frame = await _captureFrame(token).ConfigureAwait(false);
-            if (frame != null && frame.Length > 0)
-                frames.Add(frame);
+            _frames.Add(await _captureFrame(token).ConfigureAwait(false));
             await Delay(step, token).ConfigureAwait(false);
         }
-        return frames;
+    }
+
+    // The newest frames, handed to a round once FramesPerRound tries were made since the last round took them (a try that got
+    // no frame counts, so a camera that gives none doesn't stop the rounds).
+    private sealed class LatestFrames
+    {
+        private readonly object _gate = new object();
+        private readonly Queue<byte[]> _frames = new Queue<byte[]>();
+        private readonly int _count;
+        private int _tries;
+        private TaskCompletionSource<bool> _ready;
+
+        public LatestFrames(int count) { _count = count; }
+
+        public void Add(byte[] frame)
+        {
+            TaskCompletionSource<bool> ready = null;
+            lock (_gate)
+            {
+                if (frame != null && frame.Length > 0)
+                {
+                    _frames.Enqueue(frame);
+                    if (_frames.Count > _count)
+                        _frames.Dequeue();
+                }
+                if (++_tries >= _count)
+                {
+                    ready = _ready;
+                    _ready = null;
+                }
+            }
+            ready?.TrySetResult(true);
+        }
+
+        public async Task<List<byte[]>> TakeWhenReadyAsync(CancellationToken token)
+        {
+            while (true)
+            {
+                Task wait;
+                lock (_gate)
+                {
+                    if (_tries >= _count)
+                    {
+                        var frames = new List<byte[]>(_frames);
+                        _frames.Clear();
+                        _tries = 0;
+                        return frames;
+                    }
+                    _ready ??= new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    wait = _ready.Task;
+                }
+                var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                using (token.Register(() => cancelled.TrySetCanceled()))
+                    await Task.WhenAny(wait, cancelled.Task).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
+            }
+        }
+
+        public void Clear()
+        {
+            lock (_gate)
+            {
+                _frames.Clear();
+                _tries = 0;
+            }
+        }
     }
 
     /// <summary>
