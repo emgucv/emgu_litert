@@ -26,6 +26,14 @@ public partial class MainPage : ContentPage
                 ? "Chat with Gemma 4 or Qwen on this device - images, voice and web search too"
                 : "Chat with Claude or your own server - images, voice and web search too", () => new LiteRtLmChatPage()),
         }));
+        // Gemma 4 describing the live camera and microphone (Android, iOS and Mac Catalyst: no Windows microphone stream yet).
+        if (Emgu.LiteRT.LM.Maui.CV.WatchAndListenPage.IsSupported)
+            tabs[0].Rows.Add((Theme.GlyphCamera, "Watch and listen", "Gemma describes what the camera sees and the microphone hears, every few seconds",
+                () => new Emgu.LiteRT.LM.Maui.CV.WatchAndListenPage(new ChatSettingsAdapter(), settings =>
+                {
+                    settings.EnableBenchmark();
+                    settings.AudioNumThreads = Emgu.LiteRT.LM.Maui.CpuThreadSettings.Count;
+                })));
         tabs.Add(("TF Lite", Theme.GlyphImage, "TF Lite Demos", new List<(string, string, string, Func<Page>)>
         {
             (Theme.GlyphDetect, "Coco SSD Mobilenet", "Detect and label objects in a photo", () => new CocoSsdMobilenetPage()),

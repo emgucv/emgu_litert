@@ -1270,6 +1270,38 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   in place of the microphone): the piece with "Good morning." at the end of 25 s of noise was no speech by the old
   rule and is now written down ("Good morning.", 19 words in all).
 
+## Watch and listen
+
+- "Tell me what you see and hear", over and over: the home screen's LiteRT-LM tab has a "Watch and listen" row
+  (Android, iOS and Mac Catalyst; hidden on Windows, which has no microphone stream yet). The page is
+  `Emgu.LiteRT.LM.Maui.CV`'s `WatchAndListenPage`, its loop `Emgu.LiteRT.LM.Agents`' `SceneNarrator` (TODO item 60).
+- LiteRT-LM has no video input, so each round sends Gemma 4 three frames from `LiveCamera.CaptureAsync` (JPEG,
+  at most 960 px), taken over a 5 s window, and the sound since the last round (`MicrophoneSoundSource`, as a 16 kHz
+  WAV, at most 15 s; left out when silent) in one request. It is a page of its own rather than part of the chat: the
+  chat frees its model when it closes, and a round is ~1k tokens of images and sound that would fill a chat's context
+  in a few rounds. Each request here is a fresh conversation.
+- The next round's frames are taken while the model answers, and the sound keeps arriving, so little is missed between
+  rounds. It stops on Stop, when the page closes or the app goes to the background, after 10 minutes, and when the
+  device is hot or the battery low (`WorkloadPolicy`). The screen stays on while it runs. Nothing is saved: the
+  descriptions stay on the page (newest first, with the time, how long the model took and a 🔇 when nothing was heard),
+  with Copy.
+- The model loads when Start is first tapped (after asking to download it), through `ChatModelLoader` (the chat's GPU
+  setting, the CPU if the GPU fails; scheduled tasks use it too), with a 4,096-token context and Gemma 4's vision
+  encoder on the same backend as the model. Gemma 4 E2B by default; E4B where offered.
+- The request (measured with Gemma 4 E2B, `UnitTestLiteRtLm.TestGemma4E2BSceneRoundTime`): the frames after a
+  "Camera pictures:" label, the sound after "Microphone audio:", then the instructions, asking for two lines, "See: ..."
+  and "Hear: ..." with the words spoken quoted. Without the labels it described the pictures and answered
+  "Hear: nothing" to speech it quoted word for word when sent the sound alone. Asked only to describe what it saw and
+  heard, it answered the question spoken in the recording. As a system message the instructions were ignored for the
+  sound. Given the last description, it repeated "Hear: nothing" over new speech, so each round stands alone.
+- One round on an M1 Mac (Gemma 4 E2B on Metal, 3 frames and 5.8 s of speech): 4.3-5.3 s with the vision encoder on the
+  GPU, 9.5-10.6 s on the CPU (as the chat loads it).
+- On a Galaxy S10 (2026-11-06, Gemma 4 E2B on the GPU with its vision encoder there too, which loaded): 26 s for the
+  first round, then 17.6-19.9 s a round; the descriptions matched the scene ("a white object and cables on a black
+  stand": a router). The room was quiet, so every round was judged silent (🔇), and speech hasn't been heard on a phone
+  yet. While it ran, Samsung's camera service logged a stream start every 4-8 s (not while idle); the preview and the
+  frames went on. Leaving the page freed the model (the app back to ~390 MB).
+
 ## The TF Lite pages, the live camera and the About page
 
 - The TF Lite tab's photo demos (`DemoPage` subclasses: COCO SSD MobileNet, YOLOX, PicoDet, hand gestures, body pose,

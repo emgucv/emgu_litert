@@ -24,7 +24,7 @@ How the MAUI demo's code is organised. Moved here from CLAUDE.md, which keeps th
 
 ## The home page
 
-- The MAUI demo's home page (`MainPage.xaml.cs`) has two tabs, pills like the Emgu CV demo's category pills: "LiteRT-LM" (the chat; on the platforms with LiteRT-LM) and "TF Lite" (Coco SSD MobileNet, MobileNet, Inception, Model Checker); the last one used is kept in Preferences (`main_page_tab`).
+- The MAUI demo's home page (`MainPage.xaml.cs`) has two tabs, pills like the Emgu CV demo's category pills: "LiteRT-LM" (the chat, and "Watch and listen" - the library's `WatchAndListenPage`, where it is supported; on the platforms with LiteRT-LM) and "TF Lite" (Coco SSD MobileNet, MobileNet, Inception, Model Checker); the last one used is kept in Preferences (`main_page_tab`).
 
 ## Settings
 

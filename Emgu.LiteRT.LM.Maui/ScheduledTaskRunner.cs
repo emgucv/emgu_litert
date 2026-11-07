@@ -292,44 +292,10 @@ public static class ScheduledTaskRunner
     // The chat's model on its backend, without downloading it; the CPU if the GPU fails. The model, its backend, or why not.
     private static async Task<(LanguageModel, string, string)> LoadAsync(ScheduledTaskRunnerOptions options, ChatModelOption option, CancellationToken cancellationToken)
     {
-        bool gpu = options.Settings.Get("use_gpu_" + DeviceInfo.Current.Platform, DeviceInfo.Current.Platform != DevicePlatform.WinUI);
-        string backend = option.Backends.Count > 1 && gpu ? "gpu" : option.Backends.FirstOrDefault() ?? "cpu";
-        bool phone = DeviceInfo.Current.Platform == DevicePlatform.Android || DeviceInfo.Current.Platform == DevicePlatform.iOS;
-        int setting = options.Settings.Get("context_tokens", 0);
-        if (Array.IndexOf(ChatContextWindow.Choices, setting) < 0)
-            setting = 0;
-        int context = option.MaxContextWindow > 0
-            ? ChatContextWindow.Choose(setting, option.ContextWindow, option.MaxContextWindow, phone, option.CanUseTools)
-            : option.ContextWindow;
-        string error = null;
-        foreach (string tryBackend in backend == "gpu" ? new[] { "gpu", "cpu" } : new[] { backend })
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            LanguageModel model = option.Create();
-            if (context > 0)
-                model.MaxNumTokens = context;
-            var state = new ModelLoadState(model) { Backend = tryBackend };
-            if (!state.IsDownloaded)
-            {
-                model.Dispose();
-                return (null, null, "the model isn't downloaded (" + option.DisplayName + ")");
-            }
-            state.ConfigureSettings = settings =>
-            {
-                settings.NumThreads = CpuThreadSettings.Count;
-                if (context > 0)
-                    settings.MaxNumTokens = context;
-                options.ConfigureEngine?.Invoke(settings);
-            };
-            using (cancellationToken.Register(state.Cancel))
-            {
-                if (await state.LoadAsync().ConfigureAwait(false) && model.Initialized)
-                    return (model, tryBackend, null);
-            }
-            error = state.Error;
-            await Task.Run(() => model.Dispose()).ConfigureAwait(false);
-        }
-        return (null, null, "the model couldn't load: " + error);
+        ChatModelLoad load = await ChatModelLoader.LoadAsync(option, ChatModelLoader.PreferredBackend(options.Settings, option),
+            ChatModelLoader.ChatContextWindowFor(options.Settings, option), false, null, options.ConfigureEngine, null,
+            cancellationToken).ConfigureAwait(false);
+        return (load.Model, load.Backend, load.Error);
     }
 
     // As ChatPage.ConfigureConversation, for a model the run loaded.

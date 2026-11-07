@@ -1493,6 +1493,52 @@ namespace Emgu.TF.Lite.Test
             await TestGemma4ImageAndAudio(new Gemma4E4B());
         }
 
+        // "Watch and listen" rounds (SceneNarrator.BuildRequest): 3 frames and ~5.8 s of speech in one request to Gemma 4 E2B
+        // on the GPU, with the vision encoder on the GPU and then on the CPU (as the chat loads it); logs each round's time.
+        // The reply must quote the speech, and not in a silent round.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestGemma4E2BSceneRoundTime()
+        {
+            RequireLiteRtLm();
+            if (!UnitTest1.StageGpuPlugin())
+                Skip("No LiteRT GPU accelerator plugin next to libLiteRt");
+            byte[][] frames = { System.IO.File.ReadAllBytes("apple.jpg"), System.IO.File.ReadAllBytes("tulips.jpg"), System.IO.File.ReadAllBytes("surfers.jpg") };
+            byte[] wav = System.IO.File.ReadAllBytes("audio_sample.wav");
+            foreach (string visionBackend in new[] { "gpu", "cpu" })
+            {
+                System.Diagnostics.Stopwatch load = System.Diagnostics.Stopwatch.StartNew();
+                using (Gemma4E2B model = new Gemma4E2B { VisionBackend = visionBackend })
+                {
+                    await model.Init(backend: "gpu");
+                    Console.WriteLine("Vision on {0}: loaded in {1:F1} s", visionBackend, load.Elapsed.TotalSeconds);
+                    using (IChatClient client = model.AsIChatClient())
+                    {
+                        ChatOptions options = new ChatOptions { MaxOutputTokens = 120, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } };
+                        for (int round = 0; round < 3; round++)
+                        {
+                            System.Diagnostics.Stopwatch time = System.Diagnostics.Stopwatch.StartNew();
+                            // The second round is silent; the others have speech.
+                            ChatResponse response = await client.GetResponseAsync(Emgu.LiteRT.LM.Agents.SceneNarrator.BuildRequest(
+                                frames, round == 1 ? null : wav, true, Emgu.LiteRT.LM.Agents.SceneNarrationOptions.DefaultInstructions), options);
+                            Console.WriteLine("Vision on {0}, round {1}: {2:F1} s: {3}", visionBackend, round + 1, time.Elapsed.TotalSeconds, response.Text);
+                            bool quoted = response.Text.IndexOf("tomb", StringComparison.OrdinalIgnoreCase) >= 0;
+                            if (quoted != (round != 1))
+                                throw new Exception("The reply should " + (round == 1 ? "not " : "") + "quote the speech: " + response.Text);
+                            if (String.IsNullOrWhiteSpace(response.Text))
+                                throw new Exception("The reply is empty");
+                        }
+                    }
+                }
+            }
+        }
+
         private static async Task TestGemma4ImageAndAudio(Gemma4 gemma)
         {
             RequireLiteRtLm();

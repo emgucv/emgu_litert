@@ -564,3 +564,20 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] Not done: a real detection triggering a photo or a clip, Mac Catalyst on this path (it keeps OpenCV's capture).
 - [ ] The iPad's USB tunnel reset four times in 35 minutes on 2026-11-05, each time soon after the camera or the
   microphone started (it ended WebDriverAgent's runner each time; the app went on). The cable, or the camera's draw?
+
+## 60. Watch and listen — Gemma 4 describes the live camera and microphone, every few seconds; Mac measured, Galaxy S10 run
+
+"Tell me what you see and hear", on a page of its own on the home screen's LiteRT-LM tab (`Emgu.LiteRT.LM.Maui.CV`'s
+`WatchAndListenPage` over `Emgu.LiteRT.LM.Agents`' `SceneNarrator`; how it works in [FEATURES.md](FEATURES.md),
+"Watch and listen"). Done: the loop and its model-free tests, the shared `ChatModelLoader` (scheduled tasks use it
+too), the page, one round measured on the Mac (4.3-5.3 s with Gemma 4 E2B's vision encoder on the GPU, 9.5-10.6 s
+on the CPU), and a run on a Galaxy S10. Still open:
+
+- [x] Galaxy S10: the scene described, 17.6-19.9 s a round with the vision encoder on the GPU, Stop, and leaving the
+  page frees the model (2026-11-06).
+- [ ] Speech heard on a phone (the S10's room was quiet: every round silent), the battery and heat over the 10-minute
+  limit, the Z Fold3 and the iPad Air (the iOS build passes; not run on the iPad yet).
+- [ ] Windows: a streaming `MicrophoneSoundSource` (WinRT `AudioGraph`); the page is hidden there until then.
+- [ ] Reading the descriptions aloud (the microphone would hear them: mute it while speaking).
+- [ ] Saving a session as a chat or a note; opening the page from the chat ("tell me what you see and hear"); running
+  it through the Mac's server (item 29).
