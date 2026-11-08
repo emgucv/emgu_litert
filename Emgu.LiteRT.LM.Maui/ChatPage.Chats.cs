@@ -215,7 +215,8 @@ namespace Emgu.LiteRT.LM.Maui
 
         /// <summary>
         /// Show the files a saved reply kept (<see cref="ChatMessageItem.SavedFiles"/>: the pictures it drew, the documents
-        /// it wrote) above it again, as the cards the features make of them (<see cref="ChatFeature.RestoreSavedFile"/>).
+        /// it wrote) above it again, as the cards the features make of them (<see cref="ChatFeature.RestoreSavedFiles"/> for a
+        /// card of several, then <see cref="ChatFeature.RestoreSavedFile"/> for each file left).
         /// A page that reads chats back itself calls it for each message.
         /// </summary>
         /// <param name="item">A message read back from the store</param>
@@ -223,8 +224,20 @@ namespace Emgu.LiteRT.LM.Maui
         {
             if (item == null || item.SavedFiles.Count == 0)
                 return;
-            foreach (ChatSavedFile file in item.SavedFiles.ToList())
+            List<ChatSavedFile> files = item.SavedFiles.ToList();
+            var restored = new HashSet<ChatSavedFile>(ReferenceEqualityComparer.Instance);
+            foreach (ChatFeature feature in _features)
             {
+                View group;
+                try { group = feature.RestoreSavedFiles(files, restored); }
+                catch (Exception) { group = null; }
+                if (group != null)
+                    item.Decorations.Add(group);
+            }
+            foreach (ChatSavedFile file in files)
+            {
+                if (restored.Contains(file))
+                    continue;
                 foreach (ChatFeature feature in _features)
                 {
                     View card;

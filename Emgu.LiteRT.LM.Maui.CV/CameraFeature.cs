@@ -184,6 +184,8 @@ public sealed partial class CameraFeature : CvFeature
     /// <inheritdoc/>
     public override void OnNewConversation()
     {
+        // The captures go first, so closing the camera adds no row to the new chat.
+        ClearCaptures();
         _ = CloseCameraAsync();
         _cameraFront = false;
 #if ANDROID || (IOS && !MACCATALYST)
@@ -193,7 +195,6 @@ public sealed partial class CameraFeature : CvFeature
         ClearSoundMonitors();
         ForgetMonitorRequests();
         ClearCameraTurn();
-        ClearCaptures();
     }
 
     /// <inheritdoc/>
@@ -426,7 +427,7 @@ public sealed partial class CameraFeature : CvFeature
                 if (facing == "front" && !LiveCamera.HasFrontCamera) return "This device has no selfie camera. Tell the user.";
                 _cameraFront = facing == "front";
                 UpdateCameraSwitch();
-                if (_camera != null) await CloseCameraCoreAsync();
+                if (_camera != null) await CloseCameraCoreAsync(endOpening: false);
             }
 #endif
             if (_camera?.IsRunning == true && _cameraPanel.IsVisible)
@@ -434,7 +435,7 @@ public sealed partial class CameraFeature : CvFeature
                 _visualRuntime.SetFeedVisible(true);
                 return "The live camera preview" + CameraNote + " is open. You have not captured an image. Tell the user they can ask what you see in the camera.";
             }
-            if (_camera != null) await CloseCameraCoreAsync();
+            if (_camera != null) await CloseCameraCoreAsync(endOpening: false);
             var permission = await Permissions.RequestAsync<Permissions.Camera>();
             if (permission != PermissionStatus.Granted) return "Camera permission was not granted. Allow Camera for this app in system settings to use the live preview.";
             token.ThrowIfCancellationRequested();
@@ -495,7 +496,8 @@ public sealed partial class CameraFeature : CvFeature
         if (front && !LiveCamera.HasFrontCamera) { Host.SetStatus("This device has no selfie camera."); return; }
         _cameraFront = front;
         UpdateCameraSwitch();
-        await CloseCameraAsync();
+        // The same opening goes on with the other camera: no row in the chat yet.
+        await CloseCameraAsync(endOpening: false);
         string result = await OpenCameraCoreAsync(CancellationToken.None, false);
         if (_camera?.IsRunning != true) Host.SetStatus(result);
     }
@@ -584,13 +586,16 @@ public sealed partial class CameraFeature : CvFeature
 
     /// <summary>Close the live camera.</summary>
 
-    public Task CloseCameraAsync()
+    public Task CloseCameraAsync() => CloseCameraAsync(endOpening: true);
+
+    // endOpening: the camera closes for good, so what it took becomes a row in the chat (false to reopen it, e.g. the other camera).
+    private Task CloseCameraAsync(bool endOpening)
     {
         PauseVisualFeed();
         return MainThread.InvokeOnMainThreadAsync(async () =>
         {
             await _cameraGate.WaitAsync();
-            try { await CloseCameraCoreAsync(); }
+            try { await CloseCameraCoreAsync(endOpening); }
             finally { _cameraGate.Release(); }
         });
     }
@@ -603,13 +608,14 @@ public sealed partial class CameraFeature : CvFeature
             await CloseCameraAsync();
     }
 
-    private async Task CloseCameraCoreAsync()
+    private async Task CloseCameraCoreAsync(bool endOpening = true)
     {
         PauseVisualFeed();
         DeviceDisplay.Current.MainDisplayInfoChanged -= CameraDisplayChanged;
         var camera = _camera;
         _camera = null;
         if (_cameraPanel != null) { SetCameraMaximized(false); _cameraPanel.IsVisible = false; }
+        if (endOpening && _captureStrip != null) EndCaptureOpening();
         QueueVisualMonitorUi();
         _cameraPreview?.ClearFrame();
         lock (_previewGate)

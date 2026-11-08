@@ -1007,23 +1007,30 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   `CameraChimeAction("camera_click.wav")`, inside the sound mute) unless Settings > "Camera sounds" is off (TODO item 50);
   clips are silent. The planner answers "take a photo when you see a person" with `take_snapshot` (`take_photo` is for a
   full-resolution or high-quality photo), which is why the iPad's first alert picture was silent (TODO item 59).
-- The camera panel's capture strip (TODO item 61, 2026-11-08): the snapshots, photos and clips the camera actions take show
-  as small thumbnails in one row under the live preview, the newest on the left (a clip with a ▶ and its length), as
-  well as their cards in the transcript. Tapping one opens the same viewer as its card. `Emgu.LiteRT.LM.Agents`'
-  `CameraCaptures` is the one list both follow (newest first, at most 20 snapshots, 5 photos and 5 clips not kept, 40
-  in all; `UnitTestCameraCaptures`), so a thumbnail and its card leave together and an old photo or clip file is
-  deleted in one place (`Removed`). The strip (`CameraFeature.CaptureStrip.cs`) uses 240 px thumbnails, 56 px high in
-  the small panel and 72 px maximized; it scrolls back to the newest unless the user scrolled it in the last 4 s.
-  Closing the camera hides it with the panel and the cards stay; a new chat clears both.
-  - "Keep in chat" on a card saves the capture with the reply (`AddCardToSavedReplyAsync`, saved file kinds
-    `camera_snapshot`, `camera_photo`, `camera_clip`; the media type carries the time, condition, size and clip length,
-    `CameraCaptureFile`), never given to the model; a kept capture no longer counts toward the caps, and reopening the
-    chat restores its card (`CameraFeature.RestoreSavedFile`; a photo or clip is written to the cache's `kept/` folder
-    to open, share or play). Everything else stays session only. No Keep in a private chat or before the first reply.
-  - Checked on the iPad Air M4 (2026-11-08, with a self-test taking two snapshots, a photo and a clip): newest on the
-    left, a thumbnail opening the photo's and the snapshot's viewers, maximize and restore, a new chat clearing
-    the strip and cards, and a kept photo and clip back after reopening the chat (the clip played), the snapshots not
-    kept gone. Not yet run: eviction past a cap on a device (unit-tested), a private chat, the S10, Catalyst.
+- The camera's captures (TODO item 61, 2026-11-08): while the camera is open, the snapshots, photos and clips the camera
+  actions take are thumbnails in one row under the live preview - the capture strip, newest on the left (a clip with a ▶
+  and its length) - and nothing goes into the chat. When the camera closes, that opening's captures become one row on the
+  latest reply (or a notice before the first reply): "Camera · 3 pictures, 1 clip · 16:33", Keep all, and 96 px
+  thumbnails in a horizontal scroll, newest on the left. Each opening adds its own row and starts with an empty strip; a
+  camera switch is the same opening, and a new chat clears the captures without a row. A thumbnail, in the strip or a
+  row, opens the capture's viewer (`CameraFeature.CaptureViewer.cs`): the picture large or the clip playing in place,
+  when and why, Open or Full screen, Share, Save to gallery and Keep in chat, sized so the buttons stay on the sheet.
+  `Emgu.LiteRT.LM.Agents`' `CameraCaptures` is the one list the strip and the rows follow (newest first, at most 20
+  snapshots, 5 photos and 5 clips not kept, 40 in all, each with its `Opening`; `UnitTestCameraCaptures`), so a
+  thumbnail leaves wherever it is and an old photo or clip file is deleted in one place (`Removed`).
+  - Keep in chat (the viewer) and Keep all (the row) save each capture with the reply the row is on - from the strip,
+    the latest reply - as a saved file (`camera_snapshot`, `camera_photo`, `camera_clip`; the media type carries the
+    time, condition, size and clip length, `CameraCaptureFile`), never given to the model; a kept one gets a ✓, no
+    longer counts toward the caps, and stays in its row. Everything else is session only. No Keep in a private chat or
+    before the first reply. Reopening the chat shows a reply's kept captures as one row (`CameraFeature.RestoreSavedFiles`,
+    through `ChatFeature.RestoreSavedFiles`, the library's hook for one card of several saved files; photos and clips
+    are written to the cache's `kept/` folder to open, share and play).
+  - Checked on the iPad Air M4 (2026-11-08, a self-test taking two snapshots, a photo and a clip, closing the camera,
+    then one more snapshot in a second opening): no chat cards while the camera was open; a row on each close, the
+    second opening's strip empty; the clip's and a snapshot's viewers with all their buttons on the sheet, the clip
+    playing; Keep in chat and Keep all marking the thumbnails; after reopening the chat, one row with the two kept
+    captures, the clip playing and no Keep. Not yet run: a cap pushing out a capture on a device (unit-tested), a
+    camera switch, a private chat, the S10, Catalyst.
 - On Android the live camera runs through Camera2 (`Emgu.LiteRT.Models.CV.Maui/LiveCamera.Camera2.cs`, moved out of the demo on 2026-10-25; OpenCV's camera is the fallback). A 640x480 YUV
   reader feeds the preview and the detectors.
   - The `record_clip` visual-alert action (TODO item 43) adds a `MediaRecorder` surface by configuring the session again for

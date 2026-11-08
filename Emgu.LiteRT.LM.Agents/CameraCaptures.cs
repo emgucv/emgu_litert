@@ -18,7 +18,7 @@ namespace Emgu.LiteRT.LM.Agents.Events
     }
 
     /// <summary>
-    /// A picture or clip a camera action took in this session: what the chat's card and the camera panel's strip show. The
+    /// A picture or clip a camera action took in this session: what the camera panel's strip and the chat's row show. The
     /// file (<see cref="Path"/>) or the bytes (<see cref="Data"/>) are the app's; <see cref="Tag"/> holds its views.
     /// </summary>
     public sealed class CameraCapture
@@ -72,11 +72,14 @@ namespace Emgu.LiteRT.LM.Agents.Events
 
         /// <summary>
         /// True once the user kept it in the chat (saved with the reply): it no longer counts toward its kind's cap, and the
-        /// app keeps its card and file when it leaves the list.
+        /// app keeps it in its row, with its file, when it leaves the list.
         /// </summary>
         public bool Kept { get; set; }
 
-        /// <summary>The app's views for it (the card, the strip's thumbnail).</summary>
+        /// <summary>Which opening of the camera took it: the app's count, so each opening's captures can be shown together.</summary>
+        public int Opening { get; set; }
+
+        /// <summary>The app's views for it (the strip's thumbnail, the chat's row).</summary>
         public object Tag { get; set; }
     }
 
@@ -90,9 +93,9 @@ namespace Emgu.LiteRT.LM.Agents.Events
     }
 
     /// <summary>
-    /// The session's camera captures, newest first, with a cap per kind: one list the chat's cards and the camera panel's
-    /// strip both follow, so a capture's card and thumbnail come and go together, and the one place an old file is let go
-    /// of (<see cref="Removed"/>). Kept captures don't count toward their kind's cap; <see cref="MaxItems"/> bounds the
+    /// The session's camera captures, newest first, with a cap per kind: one list the camera panel's strip and the chat's
+    /// rows (one per opening of the camera, <see cref="CameraCapture.Opening"/>) follow, so a thumbnail leaves wherever it
+    /// is, and the one place an old file is let go of (<see cref="Removed"/>). Kept captures don't count toward their kind's cap; <see cref="MaxItems"/> bounds the
     /// whole list. Not thread-safe: use it on one thread (the UI's).
     /// </summary>
     public sealed class CameraCaptures
@@ -138,6 +141,9 @@ namespace Emgu.LiteRT.LM.Agents.Events
             Trim();
         }
 
+        /// <summary>The captures one opening of the camera took, newest first.</summary>
+        public IEnumerable<CameraCapture> ItemsOf(int opening) => _items.Where(c => c.Opening == opening);
+
         /// <summary>Mark a capture kept (saved with the chat): it stops counting toward its kind's cap.</summary>
         public void Keep(CameraCapture capture)
         {
@@ -176,8 +182,8 @@ namespace Emgu.LiteRT.LM.Agents.Events
     }
 
     /// <summary>
-    /// A capture kept with a chat's reply: the attachment's kind and a media type carrying what its card shows (when, why, the
-    /// size or length), and back. The chats' store keeps the media type as it is, so the card can be made again when the
+    /// A capture kept with a chat's reply: the attachment's kind and a media type carrying what its viewer shows (when, why, the
+    /// size or length), and back. The chats' store keeps the media type as it is, so the row can be made again when the
     /// chat is reopened.
     /// </summary>
     public static class CameraCaptureFile
@@ -199,6 +205,26 @@ namespace Emgu.LiteRT.LM.Agents.Events
         public static CameraCaptureKind? FromKind(string kind) =>
             kind == SnapshotKind ? CameraCaptureKind.Snapshot : kind == PhotoKind ? CameraCaptureKind.Photo : kind == ClipKind ? CameraCaptureKind.Clip
             : (CameraCaptureKind?)null;
+
+        /// <summary>
+        /// What a set of captures is, for a row's header: "3 pictures, 1 clip · 15:24–15:27" (snapshots and photos are
+        /// pictures; the times are the captures' own, one when they are in the same minute). Empty for none.
+        /// </summary>
+        public static string Summary(IEnumerable<CameraCapture> captures)
+        {
+            List<CameraCapture> list = captures?.Where(c => c != null).ToList() ?? new List<CameraCapture>();
+            if (list.Count == 0)
+                return "";
+            int clips = list.Count(c => c.Kind == CameraCaptureKind.Clip), pictures = list.Count - clips;
+            var parts = new List<string>();
+            if (pictures > 0)
+                parts.Add(pictures + (pictures == 1 ? " picture" : " pictures"));
+            if (clips > 0)
+                parts.Add(clips + (clips == 1 ? " clip" : " clips"));
+            string first = list.Min(c => c.TakenAt).ToString("HH:mm", CultureInfo.InvariantCulture);
+            string last = list.Max(c => c.TakenAt).ToString("HH:mm", CultureInfo.InvariantCulture);
+            return string.Join(", ", parts) + " · " + (first == last ? first : first + "–" + last);
+        }
 
         /// <summary>The media type to save a capture with: "image/jpeg" or "video/mp4" and its details as parameters.</summary>
         public static string MediaTypeOf(CameraCapture capture)

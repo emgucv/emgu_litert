@@ -6,7 +6,7 @@ using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
 
-// The session's camera captures behind the chat's cards and the camera panel's strip, and a kept capture's saved form.
+// The session's camera captures behind the camera panel's strip and the chat's rows (one per opening of the camera), and a kept capture's saved form.
 [TestFixture]
 public class UnitTestCameraCaptures
 {
@@ -119,5 +119,43 @@ public class UnitTestCameraCaptures
         Assert.That(CameraCaptureFile.Parse("written_document", "application/pdf; name=a.pdf", new byte[1]), Is.Null);
         Assert.That(CameraCaptureFile.FromKind("generated"), Is.Null);
         Assert.That(CameraCaptureFile.FromKind(CameraCaptureFile.SnapshotKind), Is.EqualTo(CameraCaptureKind.Snapshot));
+    }
+
+    [Test]
+    public void EachOpeningsCapturesAreTogether()
+    {
+        var captures = new CameraCaptures();
+        CameraCapture a = Capture(CameraCaptureKind.Photo, 1), b = Capture(CameraCaptureKind.Snapshot, 2), c = Capture(CameraCaptureKind.Clip, 3);
+        a.Opening = 0; b.Opening = 0; c.Opening = 1;
+        captures.Add(a); captures.Add(b); captures.Add(c);
+        Assert.That(captures.ItemsOf(0), Is.EqualTo(new[] { b, a }));
+        Assert.That(captures.ItemsOf(1), Is.EqualTo(new[] { c }));
+        Assert.That(captures.ItemsOf(2), Is.Empty);
+    }
+
+    [Test]
+    public void ACapPushesOutAnEarlierOpeningsCapture()
+    {
+        var captures = new CameraCaptures(maxPhotos: 2);
+        var removed = new List<CameraCapture>();
+        captures.Removed += (c, _) => removed.Add(c);
+        CameraCapture first = Capture(CameraCaptureKind.Photo, 1), second = Capture(CameraCaptureKind.Photo, 2), third = Capture(CameraCaptureKind.Photo, 3);
+        first.Opening = 0; second.Opening = 1; third.Opening = 1;
+        captures.Add(first); captures.Add(second); captures.Add(third);
+        Assert.That(removed, Is.EqualTo(new[] { first }));
+        Assert.That(captures.ItemsOf(0), Is.Empty);
+    }
+
+    [Test]
+    public void TheSummaryCountsPicturesAndClipsAndTheirMinutes()
+    {
+        Assert.That(CameraCaptureFile.Summary(new[] { Capture(CameraCaptureKind.Snapshot, 0) }), Is.EqualTo("1 picture · 15:42"));
+        Assert.That(CameraCaptureFile.Summary(new[]
+        {
+            Capture(CameraCaptureKind.Snapshot, 0), Capture(CameraCaptureKind.Photo, 30), Capture(CameraCaptureKind.Snapshot, 70),
+            Capture(CameraCaptureKind.Clip, 200)
+        }), Is.EqualTo("3 pictures, 1 clip · 15:42–15:45"));
+        Assert.That(CameraCaptureFile.Summary(new[] { Capture(CameraCaptureKind.Clip, 0), Capture(CameraCaptureKind.Clip, 5) }), Is.EqualTo("2 clips · 15:42"));
+        Assert.That(CameraCaptureFile.Summary(Array.Empty<CameraCapture>()), Is.Empty);
     }
 }

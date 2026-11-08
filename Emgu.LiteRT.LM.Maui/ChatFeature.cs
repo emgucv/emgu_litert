@@ -168,6 +168,16 @@ namespace Emgu.LiteRT.LM.Maui
         public virtual View RestoreSavedFile(ChatSavedFile file) => null;
 
         /// <summary>
+        /// One card for several files this feature kept with a reply, read back with a saved chat (a camera's pictures as
+        /// one row rather than a card each): add each file it shows to <paramref name="restored"/>. The page asks each
+        /// feature first with all of the reply's files, then <see cref="RestoreSavedFile"/> for each file none restored.
+        /// Null (the default) when it has none.
+        /// </summary>
+        /// <param name="files">The reply's files</param>
+        /// <param name="restored">The files restored so far: add the ones the card shows</param>
+        public virtual View RestoreSavedFiles(IReadOnlyList<ChatSavedFile> files, ISet<ChatSavedFile> restored) => null;
+
+        /// <summary>
         /// A client to run this message through instead of the model's own (e.g. task mode's, which plans the message
         /// and runs the steps one by one), or null. Asked once per message, after <see cref="PrepareMessageAsync"/>; the
         /// first feature's client wins. The client is given the page's client (<see cref="IChatPageHost.ChatClient"/>) to

@@ -582,14 +582,15 @@ on the CPU), and a run on a Galaxy S10. Still open:
 - [ ] Saving a session as a chat or a note; opening the page from the chat ("tell me what you see and hear"); running
   it through the Mac's server (item 29).
 
-## 61. The camera panel's capture strip and Keep in chat
+## 61. The camera's captures: the strip under the live view, one chat row per opening, and Keep in chat
 
 The pictures and clips the camera actions take appear under the live preview, in one row with the newest on the
-left, as well as in the chat, and "Keep in chat" saves one with the chat (how it works in [FEATURES.md](FEATURES.md),
-"Camera and sound monitors"). Done: `CameraCaptures` and its tests, the strip, Keep and restoring kept captures, checked
-on the iPad Air (2026-11-08). Still open:
+left, and nothing goes into the chat while the camera is open; when it closes, they become one row in the chat, and
+"Keep in chat" or "Keep all" saves them with the chat (how it works in [FEATURES.md](FEATURES.md), "Camera and sound
+monitors"). Done: `CameraCaptures` and its tests, the strip, the rows, the viewer, Keep and restoring kept captures as
+one row (`ChatFeature.RestoreSavedFiles`), checked on the iPad Air (2026-11-08). The viewer's cut-off "Save snapshot…"
+button seen on the iPad the same day is fixed (the picture leaves room for the buttons). Still open:
 
-- [ ] A device run of a cap pushing out the oldest photo (unit-tested), and of a private chat (no Keep button).
+- [ ] A device run of a cap pushing out the oldest photo (unit-tested), a camera switch (no row), and a private chat
+  (no Keep, no Keep all).
 - [ ] The Galaxy S10 (photos and clips through Camera2) and Mac Catalyst (snapshots with OpenCV's camera).
-- [ ] The snapshot viewer's "Save snapshot…" button is cut off at the bottom of the sheet on the iPad (seen 2026-11-08;
-  the viewer is older than the strip).

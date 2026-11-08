@@ -3,15 +3,14 @@
 using System.IO;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.Models.CV.Maui;
-using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Maui;
 
 namespace Emgu.LiteRT.LM.Maui.CV;
 
-// The take_photo alert action (TODO item 44): one full-resolution photo from the live camera (Camera2 or AVFoundation, LiveCamera.TakePhotoAsync), shown in the
-// transcript as a thumbnail with its size, Open, Share, Save to gallery and Keep in chat, and in the camera panel's strip. Session only unless kept like
-// the snapshots and clips: the JPEGs live in the app's cache folder, the latest five are kept (CameraCaptures), New chat deletes them, and nothing is
-// sent to the model.
+// The take_photo alert action (TODO item 44): one full-resolution photo from the live camera (Camera2 or AVFoundation, LiveCamera.TakePhotoAsync), a thumbnail
+// in the camera panel's strip and then in the chat's row for that opening; its viewer has its size, Open, Share, Save to gallery and Keep in chat. Session only
+// unless kept like the snapshots and clips: the JPEGs live in the app's cache folder, the latest five are kept (CameraCaptures), New chat deletes them, and
+// nothing is sent to the model.
 public sealed partial class CameraFeature
 {
     private Task TakeVisualPhotoAsync(VisualEvent occurrence, CancellationToken token) =>
@@ -43,35 +42,27 @@ public sealed partial class CameraFeature
                 token.ThrowIfCancellationRequested();
                 return;
             }
-            var capture = new CameraCapture(CameraCaptureKind.Photo, at, cause(), path: photo.Path, thumbnail: small)
+            AddCapture(new CameraCapture(CameraCaptureKind.Photo, at, cause(), path: photo.Path, thumbnail: small)
             {
                 Width = photo.Width, Height = photo.Height
-            };
-            ChatMessageItem reply = CaptureReply();
-            View card = PhotoCard(capture, thumbnail, reply);
-            Host.AddCardToReply(card);
-            AddCapture(capture, new CaptureViews { Card = card, Reply = reply });
+            }, thumbnail);
         });
     }
 
-    // A photo's card: the thumbnail (tap to open), its time, size and cause, Open, Share, Save to gallery, and Keep in chat (for a live
-    // one with a reply). A restored one is opened from its copy in the cache.
-    private View PhotoCard(CameraCapture capture, byte[] thumbnail, ChatMessageItem reply)
+    // A photo's viewer: the picture (tap to open it full size), its time, size and cause, Open, Share, Save to gallery and Keep in chat.
+    private View PhotoViewer(CameraCapture capture)
     {
         string path = capture.Path;
         DateTimeOffset at = capture.TakenAt;
         long bytes = 0;
         try { bytes = new FileInfo(path).Length; } catch (Exception) { }
-        var image = new Image { HeightRequest = 150, WidthRequest = 210, Aspect = Aspect.AspectFit, BackgroundColor = CvViews.Color("ChatRowBorder") };
-        if (thumbnail != null) image.Source = CvViews.ToImageSource(thumbnail);
+        var image = new Image { HeightRequest = CaptureViewerHeight, Aspect = Aspect.AspectFit };
+        byte[] preview = (capture.Tag as CaptureViews)?.Preview;
+        if (preview != null) image.Source = CvViews.ToImageSource(preview);
         image.OnTap(() => _ = OpenVisualPhotoAsync(path));
         SemanticProperties.SetDescription(image, "Full-resolution camera photo. Tap to open.");
-        var caption = new Label
-        {
-            Text = "Camera photo · " + at.ToLocalTime().ToString("HH:mm:ss") + (capture.Width > 0 ? " · " + capture.Width + "×" + capture.Height : "") + " · " +
-                (bytes / 1048576.0).ToString("0.0") + " MB" + (string.IsNullOrEmpty(capture.Condition) ? "" : "\n" + capture.Condition) + "\n" + CaptureKeptText(capture.Kept),
-            FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText")
-        };
+        Label caption = CaptureCaption(capture, "Camera photo · " + at.ToString("HH:mm:ss") + (capture.Width > 0 ? " · " + capture.Width + "×" + capture.Height : "") +
+            " · " + (bytes / 1048576.0).ToString("0.0") + " MB");
         var status = new Label { FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText"), IsVisible = false };
         var open = MonitorButton("Open");
         var share = MonitorButton("Share");
@@ -87,34 +78,18 @@ public sealed partial class CameraFeature
             save.IsEnabled = false;
             try
             {
-                status.Text = await PictureGallery.SavePhotoAsync(path, "camera-photo-" + at.ToLocalTime().ToString("yyyyMMdd-HHmmss") + ".jpg");
+                status.Text = await PictureGallery.SavePhotoAsync(path, "camera-photo-" + at.ToString("yyyyMMdd-HHmmss") + ".jpg");
                 status.IsVisible = true;
             }
             catch (Exception ex) { await Host.AskAsync("Couldn't save the photo", ex.Message, "OK"); save.IsEnabled = true; }
         };
-        var buttons = CaptureButtons(open, share, save, capture.Kept ? null : KeepInChatButton(capture, reply, caption));
         return new VerticalStackLayout
         {
-            Spacing = 4, Margin = new Thickness(6, 4), HorizontalOptions = LayoutOptions.Start,
-            Children = { image, caption, buttons, status }
+            Spacing = 8, Children = { image, caption, CaptureButtons(open, share, save, KeepInChatButton(capture, caption)), status }
         };
     }
 
-    // A card's buttons, wrapping to the next line rather than squeezed: a squeezed "Full screen" was cut to "Full screer" on an iPad.
-    private static FlexLayout CaptureButtons(params Button[] buttons)
-    {
-        var layout = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, MaximumWidthRequest = 320, HorizontalOptions = LayoutOptions.Start };
-        foreach (Button button in buttons)
-        {
-            if (button == null) continue;
-            button.Margin = new Thickness(0, 0, 6, 4);
-            FlexLayout.SetShrink(button, 0);
-            layout.Children.Add(button);
-        }
-        return layout;
-    }
-
-    // A small JPEG for the card: the photo decoded at a fraction of its size (a full-size bitmap of a 12 MP photo is ~48 MB).
+    // A larger picture for the viewer: the photo decoded at a fraction of its size (a full-size bitmap of a 12 MP photo is ~48 MB).
     private static byte[] PhotoThumbnail(string path)
     {
         try
