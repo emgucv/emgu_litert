@@ -3,18 +3,17 @@
 using System.IO;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.Models.CV.Maui;
+using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Maui;
 
 namespace Emgu.LiteRT.LM.Maui.CV;
 
 // The take_photo alert action (TODO item 44): one full-resolution photo from the live camera (Camera2 or AVFoundation, LiveCamera.TakePhotoAsync), shown in the
-// transcript as a thumbnail with its size, Open, Share and Save to gallery. Session only like the snapshots and clips: the JPEGs live in the app's
-// cache folder, the latest five are kept, New chat deletes them, and nothing is sent to the model.
+// transcript as a thumbnail with its size, Open, Share, Save to gallery and Keep in chat, and in the camera panel's strip. Session only unless kept like
+// the snapshots and clips: the JPEGs live in the app's cache folder, the latest five are kept (CameraCaptures), New chat deletes them, and nothing is
+// sent to the model.
 public sealed partial class CameraFeature
 {
-    private readonly Queue<(View Row, string Path)> _visualPhotos = new();
-    private const int MaximumVisualPhotos = 5;
-
     private Task TakeVisualPhotoAsync(VisualEvent occurrence, CancellationToken token) =>
         TakePhotoAsync(() => _visualRuntime.Snapshot().FirstOrDefault(m => m.Id == occurrence.MonitorId)?.Condition, token);
 
@@ -34,6 +33,7 @@ public sealed partial class CameraFeature
         try { photo = await camera.TakePhotoAsync(path, token); }
         finally { await MainThread.InvokeOnMainThreadAsync(() => EndCameraActivity(activity)); await click; }
         byte[] thumbnail = PhotoThumbnail(photo.Path);
+        byte[] small = SmallJpeg(thumbnail);
         DateTimeOffset at = DateTimeOffset.Now;
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
@@ -43,51 +43,75 @@ public sealed partial class CameraFeature
                 token.ThrowIfCancellationRequested();
                 return;
             }
-            string condition = cause();
-            var image = new Image { HeightRequest = 150, WidthRequest = 210, Aspect = Aspect.AspectFit, BackgroundColor = CvViews.Color("ChatRowBorder") };
-            if (thumbnail != null) image.Source = CvViews.ToImageSource(thumbnail);
-            image.OnTap(() => _ = OpenVisualPhotoAsync(photo.Path));
-            SemanticProperties.SetDescription(image, "Full-resolution camera photo. Tap to open.");
-            var caption = new Label
+            var capture = new CameraCapture(CameraCaptureKind.Photo, at, cause(), path: photo.Path, thumbnail: small)
             {
-                Text = "Camera photo · " + at.ToString("HH:mm:ss") + " · " + photo.Width + "×" + photo.Height + " · " +
-                    (photo.Bytes / 1048576.0).ToString("0.0") + " MB\n" + condition + "\nSession only",
-                FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText")
+                Width = photo.Width, Height = photo.Height
             };
-            var status = new Label { FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText"), IsVisible = false };
-            var open = MonitorButton("Open");
-            var share = MonitorButton("Share");
-            var save = MonitorButton("Save to gallery");
-            open.Clicked += async (_, _) => await OpenVisualPhotoAsync(photo.Path);
-            share.Clicked += async (_, _) =>
-            {
-                try { await Share.Default.RequestAsync(new ShareFileRequest("Camera photo", new ShareFile(photo.Path, "image/jpeg"))); }
-                catch (Exception ex) { await Host.AskAsync("Couldn't share the photo", ex.Message, "OK"); }
-            };
-            save.Clicked += async (_, _) =>
-            {
-                save.IsEnabled = false;
-                try
-                {
-                    status.Text = await PictureGallery.SavePhotoAsync(photo.Path, "camera-photo-" + at.ToString("yyyyMMdd-HHmmss") + ".jpg");
-                    status.IsVisible = true;
-                }
-                catch (Exception ex) { await Host.AskAsync("Couldn't save the photo", ex.Message, "OK"); save.IsEnabled = true; }
-            };
-            var row = new VerticalStackLayout
-            {
-                Spacing = 4, Margin = new Thickness(6, 4), HorizontalOptions = LayoutOptions.Start,
-                Children = { image, caption, new HorizontalStackLayout { Spacing = 6, Children = { open, share, save } }, status }
-            };
-            Host.AddCardToReply(row);
-            _visualPhotos.Enqueue((row, photo.Path));
-            while (_visualPhotos.Count > MaximumVisualPhotos)
-            {
-                var old = _visualPhotos.Dequeue();
-                Host.RemoveCard(old.Row);
-                try { File.Delete(old.Path); } catch (Exception) { }
-            }
+            ChatMessageItem reply = CaptureReply();
+            View card = PhotoCard(capture, thumbnail, reply);
+            Host.AddCardToReply(card);
+            AddCapture(capture, new CaptureViews { Card = card, Reply = reply });
         });
+    }
+
+    // A photo's card: the thumbnail (tap to open), its time, size and cause, Open, Share, Save to gallery, and Keep in chat (for a live
+    // one with a reply). A restored one is opened from its copy in the cache.
+    private View PhotoCard(CameraCapture capture, byte[] thumbnail, ChatMessageItem reply)
+    {
+        string path = capture.Path;
+        DateTimeOffset at = capture.TakenAt;
+        long bytes = 0;
+        try { bytes = new FileInfo(path).Length; } catch (Exception) { }
+        var image = new Image { HeightRequest = 150, WidthRequest = 210, Aspect = Aspect.AspectFit, BackgroundColor = CvViews.Color("ChatRowBorder") };
+        if (thumbnail != null) image.Source = CvViews.ToImageSource(thumbnail);
+        image.OnTap(() => _ = OpenVisualPhotoAsync(path));
+        SemanticProperties.SetDescription(image, "Full-resolution camera photo. Tap to open.");
+        var caption = new Label
+        {
+            Text = "Camera photo · " + at.ToLocalTime().ToString("HH:mm:ss") + (capture.Width > 0 ? " · " + capture.Width + "×" + capture.Height : "") + " · " +
+                (bytes / 1048576.0).ToString("0.0") + " MB" + (string.IsNullOrEmpty(capture.Condition) ? "" : "\n" + capture.Condition) + "\n" + CaptureKeptText(capture.Kept),
+            FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText")
+        };
+        var status = new Label { FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText"), IsVisible = false };
+        var open = MonitorButton("Open");
+        var share = MonitorButton("Share");
+        var save = MonitorButton("Save to gallery");
+        open.Clicked += async (_, _) => await OpenVisualPhotoAsync(path);
+        share.Clicked += async (_, _) =>
+        {
+            try { await Share.Default.RequestAsync(new ShareFileRequest("Camera photo", new ShareFile(path, "image/jpeg"))); }
+            catch (Exception ex) { await Host.AskAsync("Couldn't share the photo", ex.Message, "OK"); }
+        };
+        save.Clicked += async (_, _) =>
+        {
+            save.IsEnabled = false;
+            try
+            {
+                status.Text = await PictureGallery.SavePhotoAsync(path, "camera-photo-" + at.ToLocalTime().ToString("yyyyMMdd-HHmmss") + ".jpg");
+                status.IsVisible = true;
+            }
+            catch (Exception ex) { await Host.AskAsync("Couldn't save the photo", ex.Message, "OK"); save.IsEnabled = true; }
+        };
+        var buttons = CaptureButtons(open, share, save, capture.Kept ? null : KeepInChatButton(capture, reply, caption));
+        return new VerticalStackLayout
+        {
+            Spacing = 4, Margin = new Thickness(6, 4), HorizontalOptions = LayoutOptions.Start,
+            Children = { image, caption, buttons, status }
+        };
+    }
+
+    // A card's buttons, wrapping to the next line rather than squeezed: a squeezed "Full screen" was cut to "Full screer" on an iPad.
+    private static FlexLayout CaptureButtons(params Button[] buttons)
+    {
+        var layout = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, MaximumWidthRequest = 320, HorizontalOptions = LayoutOptions.Start };
+        foreach (Button button in buttons)
+        {
+            if (button == null) continue;
+            button.Margin = new Thickness(0, 0, 6, 4);
+            FlexLayout.SetShrink(button, 0);
+            layout.Children.Add(button);
+        }
+        return layout;
     }
 
     // A small JPEG for the card: the photo decoded at a fraction of its size (a full-size bitmap of a 12 MP photo is ~48 MB).
@@ -133,16 +157,6 @@ public sealed partial class CameraFeature
     {
         try { await Launcher.Default.OpenAsync(new OpenFileRequest("Camera photo", new ReadOnlyFile(path, "image/jpeg"))); }
         catch (Exception ex) { await Host.AskAsync("Couldn't open the photo", ex.Message, "OK"); }
-    }
-
-    private void ClearVisualPhotos()
-    {
-        while (_visualPhotos.Count > 0)
-        {
-            var photo = _visualPhotos.Dequeue();
-            Host.RemoveCard(photo.Row);
-            try { File.Delete(photo.Path); } catch (Exception) { }
-        }
     }
 }
 #endif

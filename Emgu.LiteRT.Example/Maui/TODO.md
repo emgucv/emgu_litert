@@ -581,3 +581,15 @@ on the CPU), and a run on a Galaxy S10. Still open:
 - [ ] Reading the descriptions aloud (the microphone would hear them: mute it while speaking).
 - [ ] Saving a session as a chat or a note; opening the page from the chat ("tell me what you see and hear"); running
   it through the Mac's server (item 29).
+
+## 61. The camera panel's capture strip and Keep in chat
+
+The pictures and clips the camera actions take appear under the live preview, in one row with the newest on the
+left, as well as in the chat, and "Keep in chat" saves one with the chat (how it works in [FEATURES.md](FEATURES.md),
+"Camera and sound monitors"). Done: `CameraCaptures` and its tests, the strip, Keep and restoring kept captures, checked
+on the iPad Air (2026-11-08). Still open:
+
+- [ ] A device run of a cap pushing out the oldest photo (unit-tested), and of a private chat (no Keep button).
+- [ ] The Galaxy S10 (photos and clips through Camera2) and Mac Catalyst (snapshots with OpenCV's camera).
+- [ ] The snapshot viewer's "Save snapshot…" button is cut off at the bottom of the sheet on the iPad (seen 2026-11-08;
+  the viewer is older than the strip).

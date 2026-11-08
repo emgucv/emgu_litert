@@ -1039,6 +1039,7 @@ namespace Emgu.LiteRT.LM.Chat.Sqlite
                 case "audio/mpeg": return ".mp3";
                 case "audio/flac": return ".flac";
                 case "audio/mp4": return ".m4a";
+                case "video/mp4": return ".mp4";
                 default: return mediaType != null && mediaType.StartsWith("audio", StringComparison.Ordinal) ? ".wav" : ".bin";
             }
         }

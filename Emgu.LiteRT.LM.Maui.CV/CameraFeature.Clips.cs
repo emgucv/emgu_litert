@@ -2,19 +2,19 @@
 #if ANDROID || (IOS && !MACCATALYST)
 using System.IO;
 using Emgu.LiteRT.LM.Agents.Events;
+using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.Models.CV.Maui;
 
 namespace Emgu.LiteRT.LM.Maui.CV;
 
 // The record_clip alert action (TODO item 43): a few seconds of video from the live camera (Camera2 or AVFoundation, LiveCamera.RecordClipAsync), with sound when the
-// microphone is allowed, shown in the transcript with the first frame, Play (in the card, InlineVideoView) / Full screen / Share / Save to gallery. Session only, like the snapshots: the clips
-// live in the app's cache folder, the latest five are kept, New chat deletes them, and nothing is sent to the model.
+// microphone is allowed, shown in the transcript with the first frame, Play (in the card, InlineVideoView) / Full screen / Share / Save to gallery / Keep in chat,
+// and in the camera panel's strip. Session only unless kept, like the snapshots: the clips live in the app's cache folder, the latest five are kept
+// (CameraCaptures), New chat deletes them, and nothing is sent to the model.
 public sealed partial class CameraFeature
 {
-    private readonly Queue<(View Row, string Path, Action Stop)> _visualClips = new();
     private Action _stopPlayingClip;   // the one clip that plays in the chat now
-    private const int MaximumVisualClips = 5;
 
     private Task RecordVisualClipAsync(VisualEvent occurrence, int seconds, CancellationToken token) =>
         RecordClipAsync(() => _visualRuntime.Snapshot().FirstOrDefault(m => m.Id == occurrence.MonitorId)?.Condition, seconds, token);
@@ -46,127 +46,130 @@ public sealed partial class CameraFeature
                 token.ThrowIfCancellationRequested();
                 return;
             }
-            string condition = cause();
-            var image = new Image { Aspect = Aspect.AspectFit };
-            if (thumbnail != null) image.Source = CvViews.ToImageSource(thumbnail);
-            SemanticProperties.SetDescription(image, "Camera clip. Tap to play.");
-            var host = new Grid { HeightRequest = 150, WidthRequest = 210, HorizontalOptions = LayoutOptions.Start, BackgroundColor = CvViews.Color("ChatRowBorder"), Children = { image } };
-            string size = (clip.Bytes / 1048576.0).ToString("0.0") + " MB";
-            var caption = new Label
+            var capture = new CameraCapture(CameraCaptureKind.Clip, at, cause(), path: clip.Path, thumbnail: SmallJpeg(thumbnail))
             {
-                Text = "Camera clip · " + at.ToString("HH:mm:ss") + " · " + Math.Round(clip.Duration.TotalSeconds) + " s · " + size +
-                    (clip.WithAudio ? " · with sound" : " · no sound (microphone not allowed)") + "\n" + condition + "\nSession only",
-                FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText")
+                Duration = clip.Duration, WithSound = clip.WithAudio
             };
-            var status = new Label { FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText"), IsVisible = false };
-            var progress = new ProgressBar { WidthRequest = 150, VerticalOptions = LayoutOptions.Center, ProgressColor = ChatResources.FindColor("ChatAccent") };
-            var time = new Label { FontSize = 11, TextColor = CvViews.Color("ChatSecondaryText"), VerticalOptions = LayoutOptions.Center };
-            var position = new HorizontalStackLayout { Spacing = 8, IsVisible = false, Children = { progress, time } };
-            var play = MonitorButton("Play");
-            var fullScreen = MonitorButton("Full screen");
-            var share = MonitorButton("Share");
-            var save = MonitorButton("Save to gallery");
-
-            // Playing in the card: the video replaces the thumbnail; the end, an error, another clip or New chat put the thumbnail back.
-            InlineVideoView video = null;
-            IDispatcherTimer timer = null;
-            bool muted = false;
-            void StopPlayback()
-            {
-                if (_stopPlayingClip == StopPlayback) _stopPlayingClip = null;
-                timer?.Stop(); timer = null;
-                if (video != null) { try { video.Stop(); } catch (Exception) { } host.Children.Remove(video); video = null; }
-                image.IsVisible = true;
-                host.HeightRequest = 150;
-                position.IsVisible = false;
-                play.Text = "Play";
-                if (muted) { muted = false; EndSoundMute(); }
-            }
-            void StartPlayback()
-            {
-                _stopPlayingClip?.Invoke();
-                _stopPlayingClip = StopPlayback;
-                video = new InlineVideoView { Source = clip.Path };
-                video.Prepared += (duration, width, height) =>
-                {
-                    // A portrait clip needs a taller box than the thumbnail's.
-                    host.HeightRequest = height > width ? 300 : 150;
-                    time.Text = FormatClipTime(0) + " / " + FormatClipTime(duration);
-                    position.IsVisible = true;
-                    video.Play();
-                };
-                video.Completed += StopPlayback;
-                video.Failed += message => { StopPlayback(); status.Text = message + " Try Full screen."; status.IsVisible = true; };
-                host.Children.Add(video);
-                image.IsVisible = false;
-                play.Text = "Pause";
-                // A sound monitor would hear the clip: it doesn't listen while one plays.
-                muted = true; BeginSoundMute();
-                timer = Host.Page.Dispatcher.CreateTimer();
-                timer.Interval = TimeSpan.FromMilliseconds(250);
-                timer.Tick += (_, _) =>
-                {
-                    if (video == null) return;
-                    int length = (int)Math.Round(clip.Duration.TotalMilliseconds);
-                    int at = video.PositionMs;
-                    progress.Progress = Math.Clamp(at / Math.Max(1.0, length), 0, 1);
-                    time.Text = FormatClipTime(at) + " / " + FormatClipTime(length);
-                };
-                timer.Start();
-            }
-            void Toggle()
-            {
-                status.IsVisible = false;
-                if (video == null) StartPlayback();
-                else if (video.IsPlaying) { video.Pause(); play.Text = "Play"; }
-                else { video.Play(); play.Text = "Pause"; }
-            }
-            image.OnTap(Toggle);
-            play.Clicked += (_, _) => Toggle();
-            fullScreen.Clicked += async (_, _) =>
-            {
-                StopPlayback();
-                await PlayVisualClipAsync(clip.Path);
-            };
-            share.Clicked += async (_, _) =>
-            {
-                try { await Share.Default.RequestAsync(new ShareFileRequest("Camera clip", new ShareFile(clip.Path, "video/mp4"))); }
-                catch (Exception ex) { await Host.AskAsync("Couldn't share the clip", ex.Message, "OK"); }
-            };
-            save.Clicked += async (_, _) =>
-            {
-                save.IsEnabled = false;
-                try
-                {
-                    status.Text = await PictureGallery.SaveVideoAsync(clip.Path, "camera-clip-" + at.ToString("yyyyMMdd-HHmmss") + ".mp4");
-                    status.IsVisible = true;
-                }
-                catch (Exception ex) { await Host.AskAsync("Couldn't save the clip", ex.Message, "OK"); save.IsEnabled = true; }
-            };
-            var buttons = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, MaximumWidthRequest = 300, HorizontalOptions = LayoutOptions.Start };
-            // Not shrunk to fit a line (FlexLayout's default): a squeezed "Full screen" was cut to "Full screer" on an iPad; it
-            // goes to the next line instead.
-            foreach (Button button in new[] { play, fullScreen, share, save })
-            {
-                button.Margin = new Thickness(0, 0, 6, 4);
-                FlexLayout.SetShrink(button, 0);
-                buttons.Children.Add(button);
-            }
-            var row = new VerticalStackLayout
-            {
-                Spacing = 4, Margin = new Thickness(6, 4), HorizontalOptions = LayoutOptions.Start,
-                Children = { host, position, caption, buttons, status }
-            };
-            Host.AddCardToReply(row);
-            _visualClips.Enqueue((row, clip.Path, StopPlayback));
-            while (_visualClips.Count > MaximumVisualClips)
-            {
-                var old = _visualClips.Dequeue();
-                old.Stop();
-                Host.RemoveCard(old.Row);
-                try { File.Delete(old.Path); } catch (Exception) { }
-            }
+            ChatMessageItem reply = CaptureReply();
+            View card = ClipCard(capture, thumbnail, reply, out Action stop);
+            Host.AddCardToReply(card);
+            AddCapture(capture, new CaptureViews { Card = card, Reply = reply, Stop = stop });
         });
+    }
+
+    // A clip's card: the thumbnail that plays in place (tap or Play), its time, length, size and cause, Full screen, Share, Save to
+    // gallery, and Keep in chat (for a live one with a reply); stop stops it playing. A restored one plays from its copy in the cache.
+    private View ClipCard(CameraCapture capture, byte[] thumbnail, ChatMessageItem reply, out Action stop)
+    {
+        string path = capture.Path;
+        DateTimeOffset at = capture.TakenAt;
+        var image = new Image { Aspect = Aspect.AspectFit };
+        if (thumbnail != null) image.Source = CvViews.ToImageSource(thumbnail);
+        SemanticProperties.SetDescription(image, "Camera clip. Tap to play.");
+        var host = new Grid { HeightRequest = 150, WidthRequest = 210, HorizontalOptions = LayoutOptions.Start, BackgroundColor = CvViews.Color("ChatRowBorder"), Children = { image } };
+        long bytes = 0;
+        try { bytes = new FileInfo(path).Length; } catch (Exception) { }
+        string size = (bytes / 1048576.0).ToString("0.0") + " MB";
+        var caption = new Label
+        {
+            Text = "Camera clip · " + at.ToLocalTime().ToString("HH:mm:ss") + " · " + Math.Round(capture.Duration.TotalSeconds) + " s · " + size +
+                (capture.WithSound ? " · with sound" : " · no sound (microphone not allowed)") +
+                (string.IsNullOrEmpty(capture.Condition) ? "" : "\n" + capture.Condition) + "\n" + CaptureKeptText(capture.Kept),
+            FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText")
+        };
+        var status = new Label { FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText"), IsVisible = false };
+        var progress = new ProgressBar { WidthRequest = 150, VerticalOptions = LayoutOptions.Center, ProgressColor = ChatResources.FindColor("ChatAccent") };
+        var time = new Label { FontSize = 11, TextColor = CvViews.Color("ChatSecondaryText"), VerticalOptions = LayoutOptions.Center };
+        var position = new HorizontalStackLayout { Spacing = 8, IsVisible = false, Children = { progress, time } };
+        var play = MonitorButton("Play");
+        var fullScreen = MonitorButton("Full screen");
+        var share = MonitorButton("Share");
+        var save = MonitorButton("Save to gallery");
+
+        // Playing in the card: the video replaces the thumbnail; the end, an error, another clip or New chat put the thumbnail back.
+        InlineVideoView video = null;
+        IDispatcherTimer timer = null;
+        bool muted = false;
+        void StopPlayback()
+        {
+            if (_stopPlayingClip == StopPlayback) _stopPlayingClip = null;
+            timer?.Stop(); timer = null;
+            if (video != null) { try { video.Stop(); } catch (Exception) { } host.Children.Remove(video); video = null; }
+            image.IsVisible = true;
+            host.HeightRequest = 150;
+            position.IsVisible = false;
+            play.Text = "Play";
+            if (muted) { muted = false; EndSoundMute(); }
+        }
+        void StartPlayback()
+        {
+            _stopPlayingClip?.Invoke();
+            _stopPlayingClip = StopPlayback;
+            video = new InlineVideoView { Source = path };
+            video.Prepared += (duration, width, height) =>
+            {
+                // A portrait clip needs a taller box than the thumbnail's.
+                host.HeightRequest = height > width ? 300 : 150;
+                time.Text = FormatClipTime(0) + " / " + FormatClipTime(duration);
+                position.IsVisible = true;
+                video.Play();
+            };
+            video.Completed += StopPlayback;
+            video.Failed += message => { StopPlayback(); status.Text = message + " Try Full screen."; status.IsVisible = true; };
+            host.Children.Add(video);
+            image.IsVisible = false;
+            play.Text = "Pause";
+            // A sound monitor would hear the clip: it doesn't listen while one plays.
+            muted = true; BeginSoundMute();
+            timer = Host.Page.Dispatcher.CreateTimer();
+            timer.Interval = TimeSpan.FromMilliseconds(250);
+            timer.Tick += (_, _) =>
+            {
+                if (video == null) return;
+                int length = (int)Math.Round(capture.Duration.TotalMilliseconds);
+                int at = video.PositionMs;
+                progress.Progress = Math.Clamp(at / Math.Max(1.0, length), 0, 1);
+                time.Text = FormatClipTime(at) + " / " + FormatClipTime(length);
+            };
+            timer.Start();
+        }
+        void Toggle()
+        {
+            status.IsVisible = false;
+            if (video == null) StartPlayback();
+            else if (video.IsPlaying) { video.Pause(); play.Text = "Play"; }
+            else { video.Play(); play.Text = "Pause"; }
+        }
+        image.OnTap(Toggle);
+        play.Clicked += (_, _) => Toggle();
+        fullScreen.Clicked += async (_, _) =>
+        {
+            StopPlayback();
+            await PlayVisualClipAsync(path);
+        };
+        share.Clicked += async (_, _) =>
+        {
+            try { await Share.Default.RequestAsync(new ShareFileRequest("Camera clip", new ShareFile(path, "video/mp4"))); }
+            catch (Exception ex) { await Host.AskAsync("Couldn't share the clip", ex.Message, "OK"); }
+        };
+        save.Clicked += async (_, _) =>
+        {
+            save.IsEnabled = false;
+            try
+            {
+                status.Text = await PictureGallery.SaveVideoAsync(path, "camera-clip-" + at.ToLocalTime().ToString("yyyyMMdd-HHmmss") + ".mp4");
+                status.IsVisible = true;
+            }
+            catch (Exception ex) { await Host.AskAsync("Couldn't save the clip", ex.Message, "OK"); save.IsEnabled = true; }
+        };
+        var buttons = CaptureButtons(play, fullScreen, share, save, capture.Kept ? null : KeepInChatButton(capture, reply, caption));
+        var row = new VerticalStackLayout
+        {
+            Spacing = 4, Margin = new Thickness(6, 4), HorizontalOptions = LayoutOptions.Start,
+            Children = { host, position, caption, buttons, status }
+        };
+        stop = StopPlayback;
+        return row;
     }
 
     private static string FormatClipTime(int milliseconds) => (milliseconds / 60000) + ":" + (milliseconds / 1000 % 60).ToString("00");
@@ -211,15 +214,5 @@ public sealed partial class CameraFeature
         catch (Exception ex) { await Host.AskAsync("Couldn't play the clip", ex.Message, "OK"); }
     }
 
-    private void ClearVisualClips()
-    {
-        while (_visualClips.Count > 0)
-        {
-            var clip = _visualClips.Dequeue();
-            clip.Stop();
-            Host.RemoveCard(clip.Row);
-            try { File.Delete(clip.Path); } catch (Exception) { }
-        }
-    }
 }
 #endif

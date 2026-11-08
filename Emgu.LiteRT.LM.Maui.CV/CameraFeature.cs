@@ -193,11 +193,7 @@ public sealed partial class CameraFeature : CvFeature
         ClearSoundMonitors();
         ForgetMonitorRequests();
         ClearCameraTurn();
-        ClearVisualSnapshots();
-#if ANDROID || (IOS && !MACCATALYST)
-        ClearVisualClips();
-        ClearVisualPhotos();
-#endif
+        ClearCaptures();
     }
 
     /// <inheritdoc/>
@@ -263,7 +259,7 @@ public sealed partial class CameraFeature : CvFeature
             Content = new VerticalStackLayout { Children = { _cameraOverlayCount, _cameraOverlayDetail } }
         };
         var previewArea = new Grid { Children = { _cameraPreview, _cameraOverlay } };
-        _cameraPanel = CvViews.Card(new VerticalStackLayout { Spacing = 4, Children = { header, previewArea, footer } }, 8);
+        _cameraPanel = CvViews.Card(new VerticalStackLayout { Spacing = 4, Children = { header, previewArea, BuildCaptureStrip(), footer } }, 8);
         _cameraPanel.WidthRequest = 270;
         _cameraPanel.HorizontalOptions = LayoutOptions.End;
         _cameraPanel.VerticalOptions = LayoutOptions.Start;
@@ -286,13 +282,14 @@ public sealed partial class CameraFeature : CvFeature
         if (_cameraMaximized)
         {
             _cameraPanel.WidthRequest = Math.Max(180, ChatSize.Width - 16);
-            _cameraPreview.HeightRequest = Math.Max(70, ChatSize.Height - 16 - 110);
+            _cameraPreview.HeightRequest = Math.Max(70, ChatSize.Height - 16 - 110 - CaptureStripHeight);
         }
         else
         {
             _cameraPanel.WidthRequest = Math.Min(270, Math.Max(180, ChatSize.Width - 16));
-            _cameraPreview.HeightRequest = Math.Min(170, Math.Max(70, ChatSize.Height - 100));
+            _cameraPreview.HeightRequest = Math.Min(170, Math.Max(70, ChatSize.Height - 100 - CaptureStripHeight));
         }
+        UpdateCaptureThumbnailSizes();
         MoveCameraPanel(_cameraPanel.TranslationX, _cameraPanel.TranslationY);
     }
 

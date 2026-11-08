@@ -72,6 +72,7 @@
     <Compile Include="..\UnitTestBackgroundDownloads.cs" Link="UnitTestBackgroundDownloads.cs" />
     <Compile Include="..\UnitTestWorkloadPolicy.cs" Link="UnitTestWorkloadPolicy.cs" />
     <Compile Include="..\UnitTestSceneNarrator.cs" Link="UnitTestSceneNarrator.cs" />
+    <Compile Include="..\UnitTestCameraCaptures.cs" Link="UnitTestCameraCaptures.cs" />
     <Compile Include="..\UnitTestVoiceConversation.cs" Link="UnitTestVoiceConversation.cs" />
     <Compile Include="..\UnitTestDeviceActions.cs" Link="UnitTestDeviceActions.cs" />
     <Compile Include="..\UnitTestAgentGoals.cs" Link="UnitTestAgentGoals.cs" />

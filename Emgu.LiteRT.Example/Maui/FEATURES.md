@@ -1007,6 +1007,23 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   `CameraChimeAction("camera_click.wav")`, inside the sound mute) unless Settings > "Camera sounds" is off (TODO item 50);
   clips are silent. The planner answers "take a photo when you see a person" with `take_snapshot` (`take_photo` is for a
   full-resolution or high-quality photo), which is why the iPad's first alert picture was silent (TODO item 59).
+- The camera panel's capture strip (TODO item 61, 2026-11-08): the snapshots, photos and clips the camera actions take show
+  as small thumbnails in one row under the live preview, the newest on the left (a clip with a ▶ and its length), as
+  well as their cards in the transcript. Tapping one opens the same viewer as its card. `Emgu.LiteRT.LM.Agents`'
+  `CameraCaptures` is the one list both follow (newest first, at most 20 snapshots, 5 photos and 5 clips not kept, 40
+  in all; `UnitTestCameraCaptures`), so a thumbnail and its card leave together and an old photo or clip file is
+  deleted in one place (`Removed`). The strip (`CameraFeature.CaptureStrip.cs`) uses 240 px thumbnails, 56 px high in
+  the small panel and 72 px maximized; it scrolls back to the newest unless the user scrolled it in the last 4 s.
+  Closing the camera hides it with the panel and the cards stay; a new chat clears both.
+  - "Keep in chat" on a card saves the capture with the reply (`AddCardToSavedReplyAsync`, saved file kinds
+    `camera_snapshot`, `camera_photo`, `camera_clip`; the media type carries the time, condition, size and clip length,
+    `CameraCaptureFile`), never given to the model; a kept capture no longer counts toward the caps, and reopening the
+    chat restores its card (`CameraFeature.RestoreSavedFile`; a photo or clip is written to the cache's `kept/` folder
+    to open, share or play). Everything else stays session only. No Keep in a private chat or before the first reply.
+  - Checked on the iPad Air M4 (2026-11-08, with a self-test taking two snapshots, a photo and a clip): newest on the
+    left, a thumbnail opening the photo's and the snapshot's viewers, maximize and restore, a new chat clearing
+    the strip and cards, and a kept photo and clip back after reopening the chat (the clip played), the snapshots not
+    kept gone. Not yet run: eviction past a cap on a device (unit-tested), a private chat, the S10, Catalyst.
 - On Android the live camera runs through Camera2 (`Emgu.LiteRT.Models.CV.Maui/LiveCamera.Camera2.cs`, moved out of the demo on 2026-10-25; OpenCV's camera is the fallback). A 640x480 YUV
   reader feeds the preview and the detectors.
   - The `record_clip` visual-alert action (TODO item 43) adds a `MediaRecorder` surface by configuring the session again for
