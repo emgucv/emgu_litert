@@ -28,39 +28,48 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   model on a background thread.
 - Verified on the Pixel Fold: the first load took 11 s (9 s of it a one-time hash) with no UI stall; later loads take under
   3 s.
-- On an iPhone 12 (2026-11-08, iPhone13,2, iOS 27.2, 4 GB of RAM - the smallest Apple device tried): Gemma 4 E2B,
-  copied from the Mac with its `.sha256ok` (`README.md`, "iOS"), loaded and chatted. The iOS build's memory
-  entitlements are in its profile for this phone too, but iOS lets the app have only ~2.2 GB here (12.2 GB on the
-  iPad Air). Measured in a temporary self-test (`Chat.SendAsync`, thinking off): on the CPU it loaded in 5.5 s and
-  wrote ~12 tokens/s (3.7 s to the first token of the chat's first reply, under 1 s after); on the GPU (its caches
-  already built) it loaded in 0.8-1.4 s and wrote ~21 tokens/s, slowing to ~18 by the seventh turn of a chat that
-  still remembered the first question; ~1.36 GB was left while it ran on either, and all came back when released.
-  A 720x960 picture alone (the self-test, GPU) was described in 8.7 s with at least 700 MB left, but in the chat page
-  with the camera open, "Take a snapshot." - which Gemma answers with `capture_camera_frame`, the frame sent to the model,
-  not a capture - got the app killed (signal 9, no jetsam report) on the GPU and the CPU, at the picture's encoding
-  (2394 patches). Fixed on 2026-11-09 (below). Measured in the chat page (a temporary self-test, GPU, 8192-token context): 1834 MB
-  left with the model loaded; the first message ("Open the camera.", with the chat's instructions and tools) brought it
-  to ~535 MB, and it stayed there after the reply; opening the camera cost almost nothing; the frame's encoding then
-  went from 468 to 111 MB left in 0.1 s and the app was killed. Why the first message costs so much: the model has two
-  prefill signatures, 128 and 1024 tokens, and on the GPU LiteRT-LM prefills any prompt of 512 tokens or more with
-  `prefill_1024` (`GetOptimizedPrefillWorkGroups`), whose buffers stay allocated for the engine's life. Measured
-  (2026-11-09, a temporary self-test, GPU): a 290- or 452-token first prompt took 1877 -> 1359 MB left (~520 MB, the
-  same after both), a 704-token one 2021 -> 758 MB (~1.26 GB), and a 290-token one after it nothing more. The picture
-  itself needs ~650 MB: after the short prompts it went 1359 -> 696 MB at the least and was described. The chat's first
-  prompt, with its instructions and tools, is over 512 tokens. LiteRT-LM can limit the model to chosen signatures
-  (`LlmExecutorSettings::SetSelectedSignatures`, e.g. decode and `prefill_128`), but not through the C API. The fix:
-  `omniextern_engine_settings_set_selected_signatures` sets it (`EngineSettings.SelectedSignatures`), `Gemma4.SmallPrefillOnly`
-  keeps the model to `prefill_128` on the GPU, and `ChatDevicePlatform.LowMemory` (iOS devices under 5 GB) turns it on for
-  the catalog's Gemma 4. On the iPhone 12 (2026-11-09): the 704-token prompt then kept ~220 MB instead of ~1.25 GB, its
-  first token came at 3.2 s against 3.5 s, and a picture after it was described (8.0 s, 1008 MB left at the least); in
-  the chat page the first message took 1969 -> 1453 MB, and "What do you see through the camera?" was answered with
-  784 MB left at the least (the phone lay face down: "very dark"). The captures themselves worked at the phone's width (2026-11-09, through WebDriverAgent:
-  a sound monitor for speech taking photos, the Mac speaking): two photos in the strip, the photo viewer with its four
-  buttons on one line, a switch to the selfie camera and back adding no row, Close adding the row "Camera · 2 pictures"
-  on the reply, and Keep all marking both. Seen on the way: the sound monitor card covers the message box and the chips
-  at this width, and Gemma made "record a 5 second clip" into playing 'white noise' for 5 s. `EngineSettings.MaxVisionTokensPerImage` (70 or 140) doesn't
-  help in LiteRT-LM v0.19.0: the Gemma 4 preprocessor still sizes every picture to the model's 2520 patches (it enlarges
-  small ones too), then finds no encoder that small ("No signature found with prefix vision_ ...").
+- On an iPhone 12 (iPhone13,2, iOS 27.2, 4 GB of RAM - the smallest Apple device tried), Gemma 4 E2B, copied from the
+  Mac with its `.sha256ok` (`README.md`, "iOS"), loads and chats. Measured with temporary self-tests (`Chat.SendAsync`,
+  thinking off, 8192-token context) and WebDriverAgent, 2026-11-08/09:
+  - Memory: the build's memory entitlements are in its profile for this phone too, but iOS lets the app have only
+    ~2.2 GB here (12.2 GB on the iPad Air).
+  - Speed: on the CPU it loaded in 5.5 s and wrote ~12 tokens/s (3.7 s to the first token of the chat's first reply,
+    under 1 s after); on the GPU (its caches already built) it loaded in 0.8-1.4 s and wrote ~21 tokens/s, slowing to
+    ~18 by the seventh turn of a chat that still remembered the first question. ~1.36 GB was left while it ran on
+    either, and all came back when released.
+  - A picture: a 720x960 one was described in 8.0-8.7 s on the GPU; its encoding needs ~650 MB.
+  - The first prompt's cost: the model has two prefill signatures, 128 and 1024 tokens, and on the GPU LiteRT-LM
+    prefills any prompt of 512 tokens or more with `prefill_1024` (`GetOptimizedPrefillWorkGroups`), whose buffers stay
+    allocated for the engine's life. The chat's first prompt, with its instructions and tools, is over 512 tokens.
+    Memory left (GPU):
+
+    | | Before | After |
+    |---|---|---|
+    | 290- or 452-token first prompt | 1877 MB | 1359 MB (~520 MB used; nothing more for the second) |
+    | 704-token first prompt | 2021 MB | 758 MB (~1.26 GB; a 290-token prompt after it nothing more) |
+    | the same with `SmallPrefillOnly` | 1895 MB | 1671 MB (~220 MB; first token 3.2 s against 3.5 s) |
+    | a picture after the short prompts | 1359 MB | 696 MB at the least, described |
+    | a picture after the 704-token prompt, `SmallPrefillOnly` | 1671 MB | 1008 MB at the least, described in 8.0 s |
+    | chat page: the first message ("Open the camera.") | 1834 MB | ~535 MB |
+    | chat page, `SmallPrefillOnly` | 1969 MB | 1453 MB |
+    | opening the camera | | almost nothing |
+
+  - The crash, fixed on 2026-11-09: in the chat page with the camera open, "Take a snapshot." - which Gemma answers with
+    `capture_camera_frame`, the frame sent to the model, not a capture - got the app killed (signal 9, no jetsam report)
+    on the GPU and the CPU at the picture's encoding (2394 patches): it went from 468 to 111 MB left in 0.1 s. The fix:
+    LiteRT-LM can limit the model to chosen signatures (`LlmExecutorSettings::SetSelectedSignatures`), but not through
+    the C API, so `omniextern_engine_settings_set_selected_signatures` sets it (`EngineSettings.SelectedSignatures`),
+    `Gemma4.SmallPrefillOnly` keeps the model to `prefill_128` on the GPU, and `ChatDevicePlatform.LowMemory` (iOS
+    devices under 5 GB) turns it on for the catalog's Gemma 4. Then "What do you see through the camera?" was answered
+    with 784 MB left at the least (the phone lay face down: "very dark").
+  - `EngineSettings.MaxVisionTokensPerImage` (70 or 140) doesn't help in LiteRT-LM v0.19.0: the Gemma 4 preprocessor
+    still sizes every picture to the model's 2520 patches (it enlarges small ones too), then finds no encoder that small
+    ("No signature found with prefix vision_ ...").
+  - The captures at the phone's width (through WebDriverAgent, a sound monitor for speech taking photos while the Mac
+    spoke): two photos in the strip, the photo viewer with its four buttons on one line, a switch to the selfie camera
+    and back adding no row, Close adding the row "Camera · 2 pictures" on the reply, and Keep all marking both. Seen on
+    the way: the sound monitor card covers the message box and the chips at this width, and Gemma made "record a 5
+    second clip" into playing 'white noise' for 5 s.
 - `Chat.SendAsync` and `LiteRtLmChatClient` create their LiteRT-LM conversation on a background thread: on the caller's (UI)
   thread it stalled the demo for ~2.5 s after Send on a Pixel Fold, which the stall watchdog found.
 
