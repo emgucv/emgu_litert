@@ -11,7 +11,7 @@
     <EmguTfLiteCatalystNativeFile>$(EmguTfLiteCatalystBinaryDir)\libtfliteextern.dylib</EmguTfLiteCatalystNativeFile>
     <EmguLiteRtCatalystNativeFile>$(EmguTfLiteCatalystBinaryDir)\libLiteRt.dylib</EmguLiteRtCatalystNativeFile>
     <EmguTfLiteLinkTarget>MAUI MacCatalyst Library</EmguTfLiteLinkTarget>
-    <EmguTfLiteMauiMacErrorMessage Condition="!Exists('$(EmguTfLiteCatalystNativeFile)') Or !Exists('$(EmguLiteRtCatalystNativeFile)')">This package does not contain the native binaries for $(EmguTfLiteLinkTarget): $(EmguTfLiteCatalystNativeFile) or $(EmguLiteRtCatalystNativeFile) is missing - run platforms/macos/bazel_build_tflite_macos_fat.</EmguTfLiteMauiMacErrorMessage>
+    <EmguTfLiteMauiMacErrorMessage Condition="!Exists('$(EmguTfLiteCatalystNativeFile)') Or !Exists('$(EmguLiteRtCatalystNativeFile)')">This package does not contain the native binaries for $(EmguTfLiteLinkTarget): $(EmguTfLiteCatalystNativeFile) or $(EmguLiteRtCatalystNativeFile) is missing - run platforms/macos/bazel_build_macos_fat.</EmguTfLiteMauiMacErrorMessage>
     <BaseOutputPath>$(TfLiteBinaryDir)\Build\$(AssemblyName)\$(Platform)\</BaseOutputPath>
     </PropertyGroup>
 
@@ -23,7 +23,7 @@
   </ItemGroup>
 
     <!-- The macOS libtfliteextern.dylib and the libLiteRt.dylib it links (universal: arm64 and x86_64), from
-         platforms/macos/bazel_build_tflite_macos_fat, as on macOS: a Mac Catalyst app can't link a macOS library, but
+         platforms/macos/bazel_build_macos_fat, as on macOS: a Mac Catalyst app can't link a macOS library, but
          it loads one at run time, from Contents/MonoBundle, where DllImport("tfliteextern") and Emgu.LiteRT's
          DllImport("libLiteRt") find them - the same way it loads LiteRT-LM's macOS dylibs (Emgu.LiteRT.LM.runtime.maui.macos).
          Until 2026-11-09 Catalyst had its own static tfliteextern (platforms/ios/cmake_build_tflite_catalyst), with a

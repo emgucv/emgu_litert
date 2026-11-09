@@ -1,0 +1,6 @@
+#!/bin/bash -v
+
+cd "$(dirname "$0")"
+
+./bazel_build_macos darwin_arm64 || exit 1
+./bazel_build_macos darwin || exit 1

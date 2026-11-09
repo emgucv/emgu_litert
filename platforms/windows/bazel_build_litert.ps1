@@ -13,13 +13,13 @@
     `call %ENV_SETUP_SCRIPT%`.
 
     Builds in the LiteRT-LM submodule's Bazel workspace rather than the `litert` submodule's -
-    the same switch already made for bazel_build_tflite_macos and
+    the same switch already made for bazel_build_macos and
     platforms/android/bazel_build_tflite_android, and for the same reason: LiteRT-LM's WORKSPACE
     fetches LiteRT as the external repository @litert, pinned to a newer commit than the `litert`
     submodule's own v2.2.0 tag.
 
     For Arch "64" only, also builds liblitert-lm.dll (LiteRT-LM's C API), the same way
-    bazel_build_tflite_macos and platforms/android/bazel_build_tflite_android do: via
+    bazel_build_macos and platforms/android/bazel_build_tflite_android do: via
     //c:litert-lm with --define=litert_runtime_link_mode=dynamic (so it links against the
     libLiteRt.dll built above instead of bundling LiteRT's runtime itself), copied alongside
     LiteRT-LM's prebuilt libGemmaModelConstraintProvider.dll (prebuilt/windows_x86_64/, Git LFS -
@@ -266,7 +266,7 @@ if ($BazelVc) { $BazelLlvm = Join-Path $BazelVc "Tools\Llvm\x64" }
 Write-Host "Using BAZEL_LLVM=$BazelLlvm"
 
 # Build in the LiteRT-LM submodule's Bazel workspace, against the LiteRT it pins (its WORKSPACE
-# fetches LiteRT as the external repository @litert) - same as bazel_build_tflite_macos and
+# fetches LiteRT as the external repository @litert) - same as bazel_build_macos and
 # platforms/android/bazel_build_tflite_android. LiteRT-LM is a pristine third-party submodule (we
 # don't own/patch it upstream), so the tfliteextern Bazel package can't live there in git either:
 # stage our tracked source into it here instead, each run. Our BUILD file is written for the
@@ -398,7 +398,7 @@ if ($BuildLitertLm) {
     # containing LiteRT's runtime; the libLiteRt.dll built above (same LiteRT source) is deployed next to it
     # in place of the LiteRt*-only one this build produces. The define isn't part of Bazel's output folder
     # name, so --platform_suffix keeps this from colliding with a non-dynamic build of the same target
-    # under the same (short) output_base - same approach as bazel_build_tflite_macos and
+    # under the same (short) output_base - same approach as bazel_build_macos and
     # platforms/android/bazel_build_tflite_android. Uses $LitertLmBazelArgs (a separate, short
     # output_base/root - see above), not $CommonBazelArgs.
     & $BazelCommand @LitertLmBazelArgs "//c:litert-lm" "//omniextern:omniextern" @GpuTargets "--define=litert_runtime_link_mode=dynamic" "--platform_suffix=-litert_lm_dynamic" "--verbose_failures"

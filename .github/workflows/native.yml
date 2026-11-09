@@ -133,7 +133,7 @@ jobs:
         git -C LiteRT-LM lfs pull
         --include=prebuilt/macos_arm64/libGemmaModelConstraintProvider.dylib,prebuilt/macos_arm64/libLiteRtMetalAccelerator.dylib,prebuilt/macos_arm64/libwebgpu_dawn.dylib
     - name: Build universal libLiteRt.dylib and libtfliteextern.dylib, and arm64 liblitert-lm.dylib
-      run: platforms/macos/bazel_build_tflite_macos_fat
+      run: platforms/macos/bazel_build_macos_fat
     - uses: actions/upload-artifact@v7
       with:
         name: native-macos-universal

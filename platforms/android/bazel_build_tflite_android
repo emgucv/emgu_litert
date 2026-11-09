@@ -48,7 +48,7 @@ mkdir -p lib/android/$arch
 
 # Build in the LiteRT-LM submodule's Bazel workspace, against the LiteRT it pins (its WORKSPACE fetches LiteRT as
 # the external repository @litert), so that libLiteRt.so comes from the same LiteRT source as LiteRT-LM's
-# liblitert-lm.so and one copy can serve both - as platforms/macos/bazel_build_tflite_macos does. LiteRT-LM is a
+# liblitert-lm.so and one copy can serve both - as platforms/macos/bazel_build_macos does. LiteRT-LM is a
 # pristine third-party submodule (we don't own/patch it upstream), so the tfliteextern Bazel package can't live
 # there in git: stage our tracked source into it here instead, each run. Our BUILD file is written for the litert
 # workspace, where LiteRT's packages are local (//tflite/..., //litert/...); rewrite those labels to @litert//...

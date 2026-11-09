@@ -16,7 +16,7 @@
   <!-- There is no Mac Catalyst build of LiteRT-LM: Bazel (rules_apple) has no Mac Catalyst platform, and
        LiteRT-LM's prebuilt libGemmaModelConstraintProvider only exists for macOS, iOS and Android. A Mac Catalyst
        app can't link against a macOS dylib, but it can load one at run time, so this add-on ships the macOS
-       liblitert-lm.dylib built by platforms/macos/bazel_build_tflite_macos (Apple Silicon only), with the
+       liblitert-lm.dylib built by platforms/macos/bazel_build_macos (Apple Silicon only), with the
        libGemmaModelConstraintProvider.dylib and libwebgpu_dawn.dylib it depends on (found through its @loader_path
        rpath), in the app bundle's Contents/MonoBundle, where Emgu.LiteRT.LM's DllImport("liblitert-lm") finds them.
        The libLiteRt.dylib it also links comes from Emgu.LiteRT.runtime.maui.macos, which ships the macOS
@@ -58,6 +58,6 @@
 
   <Target Name="EmguLiteRtLmMauiMacPackageBuildImports" BeforeTargets="PrepareForBuild">
     <Message Text="LiteRT-LM Mac Catalyst library included: '$(EmguLiteRtLmMacLibrary)'" Importance="high" Condition="Exists('$(EmguLiteRtLmMacLibrary)')" />
-    <Warning Text="LiteRT-LM is not available for $(TargetFramework): $(EmguLiteRtLmMacLibrary) is missing - run platforms/macos/bazel_build_tflite_macos darwin_arm64." Condition="!Exists('$(EmguLiteRtLmMacLibrary)')" />
+    <Warning Text="LiteRT-LM is not available for $(TargetFramework): $(EmguLiteRtLmMacLibrary) is missing - run platforms/macos/bazel_build_macos darwin_arm64." Condition="!Exists('$(EmguLiteRtLmMacLibrary)')" />
   </Target>
 </Project>

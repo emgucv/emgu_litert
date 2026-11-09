@@ -909,7 +909,7 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
     </ItemGroup>")
   ENDIF()
   # Emgu.LiteRT.LM.runtime.maui.macos (Mac Catalyst, which loads the macOS liblitert-lm.dylib built by
-  # platforms/macos/bazel_build_tflite_macos darwin_arm64) the same way, with the maccatalyst TargetFramework.
+  # platforms/macos/bazel_build_macos darwin_arm64) the same way, with the maccatalyst TargetFramework.
   SET(EMGU_LITERT_LM_MAUI_MACCATALYST_TFM "")
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/liblitert-lm.dylib")
     SET(EMGU_LITERT_LM_MAUI_MACCATALYST_TFM ";net${DOTNET_VERSION_MAJOR}.0-maccatalyst${IOS_TFM_VERSION}")
@@ -1089,13 +1089,13 @@ ENDIF()
 IF(HAVE_OSX_LITE)
   SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libtfliteextern.dylib\" target=\"runtimes\\osx\\native\" />")
-  # LiteRT's own runtime (built by platforms/macos/bazel_build_tflite_macos_fat, universal), P/Invoked directly by the
+  # LiteRT's own runtime (built by platforms/macos/bazel_build_macos_fat, universal), P/Invoked directly by the
   # Emgu.LiteRT classes. Optional: the tfliteextern-based API works without it.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libLiteRt.dylib")
     SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libLiteRt.dylib\" target=\"runtimes\\osx\\native\" />")
   ENDIF()
-  # LiteRT-LM's C API (built by platforms/macos/bazel_build_tflite_macos_fat, Apple Silicon only), P/Invoked directly by
+  # LiteRT-LM's C API (built by platforms/macos/bazel_build_macos_fat, Apple Silicon only), P/Invoked directly by
   # the Emgu.LiteRT.LM classes, plus the prebuilt libGemmaModelConstraintProvider.dylib and (since v0.19.0)
   # libwebgpu_dawn.dylib it depends on. Optional.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/liblitert-lm.dylib")
@@ -1119,7 +1119,7 @@ IF(HAVE_OSX_LITE)
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")	
-  # LiteRT's GPU (Metal) accelerator (a LiteRT-LM prebuilt, copied by platforms/macos/bazel_build_tflite_macos
+  # LiteRT's GPU (Metal) accelerator (a LiteRT-LM prebuilt, copied by platforms/macos/bazel_build_macos
   # darwin_arm64), in its own optional package next to libLiteRt.dylib.
   SET(HAVE_MACOS_LITERT_METAL OFF)
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib")

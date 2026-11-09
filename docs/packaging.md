@@ -49,7 +49,7 @@ The NuGet packages, the native runtime packages and their add-ons, and versionin
   base package they depend on provides them. Verified: the OpenCL package went from 16 to 4.1 MB, the LM package from 37 to
   26 MB, and an Android app referencing only the two add-on packages gets one copy of each library.
 - **Mac Catalyst, Metal.** LiteRT's Metal accelerator `libLiteRtMetalAccelerator.dylib` is a LiteRT-LM prebuilt
-  (`prebuilt/macos_arm64`; arm64, macOS 14+, using only system frameworks). `bazel_build_tflite_macos darwin_arm64` copies it
+  (`prebuilt/macos_arm64`; arm64, macOS 14+, using only system frameworks). `bazel_build_macos darwin_arm64` copies it
   to `lib/runtimes/osx/native/`, and the optional `Emgu.LiteRT.Metal.runtime.maui.macos` package puts it in
   `Contents/MonoBundle` (`Emgu.LiteRT.Runtime/Maui/Metal/Mac/`; `EMGU_LITERT_METAL_MAUI_MACOS_NUGET_ID`; props and README from
   `cmake/Emgu.LiteRT.Metal.runtime.maui.macos.*.in`). It depends on `Emgu.LiteRT.LM.runtime.maui.macos` (Apple Silicon only, like

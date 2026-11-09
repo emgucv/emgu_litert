@@ -15,7 +15,7 @@
   <!-- LiteRT's GPU (Metal) accelerator plugin, libLiteRtMetalAccelerator.dylib: libLiteRt.dylib loads it at run time
        when a model asks for the GPU (LiteRT-LM's "gpu" backend). An optional add-on. It is a LiteRT-LM prebuilt
        (prebuilt/macos_arm64: Apple Silicon only, macOS 14+, only system frameworks), copied to
-       lib/runtimes/osx/native/ by platforms/macos/bazel_build_tflite_macos. Like the macOS dylibs of
+       lib/runtimes/osx/native/ by platforms/macos/bazel_build_macos. Like the macOS dylibs of
        Emgu.LiteRT.LM.runtime.maui.macos, a Mac Catalyst app loads it at run time from Contents/MonoBundle, next to the
        libLiteRt.dylib of Emgu.LiteRT.runtime.maui.macos (which the LiteRT-LM add-on this package depends on depends on). -->
   <ItemGroup Condition="Exists('$(EmguLiteRtMetalLibrary)')">
@@ -34,6 +34,6 @@
 
   <Target Name="EmguLiteRtMetalMauiMacPackageBuildImports" BeforeTargets="PrepareForBuild">
     <Message Text="LiteRT Metal accelerator included: '$(EmguLiteRtMetalLibrary)'" Importance="high" Condition="Exists('$(EmguLiteRtMetalLibrary)')" />
-    <Warning Text="LiteRT's Metal accelerator is not available: $(EmguLiteRtMetalLibrary) is missing - run platforms/macos/bazel_build_tflite_macos darwin_arm64." Condition="!Exists('$(EmguLiteRtMetalLibrary)')" />
+    <Warning Text="LiteRT's Metal accelerator is not available: $(EmguLiteRtMetalLibrary) is missing - run platforms/macos/bazel_build_macos darwin_arm64." Condition="!Exists('$(EmguLiteRtMetalLibrary)')" />
   </Target>
 </Project>
