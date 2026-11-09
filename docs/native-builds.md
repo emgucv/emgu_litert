@@ -127,7 +127,7 @@ platforms/macos/cmake_build_tflite
 
 ### The .NET solution and packages (macOS)
 ```bash
-platforms/macos/build_emgutf
+platforms/macos/build_emgu_litert
 ```
 Configures CMake in `build/` (Release) and runs `make package`: builds the managed projects, writes the NuGet packages (`Emgu.LiteRT`, `Emgu.TF.Lite`, `Emgu.LiteRT.Util`, `Emgu.TF.Lite.ImageIO`, `Emgu.LiteRT.Tflite.Models`, `Emgu.LiteRT.runtime.*`) to `platforms/nuget/`, and the CPack zip to `build/libemgulitert-ios-macos-<version>.zip`. The version's last component is derived from the git commit count, so it changes with every commit. Run the native build first: packages only include the native binaries already in `lib/`.
 
