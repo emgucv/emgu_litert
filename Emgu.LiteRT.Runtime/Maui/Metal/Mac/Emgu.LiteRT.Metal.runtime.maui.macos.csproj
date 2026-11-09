@@ -17,8 +17,7 @@
        (prebuilt/macos_arm64: Apple Silicon only, macOS 14+, only system frameworks), copied to
        lib/runtimes/osx/native/ by platforms/macos/bazel_build_tflite_macos. Like the macOS dylibs of
        Emgu.LiteRT.LM.runtime.maui.macos, a Mac Catalyst app loads it at run time from Contents/MonoBundle, next to the
-       libLiteRt.dylib that package provides - the only libLiteRt.dylib a Catalyst app has, so this package depends on
-       it rather than on Emgu.LiteRT.runtime.maui.macos (whose Catalyst tfliteextern is a static library). -->
+       libLiteRt.dylib of Emgu.LiteRT.runtime.maui.macos (which the LiteRT-LM add-on this package depends on depends on). -->
   <ItemGroup Condition="Exists('$(EmguLiteRtMetalLibrary)')">
     <None Include="$(EmguLiteRtMetalLibrary)">
       <Link>%(Filename)%(Extension)</Link>

@@ -58,8 +58,8 @@ SET(CSC_TARGET_FRAMEWORK "" CACHE STRING "C# target framework")
 FIND_PACKAGE(CSharp REQUIRED)
 MESSAGE(STATUS "DOTNET_FOUND: ${DOTNET_FOUND}")
 
-# Minimum iOS version, shared by the native iOS and Mac Catalyst builds (platforms/ios/bazel_build_xcframework,
-# cmake_build_tflite_catalyst) and the managed projects' SupportedOSPlatformVersion, so they cannot drift apart.
+# Minimum iOS version, shared by the native iOS build (platforms/ios/bazel_build_xcframework) and the managed
+# projects' SupportedOSPlatformVersion, so they cannot drift apart.
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ios_min_version.txt" EMGU_LITERT_IOS_MIN_VERSION LIMIT_COUNT 1)
 string(STRIP "${EMGU_LITERT_IOS_MIN_VERSION}" EMGU_LITERT_IOS_MIN_VERSION)
 
@@ -255,9 +255,11 @@ ELSE()
   SET(HAVE_IOS_LITE OFF)
 ENDIF()
 
-CHECK_BINARY_EXIST("lib/ios" "libtfliteextern_darwin_arm64.a" HAVE_MAC_CATALYST_LITE_ARM64 OFF)
-CHECK_BINARY_EXIST("lib/ios" "libtfliteextern_darwin_x86_64.a" HAVE_MAC_CATALYST_LITE_X86_64 OFF)
-IF (HAVE_MAC_CATALYST_LITE_ARM64 OR HAVE_MAC_CATALYST_LITE_X86_64)
+# Mac Catalyst loads the macOS libtfliteextern.dylib and libLiteRt.dylib (Emgu.LiteRT.Runtime/Maui/Mac); since 2026-11-09
+# it has no build of its own.
+CHECK_BINARY_EXIST("lib/runtimes/osx/native" "libtfliteextern.dylib" HAVE_MAC_CATALYST_TFLITEEXTERN OFF)
+CHECK_BINARY_EXIST("lib/runtimes/osx/native" "libLiteRt.dylib" HAVE_MAC_CATALYST_LITERT OFF)
+IF (HAVE_MAC_CATALYST_TFLITEEXTERN AND HAVE_MAC_CATALYST_LITERT)
   SET(HAVE_MAC_CATALYST_LITE ON)
   MESSAGE(STATUS "HAVE_MAC_CATALYST_LITE: ${HAVE_MAC_CATALYST_LITE}")
 ELSE()

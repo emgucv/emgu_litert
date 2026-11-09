@@ -476,8 +476,11 @@ namespace Emgu.TF.Lite
             bool libraryLoaded = true;
 #if !(UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR || UNITY_STANDALONE)
 
-            #region Check for MAUI iOS
-            if (Emgu.LiteRT.Util.Toolbox.FindAssembly("Microsoft.iOS.dll") != null)
+            #region Check for MAUI iOS and Mac Catalyst
+            // DllImport finds the library: iOS's framework by its path, Mac Catalyst's libtfliteextern.dylib in the app
+            // bundle's Contents/MonoBundle (as it finds Emgu.LiteRT.LM's liblitert-lm.dylib).
+            if (Emgu.LiteRT.Util.Toolbox.FindAssembly("Microsoft.iOS.dll") != null ||
+                Emgu.LiteRT.Util.Toolbox.FindAssembly("Microsoft.MacCatalyst.dll") != null)
                 return libraryLoaded;
             #endregion
 

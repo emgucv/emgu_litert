@@ -42,26 +42,6 @@ ELSE()
 ENDIF()
 OPTION(TFLITEEXTERN_LINK_LITERT "Link tfliteextern dynamically against LiteRT's libLiteRt shared library" ${TFLITEEXTERN_LINK_LITERT_DEFAULT})
 
-# Mac Catalyst (clang's "-target <arch>-apple-ios<version>-macabi", see platforms/ios/cmake_build_tflite_catalyst)
-# is CMAKE_SYSTEM_NAME Darwin to CMake, but TARGET_OS_IOS to the compiler. litert/tflite's
-# profiling/platform_profiler.cc calls MaybeCreateSignpostProfiler() whenever TARGET_OS_IOS, while its
-# CMakeLists.txt only compiles profiling/signpost_profiler.mm (which defines it) when CMAKE_SYSTEM_NAME is iOS,
-# so a Catalyst link fails on that undefined symbol. litert is a pristine submodule we don't patch, so the file
-# is added to tensorflow-lite below, with the same -fno-objc-arc it gets on iOS. Objective-C++ has to be
-# enabled before litert/tflite's directory is added, or that directory lacks the OBJCXX compile rules.
-IF(APPLE)
-  INCLUDE(CheckCXXSourceCompiles)
-  CHECK_CXX_SOURCE_COMPILES("
-    #include <TargetConditionals.h>
-    #if !TARGET_OS_MACCATALYST
-    #error not Mac Catalyst
-    #endif
-    int main() { return 0; }" TFLITEEXTERN_TARGET_MACCATALYST)
-  IF(TFLITEEXTERN_TARGET_MACCATALYST)
-    enable_language(OBJCXX)
-  ENDIF()
-ENDIF()
-
 # The TFLite version (TfLiteVersion(), TFLITE_VERSION_STRING) is TensorFlow's version. Bazel passes it to
 # litert/tflite/version.h as TF_MAJOR_VERSION etc., but LiteRT's CMake doesn't, so version.h would fall back to its
 # hardcoded (stale) default. Define them here, before LiteRT's directories are added so they inherit them, from the
@@ -112,11 +92,6 @@ ELSE()
   ADD_SUBDIRECTORY(${LITERT_SOURCE_DIR_ABS}/tflite ${CMAKE_CURRENT_BINARY_DIR}/tflite)
 ENDIF()
 
-IF(TFLITEEXTERN_TARGET_MACCATALYST AND TARGET tensorflow-lite)
-  target_sources(tensorflow-lite PRIVATE ${LITERT_SOURCE_DIR_ABS}/tflite/profiling/signpost_profiler.mm)
-  set_source_files_properties(${LITERT_SOURCE_DIR_ABS}/tflite/profiling/signpost_profiler.mm
-    TARGET_DIRECTORY tensorflow-lite PROPERTIES COMPILE_FLAGS -fno-objc-arc)
-ENDIF()
 
 
 
@@ -275,9 +250,7 @@ IF(WIN32 AND MSVC AND (NOT NETFX_CORE))
   LIST(APPEND TFLITEEXTERN_DEPENDENCY_DLLS ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS})
 ENDIF()
 
-# TFLITEEXTERN_OUTPUT_DIRECTORY can be set on the command line to override the per-platform lib/ folder - e.g.
-# platforms/ios/cmake_build_tflite_catalyst, whose Mac Catalyst build would otherwise land in (and overwrite)
-# the macOS folder, since CMake sees both as APPLE AND NOT IOS.
+# TFLITEEXTERN_OUTPUT_DIRECTORY can be set on the command line to override the per-platform lib/ folder.
 IF(NOT TFLITEEXTERN_OUTPUT_DIRECTORY)
   SET(TFLITEEXTERN_OUTPUT_DIRECTORY_RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/../../lib/${BINARY_OUTPUT_SUBFOLDER})
   GET_FILENAME_COMPONENT(TFLITEEXTERN_OUTPUT_DIRECTORY "${TFLITEEXTERN_OUTPUT_DIRECTORY_RELATIVE}" ABSOLUTE)

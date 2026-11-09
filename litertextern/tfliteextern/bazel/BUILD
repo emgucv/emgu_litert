@@ -100,7 +100,7 @@ cc_binary(
 )
 
 # Static-library counterpart of the ":tfliteextern" shared library above, for platforms
-# (iOS device/simulator, Mac Catalyst) where the C# side statically links tfliteextern
+# (static iOS builds, e.g. Unity iOS) where the C# side statically links tfliteextern
 # into the app instead of loading a shared object - DllImport("tfliteextern") resolves to
 # "__Internal" there (see Emgu.LiteRT.Runtime/Maui/iOS's NativeReference), so the exported tfe*
 # symbols just need to be present in the final linked binary, not in a standalone .dylib/.so.
@@ -325,8 +325,8 @@ cc_shared_library(
 
 # bazel build --config=ios_arm64 //tfliteextern:tfliteextern_ios_framework      # device
 # bazel build --config=ios_sim_arm64 //tfliteextern:tfliteextern_ios_framework  # simulator (Apple Silicon)
-# Not for Mac Catalyst: Bazel has no Catalyst platform, and darwin_<arch> gives iOS Simulator objects; Catalyst's
-# static tfliteextern comes from platforms/ios/cmake_build_tflite_catalyst. No script builds this target any more.
+# Not for Mac Catalyst: Bazel has no Catalyst platform, and darwin_<arch> gives iOS Simulator objects; a Catalyst
+# app loads the macOS libtfliteextern.dylib (docs/native-builds.md). No script builds this target any more.
 #
 # No symbol-hiding/allowlist step (unlike litert's own TensorFlowLiteC_framework, which
 # wraps this in extract_object_files/hide_symbols_with_allowlist) - the tfe* symbols must

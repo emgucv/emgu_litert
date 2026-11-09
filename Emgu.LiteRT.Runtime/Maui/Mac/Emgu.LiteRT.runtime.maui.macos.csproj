@@ -7,12 +7,11 @@
     <AssemblyName>Emgu.LiteRT.runtime.maui.macos</AssemblyName>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\lib))</TfLiteBinaryDir>
-    <EmguTfLiteCatalystBinaryDir>$(TfLiteBinaryDir)\ios</EmguTfLiteCatalystBinaryDir>
-    <EmguTfLiteCatalystNativeFileX64>$(EmguTfLiteCatalystBinaryDir)\libtfliteextern_darwin_x86_64.a</EmguTfLiteCatalystNativeFileX64>
-    <EmguTfLiteCatalystNativeFileARM64>$(EmguTfLiteCatalystBinaryDir)\libtfliteextern_darwin_arm64.a</EmguTfLiteCatalystNativeFileARM64>
+    <EmguTfLiteCatalystBinaryDir>$(TfLiteBinaryDir)\runtimes\osx\native</EmguTfLiteCatalystBinaryDir>
+    <EmguTfLiteCatalystNativeFile>$(EmguTfLiteCatalystBinaryDir)\libtfliteextern.dylib</EmguTfLiteCatalystNativeFile>
+    <EmguLiteRtCatalystNativeFile>$(EmguTfLiteCatalystBinaryDir)\libLiteRt.dylib</EmguLiteRtCatalystNativeFile>
     <EmguTfLiteLinkTarget>MAUI MacCatalyst Library</EmguTfLiteLinkTarget>
-    <EmguTfLiteMauiMacErrorMessage Condition="!Exists('$(EmguTfLiteCatalystNativeFileX64)')">This package do not contains necessary binary for $(EmguTfLiteLinkTarget). Emgu TF for MacOS Commercial license is required, Mac Catalyst x86_64 is targeted, but file $(EmguTfLiteCatalystNativeFileX64) is missing.</EmguTfLiteMauiMacErrorMessage>
-    <EmguTfLiteMauiMacErrorMessage Condition="!Exists('$(EmguTfLiteCatalystNativeFileARM64)')">This package do not contains necessary binary for $(EmguTfLiteLinkTarget). Emgu TF for MacOS Commercial license is required, Mac Catalyst ARM64 is targeted, but file $(EmguTfLiteCatalystNativeFileARM64) is missing.</EmguTfLiteMauiMacErrorMessage>
+    <EmguTfLiteMauiMacErrorMessage Condition="!Exists('$(EmguTfLiteCatalystNativeFile)') Or !Exists('$(EmguLiteRtCatalystNativeFile)')">This package does not contain the native binaries for $(EmguTfLiteLinkTarget): $(EmguTfLiteCatalystNativeFile) or $(EmguLiteRtCatalystNativeFile) is missing - run platforms/macos/bazel_build_tflite_macos_fat.</EmguTfLiteMauiMacErrorMessage>
     <BaseOutputPath>$(TfLiteBinaryDir)\Build\$(AssemblyName)\$(Platform)\</BaseOutputPath>
     </PropertyGroup>
 
@@ -23,25 +22,20 @@
 	<Compile Include="$(MSBuildThisFileDirectory)..\iOS\TfLiteInvokeIOS.cs" Link="TfLiteInvokeIOS.cs" />
   </ItemGroup>
 
-    <ItemGroup Condition="Exists('$(EmguTfLiteCatalystNativeFileX64)')">
-      <NativeReference Include="$(EmguTfLiteCatalystNativeFileX64)">
-        <Kind>Static</Kind>
-        <SmartLink>True</SmartLink>
-	<ForceLoad>True</ForceLoad>
-	<IsCxx>True</IsCxx>
-	<LinkerFlags>-stdlib=libc++ -ObjC -lc++</LinkerFlags>
-        <Frameworks>Foundation Accelerate CoreFoundation CoreGraphics AssetsLibrary AVFoundation CoreImage CoreMedia CoreVideo QuartzCore ImageIO UIKit CoreText</Frameworks>
-      </NativeReference>
-    </ItemGroup>
-    <ItemGroup Condition="Exists('$(EmguTfLiteCatalystNativeFileARM64)')">
-      <NativeReference Include="$(EmguTfLiteCatalystNativeFileARM64)">
-        <Kind>Static</Kind>
-        <SmartLink>True</SmartLink>
-	<ForceLoad>True</ForceLoad>
-	<IsCxx>True</IsCxx>
-	<LinkerFlags>-stdlib=libc++ -ObjC -lc++</LinkerFlags>
-        <Frameworks>Foundation Accelerate CoreFoundation CoreGraphics AssetsLibrary AVFoundation CoreImage CoreMedia CoreVideo QuartzCore ImageIO UIKit CoreText</Frameworks>
-      </NativeReference>
+    <!-- The macOS libtfliteextern.dylib and the libLiteRt.dylib it links (universal: arm64 and x86_64), from
+         platforms/macos/bazel_build_tflite_macos_fat, as on macOS: a Mac Catalyst app can't link a macOS library, but
+         it loads one at run time, from Contents/MonoBundle, where DllImport("tfliteextern") and Emgu.LiteRT's
+         DllImport("libLiteRt") find them - the same way it loads LiteRT-LM's macOS dylibs (Emgu.LiteRT.LM.runtime.maui.macos).
+         Until 2026-11-09 Catalyst had its own static tfliteextern (platforms/ios/cmake_build_tflite_catalyst), with a
+         second copy of TFLite, without XNNPACK, and no libLiteRt unless the LiteRT-LM add-on was there. -->
+    <ItemGroup Condition="Exists('$(EmguTfLiteCatalystNativeFile)') And Exists('$(EmguLiteRtCatalystNativeFile)')">
+      <None Include="$(EmguTfLiteCatalystNativeFile);$(EmguLiteRtCatalystNativeFile)">
+        <Link>%(Filename)%(Extension)</Link>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <Pack>True</Pack>
+        <PackagePath>runtimes\maccatalyst-arm64\native;runtimes\maccatalyst-x64\native</PackagePath>
+      </None>
     </ItemGroup>
     <ItemGroup>
       <!-- Emgu.TF.Lite and Emgu.LiteRT.Util each have their own nuget package now: plain
