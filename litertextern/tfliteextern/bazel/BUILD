@@ -52,6 +52,7 @@ load(
     "@build_bazel_rules_apple//apple:ios.bzl",
     "ios_static_framework",
 )
+load(":headers_only.bzl", "headers_only")
 
 _TFLITEEXTERN_SRCS = [
     "tfliteextern.cc",
@@ -231,11 +232,10 @@ cc_shared_library(
 # understood (not simply /WHOLEARCHIVE - that was tried and made no difference either way), but
 # win_def_file is also the exact mechanism LiteRT's own private //litert/c:libLiteRt target above uses.
 #
-# tfliteextern.dll's own Windows build (the ":tfliteextern" target above) is intentionally left linking the
-# TFLite C API statically rather than dynamically against this - that's already built, tested, and shipped,
-# and switching it over is a separate, riskier change this target doesn't require. libLiteRt.dll here is a
-# standalone artifact for Emgu.LiteRT's own classes to P/Invoke directly on Windows (DllImport("libLiteRt")),
-# matching what they already do against libLiteRt.dylib/.so on macOS/Android.
+# libLiteRt.dll is what Emgu.LiteRT's own classes P/Invoke directly on Windows (DllImport("libLiteRt")), as
+# against libLiteRt.dylib/.so on macOS/Android, and, since 2026-11-09, what the x64 tfliteextern.dll imports
+# (":tfliteextern_thin" below). The ":tfliteextern" target above, with its own statically linked copy of the TFLite
+# runtime, stays for the other architectures and bazel_build_litert.ps1 -StaticTfliteextern.
 #
 # bazel build --config=windows //tfliteextern:libLiteRt
 # ---------------------------------------------------------------------------------------------------------
@@ -262,6 +262,51 @@ cc_binary(
         "//tflite/c:common",
         "//tflite/schema:schema_fbs",
         "//litert/c:litert_tflite_runtime_c_api_so_shim",
+    ],
+)
+
+# ---------------------------------------------------------------------------------------------------------
+# Windows: tfliteextern.dll as a thin wrapper over libLiteRt.dll, as on macOS and Android - compiled against the
+# TFLite C API's headers and linked against libLiteRt.dll's import library, so the TFLite runtime is in libLiteRt.dll
+# only (the ":tfliteextern" target above carries its own copy, 5 MB). cc_shared_library with dynamic_deps isn't
+# supported on Windows here (see ":libLiteRt"), so ":tfliteextern_headers" drops the runtime's code (headers_only.bzl)
+# and ":libLiteRt_import" is the import library Bazel makes for ":libLiteRt". The DLL is named
+# tfliteextern_thin.dll; bazel_build_litert.ps1 copies it as tfliteextern.dll. Its exports are the tfe* functions
+# in tfliteextern.def (the C# side calls nothing else); the TfLite* functions come from libLiteRt.dll.
+#
+# bazel build --config=windows //tfliteextern:tfliteextern_thin
+# ---------------------------------------------------------------------------------------------------------
+headers_only(
+    name = "tfliteextern_headers",
+    deps = _TFLITEEXTERN_CAPI_DEPS,
+    target_compatible_with = ["@platforms//os:windows"],
+)
+
+filegroup(
+    name = "libLiteRt_implib",
+    srcs = [":libLiteRt"],
+    output_group = "interface_library",
+    target_compatible_with = ["@platforms//os:windows"],
+)
+
+cc_import(
+    name = "libLiteRt_import",
+    interface_library = ":libLiteRt_implib",
+    shared_library = ":libLiteRt",
+    target_compatible_with = ["@platforms//os:windows"],
+)
+
+cc_binary(
+    name = "tfliteextern_thin",
+    srcs = _TFLITEEXTERN_SRCS,
+    copts = tflite_copts() + ["-DWITHOUT_XNNPACK"],
+    additional_linker_inputs = ["tfliteextern.def"],
+    linkopts = ["/DEF:$(location tfliteextern.def)"],
+    linkshared = 1,
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [
+        ":libLiteRt_import",
+        ":tfliteextern_headers",
     ],
 )
 

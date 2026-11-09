@@ -48,6 +48,13 @@
     the MSVC STL's: thinking with tools ended the process with a std::length_error); see docs\litert-lm.md. This switch builds
     from the pristine submodule instead (then LiteRtLmChatClient.EnableConstrainedDecodingWithThinking must be off).
 
+.PARAMETER StaticTfliteextern
+    Build tfliteextern.dll the old way, with its own copy of the TFLite runtime (5 MB). By default (x64) it is a thin wrapper
+    that imports libLiteRt.dll's TFLite C API, as on macOS and Android: the runtime is in libLiteRt.dll only.
+
+.PARAMETER TfliteexternOnly
+    Build only tfliteextern.dll and libLiteRt.dll: no liblitert-lm.dll, omniextern.dll or accelerator.
+
 .PARAMETER DockerFlag
     Pass "docker" as the second positional argument to use the Bazel docker/remote executor.
 
@@ -62,7 +69,9 @@ param(
     [Parameter(Position = 1)][ValidateSet('', 'docker')][string]$DockerFlag = "",
     [switch]$DisableXnn,
     [switch]$Gpu,
-    [switch]$NoLiteRtLmPatches
+    [switch]$NoLiteRtLmPatches,
+    [switch]$StaticTfliteextern,
+    [switch]$TfliteexternOnly
 )
 # liblitert-lm.dll, omniextern.dll and the accelerator are built from a patched copy of the LiteRT-LM tree, unless -NoLiteRtLmPatches.
 $PatchLiteRtLm = -not $NoLiteRtLmPatches
@@ -292,6 +301,8 @@ if ($Arch -eq "64") {
     }
 }
 
+if ($TfliteexternOnly) { $BuildLitertLm = $false }
+
 $TfliteexternStageDir = Join-Path $WorkspaceDir "tfliteextern"
 if (-not (Test-Path $TfliteexternStageDir)) { New-Item -ItemType Directory -Path $TfliteexternStageDir | Out-Null }
 (Get-Content "litertextern\tfliteextern\bazel\BUILD" -Raw) `
@@ -300,6 +311,7 @@ if (-not (Test-Path $TfliteexternStageDir)) { New-Item -ItemType Directory -Path
     Set-Content -Path (Join-Path $TfliteexternStageDir "BUILD") -NoNewline
 Copy-Item "litertextern\tfliteextern\bazel\tfliteextern.def" (Join-Path $TfliteexternStageDir "tfliteextern.def") -Force
 Copy-Item "litertextern\tfliteextern\bazel\litert_windows_exports.def" (Join-Path $TfliteexternStageDir "litert_windows_exports.def") -Force
+Copy-Item "litertextern\tfliteextern\bazel\headers_only.bzl" (Join-Path $TfliteexternStageDir "headers_only.bzl") -Force
 Copy-Item "litertextern\tfliteextern\tfliteextern.cc" (Join-Path $TfliteexternStageDir "tfliteextern.cc") -Force
 Copy-Item "litertextern\tfliteextern\tfliteextern.h" (Join-Path $TfliteexternStageDir "tfliteextern.h") -Force
 Copy-Item "litertextern\imgproc\imgproc.cc" (Join-Path $TfliteexternStageDir "imgproc.cc") -Force
@@ -340,20 +352,22 @@ $LitertLmBazelArgs = @(
 
 & $BazelCommand @CommonBazelArgs "@litert//tflite:version" "--verbose_failures"
 
-& $BazelCommand @CommonBazelArgs "//tfliteextern:tfliteextern" "--verbose_failures"
+# x64: tfliteextern.dll is a thin wrapper that imports libLiteRt.dll (the TFLite runtime is in libLiteRt.dll only, as on
+# macOS and Android; the ":tfliteextern_thin" target). The other architectures, and -StaticTfliteextern, link the TFLite C
+# API into tfliteextern.dll (the ":tfliteextern" target).
+$ThinTfliteextern = ($Arch -eq "64") -and -not $StaticTfliteextern
+$TfliteexternTarget = if ($ThinTfliteextern) { "tfliteextern_thin" } else { "tfliteextern" }
+& $BazelCommand @CommonBazelArgs "//tfliteextern:$TfliteexternTarget" "--verbose_failures"
 
 # LiteRT's own runtime (LiteRT's C API plus the TensorFlow Lite C API), P/Invoked directly by the
-# Emgu.LiteRT classes - same purpose as libLiteRt.dylib/.so on macOS/Android. tfliteextern.dll
-# itself still links the TFLite C API statically on Windows (see litertextern/tfliteextern/
-# bazel/BUILD's comment on the ":libLiteRt" target for why), so this is an independent artifact,
-# not something tfliteextern.dll depends on here.
+# Emgu.LiteRT classes - same purpose as libLiteRt.dylib/.so on macOS/Android, and what the thin tfliteextern.dll imports.
 & $BazelCommand @CommonBazelArgs "//tfliteextern:libLiteRt" "--verbose_failures"
 
 Set-Location ".."
 
 $NativeOutDir = "lib\runtimes\win-x64\native"
 if (-not (Test-Path $NativeOutDir)) { New-Item -ItemType Directory -Path $NativeOutDir -Force | Out-Null }
-Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\tfliteextern.dll") "$NativeOutDir\tfliteextern.dll" -Force
+Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\$TfliteexternTarget.dll") "$NativeOutDir\tfliteextern.dll" -Force
 Copy-Item (Join-Path $WorkspaceDir "bazel-bin\tfliteextern\libLiteRt.dll") "$NativeOutDir\libLiteRt.dll" -Force
 
 if ($BuildLitertLm) {
