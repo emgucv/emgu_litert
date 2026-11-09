@@ -68,6 +68,7 @@ Directory.Build.props
 /platforms/nuget/*/*.props
 /platforms/nuget/Emgu.LiteRT.runtime.windows/README.md
 /platforms/nuget/Emgu.TF.Lite.runtime.windows/README.md
+/platforms/nuget/Emgu.TF.Lite.runtime.ubuntu/README.md
 /platforms/nuget/Emgu.LiteRT.LM.runtime.windows/README.md
 /platforms/nuget/Emgu.LiteRT.Metal.runtime.macos/README.md
 /platforms/nuget/Emgu.LiteRT.LM.runtime.macos/README.md

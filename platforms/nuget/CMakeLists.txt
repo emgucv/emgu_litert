@@ -37,6 +37,7 @@ ENDIF()
 
 add_subdirectory(Emgu.LiteRT.runtime.ubuntu)
 add_subdirectory(Emgu.LiteRT.LM.runtime.ubuntu)
+add_subdirectory(Emgu.TF.Lite.runtime.ubuntu)
 
 add_subdirectory(Emgu.LiteRT.runtime.debian-arm)
 add_subdirectory(Emgu.LiteRT.runtime.debian-arm64)

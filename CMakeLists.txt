@@ -318,10 +318,14 @@ ELSE()
   SET(UBUNTU_LITE_ARCH "arm64")
 ENDIF()
 EMGU_READ_DISTRO_VERSION("${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/ubuntu-${UBUNTU_LITE_ARCH}/native/ubuntu_version.txt" IS_UBUNTU "-rs" UBUNTU_LITE_VERSION)
+# Emgu.TF.Lite.runtime.ubuntu.<version>-<arch> keeps the RID-style dot (ubuntu.26.04-x64) of the Emgu TF Lite runtime
+# packages already on nuget.org (Emgu.TF.Lite.runtime.ubuntu.24.04-x64), so new versions continue them.
 IF(UBUNTU_LITE_VERSION)
   SET(NUGET_NATIVE_PLATFORM_ID_UBUNTU "ubuntu-${UBUNTU_LITE_VERSION}-${UBUNTU_LITE_ARCH}")
+  SET(NUGET_NATIVE_PLATFORM_ID_UBUNTU_TFLITE "ubuntu.${UBUNTU_LITE_VERSION}-${UBUNTU_LITE_ARCH}")
 ELSE()
   SET(NUGET_NATIVE_PLATFORM_ID_UBUNTU "ubuntu-${UBUNTU_LITE_ARCH}")
+  SET(NUGET_NATIVE_PLATFORM_ID_UBUNTU_TFLITE "ubuntu-${UBUNTU_LITE_ARCH}")
   IF(HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
     MESSAGE(WARNING "lib/runtimes/ubuntu-${UBUNTU_LITE_ARCH}/native/ubuntu_version.txt not found: the Ubuntu nuget package ids carry no Ubuntu version. Rebuild the native libraries with platforms/ubuntu/<version>/bazel_build_litert.")
   ENDIF()
@@ -742,9 +746,16 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   SET(EMGU_LITERT_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}") 
   SET(EMGU_LITERT_UBUNTU_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
 
+  # libtfliteextern.so (the TensorFlow Lite Interpreter C API wrapper Emgu.TF.Lite P/Invokes) is packaged
+  # separately from libLiteRt.so (${EMGU_LITERT_UBUNTU_NUGET_ID} above), with a nuget dependency on it, as on
+  # Windows (${EMGU_TFLITE_WINDOWS_NUGET_ID}) - see EMGU_TFLITE_UBUNTU_NUGET_DEPENDENCY below. Its id keeps the dot
+  # of the existing nuget.org packages (Emgu.TF.Lite.runtime.ubuntu.24.04-x64), see NUGET_NATIVE_PLATFORM_ID_UBUNTU_TFLITE.
+  SET(EMGU_TFLITE_UBUNTU_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU_TFLITE}")
+  SET(EMGU_TFLITE_UBUNTU_NUGET_TITLE "Native runtime (tfliteextern) of Emgu TF Lite for Ubuntu")
+
   # liblitert-lm.so (LiteRT-LM's own C API, P/Invoked directly by Emgu.LiteRT.LM) and the prebuilt
   # libGemmaModelConstraintProvider.so it depends on are packaged separately from
-  # ${EMGU_LITERT_UBUNTU_NUGET_ID} above (libLiteRt.so/libtfliteextern.so), with a nuget dependency on
+  # ${EMGU_LITERT_UBUNTU_NUGET_ID} above (libLiteRt.so), with a nuget dependency on
   # it - see EMGU_LITERT_LM_UBUNTU_NUGET_DEPENDENCY below.
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM.runtime.${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
   SET(EMGU_LITERT_LM_UBUNTU_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGU_LITERT_NUGET_TITLE} for Ubuntu")
@@ -1154,14 +1165,19 @@ ENDIF()
 
 IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
   # liblitert-lm.so/libGemmaModelConstraintProvider.so/libomniextern.so/libwebgpu_dawn.so (when present) are excluded from this package's
-  # *.so glob - they ship in ${EMGU_LITERT_LM_UBUNTU_NUGET_ID} instead, see below.
+  # *.so glob - they ship in ${EMGU_LITERT_LM_UBUNTU_NUGET_ID} instead, see below - and so is libtfliteextern.so, which
+  # ships in ${EMGU_TFLITE_UBUNTU_NUGET_ID}.
   IF (HAVE_UBUNTU_X86_64_LITE)
     SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
-      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libwebgpu_dawn.so\" target=\"runtimes\\ubuntu-x64\\native\" />")
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libwebgpu_dawn.so;..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libtfliteextern.so\" target=\"runtimes\\ubuntu-x64\\native\" />")
+    SET(EMGU_TFLITE_UBUNTU_NUGET_FILE_LIST "${EMGU_TFLITE_UBUNTU_NUGET_FILE_LIST}
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-x64\\native\\libtfliteextern.so\" target=\"runtimes\\ubuntu-x64\\native\" />")
   ENDIF()
   IF (HAVE_UBUNTU_ARM64_LITE)
     SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
-      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libwebgpu_dawn.so\" target=\"runtimes\\ubuntu-arm64\\native\" />")
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libwebgpu_dawn.so;..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libtfliteextern.so\" target=\"runtimes\\ubuntu-arm64\\native\" />")
+    SET(EMGU_TFLITE_UBUNTU_NUGET_FILE_LIST "${EMGU_TFLITE_UBUNTU_NUGET_FILE_LIST}
+      <file src=\"..\\..\\..\\lib\\runtimes\\ubuntu-arm64\\native\\libtfliteextern.so\" target=\"runtimes\\ubuntu-arm64\\native\" />")
   ENDIF()
   SET(EMGU_LITERT_UBUNTU_NUGET_FILE_LIST "${EMGU_LITERT_UBUNTU_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
@@ -1170,6 +1186,18 @@ IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
   SET(EMGU_LITERT_UBUNTU_NUGET_DEPENDENCY "${EMGU_LITERT_UBUNTU_NUGET_DEPENDENCY}
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+    </dependencies>")
+  SET(EMGU_TFLITE_UBUNTU_NUGET_FILE_LIST "${EMGU_TFLITE_UBUNTU_NUGET_FILE_LIST}
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
+	<file src=\"README.md\" target=\"docs\\\" />
+	<file src=\"${EMGU_TFLITE_UBUNTU_NUGET_ID}.props\" target=\"build\" />")
+  # Also depends on the managed Emgu.TF.Lite, as the earlier Emgu.TF.Lite.runtime.ubuntu.24.04-x64 versions on nuget.org
+  # did, so an app that only references this package keeps getting it.
+  SET(EMGU_TFLITE_UBUNTU_NUGET_DEPENDENCY "
+    <dependencies>
+		<dependency id=\"${EMGU_LITERT_UBUNTU_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+		<dependency id=\"${EMGU_TFLITE_NUGET_ID}\" version=\"${EMGU_TFLITE_PACKAGE_VERSION}\" />
     </dependencies>")
 ENDIF()
 
@@ -1586,6 +1614,8 @@ ENDIF()
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.ubuntu.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.ubuntu/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.ubuntu.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.ubuntu/Package.nuspec)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.ubuntu.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.ubuntu/Package.nuspec)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.ubuntu.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.ubuntu/README.md)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.debian-arm/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm64.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.debian-arm64/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.debian-arm64.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.debian-arm64/Package.nuspec)
@@ -1595,6 +1625,7 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.debian-a
 FOREACH(LINUX_PACKAGE
     "Emgu.LiteRT.runtime.ubuntu|EMGU_LITERT_UBUNTU_NUGET_ID|EMGU_LITERT_UBUNTU_NUGET_FILE_LIST"
     "Emgu.LiteRT.LM.runtime.ubuntu|EMGU_LITERT_LM_UBUNTU_NUGET_ID|EMGU_LITERT_LM_UBUNTU_NUGET_FILE_LIST"
+    "Emgu.TF.Lite.runtime.ubuntu|EMGU_TFLITE_UBUNTU_NUGET_ID|EMGU_TFLITE_UBUNTU_NUGET_FILE_LIST"
     "Emgu.LiteRT.runtime.debian-arm|EMGU_LITERT_DEBIAN_ARM_NUGET_ID|EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST"
     "Emgu.LiteRT.runtime.debian-arm64|EMGU_LITERT_DEBIAN_ARM64_NUGET_ID|EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST"
     "Emgu.LiteRT.LM.runtime.debian-arm64|EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID|EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_FILE_LIST")
