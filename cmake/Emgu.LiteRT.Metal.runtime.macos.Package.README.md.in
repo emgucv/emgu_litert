@@ -21,6 +21,8 @@ The accelerator is installed in the same folder as `libLiteRt.dylib` and `liblit
 
 ## Using it with LiteRT-LM
 
+LiteRT-LM itself, `liblitert-lm.dylib`, is in `${EMGU_LITERT_LM_MACOS_NUGET_ID}`: add that package too.
+
 On an Apple M1, the GPU read a 3,000-token conversation in 3.4 s with Gemma 4 E2B, against 12 s on the CPU. It also makes Gemma 4 12B, a desktop model that needs about 8 GB of memory, practical: about 8.6 tokens/s on an M1.
 
 - **32-bit activations:** use them on the GPU. With LiteRT-LM's default 16-bit ones, Gemma 4 E2B and 12B answered wrongly after a long conversation. `Emgu.LiteRT.LM.Models`' Gemma 4 classes set this themselves; elsewhere, set `EngineSettings.ActivationDataType = ActivationDataType.Float32`.

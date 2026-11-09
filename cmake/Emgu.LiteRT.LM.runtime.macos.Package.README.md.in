@@ -1,0 +1,18 @@
+## About this package
+
+This package adds LiteRT-LM's native runtime, `liblitert-lm.dylib`, to Emgu LiteRT for Mac OS console and asp.net applications, for `Emgu.LiteRT.LM` (language models, embeddings, speech recognition, text to image and text to speech). It is the ${EMGU_LITERT_LM_PACKAGE_VERSION} release, built on LiteRT-LM ${LITERT_LM_VERSION}, part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. For a MAUI (Mac Catalyst) app, use `${EMGU_LITERT_LM_MAUI_MACOS_NUGET_ID}` instead.
+
+It contains, in `runtimes/osx/native`:
+
+- `liblitert-lm.dylib`: LiteRT-LM's C API.
+- `libGemmaModelConstraintProvider.dylib` and `libwebgpu_dawn.dylib`: LiteRT-LM prebuilt libraries that `liblitert-lm.dylib` needs.
+- `libomniextern.dylib`: Emgu's C API over LiteRT-LM's OmniEngine, for speech recognition, text to image and text to speech.
+
+It depends on `${EMGU_LITERT_MACOS_NUGET_ID}`, whose `libLiteRt.dylib` `liblitert-lm.dylib` links against. For the GPU, add the optional `${EMGU_LITERT_METAL_MACOS_NUGET_ID}` too.
+
+## Requirements
+
+- A Mac with Apple Silicon (arm64). LiteRT-LM is not built for Intel Macs.
+
+For online documentation please visit
+<http://www.emgu.com/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/>

@@ -727,6 +727,12 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
 
   SET(EMGU_LITERT_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.macos")
   SET(EMGU_LITERT_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
+  # liblitert-lm.dylib (LiteRT-LM's C API, Apple Silicon only) and the libraries that go with it are packaged
+  # separately from ${EMGU_LITERT_MACOS_NUGET_ID} above (libtfliteextern.dylib/libLiteRt.dylib), with a nuget
+  # dependency on it, as on Windows and Linux - see EMGU_LITERT_LM_MACOS_NUGET_DEPENDENCY below. Only built when
+  # lib/runtimes/osx/native/liblitert-lm.dylib exists (HAVE_MACOS_LITERT_LM, below).
+  SET(EMGU_LITERT_LM_MACOS_NUGET_ID "${EMGU_LITERT_LM_NUGET_ID}.runtime.macos")
+  SET(EMGU_LITERT_LM_MACOS_NUGET_TITLE "Native runtime (liblitert-lm) of ${EMGU_LITERT_LM_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")
   # Emgu.LiteRT.Metal.runtime.macos: LiteRT's GPU (Metal) accelerator for plain macOS apps, an optional add-on to
   # ${EMGU_LITERT_MACOS_NUGET_ID} (whose libLiteRt.dylib loads it) that nothing depends on. Only built when
   # lib/runtimes/osx/native/libLiteRtMetalAccelerator.dylib exists (HAVE_MACOS_LITERT_METAL, below).
@@ -1095,23 +1101,6 @@ IF(HAVE_OSX_LITE)
     SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libLiteRt.dylib\" target=\"runtimes\\osx\\native\" />")
   ENDIF()
-  # LiteRT-LM's C API (built by platforms/macos/bazel_build_macos_fat, Apple Silicon only), P/Invoked directly by
-  # the Emgu.LiteRT.LM classes, plus the prebuilt libGemmaModelConstraintProvider.dylib and (since v0.19.0)
-  # libwebgpu_dawn.dylib it depends on. Optional.
-  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/liblitert-lm.dylib")
-    SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
-    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\liblitert-lm.dylib\" target=\"runtimes\\osx\\native\" />
-    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libGemmaModelConstraintProvider.dylib\" target=\"runtimes\\osx\\native\" />")
-    IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libwebgpu_dawn.dylib")
-      SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
-    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libwebgpu_dawn.dylib\" target=\"runtimes\\osx\\native\" />")
-    ENDIF()
-  ENDIF()
-  # libomniextern.dylib: Emgu's C API over LiteRT-LM's OmniEngine (Emgu.LiteRT.LM's SpeechToTextEngine). Optional.
-  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libomniextern.dylib")
-    SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
-    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libomniextern.dylib\" target=\"runtimes\\osx\\native\" />")
-  ENDIF()
   SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
@@ -1119,6 +1108,33 @@ IF(HAVE_OSX_LITE)
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")	
+  # LiteRT-LM's C API (built by platforms/macos/bazel_build_macos_fat, Apple Silicon only), P/Invoked directly by
+  # the Emgu.LiteRT.LM classes, plus the prebuilt libGemmaModelConstraintProvider.dylib and (since v0.19.0)
+  # libwebgpu_dawn.dylib it depends on, and libomniextern.dylib (Emgu's C API over LiteRT-LM's OmniEngine:
+  # Emgu.LiteRT.LM's speech recognition, text to image and text to speech), in their own package.
+  SET(HAVE_MACOS_LITERT_LM OFF)
+  IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/liblitert-lm.dylib")
+    SET(HAVE_MACOS_LITERT_LM ON)
+    SET(EMGU_LITERT_LM_MACOS_NUGET_FILE_LIST "
+    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\liblitert-lm.dylib\" target=\"runtimes\\osx\\native\" />
+    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libGemmaModelConstraintProvider.dylib\" target=\"runtimes\\osx\\native\" />")
+    IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libwebgpu_dawn.dylib")
+      SET(EMGU_LITERT_LM_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_LM_MACOS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libwebgpu_dawn.dylib\" target=\"runtimes\\osx\\native\" />")
+    ENDIF()
+    IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libomniextern.dylib")
+      SET(EMGU_LITERT_LM_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_LM_MACOS_NUGET_FILE_LIST}
+    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libomniextern.dylib\" target=\"runtimes\\osx\\native\" />")
+    ENDIF()
+    SET(EMGU_LITERT_LM_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_LM_MACOS_NUGET_FILE_LIST}
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"README.md\" target=\"docs\\\" />")
+    SET(EMGU_LITERT_LM_MACOS_NUGET_DEPENDENCY "
+    <dependencies>
+		<dependency id=\"${EMGU_LITERT_MACOS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+    </dependencies>")
+  ENDIF()
   # LiteRT's GPU (Metal) accelerator (a LiteRT-LM prebuilt, copied by platforms/macos/bazel_build_macos
   # darwin_arm64), in its own optional package next to libLiteRt.dylib.
   SET(HAVE_MACOS_LITERT_METAL OFF)
@@ -1559,6 +1575,10 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.windows.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.windows/README.md)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.macos/Package.nuspec)
+IF(HAVE_MACOS_LITERT_LM)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.macos/Package.nuspec)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.macos.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.macos/README.md)
+ENDIF()
 IF(HAVE_MACOS_LITERT_METAL)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Metal.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.Metal.runtime.macos/Package.nuspec)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Metal.runtime.macos.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.Metal.runtime.macos/README.md)
