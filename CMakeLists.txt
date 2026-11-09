@@ -323,7 +323,7 @@ IF(UBUNTU_LITE_VERSION)
 ELSE()
   SET(NUGET_NATIVE_PLATFORM_ID_UBUNTU "ubuntu-${UBUNTU_LITE_ARCH}")
   IF(HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
-    MESSAGE(WARNING "lib/runtimes/ubuntu-${UBUNTU_LITE_ARCH}/native/ubuntu_version.txt not found: the Ubuntu nuget package ids carry no Ubuntu version. Rebuild the native libraries with platforms/ubuntu/<version>/bazel_build_tflite.")
+    MESSAGE(WARNING "lib/runtimes/ubuntu-${UBUNTU_LITE_ARCH}/native/ubuntu_version.txt not found: the Ubuntu nuget package ids carry no Ubuntu version. Rebuild the native libraries with platforms/ubuntu/<version>/bazel_build_litert.")
   ENDIF()
 ENDIF()
 MESSAGE(STATUS "NUGET_NATIVE_PLATFORM_ID_UBUNTU: ${NUGET_NATIVE_PLATFORM_ID_UBUNTU}")
@@ -336,7 +336,7 @@ FOREACH(DEBIAN_LITE_ARCH "arm" "arm64")
   ELSE()
     SET(EMGU_LITERT_DEBIAN_ID_${DEBIAN_LITE_ARCH_UPPER} "debian-${DEBIAN_LITE_ARCH}")
     IF(HAVE_LINUX_${DEBIAN_LITE_ARCH_UPPER}_LITE)
-      MESSAGE(WARNING "lib/runtimes/linux-${DEBIAN_LITE_ARCH}/native/debian_version.txt not found: the Debian ${DEBIAN_LITE_ARCH} nuget package ids carry no Debian release. Rebuild the native libraries with platforms/debian/<release>/bazel_build_tflite.")
+      MESSAGE(WARNING "lib/runtimes/linux-${DEBIAN_LITE_ARCH}/native/debian_version.txt not found: the Debian ${DEBIAN_LITE_ARCH} nuget package ids carry no Debian release. Rebuild the native libraries with platforms/debian/<release>/bazel_build_litert.")
     ENDIF()
   ENDIF()
 ENDFOREACH()
@@ -1174,7 +1174,7 @@ IF (HAVE_UBUNTU_X86_64_LITE OR HAVE_UBUNTU_ARM64_LITE)
 ENDIF()
 
 # Emgu.LiteRT.LM.runtime.ubuntu: liblitert-lm.so (LiteRT-LM's C API, built by
-# platforms/ubuntu/{24.04,26.04}/bazel_build_tflite) plus the prebuilt libGemmaModelConstraintProvider.so and (since
+# platforms/ubuntu/{24.04,26.04}/bazel_build_litert) plus the prebuilt libGemmaModelConstraintProvider.so and (since
 # LiteRT-LM v0.19.0) libwebgpu_dawn.so
 # it depends on. Optional - guarded on EXISTS the same way the macOS packaging treats liblitert-lm.dylib,
 # so a build that didn't produce it doesn't fail to pack an empty package.
@@ -1239,7 +1239,7 @@ IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
 ENDIF()
 
 # Emgu.LiteRT.LM.runtime.debian-<release>-arm64: liblitert-lm.so and libomniextern.so from
-# platforms/debian/<release>/bazel_build_tflite, as Emgu.LiteRT.LM.runtime.ubuntu-* above. By default they are built
+# platforms/debian/<release>/bazel_build_litert, as Emgu.LiteRT.LM.runtime.ubuntu-* above. By default they are built
 # without LiteRT-LM's prebuilt libGemmaModelConstraintProvider.so and libwebgpu_dawn.so (which need AES, so not
 # a Raspberry Pi 4); a LITERT_LM_PREBUILTS=1 build has them, so each file is guarded on EXISTS.
 SET(EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID "${EMGU_LITERT_NUGET_ID}.LM.runtime.${EMGU_LITERT_DEBIAN_ID_ARM64}")

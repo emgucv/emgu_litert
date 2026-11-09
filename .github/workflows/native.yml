@@ -61,7 +61,7 @@ jobs:
       # sets up an Android SDK repository from them and fails if it's missing, so hide them from this build.
       run: |
         env -u ANDROID_HOME -u ANDROID_SDK_ROOT -u ANDROID_NDK -u ANDROID_NDK_HOME -u ANDROID_NDK_ROOT \
-          -u ANDROID_NDK_LATEST_HOME platforms/ubuntu/26.04/bazel_build_tflite
+          -u ANDROID_NDK_LATEST_HOME platforms/ubuntu/26.04/bazel_build_litert
     - uses: actions/upload-artifact@v7
       with:
         name: native-ubuntu-${{ matrix.arch }}

@@ -43,7 +43,7 @@ Native libraries first, then the .NET projects: packages only include the native
 | iOS | `platforms/ios/bazel_build_xcframework` (LiteRT, then LiteRT-LM) | (the MAUI projects) |
 | Mac Catalyst | the macOS build (`bazel_build_macos_fat`): a Catalyst app loads the macOS dylibs | (the MAUI projects) |
 | Android | `platforms/android/bazel_build_tflite_android <arm64\|x86_64\|arm\|x86>` with `ANDROID_HOME` set | (the MAUI projects) |
-| Ubuntu / Debian ARM | `platforms/ubuntu/24.04/bazel_build_tflite`, `platforms/debian/{bookworm,trixie}/bazel_build_tflite` | CMake |
+| Ubuntu / Debian ARM | `platforms/ubuntu/24.04/bazel_build_litert`, `platforms/debian/{bookworm,trixie}/bazel_build_litert` | CMake |
 
 The MAUI demo: `dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-<android|ios|maccatalyst|windows10.0.22621.0>` (on a Mac, iOS and Mac Catalyst add the version `platforms/macos/apple_tfm_version.sh` prints for the installed Xcode: `net10.0-ios26.0` with Xcode 26.x); `Emgu.LiteRT.Example/Maui/tools/deploy_android <serial>` installs and starts it on Android devices (with the models the Mac has), `tools/run_catalyst` builds, re-signs and runs the Catalyst build - with the identity of the gitignored `MacCatalyst.Signing.props` when it is in the keychain, so saved API keys survive rebuilds, else ad hoc. Step by step in `Emgu.LiteRT.Example/Maui/README.md`.
 

@@ -1,8 +1,8 @@
 # Bazel target for building tfliteextern against LiteRT's Bazel path.
 # Wired into platforms/windows/bazel_build_litert.ps1 (Windows),
 # platforms/macos/bazel_build_macos (macOS),
-# platforms/ubuntu/24.04/bazel_build_tflite (Ubuntu), and
-# platforms/debian/{bookworm,trixie}/bazel_build_tflite (Debian arm/arm64).
+# platforms/ubuntu/24.04/bazel_build_litert (Ubuntu), and
+# platforms/debian/{bookworm,trixie}/bazel_build_litert (Debian arm/arm64).
 #
 # litert is a pristine third-party submodule (we don't own/patch it
 # upstream), so this package can't live there in git - the build scripts

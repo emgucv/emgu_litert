@@ -21,6 +21,6 @@ docker run \
   -v /etc/passwd:/etc/passwd \
   -w /src/workspace/platforms/ubuntu/24.04 \
   emgu/bazel-android:ubuntu-24.04-dotnet-8-bazelisk \
-  bash -c "./bazel_build_tflite"
+  bash -c "./bazel_build_litert"
 
 
