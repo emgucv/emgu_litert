@@ -1,0 +1,8 @@
+## About this package
+
+This package adds `libtfliteextern.dylib`, the native TensorFlow Lite Interpreter wrapper that `Emgu.TF.Lite` calls, for Mac OS console and asp.net applications (Apple Silicon and Intel). It is the ${EMGU_TFLITE_PACKAGE_VERSION} release, built on TensorFlow Lite ${EMGU_TFLITE_VERSION}, part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT. For a MAUI (Mac Catalyst) app, use `${EMGU_LITERT_MAUI_MACOS_NUGET_ID}` instead.
+
+It depends on `${EMGU_LITERT_MACOS_NUGET_ID}`, whose `libLiteRt.dylib` contains TensorFlow Lite itself, and on `Emgu.TF.Lite`, so referencing this package is enough for an app that uses the Interpreter API.
+
+For online documentation please visit
+<http://www.emgu.com/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/>

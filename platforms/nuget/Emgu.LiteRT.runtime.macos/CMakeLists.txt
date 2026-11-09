@@ -2,7 +2,7 @@
 #  Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 # --------------------------------------------------------
 
-IF(HAVE_OSX_LITE)
+IF(HAVE_MACOS_LITERT)
 
 PROJECT(Emgu.LiteRT.runtime.macos.nuget)
 

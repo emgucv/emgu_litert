@@ -17,8 +17,9 @@ IF (HAVE_WINDESKTOP_LITE)
 ENDIF()
 
 
-IF(HAVE_OSX_LITE)
+IF(HAVE_MACOS_LITERT)
   add_subdirectory(Emgu.LiteRT.runtime.macos)
+  add_subdirectory(Emgu.TF.Lite.runtime.macos)
   add_subdirectory(Emgu.LiteRT.LM.runtime.macos)
   add_subdirectory(Emgu.LiteRT.Metal.runtime.macos)
 ENDIF()

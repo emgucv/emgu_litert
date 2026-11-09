@@ -731,6 +731,11 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
 
   SET(EMGU_LITERT_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.macos")
   SET(EMGU_LITERT_MACOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Mac OS console or asp.net application. (not for MAUI)")	
+  # libtfliteextern.dylib (the TensorFlow Lite Interpreter C API wrapper Emgu.TF.Lite P/Invokes) is packaged
+  # separately from libLiteRt.dylib (${EMGU_LITERT_MACOS_NUGET_ID} above), with a nuget dependency on it, as on
+  # Windows and Ubuntu - see EMGU_TFLITE_MACOS_NUGET_DEPENDENCY below.
+  SET(EMGU_TFLITE_MACOS_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.runtime.macos")
+  SET(EMGU_TFLITE_MACOS_NUGET_TITLE "Native runtime (tfliteextern) of Emgu TF Lite for Mac OS console or asp.net application. (not for MAUI)")
   # liblitert-lm.dylib (LiteRT-LM's C API, Apple Silicon only) and the libraries that go with it are packaged
   # separately from ${EMGU_LITERT_MACOS_NUGET_ID} above (libtfliteextern.dylib/libLiteRt.dylib), with a nuget
   # dependency on it, as on Windows and Linux - see EMGU_LITERT_LM_MACOS_NUGET_DEPENDENCY below. Only built when
@@ -1103,22 +1108,40 @@ IF (HAVE_WINDESKTOP_LITE)
   ENDIF()
 ENDIF()
 
+# The macOS packages need libLiteRt.dylib: it is the base package's only file, and libtfliteextern.dylib and
+# liblitert-lm.dylib link against it.
+SET(HAVE_MACOS_LITERT OFF)
 IF(HAVE_OSX_LITE)
-  SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST} 
-    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libtfliteextern.dylib\" target=\"runtimes\\osx\\native\" />")
-  # LiteRT's own runtime (built by platforms/macos/bazel_build_macos_fat, universal), P/Invoked directly by the
-  # Emgu.LiteRT classes. Optional: the tfliteextern-based API works without it.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libLiteRt.dylib")
-    SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
-    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libLiteRt.dylib\" target=\"runtimes\\osx\\native\" />")
+    SET(HAVE_MACOS_LITERT ON)
+  ELSE()
+    MESSAGE(WARNING "lib/runtimes/osx/native/libLiteRt.dylib not found: no macOS nuget packages. Build the macOS natives with platforms/macos/bazel_build_macos_fat.")
   ENDIF()
-  SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
+ENDIF()
+
+IF(HAVE_MACOS_LITERT)
+  # LiteRT's own runtime (built by platforms/macos/bazel_build_macos_fat, universal), which contains TensorFlow Lite:
+  # P/Invoked directly by the Emgu.LiteRT classes.
+  SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "
+    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libLiteRt.dylib\" target=\"runtimes\\osx\\native\" />
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />")
-  SET(EMGU_LITERT_MACOS_NUGET_DEPENDENCY "${EMGU_LITERT_MACOS_NUGET_DEPENDENCY}
+  SET(EMGU_LITERT_MACOS_NUGET_DEPENDENCY "
     <dependencies>
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")	
+  # libtfliteextern.dylib (universal), the TensorFlow Lite Interpreter wrapper over libLiteRt.dylib, in its own package.
+  # Like the Ubuntu one, it also depends on the managed Emgu.TF.Lite, so an app needs only this package.
+  SET(EMGU_TFLITE_MACOS_NUGET_FILE_LIST "
+    <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libtfliteextern.dylib\" target=\"runtimes\\osx\\native\" />
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"README.md\" target=\"docs\\\" />")
+  SET(EMGU_TFLITE_MACOS_NUGET_DEPENDENCY "
+    <dependencies>
+		<dependency id=\"${EMGU_LITERT_MACOS_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
+		<dependency id=\"${EMGU_TFLITE_NUGET_ID}\" version=\"${EMGU_TFLITE_PACKAGE_VERSION}\" />
+    </dependencies>")
   # LiteRT-LM's C API (built by platforms/macos/bazel_build_macos_fat, Apple Silicon only), P/Invoked directly by
   # the Emgu.LiteRT.LM classes, plus the prebuilt libGemmaModelConstraintProvider.dylib and (since v0.19.0)
   # libwebgpu_dawn.dylib it depends on, and libomniextern.dylib (Emgu's C API over LiteRT-LM's OmniEngine:
@@ -1603,6 +1626,10 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.windows.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.windows.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.windows/README.md)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.macos/Package.nuspec)
+IF(HAVE_MACOS_LITERT)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.macos/Package.nuspec)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.macos.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.macos/README.md)
+ENDIF()
 IF(HAVE_MACOS_LITERT_LM)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.macos.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.macos/Package.nuspec)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.macos.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.macos/README.md)
