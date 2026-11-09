@@ -58,7 +58,7 @@ SET(CSC_TARGET_FRAMEWORK "" CACHE STRING "C# target framework")
 FIND_PACKAGE(CSharp REQUIRED)
 MESSAGE(STATUS "DOTNET_FOUND: ${DOTNET_FOUND}")
 
-# Minimum iOS version, shared by the native iOS and Mac Catalyst builds (platforms/ios/ios_frameworks.sh,
+# Minimum iOS version, shared by the native iOS and Mac Catalyst builds (platforms/ios/bazel_build_xcframework,
 # cmake_build_tflite_catalyst) and the managed projects' SupportedOSPlatformVersion, so they cannot drift apart.
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ios_min_version.txt" EMGU_LITERT_IOS_MIN_VERSION LIMIT_COUNT 1)
 string(STRIP "${EMGU_LITERT_IOS_MIN_VERSION}" EMGU_LITERT_IOS_MIN_VERSION)
@@ -239,7 +239,7 @@ MACRO(CHECK_BINARY_EXIST folder patterns property_name second_check)
 ENDMACRO()
 
 
-# iOS: the dynamic frameworks built by platforms/ios/bazel_build_tflite_ios_frameworks (LiteRT's runtime, and
+# iOS: the dynamic frameworks built by platforms/ios/bazel_build_xcframework (LiteRT's runtime, and
 # tfliteextern linked to it).
 IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/tfliteextern.xcframework" AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ios/LiteRt.xcframework")
   SET(HAVE_IOS_LITE ON)
@@ -894,7 +894,7 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # computed after this point in the file - re-checked here with the same EXISTS test rather than
   # reordering that block).
   # Emgu.LiteRT.LM.runtime.maui.ios (LiteRtLm.xcframework, built on macOS by
-  # platforms/ios/bazel_build_litert_lm_ios) is likewise only added - together with the ios
+  # platforms/ios/bazel_build_xcframework) is likewise only added - together with the ios
   # TargetFramework it needs - when that framework exists, so hosts without it (e.g. Windows) don't
   # try to restore an iOS add-on package that was never built.
   SET(EMGU_LITERT_LM_MAUI_IOS_TFM "")

@@ -163,10 +163,8 @@ jobs:
       run: >
         git -C LiteRT-LM lfs pull
         --include=prebuilt/ios_arm64/libGemmaModelConstraintProvider.dylib,prebuilt/ios_sim_arm64/libGemmaModelConstraintProvider.dylib,prebuilt/ios_arm64/libLiteRtMetalAccelerator.dylib,prebuilt/ios_sim_arm64/libLiteRtMetalAccelerator.dylib
-    - name: Build LiteRt.xcframework and tfliteextern.xcframework
-      run: platforms/ios/bazel_build_tflite_ios_frameworks
-    - name: Build LiteRtLm.xcframework and GemmaModelConstraintProvider.xcframework
-      run: platforms/ios/bazel_build_litert_lm_ios
+    - name: Build the iOS xcframeworks
+      run: platforms/ios/bazel_build_xcframework
     - uses: actions/upload-artifact@v7
       with:
         name: native-ios

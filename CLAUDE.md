@@ -40,7 +40,7 @@ Native libraries first, then the .NET projects: packages only include the native
 |---|---|---|
 | Windows x64 | `platforms/windows/cmake_build_litert.ps1 64 xnn` or `bazel_build_litert.ps1 64` | `platforms/windows/build_emgu_litert.ps1` (`nuget`, `package`, `doc`) |
 | macOS | `platforms/macos/bazel_build_tflite_macos_fat` (universal; LiteRT-LM arm64 only) | `platforms/macos/build_emgutf` |
-| iOS | `platforms/ios/bazel_build_tflite_ios_frameworks`, then `bazel_build_litert_lm_ios` | (the MAUI projects) |
+| iOS | `platforms/ios/bazel_build_xcframework` (LiteRT, then LiteRT-LM) | (the MAUI projects) |
 | Mac Catalyst | `platforms/ios/cmake_build_tflite_catalyst arm64` (plus the macOS build for LiteRT-LM) | (the MAUI projects) |
 | Android | `platforms/android/bazel_build_tflite_android <arm64\|x86_64\|arm\|x86>` with `ANDROID_HOME` set | (the MAUI projects) |
 | Ubuntu / Debian ARM | `platforms/ubuntu/24.04/bazel_build_tflite`, `platforms/debian/{bookworm,trixie}/bazel_build_tflite` | CMake |

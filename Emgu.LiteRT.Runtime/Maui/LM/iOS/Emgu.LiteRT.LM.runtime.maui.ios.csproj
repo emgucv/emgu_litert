@@ -30,7 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- LiteRT-LM's C API (Emgu.LiteRT.LM), built by platforms/ios/bazel_build_litert_lm_ios: a dynamic framework
+    <!-- LiteRT-LM's C API (Emgu.LiteRT.LM), built by platforms/ios/bazel_build_xcframework: a dynamic framework
          linked to LiteRt.framework, LiteRT's runtime, which the base Emgu.LiteRT.runtime.maui.ios embeds. It depends on
          LiteRT-LM's prebuilt Gemma model constraint provider, which that script wraps into a framework of its own.
          Emgu.LiteRT.LM's DllImport names it by path (@rpath/LiteRtLm.framework/LiteRtLm). -->
@@ -49,7 +49,7 @@
       <SmartLink>False</SmartLink>
     </NativeReference>
     <!-- LiteRT's GPU (Metal) accelerator, Google's prebuilt: LiteRt.framework loads it by name for the GPU backend
-         (platforms/ios/bazel_build_litert_lm_ios). -->
+         (platforms/ios/bazel_build_xcframework). -->
     <NativeReference Condition="Exists('$(EmguLiteRtMetalIOSFramework)')" Include="$(EmguLiteRtMetalIOSFramework)">
       <Kind>Framework</Kind>
       <SmartLink>False</SmartLink>
@@ -64,6 +64,6 @@
 
   <Target Name="EmguLiteRtLmMauiIOSPackageBuildImports" BeforeTargets="PrepareForBuild">
     <Message Text="LiteRT-LM iOS framework linked: '$(EmguLiteRtLmIOSFramework)'" Importance="high" Condition="Exists('$(EmguLiteRtLmIOSFramework)')" />
-    <Warning Text="LiteRT-LM is not available for $(TargetFramework): $(EmguLiteRtLmIOSFramework) is missing - run platforms/ios/bazel_build_litert_lm_ios." Condition="!Exists('$(EmguLiteRtLmIOSFramework)')" />
+    <Warning Text="LiteRT-LM is not available for $(TargetFramework): $(EmguLiteRtLmIOSFramework) is missing - run platforms/ios/bazel_build_xcframework." Condition="!Exists('$(EmguLiteRtLmIOSFramework)')" />
   </Target>
 </Project>

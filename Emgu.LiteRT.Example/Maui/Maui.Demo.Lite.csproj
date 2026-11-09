@@ -57,7 +57,7 @@
 		<UseInterpreter>false</UseInterpreter>
 	</PropertyGroup>
 
-	<!-- iOS without LiteRT-LM (lib/ios/LiteRtLm.xcframework not built: bazel_build_litert_lm_ios needs an Apple Silicon
+	<!-- iOS without LiteRT-LM (lib/ios/LiteRtLm.xcframework not built: bazel_build_xcframework needs an Apple Silicon
 	     Mac): the trimmer still lists LiteRtLm and omniextern, the frameworks Emgu.LiteRT.LM's DllImports name, for the
 	     native link, which then fails ("framework 'LiteRtLm' not found"). Leave them out of the link and look
 	     Emgu.LiteRT.LM's functions up at run time, where LiteRtLmInvoke.IsAvailable is false and the chat offers only
@@ -122,7 +122,7 @@
 
 		<!-- LiteRT-LM chat demo (LiteRtLmChatPage.cs), on Windows, iOS and Android: LiteRT-LM's native library isn't
 		     bundled with this app on Mac Catalyst yet (on iOS it comes from the LiteRtLm.xcframework the iOS LiteRT-LM
-		     add-on embeds, built by platforms/ios/bazel_build_litert_lm_ios; on Android from liblitert-lm.so, arm64-v8a
+		     add-on embeds, built by platforms/ios/bazel_build_xcframework; on Android from liblitert-lm.so, arm64-v8a
 		     and x86_64 only, which the Android MAUI runtime packages). -->
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.LM\NetStandard\Emgu.LiteRT.LM.csproj" />
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />

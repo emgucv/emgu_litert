@@ -153,7 +153,7 @@ cc_shared_library(
         "@XNNPACK//:__subpackages__",
     ],
     shared_lib_name = "libLiteRt.dylib",
-    # Also built for iOS, where platforms/ios/bazel_build_tflite_ios_frameworks wraps it into LiteRt.framework (and
+    # Also built for iOS, where platforms/ios/bazel_build_xcframework wraps it into LiteRt.framework (and
     # changes its install name to @rpath/LiteRt.framework/LiteRt).
     target_compatible_with = select({
         "@platforms//os:macos": [],

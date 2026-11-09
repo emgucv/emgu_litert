@@ -1,4 +1,4 @@
-# iOS: LiteRtLm.framework and omniextern.framework from one LiteRT-LM runtime. platforms/ios/bazel_build_litert_lm_ios
+# iOS: LiteRtLm.framework and omniextern.framework from one LiteRT-LM runtime. platforms/ios/bazel_build_xcframework
 # stages this package into the LiteRT-LM workspace as omniextern_ios/, with static_archives.bzl, next to omniextern/ (whose
 # omniextern.cc and omniextern.h it compiles).
 #

@@ -33,7 +33,7 @@
   </ItemGroup>
    
   <ItemGroup>
-    <!-- Dynamic frameworks built by platforms/ios/bazel_build_tflite_ios_frameworks, the same split as the macOS and
+    <!-- Dynamic frameworks built by platforms/ios/bazel_build_xcframework, the same split as the macOS and
          Android libraries: LiteRt.framework is LiteRT's runtime (the LiteRt* and TfLite* C APIs, P/Invoked by
          Emgu.LiteRT), and tfliteextern.framework the Emgu TF Lite wrapper (Emgu.TF.Lite), linked to it. LiteRT-LM's
          framework (the Emgu.LiteRT.LM.runtime.maui.ios add-on) is linked to it too. The DllImports name them by path
@@ -58,6 +58,6 @@
 	  
   <Target Name="EmguTfLiteMauiIOSPackageBuildImports" BeforeTargets="PrepareForBuild">
     <Message Text="iOS frameworks embedded: '$(EmguLiteRtIOSFramework)', '$(EmguTfLiteIOSFramework)'" Importance="high" Condition="Exists('$(EmguLiteRtIOSFramework)') And Exists('$(EmguTfLiteIOSFramework)')" />
-    <Warning Text="The iOS native frameworks are missing ($(EmguLiteRtIOSFramework), $(EmguTfLiteIOSFramework)) - run platforms/ios/bazel_build_tflite_ios_frameworks." Condition="!Exists('$(EmguLiteRtIOSFramework)') Or !Exists('$(EmguTfLiteIOSFramework)')" />
+    <Warning Text="The iOS native frameworks are missing ($(EmguLiteRtIOSFramework), $(EmguTfLiteIOSFramework)) - run platforms/ios/bazel_build_xcframework." Condition="!Exists('$(EmguLiteRtIOSFramework)') Or !Exists('$(EmguTfLiteIOSFramework)')" />
   </Target>
 </Project>
