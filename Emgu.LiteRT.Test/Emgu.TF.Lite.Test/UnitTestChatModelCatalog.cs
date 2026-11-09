@@ -36,6 +36,20 @@ public class UnitTestChatModelCatalog
     }
 
     [Test]
+    public void ALowMemoryDeviceGetsOnlyWhatFitsAnIPhone12()
+    {
+        IList<ChatModelOption> small = ChatModelCatalog.For(ChatPlatform.iOS, lowMemory: true);
+        Assert.That(small.Select(m => m.Id), Is.EqualTo(new[] { "Qwen3", "Qwen35_0_8B_VL", "Qwen35_2B", "Gemma4E2B", "Gemma4E4B" }));
+        Assert.That(small.Single(m => m.Id == "Gemma4E4B").Backends, Is.EqualTo(new[] { "gpu" }), "E4B's CPU ran out of memory for a picture");
+        Assert.That(small.Single(m => m.Id == "Gemma4E2B").Backends, Is.EqualTo(new[] { "cpu", "gpu" }));
+        Assert.That(((Emgu.LiteRT.LM.Models.Gemma4)small.Single(m => m.Id == "Gemma4E2B").Create()).SmallPrefillOnly, Is.True);
+        IList<ChatModelOption> large = ChatModelCatalog.For(ChatPlatform.iOS);
+        Assert.That(large.Any(m => m.Id == "Qwen35_4B"), Is.True);
+        Assert.That(large.Single(m => m.Id == "Gemma4E4B").Backends, Is.EqualTo(new[] { "cpu", "gpu" }));
+        Assert.That(((Emgu.LiteRT.LM.Models.Gemma4)large.Single(m => m.Id == "Gemma4E4B").Create()).SmallPrefillOnly, Is.False);
+    }
+
+    [Test]
     public void TheFlagsMatchWhatTheModelsCanDo()
     {
         foreach (ChatModelOption option in ChatModelCatalog.For(ChatPlatform.MacCatalyst))

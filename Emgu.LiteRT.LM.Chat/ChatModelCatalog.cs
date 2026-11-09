@@ -47,7 +47,8 @@ namespace Emgu.LiteRT.LM.Chat
         /// <param name="platform">The platform</param>
         /// <param name="lowMemory">True on a device that allows an app little memory (a 4 GB iPhone: ~2.2 GB): Gemma 4 on the
         /// GPU then prefills with its 128-token signature only (<see cref="Gemma4.SmallPrefillOnly"/>), keeping ~740 MB
-        /// that the chat's first prompt would otherwise hold, so a picture still fits after it</param>
+        /// that the chat's first prompt would otherwise hold, so a picture still fits after it; Qwen3.5 4B is left out
+        /// and Gemma 4 E4B is offered on the GPU only (measured on an iPhone 12)</param>
         public static IList<ChatModelOption> For(ChatPlatform platform, bool lowMemory = false)
         {
             bool android = platform == ChatPlatform.Android, ios = platform == ChatPlatform.iOS, mac = platform == ChatPlatform.MacCatalyst,
@@ -80,6 +81,20 @@ namespace Emgu.LiteRT.LM.Chat
                     windows ? "~6.9 GB download. Large desktop model for code and harder questions. CPU only on Windows: GPU image inference failed compatibility testing. Needs substantial system memory."
                         : "~6.9 GB download. The most capable - best for code and harder questions. Needs a Mac with 16 GB of memory.",
                     gpu: mac));
+            // Little memory (an iPhone 12: 4 GB, ~2.2 GB for the app; 2026-11-09, a ~1500-token first prompt): Qwen3.5 4B on the
+            // CPU loaded with 811 MB left and was killed reading the prompt; Gemma 4 E4B on the CPU read it (335 MB left) but
+            // was killed encoding a picture, while on the GPU with SmallPrefillOnly it read it in 21 s (1431 MB left) and
+            // described the picture (767 MB left). Qwen3.5 2B read it on the CPU in 34 s with 356 MB left.
+            if (lowMemory)
+            {
+                models.RemoveAll(m => m.Id == "Qwen35_4B");
+                ChatModelOption e4b = models.Find(m => m.Id == "Gemma4E4B");
+                if (e4b != null && e4b.Backends.Contains("gpu"))
+                {
+                    e4b.Backends.Remove("cpu");
+                    e4b.Detail = "~3.7 GB download. More capable than E2B, but slower and needs more memory. On the GPU only on this device: its CPU runs out of memory for pictures.";
+                }
+            }
             return models;
         }
 

@@ -341,6 +341,9 @@ public sealed class LiteRtLmChatPage : ChatPage
         true;
 #endif
 
+    // Not the GPU choices on a device with little memory: on an iPhone 12 (4 GB) Bonsai on the GPU loaded, then took the
+    // phone's interface down while drawing (SpringBoard restarted, no jetsam report: the GPU's memory isn't the app's);
+    // on its CPU it drew a picture in 61 s with 1.5 GB still left (2026-11-09).
     private static List<ImageModelOption> ImageModelOptions()
     {
         var options = new List<ImageModelOption>();
@@ -353,6 +356,7 @@ public sealed class LiteRtLmChatPage : ChatPage
                 "256 x 256, 4 steps; a 4.3 GB download. About 25 s a picture on a computer, 4-5 minutes on an older phone.", bonsai,
                 () => new OmniImageModel(new BonsaiImage4B(), "cpu", caches)));
 #if MACCATALYST || ANDROID || IOS || WINDOWS_WEBGPU
+            if (!ChatDevicePlatform.LowMemory)
             options.Add(new ImageModelOption("bonsai_gpu", "Bonsai Image 4B · GPU",
                 "The same model on the GPU: about 11 s a picture on a Mac, 8-9 s on an iPad Air (21 s on its CPU), 4 s on a Windows PC with an RTX 3070 (20-40 s while the chat model is on the same 8 GB GPU). " + GpuFirstLoad + " A GPU without enough memory (an 8 GB phone's) falls back to the CPU.", bonsai,
                 () => new OmniImageModel(new BonsaiImage4B(), "gpu", caches)));
@@ -377,6 +381,7 @@ public sealed class LiteRtLmChatPage : ChatPage
                 "256 x 256, 4 steps; a 4.7 GB download. About 25 s a picture on a computer, minutes on a phone.", klein,
                 () => new OmniImageModel(new Flux2Klein4B(), "cpu", caches)));
 #if MACCATALYST || ANDROID || IOS || WINDOWS_WEBGPU
+            if (!ChatDevicePlatform.LowMemory)
             options.Add(new ImageModelOption("flux2_klein_gpu", "FLUX.2-klein 4B · GPU",
                 "The same model on the GPU: about 17 s a picture on a Mac, 10 s on an iPad Air (22 s on its CPU), 10-20 s on a Windows PC with an RTX 3070 (more while the chat model is on the same GPU). " + GpuFirstLoad + " A GPU without enough memory (an 8 GB phone's) falls back to the CPU.", klein,
                 () => new OmniImageModel(new Flux2Klein4B(), "gpu", caches)));

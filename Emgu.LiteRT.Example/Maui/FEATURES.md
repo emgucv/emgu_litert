@@ -65,6 +65,27 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   - `EngineSettings.MaxVisionTokensPerImage` (70 or 140) doesn't help in LiteRT-LM v0.19.0: the Gemma 4 preprocessor
     still sizes every picture to the model's 2520 patches (it enlarges small ones too), then finds no encoder that small
     ("No signature found with prefix vision_ ...").
+  - Which models fit (2026-11-09; a temporary self-test, one model per launch, the models copied in and deleted after; a
+    chat model read a ~1500-token system message, then a Gemma one a picture; an image model drew one 256 px picture):
+
+    | Model | Load | Then | Offered on 4 GB devices |
+    |---|---|---|---|
+    | Qwen3.5 2B · CPU | 13.6 s | prompt in 33.8 s, 356 MB left at the least | yes |
+    | Qwen3.5 4B · CPU | 21.3 s, 811 MB left | killed reading the prompt | no |
+    | Gemma 4 E4B · CPU | 14.3 s | prompt in 43.3 s (335 MB left), killed encoding the picture | no |
+    | Gemma 4 E4B · GPU, `SmallPrefillOnly` | 14.0 s | prompt in 21.2 s (1431 MB left), picture in 127 s (767 MB left) | yes, GPU only |
+    | Bonsai Image 4B · CPU | 23.7 s | drawn in 61 s, 1544 MB left | yes |
+    | Bonsai Image 4B · GPU | 33.0 s, 705 MB left | took the phone's interface down while drawing | no |
+    | FLUX.2-klein 4B · CPU | 24.4 s | drawn in 62.6 s, 593 MB left | yes |
+    | FLUX.2-klein 4B · GPU | not run (as Bonsai's GPU) | | no |
+
+    Bonsai on the GPU left no jetsam report: SpringBoard and backboardd restarted (newer process ids than the app), the
+    USB connection dropped, WebDriverAgent ended and the phone asked for its passcode - the GPU's memory isn't charged to
+    the app, so iOS didn't stop it first. `ChatModelCatalog.For(platform, lowMemory)` leaves out Qwen3.5 4B and offers
+    E4B on the GPU only, and `LiteRtLmChatPage.ImageModelOptions` leaves out the GPU image models, on
+    `ChatDevicePlatform.LowMemory` devices (iOS under 5 GB); Z-Image-Turbo (a 10.6 GB download, ~9 GB of caches) wasn't
+    tried and is still offered. A model chosen before stays harmless: an unknown saved model falls back to the first one,
+    a saved chat of a hidden model opens on the current one, and an unknown image model on the first image model.
   - The captures at the phone's width (through WebDriverAgent, a sound monitor for speech taking photos while the Mac
     spoke): two photos in the strip, the photo viewer with its four buttons on one line, a switch to the selfie camera
     and back adding no row, Close adding the row "Camera · 2 pictures" on the reply, and Keep all marking both. Seen on
