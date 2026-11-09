@@ -1089,13 +1089,13 @@ ENDIF()
 IF(HAVE_OSX_LITE)
   SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST} 
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libtfliteextern.dylib\" target=\"runtimes\\osx\\native\" />")
-  # LiteRT's own runtime (built by platforms/macos/bazel_build_litert_macos), P/Invoked directly by the
+  # LiteRT's own runtime (built by platforms/macos/bazel_build_tflite_macos_fat, universal), P/Invoked directly by the
   # Emgu.LiteRT classes. Optional: the tfliteextern-based API works without it.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/libLiteRt.dylib")
     SET(EMGU_LITERT_MACOS_NUGET_FILE_LIST "${EMGU_LITERT_MACOS_NUGET_FILE_LIST}
     <file src=\"..\\..\\..\\lib\\runtimes\\osx\\native\\libLiteRt.dylib\" target=\"runtimes\\osx\\native\" />")
   ENDIF()
-  # LiteRT-LM's C API (built by platforms/macos/bazel_build_tflite_macos, Apple Silicon only), P/Invoked directly by
+  # LiteRT-LM's C API (built by platforms/macos/bazel_build_tflite_macos_fat, Apple Silicon only), P/Invoked directly by
   # the Emgu.LiteRT.LM classes, plus the prebuilt libGemmaModelConstraintProvider.dylib and (since v0.19.0)
   # libwebgpu_dawn.dylib it depends on. Optional.
   IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/osx/native/liblitert-lm.dylib")
