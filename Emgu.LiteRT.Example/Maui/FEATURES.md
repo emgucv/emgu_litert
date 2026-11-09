@@ -28,6 +28,27 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   model on a background thread.
 - Verified on the Pixel Fold: the first load took 11 s (9 s of it a one-time hash) with no UI stall; later loads take under
   3 s.
+- On an iPhone 12 (2026-11-08, iPhone13,2, iOS 27.2, 4 GB of RAM - the smallest Apple device tried): Gemma 4 E2B,
+  copied from the Mac with its `.sha256ok` (`README.md`, "iOS"), loaded and chatted. The iOS build's memory
+  entitlements are in its profile for this phone too, but iOS lets the app have only ~2.2 GB here (12.2 GB on the
+  iPad Air). Measured in a temporary self-test (`Chat.SendAsync`, thinking off): on the CPU it loaded in 5.5 s and
+  wrote ~12 tokens/s (3.7 s to the first token of the chat's first reply, under 1 s after); on the GPU (its caches
+  already built) it loaded in 0.8-1.4 s and wrote ~21 tokens/s, slowing to ~18 by the seventh turn of a chat that
+  still remembered the first question; ~1.36 GB was left while it ran on either, and all came back when released.
+  A 720x960 picture alone (the self-test, GPU) was described in 8.7 s with at least 700 MB left, but in the chat page
+  with the camera open, "Take a snapshot." - which Gemma answers with `capture_camera_frame`, the frame sent to the model,
+  not a capture - got the app killed (signal 9, no jetsam report) on the GPU and the CPU, at the picture's encoding
+  (2394 patches). Not fixed yet. Measured in the chat page (a temporary self-test, GPU, 8192-token context): 1834 MB
+  left with the model loaded; the first message ("Open the camera.", with the chat's instructions and tools) brought it
+  to ~535 MB, and it stayed there after the reply; opening the camera cost almost nothing; the frame's encoding then
+  went from 468 to 111 MB left in 0.1 s and the app was killed. The encoding needs ~1.3 GB (2023 -> 700 MB left in the
+  standalone test), so on this phone it fits only before the chat's first long prompt. The captures themselves worked at the phone's width (2026-11-09, through WebDriverAgent:
+  a sound monitor for speech taking photos, the Mac speaking): two photos in the strip, the photo viewer with its four
+  buttons on one line, a switch to the selfie camera and back adding no row, Close adding the row "Camera · 2 pictures"
+  on the reply, and Keep all marking both. Seen on the way: the sound monitor card covers the message box and the chips
+  at this width, and Gemma made "record a 5 second clip" into playing 'white noise' for 5 s. `EngineSettings.MaxVisionTokensPerImage` (70 or 140) doesn't
+  help in LiteRT-LM v0.19.0: the Gemma 4 preprocessor still sizes every picture to the model's 2520 patches (it enlarges
+  small ones too), then finds no encoder that small ("No signature found with prefix vision_ ...").
 - `Chat.SendAsync` and `LiteRtLmChatClient` create their LiteRT-LM conversation on a background thread: on the caller's (UI)
   thread it stalled the demo for ~2.5 s after Send on a Pixel Fold, which the stall watchdog found.
 
