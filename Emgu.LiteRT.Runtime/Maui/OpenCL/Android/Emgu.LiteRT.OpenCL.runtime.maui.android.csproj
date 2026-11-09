@@ -15,7 +15,7 @@
          Emgu.LiteRT.runtime.maui.android) loads it at run time when a model asks for the GPU - LiteRT's CompiledModel
          (HwAccelerators.Gpu) or LiteRT-LM's "gpu" backend. An optional add-on, so apps that don't use the GPU don't
          carry it. It is a LiteRT-LM prebuilt (prebuilt/android_<abi>, built from the LiteRT commit LiteRT-LM pins, the
-         same source as our libLiteRt.so), copied to lib/android/<abi>/ by bazel_build_tflite_android, and only exists
+         same source as our libLiteRt.so), copied to lib/android/<abi>/ by platforms/android/bazel_build_litert, and only exists
          for arm64-v8a and x86_64. Apps must declare <uses-native-library android:name="libOpenCL.so"
          android:required="false" /> in their manifest for it to find the device's OpenCL driver. -->
     <EmguTfLiteBuildAndroidArm64v8a Condition="$(AndroidSupportedAbis.Contains('arm64-v8a%3')) OR $(AndroidSupportedAbis.Contains('arm64-v8a,')) OR $(AndroidSupportedAbis.EndsWith('arm64-v8a;')) OR $(AndroidSupportedAbis.EndsWith('arm64-v8a')) OR ('$(AndroidSupportedAbis)'=='' AND '$(Platform)'=='AnyCPU')  OR ('$(Platform)'=='arm64-v8a')">True</EmguTfLiteBuildAndroidArm64v8a>

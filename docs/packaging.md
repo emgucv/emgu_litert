@@ -35,7 +35,7 @@ The NuGet packages, the native runtime packages and their add-ons, and versionin
 ## GPU accelerator packages (OpenCL, Metal)
 
 - **Android, OpenCL.** LiteRT's OpenCL accelerator `libLiteRtOpenClAccelerator.so` is a LiteRT-LM prebuilt
-  (`prebuilt/android_{arm64,x86_64}`; self-contained, using only Android system libraries). `bazel_build_tflite_android`
+  (`prebuilt/android_{arm64,x86_64}`; self-contained, using only Android system libraries). `platforms/android/bazel_build_litert`
   copies it to `lib/android/<abi>/`, and the optional `Emgu.LiteRT.OpenCL.runtime.maui.android` package embeds it
   (`Emgu.LiteRT.Runtime/Maui/OpenCL/Android/`; props and README from `cmake/Emgu.LiteRT.OpenCL.runtime.maui.android.*.in`;
   `EMGU_LITERT_OPENCL_MAUI_ANDROID_NUGET_ID`). It has arm64-v8a and x86_64 only and depends on

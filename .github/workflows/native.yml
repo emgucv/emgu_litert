@@ -109,7 +109,7 @@ jobs:
         git -C LiteRT-LM lfs pull
         --include=prebuilt/android_${{ matrix.arch }}/libGemmaModelConstraintProvider.so,prebuilt/android_${{ matrix.arch }}/libLiteRtOpenClAccelerator.so
     - name: Build libLiteRt.so, libtfliteextern.so and liblitert-lm.so
-      run: platforms/android/bazel_build_tflite_android ${{ matrix.arch }}
+      run: platforms/android/bazel_build_litert ${{ matrix.arch }}
     - uses: actions/upload-artifact@v7
       with:
         name: native-android-${{ matrix.abi }}
