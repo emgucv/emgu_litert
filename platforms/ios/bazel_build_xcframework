@@ -18,7 +18,7 @@
 # Both come from the macOS targets //tfliteextern:litert_runtime and //tfliteextern:tfliteextern_dylib
 # (litertextern/tfliteextern/bazel/BUILD), built in the LiteRT-LM workspace against the LiteRT it pins, and are embedded
 # by Emgu.LiteRT.Runtime/Maui/iOS (Emgu.LiteRT.runtime.maui.ios). They replace the static libtfliteextern_ios.xcframework
-# this script used to build from bazel_build_tflite_ios, which carried its own copy of TFLite.
+# this script used to build from bazel_build_tflite_ios (removed), which carried its own copy of TFLite.
 #
 # Second part, LiteRT-LM's C API (Emgu.LiteRT.LM's native library) from the LiteRT-LM submodule, linked to that
 # LiteRt.framework instead of carrying its own LiteRT runtime:

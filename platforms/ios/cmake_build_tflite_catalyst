@@ -4,9 +4,9 @@
 # static libraries Emgu.LiteRT.Runtime/Maui/Mac's .csproj force-loads into a Catalyst app (DllImport resolves the
 # tfe* symbols from the app binary itself, as on iOS).
 #
-# Bazel can't target Mac Catalyst: rules_apple/apple_support have no Catalyst platform, and
-# bazel_build_tflite_ios darwin_<arch> actually produces iOS Simulator objects (LC_BUILD_VERSION platform 7),
-# which a Catalyst app can't link. Plain clang can, via the "<arch>-apple-ios<version>-macabi" target, so
+# Bazel can't target Mac Catalyst: rules_apple/apple_support have no Catalyst platform, and a Bazel build for
+# darwin_<arch> (the removed bazel_build_tflite_ios and bazel_build_mac_catalyst) produces iOS Simulator objects
+# (LC_BUILD_VERSION platform 7), which a Catalyst app can't link. Plain clang can, via the "<arch>-apple-ios<version>-macabi" target, so
 # this configures litertextern/tfliteextern's CMake project (statically linking TFLite, like the iOS builds:
 # TFLITEEXTERN_LINK_LITERT=OFF) with that target.
 #

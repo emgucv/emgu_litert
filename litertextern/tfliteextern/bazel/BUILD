@@ -325,7 +325,8 @@ cc_shared_library(
 
 # bazel build --config=ios_arm64 //tfliteextern:tfliteextern_ios_framework      # device
 # bazel build --config=ios_sim_arm64 //tfliteextern:tfliteextern_ios_framework  # simulator (Apple Silicon)
-# bazel build --apple_platform_type=macos --cpu=darwin_arm64 //tfliteextern:tfliteextern_ios_framework  # Mac Catalyst
+# Not for Mac Catalyst: Bazel has no Catalyst platform, and darwin_<arch> gives iOS Simulator objects; Catalyst's
+# static tfliteextern comes from platforms/ios/cmake_build_tflite_catalyst. No script builds this target any more.
 #
 # No symbol-hiding/allowlist step (unlike litert's own TensorFlowLiteC_framework, which
 # wraps this in extract_object_files/hide_symbols_with_allowlist) - the tfe* symbols must
