@@ -130,6 +130,16 @@ OMNIEXTERN_EXPORT int omniextern_tts_engine_get_default_voice(OmniExternTtsEngin
 OMNIEXTERN_EXPORT int omniextern_tts_synthesize(OmniExternTtsEngine* engine, const char* text, float** out_pcm,
                                                 int* out_count, int* out_sample_rate);
 
+// LiteRT-LM's engine settings (c/engine.h), for the setting its C API doesn't have.
+typedef struct LiteRtLmEngineSettings LiteRtLmEngineSettings;
+
+// Limits the main model to these signatures (count names, e.g. "decode" and "prefill_128"); count 0 for all of them
+// (the default). LiteRT-LM's LlmExecutorSettings::SetSelectedSignatures, its --selected_signatures flag: the list must
+// include "decode" and a prefill signature, or the engine fails to load. Prefilling with a smaller signature only keeps
+// its smaller buffers: Gemma 4 E2B on the GPU keeps ~740 MB more after any prompt that took its prefill_1024.
+OMNIEXTERN_EXPORT int omniextern_engine_settings_set_selected_signatures(LiteRtLmEngineSettings* settings,
+                                                                          const char* const* names, int count);
+
 #ifdef __cplusplus
 }
 #endif

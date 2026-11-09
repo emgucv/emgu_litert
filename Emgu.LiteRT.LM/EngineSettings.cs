@@ -38,6 +38,7 @@ namespace Emgu.LiteRT.LM
         private int _audioLoraRank;
         private int[] _supportedAudioLoraRanks;
         private bool _gpuEnableMetalResidencySet;
+        private String[] _selectedSignatures;
         private bool _singleThreadedExecution;
         private SpeculativeDecodingMode? _speculativeDecoding;
 
@@ -367,6 +368,41 @@ namespace Emgu.LiteRT.LM
         {
             get { return _gpuEnableMetalResidencySet; }
             set { LiteRtLmInvoke.CheckError(LiteRtLmInvoke.litert_lm_engine_settings_set_gpu_enable_metal_residency_set(_ptr, value), "litert_lm_engine_settings_set_gpu_enable_metal_residency_set"); _gpuEnableMetalResidencySet = value; }
+        }
+
+        /// <summary>
+        /// The main model's signatures the engine may use (e.g. "decode" and "prefill_128"), or null for all of them (the
+        /// default): LiteRT-LM's --selected_signatures, which its C API doesn't have, so it is set through omniextern
+        /// (OmniInvoke.IsAvailable must be true). It must include "decode" and a prefill signature, or the engine fails to
+        /// load. A long prompt is then prefilled in more, smaller pieces, but only the smaller signature's buffers are kept:
+        /// Gemma 4 E2B on the GPU keeps ~740 MB more once any prompt of 512 tokens or more has taken its prefill_1024.
+        /// </summary>
+        public String[] SelectedSignatures
+        {
+            get { return _selectedSignatures; }
+            set
+            {
+                String[] names = value ?? new String[0];
+                IntPtr[] utf8 = new IntPtr[names.Length];
+                try
+                {
+                    for (int i = 0; i < names.Length; i++)
+                    {
+                        byte[] bytes = LiteRtLmInvoke.ToUtf8(names[i]);
+                        utf8[i] = Marshal.AllocHGlobal(bytes.Length);
+                        Marshal.Copy(bytes, 0, utf8[i], bytes.Length);
+                    }
+                    OmniInvoke.CheckError(OmniInvoke.omniextern_engine_settings_set_selected_signatures(_ptr, utf8, names.Length),
+                        "omniextern_engine_settings_set_selected_signatures");
+                }
+                finally
+                {
+                    foreach (IntPtr name in utf8)
+                        if (name != IntPtr.Zero)
+                            Marshal.FreeHGlobal(name);
+                }
+                _selectedSignatures = value;
+            }
         }
 
         /// <summary>

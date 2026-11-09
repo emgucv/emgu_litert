@@ -31,6 +31,7 @@ cc_library(
         "//omni/text2speech:kokoro",
         "//omni/text2speech:tts_session",
         "//omni:omni_registry",
+        "//c:engine_internal",
         "//runtime/proto:speech2text_session_config_cc_proto",
         "//runtime/proto:text2image_session_config_cc_proto",
         "//runtime/proto:text2speech_session_config_cc_proto",

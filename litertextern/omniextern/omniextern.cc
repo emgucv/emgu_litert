@@ -17,6 +17,7 @@
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/match.h"  // from @com_google_absl
+#include "c/engine_internal.h"
 #include "omni/omni_engine.h"
 #include "omni/omni_registry.h"
 #include "omni/omni_session.h"
@@ -492,6 +493,22 @@ int omniextern_tts_synthesize(OmniExternTtsEngine* engine, const char* text, flo
     *out_pcm = buffer;
     *out_count = static_cast<int>(pcm.size());
     *out_sample_rate = sample_rate;
+    return OMNIEXTERN_STATUS_OK;
+  });
+}
+
+int omniextern_engine_settings_set_selected_signatures(LiteRtLmEngineSettings* settings, const char* const* names,
+                                                       int count) {
+  return Guard([&]() -> int {
+    if (settings == nullptr || settings->settings == nullptr || count < 0 || (count > 0 && names == nullptr)) {
+      return Fail(absl::StatusCode::kInvalidArgument, "settings is null, or the names are missing.");
+    }
+    std::vector<std::string> selected;
+    for (int i = 0; i < count; ++i) {
+      if (names[i] == nullptr) return Fail(absl::StatusCode::kInvalidArgument, "A signature name is null.");
+      selected.emplace_back(names[i]);
+    }
+    settings->settings->GetMutableMainExecutorSettings().SetSelectedSignatures(std::move(selected));
     return OMNIEXTERN_STATUS_OK;
   });
 }

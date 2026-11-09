@@ -45,7 +45,10 @@ namespace Emgu.LiteRT.LM.Chat
 
         /// <summary>The models a chat offers on a platform, smallest first.</summary>
         /// <param name="platform">The platform</param>
-        public static IList<ChatModelOption> For(ChatPlatform platform)
+        /// <param name="lowMemory">True on a device that allows an app little memory (a 4 GB iPhone: ~2.2 GB): Gemma 4 on the
+        /// GPU then prefills with its 128-token signature only (<see cref="Gemma4.SmallPrefillOnly"/>), keeping ~740 MB
+        /// that the chat's first prompt would otherwise hold, so a picture still fits after it</param>
+        public static IList<ChatModelOption> For(ChatPlatform platform, bool lowMemory = false)
         {
             bool android = platform == ChatPlatform.Android, ios = platform == ChatPlatform.iOS, mac = platform == ChatPlatform.MacCatalyst,
                 windows = platform == ChatPlatform.Windows;
@@ -63,12 +66,12 @@ namespace Emgu.LiteRT.LM.Chat
                 // fixed at 4096 tokens, and the chat's instructions and tool groups take ~1.1-2.5k of them.
                 Model("Qwen35_4B", "Qwen3.5 4B", () => new Qwen35_4B(), Qwen35_4B.ModelFile, 2800,
                     "~2.8 GB download. Much more capable and can think before answering, but slow on the CPU.", gpu: windows, summarize: true),
-                Gemma("Gemma4E2B", "Gemma 4 E2B", () => new Gemma4E2B(), Gemma4E2B.ModelFile, 2600,
+                Gemma("Gemma4E2B", "Gemma 4 E2B", () => new Gemma4E2B { SmallPrefillOnly = lowMemory }, Gemma4E2B.ModelFile, 2600,
                     "~2.6 GB download. Understands images and speech, and can think before answering.", gpu: android || ios || mac || windows),
                 // E4B on Android's GPU (the OpenCL plugin, as E2B): first tried on a Pixel Fold on 2026-10-27; a failed GPU
                 // load offers the CPU. On iOS (LiteRT's Metal accelerator, 2026-11-04) an iPad Air M4 wrote E2B at 55 tokens/s
                 // on the GPU against 29 on its CPU, E4B at 30 against 13.
-                Gemma("Gemma4E4B", "Gemma 4 E4B", () => new Gemma4E4B(), Gemma4E4B.ModelFile, 3700,
+                Gemma("Gemma4E4B", "Gemma 4 E4B", () => new Gemma4E4B { SmallPrefillOnly = lowMemory }, Gemma4E4B.ModelFile, 3700,
                     "~3.7 GB download. More capable than E2B, but slower and needs more memory.", gpu: android || ios || mac || windows),
             };
             // A large desktop model; on Windows its GPU image inference failed compatibility testing.

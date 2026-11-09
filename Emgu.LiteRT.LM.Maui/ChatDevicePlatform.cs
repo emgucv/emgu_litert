@@ -23,11 +23,22 @@ namespace Emgu.LiteRT.LM.Maui
 #endif
 
         /// <summary>
+        /// True on a device that allows an app little memory: an iPhone or iPad with less than 5 GB (an iPhone 12's 4 GB
+        /// allow ~2.2 GB, with the memory entitlements). Android phones weren't measured.
+        /// </summary>
+        public static bool LowMemory =>
+#if IOS && !MACCATALYST
+            Foundation.NSProcessInfo.ProcessInfo.PhysicalMemory < 5_000_000_000UL;
+#else
+            false;
+#endif
+
+        /// <summary>
         /// The catalog's models (<see cref="ChatModelCatalog.For"/>) this app can run: none when LiteRT-LM isn't in the app
         /// (<see cref="LiteRtLmInvoke.IsAvailable"/>; e.g. an iOS build from an Intel Mac, where LiteRT-LM can't be built), so
-        /// the app offers only its remote models.
+        /// the app offers only its remote models. On a <see cref="LowMemory"/> device, Gemma 4 prefills in small pieces.
         /// </summary>
         public static IList<ChatModelOption> AvailableModels() =>
-            LiteRtLmInvoke.IsAvailable ? ChatModelCatalog.For(Current) : new List<ChatModelOption>();
+            LiteRtLmInvoke.IsAvailable ? ChatModelCatalog.For(Current, LowMemory) : new List<ChatModelOption>();
     }
 }

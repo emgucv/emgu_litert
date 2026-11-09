@@ -38,11 +38,23 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
   A 720x960 picture alone (the self-test, GPU) was described in 8.7 s with at least 700 MB left, but in the chat page
   with the camera open, "Take a snapshot." - which Gemma answers with `capture_camera_frame`, the frame sent to the model,
   not a capture - got the app killed (signal 9, no jetsam report) on the GPU and the CPU, at the picture's encoding
-  (2394 patches). Not fixed yet. Measured in the chat page (a temporary self-test, GPU, 8192-token context): 1834 MB
+  (2394 patches). Fixed on 2026-11-09 (below). Measured in the chat page (a temporary self-test, GPU, 8192-token context): 1834 MB
   left with the model loaded; the first message ("Open the camera.", with the chat's instructions and tools) brought it
   to ~535 MB, and it stayed there after the reply; opening the camera cost almost nothing; the frame's encoding then
-  went from 468 to 111 MB left in 0.1 s and the app was killed. The encoding needs ~1.3 GB (2023 -> 700 MB left in the
-  standalone test), so on this phone it fits only before the chat's first long prompt. The captures themselves worked at the phone's width (2026-11-09, through WebDriverAgent:
+  went from 468 to 111 MB left in 0.1 s and the app was killed. Why the first message costs so much: the model has two
+  prefill signatures, 128 and 1024 tokens, and on the GPU LiteRT-LM prefills any prompt of 512 tokens or more with
+  `prefill_1024` (`GetOptimizedPrefillWorkGroups`), whose buffers stay allocated for the engine's life. Measured
+  (2026-11-09, a temporary self-test, GPU): a 290- or 452-token first prompt took 1877 -> 1359 MB left (~520 MB, the
+  same after both), a 704-token one 2021 -> 758 MB (~1.26 GB), and a 290-token one after it nothing more. The picture
+  itself needs ~650 MB: after the short prompts it went 1359 -> 696 MB at the least and was described. The chat's first
+  prompt, with its instructions and tools, is over 512 tokens. LiteRT-LM can limit the model to chosen signatures
+  (`LlmExecutorSettings::SetSelectedSignatures`, e.g. decode and `prefill_128`), but not through the C API. The fix:
+  `omniextern_engine_settings_set_selected_signatures` sets it (`EngineSettings.SelectedSignatures`), `Gemma4.SmallPrefillOnly`
+  keeps the model to `prefill_128` on the GPU, and `ChatDevicePlatform.LowMemory` (iOS devices under 5 GB) turns it on for
+  the catalog's Gemma 4. On the iPhone 12 (2026-11-09): the 704-token prompt then kept ~220 MB instead of ~1.25 GB, its
+  first token came at 3.2 s against 3.5 s, and a picture after it was described (8.0 s, 1008 MB left at the least); in
+  the chat page the first message took 1969 -> 1453 MB, and "What do you see through the camera?" was answered with
+  784 MB left at the least (the phone lay face down: "very dark"). The captures themselves worked at the phone's width (2026-11-09, through WebDriverAgent:
   a sound monitor for speech taking photos, the Mac speaking): two photos in the strip, the photo viewer with its four
   buttons on one line, a switch to the selfie camera and back adding no row, Close adding the row "Camera · 2 pictures"
   on the reply, and Keep all marking both. Seen on the way: the sound monitor card covers the message box and the chips

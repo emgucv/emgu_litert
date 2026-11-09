@@ -99,6 +99,10 @@ namespace Emgu.LiteRT.LM
         internal static extern LiteRtLmStatusCode omniextern_tts_synthesize(IntPtr engine, byte[] text, out IntPtr pcm,
             out int count, out int sampleRate);
 
+        [DllImport(OmniLibrary, CallingConvention = LiteRtLmInvoke.LiteRtLmCallingConvention)]
+        internal static extern LiteRtLmStatusCode omniextern_engine_settings_set_selected_signatures(IntPtr settings,
+            IntPtr[] names, int count);
+
         private static bool? _isAvailable;
 
         /// <summary>

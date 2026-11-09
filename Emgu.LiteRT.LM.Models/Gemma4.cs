@@ -81,9 +81,32 @@ namespace Emgu.LiteRT.LM.Models
             EngineSettings settings = new EngineSettings(modelPath, backend, VisionBackend, AudioBackend);
             // 32-bit activations on the GPU (see the remarks of Gemma4).
             if (String.Equals(backend, "gpu", StringComparison.OrdinalIgnoreCase))
+            {
                 settings.ActivationDataType = ActivationDataType.Float32;
+                if (SmallPrefillOnly && OmniInvoke.IsAvailable)
+                {
+                    try
+                    {
+                        settings.SelectedSignatures = new[] { "decode", "prefill_128", "verify" };
+                    }
+                    catch (EntryPointNotFoundException)
+                    {
+                        // A libomniextern built before 2026-11-09: all the signatures, as without the setting.
+                    }
+                }
+            }
             return settings;
         }
+
+        /// <summary>
+        /// On the GPU, read prompts with the model's 128-token prefill only, never its 1024-token one; set before Init. For
+        /// devices with little memory: LiteRT-LM prefills any prompt of 512 tokens or more with prefill_1024, whose buffers
+        /// it keeps as long as the engine, ~740 MB more for Gemma 4 E2B (measured on an iPhone 12, which allows an app
+        /// ~2.2 GB: after a chat's first prompt with tools a picture no longer fit). A long prompt then takes more, smaller
+        /// steps, no slower: an iPhone 12 read a 704-token prompt in 3.2 s against 3.5 s, keeping ~220 MB instead of ~1.25 GB.
+        /// Needs libomniextern built since 2026-11-09 (EngineSettings.SelectedSignatures); ignored without it and on the CPU.
+        /// </summary>
+        public bool SmallPrefillOnly { get; set; }
 
         /// <summary>
         /// True: LiteRT-LM parses Gemma 4's tool calls, and its chat template takes the tool responses
