@@ -69,6 +69,8 @@ Directory.Build.props
 /platforms/nuget/Emgu.LiteRT.runtime.windows/README.md
 /platforms/nuget/Emgu.TF.Lite.runtime.windows/README.md
 /platforms/nuget/Emgu.TF.Lite.runtime.ubuntu/README.md
+/platforms/nuget/Emgu.TF.Lite.runtime.debian-arm/README.md
+/platforms/nuget/Emgu.TF.Lite.runtime.debian-arm64/README.md
 /platforms/nuget/Emgu.TF.Lite.runtime.macos/README.md
 /platforms/nuget/Emgu.LiteRT.LM.runtime.windows/README.md
 /platforms/nuget/Emgu.LiteRT.Metal.runtime.macos/README.md

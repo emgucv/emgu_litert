@@ -1266,11 +1266,14 @@ IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
 		<dependency id=\"${EMGU_LITERT_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />
     </dependencies>")	
 	
+  # libtfliteextern.so (the TensorFlow Lite Interpreter C API wrapper Emgu.TF.Lite P/Invokes) is packaged
+  # separately from libLiteRt.so, as on Ubuntu (${EMGU_TFLITE_UBUNTU_NUGET_ID}) and Windows: see the
+  # Emgu.TF.Lite.runtime.debian-<release>-<arch> block below.
   IF(HAVE_LINUX_ARM_LITE)
     SET(EMGU_LITERT_DEBIAN_ARM_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.${EMGU_LITERT_DEBIAN_ID_ARM}")
     SET(EMGU_LITERT_DEBIAN_ARM_NUGET_TITLE "Native ARM runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")
     SET(EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST "${EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST}
-    <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\\*.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\" />
+    <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\\libtfliteextern.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM}\\native\" />
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"${EMGU_LITERT_DEBIAN_ARM_NUGET_ID}.props\" target=\"build\" />")
@@ -1278,16 +1281,44 @@ IF (HAVE_LINUX_ARM_LITE OR HAVE_LINUX_ARM64_LITE)
 
   IF(HAVE_LINUX_ARM64_LITE)
     # LiteRT-LM's libraries (when present) are excluded from this package's *.so glob - they ship in
-    # ${EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID} instead, see below.
+    # ${EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID} instead, see below - and so is libtfliteextern.so, which ships in
+    # ${EMGU_TFLITE_DEBIAN_ARM64_NUGET_ID}.
     SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.${EMGU_LITERT_DEBIAN_ID_ARM64}")
     SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_TITLE "Native ARM64 runtime of Emgu TF Lite for Debian (including Raspberry Pi OS)")
     SET(EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST "${EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST}
-    <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\libwebgpu_dawn.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\" />
+    <file src=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\*.so\" exclude=\"..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\liblitert-lm.so;..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\libGemmaModelConstraintProvider.so;..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\libomniextern.so;..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\libwebgpu_dawn.so;..\\..\\..\\lib\\runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\\libtfliteextern.so\" target=\"runtimes\\${NUGET_NATIVE_PLATFORM_ID_DEBIAN_ARM64}\\native\" />
 	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
 	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
 	<file src=\"${EMGU_LITERT_DEBIAN_ARM64_NUGET_ID}.props\" target=\"build\" />")
   ENDIF()
 ENDIF()
+
+# Emgu.TF.Lite.runtime.debian-<release>-<arch>: libtfliteextern.so, as Emgu.TF.Lite.runtime.ubuntu.<version>-<arch>.
+# TFLite-versioned, and depends on the managed Emgu.TF.Lite and, when libLiteRt.so is there, on the base Debian package:
+# the Bazel build's libtfliteextern.so links libLiteRt.so (which contains TensorFlow Lite), while cmake_build_tflite's
+# links TensorFlow Lite in statically.
+FOREACH(DEBIAN_LITE_ARCH "arm" "arm64")
+  STRING(TOUPPER "${DEBIAN_LITE_ARCH}" DEBIAN_LITE_ARCH_UPPER)
+  SET(EMGU_TFLITE_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_ID "${EMGU_TFLITE_NUGET_ID}.runtime.${EMGU_LITERT_DEBIAN_ID_${DEBIAN_LITE_ARCH_UPPER}}")
+  SET(EMGU_TFLITE_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_TITLE "Native ${DEBIAN_LITE_ARCH_UPPER} runtime (tfliteextern) of Emgu TF Lite for Debian (including Raspberry Pi OS)")
+  IF(HAVE_LINUX_${DEBIAN_LITE_ARCH_UPPER}_LITE)
+    SET(EMGU_TFLITE_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_FILE_LIST "
+    <file src=\"..\\..\\..\\lib\\runtimes\\linux-${DEBIAN_LITE_ARCH}\\native\\libtfliteextern.so\" target=\"runtimes\\linux-${DEBIAN_LITE_ARCH}\\native\" />
+	<file src=\"..\\..\\..\\miscellaneous\\nuget_icon.png\" target=\"icon.png\" />
+	<file src=\"..\\..\\..\\${EMGU_LITERT_LICENSE_FILE}\" target=\"\" />
+	<file src=\"README.md\" target=\"docs\\\" />
+	<file src=\"${EMGU_TFLITE_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_ID}.props\" target=\"build\" />")
+    SET(EMGU_TFLITE_DEBIAN_DEPENDENCY_LITERT "")
+    IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/runtimes/linux-${DEBIAN_LITE_ARCH}/native/libLiteRt.so")
+      SET(EMGU_TFLITE_DEBIAN_DEPENDENCY_LITERT "
+		<dependency id=\"${EMGU_LITERT_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_ID}\" version=\"${CPACK_PACKAGE_DEPENDENCY_VERSION}\" />")
+    ENDIF()
+    SET(EMGU_TFLITE_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_DEPENDENCY "
+    <dependencies>${EMGU_TFLITE_DEBIAN_DEPENDENCY_LITERT}
+		<dependency id=\"${EMGU_TFLITE_NUGET_ID}\" version=\"${EMGU_TFLITE_PACKAGE_VERSION}\" />
+    </dependencies>")
+  ENDIF()
+ENDFOREACH()
 
 # Emgu.LiteRT.LM.runtime.debian-<release>-arm64: liblitert-lm.so and libomniextern.so from
 # platforms/debian/<release>/bazel_build_litert, as Emgu.LiteRT.LM.runtime.ubuntu-* above. By default they are built
@@ -1646,6 +1677,17 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.ubuntu.Pac
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.debian-arm/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.runtime.debian-arm64.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.runtime.debian-arm64/Package.nuspec)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.debian-arm64.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.LiteRT.LM.runtime.debian-arm64/Package.nuspec)
+FOREACH(DEBIAN_LITE_ARCH "arm" "arm64")
+  STRING(TOUPPER "${DEBIAN_LITE_ARCH}" DEBIAN_LITE_ARCH_UPPER)
+  SET(DEBIAN_LITE_RELEASE_ARCH_ID "${EMGU_LITERT_DEBIAN_ID_${DEBIAN_LITE_ARCH_UPPER}}")
+  SET(EMGU_TFLITE_DEBIAN_NUGET_ID "${EMGU_TFLITE_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_ID}")
+  SET(EMGU_TFLITE_DEBIAN_NUGET_TITLE "${EMGU_TFLITE_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_TITLE}")
+  SET(EMGU_TFLITE_DEBIAN_NUGET_DEPENDENCY "${EMGU_TFLITE_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_DEPENDENCY}")
+  SET(EMGU_TFLITE_DEBIAN_NUGET_FILE_LIST "${EMGU_TFLITE_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_FILE_LIST}")
+  SET(EMGU_LITERT_DEBIAN_NUGET_ID_FOR_TFLITE "${EMGU_LITERT_DEBIAN_${DEBIAN_LITE_ARCH_UPPER}_NUGET_ID}")
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.debian.Package.nuspec.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.debian-${DEBIAN_LITE_ARCH}/Package.nuspec)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.TF.Lite.runtime.debian.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/platforms/nuget/Emgu.TF.Lite.runtime.debian-${DEBIAN_LITE_ARCH}/README.md)
+ENDFOREACH()
 
 # The Linux packages' native files are under distro RIDs (ubuntu-x64...), which .NET 8+ only matches with the full RID
 # graph: each package's build/<id>.props turns it on in the projects that reference it, as Emgu CV's packages do.
@@ -1655,7 +1697,9 @@ FOREACH(LINUX_PACKAGE
     "Emgu.TF.Lite.runtime.ubuntu|EMGU_TFLITE_UBUNTU_NUGET_ID|EMGU_TFLITE_UBUNTU_NUGET_FILE_LIST"
     "Emgu.LiteRT.runtime.debian-arm|EMGU_LITERT_DEBIAN_ARM_NUGET_ID|EMGU_LITERT_DEBIAN_ARM_NUGET_FILE_LIST"
     "Emgu.LiteRT.runtime.debian-arm64|EMGU_LITERT_DEBIAN_ARM64_NUGET_ID|EMGU_LITERT_DEBIAN_ARM64_NUGET_FILE_LIST"
-    "Emgu.LiteRT.LM.runtime.debian-arm64|EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID|EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_FILE_LIST")
+    "Emgu.LiteRT.LM.runtime.debian-arm64|EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_ID|EMGU_LITERT_LM_DEBIAN_ARM64_NUGET_FILE_LIST"
+    "Emgu.TF.Lite.runtime.debian-arm|EMGU_TFLITE_DEBIAN_ARM_NUGET_ID|EMGU_TFLITE_DEBIAN_ARM_NUGET_FILE_LIST"
+    "Emgu.TF.Lite.runtime.debian-arm64|EMGU_TFLITE_DEBIAN_ARM64_NUGET_ID|EMGU_TFLITE_DEBIAN_ARM64_NUGET_FILE_LIST")
   STRING(REPLACE "|" ";" LINUX_PACKAGE "${LINUX_PACKAGE}")
   LIST(GET LINUX_PACKAGE 0 LINUX_PACKAGE_FOLDER)
   LIST(GET LINUX_PACKAGE 1 LINUX_PACKAGE_ID_VAR)
