@@ -222,7 +222,7 @@ greyed Delete (now "Not on this device", no button), and the photo and past-chat
 the search model was deleted - each now shows a note with its own Download button. (The packaged app sees the real
 LocalApplicationData folder through the package's copy, so test models copied into both places need deleting twice.)
 
-## 9. Update to the next LiteRT-LM release — v0.19.0 done on macOS, Mac Catalyst, iOS and Android; Windows pending
+## 9. Update to the next LiteRT-LM release — completed (v0.19.0 on every platform)
 
 **Moved to LiteRT-LM v0.19.0 (2026-11-01)**, with `litert` at its `LITERT_REF` `dcb657e8` (LiteRT 2.4.0, TFLite 2.23.0); the
 code before it is tagged `v0.18.0`. The plan, with what changed and why: `history/LITERT_LM_V019_PLAN.md`. In short:
@@ -261,6 +261,10 @@ code before it is tagged `v0.18.0`. The plan, with what changed and why: `histor
 
 - [x] The agent regression test (item 7) with v0.19.0 (2026-11-05): 30/30 scenarios (10 × 3) on the Mac's CPU with
       Gemma 4 E2B, in 3 min 23 s; recorded in `Emgu.LiteRT.Test/Emgu.TF.Lite.Test/AgentRegression.md`.
+- [x] Ubuntu/Debian natives (moved from TODO.md on 2026-11-09): CI builds Ubuntu 26.04 x64 and arm64 on v0.19.0
+      (`.github/workflows/native.yml`). Checked with the Bazel-built natives on Ubuntu 26.04 x64 (501 passed, 64 skipped)
+      and a Raspberry Pi 4 on Debian trixie (2026-11-05: 748 passed, 94 skipped, `liblitert-lm.so` included);
+      `docs/native-builds.md`, Linux.
 
 ## 10. GPU on Windows — core support completed; follow-ups remain
 
@@ -992,6 +996,13 @@ Moved from TODO.md on 2026-11-05:
 - [x] The first iPhone (2026-11-05): an iPhone X (iOS 16.7, 3 GB), with the minimum iOS lowered to 15.0 (it was 17.2)
   and built on the Intel Mac mini (Xcode 26.3), so without LiteRT-LM, which can't be built there: the chat offers only
   Claude and the user's server, and Claude answered. Not the image models (no LiteRT-LM, and too little memory).
+
+- [x] Through the UI on the iPad Air M4 (2026-11-09, a Debug build of the current code, driven with WebDriverAgent): in a
+      chat on "Gemma 4 E2B · GPU" with Think on, "Bonsai Image 4B 512 · GPU" drew a red fox in 27 s (Gemma had
+      thought for 35 s first), then, chosen in Settings > Image model, "Bonsai Image 4B · GPU" drew a
+      lighthouse in 10 s. The same chat then went on for twelve more messages on the GPU (17-40 s a reply, with tools:
+      a memory, Wikipedia, the calculator): all answers sound - 17 x 23 = 391, the Lisbon summary matched the plan, and
+      the last one recalled the name and the dog's name from the first. The test chat and its memory were deleted.
 
 ## 32. Live camera tools — first version implemented
 

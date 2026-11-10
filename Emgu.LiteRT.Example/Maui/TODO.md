@@ -22,6 +22,7 @@ Their full write-ups are in [history/TODO-done.md](history/TODO-done.md):
 - 6. Run the model-free tests in CI — completed
 - 7. An agent regression test — implemented
 - 8. A Storage page in settings
+- 9. Update to the next LiteRT-LM release — completed (v0.19.0 on every platform)
 - 10. GPU on Windows — core support completed; follow-ups remain
 - 15. Agent tool: search documents (`search_documents`)
 - 16. Agent tool: search past chats (`search_chats`)
@@ -45,12 +46,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] Foldable inner-screen UI check (Z Fold3 installed; initially locked, then wireless debugging disconnected).
-
-## 9. Update to the next LiteRT-LM release — v0.19.0 done on macOS, Mac Catalyst, iOS and Android; Windows pending
-
-Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
-
-- [ ] Ubuntu/Debian natives (CI builds them).
 
 ## 11. GPU for the embedding models — Windows, Mac (Metal), a Galaxy S10 and the Pixel Fold (OpenCL) checked; the demo offers it on Windows, Mac Catalyst and Android
 
@@ -202,9 +197,8 @@ iOS: no run at a time the app picks.
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] An 8 GB iPhone (the model cards' floor): the iPad has more memory.
-- [ ] Through the UI on the iPad (choosing "· GPU" in the lists, a long chat on the GPU), an 8 GB iPhone (Bonsai 512 is
-  hidden there), and a Metal add-on package for iOS, as on macOS.
+- [ ] An 8 GB iPhone (the model cards' floor; Bonsai 512 is hidden there): the iPad has more memory.
+- [ ] A Metal add-on package for iOS, as on macOS.
 
 ## 32. Live camera tools — first version implemented
 
