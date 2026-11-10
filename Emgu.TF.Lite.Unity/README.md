@@ -59,4 +59,4 @@ Android:
 
 The Windows plug-in folders (`Plugins/x86`, `x86_64`) only hold `.meta` files from earlier releases: their native libraries
 are copied in by hand and were not checked with Unity 6. Opening the project without them makes Unity delete those `.meta`
-files; restore them with git before committing.
+files; restore them with git before committing. The Windows work still to do is in `TODO.md`.
