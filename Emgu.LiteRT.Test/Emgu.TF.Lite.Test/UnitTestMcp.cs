@@ -162,6 +162,88 @@ public class UnitTestMcp
             Throws.TypeOf<ArgumentException>());
     }
 
+    // A minimal MCP server over stdio (newline-delimited JSON-RPC), in Python: one read-only tool. It writes its process id
+    // first to the file named by its argument, and appends "stdin closed" there when the client closes its input.
+    private const string StdioServer = @"import json, os, sys
+state = sys.argv[1]
+with open(state, 'w') as f: f.write(str(os.getpid()) + '\n')
+def send(id, result):
+    sys.stdout.write(json.dumps({'jsonrpc': '2.0', 'id': id, 'result': result}) + '\n'); sys.stdout.flush()
+for line in sys.stdin:
+    if not line.strip(): continue
+    m = json.loads(line); method = m.get('method'); id = m.get('id')
+    if method == 'initialize':
+        send(id, {'protocolVersion': m['params']['protocolVersion'], 'capabilities': {'tools': {}}, 'serverInfo': {'name': 'codes', 'version': '1'}})
+    elif method == 'tools/list':
+        send(id, {'tools': [{'name': 'get_code', 'description': 'The code of a person.', 'annotations': {'readOnlyHint': True},
+            'inputSchema': {'type': 'object', 'properties': {'person': {'type': 'string'}}, 'required': ['person']}}]})
+    elif method == 'tools/call':
+        send(id, {'content': [{'type': 'text', 'text': 'code of ' + m['params']['arguments']['person'] + ': 4827'}]})
+    elif id is not None:
+        sys.stdout.write(json.dumps({'jsonrpc': '2.0', 'id': id, 'error': {'code': -32601, 'message': 'no ' + str(method)}}) + '\n'); sys.stdout.flush()
+with open(state, 'a') as f: f.write('stdin closed\n')
+";
+
+    // A server started as a program (stdio), as Settings adds "python3 server.py" on a desktop: started, its tool listed and
+    // called, and the program gone once the server is disposed (removed in Settings, or the app closing).
+    [Test]
+    public async Task StartsAProgramOverStdioAndEndsItWhenDisposed()
+    {
+        string python = new[] { "python3", "/opt/homebrew/bin/python3", "/usr/bin/python3" }.FirstOrDefault(CanRun);
+        if (python == null)
+            Assert.Ignore("No python3 to run the test server.");
+        string folder = System.IO.Path.Combine(TestContext.CurrentContext.WorkDirectory, "mcp-stdio-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(folder);
+        try
+        {
+            string script = System.IO.Path.Combine(folder, "server.py"), state = System.IO.Path.Combine(folder, "state.txt");
+            System.IO.File.WriteAllText(script, StdioServer);
+            var config = new McpServerConfig { Name = "Codes", Command = python, Arguments = "-I \"" + script + "\" \"" + state + "\"" };
+            var server = await McpToolServer.ConnectAsync(config, null, CancellationToken.None);
+            int pid = int.Parse(System.IO.File.ReadAllLines(state)[0]);
+            Assert.That(server.Tools.Select(t => (t.Name, t.ReadOnly)), Is.EqualTo(new[] { ("get_code", true) }));
+            var tools = server.CreateTools((request, token) => Task.FromResult(false));
+            string result = (await Tool(tools, "codes_get_code").InvokeAsync(new AIFunctionArguments { ["person"] = "Alice" })).ToString();
+            Assert.That(result, Does.StartWith("Result from the tool server \"Codes\"").And.EndWith("code of Alice: 4827"));
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            await server.DisposeAsync();
+            Console.WriteLine("Disposed in " + watch.ElapsedMilliseconds + " ms; " + string.Join(" | ", System.IO.File.ReadAllLines(state)));
+            Assert.That(Running(pid), Is.False, "The server's program still runs.");
+        }
+        finally
+        {
+            System.IO.Directory.Delete(folder, true);
+        }
+    }
+
+    private static bool CanRun(string program)
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(program, "--version") { RedirectStandardOutput = true, RedirectStandardError = true });
+            process.WaitForExit(5000);
+            return process.ExitCode == 0;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static bool Running(int pid)
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(pid);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     // A public Streamable HTTP server that needs no key (DeepWiki, read-only tools about GitHub repositories): the real
     // transport, the tool list and a call. Network: run with -p:TestModels=true.
 #if !TEST_MODELS

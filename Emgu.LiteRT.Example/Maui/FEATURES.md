@@ -1028,8 +1028,9 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   - Results are wrapped as the server's data - not instructions - and cut to 2,500 characters. Step lines read "Calling
     <tool> on <server> (...)".
 - `UnitTestMcp` runs a server in the test process over pipes (`ConnectsToAPublicServerOverHttp` is `TEST_MODELS`-gated and
-  uses DeepWiki). Verified on a Galaxy S10 with Gemma 4 E2B on the GPU calling DeepWiki's `read_wiki_contents`; stdio is
-  untested.
+  uses DeepWiki). Verified on a Galaxy S10 with Gemma 4 E2B on the GPU calling DeepWiki's `read_wiki_contents`; stdio on Mac
+  Catalyst with a Python server (`StartsAProgramOverStdioAndEndsItWhenDisposed` tests it too). Disposing a stdio server takes the
+  SDK's `ShutdownTimeout` (5 s) before the program is killed, so the settings list is updated before the dispose.
 - Apple Intelligence (Microsoft.Maui.Essentials.AI, an `IChatClient` too) only ships for .NET 11, so it's left for when the
   repo moves to .NET 11.
 

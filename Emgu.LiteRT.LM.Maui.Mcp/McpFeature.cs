@@ -217,14 +217,14 @@ public sealed class McpFeature : ChatFeature
             foreach (McpServerConfig config in McpConfigs.ToList())
             {
                 bool wanted = config.Enabled && (!config.IsStdio || McpCanStartPrograms);
-                if (!wanted && _mcpServers.Remove(config.Id, out McpToolServer old))
-                {
-                    await old.DisposeAsync();
-                    changed = true;
-                }
                 if (!wanted)
                 {
                     SetMcpStatus(config, config.Enabled ? "Needs a desktop to start programs" : "Off");
+                    if (_mcpServers.Remove(config.Id, out McpToolServer old))
+                    {
+                        await old.DisposeAsync();
+                        changed = true;
+                    }
                     continue;
                 }
                 if (_mcpServers.ContainsKey(config.Id))
@@ -388,12 +388,13 @@ public sealed class McpFeature : ChatFeature
             McpConfigs.Remove(config);
             SaveMcpConfigs();
             try { SecureStorage.Default.Remove(McpKeyStoragePrefix + config.Id); } catch (Exception) { }
-            if (_mcpServers.Remove(config.Id, out McpToolServer old))
-            {
-                await old.DisposeAsync();
+            bool wasConnected = _mcpServers.Remove(config.Id, out McpToolServer old);
+            if (wasConnected)
                 InvalidateToolRouter();
-            }
             RefreshMcpList();
+            // After the list: a program's server can take the SDK's shutdown timeout (5 s) to end.
+            if (wasConnected)
+                await old.DisposeAsync();
         }
         else if (picked == "Choose tools")
             await ChooseMcpToolsAsync(config);

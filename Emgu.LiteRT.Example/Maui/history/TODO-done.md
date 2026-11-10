@@ -864,7 +864,7 @@ Moved from TODO.md on 2026-11-05:
 - [x] Tests: `UnitTestClipboardTool` (the wrapping, cutting, empty and failing reads, 10 phrasings that mention the clipboard and 9 that
       don't, the step line).
 
-## 28. MCP support — implemented (HTTP verified with DeepWiki on a Galaxy S10; stdio untested)
+## 28. MCP support — implemented (HTTP verified with DeepWiki on a Galaxy S10; stdio on Mac Catalyst)
 
 Let the chat's agent use tools from Model Context Protocol (MCP) servers, next to its built-in ones.
 
@@ -896,8 +896,15 @@ Let the chat's agent use tools from Model Context Protocol (MCP) servers, next t
       repository about? Ask DeepWiki." routed the group by its name, called `read_wiki_contents` and answered correctly (43 s); "Use the
       DeepWiki tools: what topics does the wiki ... have?" called `read_wiki_structure` and listed the wiki's topics (118 s, a long
       answer); "What is 12 times 7?" in a new chat carried no MCP group and called `calculate` (23 s).
-- [ ] stdio on Mac Catalyst and Windows is untested (a program such as `npx -y <server>`); OAuth for servers that need it (the SDK has
-      a client for it) - only a static header now; resources and prompts of servers aren't used, only tools.
+- [x] stdio on Mac Catalyst (2026-11-10): a locker-codes server in Python (`/opt/homebrew/bin/python3 -I <script>`, one read-only
+      `get_locker_code` tool) added in Settings showed "Connected · 1 tool"; Gemma 4 E2B on the GPU called it for "Alice" and answered
+      "The gym locker code for Alice is 4827" without a confirmation (read-only). Removing the server ended the program, but the SDK
+      waits its `ShutdownTimeout` (5 s) and then kills it - the program never saw stdin close - and the list kept showing it as
+      connected until then: Remove and switching a server off now update the list first and dispose after.
+      `StartsAProgramOverStdioAndEndsItWhenDisposed` (`UnitTestMcp`; a Python script, ignored without `python3`) starts a program
+      over stdio, lists and calls its tool, and checks it has ended after `DisposeAsync`.
+- [ ] stdio on Windows is untested (verified on Mac Catalyst); OAuth for servers that need it (the SDK has a client for it) - only
+      a static header now; resources and prompts of servers aren't used, only tools.
 - [x] On Mac Catalyst (built and launched with `tools/run_catalyst`, see below): the settings section shows DeepWiki "Connected · 3 tools ·
       trusted" and a disabled server, with the add form; Gemma 4 E2B on the Metal GPU answered "What is the modelcontextprotocol/csharp-sdk
       repository about? Ask DeepWiki." through the tool (20 s) and "What is 12 times 7?" through `calculate` (5 s), from a temporary self-test.

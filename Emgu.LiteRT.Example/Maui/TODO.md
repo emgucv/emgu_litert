@@ -147,12 +147,12 @@ System models, offered in the model picker only where the device has them (detec
 - [ ] Apple's Foundation Models through `Microsoft.Maui.Essentials.AI` (an `IChatClient`), once the repo moves to
       .NET 11 (iOS / Mac Catalyst with Apple Intelligence).
 
-## 28. MCP support — implemented (HTTP verified with DeepWiki on a Galaxy S10; stdio untested)
+## 28. MCP support — implemented (HTTP verified with DeepWiki on a Galaxy S10; stdio on Mac Catalyst)
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] stdio on Mac Catalyst and Windows is untested (a program such as `npx -y <server>`); OAuth for servers that need it (the SDK has
-      a client for it) - only a static header now; resources and prompts of servers aren't used, only tools.
+- [ ] stdio on Windows is untested (verified on Mac Catalyst); OAuth for servers that need it (the SDK has a client for it) - only
+      a static header now; resources and prompts of servers aren't used, only tools.
 
 ## 29. Serve the Mac's models to phones ("Server" option) — chat served and paired; verified with a Galaxy S10
 
