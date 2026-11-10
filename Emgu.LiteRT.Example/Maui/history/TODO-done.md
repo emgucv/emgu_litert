@@ -1279,7 +1279,7 @@ near its context limit. Record enabled tool/settings differences, history size a
       and chats stay local, but the web tools send queries (and, with location shared, the place) to Open-Meteo,
       Wikipedia, Frankfurter and Tavily; none track the user (`NSPrivacyTracking` false).
 
-## 36. Split the iOS natives into frameworks — implemented; verified in the simulator
+## 36. Split the iOS natives into frameworks — completed (the simulator, an iPad Air and an iPhone 12)
 
 The iOS natives are now frameworks that depend on each other, like the Android/macOS libraries: a base
 `LiteRt.framework`, with `tfliteextern.framework` and LiteRT-LM's `LiteRtLm.framework` linked to it instead of
@@ -1308,7 +1308,10 @@ LiteRT inside LiteRT-LM's `CLiteRTLM` (item 31).
 - [x] An app that references only the base runtime (no LM add-on): a plain .NET iOS app in the simulator ran TF Lite
       and CompiledModel MobileNet (space shuttle, 1.0) with only `LiteRt` and `tfliteextern` in its bundle. (The
       simulator runs iOS 27, so the iOS 15 minimum itself is untested.)
-- [ ] A real iPhone, and App Store validation of the frameworks (item 35).
+- [x] Real devices: an iPad Air M4 (iPadOS 27.2) since 2026-11-03 - the demo's chat, speech, image models and the GPU
+      (item 31) - and an iPhone 12 (iOS 27.2, 4 GB) on 2026-11-08/09: Gemma 4 E2B on the CPU and the GPU, pictures
+      described (FEATURES.md); the user confirmed it works there. Closed 2026-11-10. App Store validation of the
+      frameworks stays with item 35.
 
 ## 37. Tool groups on demand — implemented; verified with Gemma 4 E2B on a Mac and a Galaxy S10
 

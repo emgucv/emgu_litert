@@ -28,6 +28,7 @@ Their full write-ups are in [history/TODO-done.md](history/TODO-done.md):
 - 16. Agent tool: search past chats (`search_chats`)
 - 19. A private chat
 - 21. Accessibility — completed (labels, large text and contrast, 2026-11-05)
+- 36. Split the iOS natives into frameworks — completed (the simulator, an iPad Air and an iPhone 12)
 - 43. (Notes from the feasibility checks, before it was built)
 - 50. A shutter click for photos taken by an alert
 
@@ -309,12 +310,6 @@ them in a `PrivacyInfo.xcprivacy`. The demo's, for iOS and Mac Catalyst, are in 
 - [ ] Confirm by uploading a Release build to App Store Connect (or `xcrun altool --validate-app`) and fixing what
       validation reports - also the embedded frameworks' `Info.plist` and `MinimumOSVersion` (the Gemma library needs
       iOS 26.4).
-
-## 36. Split the iOS natives into frameworks — implemented; verified in the simulator
-
-Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
-
-- [ ] A real iPhone, and App Store validation of the frameworks (item 35).
 
 ## 37. Tool groups on demand — implemented; verified with Gemma 4 E2B on a Mac and a Galaxy S10
 
