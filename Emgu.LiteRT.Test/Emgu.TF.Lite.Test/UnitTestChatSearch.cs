@@ -213,6 +213,57 @@ namespace Emgu.TF.Lite.Test
         }
 
         [Test]
+        public async Task IndexesSeveralMessagesACallAsOneAtATime()
+        {
+            var store = CreateStore();
+            int chat = await store.CreateChatAsync("Chat", "Gemma4E2B");
+            // 1, 1, 3 (a long message), 1, 1 passages.
+            foreach (string text in new[] { "one", "two", new string('l', 1900), "four", "five" })
+                await store.AddMessageAsync(chat, ChatMessageRecord.UserRole, text, null);
+            static float[] Vector(string text) => new float[] { text.Length, text[0] };
+            var calls = new List<int>();
+            Task<float[][]> EmbedMany(string[] texts, CancellationToken token)
+            {
+                calls.Add(texts.Length);
+                return Task.FromResult(texts.Select(Vector).ToArray());
+            }
+            var progress = new List<int>();
+            await new ChatSearchIndex(store).IndexAsync("model-a", EmbedMany, 3, (done, total) => progress.Add(done), CancellationToken.None);
+            // Whole messages up to 3 passages; the long message alone.
+            Assert.That(calls, Is.EqualTo(new[] { 2, 3, 2 }));
+            Assert.That(progress, Is.EqualTo(new[] { 0, 1, 2, 3, 4, 5 }));
+            IReadOnlyList<ChatSearchHit> batched = await store.GetChatEmbeddingsAsync();
+
+            // The same passages, ids and vectors as one passage a call.
+            await store.ClearChatEmbeddingsAsync();
+            await new ChatSearchIndex(store).IndexAsync("model-a", (text, token) => Task.FromResult(Vector(text)), null, CancellationToken.None);
+            IReadOnlyList<ChatSearchHit> single = await store.GetChatEmbeddingsAsync();
+            Assert.That(batched.Select(h => (h.Id, h.Text, Convert.ToBase64String(h.Embedding))).OrderBy(h => h.Id),
+                Is.EqualTo(single.Select(h => (h.Id, h.Text, Convert.ToBase64String(h.Embedding))).OrderBy(h => h.Id)));
+            Assert.That(batched, Has.Count.EqualTo(7));
+
+            // Cancelled during a batch: the batches before it are kept, and the next run embeds only the rest.
+            await store.ClearChatEmbeddingsAsync();
+            using var cancelled = new CancellationTokenSource();
+            calls.Clear();
+            Assert.ThrowsAsync<OperationCanceledException>(() => new ChatSearchIndex(store).IndexAsync("model-a", (texts, token) =>
+            {
+                calls.Add(texts.Length);
+                if (calls.Count == 2) cancelled.Cancel();
+                return Task.FromResult(texts.Select(Vector).ToArray());
+            }, 3, null, cancelled.Token));
+            Assert.That((await store.GetChatEmbeddingsAsync()).Select(h => h.MessageId).Distinct().Count(), Is.EqualTo(2));
+            calls.Clear();
+            await new ChatSearchIndex(store).IndexAsync("model-a", EmbedMany, 3, null, CancellationToken.None);
+            Assert.That(calls, Is.EqualTo(new[] { 3, 2 }));
+
+            // A model that gives the wrong number of vectors stops the indexing.
+            await store.ClearChatEmbeddingsAsync();
+            Assert.ThrowsAsync<InvalidOperationException>(() => new ChatSearchIndex(store).IndexAsync("model-a",
+                (texts, token) => Task.FromResult(new[] { new[] { 1f } }), 3, null, CancellationToken.None));
+        }
+
+        [Test]
         public async Task SearchFiltersDatesCurrentChatModelAndUnrelatedResults()
         {
             var store = CreateStore();

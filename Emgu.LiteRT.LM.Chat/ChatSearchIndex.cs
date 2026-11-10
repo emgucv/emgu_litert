@@ -172,38 +172,85 @@ namespace Emgu.LiteRT.LM.Chat
         /// <param name="embed">Embeds a passage</param>
         /// <param name="progress">Told the messages done and the total, or null</param>
         /// <param name="cancel">Stops the indexing</param>
-        public async Task IndexAsync(string model, Func<string, CancellationToken, Task<float[]>> embed,
+        public Task IndexAsync(string model, Func<string, CancellationToken, Task<float[]>> embed,
             Action<int, int> progress, CancellationToken cancel)
         {
+            if (embed == null)
+                throw new ArgumentNullException(nameof(embed));
+            return IndexAsync(model, async (texts, token) =>
+            {
+                var vectors = new float[texts.Length][];
+                for (int i = 0; i < texts.Length; i++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    vectors[i] = await embed(texts[i], token).ConfigureAwait(false);
+                }
+                return vectors;
+            }, 1, progress, cancel);
+        }
+
+        /// <summary>
+        /// Embed the saved messages not yet indexed with this model, several at a time: whole messages, up to
+        /// <paramref name="batchPassages"/> passages a call (more for one long message) - a model on a server takes one request
+        /// for them. Each message is saved once its batch is embedded (cancelling loses only the batch being embedded).
+        /// </summary>
+        /// <param name="model">The search model's key (its file; another model's passages are replaced)</param>
+        /// <param name="embed">Embeds passages, a vector for each in their order</param>
+        /// <param name="batchPassages">The most passages a call takes when they are of several messages (1: a message a call)</param>
+        /// <param name="progress">Told the messages done and the total, or null</param>
+        /// <param name="cancel">Stops the indexing</param>
+        public async Task IndexAsync(string model, Func<string[], CancellationToken, Task<float[][]>> embed, int batchPassages,
+            Action<int, int> progress, CancellationToken cancel)
+        {
+            if (embed == null)
+                throw new ArgumentNullException(nameof(embed));
             IReadOnlyList<ChatSearchMessage> messages = await _store.GetSearchMessagesAsync().ConfigureAwait(false);
             var indexed = new HashSet<int>((await _store.GetChatEmbeddingsAsync().ConfigureAwait(false)).Where(e => e.Model == model)
                 .Select(e => e.MessageId));
             List<ChatSearchMessage> pending = messages.Where(m => !indexed.Contains(m.Id)).ToList();
             int done = messages.Count - pending.Count;
             progress?.Invoke(done, messages.Count);
-            foreach (ChatSearchMessage message in pending)
+            int next = 0;
+            while (next < pending.Count)
             {
-                var passages = new List<ChatSearchPassage>();
-                int position = 0;
-                foreach (string text in Chunk(message.Text))
+                // Whole messages, until the batch is full.
+                var batch = new List<(ChatSearchMessage Message, List<string> Texts)>();
+                int count = 0;
+                while (next < pending.Count && (batch.Count == 0 || count < batchPassages))
                 {
-                    cancel.ThrowIfCancellationRequested();
-                    float[] vector = await embed(text, cancel).ConfigureAwait(false);
-                    var bytes = new byte[vector.Length * sizeof(float)];
-                    Buffer.BlockCopy(vector, 0, bytes, 0, bytes.Length);
-                    passages.Add(new ChatSearchPassage
-                    {
-                        Id = message.Id + "_" + position,
-                        MessageId = message.Id,
-                        Position = position++,
-                        Model = model,
-                        Text = text,
-                        Embedding = bytes
-                    });
+                    List<string> texts = Chunk(pending[next].Text).ToList();
+                    if (batch.Count > 0 && count + texts.Count > batchPassages)
+                        break;
+                    batch.Add((pending[next++], texts));
+                    count += texts.Count;
                 }
                 cancel.ThrowIfCancellationRequested();
-                await _store.SaveChatEmbeddingsAsync(message.Id, passages).ConfigureAwait(false);
-                progress?.Invoke(++done, messages.Count);
+                float[][] vectors = await embed(batch.SelectMany(b => b.Texts).ToArray(), cancel).ConfigureAwait(false);
+                if (vectors == null || vectors.Length != count)
+                    throw new InvalidOperationException("The search model gave " + (vectors?.Length ?? 0) + " embeddings for " + count + " passages.");
+                cancel.ThrowIfCancellationRequested();
+                int v = 0;
+                foreach ((ChatSearchMessage message, List<string> texts) in batch)
+                {
+                    var passages = new List<ChatSearchPassage>();
+                    for (int position = 0; position < texts.Count; position++)
+                    {
+                        float[] vector = vectors[v++];
+                        var bytes = new byte[vector.Length * sizeof(float)];
+                        Buffer.BlockCopy(vector, 0, bytes, 0, bytes.Length);
+                        passages.Add(new ChatSearchPassage
+                        {
+                            Id = message.Id + "_" + position,
+                            MessageId = message.Id,
+                            Position = position,
+                            Model = model,
+                            Text = texts[position],
+                            Embedding = bytes
+                        });
+                    }
+                    await _store.SaveChatEmbeddingsAsync(message.Id, passages).ConfigureAwait(false);
+                    progress?.Invoke(++done, messages.Count);
+                }
             }
         }
 

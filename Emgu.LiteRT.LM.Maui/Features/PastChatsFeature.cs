@@ -209,6 +209,9 @@ namespace Emgu.LiteRT.LM.Maui.Features
             _status.Text = text;
         }
 
+        // Passages a request to a server's search model takes when indexing (a few seconds' work for the Mac's CPU).
+        private const int RemoteBatchPassages = 64;
+
         private async Task IndexAsync(CancellationToken cancel)
         {
             try
@@ -218,24 +221,31 @@ namespace Emgu.LiteRT.LM.Maui.Features
                     _indexRequested = false;
                     cancel.ThrowIfCancellationRequested();
                     string model = IndexModel;
+                    Action<int, int> progress = (done, total) => IndexStatus(done == total
+                        ? string.Format(CultureInfo.InvariantCulture, "{0} messages indexed.", done)
+                        : string.Format(CultureInfo.InvariantCulture, "Indexing chats: {0} of {1} messages.", done, total));
+                    if (_search.Embedder.IsRemote)
+                    {
+                        // On the server: nothing runs on the device, and many messages go in one request.
+                        await new ChatSearchIndex(_store).IndexAsync(model, async (texts, token) =>
+                        {
+                            while (Host.IsReplying)
+                                await Task.Delay(250, token);
+                            return await _search.Embedder.EmbedDocumentsRemotelyAsync(texts, token);
+                        }, RemoteBatchPassages, progress, cancel);
+                        continue;
+                    }
                     await new ChatSearchIndex(_store).IndexAsync(model,
                         async (text, token) =>
                         {
                             while (Host.IsReplying)
                                 await Task.Delay(250, token);
-                            // On the server: nothing runs on the device.
-                            if (_search.Embedder.IsRemote)
-                                return (await _search.Embedder.EmbedDocumentsRemotelyAsync(new[] { text }, token))[0];
                             Action<string> paused = reason => MainThread.BeginInvokeOnMainThread(() =>
                                 IndexStatus(reason == null ? "Indexing chats..." : "Chat indexing paused: " + reason));
                             await _search.Workload.WaitAsync(paused, token);
                             var embedder = await _search.Embedder.EnsureAsync(new Progress<string>(IndexStatus), token);
                             return await _search.Workload.RunEmbeddingAsync(_search.Embedder, () => embedder.EmbedDocuments(new[] { text })[0], paused, token);
-                        },
-                        (done, total) => IndexStatus(done == total
-                            ? string.Format(CultureInfo.InvariantCulture, "{0} messages indexed.", done)
-                            : string.Format(CultureInfo.InvariantCulture, "Indexing chats: {0} of {1} messages.", done, total)),
-                        cancel);
+                        }, progress, cancel);
                 }
             }
             catch (OperationCanceledException) { }

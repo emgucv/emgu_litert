@@ -977,6 +977,14 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       in under 5 s, and "In a past chat I asked you a multiplication... what was the answer?" found the "What is 6 times 7?"
       chat and answered 42; the app's process never mapped an EmbeddingGemma file. Documents through the Mac weren't tried on
       the phone (the same calls, covered by the tests). The S10 was set back afterwards and the test chats deleted.
+- [x] Past-chat indexing through the Mac in batches (2026-11-10): `ChatSearchIndex.IndexAsync` has an overload that embeds
+      whole messages together, up to a number of passages a call (the one-passage overload is it with a message a call), and
+      saves each message after its batch; with the Mac's model `PastChatsFeature` sends 64 passages a request. Timed once over
+      loopback with EmbeddingGemma 2 on the Mac's CPU, 200 short messages: 11.9 s one a request, 11.7 s 64 a request, 11.2 s
+      the model directly - the model's own time dominates (LiteRT-LM embeds a batch text by text), so the gain is the Wi-Fi
+      round trips (13 ms each to the S10: about 2.6 s for 200 messages) and 4 requests instead of 200 for the Mac (its
+      settings refresh the device list after each). Test: `IndexesSeveralMessagesACallAsOneAtATime`. On the S10 the 18
+      messages were indexed through the Mac in one request, again with no EmbeddingGemma on the phone.
 
 ## 30. Background tasks and monitoring
 
