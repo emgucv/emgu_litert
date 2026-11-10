@@ -73,6 +73,26 @@ public class UnitTestChatServer
     }
 
     [Test]
+    public void ReadsAToolResultSentAsJsonAsTheFunctionReturnedIt()
+    {
+        // The phone's client serializes its function's result: a string comes with its quotes, which the model would see.
+        ChatCompletionRequest request = OpenAIChatProtocol.ParseRequest(@"{ ""messages"": [
+            { ""role"": ""user"", ""content"": ""Codes?"" },
+            { ""role"": ""assistant"", ""tool_calls"": [
+                { ""id"": ""a"", ""type"": ""function"", ""function"": { ""name"": ""code"", ""arguments"": ""{}"" } },
+                { ""id"": ""b"", ""type"": ""function"", ""function"": { ""name"": ""weather"", ""arguments"": ""{}"" } },
+                { ""id"": ""c"", ""type"": ""function"", ""function"": { ""name"": ""note"", ""arguments"": ""{}"" } } ] },
+            { ""role"": ""tool"", ""tool_call_id"": ""a"", ""content"": ""\""7391\"""" },
+            { ""role"": ""tool"", ""tool_call_id"": ""b"", ""content"": ""{\""temp\"":12}"" },
+            { ""role"": ""tool"", ""tool_call_id"": ""c"", ""content"": ""Error: not found"" } ] }");
+        FunctionResultContent[] results = request.Messages[2].Contents.OfType<FunctionResultContent>().ToArray();
+        JsonElement code = (JsonElement)results[0].Result;
+        Assert.That((code.ValueKind, code.GetString()), Is.EqualTo((JsonValueKind.String, "7391")));
+        Assert.That(((JsonElement)results[1].Result).GetProperty("temp").GetInt32(), Is.EqualTo(12));
+        Assert.That(results[2].Result, Is.EqualTo("Error: not found"));
+    }
+
+    [Test]
     public void ReadsOptionsAndAudio()
     {
         string wav = Convert.ToBase64String(new byte[] { 1, 2, 3, 4 });
@@ -398,6 +418,8 @@ public class UnitTestChatServer
         AssertConversationKept(directContext);
         AssertConversationKept(context);
         Assert.That(context.Count(c => c.Stage == "complete" && c.ToolCalls > 0), Is.EqualTo(1));
+        // The model reads the same tokens either way: the tool's result isn't quoted by its trip over the wire.
+        Assert.That(context.Select(c => (c.Stage, c.InputTokens, c.CachedTokens)), Is.EqualTo(directContext.Select(c => (c.Stage, c.InputTokens, c.CachedTokens))));
     }
 
     private static async Task<string[]> TwoTurnsAsync(IChatClient client, string[] questions, ChatOptions options)

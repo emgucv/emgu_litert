@@ -938,7 +938,9 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       the server answers as when called directly (two turns, the name recalled), and a tool round of Gemma 4 E2B on the
       GPU, the tool run on the client's side, finds the code as the direct call does. Both keep the LiteRT-LM conversation
       open: each request after the first starts from the tokens the previous one left (`ContextChanged`'s cached tokens).
-      A tool result crosses the wire as JSON text (`"7391"` with its quotes), so the model sees it quoted.
+      A tool result crossed the wire as JSON text (`"7391"` with its quotes) and the model saw it quoted; the server now
+      reads a tool message that is JSON back as a `JsonElement`, as an `AIFunction`'s result is, so the served round reads
+      the same tokens as the direct one (the test checks it).
 
 ## 30. Background tasks and monitoring
 

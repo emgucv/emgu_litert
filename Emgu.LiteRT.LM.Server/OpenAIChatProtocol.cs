@@ -114,7 +114,7 @@ namespace Emgu.LiteRT.LM.Server
                     string callId = String(message, "tool_call_id");
                     if (string.IsNullOrEmpty(callId))
                         throw new ChatProtocolException("A tool message needs 'tool_call_id'.");
-                    var result = new FunctionResultContent(callId, Text(message));
+                    var result = new FunctionResultContent(callId, ToolResult(Text(message)));
                     // A round's results are one message, as the client that called the tools has them.
                     ChatMessage last = request.Messages.LastOrDefault();
                     if (last != null && last.Role == ChatRole.Tool)
@@ -193,6 +193,24 @@ namespace Emgu.LiteRT.LM.Server
                 }
             }
             return contents;
+        }
+
+        // A tool's result as the client's function returned it: the client sends it serialized ("7391" with its quotes,
+        // {"temp": 12}), so JSON is read back as a JsonElement, as an AIFunction's result is when the model is called
+        // directly; other text (an error message, "12:00") stays text.
+        private static object ToolResult(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return text;
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(text);
+                return document.RootElement.Clone();
+            }
+            catch (JsonException)
+            {
+                return text;
+            }
         }
 
         // A message's text: the string, or its text parts joined.
