@@ -188,7 +188,7 @@ public sealed class ServeModelsFeature : ChatFeature
         if (IsServing || _pairing == null)
             return;
         _problem = null;
-        var server = new ChatServer(_pairing, Served, ServedSearch) { Name = ServerName };
+        var server = new ChatServer(_pairing, Served, ServedSearch, () => ServedImages?.Invoke()) { Name = ServerName };
         try { server.Start(ChatServer.DefaultPort); }
         catch (Exception ex) when (ex is HttpListenerException || ex is System.Net.Sockets.SocketException || ex is InvalidOperationException)
         {
@@ -261,13 +261,25 @@ public sealed class ServeModelsFeature : ChatFeature
     private static string ModelId(ChatModelOption option) =>
         string.Join("-", option.DisplayName.ToLowerInvariant().Split(new[] { ' ', '·', '/' }, StringSplitOptions.RemoveEmptyEntries));
 
+    /// <summary>
+    /// The image model to serve phones at POST /v1/images/generations (e.g. Emgu.LiteRT.LM.Maui.Images' <c>ImageFeature.ServedImages(BeginDrawing)</c>),
+    /// asked for each request; null, or giving null, for none.
+    /// </summary>
+    public Func<ServedImages> ServedImages { get; set; }
+
+    /// <summary>A phone's picture being drawn: the page is busy meanwhile and says for whom; dispose the result when it is done.</summary>
+    /// <param name="device">The phone's name</param>
+    public IDisposable BeginDrawing(string device) => BeginRequest(device, "Drawing a picture for ");
+
     // A phone's request on the page's model: the page is busy meanwhile, and says whose request it is.
-    private IDisposable BeginRequest(string device)
+    private IDisposable BeginRequest(string device) => BeginRequest(device, "Answering ");
+
+    private IDisposable BeginRequest(string device, string doing)
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
             Host?.SetBusy(true);
-            Host?.SetStatus("Answering " + device + "...");
+            Host?.SetStatus(doing + device + "...");
         });
         return new Done(() => MainThread.BeginInvokeOnMainThread(() =>
         {

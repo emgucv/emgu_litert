@@ -7,6 +7,7 @@ using System.Globalization;
 using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Chat;
 using Emgu.LiteRT.LM.Maui.Features;
+using Emgu.LiteRT.LM.Server;
 using Emgu.LiteRT.Models;
 using Microsoft.Extensions.AI;
 using Microsoft.Maui.Controls.Shapes;
@@ -71,8 +72,11 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     private Button _imageDeleteButton;
     private Button _modelButton;
     private ImageModelOption _option;
+    private ImageModelOption _remoteOption;
     private IImageModel _model;
     private Task _modelInit;
+    // One picture at a time on the model: the chat's own and a phone's (ServedImages).
+    private readonly SemaphoreSlim _drawGate = new SemaphoreSlim(1, 1);
     // Pictures being drawn, and the timer that lets an idle GPU model go (see GpuIdleRelease).
     private int _drawing;
     private CancellationTokenSource _idle;
@@ -103,6 +107,42 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     public ImageModelOption SelectedOption => _option;
 
     /// <summary>
+    /// An image model on a server the app reaches (a paired Mac's: its <see cref="ImageModelOption.Create"/> makes a
+    /// <see cref="ServerImageModel"/>), offered after <see cref="ModelOptions"/>; or null. Chosen before, it is taken again
+    /// when it is given (e.g. after the app started); given again for the same key (the server's model changed), the chosen
+    /// one is replaced.
+    /// </summary>
+    public ImageModelOption RemoteOption
+    {
+        get => _remoteOption;
+        set
+        {
+            _remoteOption = value;
+            if (value == null || Host == null)
+                return;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                bool chosen = Host.Settings.Get(ModelSettingKey, string.Empty) == value.Key;
+                if (!chosen || ReferenceEquals(_option, value) || _modelInit != null && _option?.Key != value.Key || Volatile.Read(ref _drawing) > 0)
+                    return;
+                IImageModel old = _model;
+                _option = value;
+                _model = value.Create();
+                _modelInit = null;
+                old?.Dispose();
+                if (_modelButton != null)
+                    _modelButton.Text = value.Name;
+                UpdateStatus();
+            });
+        }
+    }
+
+    // The device's models, then the server's.
+    private IReadOnlyList<ImageModelOption> Choices => _remoteOption == null ? ModelOptions : ModelOptions.Append(_remoteOption).ToList();
+
+    private bool IsServerModel => _model is ServerImageModel;
+
+    /// <summary>
     /// Saves a picture where the user chooses (a Save As dialog, e.g. CommunityToolkit.Maui's FileSaver): given the PNG
     /// and a file name, returns what to tell the user, or null when they cancelled. Without it the sheet has no Save button.
     /// </summary>
@@ -131,7 +171,7 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         if (ModelOptions == null || ModelOptions.Count == 0)
             ModelOptions = new[] { ZImageTurboOption };
         string key = host.Settings.Get(ModelSettingKey, ModelOptions[0].Key);
-        _option = ModelOptions.FirstOrDefault(o => o.Key == key) ?? ModelOptions[0];
+        _option = Choices.FirstOrDefault(o => o.Key == key) ?? ModelOptions[0];
         _model = _option.Create();
         ExcludeFromBackup(_model.Folder);
     }
@@ -208,8 +248,9 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         _imageDeleteButton.Clicked += OnDeleteImageModelClicked;
         _imageNote = ChatPage.Note(string.Empty);
         UpdateStatus();
-        // Turned on before and the model isn't complete: go on downloading.
-        if (on && !_model.IsDownloaded)
+        // Turned on before and the model isn't complete: go on downloading (not the default standing in for a server's model
+        // that isn't offered yet).
+        if (on && !_model.IsDownloaded && Host.Settings.Get(ModelSettingKey, _option.Key) == _option.Key)
             StartImageModelDownload();
         View modelSelector = ModelSelector?.Invoke() ?? BuildModelChoice();
         return new VerticalStackLayout
@@ -230,7 +271,7 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
     // there is only one.
     private View BuildModelChoice()
     {
-        if (ModelOptions.Count < 2)
+        if (Choices.Count < 2)
             return new ContentView();
         var title = new Label { Text = "Image model" };
         ChatResources.ApplyStyle(title, "ChatSectionTextStyle");
@@ -245,7 +286,11 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         ? string.Format(CultureInfo.InvariantCulture, "{0:F1} GB", bytes / 1e9)
         : string.Format(CultureInfo.InvariantCulture, "{0:F0} MB", Math.Ceiling(bytes / 1e6));
 
-    private string ModelNote() => string.Format(CultureInfo.InvariantCulture,
+    private string ModelNote() => IsServerModel
+        ? string.Format(CultureInfo.InvariantCulture,
+            "Lets the model draw pictures (\"draw a red fox in the snow\") with {0}, {1}: the description goes to it and the picture comes back. Nothing is downloaded to this device.",
+            _model.Name, _model.SizeLabel)
+        : string.Format(CultureInfo.InvariantCulture,
         "Lets the model draw pictures (\"draw a red fox in the snow\") with {0}, {1}, on this device. The model is a {2} download{3}. Nothing leaves the device.",
         _model.Name, _model.SizeLabel, Gigabytes(_model.DownloadSize),
         _model.CacheSize > 0 ? ", and the first picture prepares about " + Gigabytes(_model.CacheSize) + " more" : string.Empty);
@@ -257,15 +302,16 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             Host.SetStatus("Hang on - still busy.");
             return;
         }
-        string chosen = await Host.ChooseAsync("Image model", ModelOptions.Select(o => new ChatChoice(o.Key, o.Name, o.Detail)), _option.Key);
-        ImageModelOption option = ModelOptions.FirstOrDefault(o => o.Key == chosen);
+        IReadOnlyList<ImageModelOption> choices = Choices;
+        string chosen = await Host.ChooseAsync("Image model", choices.Select(o => new ChatChoice(o.Key, o.Name, o.Detail)), _option.Key);
+        ImageModelOption option = choices.FirstOrDefault(o => o.Key == chosen);
         if (option == null || option == _option || Host.IsBusy)
             return;
         await SwitchModelAsync(option);
     }
 
     /// <summary>Choose another image model: the current one is let go of, and the new one downloaded (asked first) when image generation is on.</summary>
-    /// <param name="option">One of <see cref="ModelOptions"/></param>
+    /// <param name="option">One of <see cref="ModelOptions"/>, or <see cref="RemoteOption"/></param>
     public async Task SwitchModelAsync(ImageModelOption option)
     {
         if (option == null)
@@ -667,7 +713,9 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             _imagePauseReason = reason;
             UpdateStatus();
         });
-        await _workload.WaitAsync(modelPaused, cancel);
+        // A server's model draws there: nothing heavy here.
+        if (!IsServerModel)
+            await _workload.WaitAsync(modelPaused, cancel);
         IImageModel model = _model;
         Task load = EnsureModelAsync();
         ImageTile tile = null;
@@ -735,21 +783,30 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
         try
         {
             // The tool runs off the UI thread, so the progress is marshalled to it here.
-            ImageModelPicture result = await model.GenerateAsync(prompt, seed, stage =>
+            await _drawGate.WaitAsync(cancel);
+            ImageModelPicture result;
+            try
             {
-                // Reported synchronously on the worker thread, before the stage's native graph runs. Keep the current
-                // latent state while waiting; cancellation still stops the pending generation.
-                _workload.WaitAsync(reason => MainThread.BeginInvokeOnMainThread(() =>
+                result = await model.GenerateAsync(prompt, seed, stage =>
                 {
-                    _imagePauseReason = reason;
-                    UpdateStatus();
-                    tile.Stage.Text = reason == null ? stage : "Image generation paused: " + reason;
-                }), cancel).GetAwaiter().GetResult();
-                string text = stage + string.Format(CultureInfo.InvariantCulture, " ({0:F0} s)", watch.Elapsed.TotalSeconds);
-                MainThread.BeginInvokeOnMainThread(() => tile.Stage.Text = text);
-            }, cancel);
+                    // Reported synchronously on the worker thread, before the stage's native graph runs. Keep the current
+                    // latent state while waiting; cancellation still stops the pending generation.
+                    _workload.WaitAsync(reason => MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        _imagePauseReason = reason;
+                        UpdateStatus();
+                        tile.Stage.Text = reason == null ? stage : "Image generation paused: " + reason;
+                    }), cancel).GetAwaiter().GetResult();
+                    string text = stage + string.Format(CultureInfo.InvariantCulture, " ({0:F0} s)", watch.Elapsed.TotalSeconds);
+                    MainThread.BeginInvokeOnMainThread(() => tile.Stage.Text = text);
+                }, cancel);
+            }
+            finally
+            {
+                _drawGate.Release();
+            }
             ticking.Cancel();
-            byte[] png = await Task.Run(() => AddPictureDetails(PngEncoder.Encode(result.Rgb, result.Width, result.Height), prompt, seed, model));
+            byte[] png = await Task.Run(() => AddPictureDetails(result.Png ?? PngEncoder.Encode(result.Rgb, result.Width, result.Height), prompt, seed, model));
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
                 ShowGeneratedImage(tile, png, string.Format(CultureInfo.InvariantCulture, "{0:F0} s", result.Elapsed.TotalSeconds));
@@ -769,6 +826,54 @@ public sealed class ImageFeature : ChatFeature, IStorageParticipant
             ticking.Cancel();
             await MainThread.InvokeOnMainThreadAsync(() => tile.Stage.Text = "Couldn't draw it: " + ex.Message);
             return "The picture couldn't be drawn: " + ex.Message;
+        }
+    }
+
+    /// <summary>
+    /// What a <see cref="ChatServer"/> serves at POST /v1/images/generations (this device serving phones): the chosen model
+    /// when image generation is on and the model is downloaded, else null (the phone gets 503). Pictures for phones aren't
+    /// shown in this page's chat; one is drawn at a time with this page's own.
+    /// </summary>
+    /// <param name="beginRequest">Called as a request starts, with the device's name (e.g. the page shows "Drawing for ..."); or null</param>
+    /// <returns>The model, its id its option's key (e.g. "bonsai-image-4b_gpu"); or null</returns>
+    public ServedImages ServedImages(Func<string, IDisposable> beginRequest = null)
+    {
+        IImageModel model = _model;
+        if (Host == null || model == null || IsServerModel || !Host.Settings.Get(SettingKey, false) || _download != null || !model.IsDownloaded)
+            return null;
+        string size = model.SizeLabel?.Replace(" x ", "x");
+        return new ServedImages(DrawForServerAsync, new ServedModel(_option.Key, model.Name) { ImageSize = size, ImageSteps = model.Steps }, beginRequest);
+    }
+
+    private async Task<ServedPicture> DrawForServerAsync(string prompt, long? seed, CancellationToken cancel)
+    {
+        Interlocked.Exchange(ref _idle, null)?.Cancel();
+        Interlocked.Increment(ref _drawing);
+        try
+        {
+            Stopwatch watch = Stopwatch.StartNew();
+            await _workload.WaitAsync(reason => MainThread.BeginInvokeOnMainThread(() =>
+            {
+                _imagePauseReason = reason;
+                UpdateStatus();
+            }), cancel);
+            IImageModel model = _model;
+            await WaitOrCancelAsync(EnsureModelAsync(), cancel);
+            string tooLong = model.CheckPrompt(prompt);
+            if (tooLong != null)
+                throw new ArgumentException(tooLong);
+            long drawn = seed ?? Random.Shared.NextInt64(1, 1L << 40);
+            ImageModelPicture result;
+            await _drawGate.WaitAsync(cancel);
+            try { result = await model.GenerateAsync(prompt, drawn, stage => { }, cancel); }
+            finally { _drawGate.Release(); }
+            byte[] png = result.Png ?? await Task.Run(() => PngEncoder.Encode(result.Rgb, result.Width, result.Height));
+            return new ServedPicture(png, drawn, watch.Elapsed);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _drawing);
+            ScheduleIdleRelease();
         }
     }
 

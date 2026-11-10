@@ -191,6 +191,10 @@ public sealed class LiteRtLmChatPage : ChatPage
                 return null;
             }
         };
+        // Item 29: a phone draws with the paired Mac's image model (offered after the demo's own), and a Mac draws for its
+        // phones with the image model chosen here.
+        parts.Server.ServerModelsChanged += (s, e) => parts.Images.RemoteOption = ServerImageOption(parts.Server);
+        parts.ServeModels.ServedImages = () => parts.Images.ServedImages(parts.ServeModels.BeginDrawing);
         // What the library's searches share: the demo's search model and workload (the storage feature adds the
         // deleted-model notice and check).
         parts.Search = parts.SearchModel.CreateServices(parts.Workload);
@@ -344,6 +348,19 @@ public sealed class LiteRtLmChatPage : ChatPage
     // Not the GPU choices on a device with little memory: on an iPhone 12 (4 GB) Bonsai on the GPU loaded, then took the
     // phone's interface down while drawing (SpringBoard restarted, no jetsam report: the GPU's memory isn't the app's);
     // on its CPU it drew a picture in 61 s with 1.5 GB still left (2026-11-09).
+    // The paired Mac's image model as one of Settings > Image model's choices, or null.
+    private static ImageModelOption ServerImageOption(ServerFeature server)
+    {
+        ServerFeature.ServerImageModelInfo info = server.PairedImageModel;
+        if (info == null)
+            return null;
+        string where = server.ServerDisplayName;
+        return new ImageModelOption(ServerFeature.ImageOptionKey, where + " · " + info.Name,
+            "Drawn on " + where + (string.IsNullOrEmpty(info.SizeLabel) ? "" : ", " + info.SizeLabel) +
+            ": nothing to download here; the description goes to it and the picture comes back.", null,
+            () => new ServerImageModel(server.CreateImageGenerator(info.Id), info.Name + " on " + where, info.SizeLabel, info.Steps));
+    }
+
     private static List<ImageModelOption> ImageModelOptions()
     {
         var options = new List<ImageModelOption>();

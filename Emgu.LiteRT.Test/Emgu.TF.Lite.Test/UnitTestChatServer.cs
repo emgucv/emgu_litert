@@ -481,6 +481,59 @@ public class UnitTestChatServer
     }
 
     [Test]
+    public void ReadsAnImageRequest()
+    {
+        ImageRequest request = OpenAIChatProtocol.ParseImageRequest("{\"model\":\"m\",\"prompt\":\" a red fox \",\"n\":1,\"size\":\"512x512\",\"response_format\":\"b64_json\",\"seed\":42}", "512x512");
+        Assert.That((request.Prompt, request.Model, request.Seed), Is.EqualTo(("a red fox", "m", (long?)42)));
+        Assert.That(OpenAIChatProtocol.ParseImageRequest("{\"prompt\":\"x\",\"size\":\"auto\"}", "512x512").Seed, Is.Null);
+        foreach (string bad in new[] { "{}", "{\"prompt\":\"  \"}", "{\"prompt\":\"x\",\"n\":2}", "{\"prompt\":\"x\",\"response_format\":\"url\"}",
+            "{\"prompt\":\"x\",\"size\":\"1024x1024\"}", "{\"prompt\":\"x\",\"seed\":-1}", "{\"prompt\":\"" + new string('a', OpenAIChatProtocol.MaxImagePromptLength + 1) + "\"}", "nope" })
+            Assert.That(Assert.Throws<ChatProtocolException>(() => OpenAIChatProtocol.ParseImageRequest(bad, "512x512")).Status, Is.EqualTo(400), bad);
+    }
+
+    [Test]
+    public async Task APhoneDrawsAPictureOnTheServer()
+    {
+        using var host = await ServerHost.StartAsync(new ScriptedModel());
+        var asked = new List<(string Prompt, long? Seed)>();
+        byte[] png = { 0x89, 0x50, 0x4E, 0x47, 1, 2, 3 };
+        bool refuse = false;
+        host.Images = new ServedImages((prompt, seed, cancel) =>
+        {
+            if (refuse)
+                throw new ArgumentException("The description is too long for Bonsai Image 4B.");
+            asked.Add((prompt, seed));
+            return Task.FromResult(new ServedPicture(png, seed ?? 7, TimeSpan.FromSeconds(19)));
+        }, new ServedModel("bonsai-image-4b-gpu", "Bonsai Image 4B · GPU") { ImageSize = "512x512", ImageSteps = 4 });
+
+        using var http = new HttpClient();
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", host.Token);
+        using (JsonDocument models = JsonDocument.Parse(await http.GetStringAsync(host.Url + "v1/models")))
+        {
+            JsonElement image = models.RootElement.GetProperty("data").EnumerateArray().Single(m => m.GetProperty("id").GetString() == "bonsai-image-4b-gpu");
+            Assert.That((image.GetProperty("type").GetString(), image.GetProperty("size").GetString(), image.GetProperty("steps").GetInt32()), Is.EqualTo(("images", "512x512", 4)));
+        }
+
+        string token = host.Token;
+        using var phone = new ServerImageGenerator(() => host.Url + "v1", () => token, "bonsai-image-4b-gpu");
+        ServedPicture picture = await phone.GenerateAsync("a red fox in the snow", 42, CancellationToken.None);
+        Assert.That((picture.Png, picture.Seed, picture.Elapsed), Is.EqualTo((png, 42L, TimeSpan.FromSeconds(19))));
+        Assert.That((await phone.GenerateAsync("a cat", null, CancellationToken.None)).Seed, Is.EqualTo(7));
+        Assert.That(asked, Is.EqualTo(new[] { ("a red fox in the snow", (long?)42), ("a cat", (long?)null) }));
+        Assert.That(host.Requests.Last().Path, Is.EqualTo("/v1/images/generations"));
+
+        // The model's refusal is a bad request with its words; no image model is 503; no token is 401.
+        refuse = true;
+        Assert.That(Assert.ThrowsAsync<InvalidOperationException>(() => phone.GenerateAsync("x", null, CancellationToken.None)).Message,
+            Does.Contain("400").And.Contain("too long for Bonsai"));
+        host.Images = null;
+        Assert.That(Assert.ThrowsAsync<InvalidOperationException>(() => phone.GenerateAsync("x", null, CancellationToken.None)).Message, Does.Contain("503"));
+        Assert.That(await http.GetStringAsync(host.Url + "v1/models"), Does.Not.Contain("\"images\""));
+        token = "wrong";
+        Assert.That(Assert.ThrowsAsync<InvalidOperationException>(() => phone.GenerateAsync("x", null, CancellationToken.None)).Message, Does.Contain("401"));
+    }
+
+    [Test]
     public void SearchesADocumentWithAQueryEmbeddedElsewhere()
     {
         var index = new Emgu.LiteRT.LM.Models.DocumentIndex();
@@ -775,6 +828,7 @@ public class UnitTestChatServer
         public string Token { get; private set; }
         public ServedChat Served { get; set; }
         public ServedEmbeddings Embeddings { get; set; }
+        public ServedImages Images { get; set; }
         public List<ServerRequestInfo> Requests { get; } = new List<ServerRequestInfo>();
 
         public static async Task<ServerHost> StartAsync(IChatClient model)
@@ -785,7 +839,7 @@ public class UnitTestChatServer
             listener.Stop();
             var pairing = new ServerPairing(new InMemoryServerTokenStore());
             ServerHost host = null;
-            var server = new ChatServer(pairing, () => host.Served, () => host.Embeddings) { Name = "Test Mac" };
+            var server = new ChatServer(pairing, () => host.Served, () => host.Embeddings, () => host.Images) { Name = "Test Mac" };
             host = new ServerHost(server, "http://localhost:" + port + "/");
             host.Served = new ServedChat(model, new ServedModel("test-model", "Test model") { ContextLength = 4096, Tools = true, Thinking = true });
             server.Start(port);

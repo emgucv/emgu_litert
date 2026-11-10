@@ -757,6 +757,9 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   its file. A phone offers it in Settings > Embedding model ("<Mac> · <model>"); chosen, past-chat and document search embed on
   the Mac and no search model loads on the phone, and photo and video search are off (text only). The same model file on both
   keeps the phone's indexes. Verified on the Galaxy S10 with the Mac mini: past chats indexed and found through the Mac.
+- Since 2026-11-10 it can serve the Mac's image model too (`POST /v1/images/generations`, OpenAI's shape plus "seed"), while
+  image generation is on there and the model downloaded; a phone offers it in Settings > Image model ("<Mac> · Bonsai Image
+  4B"), nothing to download. Verified on the Galaxy S10: a fox drawn by Bonsai Image 4B on the Mac's GPU came back in 22 s.
 - A Mac that isn't answering (asleep, its app stopped, at another address) fails within seconds instead of the system's
   minutes: connections give up after 6 s (`ServerReachability`), the message names the Mac ("... isn't answering - it may be
   asleep or on another network ..."), nothing is sent again, and the model list's row says when it last failed until the next

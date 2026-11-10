@@ -29,6 +29,7 @@
 		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Maui\Maui\Emgu.LiteRT.LM.Maui.csproj" />
 		<ProjectReference Include="..\..\Emgu.LiteRT.Models\NetStandard\Emgu.LiteRT.Models.csproj" />
 		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Models\NetStandard\Emgu.LiteRT.LM.Models.csproj" />
+		<ProjectReference Include="..\..\Emgu.LiteRT.LM.Server\NetStandard\Emgu.LiteRT.LM.Server.csproj" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 	</ItemGroup>
 </Project>

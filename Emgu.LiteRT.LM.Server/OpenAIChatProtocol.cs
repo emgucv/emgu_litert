@@ -64,6 +64,19 @@ namespace Emgu.LiteRT.LM.Server
         public bool Base64 { get; set; }
     }
 
+    /// <summary>An image generation request read: the description, and the seed if the client chose one.</summary>
+    public sealed class ImageRequest
+    {
+        /// <summary>What to draw.</summary>
+        public string Prompt { get; set; }
+
+        /// <summary>The model asked for.</summary>
+        public string Model { get; set; }
+
+        /// <summary>The seed, or null for a random one.</summary>
+        public long? Seed { get; set; }
+    }
+
     /// <summary>
     /// OpenAI's chat completions wire format and Microsoft.Extensions.AI's types, both ways, as <see cref="ChatServer"/>
     /// serves them. The request becomes the conversation as the client keeps it, so a model that keeps its open conversation
@@ -432,7 +445,8 @@ namespace Emgu.LiteRT.LM.Server
         /// <param name="model">The model, or null for none</param>
         /// <param name="created">When the server started (Unix seconds)</param>
         /// <param name="embeddings">The search model, or null for none</param>
-        public static string Models(ServedModel model, long created, ServedModel embeddings = null) => Write(w =>
+        /// <param name="images">The image model ("type": "images", its "size" and "steps"), or null for none</param>
+        public static string Models(ServedModel model, long created, ServedModel embeddings = null, ServedModel images = null) => Write(w =>
         {
             w.WriteStartObject();
             w.WriteString("object", "list");
@@ -468,6 +482,21 @@ namespace Emgu.LiteRT.LM.Server
                     w.WriteNumber("dimensions", embeddings.Dimensions);
                 w.WriteEndObject();
             }
+            if (images != null)
+            {
+                w.WriteStartObject();
+                w.WriteString("id", images.Id);
+                w.WriteString("object", "model");
+                w.WriteNumber("created", created);
+                w.WriteString("owned_by", "emgu-litert");
+                w.WriteString("display_name", images.DisplayName);
+                w.WriteString("type", "images");
+                if (!string.IsNullOrEmpty(images.ImageSize))
+                    w.WriteString("size", images.ImageSize);
+                if (images.ImageSteps > 0)
+                    w.WriteNumber("steps", images.ImageSteps);
+                w.WriteEndObject();
+            }
             w.WriteEndArray();
             w.WriteEndObject();
         });
@@ -475,7 +504,8 @@ namespace Emgu.LiteRT.LM.Server
         /// <summary>LM Studio's GET /api/v0/models for the model served, so clients written for LM Studio read it too.</summary>
         /// <param name="model">The model, or null for none</param>
         /// <param name="embeddings">The search model, or null for none</param>
-        public static string LmStudioModels(ServedModel model, ServedModel embeddings = null) => Write(w =>
+        /// <param name="images">The image model, or null for none</param>
+        public static string LmStudioModels(ServedModel model, ServedModel embeddings = null, ServedModel images = null) => Write(w =>
         {
             w.WriteStartObject();
             w.WriteString("object", "list");
@@ -501,6 +531,16 @@ namespace Emgu.LiteRT.LM.Server
                 w.WriteString("id", embeddings.Id);
                 w.WriteString("object", "model");
                 w.WriteString("type", "embeddings");
+                w.WriteString("publisher", "emgu-litert");
+                w.WriteString("state", "loaded");
+                w.WriteEndObject();
+            }
+            if (images != null)
+            {
+                w.WriteStartObject();
+                w.WriteString("id", images.Id);
+                w.WriteString("object", "model");
+                w.WriteString("type", "images");
                 w.WriteString("publisher", "emgu-litert");
                 w.WriteString("state", "loaded");
                 w.WriteEndObject();
@@ -612,6 +652,70 @@ namespace Emgu.LiteRT.LM.Server
             w.WriteNumber("prompt_tokens", 0);
             w.WriteNumber("total_tokens", 0);
             w.WriteEndObject();
+            w.WriteEndObject();
+        });
+
+        /// <summary>The longest description an image request takes: 4,000 characters (an image model's text encoder takes far fewer tokens; it says so itself).</summary>
+        public const int MaxImagePromptLength = 4000;
+
+        /// <summary>
+        /// Read a POST /v1/images/generations body: "prompt", and as OpenAI has them "n" (1 only), "response_format" ("b64_json"
+        /// only: no URLs to fetch the picture from) and "size" (the model's own, or "auto"); and "seed", which OpenAI's API
+        /// lacks.
+        /// </summary>
+        /// <param name="json">The body</param>
+        /// <param name="size">The model's picture size ("512x512"), or null to take any</param>
+        /// <exception cref="ChatProtocolException">It isn't an image request this server takes</exception>
+        public static ImageRequest ParseImageRequest(string json, string size = null)
+        {
+            JsonDocument document;
+            try { document = JsonDocument.Parse(json); }
+            catch (JsonException ex) { throw new ChatProtocolException("The body isn't JSON: " + ex.Message); }
+            using (document)
+            {
+                JsonElement root = document.RootElement;
+                if (root.ValueKind != JsonValueKind.Object)
+                    throw new ChatProtocolException("The body must be a JSON object.");
+                string prompt = String(root, "prompt")?.Trim();
+                if (string.IsNullOrEmpty(prompt))
+                    throw new ChatProtocolException("\"prompt\" is missing: what to draw.");
+                if (prompt.Length > MaxImagePromptLength)
+                    throw new ChatProtocolException("\"prompt\" is longer than " + MaxImagePromptLength + " characters.");
+                if (root.TryGetProperty("n", out JsonElement n) && n.ValueKind != JsonValueKind.Null && (!n.TryGetInt32(out int count) || count != 1))
+                    throw new ChatProtocolException("This server draws one picture a request (\"n\": 1).");
+                string format = String(root, "response_format");
+                if (format != null && format != "b64_json")
+                    throw new ChatProtocolException("\"response_format\" is \"b64_json\": the picture comes in the reply.");
+                string asked = String(root, "size");
+                if (asked != null && asked != "auto" && size != null && asked != size)
+                    throw new ChatProtocolException("This server's image model draws " + size + " pictures, not " + asked + ".");
+                var request = new ImageRequest { Prompt = prompt, Model = String(root, "model") };
+                if (root.TryGetProperty("seed", out JsonElement seed) && seed.ValueKind != JsonValueKind.Null)
+                {
+                    if (!seed.TryGetInt64(out long value) || value < 0)
+                        throw new ChatProtocolException("\"seed\" must be a whole number, 0 or more.");
+                    request.Seed = value;
+                }
+                return request;
+            }
+        }
+
+        /// <summary>The reply to POST /v1/images/generations, in OpenAI's shape, with the picture's "seed" and "elapsed_ms".</summary>
+        /// <param name="picture">The picture</param>
+        /// <param name="prompt">Its description</param>
+        /// <param name="created">When (Unix seconds)</param>
+        public static string Image(ServedPicture picture, string prompt, long created) => Write(w =>
+        {
+            w.WriteStartObject();
+            w.WriteNumber("created", created);
+            w.WriteStartArray("data");
+            w.WriteStartObject();
+            w.WriteString("b64_json", Convert.ToBase64String(picture.Png));
+            w.WriteString("revised_prompt", prompt);
+            w.WriteNumber("seed", picture.Seed);
+            w.WriteNumber("elapsed_ms", (long)picture.Elapsed.TotalMilliseconds);
+            w.WriteEndObject();
+            w.WriteEndArray();
             w.WriteEndObject();
         });
 

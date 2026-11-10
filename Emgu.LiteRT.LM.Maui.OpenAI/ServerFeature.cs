@@ -1,6 +1,7 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -45,6 +46,12 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
 
     /// <summary>The key of the paired Mac's search model in Settings > Embedding model.</summary>
     public const string SearchOptionKey = "server";
+
+    // The paired Mac's image model, as its model list last gave it ("id|name|size|steps").
+    private const string ImageModelSettingKey = "server_image_model";
+
+    /// <summary>The key an app gives the paired Mac's image model among its image models (e.g. Emgu.LiteRT.LM.Maui.Images' ImageModelOption).</summary>
+    public const string ImageOptionKey = "server";
 
     // Without a context length from the server, the conversation is kept within this (LM Studio's default).
     private const int DefaultServerContextTokens = 4096;
@@ -130,7 +137,37 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         UpdateOptionDetail();
         UpdateSearchOption();
         _ = LoadServerKeyAsync();
+        ServerModelsChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>An image model on the paired Mac: its id, name, picture size ("512 x 512") and steps.</summary>
+    public sealed record ServerImageModelInfo(string Id, string Name, string SizeLabel, int Steps);
+
+    /// <summary>
+    /// The paired Mac's image model, as its model list last gave it (an app offers it beside its own image models, with
+    /// <see cref="CreateImageGenerator"/>); null when the server is no Emgu LiteRT Mac or draws nothing.
+    /// </summary>
+    public ServerImageModelInfo PairedImageModel
+    {
+        get
+        {
+            string[] saved = (Host?.Settings.Get(ImageModelSettingKey, string.Empty) ?? string.Empty).Split('|');
+            if (saved.Length < 4 || saved[0].Length == 0 || string.IsNullOrEmpty(_serverUrl))
+                return null;
+            return new ServerImageModelInfo(saved[0], saved[1], saved[2].Replace("x", " x "),
+                int.TryParse(saved[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int steps) ? steps : 0);
+        }
+    }
+
+    /// <summary>The server by name: the paired Mac's, else its address.</summary>
+    public string ServerDisplayName => string.IsNullOrEmpty(_pairedMac) ? "your server" : _pairedMac;
+
+    /// <summary>Raised (on the UI thread) when what the server offers besides its chat model may have changed: <see cref="PairedImageModel"/>.</summary>
+    public event EventHandler ServerModelsChanged;
+
+    /// <summary>A client that draws with the server's image model, reading the server's address and token for each picture.</summary>
+    /// <param name="model">The model's id (<see cref="ServerImageModelInfo.Id"/>)</param>
+    public ServerImageGenerator CreateImageGenerator(string model) => new ServerImageGenerator(() => _serverUrl, () => _serverKey, model);
 
     // Settings > Embedding model offers the paired Mac's search model (texts embedded there, so past-chat and document search
     // need no model on the phone) while the server is a Mac that serves one.
@@ -161,17 +198,25 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             "Text only - photo and video search are off with it.");
     }
 
-    // What the server's model list says of its search model: an Emgu LiteRT Mac's, or none.
-    private void RememberSearchModel(List<ServerModelInfo> models)
+    // What the server's model list says of its search and image models: an Emgu LiteRT Mac's, or none.
+    private void RememberServerModels(List<ServerModelInfo> models)
     {
         ServerModelInfo search = models.FirstOrDefault(m => m.IsEmguMac && m.IsEmbedding);
         string value = search == null ? string.Empty : search.Id + "|" + (search.DisplayName ?? search.Id);
+        ServerModelInfo images = models.FirstOrDefault(m => m.IsEmguMac && m.IsImages);
+        string image = images == null ? string.Empty : string.Join("|", images.Id, (images.DisplayName ?? images.Id).Replace("|", " "),
+            images.ImageSize ?? string.Empty, images.ImageSteps.ToString(CultureInfo.InvariantCulture));
         MainThread.BeginInvokeOnMainThread(() =>
         {
             if (Host == null)
                 return;
             Host.Settings.Set(SearchModelSettingKey, value);
             UpdateSearchOption();
+            if (Host.Settings.Get(ImageModelSettingKey, string.Empty) != image)
+            {
+                Host.Settings.Set(ImageModelSettingKey, image);
+                ServerModelsChanged?.Invoke(this, EventArgs.Empty);
+            }
         });
     }
 
@@ -290,6 +335,7 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         if (url.Length == 0)
         {
             UpdateSearchOption();
+            ServerModelsChanged?.Invoke(this, EventArgs.Empty);
             _serverStatus.Text = "Enter the server's address.";
             return;
         }
@@ -437,7 +483,7 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             _serverStatus.Text = "Could not connect: " + ex.Message;
             return;
         }
-        List<ServerModelInfo> chat = models.Where(m => !m.IsEmbedding).ToList();
+        List<ServerModelInfo> chat = models.Where(m => !m.IsEmbedding && !m.IsImages).ToList();
         if (chat.Count == 0)
         {
             _serverStatus.Text = "The server has no chat models.";
@@ -476,8 +522,8 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
     // Keep the chosen model if the server has it, else take the first chat model (a loaded one, if the server says).
     private void ChooseServerModel(List<ServerModelInfo> models)
     {
-        RememberSearchModel(models);
-        List<ServerModelInfo> chat = models.Where(m => !m.IsEmbedding).ToList();
+        RememberServerModels(models);
+        List<ServerModelInfo> chat = models.Where(m => !m.IsEmbedding && !m.IsImages).ToList();
         if (chat.Count == 0)
             throw new InvalidOperationException("The server has no chat models.");
         if (!chat.Any(m => m.Id == _serverModel))
@@ -488,6 +534,10 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
     {
         public string Id;
         public bool IsEmbedding;
+        // An Emgu LiteRT Mac's image model, its picture size ("512x512") and steps.
+        public bool IsImages;
+        public string ImageSize;
+        public int ImageSteps;
         public bool Loaded;
         // From LM Studio's own API, or an Emgu LiteRT Mac's list; null when the server doesn't say.
         public bool? Vision;
@@ -530,6 +580,12 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
                             info.DisplayName = display.GetString();
                         if (model.TryGetProperty("type", out JsonElement type) && type.ValueKind == JsonValueKind.String && type.GetString() == "embeddings")
                             info.IsEmbedding = true;
+                        if (type.ValueKind == JsonValueKind.String && type.GetString() == "images")
+                        {
+                            info.IsImages = true;
+                            info.ImageSize = model.TryGetProperty("size", out JsonElement size) && size.ValueKind == JsonValueKind.String ? size.GetString() : null;
+                            info.ImageSteps = model.TryGetProperty("steps", out JsonElement steps) && steps.TryGetInt32(out int count) ? count : 0;
+                        }
                         if (model.TryGetProperty("context_length", out JsonElement length) && length.TryGetInt32(out int contextTokens) && contextTokens > 0)
                             info.ContextTokens = contextTokens;
                         if (model.TryGetProperty("capabilities", out JsonElement capabilities) && capabilities.ValueKind == JsonValueKind.Object)

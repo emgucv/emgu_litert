@@ -4,6 +4,7 @@
 
 using System.Globalization;
 using Emgu.LiteRT.LM.Models;
+using Emgu.LiteRT.LM.Server;
 using Emgu.LiteRT.Models;
 
 namespace Emgu.LiteRT.LM.Maui.Images;
@@ -13,7 +14,8 @@ namespace Emgu.LiteRT.LM.Maui.Images;
 /// <param name="Width">The width in pixels</param>
 /// <param name="Height">The height in pixels</param>
 /// <param name="Elapsed">How long it took</param>
-public sealed record ImageModelPicture(byte[] Rgb, int Width, int Height, TimeSpan Elapsed);
+/// <param name="Png">The picture already PNG-encoded (a server's), or null (the feature encodes <paramref name="Rgb"/>)</param>
+public sealed record ImageModelPicture(byte[] Rgb, int Width, int Height, TimeSpan Elapsed, byte[] Png = null);
 
 /// <summary>
 /// An image model <see cref="ImageFeature"/> draws with: downloads its files, loads, and draws a picture for a prompt.
@@ -313,4 +315,89 @@ internal sealed class InlineProgress<T> : IProgress<T>
     }
 
     public void Report(T value) => _handler(value);
+}
+
+/// <summary>
+/// An image model on a server (a paired Mac's, through Emgu.LiteRT.LM.Server's <see cref="ServerImageGenerator"/>): nothing is
+/// downloaded or loaded here, the description goes to the server and the picture comes back. The seed is the one asked for.
+/// </summary>
+public sealed class ServerImageModel : IImageModel
+{
+    private readonly ServerImageGenerator _generator;
+
+    /// <summary>Draw on a server.</summary>
+    /// <param name="generator">The server's image client (disposed with the model)</param>
+    /// <param name="name">The name to show, e.g. "Bonsai Image 4B on MacMini"</param>
+    /// <param name="sizeLabel">The picture size to show, e.g. "512 x 512"</param>
+    /// <param name="steps">The denoising steps a picture takes, or 0 if unknown</param>
+    public ServerImageModel(ServerImageGenerator generator, string name, string sizeLabel, int steps)
+    {
+        _generator = generator ?? throw new ArgumentNullException(nameof(generator));
+        Name = name ?? generator.Model;
+        SizeLabel = sizeLabel ?? string.Empty;
+        Steps = steps;
+    }
+
+    /// <inheritdoc/>
+    public string Name { get; }
+
+    /// <inheritdoc/>
+    public string SizeLabel { get; }
+
+    /// <inheritdoc/>
+    public int Steps { get; }
+
+    /// <summary>"server": the picture is drawn there.</summary>
+    public string Backend => "server";
+
+    /// <inheritdoc/>
+    public long DownloadSize => 0;
+
+    /// <inheritdoc/>
+    public long CacheSize => 0;
+
+    /// <inheritdoc/>
+    public long DownloadedBytes => 0;
+
+    /// <inheritdoc/>
+    public bool IsDownloaded => true;
+
+    /// <summary>The app's cache folder (nothing is kept in it).</summary>
+    public string Folder => FileSystem.CacheDirectory;
+
+    /// <inheritdoc/>
+    public bool ReportsSteps => false;
+
+    /// <inheritdoc/>
+    public Task DownloadAsync(Action<long, long> progress, CancellationToken cancel) => Task.CompletedTask;
+
+    /// <inheritdoc/>
+    public Task InitAsync(int threads) => Task.CompletedTask;
+
+    /// <inheritdoc/>
+    public string FirstLoadEstimate => null;
+
+    /// <inheritdoc/>
+    public bool CachesExist => true;
+
+    /// <inheritdoc/>
+    public string GpuFailure => null;
+
+    /// <summary>Null: the server says when a description is too long.</summary>
+    public string CheckPrompt(string prompt) => null;
+
+    /// <inheritdoc/>
+    public async Task<ImageModelPicture> GenerateAsync(string prompt, long seed, Action<string> stage, CancellationToken cancel)
+    {
+        ServedPicture picture = await _generator.GenerateAsync(prompt, seed, cancel);
+        return new ImageModelPicture(null, 0, 0, picture.Elapsed, picture.Png);
+    }
+
+    /// <inheritdoc/>
+    public void ClearPromptCache()
+    {
+    }
+
+    /// <inheritdoc/>
+    public void Dispose() => _generator.Dispose();
 }

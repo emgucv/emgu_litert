@@ -3,6 +3,8 @@
 //----------------------------------------------------------------------------
 
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
 
 namespace Emgu.LiteRT.LM.Server
@@ -47,6 +49,12 @@ namespace Emgu.LiteRT.LM.Server
 
         /// <summary>An embedding model's vectors' length, or 0 if unknown (or a chat model).</summary>
         public int Dimensions { get; set; }
+
+        /// <summary>An image model's picture size, as OpenAI writes it ("512x512"), or null.</summary>
+        public string ImageSize { get; set; }
+
+        /// <summary>An image model's denoising steps, or 0.</summary>
+        public int ImageSteps { get; set; }
     }
 
     /// <summary>
@@ -99,6 +107,59 @@ namespace Emgu.LiteRT.LM.Server
 
         /// <summary>The model's generator.</summary>
         public IEmbeddingGenerator<string, Embedding<float>> Generator { get; }
+
+        /// <summary>The model.</summary>
+        public ServedModel Model { get; }
+
+        /// <summary>Called as a request starts, or null.</summary>
+        public Func<string, IDisposable> BeginRequest { get; }
+    }
+
+    /// <summary>A picture an image model drew for <see cref="ChatServer"/>'s POST /v1/images/generations.</summary>
+    public sealed class ServedPicture
+    {
+        /// <summary>A picture.</summary>
+        /// <param name="png">The picture, PNG-encoded</param>
+        /// <param name="seed">The seed it was drawn with</param>
+        /// <param name="elapsed">How long it took (with the model's load, if it loaded for it)</param>
+        public ServedPicture(byte[] png, long seed, TimeSpan elapsed)
+        {
+            Png = png ?? throw new ArgumentNullException(nameof(png));
+            Seed = seed;
+            Elapsed = elapsed;
+        }
+
+        /// <summary>The picture, PNG-encoded.</summary>
+        public byte[] Png { get; }
+
+        /// <summary>The seed it was drawn with.</summary>
+        public long Seed { get; }
+
+        /// <summary>How long it took.</summary>
+        public TimeSpan Elapsed { get; }
+    }
+
+    /// <summary>
+    /// The image model a <see cref="ChatServer"/> serves at POST /v1/images/generations: what draws a picture, and the model.
+    /// The host gives one for each request, or null when there is none (the request gets 503).
+    /// </summary>
+    public sealed class ServedImages
+    {
+        /// <summary>Serve an image model.</summary>
+        /// <param name="draw">Draws a picture for a description, with a seed or (null) a random one; a model that isn't
+        /// loaded loads first, and one picture is drawn at a time</param>
+        /// <param name="model">The model (its <see cref="ServedModel.ImageSize"/> and <see cref="ServedModel.ImageSteps"/>)</param>
+        /// <param name="beginRequest">Called as a request starts, with the device's name; disposing its result marks the request
+        /// done; or null</param>
+        public ServedImages(Func<string, long?, CancellationToken, Task<ServedPicture>> draw, ServedModel model, Func<string, IDisposable> beginRequest = null)
+        {
+            Draw = draw ?? throw new ArgumentNullException(nameof(draw));
+            Model = model ?? throw new ArgumentNullException(nameof(model));
+            BeginRequest = beginRequest;
+        }
+
+        /// <summary>Draws a picture.</summary>
+        public Func<string, long?, CancellationToken, Task<ServedPicture>> Draw { get; }
 
         /// <summary>The model.</summary>
         public ServedModel Model { get; }

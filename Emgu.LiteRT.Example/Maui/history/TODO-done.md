@@ -1003,6 +1003,27 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       within 6 s (refused, then the 3 s search for the Mac by name), and the model list said so; the app started again, the
       next message was answered and the row was back to normal. The S10's test chats were deleted. A Mac really asleep
       wasn't tried (this Mac runs the session).
+- [x] Pictures through the Mac (2026-11-10): the server's
+      `POST /v1/images/generations` in OpenAI's shape - "prompt", "n" 1, "response_format" "b64_json" (no URLs), "size" the
+      model's own or "auto" - plus "seed" (and "seed" and "elapsed_ms" in the reply); `GET /v1/models` lists the image model
+      with `"type": "images"`, its "size" and "steps". The server takes a `ServedImages` (a draw function and the model);
+      `ServerImageGenerator` is the phone's client (a picture may take 20 minutes - the model's first load on the Mac -, an
+      unreachable Mac fails in seconds). `ImageFeature` (Emgu.LiteRT.LM.Maui.Images, which now references Emgu.LiteRT.LM.Server):
+      `ServedImages(beginRequest)` serves the chosen model while image generation is on and it is downloaded (its id the
+      option's key), drawn without a tile in the Mac's chat and one picture at a time with the Mac's own (a gate on the model);
+      `RemoteOption` offers a server's model after the app's own, and `ServerImageModel` is that model (nothing downloaded,
+      the PNG as the Mac sent it, the phone adding the description, seed and model to it). `ServerFeature` reads the Mac's
+      image model (`PairedImageModel`, `ServerModelsChanged`, `CreateImageGenerator`) and `ServeModelsFeature` takes the app's
+      (`ServedImages`, `BeginDrawing`: "Drawing a picture for <phone>..."); the demo connects them (`ServerImageOption`), since
+      the two packages don't reference each other. A choice of the Mac's model made before the app started is taken again when
+      the Mac's model is known, and the default model standing in meanwhile isn't downloaded. Tests: `ReadsAnImageRequest`,
+      `APhoneDrawsAPictureOnTheServer` (the picture, its seed and time; the model's refusal as a 400 with its words; 503 and
+      401). On the Galaxy S10 with the Mac mini (Bonsai Image 4B on the Mac's GPU, downloaded again in the Mac's app and kept):
+      the phone learnt the Mac's model ("bonsai_gpu", 256x256, 4 steps) with its first message, Settings > Image model offered
+      "MacMini M1 2020 (7) · Bonsai Image 4B" and switching image generation on asked for no download; "Draw a red fox sitting
+      in the snow." through Gemma 4 E2B on the Mac called generate_image and the fox came back in 22 s (the Mac's model loading
+      from its caches included), with nothing in the Mac's own chat and no image model mapped in the phone's process. Both
+      were set back afterwards (the phone's own Bonsai, off; the Mac's Bonsai on the CPU, off) and the test chat deleted.
 
 ## 30. Background tasks and monitoring
 
