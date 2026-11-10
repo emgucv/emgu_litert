@@ -57,3 +57,19 @@ do
         echo "../lib/runtimes/osx/native/$f.dylib not found: run platforms/macos/bazel_build_macos_fat for macOS"
     fi
 done
+
+# Android: libtfliteextern.so and the libLiteRt.so it links, per ABI, from platforms/android/bazel_build_litert. Their .meta
+# files set each pair's CPU; Unity's Android build needs IL2CPP for arm64 and x86_64.
+for abi in arm64-v8a armeabi-v7a x86 x86_64
+do
+    mkdir -p Assets/Emgu.TF.Lite/Plugins/Android/libs/$abi
+    for f in libtfliteextern libLiteRt
+    do
+        if test -f "../lib/android/$abi/$f.so"
+        then
+            cp -f "../lib/android/$abi/$f.so" Assets/Emgu.TF.Lite/Plugins/Android/libs/$abi/
+        else
+            echo "../lib/android/$abi/$f.so not found: run platforms/android/bazel_build_litert for $abi"
+        fi
+    done
+done

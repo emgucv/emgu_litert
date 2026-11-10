@@ -5,6 +5,7 @@
 /UserSettings/
 /obj/
 /Builds/
+/build/
 /.vs/
 /.vscode/
 *.csproj
@@ -17,6 +18,7 @@
 /Assets/Emgu.TF.Lite/Assets.meta
 /Assets/Emgu.TF.Lite/Plugins/iOS/*.xcframework/
 /Assets/Emgu.TF.Lite/Plugins/macOS/*.dylib
+/Assets/Emgu.TF.Lite/Plugins/Android/libs/*/*.so
 /Assets/Emgu.TF.Lite/Documentation/tensorflow.license.txt
 /Assets/Emgu.TF.Lite/Demo/Resources/*.png
 /Assets/Emgu.TF.Lite/Demo/EmguTFLogo.png

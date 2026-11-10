@@ -29,10 +29,15 @@ namespace Emgu.TF.Lite
                 BuildOptions.None);
         }
 
+        // An APK for arm64-v8a and armeabi-v7a devices, with libtfliteextern.so and libLiteRt.so (Plugins/Android/libs, from
+        // copy_unity_assets). IL2CPP: Mono can't build arm64.
         static void PerformAndroidBuild()
         {
             EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android);
-            BuildPipeline.BuildPlayer(Scenes, "Builds/Android", BuildTarget.Android, BuildOptions.None);
+            PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7;
+            EditorUserBuildSettings.buildAppBundle = false;
+            BuildPipeline.BuildPlayer(Scenes, "Builds/Android/Emgu.TF.Lite.Unity.apk", BuildTarget.Android, BuildOptions.None);
         }
 
         // The Xcode project, in Builds/iOS: build it with Xcode, signed with your own team.
