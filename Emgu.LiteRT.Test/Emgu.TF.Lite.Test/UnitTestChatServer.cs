@@ -405,6 +405,48 @@ public class UnitTestChatServer
     }
 
     [Test]
+    public async Task APhoneEmbedsQueriesAndDocumentsOnTheServer()
+    {
+        using var host = await ServerHost.StartAsync(new ScriptedModel());
+        var search = new ScriptedEmbedder();
+        host.Embeddings = new ServedEmbeddings(search, new ServedModel("embeddinggemma-2-text-vision-440m.litertlm"));
+        string token = host.Token;
+        using var phone = new ServerEmbeddingGenerator(() => host.Url + "v1", () => token, "embeddinggemma-2-text-vision-440m.litertlm");
+
+        var query = new EmbeddingGenerationOptions { AdditionalProperties = new AdditionalPropertiesDictionary { ["input_type"] = "query" } };
+        GeneratedEmbeddings<Embedding<float>> one = await phone.GenerateAsync(new[] { "cats" }, query);
+        Assert.That(one.Single().Vector.ToArray(), Is.EqualTo(ScriptedEmbedder.Vector("cats", 0)));
+        Assert.That(search.Requests.Last().Options.AdditionalProperties["input_type"], Is.EqualTo("query"));
+
+        // More texts than one request takes: several requests, the vectors in order.
+        string[] passages = Enumerable.Range(0, OpenAIChatProtocol.MaxEmbeddingInputs + 3).Select(i => new string('x', i + 1)).ToArray();
+        var document = new EmbeddingGenerationOptions { AdditionalProperties = new AdditionalPropertiesDictionary { ["input_type"] = "document" } };
+        GeneratedEmbeddings<Embedding<float>> many = await phone.GenerateAsync(passages, document);
+        Assert.That(many.Count, Is.EqualTo(passages.Length));
+        Assert.That(many[^1].Vector.Span[0], Is.EqualTo(passages[^1].Length));
+        Assert.That(search.Requests.Skip(1).Select(r => r.Texts.Count), Is.EqualTo(new[] { OpenAIChatProtocol.MaxEmbeddingInputs, 3 }));
+        Assert.That(search.Requests.Skip(1).All(r => (string)r.Options.AdditionalProperties["input_type"] == "document"));
+
+        // The server's refusals come back with its message.
+        token = "wrong";
+        var refused = Assert.ThrowsAsync<InvalidOperationException>(() => phone.GenerateAsync(new[] { "x" }));
+        Assert.That(refused.Message, Does.Contain("401").And.Contain("paired"));
+        token = host.Token;
+        host.Embeddings = null;
+        Assert.That(Assert.ThrowsAsync<InvalidOperationException>(() => phone.GenerateAsync(new[] { "x" })).Message, Does.Contain("no search model"));
+    }
+
+    [Test]
+    public void SearchesADocumentWithAQueryEmbeddedElsewhere()
+    {
+        var index = new Emgu.LiteRT.LM.Models.DocumentIndex();
+        index.AddPassage("cats", "page 1", new[] { 1f, 0f });
+        index.AddPassage("dogs", "page 2", new[] { 0f, 1f });
+        Emgu.LiteRT.LM.Models.DocumentSearchResult result = index.Search(new[] { 0.1f, 0.9f });
+        Assert.That(result.Passages.Select(m => m.Item.Text), Is.EqualTo(new[] { "dogs", "cats" }));
+    }
+
+    [Test]
     public async Task AClientThatGoesAwayStopsTheReply()
     {
         var model = new ScriptedModel { Slow = true };
@@ -537,6 +579,10 @@ public class UnitTestChatServer
         float[][] queries = Read(await (await http.PostAsync(host.Url + "v1/embeddings", new StringContent(body("query")))).Content.ReadAsStringAsync());
         AssertSame(queries, texts.Select(t => model.EmbedQuery(t)).ToArray());
         Assert.That(entered, Is.EqualTo(3));
+        // The phone's generator: the same vectors, with the query and document prefixes.
+        using var phone = new ServerEmbeddingGenerator(() => host.Url + "v1", () => host.Token, "embeddinggemma-2");
+        var asDocuments = new EmbeddingGenerationOptions { AdditionalProperties = new AdditionalPropertiesDictionary { ["input_type"] = "document" } };
+        AssertSame((await phone.GenerateAsync(texts, asDocuments)).Select(e => e.Vector.ToArray()).ToArray(), documents);
         // The query finds its answer among the documents.
         float[] question = (await host.Embedder("embeddinggemma-2").GenerateAsync(new[] { "how tall is the tower in Paris" },
             new EmbeddingGenerationOptions { AdditionalProperties = new AdditionalPropertiesDictionary { ["input_type"] = "query" } })).Single().Vector.ToArray();

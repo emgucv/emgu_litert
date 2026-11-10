@@ -243,23 +243,23 @@ public sealed class ServeModelsFeature : ChatFeature
     }).GetAwaiter().GetResult();
 
     // The page's search model for a phone's POST /v1/embeddings: loaded on the first request, shared with the Mac's own
-    // searches (one embedding at a time, searches first); null when the page has none or it was deleted (the phone gets 503).
+    // searches (one embedding at a time, searches first); null when the page has none, it was deleted, or it is itself a
+    // server's (the phone gets 503). Its id is the model's file name, the key a phone's indexes use: a phone with the same
+    // model keeps its embeddings when it switches to the Mac's.
     private ServedEmbeddings ServedSearch()
     {
         SearchModelFeature search = Host?.Services.Get<SearchModelFeature>();
-        if (search == null || search.DownloadRequired)
+        if (search == null || search.Selected.Remote != null || search.DownloadRequired)
             return null;
-        string id = ModelId(search.ModelName);
+        string id = search.ModelFile;
         SearchEmbedder embedder = search.Embedder;
         var generator = new LiteRtLmEmbeddingGenerator(cancel => embedder.EnsureAsync(null, cancel), id, embedder.EnterSearchAsync);
         return new ServedEmbeddings(generator, new ServedModel(id, search.ModelName));
     }
 
     // "Gemma 4 E4B" -> "gemma-4-e4b".
-    private static string ModelId(ChatModelOption option) => ModelId(option.DisplayName);
-
-    private static string ModelId(string name) =>
-        string.Join("-", name.ToLowerInvariant().Split(new[] { ' ', '·', '/' }, StringSplitOptions.RemoveEmptyEntries));
+    private static string ModelId(ChatModelOption option) =>
+        string.Join("-", option.DisplayName.ToLowerInvariant().Split(new[] { ' ', '·', '/' }, StringSplitOptions.RemoveEmptyEntries));
 
     // A phone's request on the page's model: the page is busy meanwhile, and says whose request it is.
     private IDisposable BeginRequest(string device)

@@ -141,7 +141,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
                 Children =
                 {
                     row,
-                    ChatPage.Note("Lets the assistant search saved messages and show links to matching chats. Uses the search model on this device, indexing in the background between replies; the model downloads on first use. Turning this off deletes the search index; saved chats remain.")
+                    ChatPage.Note("Lets the assistant search saved messages and show links to matching chats. Uses the embedding model chosen below (on this device, or a paired Mac's), indexing in the background between replies; a model on this device downloads on first use. Turning this off deletes the search index; saved chats remain.")
                 }
             };
             View notice = _search.CreateDownloadNotice?.Invoke();
@@ -223,6 +223,9 @@ namespace Emgu.LiteRT.LM.Maui.Features
                         {
                             while (Host.IsReplying)
                                 await Task.Delay(250, token);
+                            // On the server: nothing runs on the device.
+                            if (_search.Embedder.IsRemote)
+                                return (await _search.Embedder.EmbedDocumentsRemotelyAsync(new[] { text }, token))[0];
                             Action<string> paused = reason => MainThread.BeginInvokeOnMainThread(() =>
                                 IndexStatus(reason == null ? "Indexing chats..." : "Chat indexing paused: " + reason));
                             await _search.Workload.WaitAsync(paused, token);
@@ -253,12 +256,7 @@ namespace Emgu.LiteRT.LM.Maui.Features
             PhotoQuery parsed = ChatSearch.Parse(request, DateTime.Now);
             var query = new ChatSearchQuery(parsed.Description, parsed.From, parsed.To);
             List<ChatSearchHit> found = await new ChatSearchIndex(_store).SearchAsync(IndexModel, query, Host.CurrentChatId,
-                async (text, token) =>
-                {
-                    var embedder = await _search.Embedder.EnsureAsync(null, token);
-                    using (await _search.Embedder.EnterSearchAsync(token))
-                        return await Task.Run(() => embedder.EmbedQuery(text), token);
-                }, cancel);
+                (text, token) => _search.Embedder.EmbedQueryAsync(text, token), cancel);
             if (!On)
                 return "Past-chat search was turned off. Discard the search results.";
             string indexing = IsIndexing ? "Indexing is still in progress; " : "";

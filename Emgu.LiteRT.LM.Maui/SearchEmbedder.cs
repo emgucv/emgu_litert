@@ -3,7 +3,9 @@
 //----------------------------------------------------------------------------
 
 using Emgu.LiteRT.LM.Agents;
+using Emgu.LiteRT.LM.Extensions.AI;
 using Emgu.LiteRT.LM.Models;
+using Microsoft.Extensions.AI;
 
 namespace Emgu.LiteRT.LM.Maui
 {
@@ -71,7 +73,8 @@ namespace Emgu.LiteRT.LM.Maui
     /// <summary>
     /// The search model that the searches of a chat page share (past chats, documents, photos): loaded once - downloaded
     /// the first time, in the background (<see cref="BackgroundDownloads"/>) - and kept until <see cref="ReleaseAsync"/>;
-    /// one embedding at a time (<see cref="Gate"/>). A GPU model that fails to load asks the choice for the CPU.
+    /// one embedding at a time (<see cref="Gate"/>). A GPU model that fails to load asks the choice for the CPU. When the
+    /// choice is a model on a server (<see cref="Remote"/>), texts are embedded there and nothing loads on the device.
     /// </summary>
     public sealed class SearchEmbedder
     {
@@ -111,12 +114,62 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>Whether the model is loaded or loading.</summary>
         public bool IsLoaded => _load != null;
 
+        /// <summary>
+        /// Gives the server's embedding generator when the chosen search model runs on a server (a Mac serving its model:
+        /// text only), or null for a model on this device; null for none.
+        /// </summary>
+        public Func<IEmbeddingGenerator<string, Embedding<float>>> Remote { get; set; }
+
+        /// <summary>Whether the chosen search model runs on a server (<see cref="Remote"/>): texts only, no model on the device.</summary>
+        public bool IsRemote => Remote?.Invoke() != null;
+
+        /// <summary>
+        /// Embed a search query: on the server, or with the model on the device (loading it the first time), before any
+        /// background index waiting.
+        /// </summary>
+        /// <param name="text">The query</param>
+        /// <param name="cancel">Stops it</param>
+        public async Task<float[]> EmbedQueryAsync(string text, CancellationToken cancel)
+        {
+            IEmbeddingGenerator<string, Embedding<float>> remote = Remote?.Invoke();
+            if (remote != null)
+                return (await EmbedRemoteAsync(remote, new[] { text }, "query", cancel))[0];
+            EmbeddingModel model = await EnsureAsync(null, cancel);
+            using (await EnterSearchAsync(cancel))
+                return await Task.Run(() => model.EmbedQuery(text), cancel);
+        }
+
+        /// <summary>Embed passages to index on the server (<see cref="Remote"/>, which must be set).</summary>
+        /// <param name="texts">The passages</param>
+        /// <param name="cancel">Stops it</param>
+        public Task<float[][]> EmbedDocumentsRemotelyAsync(string[] texts, CancellationToken cancel)
+        {
+            IEmbeddingGenerator<string, Embedding<float>> remote = Remote?.Invoke()
+                ?? throw new InvalidOperationException("The search model isn't on a server.");
+            return EmbedRemoteAsync(remote, texts, "document", cancel);
+        }
+
+        private static async Task<float[][]> EmbedRemoteAsync(IEmbeddingGenerator<string, Embedding<float>> remote, string[] texts, string inputType, CancellationToken cancel)
+        {
+            var options = new EmbeddingGenerationOptions
+            {
+                AdditionalProperties = new AdditionalPropertiesDictionary { [LiteRtLmEmbeddingGenerator.InputTypeKey] = inputType }
+            };
+            GeneratedEmbeddings<Embedding<float>> embeddings = await remote.GenerateAsync(texts, options, cancel);
+            if (embeddings.Count != texts.Length)
+                throw new InvalidOperationException("The server gave " + embeddings.Count + " embeddings for " + texts.Length + " texts.");
+            return embeddings.Select(e => e.Vector.ToArray()).ToArray();
+        }
+
         /// <summary>The model, loading it the first time.</summary>
         /// <param name="stage">Told the download's progress and the loading, or null</param>
         /// <param name="cancel">Stops the download or the loading</param>
-        /// <exception cref="InvalidOperationException">The model was deleted (<see cref="ISearchModelChoice.DownloadRequired"/>)</exception>
+        /// <exception cref="InvalidOperationException">The model was deleted (<see cref="ISearchModelChoice.DownloadRequired"/>),
+        /// or it runs on a server (<see cref="IsRemote"/>)</exception>
         public Task<EmbeddingModel> EnsureAsync(IProgress<string> stage, CancellationToken cancel)
         {
+            if (IsRemote)
+                return Task.FromException<EmbeddingModel>(new InvalidOperationException("The search model runs on the server: only text is searched (no photos or videos)."));
             if (_choice.DownloadRequired)
                 return Task.FromException<EmbeddingModel>(new InvalidOperationException("The search model was deleted. Download it again in the settings."));
             if (_load == null || _load.IsFaulted || _load.IsCanceled)

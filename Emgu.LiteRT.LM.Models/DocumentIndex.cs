@@ -328,7 +328,20 @@ namespace Emgu.LiteRT.LM.Models
         {
             if (model == null)
                 throw new ArgumentNullException("model");
-            float[] q = model.EmbedQuery(query ?? String.Empty);
+            return Search(model.EmbedQuery(query ?? String.Empty));
+        }
+
+        /// <summary>
+        /// Rank the passages and images by how related they are to a query already embedded (e.g. on a server, with the
+        /// model the index was built with).
+        /// </summary>
+        /// <param name="queryEmbedding">The question's embedding</param>
+        /// <returns>Every embedded passage and image with its score, the best match first</returns>
+        public DocumentSearchResult Search(float[] queryEmbedding)
+        {
+            if (queryEmbedding == null)
+                throw new ArgumentNullException("queryEmbedding");
+            float[] q = queryEmbedding;
             List<DocumentMatch<DocumentPassage>> passages = _passages
                 .Where(p => p.Embedding != null)
                 .Select(p => new DocumentMatch<DocumentPassage>(p, EmbeddingModel.CosineSimilarity(q, p.Embedding)))

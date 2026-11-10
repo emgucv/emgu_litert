@@ -3,11 +3,13 @@
 //----------------------------------------------------------------------------
 
 using Emgu.LiteRT.LM.Models;
+using Microsoft.Extensions.AI;
 
 namespace Emgu.LiteRT.LM.Maui.Features;
 
 /// <summary>
-/// One search model a <see cref="SearchModelFeature"/> offers: its name, a factory, a line about it, and its backend.
+/// One search model a <see cref="SearchModelFeature"/> offers: its name, a factory, a line about it, and its backend; or a
+/// model on a server (<see cref="Remote"/>), which embeds texts only.
 /// </summary>
 public sealed class SearchModelOption
 {
@@ -24,14 +26,37 @@ public sealed class SearchModelOption
         Detail = detail;
     }
 
+    /// <summary>A model on a server: texts only (photo and video search are off with it), nothing downloaded.</summary>
+    /// <param name="key">Its key, kept in the settings (e.g. "server")</param>
+    /// <param name="name">Its name in the list and in status lines</param>
+    /// <param name="remote">The server's generator</param>
+    /// <param name="indexKey">The model's key for the indexes: a model on the device with the same key (the same model
+    /// file) keeps its embeddings when switching</param>
+    /// <param name="detail">A line about it, or null</param>
+    public SearchModelOption(string key, string name, IEmbeddingGenerator<string, Embedding<float>> remote, string indexKey, string detail = null)
+    {
+        Key = key ?? throw new ArgumentNullException(nameof(key));
+        Name = name ?? key;
+        Remote = remote ?? throw new ArgumentNullException(nameof(remote));
+        IndexKey = string.IsNullOrEmpty(indexKey) ? throw new ArgumentException("An index key is needed", nameof(indexKey)) : indexKey;
+        Detail = detail;
+        SupportsImages = false;
+    }
+
     /// <summary>Its key, kept in the settings.</summary>
     public string Key { get; }
 
     /// <summary>Its name.</summary>
     public string Name { get; }
 
-    /// <summary>Makes a new instance of the model.</summary>
+    /// <summary>Makes a new instance of the model; null for a model on a server.</summary>
     public Func<EmbeddingModel> Create { get; }
+
+    /// <summary>The server's generator for a model on a server, else null.</summary>
+    public IEmbeddingGenerator<string, Embedding<float>> Remote { get; }
+
+    /// <summary>A model on a server's key for the indexes, else null (the model file's name is).</summary>
+    public string IndexKey { get; }
 
     /// <summary>A line about it, or null.</summary>
     public string Detail { get; }
@@ -65,7 +90,8 @@ public sealed class SearchModelOption
 /// key). It owns the <see cref="SearchEmbedder"/> and is the <see cref="ISearchModelChoice"/>; <see cref="CreateServices"/>
 /// makes the <see cref="SearchServices"/> for the search features. Switching stops the <see cref="ISearchModelParticipant"/>s,
 /// lets go of the old model, and has them rebuild what the old model made (another model's embeddings don't match); a
-/// GPU option that fails to load offers its <see cref="SearchModelOption.CpuFallback"/>. No tools.
+/// GPU option that fails to load offers its <see cref="SearchModelOption.CpuFallback"/>. An app that reaches a server's
+/// search model offers it too (<see cref="RemoteOption"/>). No tools.
 /// </summary>
 public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
 {
@@ -74,6 +100,8 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
 
     private readonly List<SearchModelOption> _options;
     private int _selected;
+    private string _remoteKey;
+    private SearchModelOption _remoteOption;
     private SearchServices _services;
     private Button _button;
     private Label _detail;
@@ -85,7 +113,7 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
         _options = (options ?? new[] { SearchModelOption.EmbeddingGemma2TextVision(), SearchModelOption.EmbeddingGemma2Multimodal() }).ToList();
         if (_options.Count == 0)
             throw new ArgumentException("No search model to choose from.", nameof(options));
-        Embedder = new SearchEmbedder(this);
+        Embedder = new SearchEmbedder(this) { Remote = () => Selected.Remote };
     }
 
     /// <inheritdoc/>
@@ -101,16 +129,40 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
     public IReadOnlyList<SearchModelOption> Options => _options;
 
     /// <summary>The chosen model.</summary>
-    public SearchModelOption Selected => _options[_selected];
+    public SearchModelOption Selected => _remoteKey != null && _remoteOption?.Key == _remoteKey ? _remoteOption : _options[_selected];
+
+    /// <summary>
+    /// A search model on a server the app reaches (e.g. Emgu.LiteRT.LM.Maui.OpenAI's ServerFeature: the paired Mac's), offered
+    /// after <see cref="Options"/>; or null. Chosen and then gone (the server removed), the searches go back to the
+    /// device's model.
+    /// </summary>
+    public SearchModelOption RemoteOption
+    {
+        get => _remoteOption;
+        set
+        {
+            if (value != null && value.Remote == null)
+                throw new ArgumentException("Not a model on a server", nameof(value));
+            _remoteOption = value;
+            if (_services != null)
+                _services.SupportsImages = Selected.SupportsImages;
+            MainThread.BeginInvokeOnMainThread(UpdateDetail);
+        }
+    }
 
     /// <summary>The search model the searches share: loaded once (downloaded the first time), one embedding at a time.</summary>
     public SearchEmbedder Embedder { get; }
 
-    /// <summary>The chosen model's file name: the indexes record it, so another model's passages are rebuilt.</summary>
+    /// <summary>
+    /// The chosen model's file name (a model on a server: its <see cref="SearchModelOption.IndexKey"/>): the indexes record it,
+    /// so another model's passages are rebuilt.
+    /// </summary>
     public string ModelFile
     {
         get
         {
+            if (Selected.Remote != null)
+                return Selected.IndexKey;
             using EmbeddingModel model = Selected.Create();
             return Path.GetFileName(model.DefaultModelFile.Url);
         }
@@ -144,6 +196,8 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
         base.OnAttached(host);
         string key = host.Settings.Get(SettingKey, string.Empty);
         _selected = Math.Max(0, _options.FindIndex(o => o.Key == key));
+        // Not one of the device's: the server's, once the app offers it.
+        _remoteKey = _options.Any(o => o.Key == key) || string.IsNullOrEmpty(key) ? null : key;
         if (_services != null)
             _services.SupportsImages = Selected.SupportsImages;
         // No background embedding starts while the chat model replies: the two would share the CPU, and the reply's
@@ -154,7 +208,8 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
     // ---------- ISearchModelChoice ----------
 
     /// <inheritdoc/>
-    public EmbeddingModel CreateModel() => Selected.Create();
+    public EmbeddingModel CreateModel() => Selected.Create?.Invoke()
+        ?? throw new InvalidOperationException("The search model runs on the server.");
 
     /// <inheritdoc/>
     public string ModelName => Selected.Name;
@@ -166,7 +221,7 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
     public bool UsesGpu => Selected.UsesGpu;
 
     /// <summary>The user deleted the model in Settings > Storage: it isn't downloaded again until they ask.</summary>
-    public bool DownloadRequired => StorageFeature.IsSearchModelDeleted(Host?.Settings, ModelFile);
+    public bool DownloadRequired => Selected.Remote == null && StorageFeature.IsSearchModelDeleted(Host?.Settings, ModelFile);
 
     /// <inheritdoc/>
     public async Task<bool> SwitchToCpuAsync(string error)
@@ -209,9 +264,15 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
                 + "Switching reloads the search model; another model rebuilds the saved embeddings. Models download on first use.";
     }
 
+    // The device's models, then the server's.
+    private List<SearchModelOption> Choices => _remoteOption == null ? _options : _options.Append(_remoteOption).ToList();
+
     private void Select(int index)
     {
-        _selected = index;
+        // An index past the device's models is the server's.
+        _remoteKey = index >= _options.Count ? _remoteOption?.Key : null;
+        if (index < _options.Count)
+            _selected = index;
         Host?.Settings.Set(SettingKey, Selected.Key);
         if (_services != null)
             _services.SupportsImages = Selected.SupportsImages;
@@ -225,9 +286,10 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
             Host.SetStatus("Hang on - still busy.");
             return;
         }
-        string chosen = await Host.ChooseAsync(Title, _options.Select(o => new ChatChoice(o.Key, o.Name, o.Detail)), Selected.Key);
-        int index = _options.FindIndex(o => o.Key == chosen);
-        if (index < 0 || index == _selected || Host.IsBusy)
+        List<SearchModelOption> choices = Choices;
+        string chosen = await Host.ChooseAsync(Title, choices.Select(o => new ChatChoice(o.Key, o.Name, o.Detail)), Selected.Key);
+        int index = choices.FindIndex(o => o.Key == chosen);
+        if (index < 0 || chosen == Selected.Key || Host.IsBusy)
             return;
         await Host.RunReloadAsync(() => SwitchAsync(index));
         // After the reload, not in it: the searches don't start indexing while a reload is going on.
@@ -264,9 +326,10 @@ public sealed class SearchModelFeature : ChatFeature, ISearchModelChoice
             bool otherModel = ModelFile != oldFile;
             foreach (ISearchModelParticipant participant in participants)
                 await participant.SearchModelChangedAsync(otherModel);
-            if (reload && !DownloadRequired)
+            if (reload && !DownloadRequired && Selected.Remote == null)
                 await Embedder.EnsureAsync(null, CancellationToken.None);
-            Host.SetStatus(Embedder.Model != null ? "Embedding model ready: " + Selected.Name : "Embedding model selected. It will load when search needs it.");
+            Host.SetStatus(Selected.Remote != null ? "Search uses " + Selected.Name + "."
+                : Embedder.Model != null ? "Embedding model ready: " + Selected.Name : "Embedding model selected. It will load when search needs it.");
         }
         catch (Exception ex)
         {

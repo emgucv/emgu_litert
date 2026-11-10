@@ -392,8 +392,8 @@ namespace Emgu.LiteRT.LM.Maui.Documents
                         summary = index.Passages.Count + " passages · text-only embedding model";
                     if (index.Passages.Count == 0 && index.Images.Count == 0)
                         throw new InvalidOperationException("this document needs an embedding model that supports images");
-                    // The model embeds the questions.
-                    EmbeddingModel savedEmbedder = await Embedder.EnsureAsync(stage, cancel);
+                    // The model embeds the questions (one on a server loads nothing here).
+                    EmbeddingModel savedEmbedder = Embedder.IsRemote ? null : await Embedder.EnsureAsync(stage, cancel);
                     if (rebuild)
                     {
                         ((IProgress<string>)stage).Report("Rebuilding the document embeddings...");
@@ -426,7 +426,7 @@ namespace Emgu.LiteRT.LM.Maui.Documents
                             ? "it has no text (scanned pages need a model that understands images, e.g. Gemma 4)"
                             : "no text was found in it");
 
-                    EmbeddingModel embedder = await Embedder.EnsureAsync(stage, cancel);
+                    EmbeddingModel embedder = Embedder.IsRemote ? null : await Embedder.EnsureAsync(stage, cancel);
                     Progress<DocumentIndexProgress> indexed = new Progress<DocumentIndexProgress>(p =>
                     {
                         if (_document == state)
@@ -471,9 +471,13 @@ namespace Emgu.LiteRT.LM.Maui.Documents
             }
         }
 
+        // With the model on the device, or (model null) on the server: texts only there.
         private Task BuildDocumentIndexAsync(DocumentIndex index, EmbeddingModel model, DocumentState state,
             IProgress<DocumentIndexProgress> progress, CancellationToken cancel)
         {
+            if (model == null)
+                return index.BuildAsync((texts, token) => Embedder.EmbedDocumentsRemotelyAsync(texts, token),
+                    (image, token) => throw new NotSupportedException("The search model on the server embeds text only."), progress, cancel);
             Action<string> paused = reason => MainThread.BeginInvokeOnMainThread(() =>
             {
                 if (_document == state)
@@ -635,10 +639,7 @@ namespace Emgu.LiteRT.LM.Maui.Documents
             var found = new List<DocumentLibraryMatch>();
             if (passages.Count > 0)
             {
-                EmbeddingModel embedder = await Embedder.EnsureAsync(null, cancel);
-                float[] query;
-                using (await Embedder.EnterSearchAsync(cancel))
-                    query = await Task.Run(() => embedder.EmbedQuery(request), cancel);
+                float[] query = await Embedder.EmbedQueryAsync(request, cancel);
                 found = DocumentLibrarySearch.Rank(passages, query, Host.ContextWindow >= 8192 ? 3200 : 1600);
             }
             if (found.Count == 0)
@@ -665,14 +666,18 @@ namespace Emgu.LiteRT.LM.Maui.Documents
                 return null;
             if (!state.Ready.IsCompleted)
                 Host.SetStatus("Waiting for the document to be indexed...");
-            if (!await state.Ready || state.Index == null || Embedder.Model == null)
+            if (!await state.Ready || state.Index == null || (Embedder.Model == null && !Embedder.IsRemote))
                 return null;
             Host.SetStatus("Searching the document...");
             DocumentIndex index = state.Index;
-            EmbeddingModel embedder = Embedder.Model;
             DocumentSearchResult result;
-            using (await Embedder.EnterSearchAsync())
-                result = await Task.Run(() => index.Search(embedder, prompt));
+            try { result = index.Search(await Embedder.EmbedQueryAsync(prompt, CancellationToken.None)); }
+            catch (Exception ex) when (Embedder.IsRemote)
+            {
+                // The server's search model can't be reached: the message goes without excerpts.
+                Host.SetStatus("Couldn't search the document on the server: " + ex.Message);
+                return null;
+            }
 
             var context = new ChatDocumentContext();
             // About 400 tokens of excerpts with a 4k window, 800 with 8k.

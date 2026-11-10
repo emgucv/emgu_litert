@@ -160,8 +160,8 @@ The Mac Catalyst app serves the model it runs over the local network, and phone 
 How it works and what was verified: FEATURES.md, "Serving the Mac's model". Done so far: see
 [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] The phone's searches (past chats, documents) through the Mac's `POST /v1/embeddings` (served since 2026-11-10): they
-      take an `EmbeddingModel` now; the indexes would be made with the Mac's model, and made again on a switch back.
+- [ ] Photo and video search through the Mac (the Mac's search model is text only for phones: the phone would send each
+      picture or frame); past chats and documents use it since 2026-11-10. Past-chat indexing sends a request per message.
 - [ ] `POST /v1/images/generations` (Z-Image-Turbo, FLUX, Bonsai), so a phone gets pictures without the models.
 - [ ] Try: an image and a voice message from a phone, Gemma 4 12B, the iPad (iOS's Local Network prompt), a phone on
       Tailscale (the address typed by hand), the Mac's address changing (Find a Mac again by name), several phones at once.

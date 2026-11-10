@@ -959,8 +959,24 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       `EmbedsForAnOpenAIClient` (Microsoft.Extensions.AI.OpenAI's generator over loopback; 503 without a search model, 401
       without a token) and `ServesEmbeddingGemmaAsCallingItDirectly` (`TEST_MODELS`: EmbeddingGemma 2 Text Vision on the CPU
       gives the same 768 values served and called directly, for plain texts, documents and queries; "how tall is the tower in
-      Paris" matched the Eiffel Tower passage 0.788 against 0.557). Not tried from the Catalyst app (built, not run) or a phone;
-      the phone's searches don't use it yet (TODO.md).
+      Paris" matched the Eiffel Tower passage 0.788 against 0.557).
+- [x] The phone's searches through the Mac (2026-11-10): Settings > Embedding model offers the paired Mac's search model
+      ("MacMini M1 2020 (7) · EmbeddingGemma 2 Text Vision 440M") when the Mac lists one; past-chat and document search then
+      embed on the Mac and nothing loads on the phone. Text only: the option has no image support, so photo search, video
+      search and video moments switch themselves off as with a text-only model. The Mac names its search model by its file
+      (`embeddinggemma-2-text-vision-440m.litertlm`), the key the phone's indexes already use, so a phone with the same model
+      keeps its embeddings switching either way. How: `SearchModelOption` has a server kind (`Remote`, `IndexKey`) and
+      `SearchModelFeature.RemoteOption` (set by `ServerFeature` from each `/v1/models`, remembered in "server_search_model");
+      `SearchEmbedder.Remote` / `EmbedQueryAsync` / `EmbedDocumentsRemotelyAsync` (its `EnsureAsync` refuses while the model
+      is the server's); `DocumentIndex.Search(float[])`; the HTTP client is `Emgu.LiteRT.LM.Server`'s new
+      `ServerEmbeddingGenerator` (sends `input_type`, base64, 256 texts a request). A document's excerpts are left out, with a
+      status line, when the Mac can't be reached. Tests: `APhoneEmbedsQueriesAndDocumentsOnTheServer` (two requests for 259
+      texts, refusals with the server's message), `SearchesADocumentWithAQueryEmbeddedElsewhere`, and the phone's generator in
+      `ServesEmbeddingGemmaAsCallingItDirectly`. On the Galaxy S10 paired with the Mac mini (Gemma 4 E2B on the GPU, EmbeddingGemma
+      2 Text Vision on the CPU): the option appeared after the first message, past-chat search indexed the phone's 22 messages
+      in under 5 s, and "In a past chat I asked you a multiplication... what was the answer?" found the "What is 6 times 7?"
+      chat and answered 42; the app's process never mapped an EmbeddingGemma file. Documents through the Mac weren't tried on
+      the phone (the same calls, covered by the tests). The S10 was set back afterwards and the test chats deleted.
 
 ## 30. Background tasks and monitoring
 

@@ -5,6 +5,8 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Maui.Features;
+using Emgu.LiteRT.LM.Server;
 using Microsoft.Extensions.AI;
 using OpenAI;
 
@@ -37,6 +39,12 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
 
     // A Mac paired through "Find a Mac" (its Bonjour name), so it is found again when its address changes.
     private const string PairedMacSettingKey = "server_paired_mac";
+
+    // The paired Mac's search model, as its model list last gave it ("id|name"), offered in Settings > Embedding model.
+    private const string SearchModelSettingKey = "server_search_model";
+
+    /// <summary>The key of the paired Mac's search model in Settings > Embedding model.</summary>
+    public const string SearchOptionKey = "server";
 
     // Without a context length from the server, the conversation is kept within this (LM Studio's default).
     private const int DefaultServerContextTokens = 4096;
@@ -119,7 +127,51 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         _serverModel = host.Settings.Get(ModelSettingKey, string.Empty) ?? string.Empty;
         _pairedMac = host.Settings.Get(PairedMacSettingKey, string.Empty) ?? string.Empty;
         UpdateOptionDetail();
+        UpdateSearchOption();
         _ = LoadServerKeyAsync();
+    }
+
+    // Settings > Embedding model offers the paired Mac's search model (texts embedded there, so past-chat and document search
+    // need no model on the phone) while the server is a Mac that serves one.
+    private void UpdateSearchOption()
+    {
+        SearchModelFeature search = Host?.Services.Get<SearchModelFeature>();
+        if (search == null)
+            return;
+        string[] saved = (Host.Settings.Get(SearchModelSettingKey, string.Empty) ?? string.Empty).Split('|', 2);
+        string id = saved[0], name = saved.Length > 1 && saved[1].Length > 0 ? saved[1] : saved[0];
+        // "EmbeddingGemma 2 Text Vision 440M · CPU": the Mac's backend means nothing here.
+        int backend = name.LastIndexOf(" · ", StringComparison.Ordinal);
+        if (backend > 0)
+            name = name.Substring(0, backend);
+        if (id.Length == 0 || string.IsNullOrEmpty(_serverUrl))
+        {
+            search.RemoteOption = null;
+            return;
+        }
+        string where = string.IsNullOrEmpty(_pairedMac) ? "your server" : _pairedMac;
+        // The Mac first: the list cuts a long name off at its end.
+        string label = where + " · " + name;
+        if (search.RemoteOption?.IndexKey == id && search.RemoteOption.Name == label)
+            return;
+        search.RemoteOption = new SearchModelOption(SearchOptionKey, label,
+            new ServerEmbeddingGenerator(() => _serverUrl, () => _serverKey, id), id,
+            "Runs on " + where + ": past-chat and document search without the model on this device, while it can be reached. " +
+            "Text only - photo and video search are off with it.");
+    }
+
+    // What the server's model list says of its search model: an Emgu LiteRT Mac's, or none.
+    private void RememberSearchModel(List<ServerModelInfo> models)
+    {
+        ServerModelInfo search = models.FirstOrDefault(m => m.IsEmguMac && m.IsEmbedding);
+        string value = search == null ? string.Empty : search.Id + "|" + (search.DisplayName ?? search.Id);
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (Host == null)
+                return;
+            Host.Settings.Set(SearchModelSettingKey, value);
+            UpdateSearchOption();
+        });
     }
 
     /// <inheritdoc/>
@@ -236,6 +288,7 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         UpdateOptionDetail();
         if (url.Length == 0)
         {
+            UpdateSearchOption();
             _serverStatus.Text = "Enter the server's address.";
             return;
         }
@@ -405,6 +458,7 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
     // Keep the chosen model if the server has it, else take the first chat model (a loaded one, if the server says).
     private void ChooseServerModel(List<ServerModelInfo> models)
     {
+        RememberSearchModel(models);
         List<ServerModelInfo> chat = models.Where(m => !m.IsEmbedding).ToList();
         if (chat.Count == 0)
             throw new InvalidOperationException("The server has no chat models.");
