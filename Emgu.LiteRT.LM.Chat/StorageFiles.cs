@@ -116,9 +116,10 @@ namespace Emgu.LiteRT.LM.Chat
             string fullRoot = Path.GetFullPath(root);
             while (parent != null)
             {
+                // The root itself may be a link (a models folder moved to another disk); links inside it are refused.
+                if (parent.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Equals(fullRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), Comparison)) break;
                 if (Directory.Exists(parent) && (File.GetAttributes(parent) & FileAttributes.ReparsePoint) != 0)
                     throw new InvalidOperationException("Storage deletion does not traverse linked folders.");
-                if (parent.Equals(fullRoot, Comparison)) break;
                 parent = Path.GetDirectoryName(parent);
             }
         }

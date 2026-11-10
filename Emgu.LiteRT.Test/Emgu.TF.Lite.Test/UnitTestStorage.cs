@@ -256,5 +256,27 @@ namespace Emgu.TF.Lite.Test
             Assert.That(Directory.Exists(_exports), Is.False);
             Assert.That(File.Exists(Path.Combine(_store.Folder, "chats.db3")), Is.True);
         }
+
+        [Test]
+        public void DeletesInsideALinkedRootButNotThroughLinksInsideIt()
+        {
+            // A models folder moved to another disk: the root is a link, and deleting inside it works.
+            string disk = Path.Combine(_folder, "other-disk");
+            string root = Path.Combine(_folder, "linked-models");
+            FileWithSize(Path.Combine(disk, "a.litertlm"), 10);
+            FileWithSize(Path.Combine(disk, "a.litertlm.sha256ok"), 10);
+            FileWithSize(Path.Combine(disk, "a-cache", "weights.bin"), 10);
+            Directory.CreateSymbolicLink(root, disk);
+            StorageFiles.DeleteModel(root, Path.Combine(root, "a.litertlm"));
+            StorageFiles.DeleteDirectory(root, Path.Combine(root, "a-cache"));
+            Assert.That(Directory.EnumerateFileSystemEntries(disk), Is.Empty);
+            // A link inside the root is still neither traversed nor followed.
+            string outside = Path.Combine(_folder, "outside");
+            FileWithSize(Path.Combine(outside, "keep", "keep.bin"), 10);
+            Directory.CreateSymbolicLink(Path.Combine(disk, "inner"), outside);
+            Assert.Throws<InvalidOperationException>(() => StorageFiles.DeleteDirectory(root, Path.Combine(root, "inner", "keep")));
+            Assert.Throws<InvalidOperationException>(() => StorageFiles.DeleteDirectory(root, Path.Combine(root, "inner")));
+            Assert.That(File.Exists(Path.Combine(outside, "keep", "keep.bin")), Is.True);
+        }
     }
 }
