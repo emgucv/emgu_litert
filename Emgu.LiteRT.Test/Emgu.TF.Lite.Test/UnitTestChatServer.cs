@@ -437,6 +437,50 @@ public class UnitTestChatServer
     }
 
     [Test]
+    public async Task TellsAnUnreachableServerFromOneThatFails()
+    {
+        // Refused: nothing listens on the port.
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int closed = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        using (var http = new HttpClient(ServerReachability.CreateHandler()))
+        {
+            var refused = Assert.CatchAsync<Exception>(() => http.GetAsync("http://127.0.0.1:" + closed + "/"));
+            Assert.That(ServerReachability.IsUnreachable(refused), Is.True);
+        }
+        // Through the OpenAI SDK, as the phone's chat goes.
+        var chat = new OpenAIClient(new ApiKeyCredential("token"), new OpenAIClientOptions
+        {
+            Endpoint = new Uri("http://127.0.0.1:" + closed + "/v1"),
+            Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(new HttpClient(ServerReachability.CreateHandler()))
+        }).GetChatClient("test-model").AsIChatClient();
+        Assert.That(ServerReachability.IsUnreachable(Assert.CatchAsync<Exception>(() => chat.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "Hi") }))), Is.True);
+        // The phone's search client says it in words.
+        using (var search = new ServerEmbeddingGenerator(() => "http://127.0.0.1:" + closed + "/v1", () => "token", "m"))
+            Assert.That(Assert.ThrowsAsync<InvalidOperationException>(() => search.GenerateAsync(new[] { "x" })).Message, Does.Contain("isn't answering"));
+        // Nobody answers the connection (an address that drops it): the short connect timeout.
+        using (var http = new HttpClient(ServerReachability.CreateHandler(TimeSpan.FromSeconds(1))))
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var silent = Assert.CatchAsync<Exception>(() => http.GetAsync("http://10.255.255.1:11435/"));
+            Assert.That(ServerReachability.IsUnreachable(silent), Is.True);
+            Assert.That(clock.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)));
+        }
+        // A server that connects but doesn't answer in time isn't unreachable (it's slow), nor is an answer's error.
+        var mute = new TcpListener(IPAddress.Loopback, 0);
+        mute.Start();
+        try
+        {
+            using var http = new HttpClient(ServerReachability.CreateHandler()) { Timeout = TimeSpan.FromSeconds(1) };
+            var slow = Assert.CatchAsync<Exception>(() => http.GetAsync("http://127.0.0.1:" + ((IPEndPoint)mute.LocalEndpoint).Port + "/"));
+            Assert.That(ServerReachability.IsUnreachable(slow), Is.False);
+        }
+        finally { mute.Stop(); }
+        Assert.That(ServerReachability.IsUnreachable(new HttpRequestException("Response status code does not indicate success: 500")), Is.False);
+    }
+
+    [Test]
     public void SearchesADocumentWithAQueryEmbeddedElsewhere()
     {
         var index = new Emgu.LiteRT.LM.Models.DocumentIndex();

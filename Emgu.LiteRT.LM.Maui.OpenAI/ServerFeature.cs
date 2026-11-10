@@ -53,7 +53,8 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
     // up SummaryMaxTokens before any summary came out).
     private const int ThinkingRoomTokens = 1600;
 
-    private static readonly HttpClient ServerHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+    // A server that isn't answering (a Mac asleep, stopped, or at another address) fails within seconds.
+    private static readonly HttpClient ServerHttp = new HttpClient(ServerReachability.CreateHandler()) { Timeout = TimeSpan.FromSeconds(15) };
 
     private string _serverUrl = string.Empty;
     private string _serverModel = string.Empty;
@@ -395,6 +396,23 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
     }
 
     // The model list's row for the server says what it is set up with.
+    // The server by name: the paired Mac's, else its address.
+    private string ServerName => string.IsNullOrEmpty(_pairedMac) ? _serverUrl : _pairedMac;
+
+    // What the user sees when the server can't be reached; the model list says it too until the next connection.
+    private string Unreachable(string url)
+    {
+        string when = DateTime.Now.ToString("t");
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            Option.Detail = ServerName + " wasn't answering · " + when + " · " + (string.IsNullOrEmpty(_serverModel) ? "" : _serverModel + " · ") + url;
+            Host?.RefreshModelList();
+        });
+        return string.IsNullOrEmpty(_pairedMac)
+            ? "Your server at " + url + " isn't answering: check that it is running and on this network, and its address in Settings > Your own server."
+            : _pairedMac + " isn't answering - it may be asleep or on another network. Wake it and send the message again (\"Keep this Mac awake\" in its settings keeps it from sleeping while it serves).";
+    }
+
     private void UpdateOptionDetail()
     {
         Option.Detail = string.IsNullOrEmpty(_serverUrl)
@@ -603,6 +621,8 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             if (cancellationToken.IsCancellationRequested)
                 return "The connection was cancelled.";
             System.Diagnostics.Debug.WriteLine("Server connection failed: " + ex.Message);
+            if (ServerReachability.IsUnreachable(ex))
+                return Unreachable(url);
             return "Could not reach your server at " + url + ": " + ex.Message +
                 " Check that the server is running and accepts connections from the network (LM Studio: \"Serve on Local Network\"), " +
                 "and its address in Settings > Your own server.";
@@ -612,6 +632,7 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         if (_serverRejectsReasoningUrl != url)
             _serverRejectsReasoning = false;
         System.Diagnostics.Debug.WriteLine("Server ready: " + _serverModel + ", context " + _serverContextTokens);
+        MainThread.BeginInvokeOnMainThread(UpdateOptionDetail);
         return null;
     }
 
@@ -669,6 +690,12 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
     /// <param name="options">The message's options; the reasoning option is taken out when it returns true</param>
     public bool ShouldResend(Exception error, ChatOptions options)
     {
+        if (ServerReachability.IsUnreachable(error))
+        {
+            // Not sent again: the next message connects again (and looks for a paired Mac at a new address).
+            Host?.ResetRemote();
+            return false;
+        }
         if (!(error is ClientResultException ex) || !ServerRejectedReasoning(ex))
             return false;
         System.Diagnostics.Debug.WriteLine("Server rejected reasoning_effort: " + ex.Message);
@@ -699,9 +726,11 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             {
                 Endpoint = new Uri(_serverUrl),
                 NetworkTimeout = TimeSpan.FromMinutes(10),
-                Transport = new HttpClientPipelineTransport(new HttpClient(new ServerRetryHandler(WaitForForegroundAsync)
+                RetryPolicy = new ReachableOnlyRetryPolicy(),
+                Transport = new HttpClientPipelineTransport(new HttpClient(new ServerRetryHandler(WaitForForegroundAsync, () => _foreground.Task.IsCompleted,
+                    () => Unreachable(_serverUrl))
                 {
-                    InnerHandler = new HttpClientHandler()
+                    InnerHandler = ServerReachability.CreateHandler()
                 }))
             });
         return client.GetChatClient(_serverModel).AsIChatClient();
@@ -716,17 +745,33 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
 
     private Task WaitForForegroundAsync(CancellationToken token) => _foreground.Task.WaitAsync(token);
 
+    // The OpenAI SDK's retries (3, with back-off), except for a server that can't be reached: on a Galaxy S10 a stopped
+    // Mac's refusal came back four times, the error joining four copies of the message.
+    private sealed class ReachableOnlyRetryPolicy : ClientRetryPolicy
+    {
+        protected override bool ShouldRetry(PipelineMessage message, Exception exception) =>
+            !ServerReachability.IsUnreachable(exception) && base.ShouldRetry(message, exception);
+
+        protected override ValueTask<bool> ShouldRetryAsync(PipelineMessage message, Exception exception) =>
+            ServerReachability.IsUnreachable(exception) ? new ValueTask<bool>(false) : base.ShouldRetryAsync(message, exception);
+    }
+
     // Sends a request that failed without a response once more, after the app is back in front. On a Galaxy S10
     // (Android 12) the connection to the server ended ("unexpected end of stream") the moment another app came to the
     // front - Google Maps, opened by open_directions while the reply to its result was being requested - so the reply
-    // was lost. A chat request changes nothing on the server, so sending it again is safe.
+    // was lost. A chat request changes nothing on the server, so sending it again is safe. A server that can't be reached
+    // while the app is in front isn't tried again: the user is told at once, in words naming it.
     private sealed class ServerRetryHandler : DelegatingHandler
     {
         private readonly Func<CancellationToken, Task> _waitForForeground;
+        private readonly Func<bool> _inForeground;
+        private readonly Func<string> _unreachable;
 
-        public ServerRetryHandler(Func<CancellationToken, Task> waitForForeground)
+        public ServerRetryHandler(Func<CancellationToken, Task> waitForForeground, Func<bool> inForeground, Func<string> unreachable)
         {
             _waitForForeground = waitForForeground;
+            _inForeground = inForeground;
+            _unreachable = unreachable;
         }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -735,6 +780,11 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             try
             {
                 return await base.SendAsync(request, cancellationToken);
+            }
+            catch (HttpRequestException ex) when (ServerReachability.IsUnreachable(ex) && _inForeground() && !cancellationToken.IsCancellationRequested)
+            {
+                // Still unreachable, for ShouldResend; the message is what the page shows ("Error: ...").
+                throw new HttpRequestException(_unreachable(), ex);
             }
             catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
             {

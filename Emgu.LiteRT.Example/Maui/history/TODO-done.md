@@ -985,6 +985,24 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       round trips (13 ms each to the S10: about 2.6 s for 200 messages) and 4 requests instead of 200 for the Mac (its
       settings refresh the device list after each). Test: `IndexesSeveralMessagesACallAsOneAtATime`. On the S10 the 18
       messages were indexed through the Mac in one request, again with no EmbeddingGemma on the phone.
+- [x] A Mac that isn't answering (2026-11-10): the phone says so within seconds, by the Mac's name, and the model list shows
+      it. `Emgu.LiteRT.LM.Server`'s new `ServerReachability`: `CreateHandler` (a connection of its own that gives up after
+      6 s - the handler's own `ConnectTimeout` throws what `HttpClient.Timeout` throws, so the two couldn't be told apart -
+      and idle connections closed after 30 s, so a request doesn't go down a connection the Mac dropped while asleep) and
+      `IsUnreachable` (refused, timed out, no route or host - not a slow server's timeout nor its error). The phone's model
+      list, chat and search requests use the handler; the OpenAI SDK's own retries (3, with back-off) skip an unreachable
+      server (the first run on the S10 showed four copies of the message), the retry handler too while the app is in front;
+      `ShouldResend` resets the connection, so the next message checks again (and looks for the Mac by name). The message:
+      "MacMini M1 2020 (7) isn't answering - it may be asleep or on another network. Wake it and send the message again
+      ("Keep this Mac awake" in its settings keeps it from sleeping while it serves)."; the model list's row: "... wasn't
+      answering · 4:34 a.m. · gemma-4-e2b · <address>", back to normal after the next connection. Also `ChatPage`: a failed
+      connection left the view's "Connecting..." above the chips (only a success cleared it). Test:
+      `TellsAnUnreachableServerFromOneThatFails` (refused, a silent address within its 1 s limit, through the OpenAI SDK, the
+      search client's message; a connected but slow server and a 500 aren't unreachable). On the Galaxy S10 with the Mac
+      mini: a message answered, the Mac's app quit, the next message said the Mac wasn't answering at once, the one after
+      within 6 s (refused, then the 3 s search for the Mac by name), and the model list said so; the app started again, the
+      next message was answered and the row was back to normal. The S10's test chats were deleted. A Mac really asleep
+      wasn't tried (this Mac runs the session).
 
 ## 30. Background tasks and monitoring
 

@@ -757,6 +757,10 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   its file. A phone offers it in Settings > Embedding model ("<Mac> · <model>"); chosen, past-chat and document search embed on
   the Mac and no search model loads on the phone, and photo and video search are off (text only). The same model file on both
   keeps the phone's indexes. Verified on the Galaxy S10 with the Mac mini: past chats indexed and found through the Mac.
+- A Mac that isn't answering (asleep, its app stopped, at another address) fails within seconds instead of the system's
+  minutes: connections give up after 6 s (`ServerReachability`), the message names the Mac ("... isn't answering - it may be
+  asleep or on another network ..."), nothing is sent again, and the model list's row says when it last failed until the next
+  connection. Tried on the Galaxy S10 by quitting the Mac's app; a Mac really asleep wasn't tried.
 - Not yet: an image or a voice message from the phone, a Mac on Tailscale, the iPad, a larger model (Gemma 4 12B), the
   Mac's address changing, several phones at once.
 

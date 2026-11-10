@@ -165,8 +165,8 @@ How it works and what was verified: FEATURES.md, "Serving the Mac's model". Done
 - [ ] `POST /v1/images/generations` (Z-Image-Turbo, FLUX, Bonsai), so a phone gets pictures without the models.
 - [ ] Try: an image and a voice message from a phone, Gemma 4 12B, the iPad (iOS's Local Network prompt), a phone on
       Tailscale (the address typed by hand), the Mac's address changing (Find a Mac again by name), several phones at once.
-- [ ] A Mac asleep: the phone's message waits for a timeout; say "the Mac is asleep or unreachable" sooner, and show it in
-      the model list.
+- [ ] A Mac actually asleep (only a stopped server was tried, 2026-11-10): whether a Bonjour Sleep Proxy wakes it within the
+      6 s connection limit, and a connection the Mac drops mid-reply when it sleeps.
 - [ ] A sandboxed Mac build would need `com.apple.security.network.server`; HTTPS (a self-signed certificate) for use away
       from home without Tailscale.
 

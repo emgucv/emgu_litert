@@ -235,8 +235,8 @@ namespace Emgu.LiteRT.LM.Maui
                 return true;
             _chatView.SetStatus("Connecting...");
             _remoteReady = await ConnectRemoteAsync(option, cancellationToken);
-            if (_remoteReady)
-                _chatView.SetStatus(null);
+            // Either way: a failed connection says why in the page's status.
+            _chatView.SetStatus(null);
             return _remoteReady;
         }
 

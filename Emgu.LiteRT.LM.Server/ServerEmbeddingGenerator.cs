@@ -33,7 +33,8 @@ namespace Emgu.LiteRT.LM.Server
         /// <param name="url">Gives the server's API address, e.g. "http://192.168.1.20:11435/v1"</param>
         /// <param name="token">Gives the paired device's token, or null for none</param>
         /// <param name="model">The server's search model id</param>
-        /// <param name="handler">The HTTP handler, or null for the default; the generator doesn't dispose it</param>
+        /// <param name="handler">The HTTP handler, or null for <see cref="ServerReachability.CreateHandler"/>'s (a server that
+        /// isn't answering fails within seconds); the generator doesn't dispose one given</param>
         public ServerEmbeddingGenerator(Func<string> url, Func<string> token, string model, HttpMessageHandler handler = null)
         {
             _url = url ?? throw new ArgumentNullException(nameof(url));
@@ -41,7 +42,7 @@ namespace Emgu.LiteRT.LM.Server
             if (string.IsNullOrEmpty(model))
                 throw new ArgumentException("A model id is needed", nameof(model));
             // A search model that isn't loaded yet loads on the first request.
-            _http = handler == null ? new HttpClient() : new HttpClient(handler, false);
+            _http = handler == null ? new HttpClient(ServerReachability.CreateHandler()) : new HttpClient(handler, false);
             _http.Timeout = TimeSpan.FromMinutes(2);
             _metadata = new EmbeddingGeneratorMetadata("emgu-litert", null, model);
         }
@@ -87,7 +88,13 @@ namespace Emgu.LiteRT.LM.Server
                 string token = _token?.Invoke();
                 if (!string.IsNullOrEmpty(token))
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                using (HttpResponseMessage response = await _http.SendAsync(request, cancel).ConfigureAwait(false))
+                HttpResponseMessage sent;
+                try { sent = await _http.SendAsync(request, cancel).ConfigureAwait(false); }
+                catch (HttpRequestException ex) when (ServerReachability.IsUnreachable(ex))
+                {
+                    throw new InvalidOperationException("The server isn't answering - it may be asleep, stopped or on another network.", ex);
+                }
+                using (HttpResponseMessage response = sent)
                 {
                     string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     if (!response.IsSuccessStatusCode)
