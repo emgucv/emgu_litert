@@ -19,7 +19,8 @@ using OpenAI;
 namespace Emgu.TF.Lite.Test;
 
 // Emgu.LiteRT.LM.Server (TODO item 29): the OpenAI wire format both ways, pairing, and the server over loopback called
-// through Microsoft.Extensions.AI.OpenAI as a phone calls it, with a scripted model. No model or native library.
+// through Microsoft.Extensions.AI.OpenAI as a phone calls it, with a scripted model (no model or native library); and,
+// with TEST_MODELS, over a real LiteRtLmChatClient (the Native category).
 [TestFixture]
 public class UnitTestChatServer
 {
@@ -320,6 +321,124 @@ public class UnitTestChatServer
             await Task.Delay(50);
         Assert.That(model.Cancelled, Is.True);
         Assert.That(model.Yielded, Is.LessThan(200));
+    }
+
+    // ---------- The server over a real model (TEST_MODELS) ----------
+
+    // Qwen3-0.6B (~500 MB download) through the server and called directly: the same answers, and the server's second
+    // request continues the LiteRT-LM conversation the first one left open (the phone sends the whole history back).
+#if !TEST_MODELS
+    [Ignore("Opt in with -p:TestModels=true; downloads Qwen3-0.6B.")]
+#endif
+    [Test, Category("Native")]
+    public async Task ServesQwen3AsCallingItDirectly()
+    {
+        RequireLiteRtLm();
+        using var model = new Emgu.LiteRT.LM.Models.Qwen3();
+        await model.Init();
+        var options = new ChatOptions { MaxOutputTokens = 64, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } };
+        string[] questions = { "My name is Kenji. What is the capital of France? Answer in one short sentence.", "What is my name?" };
+
+        using var direct = new Emgu.LiteRT.LM.Extensions.AI.LiteRtLmChatClient(model) { EnableContextManagement = true };
+        string[] directReplies = await TwoTurnsAsync(direct, questions, options);
+
+        using var served = new Emgu.LiteRT.LM.Extensions.AI.LiteRtLmChatClient(model) { EnableContextManagement = true };
+        var context = new List<Emgu.LiteRT.LM.Extensions.AI.LiteRtLmContextInfo>();
+        served.ContextChanged += context.Add;
+        using var host = await ServerHost.StartAsync(served);
+        string[] servedReplies = await TwoTurnsAsync(host.Client(), questions, options);
+
+        Console.WriteLine("Direct: " + string.Join(" | ", directReplies));
+        Console.WriteLine("Served: " + string.Join(" | ", servedReplies));
+        foreach (string[] replies in new[] { directReplies, servedReplies })
+        {
+            Assert.That(replies[0], Does.Contain("Paris"));
+            Assert.That(replies[1], Does.Contain("Kenji"));
+        }
+        AssertConversationKept(context);
+    }
+
+    // Gemma 4 E2B on the GPU (~2.6 GB download): a tool round through the server, the tool running on the phone's side,
+    // as the direct call does it; the model's call comes back from the phone with its id and name, so the round
+    // continues the open conversation instead of starting it again.
+#if !TEST_MODELS
+    [Ignore("Opt in with -p:TestModels=true; downloads Gemma 4 E2B.")]
+#endif
+    [Test, Category("Native")]
+    public async Task ServesAToolRoundOfGemma4KeepingTheConversation()
+    {
+        RequireLiteRtLm();
+        if (!UnitTest1.StageGpuPlugin())
+            Assert.Ignore("No LiteRT GPU accelerator plugin next to libLiteRt");
+        using var model = new Emgu.LiteRT.LM.Models.Gemma4E2B();
+        await model.Init(backend: "gpu");
+        int calls = 0;
+        AIFunction secretCode = AIFunctionFactory.Create(
+            (string person) => { calls++; return person.IndexOf("Alice", StringComparison.OrdinalIgnoreCase) >= 0 ? "7391" : "unknown"; },
+            "get_secret_code", "Returns the secret code of a person.");
+        var options = new ChatOptions { Tools = new List<AITool> { secretCode }, MaxOutputTokens = 256, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } };
+        var question = new[] { new ChatMessage(ChatRole.User, "What is the secret code of Alice?") };
+
+        using var direct = new Emgu.LiteRT.LM.Extensions.AI.LiteRtLmChatClient(model) { EnableContextManagement = true };
+        var directContext = new List<Emgu.LiteRT.LM.Extensions.AI.LiteRtLmContextInfo>();
+        direct.ContextChanged += directContext.Add;
+        ChatResponse directReply = await new ChatClientBuilder(direct).UseFunctionInvocation().Build().GetResponseAsync(question, options);
+
+        using var served = new Emgu.LiteRT.LM.Extensions.AI.LiteRtLmChatClient(model) { EnableContextManagement = true };
+        var context = new List<Emgu.LiteRT.LM.Extensions.AI.LiteRtLmContextInfo>();
+        served.ContextChanged += context.Add;
+        using var host = await ServerHost.StartAsync(served);
+        ChatResponse servedReply = await new ChatClientBuilder(host.Client()).UseFunctionInvocation().Build().GetResponseAsync(question, options);
+
+        Console.WriteLine("Direct: " + directReply.Text);
+        Console.WriteLine("Served: " + servedReply.Text);
+        Assert.That(calls, Is.EqualTo(2), "The tool ran once each way.");
+        Assert.That(directReply.Text, Does.Contain("7391"));
+        Assert.That(servedReply.Text, Does.Contain("7391"));
+        AssertConversationKept(directContext);
+        AssertConversationKept(context);
+        Assert.That(context.Count(c => c.Stage == "complete" && c.ToolCalls > 0), Is.EqualTo(1));
+    }
+
+    private static async Task<string[]> TwoTurnsAsync(IChatClient client, string[] questions, ChatOptions options)
+    {
+        var history = new List<ChatMessage>();
+        var replies = new List<string>();
+        foreach (string question in questions)
+        {
+            history.Add(new ChatMessage(ChatRole.User, question));
+            ChatResponse response = await client.GetResponseAsync(history, options);
+            history.AddRange(response.Messages);
+            replies.Add(response.Text);
+        }
+        return replies.ToArray();
+    }
+
+    // Each request after the first starts from the tokens the previous one left in the conversation: the conversation was
+    // continued, not created again from the history (a new one starts with none cached).
+    private static void AssertConversationKept(List<Emgu.LiteRT.LM.Extensions.AI.LiteRtLmContextInfo> context)
+    {
+        foreach (var info in context)
+            Console.WriteLine("  " + info);
+        var prepared = context.Where(c => c.Stage == "prepare").ToList();
+        var completed = context.Where(c => c.Stage == "complete").ToList();
+        Assert.That(context.Any(c => c.Stage == "compact" || c.Stage == "failed"), Is.False);
+        Assert.That(prepared.Count, Is.EqualTo(2));
+        Assert.That(completed.Count, Is.EqualTo(2));
+        Assert.That(completed[0].CachedTokens, Is.GreaterThan(0));
+        Assert.That(prepared[1].CachedTokens, Is.EqualTo(completed[0].CachedTokens), "The second request reopened the conversation.");
+    }
+
+    private static void RequireLiteRtLm()
+    {
+        try
+        {
+            Emgu.LiteRT.LM.LiteRtLmInvoke.SetMinLogLevel(Emgu.LiteRT.LM.LogSeverity.Warning);
+        }
+        catch (DllNotFoundException e)
+        {
+            Assert.Ignore("liblitert-lm is not available on this platform: " + e.Message);
+        }
     }
 
     private static ChatResponseUpdate Update(AIContent content) => new ChatResponseUpdate(ChatRole.Assistant, new List<AIContent> { content });

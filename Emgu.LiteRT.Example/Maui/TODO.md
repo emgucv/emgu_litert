@@ -166,8 +166,6 @@ How it works and what was verified: FEATURES.md, "Serving the Mac's model". Done
       Tailscale (the address typed by hand), the Mac's address changing (Find a Mac again by name), several phones at once.
 - [ ] A Mac asleep: the phone's message waits for a timeout; say "the Mac is asleep or unreachable" sooner, and show it in
       the model list.
-- [ ] A `Native`/`TEST_MODELS` test: the server over a real `LiteRtLmChatClient` (Qwen3-0.6B) compared with calling it
-      directly, and the conversation kept across a tool round.
 - [ ] A sandboxed Mac build would need `com.apple.security.network.server`; HTTPS (a self-signed certificate) for use away
       from home without Tailscale.
 

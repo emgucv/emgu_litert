@@ -934,6 +934,11 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
 - [x] Security: never without a token; tokens kept hashed; wrong codes end a code after 5, wrong tokens wait a minute after
       10 from an address.
 - [x] Verified with a Galaxy S10 and the Mac's Gemma 4 E2B (FEATURES.md).
+- [x] 2026-11-10: `TEST_MODELS` tests over a real `LiteRtLmChatClient` (`UnitTestChatServer`, `Native`): Qwen3-0.6B through
+      the server answers as when called directly (two turns, the name recalled), and a tool round of Gemma 4 E2B on the
+      GPU, the tool run on the client's side, finds the code as the direct call does. Both keep the LiteRT-LM conversation
+      open: each request after the first starts from the tokens the previous one left (`ContextChanged`'s cached tokens).
+      A tool result crosses the wire as JSON text (`"7391"` with its quotes), so the model sees it quoted.
 
 ## 30. Background tasks and monitoring
 
