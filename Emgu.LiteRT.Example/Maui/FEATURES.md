@@ -752,6 +752,10 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 - Verified (Mac mini M1 serving Gemma 4 E2B on Metal; a Galaxy S10 over Wi-Fi): Find a Mac found it, the code paired it, "What
   is 12 times 7?" called `calculate` on the phone and answered 84 in 18 s (with the connection), the follow-up "divided by
   4" in 5 s (the conversation carried over). `curl` from the Mac: a streamed reply in 4 s.
+- Since 2026-11-10 it also serves the Mac's search model at `POST /v1/embeddings` (OpenAI's shape, plus `input_type`
+  "query" / "document" for EmbeddingGemma's prefixes), listed in `GET /v1/models` with `"type": "embeddings"`; the phone's
+  searches don't use it yet (TODO item 29). Tested over loopback with the OpenAI SDK and EmbeddingGemma 2 (the served vectors
+  are the model's own); not run from the app.
 - Not yet: an image or a voice message from the phone, a Mac on Tailscale, the iPad, a larger model (Gemma 4 12B), the
   Mac's address changing, several phones at once.
 

@@ -44,6 +44,9 @@ namespace Emgu.LiteRT.LM.Server
 
         /// <summary>Whether it can think before answering.</summary>
         public bool Thinking { get; set; }
+
+        /// <summary>An embedding model's vectors' length, or 0 if unknown (or a chat model).</summary>
+        public int Dimensions { get; set; }
     }
 
     /// <summary>
@@ -67,6 +70,35 @@ namespace Emgu.LiteRT.LM.Server
 
         /// <summary>The model's client.</summary>
         public IChatClient Client { get; }
+
+        /// <summary>The model.</summary>
+        public ServedModel Model { get; }
+
+        /// <summary>Called as a request starts, or null.</summary>
+        public Func<string, IDisposable> BeginRequest { get; }
+    }
+
+    /// <summary>
+    /// The search (embedding) model a <see cref="ChatServer"/> serves at POST /v1/embeddings: a generator and its model. The
+    /// host gives one for each request, or null when there is none (the request gets 503).
+    /// </summary>
+    public sealed class ServedEmbeddings
+    {
+        /// <summary>Serve an embedding generator.</summary>
+        /// <param name="generator">The model's generator; a request's "input_type" ("query" or "document") reaches it as
+        /// the options' additional property "input_type", its "dimensions" as the options' Dimensions</param>
+        /// <param name="model">The model</param>
+        /// <param name="beginRequest">Called as a request starts, with the device's name; disposing its result marks the request
+        /// done; or null</param>
+        public ServedEmbeddings(IEmbeddingGenerator<string, Embedding<float>> generator, ServedModel model, Func<string, IDisposable> beginRequest = null)
+        {
+            Generator = generator ?? throw new ArgumentNullException(nameof(generator));
+            Model = model ?? throw new ArgumentNullException(nameof(model));
+            BeginRequest = beginRequest;
+        }
+
+        /// <summary>The model's generator.</summary>
+        public IEmbeddingGenerator<string, Embedding<float>> Generator { get; }
 
         /// <summary>The model.</summary>
         public ServedModel Model { get; }

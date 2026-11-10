@@ -19,8 +19,8 @@ using OpenAI;
 namespace Emgu.TF.Lite.Test;
 
 // Emgu.LiteRT.LM.Server (TODO item 29): the OpenAI wire format both ways, pairing, and the server over loopback called
-// through Microsoft.Extensions.AI.OpenAI as a phone calls it, with a scripted model (no model or native library); and,
-// with TEST_MODELS, over a real LiteRtLmChatClient (the Native category).
+// through Microsoft.Extensions.AI.OpenAI as a phone calls it, with a scripted model and search model (no model or native
+// library); and, with TEST_MODELS, over a real LiteRtLmChatClient and EmbeddingGemma (the Native category).
 [TestFixture]
 public class UnitTestChatServer
 {
@@ -191,6 +191,45 @@ public class UnitTestChatServer
     // ---------- Pairing ----------
 
     [Test]
+    public void ReadsAnEmbeddingsRequest()
+    {
+        EmbeddingRequest one = OpenAIChatProtocol.ParseEmbeddingRequest("{\"model\":\"m\",\"input\":\"a cat\"}");
+        Assert.That(one.Inputs, Is.EqualTo(new[] { "a cat" }));
+        Assert.That((one.Model, one.Base64, one.Options.Dimensions, one.Options.AdditionalProperties), Is.EqualTo(("m", false, (int?)null, (AdditionalPropertiesDictionary)null)));
+
+        EmbeddingRequest many = OpenAIChatProtocol.ParseEmbeddingRequest(
+            "{\"input\":[\"a\",\"b\"],\"dimensions\":256,\"encoding_format\":\"base64\",\"input_type\":\"search_query\"}");
+        Assert.That(many.Inputs, Is.EqualTo(new[] { "a", "b" }));
+        Assert.That((many.Base64, many.Options.Dimensions), Is.EqualTo((true, (int?)256)));
+        Assert.That(many.Options.AdditionalProperties["input_type"], Is.EqualTo("query"));
+        Assert.That(OpenAIChatProtocol.ParseEmbeddingRequest("{\"input\":\"x\",\"input_type\":\"document\"}").Options.AdditionalProperties["input_type"], Is.EqualTo("document"));
+
+        foreach (string bad in new[] { "{}", "{\"input\":[]}", "{\"input\":[[1,2,3]]}", "{\"input\":5}", "{\"input\":\"x\",\"dimensions\":0}",
+            "{\"input\":\"x\",\"encoding_format\":\"int8\"}", "{\"input\":\"x\",\"input_type\":\"classification\"}", "[1]", "not json",
+            "{\"input\":[" + string.Join(",", Enumerable.Repeat("\"x\"", OpenAIChatProtocol.MaxEmbeddingInputs + 1)) + "]}" })
+            Assert.That(Assert.Throws<ChatProtocolException>(() => OpenAIChatProtocol.ParseEmbeddingRequest(bad)).Status, Is.EqualTo(400), bad);
+    }
+
+    [Test]
+    public void WritesEmbeddingsAsNumbersOrBase64()
+    {
+        var vectors = new[] { new Embedding<float>(new[] { 1.5f, -2f }), new Embedding<float>(new[] { 0.25f, 3f }) };
+        using (JsonDocument doc = JsonDocument.Parse(OpenAIChatProtocol.Embeddings(vectors, "search", false)))
+        {
+            JsonElement data = doc.RootElement.GetProperty("data");
+            Assert.That(data.GetArrayLength(), Is.EqualTo(2));
+            Assert.That(data[1].GetProperty("index").GetInt32(), Is.EqualTo(1));
+            Assert.That(data[1].GetProperty("embedding").EnumerateArray().Select(e => e.GetSingle()), Is.EqualTo(new[] { 0.25f, 3f }));
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("search"));
+        }
+        using (JsonDocument doc = JsonDocument.Parse(OpenAIChatProtocol.Embeddings(vectors, "search", true)))
+        {
+            byte[] bytes = Convert.FromBase64String(doc.RootElement.GetProperty("data")[0].GetProperty("embedding").GetString());
+            Assert.That(Enumerable.Range(0, 2).Select(i => BitConverter.ToSingle(bytes, i * 4)), Is.EqualTo(new[] { 1.5f, -2f }));
+        }
+    }
+
+    [Test]
     public void PairsWithACodeOnceAndKeepsOnlyTheTokensHash()
     {
         DateTime now = new DateTime(2026, 11, 5, 12, 0, 0, DateTimeKind.Utc);
@@ -323,6 +362,49 @@ public class UnitTestChatServer
     }
 
     [Test]
+    public async Task EmbedsForAnOpenAIClient()
+    {
+        using var host = await ServerHost.StartAsync(new ScriptedModel());
+        var search = new ScriptedEmbedder();
+        host.Embeddings = new ServedEmbeddings(search, new ServedModel("embeddinggemma-2", "EmbeddingGemma 2") { Dimensions = 3 });
+
+        // The model list has the search model after the chat model.
+        using var http = new HttpClient();
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", host.Token);
+        using (JsonDocument models = JsonDocument.Parse(await http.GetStringAsync(host.Url + "v1/models")))
+        {
+            JsonElement data = models.RootElement.GetProperty("data");
+            Assert.That(data.EnumerateArray().Select(m => m.GetProperty("id").GetString()), Is.EqualTo(new[] { "test-model", "embeddinggemma-2" }));
+            Assert.That((data[1].GetProperty("type").GetString(), data[1].GetProperty("dimensions").GetInt32()), Is.EqualTo(("embeddings", 3)));
+        }
+        Assert.That(await http.GetStringAsync(host.Url + "api/v0/models"), Does.Contain("\"type\":\"embeddings\""));
+
+        // Microsoft.Extensions.AI.OpenAI's generator (the OpenAI SDK asks for base64).
+        IEmbeddingGenerator<string, Embedding<float>> generator = host.Embedder("embeddinggemma-2");
+        GeneratedEmbeddings<Embedding<float>> embeddings = await generator.GenerateAsync(new[] { "a cat", "the dog" }, new EmbeddingGenerationOptions { Dimensions = 3 });
+        Assert.That(embeddings.Select(e => e.Vector.ToArray()), Is.EqualTo(new[] { ScriptedEmbedder.Vector("a cat", 0), ScriptedEmbedder.Vector("the dog", 1) }));
+        Assert.That(search.Requests.Single().Options.Dimensions, Is.EqualTo(3));
+        Assert.That(host.Requests.Last().Path, Is.EqualTo("/v1/embeddings"));
+        Assert.That(host.Requests.Last().Device, Is.EqualTo("Test phone"));
+
+        // A query, as JSON numbers: "input_type" reaches the generator.
+        HttpResponseMessage query = await http.PostAsync(host.Url + "v1/embeddings", new StringContent("{\"input\":\"cats\",\"input_type\":\"query\",\"encoding_format\":\"float\"}"));
+        Assert.That(query.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        using (JsonDocument doc = JsonDocument.Parse(await query.Content.ReadAsStringAsync()))
+            Assert.That(doc.RootElement.GetProperty("data")[0].GetProperty("embedding").EnumerateArray().Select(e => e.GetSingle()), Is.EqualTo(ScriptedEmbedder.Vector("cats", 0)));
+        Assert.That(search.Requests.Last().Options.AdditionalProperties["input_type"], Is.EqualTo("query"));
+
+        // What the generator refuses is a bad request; no search model is 503; no token is 401.
+        search.Refuse = true;
+        Assert.That((await http.PostAsync(host.Url + "v1/embeddings", new StringContent("{\"input\":\"x\"}"))).StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        host.Embeddings = null;
+        Assert.That((await http.PostAsync(host.Url + "v1/embeddings", new StringContent("{\"input\":\"x\"}"))).StatusCode, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+        Assert.That(await http.GetStringAsync(host.Url + "v1/models"), Does.Not.Contain("embeddings"));
+        using var stranger = new HttpClient();
+        Assert.That((await stranger.PostAsync(host.Url + "v1/embeddings", new StringContent("{\"input\":\"x\"}"))).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+    }
+
+    [Test]
     public async Task AClientThatGoesAwayStopsTheReply()
     {
         var model = new ScriptedModel { Slow = true };
@@ -422,6 +504,53 @@ public class UnitTestChatServer
         Assert.That(context.Select(c => (c.Stage, c.InputTokens, c.CachedTokens)), Is.EqualTo(directContext.Select(c => (c.Stage, c.InputTokens, c.CachedTokens))));
     }
 
+    // EmbeddingGemma 2 Text Vision on the CPU (~440 MB download): through the server, through the OpenAI client and with a
+    // query and documents, the vectors are the model's own.
+#if !TEST_MODELS
+    [Ignore("Opt in with -p:TestModels=true; downloads EmbeddingGemma 2.")]
+#endif
+    [Test, Category("Native")]
+    public async Task ServesEmbeddingGemmaAsCallingItDirectly()
+    {
+        RequireLiteRtLm();
+        using var model = new Emgu.LiteRT.LM.Models.EmbeddingGemma2TextVision();
+        await model.Init();
+        string[] texts = { "How do I change my password?", "The Eiffel Tower is 330 metres tall." };
+        using var host = await ServerHost.StartAsync(new ScriptedModel());
+        int entered = 0;
+        var served = new Emgu.LiteRT.LM.Extensions.AI.LiteRtLmEmbeddingGenerator(_ => Task.FromResult<Emgu.LiteRT.LM.Models.EmbeddingModel>(model),
+            "embeddinggemma-2", _ => { entered++; return Task.FromResult<IDisposable>(null); });
+        host.Embeddings = new ServedEmbeddings(served, new ServedModel("embeddinggemma-2"));
+
+        float[][] plain = (await host.Embedder("embeddinggemma-2").GenerateAsync(texts)).Select(e => e.Vector.ToArray()).ToArray();
+        AssertSame(plain, model.Embed(texts));
+        using var http = new HttpClient();
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", host.Token);
+        float[][] Read(string json)
+        {
+            using JsonDocument doc = JsonDocument.Parse(json);
+            return doc.RootElement.GetProperty("data").EnumerateArray().Select(d => d.GetProperty("embedding").EnumerateArray().Select(e => e.GetSingle()).ToArray()).ToArray();
+        }
+        string body(string type) => "{\"input\":" + JsonSerializer.Serialize(texts) + ",\"input_type\":\"" + type + "\"}";
+        float[][] documents = Read(await (await http.PostAsync(host.Url + "v1/embeddings", new StringContent(body("document")))).Content.ReadAsStringAsync());
+        AssertSame(documents, model.EmbedDocuments(texts));
+        float[][] queries = Read(await (await http.PostAsync(host.Url + "v1/embeddings", new StringContent(body("query")))).Content.ReadAsStringAsync());
+        AssertSame(queries, texts.Select(t => model.EmbedQuery(t)).ToArray());
+        Assert.That(entered, Is.EqualTo(3));
+        // The query finds its answer among the documents.
+        float[] question = (await host.Embedder("embeddinggemma-2").GenerateAsync(new[] { "how tall is the tower in Paris" },
+            new EmbeddingGenerationOptions { AdditionalProperties = new AdditionalPropertiesDictionary { ["input_type"] = "query" } })).Single().Vector.ToArray();
+        Console.WriteLine("Vectors of {0}; the tower question matches {1:F3} / {2:F3}", plain[0].Length,
+            Emgu.LiteRT.LM.Models.EmbeddingModel.CosineSimilarity(question, documents[1]), Emgu.LiteRT.LM.Models.EmbeddingModel.CosineSimilarity(question, documents[0]));
+    }
+
+    private static void AssertSame(float[][] served, float[][] direct)
+    {
+        Assert.That(served.Length, Is.EqualTo(direct.Length));
+        for (int i = 0; i < served.Length; i++)
+            Assert.That(served[i], Is.EqualTo(direct[i]).Within(1e-5f));
+    }
+
     private static async Task<string[]> TwoTurnsAsync(IChatClient client, string[] questions, ChatOptions options)
     {
         var history = new List<ChatMessage>();
@@ -510,6 +639,36 @@ public class UnitTestChatServer
         }
     }
 
+    // A search model that gives each text a made-up vector and records what it was asked.
+    private sealed class ScriptedEmbedder : IEmbeddingGenerator<string, Embedding<float>>
+    {
+        public sealed class Request
+        {
+            public IList<string> Texts;
+            public EmbeddingGenerationOptions Options;
+        }
+
+        public List<Request> Requests { get; } = new List<Request>();
+        public bool Refuse { get; set; }
+
+        public static float[] Vector(string text, int index) => new[] { text.Length, index, 0.5f };
+
+        public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(IEnumerable<string> values, EmbeddingGenerationOptions options = null, CancellationToken cancellationToken = default)
+        {
+            if (Refuse)
+                throw new ArgumentException("The input type is \"query\" or \"document\".");
+            List<string> texts = values.ToList();
+            Requests.Add(new Request { Texts = texts, Options = options });
+            return Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(texts.Select((t, i) => new Embedding<float>(Vector(t, i)))));
+        }
+
+        public object GetService(Type serviceType, object serviceKey = null) => null;
+
+        public void Dispose()
+        {
+        }
+    }
+
     // A ChatServer on a free loopback port, with a phone paired.
     private sealed class ServerHost : IDisposable
     {
@@ -525,6 +684,7 @@ public class UnitTestChatServer
         public string Url { get; }
         public string Token { get; private set; }
         public ServedChat Served { get; set; }
+        public ServedEmbeddings Embeddings { get; set; }
         public List<ServerRequestInfo> Requests { get; } = new List<ServerRequestInfo>();
 
         public static async Task<ServerHost> StartAsync(IChatClient model)
@@ -535,7 +695,7 @@ public class UnitTestChatServer
             listener.Stop();
             var pairing = new ServerPairing(new InMemoryServerTokenStore());
             ServerHost host = null;
-            var server = new ChatServer(pairing, () => host.Served) { Name = "Test Mac" };
+            var server = new ChatServer(pairing, () => host.Served, () => host.Embeddings) { Name = "Test Mac" };
             host = new ServerHost(server, "http://localhost:" + port + "/");
             host.Served = new ServedChat(model, new ServedModel("test-model", "Test model") { ContextLength = 4096, Tools = true, Thinking = true });
             server.Start(port);
@@ -553,6 +713,9 @@ public class UnitTestChatServer
         // The OpenAI client a phone uses (Emgu.LiteRT.LM.Maui.OpenAI's ServerFeature).
         public IChatClient Client() =>
             new OpenAIClient(new ApiKeyCredential(Token), new OpenAIClientOptions { Endpoint = new Uri(Url + "v1") }).GetChatClient("test-model").AsIChatClient();
+
+        public IEmbeddingGenerator<string, Embedding<float>> Embedder(string model) =>
+            new OpenAIClient(new ApiKeyCredential(Token), new OpenAIClientOptions { Endpoint = new Uri(Url + "v1") }).GetEmbeddingClient(model).AsIEmbeddingGenerator();
 
         public void Dispose() => _server.Dispose();
     }

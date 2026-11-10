@@ -456,6 +456,8 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
                         info.IsEmguMac = model.TryGetProperty("owned_by", out JsonElement owner) && owner.ValueKind == JsonValueKind.String && owner.GetString() == "emgu-litert";
                         if (model.TryGetProperty("display_name", out JsonElement display) && display.ValueKind == JsonValueKind.String)
                             info.DisplayName = display.GetString();
+                        if (model.TryGetProperty("type", out JsonElement type) && type.ValueKind == JsonValueKind.String && type.GetString() == "embeddings")
+                            info.IsEmbedding = true;
                         if (model.TryGetProperty("context_length", out JsonElement length) && length.TryGetInt32(out int contextTokens) && contextTokens > 0)
                             info.ContextTokens = contextTokens;
                         if (model.TryGetProperty("capabilities", out JsonElement capabilities) && capabilities.ValueKind == JsonValueKind.Object)

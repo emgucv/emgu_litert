@@ -948,6 +948,19 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       A tool result crossed the wire as JSON text (`"7391"` with its quotes) and the model saw it quoted; the server now
       reads a tool message that is JSON back as a `JsonElement`, as an `AIFunction`'s result is, so the served round reads
       the same tokens as the direct one (the test checks it).
+- [x] `POST /v1/embeddings` (2026-11-10): the Mac serves its search model (Settings > Embedding model) in OpenAI's shape -
+      `input` a text or up to 256 texts, `dimensions`, `encoding_format` "float" or "base64" (the OpenAI SDK's default) -
+      plus `input_type` "query" / "document" (Cohere's and Voyage's name; "search_query" / "search_document" too), which
+      OpenAI's API lacks: EmbeddingGemma embeds a query and a passage with different prefixes. `GET /v1/models` lists it after
+      the chat model with `"type": "embeddings"` (the phone's `ServerFeature` reads that, as it did the name). The server
+      takes an `IEmbeddingGenerator` (`ServedEmbeddings`); `Emgu.LiteRT.LM.Extensions.AI`'s new `LiteRtLmEmbeddingGenerator`
+      is one over an `EmbeddingModel`, and `ServeModelsFeature` gives it the page's `SearchEmbedder` (loaded on the first
+      request, one embedding at a time, searches first). Tests: `ReadsAnEmbeddingsRequest`, `WritesEmbeddingsAsNumbersOrBase64`,
+      `EmbedsForAnOpenAIClient` (Microsoft.Extensions.AI.OpenAI's generator over loopback; 503 without a search model, 401
+      without a token) and `ServesEmbeddingGemmaAsCallingItDirectly` (`TEST_MODELS`: EmbeddingGemma 2 Text Vision on the CPU
+      gives the same 768 values served and called directly, for plain texts, documents and queries; "how tall is the tower in
+      Paris" matched the Eiffel Tower passage 0.788 against 0.557). Not tried from the Catalyst app (built, not run) or a phone;
+      the phone's searches don't use it yet (TODO.md).
 
 ## 30. Background tasks and monitoring
 

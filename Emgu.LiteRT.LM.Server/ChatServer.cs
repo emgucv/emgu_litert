@@ -57,8 +57,8 @@ namespace Emgu.LiteRT.LM.Server
 
     /// <summary>
     /// An OpenAI-compatible HTTP server for a chat model on the local network (System.Net.HttpListener, so it runs inside a
-    /// Mac Catalyst app): POST /v1/chat/completions (streamed as server-sent events, or whole), GET /v1/models (and LM Studio's
-    /// GET /api/v0/models), POST /pair (a device pairs with the code <see cref="ServerPairing"/> shows and gets a token), and
+    /// Mac Catalyst app): POST /v1/chat/completions (streamed as server-sent events, or whole), POST /v1/embeddings (a search
+    /// model, when the host serves one), GET /v1/models (and LM Studio's GET /api/v0/models), POST /pair (a device pairs with the code <see cref="ServerPairing"/> shows and gets a token), and
     /// GET / (the server's name, for a device that found it). Every other request carries a paired device's token
     /// (Authorization: Bearer ...); a client address with too many wrong tokens waits a minute. A client that goes away
     /// stops its reply. The tools a request lists are only declared: the model's tool calls go back to the client, which runs
@@ -77,6 +77,7 @@ namespace Emgu.LiteRT.LM.Server
 
         private readonly ServerPairing _pairing;
         private readonly Func<ServedChat> _served;
+        private readonly Func<ServedEmbeddings> _embeddings;
         private readonly ConcurrentDictionary<string, (int Count, DateTime Since)> _wrongTokens = new ConcurrentDictionary<string, (int, DateTime)>();
         private readonly long _started = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         private HttpListener _listener;
@@ -85,10 +86,13 @@ namespace Emgu.LiteRT.LM.Server
         /// <summary>Serve a chat model.</summary>
         /// <param name="pairing">The paired devices and the pairing code</param>
         /// <param name="served">Gives the client and the model to serve for each request, or null when none is ready (503)</param>
-        public ChatServer(ServerPairing pairing, Func<ServedChat> served)
+        /// <param name="embeddings">Gives the search model to serve for each embeddings request, or null when there is none
+        /// (503); or null for no search model</param>
+        public ChatServer(ServerPairing pairing, Func<ServedChat> served, Func<ServedEmbeddings> embeddings = null)
         {
             _pairing = pairing ?? throw new ArgumentNullException(nameof(pairing));
             _served = served ?? throw new ArgumentNullException(nameof(served));
+            _embeddings = embeddings;
         }
 
         /// <summary>The server's name, given at GET / and to a device that pairs (e.g. the Mac's name).</summary>
@@ -302,11 +306,13 @@ namespace Emgu.LiteRT.LM.Server
 
         private async Task<int> RouteAsync(HttpListenerRequest request, HttpListenerResponse response, string path, string device, CancellationToken stop)
         {
+            if (request.HttpMethod == "POST" && (path == "/v1/embeddings" || path == "/embeddings"))
+                return await EmbedAsync(request, response, device, stop).ConfigureAwait(false);
             ServedChat served = _served();
             if (request.HttpMethod == "GET" && (path == "/v1/models" || path == "/models"))
-                return await WriteJsonAsync(response, 200, OpenAIChatProtocol.Models(served?.Model, _started)).ConfigureAwait(false);
+                return await WriteJsonAsync(response, 200, OpenAIChatProtocol.Models(served?.Model, _started, _embeddings?.Invoke()?.Model)).ConfigureAwait(false);
             if (request.HttpMethod == "GET" && path == "/api/v0/models")
-                return await WriteJsonAsync(response, 200, OpenAIChatProtocol.LmStudioModels(served?.Model)).ConfigureAwait(false);
+                return await WriteJsonAsync(response, 200, OpenAIChatProtocol.LmStudioModels(served?.Model, _embeddings?.Invoke()?.Model)).ConfigureAwait(false);
             if (request.HttpMethod == "POST" && (path == "/v1/chat/completions" || path == "/chat/completions"))
             {
                 if (served == null)
@@ -320,6 +326,24 @@ namespace Emgu.LiteRT.LM.Server
             }
             await WriteErrorAsync(response, 404, "Not found: " + request.HttpMethod + " " + path, "invalid_request_error").ConfigureAwait(false);
             return 404;
+        }
+
+        private async Task<int> EmbedAsync(HttpListenerRequest request, HttpListenerResponse response, string device, CancellationToken stop)
+        {
+            ServedEmbeddings served = _embeddings?.Invoke();
+            if (served == null)
+            {
+                await WriteErrorAsync(response, 503, "The server has no search model.", "server_error", "model_not_loaded").ConfigureAwait(false);
+                return 503;
+            }
+            EmbeddingRequest embed = OpenAIChatProtocol.ParseEmbeddingRequest(await ReadBodyAsync(request).ConfigureAwait(false));
+            GeneratedEmbeddings<Embedding<float>> embeddings;
+            using (served.BeginRequest?.Invoke(device))
+            {
+                try { embeddings = await served.Generator.GenerateAsync(embed.Inputs, embed.Options, stop).ConfigureAwait(false); }
+                catch (ArgumentException ex) { throw new ChatProtocolException(ex.Message); }
+            }
+            return await WriteJsonAsync(response, 200, OpenAIChatProtocol.Embeddings(embeddings, served.Model.Id, embed.Base64)).ConfigureAwait(false);
         }
 
         private async Task<int> CompleteAsync(HttpListenerResponse response, ServedChat served, ChatCompletionRequest chat, CancellationToken stop)

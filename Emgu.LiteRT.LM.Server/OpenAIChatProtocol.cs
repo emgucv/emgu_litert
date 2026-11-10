@@ -48,6 +48,22 @@ namespace Emgu.LiteRT.LM.Server
         public bool Stream { get; set; }
     }
 
+    /// <summary>An embeddings request read: the texts, the options, and how the vectors are written.</summary>
+    public sealed class EmbeddingRequest
+    {
+        /// <summary>The texts.</summary>
+        public IList<string> Inputs { get; } = new List<string>();
+
+        /// <summary>The options: the vectors' length, and "input_type" ("query" or "document") as an additional property.</summary>
+        public EmbeddingGenerationOptions Options { get; } = new EmbeddingGenerationOptions();
+
+        /// <summary>The model asked for.</summary>
+        public string Model { get; set; }
+
+        /// <summary>Whether the vectors are written as base64 (little-endian floats) rather than JSON numbers.</summary>
+        public bool Base64 { get; set; }
+    }
+
     /// <summary>
     /// OpenAI's chat completions wire format and Microsoft.Extensions.AI's types, both ways, as <see cref="ChatServer"/>
     /// serves them. The request becomes the conversation as the client keeps it, so a model that keeps its open conversation
@@ -409,10 +425,14 @@ namespace Emgu.LiteRT.LM.Server
             finish == ChatFinishReason.ToolCalls ? "tool_calls" : finish == ChatFinishReason.Length ? "length"
             : finish == ChatFinishReason.ContentFilter ? "content_filter" : "stop";
 
-        /// <summary>GET /v1/models: the model served, with OpenAI's fields and this server's context window and capabilities.</summary>
+        /// <summary>
+        /// GET /v1/models: the model served, with OpenAI's fields and this server's context window and capabilities, then the
+        /// search model ("type": "embeddings", its "dimensions") if one is served.
+        /// </summary>
         /// <param name="model">The model, or null for none</param>
         /// <param name="created">When the server started (Unix seconds)</param>
-        public static string Models(ServedModel model, long created) => Write(w =>
+        /// <param name="embeddings">The search model, or null for none</param>
+        public static string Models(ServedModel model, long created, ServedModel embeddings = null) => Write(w =>
         {
             w.WriteStartObject();
             w.WriteString("object", "list");
@@ -435,13 +455,27 @@ namespace Emgu.LiteRT.LM.Server
                 w.WriteEndObject();
                 w.WriteEndObject();
             }
+            if (embeddings != null)
+            {
+                w.WriteStartObject();
+                w.WriteString("id", embeddings.Id);
+                w.WriteString("object", "model");
+                w.WriteNumber("created", created);
+                w.WriteString("owned_by", "emgu-litert");
+                w.WriteString("display_name", embeddings.DisplayName);
+                w.WriteString("type", "embeddings");
+                if (embeddings.Dimensions > 0)
+                    w.WriteNumber("dimensions", embeddings.Dimensions);
+                w.WriteEndObject();
+            }
             w.WriteEndArray();
             w.WriteEndObject();
         });
 
         /// <summary>LM Studio's GET /api/v0/models for the model served, so clients written for LM Studio read it too.</summary>
         /// <param name="model">The model, or null for none</param>
-        public static string LmStudioModels(ServedModel model) => Write(w =>
+        /// <param name="embeddings">The search model, or null for none</param>
+        public static string LmStudioModels(ServedModel model, ServedModel embeddings = null) => Write(w =>
         {
             w.WriteStartObject();
             w.WriteString("object", "list");
@@ -461,7 +495,123 @@ namespace Emgu.LiteRT.LM.Server
                 }
                 w.WriteEndObject();
             }
+            if (embeddings != null)
+            {
+                w.WriteStartObject();
+                w.WriteString("id", embeddings.Id);
+                w.WriteString("object", "model");
+                w.WriteString("type", "embeddings");
+                w.WriteString("publisher", "emgu-litert");
+                w.WriteString("state", "loaded");
+                w.WriteEndObject();
+            }
             w.WriteEndArray();
+            w.WriteEndObject();
+        });
+
+        /// <summary>The most texts one embeddings request takes.</summary>
+        public const int MaxEmbeddingInputs = 256;
+
+        /// <summary>
+        /// Read a POST /v1/embeddings body: "input" (a text or an array of texts), "dimensions", "encoding_format" ("float" or
+        /// "base64"), and "input_type" ("query" or "document", as Cohere and Voyage name it; also "search_query" /
+        /// "search_document"), which OpenAI's API doesn't have: a search model such as EmbeddingGemma embeds a query and a
+        /// document with different prefixes.
+        /// </summary>
+        /// <param name="json">The body</param>
+        /// <exception cref="ChatProtocolException">It isn't an embeddings request this server takes</exception>
+        public static EmbeddingRequest ParseEmbeddingRequest(string json)
+        {
+            JsonDocument document;
+            try { document = JsonDocument.Parse(json); }
+            catch (JsonException ex) { throw new ChatProtocolException("The body isn't JSON: " + ex.Message); }
+            using (document)
+            {
+                JsonElement root = document.RootElement;
+                if (root.ValueKind != JsonValueKind.Object)
+                    throw new ChatProtocolException("The body must be a JSON object.");
+                var request = new EmbeddingRequest { Model = String(root, "model") };
+                if (!root.TryGetProperty("input", out JsonElement input))
+                    throw new ChatProtocolException("\"input\" is missing: a text or an array of texts.");
+                if (input.ValueKind == JsonValueKind.String)
+                    request.Inputs.Add(input.GetString());
+                else if (input.ValueKind == JsonValueKind.Array)
+                    foreach (JsonElement item in input.EnumerateArray())
+                    {
+                        if (item.ValueKind != JsonValueKind.String)
+                            throw new ChatProtocolException("Only texts are embedded here (not token arrays).");
+                        request.Inputs.Add(item.GetString());
+                    }
+                else
+                    throw new ChatProtocolException("\"input\" must be a text or an array of texts.");
+                if (request.Inputs.Count == 0)
+                    throw new ChatProtocolException("\"input\" has no texts.");
+                if (request.Inputs.Count > MaxEmbeddingInputs)
+                    throw new ChatProtocolException("At most " + MaxEmbeddingInputs + " texts in one request.");
+                if (root.TryGetProperty("dimensions", out JsonElement dimensions) && dimensions.ValueKind != JsonValueKind.Null)
+                {
+                    if (!dimensions.TryGetInt32(out int count) || count <= 0)
+                        throw new ChatProtocolException("\"dimensions\" must be a positive number.");
+                    request.Options.Dimensions = count;
+                }
+                string format = String(root, "encoding_format");
+                if (format != null && format != "float" && format != "base64")
+                    throw new ChatProtocolException("\"encoding_format\" is \"float\" or \"base64\".");
+                request.Base64 = format == "base64";
+                string type = String(root, "input_type");
+                if (type != null)
+                {
+                    type = type == "search_query" ? "query" : type == "search_document" ? "document" : type;
+                    if (type != "query" && type != "document")
+                        throw new ChatProtocolException("\"input_type\" is \"query\" or \"document\".");
+                    request.Options.AdditionalProperties = new AdditionalPropertiesDictionary { ["input_type"] = type };
+                }
+                return request;
+            }
+        }
+
+        /// <summary>The reply to POST /v1/embeddings, in OpenAI's shape.</summary>
+        /// <param name="embeddings">The vectors, in the order of the texts</param>
+        /// <param name="model">The model's id</param>
+        /// <param name="base64">Whether to write the vectors as base64 (little-endian floats)</param>
+        public static string Embeddings(IReadOnlyList<Embedding<float>> embeddings, string model, bool base64) => Write(w =>
+        {
+            w.WriteStartObject();
+            w.WriteString("object", "list");
+            w.WriteStartArray("data");
+            for (int i = 0; i < embeddings.Count; i++)
+            {
+                w.WriteStartObject();
+                w.WriteString("object", "embedding");
+                w.WriteNumber("index", i);
+                ReadOnlySpan<float> vector = embeddings[i].Vector.Span;
+                if (base64)
+                {
+                    byte[] bytes = new byte[vector.Length * sizeof(float)];
+                    for (int j = 0; j < vector.Length; j++)
+                    {
+                        byte[] value = BitConverter.GetBytes(vector[j]);
+                        if (!BitConverter.IsLittleEndian)
+                            Array.Reverse(value);
+                        Buffer.BlockCopy(value, 0, bytes, j * sizeof(float), sizeof(float));
+                    }
+                    w.WriteString("embedding", Convert.ToBase64String(bytes));
+                }
+                else
+                {
+                    w.WriteStartArray("embedding");
+                    foreach (float value in vector)
+                        w.WriteNumberValue(value);
+                    w.WriteEndArray();
+                }
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteString("model", model);
+            w.WriteStartObject("usage");
+            w.WriteNumber("prompt_tokens", 0);
+            w.WriteNumber("total_tokens", 0);
+            w.WriteEndObject();
             w.WriteEndObject();
         });
 

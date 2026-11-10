@@ -2,6 +2,8 @@
 using System.Net;
 using System.Text.Json;
 using Emgu.LiteRT.LM.Chat;
+using Emgu.LiteRT.LM.Extensions.AI;
+using Emgu.LiteRT.LM.Maui.Features;
 using Emgu.LiteRT.LM.Server;
 using Microsoft.Extensions.AI;
 #if IOS || MACCATALYST
@@ -186,7 +188,7 @@ public sealed class ServeModelsFeature : ChatFeature
         if (IsServing || _pairing == null)
             return;
         _problem = null;
-        var server = new ChatServer(_pairing, Served) { Name = ServerName };
+        var server = new ChatServer(_pairing, Served, ServedSearch) { Name = ServerName };
         try { server.Start(ChatServer.DefaultPort); }
         catch (Exception ex) when (ex is HttpListenerException || ex is System.Net.Sockets.SocketException || ex is InvalidOperationException)
         {
@@ -240,9 +242,24 @@ public sealed class ServeModelsFeature : ChatFeature
         return new ServedChat(client, served, BeginRequest);
     }).GetAwaiter().GetResult();
 
+    // The page's search model for a phone's POST /v1/embeddings: loaded on the first request, shared with the Mac's own
+    // searches (one embedding at a time, searches first); null when the page has none or it was deleted (the phone gets 503).
+    private ServedEmbeddings ServedSearch()
+    {
+        SearchModelFeature search = Host?.Services.Get<SearchModelFeature>();
+        if (search == null || search.DownloadRequired)
+            return null;
+        string id = ModelId(search.ModelName);
+        SearchEmbedder embedder = search.Embedder;
+        var generator = new LiteRtLmEmbeddingGenerator(cancel => embedder.EnsureAsync(null, cancel), id, embedder.EnterSearchAsync);
+        return new ServedEmbeddings(generator, new ServedModel(id, search.ModelName));
+    }
+
     // "Gemma 4 E4B" -> "gemma-4-e4b".
-    private static string ModelId(ChatModelOption option) =>
-        string.Join("-", option.DisplayName.ToLowerInvariant().Split(new[] { ' ', '·', '/' }, StringSplitOptions.RemoveEmptyEntries));
+    private static string ModelId(ChatModelOption option) => ModelId(option.DisplayName);
+
+    private static string ModelId(string name) =>
+        string.Join("-", name.ToLowerInvariant().Split(new[] { ' ', '·', '/' }, StringSplitOptions.RemoveEmptyEntries));
 
     // A phone's request on the page's model: the page is busy meanwhile, and says whose request it is.
     private IDisposable BeginRequest(string device)
