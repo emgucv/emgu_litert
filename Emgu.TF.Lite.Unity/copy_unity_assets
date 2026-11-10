@@ -44,3 +44,16 @@ do
         echo "../lib/ios/$f.xcframework not found: run platforms/ios/bazel_build_xcframework for iOS"
     fi
 done
+
+# macOS: the universal dylibs platforms/macos/bazel_build_macos_fat builds; libtfliteextern.dylib finds libLiteRt.dylib
+# beside it (@loader_path). Their .meta files make them plug-ins for the macOS player and the editor on macOS.
+mkdir -p Assets/Emgu.TF.Lite/Plugins/macOS
+for f in libtfliteextern libLiteRt
+do
+    if test -f "../lib/runtimes/osx/native/$f.dylib"
+    then
+        cp -f "../lib/runtimes/osx/native/$f.dylib" Assets/Emgu.TF.Lite/Plugins/macOS/
+    else
+        echo "../lib/runtimes/osx/native/$f.dylib not found: run platforms/macos/bazel_build_macos_fat for macOS"
+    fi
+done

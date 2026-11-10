@@ -7,11 +7,13 @@ built by the `platforms/` scripts.
 
 Setting up the project:
 
-* Build the native libraries for the platforms you need (`docs/native-builds.md`). For iOS: `platforms/ios/bazel_build_xcframework`.
+* Build the native libraries for the platforms you need (`docs/native-builds.md`). For iOS: `platforms/ios/bazel_build_xcframework`;
+  for macOS: `platforms/macos/bazel_build_macos_fat`.
 * Run `copy_unity_assets` (`copy_unity_assets.bat` on Windows, through WSL). It copies:
   * the C# sources into `Assets/Emgu.TF.Lite/Assets/Scripts/`;
   * the TensorFlow licence into `Assets/Emgu.TF.Lite/Documentation/`;
-  * for iOS, `lib/ios/tfliteextern.xcframework` and `lib/ios/LiteRt.xcframework` into `Assets/Emgu.TF.Lite/Plugins/iOS/`.
+  * for iOS, `lib/ios/tfliteextern.xcframework` and `lib/ios/LiteRt.xcframework` into `Assets/Emgu.TF.Lite/Plugins/iOS/`;
+  * for macOS, `lib/runtimes/osx/native/libtfliteextern.dylib` and `libLiteRt.dylib` into `Assets/Emgu.TF.Lite/Plugins/macOS/`.
 * Run `copy_demo_assets` for the demo's images.
 * `sync_unity_assets` copies edited sources back to the repository's projects.
 
@@ -34,5 +36,16 @@ iOS:
   the Mobilenet demo labels grace_hopper "military uniform" (72%, 92 ms).
 * Unity 6 rather than 2021.3/2022.3: only Unity 6 takes `.xcframework` plug-ins.
 
-The Windows, Android and macOS plug-in folders (`Plugins/x86`, `x86_64`, `Android`, `tfliteextern.bundle`) only hold `.meta`
-files from earlier releases: their native libraries are copied in by hand and were not checked with Unity 6.
+macOS:
+
+* `libtfliteextern.dylib` and `libLiteRt.dylib` are universal (arm64 and x86_64); `libtfliteextern.dylib` finds `libLiteRt.dylib`
+  beside it (`@loader_path`). Their `.meta` files make them plug-ins for the macOS player and the editor on macOS; Unity puts
+  them in the app's `Contents/PlugIns/`, where `DllImport("tfliteextern")` finds them.
+* `Emgu.TF.Lite.BuildDemoScript.PerformOSXBuild` writes the demo to `Builds/OSX/osx.app`.
+* Checked on 2026-11-09 with Unity 6000.5.10f1: a player built this way loaded TF Lite 2.23.0 and labelled grace_hopper
+  "military uniform" (76%), both natively on Apple Silicon and as x86_64 under Rosetta. Run with `-batchmode -nographics`, it
+  got a wrong label: without a graphics device the texture it reads has no pixels.
+
+The Windows and Android plug-in folders (`Plugins/x86`, `x86_64`, `Android`) only hold `.meta` files from earlier releases:
+their native libraries are copied in by hand and were not checked with Unity 6. Opening the project without them makes Unity
+delete those `.meta` files; restore them with git before committing.
