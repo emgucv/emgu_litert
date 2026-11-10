@@ -51,6 +51,7 @@ mkdir -p $WORKSPACE_DIR/tfliteextern
 sed -e 's#"//tflite#"@litert//tflite#g' -e 's#"//litert#"@litert//litert#g' \
     litertextern/tfliteextern/bazel/BUILD > $WORKSPACE_DIR/tfliteextern/BUILD || exit 1
 cp -f litertextern/tfliteextern/bazel/tfliteextern.def $WORKSPACE_DIR/tfliteextern/tfliteextern.def
+cp -f litertextern/tfliteextern/bazel/headers_only.bzl $WORKSPACE_DIR/tfliteextern/headers_only.bzl
 cp -f litertextern/tfliteextern/bazel/litert_exported_symbols_darwin.lds $WORKSPACE_DIR/tfliteextern/litert_exported_symbols_darwin.lds
 cp -f litertextern/tfliteextern/tfliteextern.cc $WORKSPACE_DIR/tfliteextern/tfliteextern.cc
 cp -f litertextern/tfliteextern/tfliteextern.h $WORKSPACE_DIR/tfliteextern/tfliteextern.h
