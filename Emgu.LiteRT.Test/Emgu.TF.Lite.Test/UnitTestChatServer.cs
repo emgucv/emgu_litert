@@ -534,6 +534,55 @@ public class UnitTestChatServer
     }
 
     [Test]
+    public async Task APictureThatTakesAWhileStillArrivesWithItsErrors()
+    {
+        using var host = await ServerHost.StartAsync(new ScriptedModel());
+        host.Server.DrawingKeepAlive = TimeSpan.FromMilliseconds(50);
+        byte[] png = { 0x89, 0x50, 0x4E, 0x47, 4, 5, 6 };
+        bool fail = false;
+        host.Images = new ServedImages(async (prompt, seed, cancel) =>
+        {
+            await Task.Delay(400, cancel);
+            if (fail)
+                throw new InvalidOperationException("The GPU ran out of memory.");
+            return new ServedPicture(png, seed ?? 3, TimeSpan.FromSeconds(1));
+        }, new ServedModel("bonsai-image-4b-gpu", "Bonsai Image 4B · GPU") { ImageSize = "512x512" });
+
+        // Spaces come before the picture while it is drawn; the client reads past them.
+        using var phone = new ServerImageGenerator(() => host.Url + "v1", () => host.Token, "bonsai-image-4b-gpu");
+        Assert.That((await phone.GenerateAsync("a fox", 9, CancellationToken.None)).Png, Is.EqualTo(png));
+        Assert.That(host.Requests.Last().Status, Is.EqualTo(200));
+
+        // A failure after the status (200) was sent is in the body.
+        fail = true;
+        Assert.That(Assert.ThrowsAsync<InvalidOperationException>(() => phone.GenerateAsync("a fox", 9, CancellationToken.None)).Message,
+            Does.Contain("couldn't draw it").And.Contain("ran out of memory"));
+        Assert.That((host.Requests.Last().Status, host.Requests.Last().Error), Is.EqualTo((500, "The GPU ran out of memory.")));
+    }
+
+    [Test]
+    public async Task APhoneThatStopsWaitingStopsItsPicture()
+    {
+        using var host = await ServerHost.StartAsync(new ScriptedModel());
+        host.Server.DrawingKeepAlive = TimeSpan.FromMilliseconds(100);
+        var stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        host.Images = new ServedImages(async (prompt, seed, cancel) =>
+        {
+            try { await Task.Delay(TimeSpan.FromMinutes(5), cancel); }
+            catch (OperationCanceledException) { stopped.TrySetResult(true); throw; }
+            return new ServedPicture(new byte[1], 1, TimeSpan.Zero);
+        }, new ServedModel("bonsai-image-4b-gpu", "Bonsai Image 4B · GPU") { ImageSize = "512x512" });
+
+        using var phone = new ServerImageGenerator(() => host.Url + "v1", () => host.Token, "bonsai-image-4b-gpu");
+        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        Assert.CatchAsync<OperationCanceledException>(() => phone.GenerateAsync("a fox", 9, cancel.Token));
+        Assert.That(await Task.WhenAny(stopped.Task, Task.Delay(TimeSpan.FromSeconds(10))), Is.SameAs(stopped.Task), "the picture wasn't stopped");
+        for (int i = 0; i < 100 && host.Requests.Count == 0; i++)
+            await Task.Delay(50);
+        Assert.That(host.Requests.Single().Status, Is.EqualTo(499));
+    }
+
+    [Test]
     public void SearchesADocumentWithAQueryEmbeddedElsewhere()
     {
         var index = new Emgu.LiteRT.LM.Models.DocumentIndex();
@@ -824,6 +873,7 @@ public class UnitTestChatServer
             server.RequestCompleted += (s, e) => { lock (Requests) Requests.Add(e); };
         }
 
+        public ChatServer Server => _server;
         public string Url { get; }
         public string Token { get; private set; }
         public ServedChat Served { get; set; }

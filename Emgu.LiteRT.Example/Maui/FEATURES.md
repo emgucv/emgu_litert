@@ -760,6 +760,13 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 - Since 2026-11-10 it can serve the Mac's image model too (`POST /v1/images/generations`, OpenAI's shape plus "seed"), while
   image generation is on there and the model downloaded; a phone offers it in Settings > Image model ("<Mac> · Bonsai Image
   4B"), nothing to download. Verified on the Galaxy S10: a fox drawn by Bonsai Image 4B on the Mac's GPU came back in 22 s.
+  While a picture is drawn the reply gets a space every 2 s (`ChatServer.DrawingKeepAlive`; JSON allows it before the
+  object), because HttpListener only tells that a client went away when it writes: a phone that stopped waiting is found
+  within seconds and its picture stopped - one still waiting for the model (behind the Mac's own picture, or the model
+  loading) isn't drawn; Bonsai and FLUX, which can't stop mid-picture, finish one already started and throw it away. The
+  status (200) goes with the first space, so a failure after it is only in the body's `{"error": ...}`
+  (`ServerImageGenerator` reads it). One picture is drawn at a time on the Mac: a phone's asked for while the Mac draws its
+  own waits for it (up to the phone's 20 minutes).
 - A Mac that isn't answering (asleep, its app stopped, at another address) fails within seconds instead of the system's
   minutes: connections give up after 6 s (`ServerReachability`), the message names the Mac ("... isn't answering - it may be
   asleep or on another network ..."), nothing is sent again, and the model list's row says when it last failed until the next

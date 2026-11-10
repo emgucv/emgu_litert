@@ -109,6 +109,13 @@ namespace Emgu.LiteRT.LM.Server
         /// <summary>Whether it is listening.</summary>
         public bool IsRunning => _listener?.IsListening == true;
 
+        /// <summary>
+        /// How often a picture's reply gets a space while the picture is drawn, so that a client that went away is found and
+        /// its picture stopped: 2 s. Its status (200) and headers go with the first; an error after them is the body's
+        /// {"error": ...}.
+        /// </summary>
+        public TimeSpan DrawingKeepAlive { get; set; } = TimeSpan.FromSeconds(2);
+
         /// <summary>Raised (on any thread) after each request.</summary>
         public event EventHandler<ServerRequestInfo> RequestCompleted;
 
@@ -217,6 +224,11 @@ namespace Emgu.LiteRT.LM.Server
                 status = ex.Status;
                 error = ex.Message;
                 await WriteErrorAsync(response, status, ex.Message, "invalid_request_error", ex.Code).ConfigureAwait(false);
+            }
+            catch (AnsweredException ex)
+            {
+                status = ex.Status;
+                error = ex.Message;
             }
             catch (Exception ex) when (IsGone(ex))
             {
@@ -353,8 +365,10 @@ namespace Emgu.LiteRT.LM.Server
             return await WriteJsonAsync(response, 200, OpenAIChatProtocol.Embeddings(embeddings, served.Model.Id, embed.Base64)).ConfigureAwait(false);
         }
 
-        // A picture takes seconds to minutes (the model's first load more): the client waits for the whole reply. A client that
-        // gives up doesn't stop the picture (HttpListener only tells when the reply is written).
+        // A picture takes seconds to minutes (the model's first load more): the client waits for the whole reply. HttpListener
+        // only tells a client went away when the reply is written, so while the picture is drawn the reply gets a space every
+        // DrawingKeepAlive (JSON allows it before the object): a client that went away makes the write fail and stops the
+        // picture (one not started yet isn't drawn). The status goes with the first space: an error after it is the body's.
         private async Task<int> DrawAsync(HttpListenerRequest request, HttpListenerResponse response, string device, CancellationToken stop)
         {
             ServedImages served = _images?.Invoke();
@@ -364,13 +378,51 @@ namespace Emgu.LiteRT.LM.Server
                 return 503;
             }
             ImageRequest draw = OpenAIChatProtocol.ParseImageRequest(await ReadBodyAsync(request).ConfigureAwait(false), served.Model.ImageSize);
-            ServedPicture picture;
+            using (var cancel = CancellationTokenSource.CreateLinkedTokenSource(stop))
             using (served.BeginRequest?.Invoke(device))
             {
-                try { picture = await served.Draw(draw.Prompt, draw.Seed, stop).ConfigureAwait(false); }
+                Task<ServedPicture> drawing;
+                try { drawing = served.Draw(draw.Prompt, draw.Seed, cancel.Token); }
                 catch (ArgumentException ex) { throw new ChatProtocolException(ex.Message); }
+                Stream output = null;
+                byte[] space = { (byte)' ' };
+                while (await Task.WhenAny(drawing, Task.Delay(DrawingKeepAlive, cancel.Token)).ConfigureAwait(false) != drawing && !cancel.IsCancellationRequested)
+                {
+                    if (output == null)
+                    {
+                        response.StatusCode = 200;
+                        response.ContentType = "application/json";
+                        response.SendChunked = true;
+                        output = response.OutputStream;
+                    }
+                    try
+                    {
+                        await output.WriteAsync(space, 0, space.Length, cancel.Token).ConfigureAwait(false);
+                        await output.FlushAsync(cancel.Token).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (IsGone(ex))
+                    {
+                        cancel.Cancel();
+                        try { await drawing.ConfigureAwait(false); }
+                        catch (Exception) { }
+                        throw;
+                    }
+                }
+                ServedPicture picture;
+                try { picture = await drawing.ConfigureAwait(false); }
+                catch (ArgumentException ex) when (output == null) { throw new ChatProtocolException(ex.Message); }
+                catch (Exception ex) when (output != null && !IsGone(ex))
+                {
+                    bool refused = ex is ArgumentException;
+                    await WriteBodyAsync(output, OpenAIChatProtocol.Error(ex.Message, refused ? "invalid_request_error" : "server_error")).ConfigureAwait(false);
+                    throw new AnsweredException(refused ? 400 : 500, ex.Message);
+                }
+                string json = OpenAIChatProtocol.Image(picture, draw.Prompt, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                if (output == null)
+                    return await WriteJsonAsync(response, 200, json).ConfigureAwait(false);
+                await WriteBodyAsync(output, json).ConfigureAwait(false);
+                return 200;
             }
-            return await WriteJsonAsync(response, 200, OpenAIChatProtocol.Image(picture, draw.Prompt, DateTimeOffset.UtcNow.ToUnixTimeSeconds())).ConfigureAwait(false);
         }
 
         private async Task<int> CompleteAsync(HttpListenerResponse response, ServedChat served, ChatCompletionRequest chat, CancellationToken stop)
@@ -483,6 +535,20 @@ namespace Emgu.LiteRT.LM.Server
             response.ContentLength64 = bytes.Length;
             await response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
             return status;
+        }
+
+        // An error already written in the reply's body (its status sent before it): only logged.
+        private sealed class AnsweredException : Exception
+        {
+            public AnsweredException(int status, string message) : base(message) => Status = status;
+
+            public int Status { get; }
+        }
+
+        private static async Task WriteBodyAsync(Stream output, string json)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(json);
+            await output.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
         }
 
         private static async Task WriteErrorAsync(HttpListenerResponse response, int status, string message, string type, string code = null)

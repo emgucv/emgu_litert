@@ -1024,6 +1024,16 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       in the snow." through Gemma 4 E2B on the Mac called generate_image and the fox came back in 22 s (the Mac's model loading
       from its caches included), with nothing in the Mac's own chat and no image model mapped in the phone's process. Both
       were set back afterwards (the phone's own Bonsai, off; the Mac's Bonsai on the CPU, off) and the test chat deleted.
+- [x] A phone that stops waiting stops its picture on the Mac (2026-11-10): HttpListener only tells a client went away when
+      the reply is written, so while a picture is drawn the server writes a space every `DrawingKeepAlive` (2 s; JSON allows
+      whitespace before the object) and a failed write cancels the draw. The status (200) is sent with the first space; a
+      failure after it is written as the body's `{"error": ...}` (logged with its status and words through an internal
+      `AnsweredException`), and `ServerImageGenerator` reads an error in a 200 body. A request still waiting for the model
+      (behind the Mac's own picture, or the model loading) isn't drawn; LiteRT-LM's models (Bonsai, FLUX) can't stop a
+      picture already started (`TextToImageModel`'s gate holds the next one until it is done), Z-Image-Turbo stops between
+      steps. A phone's picture asked for while the Mac draws its own waits for it: one model, one picture at a time (kept as
+      it is). Tests: `APictureThatTakesAWhileStillArrivesWithItsErrors` (spaces before the picture; a failure after the
+      status, 500 with its words in the log), `APhoneThatStopsWaitingStopsItsPicture` (the draw cancelled, 499).
 
 ## 30. Background tasks and monitoring
 

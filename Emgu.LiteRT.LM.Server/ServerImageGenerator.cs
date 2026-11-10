@@ -50,7 +50,8 @@ namespace Emgu.LiteRT.LM.Server
         /// <summary>Draw a picture.</summary>
         /// <param name="prompt">What to draw</param>
         /// <param name="seed">The seed, or null for one the server chooses</param>
-        /// <param name="cancel">Stops waiting (the server finishes the picture)</param>
+        /// <param name="cancel">Stops waiting; the server finds it within seconds and stops the picture (one already being drawn
+        /// by a model that can't stop, LiteRT-LM's, is finished and thrown away)</param>
         /// <returns>The picture (PNG), its seed and how long the server took</returns>
         /// <exception cref="InvalidOperationException">The server refused (its message), or isn't answering</exception>
         public async Task<ServedPicture> GenerateAsync(string prompt, long? seed, CancellationToken cancel)
@@ -86,11 +87,13 @@ namespace Emgu.LiteRT.LM.Server
                     using (JsonDocument document = JsonDocument.Parse(json))
                     {
                         JsonElement root = document.RootElement;
-                        if (!response.IsSuccessStatusCode)
+                        // An error found while drawing comes after the status (200): only in the body.
+                        bool failed = root.TryGetProperty("error", out JsonElement error);
+                        if (!response.IsSuccessStatusCode || failed)
                         {
-                            string message = root.TryGetProperty("error", out JsonElement error) && error.TryGetProperty("message", out JsonElement text)
-                                ? text.GetString() : response.ReasonPhrase;
-                            throw new InvalidOperationException(string.Format("The server answered {0}: {1}", (int)response.StatusCode, message));
+                            string message = failed && error.TryGetProperty("message", out JsonElement text) ? text.GetString() : response.ReasonPhrase;
+                            throw new InvalidOperationException(response.IsSuccessStatusCode ? "The server couldn't draw it: " + message
+                                : string.Format("The server answered {0}: {1}", (int)response.StatusCode, message));
                         }
                         JsonElement picture = root.GetProperty("data")[0];
                         return new ServedPicture(Convert.FromBase64String(picture.GetProperty("b64_json").GetString()),

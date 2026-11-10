@@ -162,8 +162,6 @@ How it works and what was verified: FEATURES.md, "Serving the Mac's model". Done
 
 - [ ] Photo and video search through the Mac (the Mac's search model is text only for phones: the phone would send each
       picture or frame); past chats and documents use it since 2026-11-10.
-- [ ] Pictures through the Mac: a phone that stops waiting doesn't stop the Mac's picture (HttpListener doesn't say a client
-      left until the reply is written); a picture asked for while the Mac draws its own waits for it.
 - [ ] Try: an image and a voice message from a phone, Gemma 4 12B, the iPad (iOS's Local Network prompt), a phone on
       Tailscale (the address typed by hand), the Mac's address changing (Find a Mac again by name), several phones at once.
 - [ ] A Mac actually asleep (only a stopped server was tried, 2026-11-10): whether a Bonjour Sleep Proxy wakes it within the
