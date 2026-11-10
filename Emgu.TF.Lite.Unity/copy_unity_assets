@@ -22,7 +22,7 @@ cd ..
 cd ..
 cd ..
 
-cp ../tensorflow/LICENSE Assets/Emgu.TF.Lite/Documentation/tensorflow.license.txt
+cp ../litert/third_party/tensorflow/LICENSE Assets/Emgu.TF.Lite/Documentation/tensorflow.license.txt
 #cp unityStoreIcons/README.txt Assets/Emgu.TF/README.txt
 
 cp ../Emgu.LiteRT.Util/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.LiteRT.Util/
@@ -30,8 +30,17 @@ cp ../Emgu.TF.Lite/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite/
 cp ../Emgu.TF.Lite.ImageIO/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite.ImageIO/
 cp ../Emgu.TF.Lite.Models/*.cs Assets/Emgu.TF.Lite/Assets/Scripts/Emgu.TF.Lite.Models/
 
-cd Assets/Emgu.TF.Lite/Plugins
-if test -d "../../../../platforms/macos/tfliteextern.bundle"
-then
-    cp -rf ../../../../platforms/macos/tfliteextern.bundle ./
-fi
+# iOS: the dynamic xcframeworks platforms/ios/bazel_build_xcframework builds (tfliteextern links LiteRt). Their .meta
+# files make them iOS-only plug-ins with "Add to Embedded Binaries", so Unity links them into UnityFramework, where
+# DllImport("__Internal") resolves, and embeds them in the app (Unity 6).
+mkdir -p Assets/Emgu.TF.Lite/Plugins/iOS
+for f in tfliteextern LiteRt
+do
+    if test -d "../lib/ios/$f.xcframework"
+    then
+        rm -rf "Assets/Emgu.TF.Lite/Plugins/iOS/$f.xcframework"
+        cp -R "../lib/ios/$f.xcframework" Assets/Emgu.TF.Lite/Plugins/iOS/
+    else
+        echo "../lib/ios/$f.xcframework not found: run platforms/ios/bazel_build_xcframework for iOS"
+    fi
+done

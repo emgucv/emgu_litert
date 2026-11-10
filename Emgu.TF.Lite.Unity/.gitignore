@@ -1,0 +1,21 @@
+# Unity's generated folders and IDE files
+/Library/
+/Temp/
+/Logs/
+/UserSettings/
+/obj/
+/Builds/
+/.vs/
+/.vscode/
+*.csproj
+*.sln
+/Packages/packages-lock.json
+
+# Copied in by copy_unity_assets and copy_demo_assets: the managed sources, the native plug-ins (only their .meta files are
+# tracked), the TensorFlow licence and the demo's images
+/Assets/Emgu.TF.Lite/Assets/
+/Assets/Emgu.TF.Lite/Assets.meta
+/Assets/Emgu.TF.Lite/Plugins/iOS/*.xcframework/
+/Assets/Emgu.TF.Lite/Documentation/tensorflow.license.txt
+/Assets/Emgu.TF.Lite/Demo/Resources/*.png
+/Assets/Emgu.TF.Lite/Demo/EmguTFLogo.png

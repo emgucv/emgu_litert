@@ -1,10 +1,5 @@
 fileFormatVersion: 2
-guid: a1a3cd348b3c4bbc82b68b73893f222a
-labels:
-- gvh_version-1.2.185
-- gvhp_exportpath-ExternalDependencyManager/Editor/1.2.185/Google.IOSResolver.dll
-- gvh
-- gvhp_targets-editor
+guid: 45e8fe92382074ea3b19b6dbc80a8b6e
 PluginImporter:
   externalObjects: {}
   serializedVersion: 3
@@ -14,19 +9,19 @@ PluginImporter:
   isPreloaded: 0
   isOverridable: 0
   isExplicitlyReferenced: 0
-  validateReferences: 0
+  validateReferences: 1
   platformData:
     Any:
       enabled: 0
       settings: {}
     Editor:
-      enabled: 1
-      settings:
-        DefaultValueInitialized: true
-    WindowsStoreApps:
       enabled: 0
       settings:
-        CPU: AnyCPU
+        DefaultValueInitialized: true
+    iOS:
+      enabled: 1
+      settings:
+        AddToEmbeddedBinaries: true
   userData: 
   assetBundleName: 
   assetBundleVariant: 

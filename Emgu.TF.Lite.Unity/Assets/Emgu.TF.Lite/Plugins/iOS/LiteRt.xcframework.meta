@@ -1,10 +1,5 @@
 fileFormatVersion: 2
-guid: bf27b3f704244da0af729a6737adb7f1
-labels:
-- gvh_version-1.2.185
-- gvhp_exportpath-ExternalDependencyManager/Editor/1.2.185/Google.PackageManagerResolver.dll
-- gvh
-- gvhp_targets-editor
+guid: 5eb407a6cb3a545e6aaecfad2760507b
 PluginImporter:
   externalObjects: {}
   serializedVersion: 3
@@ -20,13 +15,13 @@ PluginImporter:
       enabled: 0
       settings: {}
     Editor:
-      enabled: 1
-      settings:
-        DefaultValueInitialized: true
-    WindowsStoreApps:
       enabled: 0
       settings:
-        CPU: AnyCPU
+        DefaultValueInitialized: true
+    iOS:
+      enabled: 1
+      settings:
+        AddToEmbeddedBinaries: true
   userData: 
   assetBundleName: 
   assetBundleVariant: 

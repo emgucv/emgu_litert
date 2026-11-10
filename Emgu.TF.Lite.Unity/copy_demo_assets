@@ -1,6 +1,12 @@
 #!/bin/sh
 cd "$(dirname "$0")"
 
-convert ../tensorflow/tensorflow/examples/label_image/data/grace_hopper.jpg Assets/Emgu.TF.Lite/Demo/Resources/grace_hopper.png
-cp ../Emgu.LiteRT.Example/CVInterop/dog416.png Assets/Emgu.TF.Lite/Demo/Resources/dog416.png
+# sips on macOS, ImageMagick elsewhere (the .bat runs this under WSL)
+if command -v sips > /dev/null
+then
+    sips -s format png ../Emgu.LiteRT.Test/Emgu.TF.Lite.Test/grace_hopper.jpg --out Assets/Emgu.TF.Lite/Demo/Resources/grace_hopper.png > /dev/null
+else
+    convert ../Emgu.LiteRT.Test/Emgu.TF.Lite.Test/grace_hopper.jpg Assets/Emgu.TF.Lite/Demo/Resources/grace_hopper.png
+fi
+cp ../Emgu.LiteRT.Example/CVInterop.Lite/dog416.png Assets/Emgu.TF.Lite/Demo/Resources/dog416.png
 cp unityStoreIcons/EmguTFLogo_128x128.png Assets/Emgu.TF.Lite/Demo/EmguTFLogo.png

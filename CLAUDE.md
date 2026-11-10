@@ -82,7 +82,7 @@ On Linux the tests use the Ubuntu natives in `lib/runtimes/ubuntu-x64/native/` a
 
 ## Key Conventions
 
-- **Extern library name**: `tfliteextern`. On iOS it is `@rpath/tfliteextern.framework/tfliteextern`; on Unity iOS (a static library) `__Internal`; Mac Catalyst loads the macOS `libtfliteextern.dylib`.
+- **Extern library name**: `tfliteextern`. On iOS it is `@rpath/tfliteextern.framework/tfliteextern`; on Unity iOS `__Internal` (the same `tfliteextern`/`LiteRt` xcframeworks, linked into `UnityFramework`); Mac Catalyst loads the macOS `libtfliteextern.dylib`.
 - **`UnmanagedObject`** (in `Emgu.LiteRT.Util/`): base class for all objects wrapping a native pointer; handles `Dispose`/finalizer pattern.
 - **Calling convention**: `CallingConvention.Cdecl` throughout.
 - **Boolean marshaling**: `UnmanagedType.U1` for `bool`, `UnmanagedType.Bool` for `int`-as-bool.
