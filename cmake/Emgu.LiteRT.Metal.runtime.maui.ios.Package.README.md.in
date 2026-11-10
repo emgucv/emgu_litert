@@ -1,0 +1,35 @@
+## About this package
+
+This optional package adds LiteRT's GPU (Metal) accelerator, `LiteRtMetalAccelerator.xcframework`, to Emgu LiteRT for MAUI iOS. It is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT.
+
+It depends on `${EMGU_LITERT_MAUI_IOS_NUGET_ID}`, whose `LiteRt.framework` loads the accelerator when a model runs on the GPU:
+
+```csharp
+// LiteRT-LM (Emgu.LiteRT.LM.Models, with ${EMGU_LITERT_LM_MAUI_IOS_NUGET_ID})
+await model.Init(backend: "gpu");
+// LiteRT (Emgu.LiteRT)
+var compiledModel = new CompiledModel(environment, model, HwAccelerators.Gpu);
+```
+
+Without this package, asking for the GPU fails (LiteRT-LM's engine or LiteRT's compiled model can't be created), so use the CPU instead. The accelerator is a LiteRT plugin, so `CompiledModel` can use it too, though only LiteRT-LM was tested with it.
+
+## Requirements
+
+- An iOS device (arm64) or an Apple Silicon simulator. The accelerator is a LiteRT-LM prebuilt library, built for iOS 15 or later.
+- Nothing to declare: the app embeds `LiteRtMetalAccelerator.framework` next to `LiteRt.framework`, which finds it by name through its rpath. It uses only system frameworks (Metal, Foundation).
+
+## Using it with LiteRT-LM
+
+Measured on an iPad Air (M4):
+
+- Gemma 4 E2B wrote 55 tokens/s on the GPU, against 29 on the CPU; Gemma 4 E4B 30 against 13.
+- Bonsai Image 4B drew a 256 x 256 picture in 8-9 s (21 s on the CPU), and FLUX.2-klein 4B in 10 s (22 s on the CPU).
+- Qwen3-ASR wrote down 26 s of speech in 3.2 s (4.3 s on the CPU).
+- The embedding models were no faster on the GPU, and compiling Z-Image-Turbo for the GPU used more memory than iOS allowed the app.
+
+- **32-bit activations:** use them on the GPU. With LiteRT-LM's default 16-bit ones, Gemma 4 answered wrongly after a long conversation. `Emgu.LiteRT.LM.Models`' Gemma 4 classes set this themselves; elsewhere, set `EngineSettings.ActivationDataType = ActivationDataType.Float32`.
+- **First load:** the first load of a model on the GPU compiles GPU programs and converts the weights. The result is kept as a cache next to the model file, so later loads are faster.
+- **Memory:** the image models need more address space than iOS gives an app by default. Give the app the Extended Virtual Addressing and Increased Memory Limit entitlements (`com.apple.developer.kernel.extended-virtual-addressing`, `com.apple.developer.kernel.increased-memory-limit`).
+
+For online documentation please visit
+<${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

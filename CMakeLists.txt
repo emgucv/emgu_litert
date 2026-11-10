@@ -791,6 +791,11 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # Emgu.LiteRT.Runtime/Maui/Metal/Mac/.
   SET(EMGU_LITERT_METAL_MAUI_MACOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Metal.runtime.maui.macos")
   SET(EMGU_LITERT_METAL_MAUI_MACOS_NUGET_TITLE "GPU (Metal) accelerator of ${EMGU_LITERT_NUGET_TITLE} for Maui Mac Catalyst")
+  # Emgu.LiteRT.Metal.runtime.maui.ios: LiteRT's GPU (Metal) accelerator framework for iOS, an optional add-on to
+  # ${EMGU_LITERT_MAUI_IOS_NUGET_ID} (whose LiteRt.framework loads it) that nothing depends on - see
+  # Emgu.LiteRT.Runtime/Maui/Metal/iOS/.
+  SET(EMGU_LITERT_METAL_MAUI_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.Metal.runtime.maui.ios")
+  SET(EMGU_LITERT_METAL_MAUI_IOS_NUGET_TITLE "GPU (Metal) accelerator of ${EMGU_LITERT_NUGET_TITLE} for Maui iOS")
 
   SET(EMGU_LITERT_MAUI_IOS_NUGET_ID "${EMGU_LITERT_NUGET_ID}.runtime.maui.ios")
   SET(EMGU_LITERT_MAUI_IOS_NUGET_TITLE "Native runtime of ${EMGU_LITERT_NUGET_TITLE} for Maui iOS")	
@@ -845,6 +850,15 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
     CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Metal/Mac/SignPkg.Targets)
   ENDIF()
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Metal.runtime.maui.macos.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Metal/Mac/docs/README.md)
+
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Metal.runtime.maui.ios.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Metal/iOS/Directory.Build.props)
+  IF(EMGU_SIGN_FOUND AND WIN32)
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Metal/iOS/SignBinary.Targets)
+  ENDIF()
+  IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Metal/iOS/SignPkg.Targets)
+  ENDIF()
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.Metal.runtime.maui.ios.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/Metal/iOS/docs/README.md)
 
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.runtime.maui.macos.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.Runtime/Maui/LM/Mac/Directory.Build.props)
   IF(EMGU_SIGN_FOUND AND WIN32)

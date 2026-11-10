@@ -198,7 +198,6 @@ iOS: no run at a time the app picks.
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] An 8 GB iPhone (the model cards' floor; Bonsai 512 is hidden there): the iPad has more memory.
-- [ ] A Metal add-on package for iOS, as on macOS.
 
 ## 32. Live camera tools — first version implemented
 

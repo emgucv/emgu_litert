@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>true</ImplicitUsings>
+    <IsBindingProject>true</IsBindingProject>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <NoBindingEmbedding>true</NoBindingEmbedding>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TfLiteBinaryDir>$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\..\..\lib))</TfLiteBinaryDir>
+    <EmguLiteRtMetalIOSFramework>$(TfLiteBinaryDir)\ios\LiteRtMetalAccelerator.xcframework</EmguLiteRtMetalIOSFramework>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <WarningLevel>4</WarningLevel>
+    <OutputPath>$(TfLiteBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>$(TfLiteBinaryDir)\Build\$(AssemblyName)\$(Platform)\$(Configuration)\</OutputPath>
+    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ObjcBindingApiDefinition Include="ApiDefinition.cs" />
+    <ObjcBindingCoreSource Include="StructsAndEnums.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- LiteRT's GPU (Metal) accelerator, LiteRT-LM's prebuilt (prebuilt/ios_{arm64,sim_arm64}), wrapped into
+         lib/ios/LiteRtMetalAccelerator.xcframework by platforms/ios/bazel_build_xcframework. An optional add-on:
+         the LiteRt.framework of Emgu.LiteRT.runtime.maui.ios loads it by name when a model asks for the GPU (LiteRT's
+         CompiledModel with HwAccelerators.Gpu, LiteRT-LM's "gpu" backend), through its rpath
+         @loader_path/../LiteRtMetalAccelerator.framework. -->
+    <NativeReference Condition="Exists('$(EmguLiteRtMetalIOSFramework)')" Include="$(EmguLiteRtMetalIOSFramework)">
+      <Kind>Framework</Kind>
+      <SmartLink>False</SmartLink>
+    </NativeReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Depends on Emgu.LiteRT.runtime.maui.ios, as Emgu.LiteRT.OpenCL.runtime.maui.android depends on
+         Emgu.LiteRT.runtime.maui.android: not on the LiteRT-LM add-on, so Emgu.LiteRT can use the GPU without it. -->
+    <ProjectReference Include="..\..\iOS\Emgu.LiteRT.runtime.maui.ios.csproj" />
+  </ItemGroup>
+
+  <Target Name="EmguLiteRtMetalMauiIOSPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <Message Text="LiteRT Metal accelerator framework embedded: '$(EmguLiteRtMetalIOSFramework)'" Importance="high" Condition="Exists('$(EmguLiteRtMetalIOSFramework)')" />
+    <Warning Text="LiteRT's Metal accelerator is not available for $(TargetFramework): $(EmguLiteRtMetalIOSFramework) is missing - run platforms/ios/bazel_build_xcframework." Condition="!Exists('$(EmguLiteRtMetalIOSFramework)')" />
+  </Target>
+</Project>

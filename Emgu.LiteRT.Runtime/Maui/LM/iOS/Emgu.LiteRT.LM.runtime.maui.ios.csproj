@@ -12,7 +12,6 @@
     <EmguLiteRtLmIOSFramework>$(TfLiteBinaryDir)\ios\LiteRtLm.xcframework</EmguLiteRtLmIOSFramework>
     <EmguLiteRtLmGemmaIOSFramework>$(TfLiteBinaryDir)\ios\GemmaModelConstraintProvider.xcframework</EmguLiteRtLmGemmaIOSFramework>
     <EmguOmniExternIOSFramework>$(TfLiteBinaryDir)\ios\omniextern.xcframework</EmguOmniExternIOSFramework>
-    <EmguLiteRtMetalIOSFramework>$(TfLiteBinaryDir)\ios\LiteRtMetalAccelerator.xcframework</EmguLiteRtMetalIOSFramework>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
@@ -48,12 +47,8 @@
       <Kind>Framework</Kind>
       <SmartLink>False</SmartLink>
     </NativeReference>
-    <!-- LiteRT's GPU (Metal) accelerator, Google's prebuilt: LiteRt.framework loads it by name for the GPU backend
-         (platforms/ios/bazel_build_xcframework). -->
-    <NativeReference Condition="Exists('$(EmguLiteRtMetalIOSFramework)')" Include="$(EmguLiteRtMetalIOSFramework)">
-      <Kind>Framework</Kind>
-      <SmartLink>False</SmartLink>
-    </NativeReference>
+    <!-- LiteRT's GPU (Metal) accelerator is not here: it is the optional Emgu.LiteRT.Metal.runtime.maui.ios
+         (Emgu.LiteRT.Runtime/Maui/Metal/iOS), as the OpenCL one is on Android and the Metal one on Mac Catalyst. -->
   </ItemGroup>
 
   <ItemGroup>

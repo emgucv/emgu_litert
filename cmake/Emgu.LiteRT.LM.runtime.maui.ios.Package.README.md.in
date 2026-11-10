@@ -2,5 +2,7 @@
 
 This package contains the native iOS runtime of Emgu LiteRT LM for MAUI: LiteRT-LM's C API (LiteRtLm.xcframework, linked to the LiteRt.framework of Emgu.LiteRT.runtime.maui.ios) and the prebuilt Gemma model constraint provider it depends on (GemmaModelConstraintProvider.xcframework). LiteRT-LM needs iOS 26.4 or later at run time. It is part of the ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} release of Emgu LiteRT.
 
+To run models on the GPU (`backend: "gpu"`), add `${EMGU_LITERT_METAL_MAUI_IOS_NUGET_ID}`, LiteRT's Metal accelerator.
+
 For online documentation please visit
 <${NUGET_EMGU_URL}/wiki/files/emgutf/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}/document-lite/index.html>

@@ -174,6 +174,9 @@
 		     needs the libOpenCL.so <uses-native-library> in Platforms/Android/AndroidManifest.xml. -->
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" Include="..\..\Emgu.LiteRT.Runtime\Maui\OpenCL\Android\Emgu.LiteRT.OpenCL.runtime.maui.android.csproj" />
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\iOS\Emgu.LiteRT.LM.runtime.maui.ios.csproj" />
+		<!-- Optional: LiteRT's GPU (Metal) accelerator framework, so the chat, the image models and speech recognition can
+		     run on the GPU ("· GPU" in the model lists). -->
+		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="..\..\Emgu.LiteRT.Runtime\Maui\Metal\iOS\Emgu.LiteRT.Metal.runtime.maui.ios.csproj" />
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.Runtime\Maui\LM\Mac\Emgu.LiteRT.LM.runtime.maui.macos.csproj" />
 		<!-- Optional: LiteRT's GPU (Metal) accelerator, so the chat can run Gemma 4 on the Mac's GPU (Settings, "Use the GPU"). -->
 		<ProjectReference Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'" Include="..\..\Emgu.LiteRT.Runtime\Maui\Metal\Mac\Emgu.LiteRT.Metal.runtime.maui.macos.csproj" />

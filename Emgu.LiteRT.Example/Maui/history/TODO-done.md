@@ -1004,6 +1004,11 @@ Moved from TODO.md on 2026-11-05:
       a memory, Wikipedia, the calculator): all answers sound - 17 x 23 = 391, the Lisbon summary matched the plan, and
       the last one recalled the name and the dog's name from the first. The test chat and its memory were deleted.
 
+- [x] A Metal add-on package for iOS (2026-11-10): `Emgu.LiteRT.Metal.runtime.maui.ios` carries
+      `LiteRtMetalAccelerator.xcframework` and depends only on the base iOS runtime; the LiteRT-LM iOS add-on no longer
+      embeds it, and the demo references the new package (docs/packaging.md, "iOS, Metal"). Checked on the iPad: a clean
+      build embeds the framework, and Bonsai Image 4B 512 drew on the GPU in 27 s.
+
 ## 32. Live camera tools — first version implemented
 
 - [x] `open_camera` opens a visible in-app preview; `capture_camera_frame` opens it if needed and returns a fresh image
