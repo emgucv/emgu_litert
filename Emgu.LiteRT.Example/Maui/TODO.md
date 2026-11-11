@@ -163,7 +163,7 @@ How it works and what was verified: FEATURES.md, "Serving the Mac's model". Done
 - [ ] Photo and video search through the Mac (the Mac's search model is text only for phones: the phone would send each
       picture or frame); past chats and documents use it since 2026-11-10.
 - [ ] Try: an image and a voice message from a phone, Gemma 4 12B, a phone on Tailscale (the address typed by hand), the
-      Mac's address changing (Find a Mac again by name), several phones at once (the S10 and the iPad are both paired).
+      Mac's address changing (Find a Mac again by name).
 - [ ] On iOS, the first Find a Mac (the one that brings up the Local Network prompt) finds nothing, and the user has to
       tap it again: search again once the prompt is answered. The pairing code's prompt shows the full keyboard, not
       the number pad.

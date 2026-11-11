@@ -1050,6 +1050,16 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       after it, the app sent to the background and back - "MacMini M1 2020 (7) · Bonsai Image 4B" listed. Set back
       afterwards (the iPad's Gemma 4 E2B GPU and its own Bonsai 512 GPU, on; the Mac's Bonsai on the CPU, off; the two test
       chats deleted; the iPad left paired with the Mac).
+- [x] Two phones at once (2026-11-11, the Galaxy S10 and the iPad, both on the Mac's Gemma 4 E2B and Bonsai Image 4B GPU):
+      questions sent 3 s apart ("What is 12 times 7?" on the S10, "What is the capital of France?" on the iPad) came back
+      each to its own phone (84 through the S10's calculator in about 40 s; Paris through the iPad's Wikipedia search in
+      about 55 s, the Mac answering one at a time). Pictures asked for together ("Draw an owl on a branch." on the S10, "Draw
+      a lighthouse at sunset." on the iPad) were drawn one after the other - the Mac's status line, read from screenshots
+      every 3 s: "Answering Canming's S10...", "Drawing a picture for iPad..." (4 s), "Drawing a picture for Canming's
+      S10..." (about 20 s), "Answering iPad..." - the lighthouse in 28 s on the iPad and the owl in 44 s on the S10. The
+      iPad's last reply waited for the S10's picture. Set back afterwards (the iPad's Gemma 4 E2B GPU and own Bonsai 512 GPU;
+      the S10's own Bonsai CPU, off, its chat model still the Mac's; the Mac's Bonsai on the CPU, off; the test chats
+      deleted).
 
 ## 30. Background tasks and monitoring
 
