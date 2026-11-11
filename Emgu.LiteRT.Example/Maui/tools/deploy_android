@@ -124,7 +124,7 @@ copy_models() {
 for serial in "${DEVICES[@]}"; do
   echo "== $serial"
   if [ -z "$NO_BUILD" ]; then
-    dotnet build "$PROJECT" -f net10.0-android -c Debug -p:RuntimeIdentifier=android-arm64 -t:Run -p:AdbTarget="-s $serial"
+    dotnet build "$PROJECT" -f "net$(dotnet --version | cut -d. -f1).0-android" -c Debug -p:RuntimeIdentifier=android-arm64 -t:Run -p:AdbTarget="-s $serial"
   fi
   copy_models "$serial"
 done

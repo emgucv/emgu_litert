@@ -44,18 +44,20 @@ target frameworks") or after switching .NET SDKs.
 ## 4. Build and run
 
 On a Mac, the iOS and Mac Catalyst target frameworks carry the platform version the installed Xcode can build
-(`net10.0-ios26.0` with any Xcode 26.x, plain `net10.0-ios` with Xcode 27 or later): the same version CMake put in the
-generated `Directory.Build.props` (see `docs/native-builds.md`, "iOS and Mac Catalyst target frameworks"). Set it once:
+(`net<N>.0-ios26.0` with any Xcode 26.x, plain `net<N>.0-ios` with Xcode 27 or later; N is the installed .NET's major
+version, 10 or 11): the same version CMake put in the generated `Directory.Build.props` (see `docs/native-builds.md`,
+"iOS and Mac Catalyst target frameworks"). Set both once:
 
 ```bash
+N=$(dotnet --version | cut -d. -f1)
 V=$(platforms/macos/apple_tfm_version.sh)
 ```
 
 ### Mac Catalyst
 
 ```bash
-dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst$V -c Debug -p:ValidateXcodeVersion=false
-open "Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-maccatalyst$V/maccatalyst-arm64/Emgu LiteRT.app"
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net$N.0-maccatalyst$V -c Debug -p:ValidateXcodeVersion=false
+open "Emgu.LiteRT.Example/Maui/bin/Debug/net$N.0-maccatalyst$V/maccatalyst-arm64/Emgu LiteRT.app"
 ```
 
 `-p:ValidateXcodeVersion=false` is needed when the .NET Mac Catalyst SDK pack doesn't match the installed Xcode
@@ -65,8 +67,8 @@ running its executable from a terminal) makes macOS ask for microphone access fo
 ### iOS simulator
 
 ```bash
-dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios$V -c Debug -p:ValidateXcodeVersion=false -p:RuntimeIdentifier=iossimulator-arm64
-xcrun simctl install booted Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios$V/iossimulator-arm64/Maui.Demo.Lite.app
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net$N.0-ios$V -c Debug -p:ValidateXcodeVersion=false -p:RuntimeIdentifier=iossimulator-arm64
+xcrun simctl install booted Emgu.LiteRT.Example/Maui/bin/Debug/net$N.0-ios$V/iossimulator-arm64/Maui.Demo.Lite.app
 xcrun simctl launch booted com.emgu.litert
 ```
 
@@ -84,10 +86,10 @@ them). Verified on an iPad Air (M4, iPadOS 27.2):
 
 ```bash
 xcrun devicectl list devices                   # the device's identifier
-dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios$V -c Debug -p:RuntimeIdentifier=ios-arm64 \
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net$N.0-ios$V -c Debug -p:RuntimeIdentifier=ios-arm64 \
   -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: <name> (<id>)" \
   -p:CodesignProvision="iOS Team Provisioning Profile: com.emgu.litert"
-xcrun devicectl device install app --device <identifier> Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios$V/ios-arm64/Maui.Demo.Lite.app
+xcrun devicectl device install app --device <identifier> Emgu.LiteRT.Example/Maui/bin/Debug/net$N.0-ios$V/ios-arm64/Maui.Demo.Lite.app
 xcrun devicectl device process launch --device <identifier> com.emgu.litert
 ```
 
@@ -121,11 +123,11 @@ The app needs iOS 15 (`cmake/ios_min_version.txt`). `devicectl` only works with 
 install and start the app with the .NET SDK's `mlaunch` (the identifier from `xcrun xctrace list devices`):
 
 ```bash
-M=$(ls /usr/local/share/dotnet/packs/Microsoft.iOS.Sdk.net10.0_$V/*/tools/bin/mlaunch | tail -1)
-dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-ios$V -c Debug -p:RuntimeIdentifier=ios-arm64 \
+M=$(ls /usr/local/share/dotnet/packs/Microsoft.iOS.Sdk.net$N.0_$V/*/tools/bin/mlaunch | tail -1)
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net$N.0-ios$V -c Debug -p:RuntimeIdentifier=ios-arm64 \
   -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: <name> (<id>)"
-$M --installdev Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios$V/ios-arm64/Maui.Demo.Lite.app --devname <identifier>
-$M --launchdev Emgu.LiteRT.Example/Maui/bin/Debug/net10.0-ios$V/ios-arm64/Maui.Demo.Lite.app --devname <identifier>
+$M --installdev Emgu.LiteRT.Example/Maui/bin/Debug/net$N.0-ios$V/ios-arm64/Maui.Demo.Lite.app --devname <identifier>
+$M --launchdev Emgu.LiteRT.Example/Maui/bin/Debug/net$N.0-ios$V/ios-arm64/Maui.Demo.Lite.app --devname <identifier>
 ```
 
 Without `CodesignProvision` the build has no memory entitlements and takes any matching profile (the wildcard
@@ -137,7 +139,7 @@ the app starts, and Claude answered.
 Start an emulator or connect a device, then:
 
 ```bash
-dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-android -c Debug -p:RuntimeIdentifier=android-arm64 -t:Run
+dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net$N.0-android -c Debug -p:RuntimeIdentifier=android-arm64 -t:Run
 ```
 
 - `-p:RuntimeIdentifier=android-arm64` builds only the ABI you need (use `android-x64` for an x86_64 emulator).
@@ -178,7 +180,7 @@ Open the project in Visual Studio, or after the native build and `build_emgu_lit
 
 ```powershell
 platforms\windows\build_emgu_litert.ps1 "" nuget
-dotnet build Emgu.LiteRT.Example\Maui\Maui.Demo.Lite.csproj -f net10.0-windows10.0.22621.0 -t:Run
+dotnet build Emgu.LiteRT.Example\Maui\Maui.Demo.Lite.csproj -f net<N>.0-windows10.0.22621.0 -t:Run
 ```
 
 For GPU chat on Windows, first build the matching runtime bundle with
@@ -347,7 +349,7 @@ See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HIS
   Obtain a Mac Catalyst development profile for `com.emgu.litert` using your Apple developer team, then build with:
 
   ```bash
-  dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-maccatalyst$V -c Debug -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: Your Name (CERTIFICATE_ID)" -p:CodesignProvision="PROFILE_UUID"
+  dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net$N.0-maccatalyst$V -c Debug -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: Your Name (CERTIFICATE_ID)" -p:CodesignProvision="PROFILE_UUID"
   ```
 
   The project includes `Platforms/MacCatalyst/Keychain.entitlements.plist` when `CodesignProvision` is supplied; its Keychain
@@ -456,7 +458,7 @@ See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HIS
 
 - **NU1201 / missing target frameworks:** re-run the project settings step (3).
 - **Changes to `Platforms/*/Info.plist` don't show up (Mac Catalyst / iOS):** delete
-  `bin/Debug/net10.0-<platform>` and `obj/Debug/net10.0-<platform>` and rebuild; incremental builds can keep a stale
+  `bin/Debug/net<N>.0-<platform>` and `obj/Debug/net<N>.0-<platform>` and rebuild; incremental builds can keep a stale
   bundled `Info.plist`.
 - **"isn't responding" / the app freezes:** Debug builds log every UI thread stall longer than a second
   (`UiStallWatchdog.cs`), with what the app was doing and, on Android, the main thread's stack: in the log (tag
@@ -474,8 +476,8 @@ See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HIS
 Moved here from CLAUDE.md, which keeps the short version.
 
 - Step-by-step instructions are in `Emgu.LiteRT.Example/Maui/README.md`.
-- In short: build the platform's natives (Mac Catalyst: `bazel_build_macos_fat`, whose macOS dylibs it loads; iOS: `bazel_build_xcframework`; Android: `platforms/android/bazel_build_litert <abi>` with `ANDROID_HOME` set), generate the projects' `Directory.Build.props` (`platforms/macos/build_emgu_litert` or `cmake .` in `build/` - again after pulling a new project, otherwise NU1201), then `dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-<platform>`.
-- Pitfalls: `-p:ValidateXcodeVersion=false` when the .NET Apple SDK pack doesn't match Xcode; `-p:RuntimeIdentifier=iossimulator-arm64` / `android-arm64` to build one architecture; `-p:AdbTarget="-s <serial>"` with several adb devices; `Emgu.LiteRT.Example/Maui/tools/deploy_android [serial ...]` builds/installs/starts the Debug app on Android devices and copies the models the Mac already has (`~/Documents/LiteRT-LM`, `~/Library/Application Support/LiteRT-LM`) into the app's private `files/LiteRT-LM` via `adb exec-in run-as <id> sh -c 'cat > ...'` - `exec-in` returns before the device has written everything, so the script waits for the full size - with the original's modification time (`touch -d @<sec.ns>`; .NET's ticks then match) and `.sha256ok` marker, so the app neither downloads nor hashes it (verified on the Pixel 8 emulator: the app's `LastWriteTimeUtc.Ticks` equalled the marker's); it uses `/usr/bin/stat` since a GNU `stat` may come first on the PATH; delete `bin`/`obj` for the platform after editing an `Info.plist` or updating the .NET Apple SDK packs (the old pack's `libxamarin-dotnet-debug.dylib` stays in `obj/.../nativelibraries` and the link fails: `_xamarin_initialize_dynamic_registrar` undefined); `Emgu.LiteRT.Example/Maui/tools/run_catalyst [folder] [ENV=value ...]` builds the Catalyst demo and signs it again - with the identity named in `MacCatalyst.Signing.props` when that identity is in the keychain (the app keeps its entitlements and profile, so API keys saved in the keychain survive rebuilds; since 2026-10-28), otherwise, or with `ADHOC=1`, ad hoc without the provisioning profile (for when the team's signing certificate has expired - the default build then fails with "code signing key ... not found in keychain" - the API keys then last for the session only), keeps only the arm64 slice of the universal dylibs (their x86_64 slices got the ad hoc app killed at launch on macOS 27 with "Code Signature Invalid"), signs it again and starts it directly, so the environment (e.g. `EMGU_LM_SELFTEST=1`) reaches the app; the Catalyst `.app` is `bin/Debug/net10.0-maccatalyst/maccatalyst-arm64/Emgu LiteRT.app` (the `ApplicationTitle`, renamed from "Emgu TF Lite Maui Demo"; the `ApplicationId` is `com.emgu.litert`, changed from `com.emgu.tf.lite.maui.demo` - Android and iOS install it as a new app, without the old one's downloaded models and saved chats; on Mac Catalyst those live in `~/Documents/LiteRT-LM` and `~/Library/chats` and carry over, Preferences and SecureStorage don't).
+- In short: build the platform's natives (Mac Catalyst: `bazel_build_macos_fat`, whose macOS dylibs it loads; iOS: `bazel_build_xcframework`; Android: `platforms/android/bazel_build_litert <abi>` with `ANDROID_HOME` set), generate the projects' `Directory.Build.props` (`platforms/macos/build_emgu_litert` or `cmake .` in `build/` - again after pulling a new project, otherwise NU1201), then `dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net<N>.0-<platform>`.
+- Pitfalls: `-p:ValidateXcodeVersion=false` when the .NET Apple SDK pack doesn't match Xcode; `-p:RuntimeIdentifier=iossimulator-arm64` / `android-arm64` to build one architecture; `-p:AdbTarget="-s <serial>"` with several adb devices; `Emgu.LiteRT.Example/Maui/tools/deploy_android [serial ...]` builds/installs/starts the Debug app on Android devices and copies the models the Mac already has (`~/Documents/LiteRT-LM`, `~/Library/Application Support/LiteRT-LM`) into the app's private `files/LiteRT-LM` via `adb exec-in run-as <id> sh -c 'cat > ...'` - `exec-in` returns before the device has written everything, so the script waits for the full size - with the original's modification time (`touch -d @<sec.ns>`; .NET's ticks then match) and `.sha256ok` marker, so the app neither downloads nor hashes it (verified on the Pixel 8 emulator: the app's `LastWriteTimeUtc.Ticks` equalled the marker's); it uses `/usr/bin/stat` since a GNU `stat` may come first on the PATH; delete `bin`/`obj` for the platform after editing an `Info.plist` or updating the .NET Apple SDK packs (the old pack's `libxamarin-dotnet-debug.dylib` stays in `obj/.../nativelibraries` and the link fails: `_xamarin_initialize_dynamic_registrar` undefined); `Emgu.LiteRT.Example/Maui/tools/run_catalyst [folder] [ENV=value ...]` builds the Catalyst demo and signs it again - with the identity named in `MacCatalyst.Signing.props` when that identity is in the keychain (the app keeps its entitlements and profile, so API keys saved in the keychain survive rebuilds; since 2026-10-28), otherwise, or with `ADHOC=1`, ad hoc without the provisioning profile (for when the team's signing certificate has expired - the default build then fails with "code signing key ... not found in keychain" - the API keys then last for the session only), keeps only the arm64 slice of the universal dylibs (their x86_64 slices got the ad hoc app killed at launch on macOS 27 with "Code Signature Invalid"), signs it again and starts it directly, so the environment (e.g. `EMGU_LM_SELFTEST=1`) reaches the app; the Catalyst `.app` is `bin/Debug/net<N>.0-maccatalyst/maccatalyst-arm64/Emgu LiteRT.app` (the `ApplicationTitle`, renamed from "Emgu TF Lite Maui Demo"; the `ApplicationId` is `com.emgu.litert`, changed from `com.emgu.tf.lite.maui.demo` - Android and iOS install it as a new app, without the old one's downloaded models and saved chats; on Mac Catalyst those live in `~/Documents/LiteRT-LM` and `~/Library/chats` and carry over, Preferences and SecureStorage don't).
 - A clean Mac Catalyst build of the demo used to fail in the SDK's `_InstallNameTool` step, hidden by incremental builds: `bazel_build_macos` left the dylibs in `lib/runtimes/osx/native/` read-only (`chmod u-w`, like bazel-bin), so the SDK's writable copy wasn't ("Permission denied" on `liblitert-lm.dylib.tmp`) - the script now leaves them writable - and the Metal add-on references the LiteRT-LM add-on, which the demo references too, so `liblitert-lm`/`libLiteRt`/`libGemmaModelConstraintProvider` were in `_FileNativeReference` twice and the two `install_name_tool` runs on each raced ("cannot rename ... .tmp") - the demo's `EmguRemoveDuplicateNativeReferences` target removes the duplicates first. (opening it with `open` makes macOS ask for microphone access for the app rather than the terminal).
 - Testing without UI automation: a temporary `[ModuleInitializer]` file in the demo that drives `LiteRtLmChatPage` (its `Parts` and the `ChatPage` members) through reflection (gated by `EMGU_LM_SELFTEST=1` on Mac Catalyst / via `SIMCTL_CHILD_EMGU_LM_SELFTEST=1 xcrun simctl launch --console-pty` on iOS; Android can't pass an environment variable, so it must run unconditionally there - reinstall a clean build afterwards), with screenshots from `screencapture -l <window id>` (Catalyst) or `adb exec-out screencap -p -d <display id>` (Android; a foldable has one display per screen).
 - UI freezes ("isn't responding"): Debug builds run `UiStallWatchdog` (started in `App`), which logs stalls of the UI thread over 1 s with the breadcrumbs pages leave via `UiStallWatchdog.Mark` and, on Android, the main thread's Java stack, to logcat (`UISTALL`) and the app data folder's `ui_stalls.log` (`adb shell run-as com.emgu.litert cat files/ui_stalls.log`); a Pixel Fold ANR at 20:17 on 2026-10-10 is still unexplained - streaming, model downloads and TTS voice listing were measured and ruled out.

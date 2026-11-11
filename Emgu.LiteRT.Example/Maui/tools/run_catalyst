@@ -19,8 +19,8 @@ root="$(cd "$here/../../.." && pwd)"
 dest="${1:-$HOME/emgu_litert_catalyst}"
 shift || true
 cd "$root"
-# The Mac Catalyst TFM for the installed Xcode, as in the generated Directory.Build.props.
-tfm="net10.0-maccatalyst$(platforms/macos/apple_tfm_version.sh)"
+# The Mac Catalyst TFM for the installed .NET and Xcode, as in the generated Directory.Build.props.
+tfm="net$(dotnet --version | cut -d. -f1).0-maccatalyst$(platforms/macos/apple_tfm_version.sh)"
 
 # The signing identity of MacCatalyst.Signing.props, if it is in the keychain.
 identity=""

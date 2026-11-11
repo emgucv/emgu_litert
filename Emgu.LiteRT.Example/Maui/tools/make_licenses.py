@@ -34,7 +34,9 @@ OUTPUT = os.path.join(DEMO, "Resources", "Raw", "licenses.json.gz")
 # The iOS / Mac Catalyst TFMs carry the platform version the installed Xcode builds (as in the generated props).
 APPLE_TFM = subprocess.run([os.path.join(REPO, "platforms", "macos", "apple_tfm_version.sh")], capture_output=True,
                            text=True).stdout.strip() if sys.platform == "darwin" else ""
-FRAMEWORKS = ["net10.0-android", "net10.0-ios" + APPLE_TFM, "net10.0-maccatalyst" + APPLE_TFM]
+# The .NET version the generated props target: the installed dotnet's.
+NET = "net" + subprocess.run(["dotnet", "--version"], capture_output=True, text=True).stdout.strip().split(".")[0] + ".0"
+FRAMEWORKS = [NET + "-android", NET + "-ios" + APPLE_TFM, NET + "-maccatalyst" + APPLE_TFM]
 
 texts = {}
 entries = []
