@@ -654,6 +654,10 @@ SET(EMGU_LITERT_MAUI_WINDOWS_DST_FOLDER "${EMGU_LITERT_MAUI_DOTNET_VERSION}-wind
   # package doesn't depend on Anthropic's SDK).
   SET(EMGU_LITERT_LM_MAUI_CLAUDE_NUGET_ID "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}.Claude")
   SET(EMGU_LITERT_LM_MAUI_CLAUDE_NUGET_TITLE "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_TITLE} Claude")
+  # Emgu.LiteRT.LM.Maui.Apple/: ChatPage's Apple Intelligence (kept out of Emgu.LiteRT.LM.Maui so that package doesn't depend
+  # on Microsoft.Maui.Essentials.AI, a preview package).
+  SET(EMGU_LITERT_LM_MAUI_APPLE_NUGET_ID "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}.Apple")
+  SET(EMGU_LITERT_LM_MAUI_APPLE_NUGET_TITLE "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_TITLE} Apple")
   # Emgu.LiteRT.LM.Maui.Images/: ChatPage's pictures drawn with Z-Image-Turbo (kept out of Emgu.LiteRT.LM.Maui so that
   # package doesn't depend on Emgu.LiteRT.Models).
   SET(EMGU_LITERT_LM_MAUI_IMAGES_NUGET_ID "${EMGU_LITERT_LM_MAUI_CONTROL_NUGET_ID}.Images")
@@ -1568,6 +1572,17 @@ IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Claude.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Claude/Maui/docs/README.md)
 
+# Emgu.LiteRT.LM.Maui.Apple: ChatPage's AppleIntelligenceFeature. Its own nuget package, depending on Emgu.LiteRT.LM.Maui and
+# Microsoft.Maui.Essentials.AI (Apple's Foundation Models as an IChatClient).
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Apple.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Apple/Maui/Directory.Build.props)
+IF(EMGU_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignBinary.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Apple/Maui/SignBinary.Targets)
+ENDIF()
+IF(EMGU_NUGET_SIGN_FOUND AND WIN32)
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignPkg.Targets.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Apple/Maui/SignPkg.Targets)
+ENDIF()
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Apple.Package.README.md.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Apple/Maui/docs/README.md)
+
 # Emgu.LiteRT.LM.Maui.Images: ChatPage's ImageFeature. Its own nuget package, depending on Emgu.LiteRT.LM.Maui and
 # Emgu.LiteRT.Models (Z-Image-Turbo).
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Emgu.LiteRT.LM.Maui.Images.Directory.Build.props.in ${CMAKE_CURRENT_SOURCE_DIR}/Emgu.LiteRT.LM.Maui.Images/Maui/Directory.Build.props)
@@ -1762,6 +1777,7 @@ IF(HAVE_LITE_BUILD)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.Mcp)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.OpenAI)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.Claude)
+  ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.Apple)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.Images)
   ADD_SUBDIRECTORY(Emgu.LiteRT.LM.Maui.CV)
   # Emgu.Models/ was renamed to Emgu.LiteRT.ImageIO/ and later to Emgu.TF.Lite.ImageIO/, and made

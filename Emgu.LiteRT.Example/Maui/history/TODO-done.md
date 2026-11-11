@@ -864,6 +864,20 @@ Moved from TODO.md on 2026-11-05:
 - [x] Tests: `UnitTestClipboardTool` (the wrapping, cutting, empty and failing reads, 10 phrasings that mention the clipboard and 9 that
       don't, the step line).
 
+## 27. More models: Gemini Nano and Apple's on-device model
+
+- [x] Apple Intelligence (2026-11-11, on .NET 11): the `Emgu.LiteRT.LM.Maui.Apple` package (`AppleIntelligenceFeature`, a remote
+      `ChatModelOption` "Apple Intelligence" over `Microsoft.Maui.Essentials.AI`'s `AppleIntelligenceChatClient`, preview.8;
+      Apple targets only reference it), offered where `IsSupported` (iOS and Mac Catalyst 26 and later; the demo adds it then).
+      Connecting asks `AppleIntelligenceChatClient.GetModelStatusAsync` and says in words when the model is not ready,
+      the device not eligible or Apple Intelligence off. Verified on the Mac mini (Mac Catalyst, macOS 27) and the iPad Air M4
+      (iPadOS 27.2): "What is the capital of France? One sentence." - "The capital of France is Paris." in 4 s on the Mac, a
+      follow-up ("And of Spain?") and a four-line poem answered with the conversation; on the iPad the same question
+      answered, listed in the saved chats as "Apple Intelligence". First try with tools on: the model called the page's
+      web tools (a Wikipedia search, reading a page), then "Provided 4,825 tokens, but the maximum allowed is 4,096" - so the
+      option is chat only (`CanUseTools = false`; the Think and Web search chips are hidden). Test chats deleted, the
+      devices' own models restored.
+
 ## 28. MCP support — implemented (HTTP verified with DeepWiki on a Galaxy S10; stdio on Mac Catalyst)
 
 Let the chat's agent use tools from Model Context Protocol (MCP) servers, next to its built-in ones.

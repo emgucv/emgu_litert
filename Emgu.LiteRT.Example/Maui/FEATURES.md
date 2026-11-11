@@ -843,6 +843,23 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
     conversation configures the one there; then "Checked the weather in Ottawa". The key needs the account's workspace: a personal key not scoped to one
     would also need the `anthropic-workspace-id` header, which isn't asked for yet.
 
+## Apple Intelligence
+
+- The `Emgu.LiteRT.LM.Maui.Apple` package (2026-11-11; `AppleIntelligenceFeature`, kept out of `Emgu.LiteRT.LM.Maui` so that package
+  doesn't depend on `Microsoft.Maui.Essentials.AI`, a preview package) offers Apple's on-device model, the Foundation Models
+  framework, as the remote option "Apple Intelligence" of the model list, on iOS and Mac Catalyst 26 and later
+  (`AppleIntelligenceFeature.IsSupported`; the demo adds the option only then). Nothing is downloaded by the app and nothing
+  leaves the device.
+- Connecting calls `AppleIntelligenceChatClient.GetModelStatusAsync`: available, or "isn't ready yet: the system may still be
+  preparing it", "can't run Apple Intelligence" (device not eligible) or "is turned off: turn it on in Settings > Apple
+  Intelligence & Siri". Settings > Apple Intelligence shows the state with a Check again button, and the model list's row says it.
+- The model's context is 4,096 tokens and it doesn't think aloud, so the option is chat only: no tools (they didn't fit: a
+  Wikipedia search through the page's web tools came to "Provided 4,825 tokens, but the maximum allowed is 4,096"), no Think chip,
+  and the conversation is summarized by the page's compaction (`ContextWindow = 4096`, summaries of 400 tokens).
+- Verified on the Mac mini (Mac Catalyst) and the iPad Air M4 (iPadOS 27.2): replies in about 4 s on the Mac ("The capital of France is Paris.",
+  a follow-up that used the conversation, a four-line poem); saved chats list "Apple Intelligence" as the model.
+- The same `Microsoft.Maui.Essentials.AI` package has `GeminiNanoChatClient` (Android) and `WindowsAIChatClient`: TODO item 27.
+
 ## Device actions
 
 - The agent gets `AgentTools.DeviceActions` - timers, alarms, calendar events, reminders and directions (the library's

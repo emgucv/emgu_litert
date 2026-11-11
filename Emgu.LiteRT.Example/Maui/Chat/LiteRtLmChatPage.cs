@@ -11,6 +11,7 @@ using Emgu.LiteRT.LM.Maui;
 using Emgu.LiteRT.LM.Maui.Documents;
 using Emgu.LiteRT.LM.Maui.Mcp;
 using Emgu.LiteRT.LM.Maui.OpenAI;
+using Emgu.LiteRT.LM.Maui.Apple;
 using Emgu.LiteRT.LM.Maui.Claude;
 using Emgu.LiteRT.LM.Maui.Images;
 using Emgu.LiteRT.LM.Maui.CV;
@@ -88,6 +89,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         public ServerFeature Server;
         public ServeModelsFeature ServeModels;
         public ClaudeFeature Claude;
+        public AppleIntelligenceFeature Apple;
         public ExportFeature Export;
         public StorageFeature Storage;
         public SearchModelFeature SearchModel;
@@ -171,6 +173,12 @@ public sealed class LiteRtLmChatPage : ChatPage
         // model list ("Claude" and "Server", the ids saved chats have).
         parts.Claude = new ClaudeFeature();
         models.Add(parts.Claude.Option);
+        // Apple's on-device model (Apple Intelligence) where the operating system has it (iOS and Mac Catalyst 26 and later).
+        if (AppleIntelligenceFeature.IsSupported)
+        {
+            parts.Apple = new AppleIntelligenceFeature();
+            models.Add(parts.Apple.Option);
+        }
         parts.Server = new ServerFeature();
         models.Add(parts.Server.Option);
         // The other side (Mac Catalyst): this Mac serving its chat's model to the phones (TODO item 29).
@@ -272,11 +280,12 @@ public sealed class LiteRtLmChatPage : ChatPage
         {
             new SpeechEngineFeature(), new VoiceFeature(), new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new PlacesFeature(), new ClipboardFeature(),
-            parts.Camera, parts.PhotoEffects, parts.Claude, parts.Server, parts.ServeModels, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
+            parts.Camera, parts.PhotoEffects, parts.Claude, parts.Apple, parts.Server, parts.ServeModels, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
             parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
             parts.WrittenDocuments, parts.Goals, parts.ScheduledTasks, parts.PastChats, parts.PhotoSearch, parts.VideoSearch, parts.Videos, parts.Meetings, parts.Exercises
         })
-            options.Features.Add(feature);
+            if (feature != null)
+                options.Features.Add(feature);
         parts.Options = options;
         _building = parts;
         return parts;

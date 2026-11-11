@@ -137,15 +137,23 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] Android 12+'s "pasted from your clipboard" toast not seen: the S10 has Settings > Privacy > "Show clipboard access" off
       (`clipboard_show_access_notifications` 0); a phone with it on.
 
-## 27. More models: Gemini Nano and Apple's on-device model
+## 27. More models: Gemini Nano and Apple's on-device model — Apple Intelligence implemented (chat only); Gemini Nano and Windows AI open
 
-System models, offered in the model picker only where the device has them (detected at run time):
+System models, offered in the model picker only where the device has them. Done so far: see
+[history/TODO-done.md](history/TODO-done.md), same number. `Microsoft.Maui.Essentials.AI` (a preview package, restored on
+.NET 11) has an `IChatClient` for each: `AppleIntelligenceChatClient`, `GeminiNanoChatClient` (Android, ML Kit's GenAI Prompt
+API: no binding of our own needed) and `WindowsAIChatClient` (Phi Silica). Still open:
 
-- [ ] Gemini Nano through ML Kit GenAI's Prompt API (Android: Pixel 9/10, Galaxy Z Fold7 and other recent flagships;
-      not the emulator, the Pixel Fold or the Z Fold3): a .NET for Android binding of `com.google.mlkit:genai-prompt`,
-      wrapped as an `IChatClient`; check whether it supports tool calling.
-- [ ] Apple's Foundation Models through `Microsoft.Maui.Essentials.AI` (an `IChatClient`), once the repo moves to
-      .NET 11 (iOS / Mac Catalyst with Apple Intelligence).
+- [ ] Apple Intelligence with tools: the model calls tools, but its context is 4,096 tokens, and one Wikipedia search with the
+      20 tools' descriptions came to 4,825 ("Provided 4,825 tokens, but the maximum allowed is 4,096"), so the option is
+      chat only. Try a few small tools (date, calculator, units) with their results cut short, and the tool groups on demand
+      (item 37); the page estimates 900 tokens for the tools, which is less than Apple's native count.
+- [ ] Images with Apple Intelligence (its status reports the `ImageInput` capability: the option takes images when it does; not
+      tried), the context window from the model (`SystemLanguageModel.contextSize` where it exists) instead of 4,096, and an
+      iPhone.
+- [ ] Gemini Nano (Android: Pixel 9/10, Galaxy Z Fold7 and other recent flagships; not the emulator, the Pixel Fold or the Z
+      Fold3) as a second feature of the same kind, with `GeminiNanoChatClient` and its download state; and the Windows AI
+      model (Copilot+ PCs) with `WindowsAIChatClient`.
 
 ## 28. MCP support — implemented (HTTP verified with DeepWiki on a Galaxy S10; stdio on Mac Catalyst)
 
