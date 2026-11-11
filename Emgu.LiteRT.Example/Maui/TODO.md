@@ -164,9 +164,8 @@ How it works and what was verified: FEATURES.md, "Serving the Mac's model". Done
       picture or frame); past chats and documents use it since 2026-11-10.
 - [ ] Try: an image and a voice message from a phone, Gemma 4 12B, a phone on Tailscale (the address typed by hand), the
       Mac's address changing (Find a Mac again by name).
-- [ ] On iOS, the first Find a Mac (the one that brings up the Local Network prompt) finds nothing, and the user has to
-      tap it again: search again once the prompt is answered. The pairing code's prompt shows the full keyboard, not
-      the number pad.
+- [ ] On iOS, the first Find a Mac now searches again for about 28 s while the Local Network prompt is answered: try it
+      on a fresh install (the app deleted and reinstalled, the prompt answered by hand).
 - [ ] A Mac actually asleep (only a stopped server was tried, 2026-11-10): whether a Bonjour Sleep Proxy wakes it within the
       6 s connection limit, and a connection the Mac drops mid-reply when it sleeps.
 - [ ] A sandboxed Mac build would need `com.apple.security.network.server`; HTTPS (a self-signed certificate) for use away

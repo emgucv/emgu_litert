@@ -41,6 +41,9 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
     // A Mac paired through "Find a Mac" (its Bonjour name), so it is found again when its address changes.
     private const string PairedMacSettingKey = "server_paired_mac";
 
+    // Whether "Find a Mac" has looked before on iOS: the first search brings up the Local Network prompt and finds nothing.
+    private const string SearchedBeforeSettingKey = "server_searched_before";
+
     // The paired Mac's search model, as its model list last gave it ("id|name"), offered in Settings > Embedding model.
     private const string SearchModelSettingKey = "server_search_model";
 
@@ -379,7 +382,19 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             return;
         _serverStatus.Text = "Looking for Macs on this network...";
         IList<FoundServer> found;
-        try { found = await LocalServerBrowser.BrowseAsync(TimeSpan.FromSeconds(4)); }
+        try
+        {
+            found = await LocalServerBrowser.BrowseAsync(TimeSpan.FromSeconds(4));
+            // iOS's first search only asks for the local network: look again while the user answers (about half a minute).
+            if (DeviceInfo.Current.Platform == DevicePlatform.iOS && !Host.Settings.Get(SearchedBeforeSettingKey, false))
+            {
+                Host.Settings.Set(SearchedBeforeSettingKey, true);
+                if (found.Count == 0)
+                    _serverStatus.Text = "Looking for Macs on this network (allow Local Network if iOS asks)...";
+                for (int i = 0; i < 7 && found.Count == 0; i++)
+                    found = await LocalServerBrowser.BrowseAsync(TimeSpan.FromSeconds(4));
+            }
+        }
         catch (Exception ex)
         {
             _serverStatus.Text = "Couldn't look for Macs: " + ex.Message;
@@ -397,7 +412,7 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         FoundServer mac = found.FirstOrDefault(f => f.Name == picked);
         if (mac == null)
             return;
-        string code = await Host.PromptAsync("Pair with " + mac.Name, "On the Mac, tap \"Pair a phone\" and type the 6-digit code it shows.", "Pair", "Cancel", null, 7);
+        string code = await Host.PromptAsync("Pair with " + mac.Name, "On the Mac, tap \"Pair a phone\" and type the 6-digit code it shows.", "Pair", "Cancel", null, 7, Keyboard.Numeric);
         if (string.IsNullOrWhiteSpace(code))
             return;
         _serverStatus.Text = "Pairing with " + mac.Name + "...";

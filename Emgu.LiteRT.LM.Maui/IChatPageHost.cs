@@ -209,8 +209,8 @@ namespace Emgu.LiteRT.LM.Maui
         /// <summary>An alert: true for accept; with cancel null it has one button.</summary>
         Task<bool> AskAsync(string title, string message, string accept, string cancel = null);
 
-        /// <summary>A text prompt: the text entered, or null when cancelled.</summary>
-        Task<string> PromptAsync(string title, string message, string accept, string cancel, string initialValue = null, int maxLength = -1);
+        /// <summary>A text prompt: the text entered, or null when cancelled; <paramref name="keyboard"/> null for the default.</summary>
+        Task<string> PromptAsync(string title, string message, string accept, string cancel, string initialValue = null, int maxLength = -1, Keyboard keyboard = null);
 
         /// <summary>The page's bottom sheet: shows a view (the result is what <see cref="DismissSheet"/> passed, or null).</summary>
         Task<string> ShowSheetAsync(string title, View content, string closeText = "Close");

@@ -778,6 +778,9 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 - Verified on the iPad Air (iPadOS 27.2): iOS's Local Network prompt on the first Find a Mac (a search running while it
   is up finds nothing; the next one finds the Mac), pairing ("iPad" in the Mac's list: iOS gives apps the generic device
   name), "What is 12 times 7?" through the Mac in about 10 s, and a fox from the Mac's Bonsai Image 4B (GPU) in 27 s.
+- On iOS the first Find a Mac that finds nothing looks again for about 28 s ("allow Local Network if iOS asks"), once
+  (`server_searched_before`), so answering the prompt doesn't need a second tap; the pairing code is typed on the number
+  pad.
 - Two phones at once (the Galaxy S10 and the iPad, sent within 3 s of each other): each reply went to the phone that asked
   ("12 times 7 is 84" with the S10's calculator in about 40 s, "The capital of France is Paris" with the iPad's Wikipedia
   search in about 55 s - the Mac answers one at a time), and two pictures asked for together came back one after the other

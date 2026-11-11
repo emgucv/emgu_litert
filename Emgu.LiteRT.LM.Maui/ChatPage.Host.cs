@@ -260,8 +260,8 @@ namespace Emgu.LiteRT.LM.Maui
             return await DisplayAlertAsync(title, message, accept, cancel);
         }
 
-        Task<string> IChatPageHost.PromptAsync(string title, string message, string accept, string cancel, string initialValue, int maxLength) =>
-            DisplayPromptAsync(title, message, accept, cancel, initialValue: initialValue, maxLength: maxLength);
+        Task<string> IChatPageHost.PromptAsync(string title, string message, string accept, string cancel, string initialValue, int maxLength, Keyboard keyboard) =>
+            DisplayPromptAsync(title, message, accept, cancel, initialValue: initialValue, maxLength: maxLength, keyboard: keyboard ?? Keyboard.Default);
 
         Task<string> IChatPageHost.ShowSheetAsync(string title, View content, string closeText) => _sheet.ShowAsync(title, content, closeText);
 

@@ -1060,6 +1060,14 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       iPad's last reply waited for the S10's picture. Set back afterwards (the iPad's Gemma 4 E2B GPU and own Bonsai 512 GPU;
       the S10's own Bonsai CPU, off, its chat model still the Mac's; the Mac's Bonsai on the CPU, off; the test chats
       deleted).
+- [x] iOS's first Find a Mac (2026-11-11): the search that brings up the Local Network prompt finds nothing, so the first
+      search on iOS that finds nothing looks again, 7 more times over about 28 s, saying "allow Local Network if iOS asks"
+      (`server_searched_before` keeps it to once). The pairing code is asked for with the number pad
+      (`IChatPageHost.PromptAsync`'s new `keyboard`). On the iPad: the number pad came up, a normal Find a Mac listed the Mac
+      within 7 s, and the first search, made while the Mac wasn't serving, ended with "No Mac found" as before (the extra
+      searches weren't timed). The
+      search again after the prompt itself was not tried (the iPad had allowed Local Network already: it needs the app
+      deleted and reinstalled).
 
 ## 30. Background tasks and monitoring
 
