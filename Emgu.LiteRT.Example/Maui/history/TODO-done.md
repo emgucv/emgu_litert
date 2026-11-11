@@ -1083,6 +1083,10 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       text - "The capital of France is Paris." in about 19 s, so the Mac's model heard the recording (the phone sends it as
       it sends a voice message, `audio/wav`, since the Mac says its model hears audio). No code change. The test chats and
       the pushed WAV and photo were deleted afterwards.
+- [x] The Mac's address changing (2026-11-11, the Galaxy S10): the server address typed as 192.168.86.99 (nothing there; the
+      Mac is at 192.168.86.36) - Settings said "Could not connect: No route to host" - and then "Hi" sent: the reply came
+      in 18 s and the address in Settings was 192.168.86.36 again, found by the paired Mac's Bonjour name. No code change.
+      The test chat was deleted.
 - [x] The model's name before connecting (2026-11-11): the button said "Your own server" each time the chat page opened,
       until the phone connected and the Mac named its model. `ServerFeature` keeps the name the server last gave with its
       address (`server_option_name`, "url|name") and shows it from the start while the address is the same. On the Galaxy

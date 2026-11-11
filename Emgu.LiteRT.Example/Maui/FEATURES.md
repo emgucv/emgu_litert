@@ -798,8 +798,11 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   transcript: the Mac's Gemma heard it.
 - The model list names the Mac's model ("Gemma 4 E2B on MacMini M1 2020 (7)") from the start: the name the server last gave
   is kept with its address and shown until the phone connects again.
-- Not yet: a Mac on Tailscale, a larger model (Gemma 4 12B), the Mac's address
-  changing.
+- The Mac's address changing (the Galaxy S10, the Mac at 192.168.86.36): with the server address set by hand to a wrong
+  one (192.168.86.99, "Could not connect: No route to host"), the next message ("Hi") was answered by the Mac in 18 s,
+  and Settings then showed 192.168.86.36 again: the phone looked for the paired Mac by its Bonjour name when the old
+  address didn't answer, and saved the new address.
+- Not yet: a Mac on Tailscale, a larger model (Gemma 4 12B).
 
 ## Claude
 

@@ -162,8 +162,7 @@ How it works and what was verified: FEATURES.md, "Serving the Mac's model". Done
 
 - [ ] Photo and video search through the Mac (the Mac's search model is text only for phones: the phone would send each
       picture or frame); past chats and documents use it since 2026-11-10.
-- [ ] Try: Gemma 4 12B, a phone on Tailscale (the address typed by hand), the Mac's address changing (Find a Mac again by
-      name).
+- [ ] Try: Gemma 4 12B, a phone on Tailscale (the address typed by hand).
 - [ ] On iOS, the first Find a Mac now searches again for about 28 s while the Local Network prompt is answered: try it
       on a fresh install (the app deleted and reinstalled, the prompt answered by hand).
 - [ ] A Mac actually asleep (only a stopped server was tried, 2026-11-10): whether a Bonjour Sleep Proxy wakes it within the
