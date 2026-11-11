@@ -802,7 +802,12 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   one (192.168.86.99, "Could not connect: No route to host"), the next message ("Hi") was answered by the Mac in 18 s,
   and Settings then showed 192.168.86.36 again: the phone looked for the paired Mac by its Bonjour name when the old
   address didn't answer, and saved the new address.
-- Not yet: a Mac on Tailscale, a larger model (Gemma 4 12B).
+- Gemma 4 12B on the Mac (loaded from its list, GPU; the Galaxy S10): "What is 12 times 7?" - "12 times 7 is 84." in 45 s
+  (the first message after the load), "Name three planets and one fact about each." - three planets with a fact each in
+  29 s; the phone's model button changed from the saved "Gemma 4 E2B on ..." to "Gemma 4 12B on MacMini M1 2020 (7)" with the
+  first reply. Setting the Mac's saved model to the 12B and opening Chat did not load it: the phone got "The server has no
+  chat model" until the 12B was chosen in the Mac's list.
+- Not yet: a Mac on Tailscale.
 
 ## Claude
 

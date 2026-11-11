@@ -1087,6 +1087,11 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       Mac is at 192.168.86.36) - Settings said "Could not connect: No route to host" - and then "Hi" sent: the reply came
       in 18 s and the address in Settings was 192.168.86.36 again, found by the paired Mac's Bonjour name. No code change.
       The test chat was deleted.
+- [x] Gemma 4 12B through the Mac (2026-11-11, the Galaxy S10; the 12B was already on the Mac, 6.9 GB with its GPU caches,
+      and chosen in the Mac's model list): "What is 12 times 7?" answered in 45 s, "Name three planets and one fact about
+      each." in 29 s; the phone's model button took the Mac's new model name. The phone's earlier tries, with the Mac's saved
+      model set to the 12B but not chosen in the list, got "The server has no chat model" (see TODO item 29). The test chat
+      was deleted.
 - [x] The model's name before connecting (2026-11-11): the button said "Your own server" each time the chat page opened,
       until the phone connected and the Mac named its model. `ServerFeature` keeps the name the server last gave with its
       address (`server_option_name`, "url|name") and shows it from the start while the address is the same. On the Galaxy

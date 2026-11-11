@@ -162,7 +162,11 @@ How it works and what was verified: FEATURES.md, "Serving the Mac's model". Done
 
 - [ ] Photo and video search through the Mac (the Mac's search model is text only for phones: the phone would send each
       picture or frame); past chats and documents use it since 2026-11-10.
-- [ ] Try: Gemma 4 12B, a phone on Tailscale (the address typed by hand).
+- [ ] Try: a phone on Tailscale (the address typed by hand).
+- [ ] A Mac whose page has no model loaded (the 12B set through the saved setting never loaded, 2026-11-11: it was not
+      loading when chosen in the list either way - find out) answers a phone 503 "The server has no chat model", which the
+      phone shows as "Could not reach your server at ...: The server has no chat model": say that the Mac has no model
+      ready (and ask the user to open its chat), not that it couldn't be reached.
 - [ ] On iOS, the first Find a Mac now searches again for about 28 s while the Local Network prompt is answered: try it
       on a fresh install (the app deleted and reinstalled, the prompt answered by hand).
 - [ ] A Mac actually asleep (only a stopped server was tried, 2026-11-10): whether a Bonjour Sleep Proxy wakes it within the
