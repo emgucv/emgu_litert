@@ -36,7 +36,9 @@ fi
 
 if [ -n "$identity" ]; then
     echo "Signing with $identity (API keys kept in the keychain)."
-    dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f "$tfm" -c Debug -p:ValidateXcodeVersion=false
+    # ValidateEntitlements=warn: the Mac Catalyst team profile (com.emgu.*) carries iOS-only capabilities such as Wallet
+    # passes, which the .NET 11 Apple SDK refuses as an error (MT7151); they are removed again when the app is signed below.
+    dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f "$tfm" -c Debug -p:ValidateXcodeVersion=false -p:ValidateEntitlements=warn
 else
     entitlements="$(mktemp -d)/empty.entitlements.plist"
     printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict/></plist>\n' > "$entitlements"
@@ -57,8 +59,12 @@ for f in "$app"/Contents/MonoBundle/*.dylib; do
     codesign --force --timestamp=none -s "$sign" "$f" > /dev/null
 done
 if [ -n "$identity" ]; then
-    # The app's entitlements (the keychain group) and its embedded provisioning profile are kept.
-    codesign --force --timestamp=none -s "$identity" --preserve-metadata=entitlements,requirements,flags "$app" > /dev/null
+    # The app's entitlements (the keychain group) and its embedded provisioning profile are kept, without the profile's
+    # iOS-only Wallet capability (the signature may carry fewer entitlements than the profile allows).
+    entitlements="$(mktemp -d)/app.entitlements.plist"
+    codesign -d --entitlements :- "$app" 2>/dev/null > "$entitlements"
+    /usr/libexec/PlistBuddy -c "Delete :com.apple.developer.pass-type-identifiers" "$entitlements" > /dev/null 2>&1 || true
+    codesign --force --timestamp=none -s "$identity" --entitlements "$entitlements" --preserve-metadata=requirements,flags "$app" > /dev/null
 else
     codesign --force --deep -s - "$app" > /dev/null
 fi

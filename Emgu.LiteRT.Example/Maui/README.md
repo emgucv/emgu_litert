@@ -349,8 +349,14 @@ See [CHAT_LIBRARY_PLAN.md](history/CHAT_LIBRARY_PLAN.md) and [CHAT_VOICE_AND_HIS
   Obtain a Mac Catalyst development profile for `com.emgu.litert` using your Apple developer team, then build with:
 
   ```bash
-  dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net$N.0-maccatalyst$V -c Debug -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: Your Name (CERTIFICATE_ID)" -p:CodesignProvision="PROFILE_UUID"
+  dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net$N.0-maccatalyst$V -c Debug -p:ValidateXcodeVersion=false -p:CodesignKey="Apple Development: Your Name (CERTIFICATE_ID)" -p:CodesignProvision="PROFILE_UUID" -p:ValidateEntitlements=warn
   ```
+
+  `ValidateEntitlements=warn` is for .NET 11: its Apple SDK refuses a profile that carries capabilities Mac Catalyst
+  doesn't have (error MT7151, e.g. Wallet passes in Xcode's wildcard "Mac Catalyst Team Provisioning Profile: com.emgu.*").
+  The entitlements of the signed app are the profile's, so `tools/run_catalyst` signs again without them; by hand,
+  `codesign -d --entitlements :- <app>`, delete the key and `codesign --force --entitlements <file> ...`. A profile for
+  an explicit App ID (`com.emgu.litert`, with only the capabilities the app uses) doesn't have them.
 
   The project includes `Platforms/MacCatalyst/Keychain.entitlements.plist` when `CodesignProvision` is supplied; its Keychain
   access group uses the provisioning profile's App ID prefix and this app's bundle identifier. Use the same team
