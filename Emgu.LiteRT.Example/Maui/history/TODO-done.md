@@ -1083,6 +1083,11 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       text - "The capital of France is Paris." in about 19 s, so the Mac's model heard the recording (the phone sends it as
       it sends a voice message, `audio/wav`, since the Mac says its model hears audio). No code change. The test chats and
       the pushed WAV and photo were deleted afterwards.
+- [x] The model's name before connecting (2026-11-11): the button said "Your own server" each time the chat page opened,
+      until the phone connected and the Mac named its model. `ServerFeature` keeps the name the server last gave with its
+      address (`server_option_name`, "url|name") and shows it from the start while the address is the same. On the Galaxy
+      S10: after one message through the Mac, the app restarted with the Mac app quit showed "Gemma 4 E2B on MacMini M1 2020
+      (7)" at once (its saved chats are listed under that name too).
 
 ## 30. Background tasks and monitoring
 

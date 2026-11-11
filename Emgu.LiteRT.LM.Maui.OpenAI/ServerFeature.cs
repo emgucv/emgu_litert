@@ -38,6 +38,9 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
 
     private const string ServerKeyStorageName = "litert_lm_chat_server_key";
 
+    // The option's name the server last gave ("url|Gemma 4 E2B on Canming's Mac mini"), shown before the next connection.
+    private const string OptionNameSettingKey = "server_option_name";
+
     // A Mac paired through "Find a Mac" (its Bonjour name), so it is found again when its address changes.
     private const string PairedMacSettingKey = "server_paired_mac";
 
@@ -137,6 +140,10 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         _serverUrl = host.Settings.Get(UrlSettingKey, string.Empty) ?? string.Empty;
         _serverModel = host.Settings.Get(ModelSettingKey, string.Empty) ?? string.Empty;
         _pairedMac = host.Settings.Get(PairedMacSettingKey, string.Empty) ?? string.Empty;
+        // The paired Mac's model by name from the start, not "Your own server" until the phone connects.
+        string[] named = (host.Settings.Get(OptionNameSettingKey, string.Empty) ?? string.Empty).Split('|', 2);
+        if (named.Length == 2 && named[0].Length > 0 && named[0] == _serverUrl)
+            Option.DisplayName = named[1];
         UpdateOptionDetail();
         UpdateSearchOption();
         _ = LoadServerKeyAsync();
@@ -739,6 +746,7 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             Option.CanThink = thinking;
         // "Gemma 4 E4B on Canming's Mac mini" for a paired Mac; the option's own name otherwise.
         string name = model.IsEmguMac && !string.IsNullOrEmpty(_pairedMac) ? (model.DisplayName ?? model.Id) + " on " + _pairedMac : _defaultName;
+        Host?.Settings.Set(OptionNameSettingKey, name == _defaultName ? string.Empty : _serverUrl + "|" + name);
         if (Option.DisplayName != name)
         {
             Option.DisplayName = name;

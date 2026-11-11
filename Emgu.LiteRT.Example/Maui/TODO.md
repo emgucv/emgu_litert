@@ -164,8 +164,6 @@ How it works and what was verified: FEATURES.md, "Serving the Mac's model". Done
       picture or frame); past chats and documents use it since 2026-11-10.
 - [ ] Try: Gemma 4 12B, a phone on Tailscale (the address typed by hand), the Mac's address changing (Find a Mac again by
       name).
-- [ ] The model button says "Your own server" when the chat page opens, until the phone connects (the Mac's model name comes
-      with the connection): keep the last name, "Gemma 4 E2B on MacMini M1 2020 (7)".
 - [ ] On iOS, the first Find a Mac now searches again for about 28 s while the Local Network prompt is answered: try it
       on a fresh install (the app deleted and reinstalled, the prompt answered by hand).
 - [ ] A Mac actually asleep (only a stopped server was tried, 2026-11-10): whether a Bonjour Sleep Proxy wakes it within the

@@ -796,6 +796,8 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   "What is the capital of France?" (Attach > Audio File, no text) - "The capital of France is Paris." in about 19 s. The
   phone offers Audio File only for a model that hears audio, and sends the recording itself (as a voice message is), not a
   transcript: the Mac's Gemma heard it.
+- The model list names the Mac's model ("Gemma 4 E2B on MacMini M1 2020 (7)") from the start: the name the server last gave
+  is kept with its address and shown until the phone connects again.
 - Not yet: a Mac on Tailscale, a larger model (Gemma 4 12B), the Mac's address
   changing.
 
