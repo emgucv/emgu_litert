@@ -2,6 +2,8 @@
   <PropertyGroup>
     
     <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <!-- .NET 11 for Android supports Android 7.0 (API 24) and later (XA4216). -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::VersionGreaterThanOrEquals($([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)')), 11.0))">24</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
