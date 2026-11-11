@@ -1033,7 +1033,11 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       picture already started (`TextToImageModel`'s gate holds the next one until it is done), Z-Image-Turbo stops between
       steps. A phone's picture asked for while the Mac draws its own waits for it: one model, one picture at a time (kept as
       it is). Tests: `APictureThatTakesAWhileStillArrivesWithItsErrors` (spaces before the picture; a failure after the
-      status, 500 with its words in the log), `APhoneThatStopsWaitingStopsItsPicture` (the draw cancelled, 499).
+      status, 500 with its words in the log), `APhoneThatStopsWaitingStopsItsPicture` (the draw cancelled, 499). On the Galaxy
+      S10 with the Mac mini (Bonsai Image 4B on the Mac's GPU): an owl drawn without stopping took 15 s; a frog stopped on the
+      phone 2 s into the drawing ("Stopped" under its tile) cleared the Mac's "Drawing a picture for Canming's S10..." 2-3 s
+      after the tap. Both set back afterwards (the phone's own Bonsai, off; the Mac's Bonsai on the CPU, off; the test chat
+      deleted).
 
 ## 30. Background tasks and monitoring
 

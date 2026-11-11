@@ -766,7 +766,8 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   loading) isn't drawn; Bonsai and FLUX, which can't stop mid-picture, finish one already started and throw it away. The
   status (200) goes with the first space, so a failure after it is only in the body's `{"error": ...}`
   (`ServerImageGenerator` reads it). One picture is drawn at a time on the Mac: a phone's asked for while the Mac draws its
-  own waits for it (up to the phone's 20 minutes).
+  own waits for it (up to the phone's 20 minutes). Verified on the Galaxy S10 with the Mac's Bonsai GPU: Stop tapped 2 s into
+  a picture, the Mac's "Drawing a picture for <phone>..." cleared about 3 s later (an unstopped picture took 15 s).
 - A Mac that isn't answering (asleep, its app stopped, at another address) fails within seconds instead of the system's
   minutes: connections give up after 6 s (`ServerReachability`), the message names the Mac ("... isn't answering - it may be
   asleep or on another network ..."), nothing is sent again, and the model list's row says when it last failed until the next
