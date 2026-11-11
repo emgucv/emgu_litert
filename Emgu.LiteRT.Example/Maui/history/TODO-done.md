@@ -1038,6 +1038,18 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       phone 2 s into the drawing ("Stopped" under its tile) cleared the Mac's "Drawing a picture for Canming's S10..." 2-3 s
       after the tap. Both set back afterwards (the phone's own Bonsai, off; the Mac's Bonsai on the CPU, off; the test chat
       deleted).
+- [x] The iPad through the Mac (2026-11-11, iPad Air M4, iPadOS 27.2, with the Mac mini): Find a Mac brought up iOS's Local
+      Network prompt with the app's reason (the user allowed it; the search running while the prompt was up found nothing,
+      the next one found "MacMini M1 2020 (7) · Gemma 4 E2B"), the code paired it ("iPad" in the Mac's list: iOS gives apps
+      the generic device name), "What is 12 times 7?" called `calculate` on the iPad and answered 84 in about 10 s, and "Draw
+      a red fox sitting in the snow." came back from the Mac's Bonsai Image 4B (GPU) in 27 s (its first picture). Found on
+      the way: the phone learned what the Mac serves besides its chat model only when it connected (pairing, Connect, the
+      chat's first connection), so a Mac that turned image generation on afterwards wasn't offered in Settings > Image model.
+      `ServerFeature` now asks the paired Mac again when the app comes back to the front and after each reply from it, and
+      remembers the list Settings' model button fetches. Checked on the iPad: the Mac's image generation off at launch, on
+      after it, the app sent to the background and back - "MacMini M1 2020 (7) · Bonsai Image 4B" listed. Set back
+      afterwards (the iPad's Gemma 4 E2B GPU and its own Bonsai 512 GPU, on; the Mac's Bonsai on the CPU, off; the two test
+      chats deleted; the iPad left paired with the Mac).
 
 ## 30. Background tasks and monitoring
 

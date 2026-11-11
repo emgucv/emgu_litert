@@ -228,13 +228,30 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
     }
 
     /// <inheritdoc/>
-    public override void OnAppResumed() => _foreground.TrySetResult(true);
+    public override void OnAppResumed()
+    {
+        _foreground.TrySetResult(true);
+        _ = RefreshPairedMacModelsAsync();
+    }
 
     /// <inheritdoc/>
     public override void OnReplyCompleted(ChatExchangeEventArgs e)
     {
         // LM Studio loads a model on its first request, with the context length it is set to: learn it then.
         _ = RefreshServerContextAsync();
+        if (IsSelected)
+            _ = RefreshPairedMacModelsAsync();
+    }
+
+    // What the paired Mac serves besides its chat model changes while the phone is connected (image generation turned on
+    // there, another search model): look again when the app comes back and after each reply from it. Quietly: a Mac that
+    // isn't answering is reported when the chat connects.
+    private async Task RefreshPairedMacModelsAsync()
+    {
+        if (Host == null || string.IsNullOrEmpty(_serverUrl) || string.IsNullOrEmpty(_pairedMac))
+            return;
+        try { RememberServerModels(await FetchServerModelsAsync(_serverUrl, _serverKey, CancellationToken.None).ConfigureAwait(false)); }
+        catch (Exception) { }
     }
 
     /// <summary>The server's address as typed, made into the API's base address: "host:1234" gets "http://" and "/v1".</summary>
@@ -483,6 +500,7 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             _serverStatus.Text = "Could not connect: " + ex.Message;
             return;
         }
+        RememberServerModels(models);
         List<ServerModelInfo> chat = models.Where(m => !m.IsEmbedding && !m.IsImages).ToList();
         if (chat.Count == 0)
         {

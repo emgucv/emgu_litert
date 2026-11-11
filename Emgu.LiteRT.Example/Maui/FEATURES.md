@@ -772,8 +772,14 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   minutes: connections give up after 6 s (`ServerReachability`), the message names the Mac ("... isn't answering - it may be
   asleep or on another network ..."), nothing is sent again, and the model list's row says when it last failed until the next
   connection. Tried on the Galaxy S10 by quitting the Mac's app; a Mac really asleep wasn't tried.
-- Not yet: an image or a voice message from the phone, a Mac on Tailscale, the iPad, a larger model (Gemma 4 12B), the
-  Mac's address changing, several phones at once.
+- What a paired Mac serves besides its chat model (its search and image models) is read when the phone connects, when the
+  app comes back to the front and after each reply from the Mac: image generation turned on there shows up in the phone's
+  Settings > Image model without pairing again.
+- Verified on the iPad Air (iPadOS 27.2): iOS's Local Network prompt on the first Find a Mac (a search running while it
+  is up finds nothing; the next one finds the Mac), pairing ("iPad" in the Mac's list: iOS gives apps the generic device
+  name), "What is 12 times 7?" through the Mac in about 10 s, and a fox from the Mac's Bonsai Image 4B (GPU) in 27 s.
+- Not yet: an image or a voice message from the phone, a Mac on Tailscale, a larger model (Gemma 4 12B), the Mac's address
+  changing, several phones at once.
 
 ## Claude
 
