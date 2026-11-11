@@ -39,6 +39,10 @@ public sealed class ServeModelsFeature : ChatFeature
     private VerticalStackLayout _serving;
     private Label _codeLabel;
     private IDispatcherTimer _codeTimer;
+    // The phones' requests running now, oldest first (e.g. "answering iPad"): several at once when phones share the Mac.
+    private readonly List<string> _requests = new List<string>();
+    // Whether the page is marked busy for them (SetBusy is counted: once for all of them).
+    private bool _busyForRequests;
 #if IOS || MACCATALYST
     private NSNetService _bonjour;
     private NSObject _activity;
@@ -269,23 +273,38 @@ public sealed class ServeModelsFeature : ChatFeature
 
     /// <summary>A phone's picture being drawn: the page is busy meanwhile and says for whom; dispose the result when it is done.</summary>
     /// <param name="device">The phone's name</param>
-    public IDisposable BeginDrawing(string device) => BeginRequest(device, "Drawing a picture for ");
+    public IDisposable BeginDrawing(string device) => BeginRequest(device, "drawing a picture for ");
 
     // A phone's request on the page's model: the page is busy meanwhile, and says whose request it is.
-    private IDisposable BeginRequest(string device) => BeginRequest(device, "Answering ");
+    private IDisposable BeginRequest(string device) => BeginRequest(device, "answering ");
 
+    // Requests run side by side (pictures one at a time behind the image model's gate): the page stays busy until the last
+    // ends and lists every one still running, so one ending doesn't clear another's.
     private IDisposable BeginRequest(string device, string doing)
     {
-        MainThread.BeginInvokeOnMainThread(() =>
+        string request = doing + device;
+        lock (_requests)
+            _requests.Add(request);
+        MainThread.BeginInvokeOnMainThread(ShowRequests);
+        return new Done(() =>
         {
-            Host?.SetBusy(true);
-            Host?.SetStatus(doing + device + "...");
+            lock (_requests)
+                _requests.Remove(request);
+            MainThread.BeginInvokeOnMainThread(ShowRequests);
         });
-        return new Done(() => MainThread.BeginInvokeOnMainThread(() =>
+    }
+
+    private void ShowRequests()
+    {
+        string text;
+        lock (_requests)
+            text = _requests.Count == 0 ? null : string.Join(", ", _requests) + "...";
+        if (Host != null && _busyForRequests != (text != null))
         {
-            Host?.SetBusy(false);
-            Host?.SetStatus(null);
-        }));
+            _busyForRequests = text != null;
+            Host.SetBusy(_busyForRequests);
+        }
+        Host?.SetStatus(text == null ? null : char.ToUpperInvariant(text[0]) + text.Substring(1));
     }
 
     private sealed class Done : IDisposable

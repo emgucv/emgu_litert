@@ -1056,8 +1056,8 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       about 55 s, the Mac answering one at a time). Pictures asked for together ("Draw an owl on a branch." on the S10, "Draw
       a lighthouse at sunset." on the iPad) were drawn one after the other - the Mac's status line, read from screenshots
       every 3 s: "Answering Canming's S10...", "Drawing a picture for iPad..." (4 s), "Drawing a picture for Canming's
-      S10..." (about 20 s), "Answering iPad..." - the lighthouse in 28 s on the iPad and the owl in 44 s on the S10. The
-      iPad's last reply waited for the S10's picture. Set back afterwards (the iPad's Gemma 4 E2B GPU and own Bonsai 512 GPU;
+      S10..." (about 20 s), "Answering iPad..." - the lighthouse in 28 s on the iPad and the owl in 44 s on the S10. (Read
+      then as the iPad's last reply waiting for the S10's picture; it didn't: the status line was wrong, fixed below.) Set back afterwards (the iPad's Gemma 4 E2B GPU and own Bonsai 512 GPU;
       the S10's own Bonsai CPU, off, its chat model still the Mac's; the Mac's Bonsai on the CPU, off; the test chats
       deleted).
 - [x] iOS's first Find a Mac (2026-11-11): the search that brings up the Local Network prompt finds nothing, so the first
@@ -1068,6 +1068,15 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       searches weren't timed). The
       search again after the prompt itself was not tried (the iPad had allowed Local Network already: it needs the app
       deleted and reinstalled).
+- [x] The Mac's status with several phones (2026-11-11): each request set the status line and the busy mark, and the first
+      to end cleared both - so "Drawing a picture for Canming's S10" showed while the iPad's was drawn, and the S10's was
+      then drawn with no status and the page not busy. `ServeModelsFeature` now keeps the requests running, lists them all
+      ("Drawing a picture for Test A, drawing a picture for Test B, answering Test A...") and marks the page busy once, until
+      the last ends (`SetBusy` is counted: the first try, calling it on every change, left the page busy for good - "Hang
+      on - still busy." - and was caught by the same test). Measured on the Mac with two clients paired by curl, twice: two
+      pictures (Bonsai Image 4B GPU) and a chat sent 5 s in - the chat answered at 13.7-17.6 s, the pictures at 22-24 s and
+      37-39 s; the status listed all three, then "Drawing a picture for Test B...", then cleared; the image model list opened
+      afterwards. A chat never waited for a picture: only pictures queue (`ImageFeature`'s one-at-a-time gate).
 
 ## 30. Background tasks and monitoring
 

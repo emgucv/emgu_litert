@@ -784,9 +784,13 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 - Two phones at once (the Galaxy S10 and the iPad, sent within 3 s of each other): each reply went to the phone that asked
   ("12 times 7 is 84" with the S10's calculator in about 40 s, "The capital of France is Paris" with the iPad's Wikipedia
   search in about 55 s - the Mac answers one at a time), and two pictures asked for together came back one after the other
-  (the Mac's status: "Drawing a picture for iPad...", then "... for Canming's S10..."): a lighthouse on the iPad in 28 s, an
-  owl on the S10 in 44 s, having waited for it. A reply that comes after a phone's picture waits until the Mac's other
-  picture is done.
+  (the Mac draws one at a time): a lighthouse on the iPad in 28 s, an owl on the S10 in 44 s, having waited for it.
+- A chat doesn't wait for another phone's picture: with two pictures being drawn for two test clients (curl, paired with the
+  Mac's code), a chat sent 5 s in was answered at 14-18 s while the first picture went on to 22-24 s and the second to
+  37-39 s. The Mac's status line lists every request still running ("Drawing a picture for Test A, drawing a picture for
+  Test B, answering Test A...") and the page stays busy until the last ends (`ServeModelsFeature.BeginRequest`); before,
+  each request set the line and the first to end cleared it and the busy mark, so the line said the wrong phone and was
+  blank while a picture was still being drawn.
 - Not yet: an image or a voice message from the phone, a Mac on Tailscale, a larger model (Gemma 4 12B), the Mac's address
   changing.
 
