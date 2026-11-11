@@ -791,7 +791,12 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   Test B, answering Test A...") and the page stays busy until the last ends (`ServeModelsFeature.BeginRequest`); before,
   each request set the line and the first to end cleared it and the busy mark, so the line said the wrong phone and was
   blank while a picture was still being drawn.
-- Not yet: an image or a voice message from the phone, a Mac on Tailscale, a larger model (Gemma 4 12B), the Mac's address
+- A picture and a recording from the phone (the Galaxy S10, the Mac on Gemma 4 E2B GPU): "Sample: surfers" with "What is in this
+  picture? One sentence." - "Three men are walking along a wet beach, each carrying a surfboard." in 17 s; a 2 s WAV asking
+  "What is the capital of France?" (Attach > Audio File, no text) - "The capital of France is Paris." in about 19 s. The
+  phone offers Audio File only for a model that hears audio, and sends the recording itself (as a voice message is), not a
+  transcript: the Mac's Gemma heard it.
+- Not yet: a Mac on Tailscale, a larger model (Gemma 4 12B), the Mac's address
   changing.
 
 ## Claude

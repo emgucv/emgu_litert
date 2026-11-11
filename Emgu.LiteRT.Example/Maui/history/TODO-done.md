@@ -1077,6 +1077,12 @@ Implemented 2026-11-05 (chat first; pairing by Bonjour and a code; the chat page
       pictures (Bonsai Image 4B GPU) and a chat sent 5 s in - the chat answered at 13.7-17.6 s, the pictures at 22-24 s and
       37-39 s; the status listed all three, then "Drawing a picture for Test B...", then cleared; the image model list opened
       afterwards. A chat never waited for a picture: only pictures queue (`ImageFeature`'s one-at-a-time gate).
+- [x] A picture and a recording from a phone (2026-11-11, the Galaxy S10 on the Mac's Gemma 4 E2B GPU): Attach > Sample:
+      surfers with "What is in this picture? One sentence." - "Three men are walking along a wet beach, each carrying a
+      surfboard." in 17 s; Attach > Audio File with a 2 s WAV (`say` "What is the capital of France?", 16 kHz mono) and no
+      text - "The capital of France is Paris." in about 19 s, so the Mac's model heard the recording (the phone sends it as
+      it sends a voice message, `audio/wav`, since the Mac says its model hears audio). No code change. The test chats and
+      the pushed WAV and photo were deleted afterwards.
 
 ## 30. Background tasks and monitoring
 
