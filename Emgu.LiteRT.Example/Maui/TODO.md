@@ -147,8 +147,8 @@ API: no binding of our own needed) and `WindowsAIChatClient` (Phi Silica). Still
 - [ ] Apple Intelligence's use of tools: it reaches for them (Wikipedia for a haiku, then "I cannot write a haiku"): stronger
       instructions, or tools only when the message names what they do; and how the 8 tools and their 923 tokens trade against
       the conversation (the page assumes 900 for tools).
-- [ ] Images with Apple Intelligence (its status reports the `ImageInput` capability: the option takes images when it does; not
-      tried), and an iPhone (the context window is read from the model now: 4,096 on the Mac, 8,192 on the iPad).
+- [ ] Images with Apple Intelligence: tried on the iPad (2026-11-11, the surfers sample): it described the picture and, asked
+      without tools, the surfboards' colors and the weather; only an iPhone is left (the context window is read from the model now: 4,096 on the Mac, 8,192 on the iPad).
 - [ ] Gemini Nano (Android: Pixel 9/10, Galaxy Z Fold7 and other recent flagships; not the emulator, the Pixel Fold or the Z
       Fold3) as a second feature of the same kind, with `GeminiNanoChatClient` and its download state; and the Windows AI
       model (Copilot+ PCs) with `WindowsAIChatClient`.
