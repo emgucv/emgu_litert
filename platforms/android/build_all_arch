@@ -1,0 +1,19 @@
+#!/bin/bash
+# Build the native libraries for every Android ABI (arm64, arm, x86_64, x86) with bazel_build_litert, then build the
+# packages on macOS with platforms/macos/build_emgu_litert (which packs whatever is in lib/android/<abi>/).
+#
+#   build_all_arch              (all four ABIs, then the packages)
+#   SKIP_PACKAGES=1 build_all_arch   (the native libraries only)
+here="$(cd "$(dirname "$0")" && pwd)"
+
+for arch in arm64 arm x86_64 x86; do
+    echo "=== Android $arch ==="
+    "$here/bazel_build_litert" "$arch" || { echo "The $arch build failed."; exit 1; }
+done
+
+if [ -n "$SKIP_PACKAGES" ]; then
+    echo "SKIP_PACKAGES is set: not building the packages."
+    exit 0
+fi
+echo "=== Packages ==="
+"$here/../macos/build_emgu_litert"
