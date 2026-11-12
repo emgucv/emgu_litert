@@ -29,8 +29,10 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
     /// <summary>The id of the option made when none is given.</summary>
     public const string DefaultId = "AppleIntelligence";
 
-    // What the model takes in: about 4,096 tokens for the conversation and its reply.
+    // What the model takes in for the conversation and its reply: 4,096 tokens on a Mac, 8,192 on an iPad Air (M4, iPadOS 27),
+    // so this is only the start: the real size is read from the model (LearnContextWindowAsync).
     private const int ContextTokens = 4096;
+    private static int _learnedContextTokens;
     private const int SummaryMaxTokens = 400;
 
     private Label _status;
@@ -118,7 +120,7 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
                 ChatPage.SectionTitle("Apple Intelligence"),
                 ChatPage.Note("Chat with Apple's own on-device model instead of a model of this app's: nothing is downloaded by " +
                     "the app and nothing leaves this device. Pick \"" + Option.DisplayName + "\" in the model list. It needs " +
-                    "Apple Intelligence, turned on in the system's settings, and its context is small (about 4,096 tokens, " +
+                    "Apple Intelligence, turned on in the system's settings, and its context is small (4,096 tokens on a Mac, 8,192 on some iPads, " +
                     "so long chats are summarized often and the tools take much of it)."),
                 check,
                 _status
@@ -141,6 +143,7 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
             {
                 case ChatModelAvailability.Available:
                     Apply(status);
+                    await LearnContextWindowAsync(cancellationToken);
                     return null;
                 case ChatModelAvailability.NotReady:
                 case ChatModelAvailability.Downloading:
@@ -179,6 +182,36 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
             Host.ModelCapabilitiesChanged();
     }
 #endif
+
+    // The model's window isn't in any API this package uses, but a request over it fails with "Provided N tokens, but the
+    // maximum allowed is M": one request far over any window (it is refused before the model reads it) tells M, once per run.
+    private async Task LearnContextWindowAsync(CancellationToken cancellationToken)
+    {
+        if (_learnedContextTokens == 0)
+        {
+            try
+            {
+                using IChatClient client = CreateChatClient();
+                string filler = string.Join(" ", System.Linq.Enumerable.Repeat("window", 40000));
+                await client.GetResponseAsync(filler, new ChatOptions { MaxOutputTokens = 1 }, cancellationToken);
+                _learnedContextTokens = -1; // accepted: no limit to read
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(ex.ToString(), @"maximum allowed is ([\d,]+)");
+                if (match.Success && int.TryParse(match.Groups[1].Value.Replace(",", ""), out int tokens) && tokens >= 1024)
+                    _learnedContextTokens = tokens;
+                else
+                    _learnedContextTokens = -1;
+            }
+        }
+        if (_learnedContextTokens > 0 && Option.ContextWindow != _learnedContextTokens)
+        {
+            Option.ContextWindow = _learnedContextTokens;
+            if (IsSelected)
+                Host.ModelCapabilitiesChanged();
+        }
+    }
 
     private async Task CheckAvailabilityAsync()
     {
@@ -240,7 +273,7 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
     };
 
     // The tools' names, descriptions and parameters: about 2.3 characters a token as the model counts them, so ~700 tokens.
-    private const int ToolBudgetCharacters = 1600;
+    private const int ToolBudgetCharacters4K = 1600;
 
     // A tool's result: ~375 tokens at most (a web page's text was 1,500 tokens).
     private const int ToolResultCharacters = 1200;
@@ -318,7 +351,7 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
             AITool compact = candidate.tool is AIFunction function ? new CompactFunction(function, ToolResultCharacters) : candidate.tool;
             int size = compact.Name.Length + (compact.Description?.Length ?? 0)
                 + ((compact as AIFunctionDeclaration)?.JsonSchema.GetRawText().Length ?? 0);
-            if (chosen.Count > 0 && used + size > ToolBudgetCharacters)
+            if (chosen.Count > 0 && used + size > ToolBudgetCharacters4K * Math.Max(1, Option.ContextWindow / ContextTokens))
                 continue;
             used += size;
             chosen.Add(compact);

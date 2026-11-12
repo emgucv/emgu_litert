@@ -853,8 +853,11 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 - Connecting calls `AppleIntelligenceChatClient.GetModelStatusAsync`: available, or "isn't ready yet: the system may still be
   preparing it", "can't run Apple Intelligence" (device not eligible) or "is turned off: turn it on in Settings > Apple
   Intelligence & Siri". Settings > Apple Intelligence shows the state with a Check again button, and the model list's row says it.
-- The model's context is 4,096 tokens, all of it counted (instructions, tools' descriptions and parameters, tool results, the
-  conversation, the reply), and it doesn't think aloud (no Think chip). Measured through the model's own usage report: the page's
+- The model's context is 4,096 tokens on the Mac mini and 8,192 on the iPad Air (M4, iPadOS 27.2: "Provided 15,647 tokens, but the
+  maximum allowed is 8,192"), all of it counted (instructions, tools' descriptions and parameters, tool results, the
+  conversation, the reply). The feature reads the size from the device once per run (`LearnContextWindowAsync`: one request far over
+  any window is refused with that message, and the page's "The model takes in about N tokens" and the tool budget - 1,600
+  characters per 4,096 tokens - follow; verified on the iPad: 8,192, a calculator question answered). It doesn't think aloud (no Think chip). Measured through the model's own usage report: the page's
   24 tools and its instructions are 3,654 tokens before a word is said, and one Wikipedia search came to "Provided 4,825
   tokens, but the maximum allowed is 4,096". So `AdjustOptions` fits the message to the window: short instructions (189
   characters), no `use_*` stubs, and the tools whose compact forms fit 1,600 characters: the date and the calculator, then the
