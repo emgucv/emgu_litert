@@ -857,11 +857,16 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   conversation, the reply), and it doesn't think aloud (no Think chip). Measured through the model's own usage report: the page's
   24 tools and its instructions are 3,654 tokens before a word is said, and one Wikipedia search came to "Provided 4,825
   tokens, but the maximum allowed is 4,096". So `AdjustOptions` fits the message to the window: short instructions (189
-  characters), no `use_*` stubs, the tools one at a time by priority (date, calculator, units, Wikipedia, reading a page,
-  weather, currency, web search) while their compact form fits 1,600 characters, a tool's description cut to its first sentence
-  and its schema without the parameters' descriptions, and a tool's result cut to 1,200 characters. That is 8 tools and 923 tokens
-  for "Hello", about 2,000 after four exchanges; the page's compaction then summarizes ("Earlier messages summarized") and no
+  characters), no `use_*` stubs, and the tools whose compact forms fit 1,600 characters: the date and the calculator, then the
+  tools the message is about (those of a tool group the message's words brought in - goals, documents, camera... - and any tool
+  whose name or description shares words with the message, `AppleIntelligenceFeature.PrepareAsync` keeps the message), then the
+  rest in this order: units, Wikipedia, reading a page, weather, currency, web search. A tool's description is cut to its first
+  sentence, its schema loses the parameters' descriptions, and its result is cut to 1,200 characters. That is about 8 tools and
+  923 tokens for "Hello", about 2,000 after four exchanges; the page's compaction then summarizes ("Earlier messages summarized") and no
   request overflowed in a run of 9 messages with Wikipedia pages and a unit conversion.
+- By what the message is about (Mac mini): "What is Apple's stock price?" - 355.63 USD (the stock tool, not among the 8 standard
+  ones), "Remember that my favorite color is blue." - "Remembered", "Set a goal to read 20 pages a day." - "Saved your goal"
+  (a goals group tool), the weather in Ottawa as before; the memory and the goal were deleted afterwards.
 - Verified on the Mac mini (Mac Catalyst) and the iPad Air M4 (iPadOS 27.2): "Called calculate" - 1234 times 5678 is 7,006,652;
   the weather in Ottawa; units; Wikipedia's Eiffel Tower and Paris pages; saved chats list "Apple Intelligence" as the model.
   The model is tool-happy: "write a haiku about rain" went to Wikipedia and came back "I cannot write a haiku" (the same

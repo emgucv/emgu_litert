@@ -884,6 +884,13 @@ Moved from TODO.md on 2026-11-05:
       72.42 kilometres" (`convert_units`), Wikipedia's Eiffel Tower and Paris; the page's compaction summarized the early
       messages ("Earlier messages summarized") and no request overflowed in nine messages. Test chats deleted, the devices'
       own models restored.
+- [x] Apple Intelligence's tools by relevance (2026-11-11): the fixed 8 left out everything else (remember, the stocks, the
+      goals...). `AdjustOptions` now ranks the tools by what the message is about: the date and calculator, then a tool group's
+      tools (a tool that isn't one of the page's own) and the tools whose name (weighted 3) or description shares words with
+      the message (`PrepareAsync` keeps the message), then units, Wikipedia, page reading, weather, currency and web search,
+      while they fit 1,600 characters. On the Mac mini: Apple's stock price (355.63 USD), "Remember that my favorite color is
+      blue" (saved), "Set a goal to read 20 pages a day" (saved), the weather in Ottawa; the memory, the goal and the chat were
+      deleted. Not run again on the iPad (the same code).
 
 ## 28. MCP support — implemented (HTTP verified with DeepWiki on a Galaxy S10; stdio on Mac Catalyst)
 

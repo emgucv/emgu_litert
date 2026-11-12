@@ -1,4 +1,5 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
+using Emgu.LiteRT.LM.Agents;
 using Emgu.LiteRT.LM.Chat;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -83,6 +84,16 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
 
     /// <inheritdoc/>
     public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
+
+    // The message being answered: the tools are chosen by what it is about (set before the page composes the message's options).
+    private string _prompt = string.Empty;
+
+    /// <inheritdoc/>
+    public override Task PrepareAsync(ChatMessageContext context)
+    {
+        _prompt = context?.Prompt ?? string.Empty;
+        return Task.CompletedTask;
+    }
 
     /// <inheritdoc/>
     public override void OnAttached(IChatPageHost host)
@@ -207,13 +218,25 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
         throw new PlatformNotSupportedException("Apple Intelligence is only on Apple devices.");
 #endif
 
-    // The tools Apple's small window can hold, in the order they are taken: every tool and its description counts toward the
-    // 4,096 tokens (all 24 of the page's, with its instructions, are 3,654 tokens before a word is said), so a message gets
-    // these, then the page's others while the budget lasts, and no stubs for the tool groups ("use_camera", ...).
+    // The tools Apple's small window can hold: every tool and its description counts toward the 4,096 tokens (all 24 of the page's,
+    // with its instructions, are 3,654 tokens before a word is said). So a message gets a few: the date and the calculator, then the
+    // tools the message is about (those of a tool group its words brought in, and any tool whose name or description shares words
+    // with it), then the others in this order, while their compact forms fit the budget. No stubs for the tool groups ("use_camera").
     private static readonly string[] ToolPriority =
     {
         "get_current_date_time", "calculate", "convert_units", "search_wikipedia", "read_web_page", "get_weather",
         "convert_currency", "search_web"
+    };
+
+    // Always there.
+    private static readonly string[] CoreTools = { "get_current_date_time", "calculate" };
+
+    // The page's own tools, present in every message; any other tool (not a stub) is one of a group the message brought in.
+    private static readonly string[] PageTools =
+    {
+        "get_current_date_time", "calculate", "convert_units", "remember", "forget", "get_weather", "search_wikipedia",
+        "convert_currency", "search_web", "read_web_page", "get_stock_quote", "get_stock_history", "get_current_location",
+        "search_places"
     };
 
     // The tools' names, descriptions and parameters: about 2.3 characters a token as the model counts them, so ~700 tokens.
@@ -226,6 +249,43 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
         "arithmetic, units and facts you are not sure of, and base your answer on what they return. Answer stories, poems and " +
         "opinions yourself, without tools. Keep answers short.";
 
+    private static readonly HashSet<string> Filler = new HashSet<string>
+    {
+        "with", "that", "this", "from", "your", "what", "when", "where", "which", "have", "does", "about", "into", "than", "then",
+        "them", "they", "will", "would", "could", "should", "tool", "user", "returns", "return", "using", "used", "give", "gives",
+        "tell", "please", "there", "their", "some", "much", "many", "only", "also", "each", "other", "more", "most", "just"
+    };
+
+    // The words of a text that can say what it is about: lower case, 4 letters or more, a trailing "s" dropped, no filler.
+    private static HashSet<string> Words(string text)
+    {
+        var words = new HashSet<string>();
+        if (string.IsNullOrEmpty(text))
+            return words;
+        foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(text.ToLowerInvariant(), "[a-z]{4,}"))
+        {
+            string word = match.Value.EndsWith("s", StringComparison.Ordinal) ? match.Value.Substring(0, match.Value.Length - 1) : match.Value;
+            if (!Filler.Contains(word) && !Filler.Contains(match.Value))
+                words.Add(word);
+        }
+        return words;
+    }
+
+    // How much a tool is about the message: shared words, a word of the tool's name counting three; a link goes to the page reader.
+    private static int Relevance(AITool tool, HashSet<string> message, string prompt)
+    {
+        int score = 0;
+        foreach (string part in tool.Name.Split('_'))
+            if (message.Contains(part.EndsWith("s", StringComparison.Ordinal) && part.Length > 4 ? part.Substring(0, part.Length - 1) : part))
+                score += 3;
+        foreach (string word in Words(tool.Description))
+            if (message.Contains(word))
+                score++;
+        if (tool.Name == "read_web_page" && prompt.IndexOf("http", StringComparison.OrdinalIgnoreCase) >= 0)
+            score += 10;
+        return score;
+    }
+
     /// <inheritdoc/>
     public void AdjustOptions(ChatOptions options)
     {
@@ -237,13 +297,25 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
             return;
         // Short instructions, the tools that fit with their results cut short.
         options.Instructions = CompactInstructions;
+        HashSet<string> message = Words(_prompt);
+        var candidates = options.Tools
+            .Where(t => !t.Name.StartsWith("use_", StringComparison.Ordinal))
+            .Select(t =>
+            {
+                int score = Relevance(t, message, _prompt);
+                bool group = Array.IndexOf(PageTools, t.Name) < 0;
+                int priority = Array.IndexOf(ToolPriority, t.Name) is int i and >= 0 ? i : ToolPriority.Length;
+                // Core first, then what the message is about (a group's tools: its words brought them in), then the rest.
+                int rank = Array.IndexOf(CoreTools, t.Name) >= 0 ? 0 : group || score > 0 ? 1 : 2;
+                return (tool: t, rank, score: group ? score + 100 : score, priority);
+            })
+            .OrderBy(c => c.rank).ThenByDescending(c => c.score).ThenBy(c => c.priority)
+            .ToList();
         var chosen = new List<AITool>();
         int used = 0;
-        foreach (AITool tool in options.Tools
-            .Where(t => !t.Name.StartsWith("use_", StringComparison.Ordinal))
-            .OrderBy(t => Array.IndexOf(ToolPriority, t.Name) is int i and >= 0 ? i : ToolPriority.Length))
+        foreach (var candidate in candidates)
         {
-            AITool compact = tool is AIFunction function ? new CompactFunction(function, ToolResultCharacters) : tool;
+            AITool compact = candidate.tool is AIFunction function ? new CompactFunction(function, ToolResultCharacters) : candidate.tool;
             int size = compact.Name.Length + (compact.Description?.Length ?? 0)
                 + ((compact as AIFunctionDeclaration)?.JsonSchema.GetRawText().Length ?? 0);
             if (chosen.Count > 0 && used + size > ToolBudgetCharacters)
