@@ -1,5 +1,7 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using Emgu.LiteRT.LM.Chat;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 #if IOS || MACCATALYST
 using Microsoft.Maui.Essentials.AI;
@@ -18,7 +20,8 @@ namespace Emgu.LiteRT.LM.Maui.Apple;
 /// the device. It needs iOS 26 or macOS 26 or later (Mac Catalyst too), on a device that has Apple Intelligence, turned on in
 /// the system's settings (<see cref="IsSupported"/> is the operating system's part; the rest is asked when the model is
 /// connected, and said in words: not eligible, turned off, still being prepared). The model's context is small (about 4,096
-/// tokens: so no tools, which would not fit) and it doesn't think aloud.
+/// tokens, all of it counted: the instructions, the tools' descriptions, their results and the conversation, so the tools are
+/// cut down to a few short ones, <see cref="AdjustOptions"/>) and it doesn't think aloud.
 /// </summary>
 public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
 {
@@ -40,9 +43,8 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
             throw new ArgumentException("The Apple Intelligence option must be a remote one (no model on the device)", nameof(option));
         Option = option ?? new ChatModelOption(DefaultId, "Apple Intelligence")
         {
-            // The model calls tools, but its 4,096-token window can't hold the tools' descriptions and a web page's text too
-            // ("Provided 4,825 tokens, but the maximum allowed is 4,096" after one Wikipedia search): chat only for now.
-            CanUseTools = false,
+            // Tools within the small window: AdjustOptions keeps the few that fit (the page's 24 and its instructions are 3,654 tokens).
+            CanUseTools = true,
             CanSummarize = true,
             CanThink = false,
             AcceptsImages = false,
@@ -160,6 +162,7 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
         if (status.Capabilities is { } capabilities)
         {
             Option.AcceptsImages = capabilities.Contains(ChatModelCapability.ImageInput);
+            Option.CanUseTools = capabilities.Contains(ChatModelCapability.ToolCalling);
         }
         if (IsSelected)
             Host.ModelCapabilitiesChanged();
@@ -204,6 +207,25 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
         throw new PlatformNotSupportedException("Apple Intelligence is only on Apple devices.");
 #endif
 
+    // The tools Apple's small window can hold, in the order they are taken: every tool and its description counts toward the
+    // 4,096 tokens (all 24 of the page's, with its instructions, are 3,654 tokens before a word is said), so a message gets
+    // these, then the page's others while the budget lasts, and no stubs for the tool groups ("use_camera", ...).
+    private static readonly string[] ToolPriority =
+    {
+        "get_current_date_time", "calculate", "convert_units", "search_wikipedia", "read_web_page", "get_weather",
+        "convert_currency", "search_web"
+    };
+
+    // The tools' names, descriptions and parameters: about 2.3 characters a token as the model counts them, so ~700 tokens.
+    private const int ToolBudgetCharacters = 1600;
+
+    // A tool's result: ~375 tokens at most (a web page's text was 1,500 tokens).
+    private const int ToolResultCharacters = 1200;
+
+    private const string CompactInstructions = "You are a helpful assistant on the user's device. Use your tools for the date, " +
+        "arithmetic, units and facts you are not sure of, and base your answer on what they return. Answer stories, poems and " +
+        "opinions yourself, without tools. Keep answers short.";
+
     /// <inheritdoc/>
     public void AdjustOptions(ChatOptions options)
     {
@@ -211,6 +233,74 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
             return;
         // The model doesn't think aloud: the Think chip's reasoning request means nothing to it.
         options.Reasoning = null;
+        if (options.Tools is not { Count: > 0 })
+            return;
+        // Short instructions, the tools that fit with their results cut short.
+        options.Instructions = CompactInstructions;
+        var chosen = new List<AITool>();
+        int used = 0;
+        foreach (AITool tool in options.Tools
+            .Where(t => !t.Name.StartsWith("use_", StringComparison.Ordinal))
+            .OrderBy(t => Array.IndexOf(ToolPriority, t.Name) is int i and >= 0 ? i : ToolPriority.Length))
+        {
+            AITool compact = tool is AIFunction function ? new CompactFunction(function, ToolResultCharacters) : tool;
+            int size = compact.Name.Length + (compact.Description?.Length ?? 0)
+                + ((compact as AIFunctionDeclaration)?.JsonSchema.GetRawText().Length ?? 0);
+            if (chosen.Count > 0 && used + size > ToolBudgetCharacters)
+                continue;
+            used += size;
+            chosen.Add(compact);
+        }
+        options.Tools = chosen;
+    }
+
+    // A tool as the small window takes it: a short description (its first sentence), a schema without the parameters'
+    // descriptions (names, types, enums and which are required stay), and a result cut to a length the window can take.
+    private sealed class CompactFunction : DelegatingAIFunction
+    {
+        private const int DescriptionCharacters = 110;
+        private readonly int _maxResultCharacters;
+
+        public CompactFunction(AIFunction inner, int maxResultCharacters) : base(inner)
+        {
+            _maxResultCharacters = maxResultCharacters;
+            string description = inner.Description ?? string.Empty;
+            int stop = description.IndexOf(". ", StringComparison.Ordinal);
+            if (stop > 0)
+                description = description.Substring(0, stop + 1);
+            Description = description.Length > DescriptionCharacters ? description.Substring(0, DescriptionCharacters) + "..." : description;
+            JsonNode schema = JsonNode.Parse(inner.JsonSchema.GetRawText());
+            Strip(schema);
+            JsonSchema = JsonSerializer.SerializeToElement(schema);
+        }
+
+        public override string Description { get; }
+
+        public override JsonElement JsonSchema { get; }
+
+        // Descriptions inside the schema go (a string "description"; a parameter named description is an object and stays).
+        private static void Strip(JsonNode node)
+        {
+            if (node is JsonObject obj)
+            {
+                if (obj["description"] is JsonValue)
+                    obj.Remove("description");
+                foreach (KeyValuePair<string, JsonNode> property in obj.ToList())
+                    if (property.Value != null)
+                        Strip(property.Value);
+            }
+            else if (node is JsonArray array)
+                foreach (JsonNode item in array)
+                    if (item != null)
+                        Strip(item);
+        }
+
+        protected override async ValueTask<object> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
+        {
+            object result = await base.InvokeCoreAsync(arguments, cancellationToken).ConfigureAwait(false);
+            string text = result as string ?? result?.ToString();
+            return text != null && text.Length > _maxResultCharacters ? text.Substring(0, _maxResultCharacters) + "... (cut)" : result;
+        }
     }
 
     /// <inheritdoc/>

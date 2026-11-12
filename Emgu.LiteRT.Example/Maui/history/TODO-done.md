@@ -874,9 +874,16 @@ Moved from TODO.md on 2026-11-05:
       (iPadOS 27.2): "What is the capital of France? One sentence." - "The capital of France is Paris." in 4 s on the Mac, a
       follow-up ("And of Spain?") and a four-line poem answered with the conversation; on the iPad the same question
       answered, listed in the saved chats as "Apple Intelligence". First try with tools on: the model called the page's
-      web tools (a Wikipedia search, reading a page), then "Provided 4,825 tokens, but the maximum allowed is 4,096" - so the
-      option is chat only (`CanUseTools = false`; the Think and Web search chips are hidden). Test chats deleted, the
-      devices' own models restored.
+      web tools (a Wikipedia search, reading a page), then "Provided 4,825 tokens, but the maximum allowed is 4,096".
+- [x] Apple Intelligence with tools (2026-11-11): the model reports its token usage, so the window was measured: the page's 24 tools
+      and its instructions came to 3,654 tokens for "Hello". `AppleIntelligenceFeature.AdjustOptions` now sends short
+      instructions (189 characters), no `use_*` stubs and the tools that fit 1,600 characters in priority order (8 tools:
+      date, calculator, units, Wikipedia, reading a page, weather, currency, web search), each compact (the first sentence of
+      its description, its schema without the parameters' descriptions, its result cut to 1,200 characters): 923 tokens for
+      "Hello" instead of 3,654. On the Mac and the iPad: "Called calculate" (7,006,652), the weather in Ottawa, "45 miles is
+      72.42 kilometres" (`convert_units`), Wikipedia's Eiffel Tower and Paris; the page's compaction summarized the early
+      messages ("Earlier messages summarized") and no request overflowed in nine messages. Test chats deleted, the devices'
+      own models restored.
 
 ## 28. MCP support — implemented (HTTP verified with DeepWiki on a Galaxy S10; stdio on Mac Catalyst)
 

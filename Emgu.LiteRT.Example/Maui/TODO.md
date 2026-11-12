@@ -137,17 +137,16 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] Android 12+'s "pasted from your clipboard" toast not seen: the S10 has Settings > Privacy > "Show clipboard access" off
       (`clipboard_show_access_notifications` 0); a phone with it on.
 
-## 27. More models: Gemini Nano and Apple's on-device model — Apple Intelligence implemented (chat only); Gemini Nano and Windows AI open
+## 27. More models: Gemini Nano and Apple's on-device model — Apple Intelligence implemented (a few tools in its 4,096 tokens); Gemini Nano and Windows AI open
 
 System models, offered in the model picker only where the device has them. Done so far: see
 [history/TODO-done.md](history/TODO-done.md), same number. `Microsoft.Maui.Essentials.AI` (a preview package, restored on
 .NET 11) has an `IChatClient` for each: `AppleIntelligenceChatClient`, `GeminiNanoChatClient` (Android, ML Kit's GenAI Prompt
 API: no binding of our own needed) and `WindowsAIChatClient` (Phi Silica). Still open:
 
-- [ ] Apple Intelligence with tools: the model calls tools, but its context is 4,096 tokens, and one Wikipedia search with the
-      20 tools' descriptions came to 4,825 ("Provided 4,825 tokens, but the maximum allowed is 4,096"), so the option is
-      chat only. Try a few small tools (date, calculator, units) with their results cut short, and the tool groups on demand
-      (item 37); the page estimates 900 tokens for the tools, which is less than Apple's native count.
+- [ ] Apple Intelligence's use of tools: it reaches for them (Wikipedia for a haiku, then "I cannot write a haiku"): stronger
+      instructions, or tools only when the message names what they do; and how the 8 tools and their 923 tokens trade against
+      the conversation (the page assumes 900 for tools).
 - [ ] Images with Apple Intelligence (its status reports the `ImageInput` capability: the option takes images when it does; not
       tried), the context window from the model (`SystemLanguageModel.contextSize` where it exists) instead of 4,096, and an
       iPhone.
