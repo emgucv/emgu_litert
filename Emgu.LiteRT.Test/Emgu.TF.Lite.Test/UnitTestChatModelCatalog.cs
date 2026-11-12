@@ -45,6 +45,8 @@ public class UnitTestChatModelCatalog
         Assert.That(((Emgu.LiteRT.LM.Models.Gemma4)small.Single(m => m.Id == "Gemma4E2B").Create()).SmallPrefillOnly, Is.True);
         IList<ChatModelOption> large = ChatModelCatalog.For(ChatPlatform.iOS);
         Assert.That(large.Any(m => m.Id == "Qwen35_4B"), Is.True);
+        Assert.That(large.Any(m => m.Id == "Bonsai8B"), Is.True);
+        Assert.That(small.Any(m => m.Id == "Bonsai8B"), Is.False);
         Assert.That(large.Single(m => m.Id == "Gemma4E4B").Backends, Is.EqualTo(new[] { "cpu", "gpu" }));
         Assert.That(((Emgu.LiteRT.LM.Models.Gemma4)large.Single(m => m.Id == "Gemma4E4B").Create()).SmallPrefillOnly, Is.False);
     }

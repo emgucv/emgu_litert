@@ -28,7 +28,7 @@ namespace Emgu.LiteRT.LM.Chat
     /// file allows, and the GPU where it was verified (Gemma 4 E2B with OpenCL on Android; the Gemma 4 models with Metal
     /// on a Mac and on iOS; all but Gemma 4 12B on Windows). Gemma 4 12B is offered on desktops only. Each call makes new options;
     /// an app takes the ones it wants by <see cref="ChatModelOption.Id"/> ("Qwen3", "Qwen35_0_8B_VL", "Qwen35_2B", "Qwen35_4B",
-    /// "Gemma4E2B", "Gemma4E4B", "Gemma4_12B" - lasting, since saved chats and settings keep them).
+    /// "Gemma4E2B", "Gemma4E4B", "Bonsai8B", "Gemma4_12B" - lasting, since saved chats and settings keep them).
     /// <code>
     /// foreach (ChatModelOption model in ChatModelCatalog.For(ChatDevicePlatform.Current))
     ///     options.Models.Add(model);
@@ -75,6 +75,10 @@ namespace Emgu.LiteRT.LM.Chat
                 Gemma("Gemma4E4B", "Gemma 4 E4B", () => new Gemma4E4B { SmallPrefillOnly = lowMemory }, Gemma4E4B.ModelFile, 3700,
                     "~3.7 GB download. More capable than E2B, but slower and needs more memory.", gpu: android || ios || mac || windows),
             };
+            // A ternary (INT2) Qwen3-8B-class model in 2.6 GB: text only, no thinking (its template ignores it), CPU only (the GPU
+            // isn't tried). Its file is fixed at 4096 tokens. After the Gemma models so the first six stay as they were.
+            models.Add(Model("Bonsai8B", "Bonsai 8B", () => new Bonsai8B(), Bonsai8B.ModelFile, 2600,
+                "~2.6 GB download. An 8B-class model squeezed into the size of a 4B (ternary weights). Text only.", gpu: false, canThink: false));
             // A large desktop model; on Windows its GPU image inference failed compatibility testing.
             if (mac || windows)
                 models.Add(Gemma("Gemma4_12B", "Gemma 4 12B", () => new Gemma4_12B(), Gemma4_12B.ModelFile, 6900,
@@ -87,7 +91,7 @@ namespace Emgu.LiteRT.LM.Chat
             // described the picture (767 MB left). Qwen3.5 2B read it on the CPU in 34 s with 356 MB left.
             if (lowMemory)
             {
-                models.RemoveAll(m => m.Id == "Qwen35_4B");
+                models.RemoveAll(m => m.Id == "Qwen35_4B" || m.Id == "Bonsai8B");
                 ChatModelOption e4b = models.Find(m => m.Id == "Gemma4E4B");
                 if (e4b != null && e4b.Backends.Contains("gpu"))
                 {

@@ -1949,6 +1949,63 @@ namespace Emgu.TF.Lite.Test
             }
         }
 
+        // Ternary-Bonsai-8B (2.6 GB download): a Qwen3-8B-class model in INT2.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestBonsai8BChat()
+        {
+            RequireLiteRtLm();
+            using (Bonsai8B model = new Bonsai8B())
+            {
+                await model.Init();
+                using (Chat chat = model.CreateChat("You are a helpful assistant. Answer in one short sentence."))
+                {
+                    chat.MaxOutputTokens = 64;
+                    ChatReply first = chat.Send("My name is Kenji. What is 17 times 23?");
+                    ChatReply second = await chat.SendAsync("What is my name?");
+                    Console.WriteLine("Replies: {0} | {1}", first.Text, second.Text);
+                    if (!first.Text.Contains("391"))
+                        throw new Exception("The first reply is wrong");
+                    if (!second.Text.Contains("Kenji"))
+                        throw new Exception("The second reply doesn't use the history");
+                }
+            }
+        }
+
+        // Ternary-Bonsai-8B thinking, and its speed on this machine.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestBonsai8BThinking()
+        {
+            RequireLiteRtLm();
+            using (Bonsai8B model = new Bonsai8B { EnableThinking = true })
+            {
+                await model.Init();
+                using (Chat chat = model.CreateChat())
+                {
+                    chat.MaxOutputTokens = 1024;
+                    System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
+                    ChatReply reply = await chat.SendAsync("A farmer has 17 sheep. All but 9 run away. How many are left? Answer with a number and one sentence.");
+                    watch.Stop();
+                    Console.WriteLine("Thinking ({0} chars): {1}\nAnswer: {2}\nTime: {3:0.0} s", (reply.Thinking ?? "").Length, reply.Thinking, reply.Text, watch.Elapsed.TotalSeconds);
+                    if (String.IsNullOrEmpty(reply.Text))
+                        throw new Exception("The reply has no answer");
+                }
+            }
+        }
+
         // Qwen3.5 0.8B with its vision encoder accepts images (1.3 GB download).
 #if !TEST_MODELS
 #if VS_TEST
