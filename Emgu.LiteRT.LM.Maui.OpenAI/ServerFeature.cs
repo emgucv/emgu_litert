@@ -600,6 +600,12 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
 
     // The server's models (GET /models of the OpenAI API), with what LM Studio's own API (/api/v0/models) adds: the
     // kind of model (embeddings, vision) and the context length a loaded model has.
+    // The server answered, and has no model loaded (503 model_not_loaded).
+    private sealed class ServerHasNoModelException : Exception
+    {
+        public ServerHasNoModelException() : base("The server has no model loaded.") { }
+    }
+
     private static async Task<List<ServerModelInfo>> FetchServerModelsAsync(string url, string key, CancellationToken token)
     {
         var models = new List<ServerModelInfo>();
@@ -607,7 +613,14 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
         using (HttpResponseMessage response = await ServerHttp.SendAsync(request, token).ConfigureAwait(false))
         {
             if (!response.IsSuccessStatusCode)
+            {
+                // An Emgu LiteRT Mac with no model loaded answers 503 "model_not_loaded": the server is there, its chat isn't ready.
+                string body = string.Empty;
+                try { body = await response.Content.ReadAsStringAsync(token).ConfigureAwait(false); } catch (Exception) { }
+                if ((int)response.StatusCode == 503 && body.Contains("model_not_loaded", StringComparison.Ordinal))
+                    throw new ServerHasNoModelException();
                 throw new InvalidOperationException(string.Format("the server answered {0} {1}", (int)response.StatusCode, response.ReasonPhrase));
+            }
             using JsonDocument json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
             if (json.RootElement.TryGetProperty("data", out JsonElement data) && data.ValueKind == JsonValueKind.Array)
                 foreach (JsonElement model in data.EnumerateArray())
@@ -717,6 +730,8 @@ public sealed class ServerFeature : ChatFeature, IRemoteChatModel
             if (cancellationToken.IsCancellationRequested)
                 return "The connection was cancelled.";
             System.Diagnostics.Debug.WriteLine("Server connection failed: " + ex.Message);
+            if (ex is ServerHasNoModelException)
+                return "Your server at " + url + " is running but has no model ready. Open the chat on the server's Mac and choose a model (it loads with the first message), then try again.";
             if (ServerReachability.IsUnreachable(ex))
                 return Unreachable(url);
             return "Could not reach your server at " + url + ": " + ex.Message +
