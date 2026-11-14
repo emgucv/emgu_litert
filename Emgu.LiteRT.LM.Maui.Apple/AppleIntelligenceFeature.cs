@@ -304,6 +304,18 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
         return words;
     }
 
+    private static readonly System.Text.RegularExpressions.Regex CreativeRequest = new System.Text.RegularExpressions.Regex(
+        @"^\s*(please\s+)?(write|compose|draft|make up|invent|rewrite|rephrase|paraphrase|translate|tell me (a|an) (joke|story|riddle)|give me (a|an) (poem|haiku|joke|story|slogan|limerick))\b|\b(haiku|poem|limerick|sonnet|lyrics|slogan)\b",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    // A request to make something up or rewrite it, unless it also names a source (a link, Wikipedia, a search).
+    private static bool IsCreative(string prompt) =>
+        !string.IsNullOrEmpty(prompt) && CreativeRequest.IsMatch(prompt)
+        && prompt.IndexOf("http", StringComparison.OrdinalIgnoreCase) < 0
+        && prompt.IndexOf("wikipedia", StringComparison.OrdinalIgnoreCase) < 0
+        && prompt.IndexOf("search", StringComparison.OrdinalIgnoreCase) < 0
+        && prompt.IndexOf("look up", StringComparison.OrdinalIgnoreCase) < 0;
+
     // How much a tool is about the message: shared words, a word of the tool's name counting three; a link goes to the page reader.
     private static int Relevance(AITool tool, HashSet<string> message, string prompt)
     {
@@ -331,7 +343,11 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
         // Short instructions, the tools that fit with their results cut short.
         options.Instructions = CompactInstructions;
         HashSet<string> message = Words(_prompt);
+        // A poem, a story or a rewrite is answered from the model itself: the lookup tools only tempt it (a haiku went
+        // through two Wikipedia searches and a page), so it keeps only a tool group's tools (the date and the calculator tempt it too).
+        bool creative = IsCreative(_prompt);
         var candidates = options.Tools
+            .Where(t => !creative || Array.IndexOf(PageTools, t.Name) < 0)
             .Where(t => !t.Name.StartsWith("use_", StringComparison.Ordinal))
             .Select(t =>
             {

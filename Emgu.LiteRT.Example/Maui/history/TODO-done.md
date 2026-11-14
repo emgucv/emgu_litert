@@ -892,6 +892,12 @@ Moved from TODO.md on 2026-11-05:
       blue" (saved), "Set a goal to read 20 pages a day" (saved), the weather in Ottawa; the memory, the goal and the chat were
       deleted. Not run again on the iPad (the same code).
 
+- [x] Apple Intelligence's eagerness with tools (2026-11-13): "Write a haiku about autumn leaves." made the model search Wikipedia twice and
+      read a page before answering. `AdjustOptions` now sends no page tools for a creative request (write, compose, rewrite,
+      translate, a haiku, poem, story, joke, lyrics...) unless it names a source (a link, Wikipedia, a search): the first try
+      still called the date tool, so the core tools go too. On the Mac mini: the haiku answered with no tool calls; "What is 17
+      times 23, and what is the weather in Ottawa?" still called the weather and the calculator (391, 1 °C). The test chats were deleted.
+
 ## 28. MCP support — implemented (HTTP verified with DeepWiki on a Galaxy S10; stdio on Mac Catalyst)
 
 Let the chat's agent use tools from Model Context Protocol (MCP) servers, next to its built-in ones.

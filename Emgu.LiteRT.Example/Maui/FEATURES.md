@@ -873,7 +873,11 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 - Verified on the Mac mini (Mac Catalyst) and the iPad Air M4 (iPadOS 27.2): "Called calculate" - 1234 times 5678 is 7,006,652;
   the weather in Ottawa; units; Wikipedia's Eiffel Tower and Paris pages; saved chats list "Apple Intelligence" as the model.
   The model is tool-happy: "write a haiku about rain" went to Wikipedia and came back "I cannot write a haiku" (the same
-  request without tools worked); the Web search chip off takes Wikipedia and the web away.
+  request without tools worked). So a creative request (write, compose, rewrite, translate, a haiku, poem, story, joke, lyrics;
+  not when it names a link, Wikipedia or a search) sends no page tools at all - even the date tool was still called for a haiku
+  with the core tools left in; on the Mac mini "Write a haiku about autumn leaves." answered with no tool calls and a
+  question about 17 times 23 and the weather in Ottawa still called both tools (2026-11-13). The Web search chip off takes
+  Wikipedia and the web away.
 - The same `Microsoft.Maui.Essentials.AI` package has `GeminiNanoChatClient` (Android) and `WindowsAIChatClient`: TODO item 27.
 
 ## Device actions
