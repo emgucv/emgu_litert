@@ -97,25 +97,37 @@ public sealed class HomeworkFeature : ChatFeature
                 yield break;
             }
             IChatClient client = Host.ChatClient;
-            Host.SetStatus("Reading the page...");
-            string read = await AskAsync(client, HomeworkCheck.ReadPrompt(_note), true, 900, ReasoningEffort.None, token);
-            yield return new ChatResponseUpdate(ChatRole.Assistant, "**What I read** (check it against the page)\n\n" + read + "\n\n");
-            string questions = HomeworkCheck.QuestionsOnly(read);
-            Host.SetStatus("Solving the questions...");
-            string solved = await AskAsync(client, HomeworkCheck.SolvePrompt(questions), true, 1500, null, token);
-            yield return new ChatResponseUpdate(ChatRole.Assistant, "**My own answers**\n\n" + solved + "\n\n");
-            Host.SetStatus("Comparing...");
-            string check = await AskAsync(client, HomeworkCheck.ComparePrompt(read, solved), false, 900, ReasoningEffort.None, token);
-            yield return new ChatResponseUpdate(ChatRole.Assistant, "**The check**\n\n" + check);
+            // Each page on its own: two pages in one request had their question numbers run together and the answers of one
+            // page matched to the other's questions.
+            var checks = new List<string>();
+            for (int page = 0; page < _images.Count; page++)
+            {
+                var image = new[] { _images[page] };
+                string label = _images.Count > 1 ? "Page " + (page + 1) + " of " + _images.Count + ": " : string.Empty;
+                string header = _images.Count > 1 ? "## Page " + (page + 1) + " of " + _images.Count + "\n\n" : string.Empty;
+                Host.SetStatus(label + "reading the page...");
+                string read = await AskAsync(client, image, HomeworkCheck.ReadPrompt(_note), 900, ReasoningEffort.None, token);
+                yield return new ChatResponseUpdate(ChatRole.Assistant, header + "**What I read** (check it against the page)\n\n" + read + "\n\n");
+                Host.SetStatus(label + "solving the questions...");
+                string solved = await AskAsync(client, image, HomeworkCheck.SolvePrompt(HomeworkCheck.QuestionsOnly(read)), 1500, null, token);
+                yield return new ChatResponseUpdate(ChatRole.Assistant, "**My own answers**\n\n" + solved + "\n\n");
+                Host.SetStatus(label + "comparing...");
+                string check = HomeworkCheck.TidyCheck(await AskAsync(client, null, HomeworkCheck.ComparePrompt(read, solved), 900, ReasoningEffort.None, token));
+                checks.Add(check);
+                yield return new ChatResponseUpdate(ChatRole.Assistant, "**The check**\n\n" + check + "\n\n");
+            }
+            string summary = HomeworkCheck.Summary(checks);
+            if (summary.Length > 0)
+                yield return new ChatResponseUpdate(ChatRole.Assistant, summary);
             Host.SetStatus(string.Empty);
         }
 
-        // One request of its own (no tools, no earlier chat), with the photo when asked; the thinking is dropped from the text.
-        private async Task<string> AskAsync(IChatClient client, string prompt, bool withImages, int maxTokens, ReasoningEffort? effort, CancellationToken token)
+        // One request of its own (no tools, no earlier chat), with the photo when given; the thinking is dropped from the text.
+        private static async Task<string> AskAsync(IChatClient client, IEnumerable<DataContent> images, string prompt, int maxTokens, ReasoningEffort? effort, CancellationToken token)
         {
             var contents = new List<AIContent>();
-            if (withImages)
-                contents.AddRange(_images);
+            if (images != null)
+                contents.AddRange(images);
             contents.Add(new TextContent(prompt));
             var options = new ChatOptions { MaxOutputTokens = maxTokens };
             if (effort.HasValue)

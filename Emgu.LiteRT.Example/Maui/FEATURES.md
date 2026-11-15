@@ -891,13 +891,24 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 - The "📝 Check homework" chip (2026-11-15; `HomeworkFeature` in `Emgu.LiteRT.LM.Maui`, its prompts in `Emgu.LiteRT.LM.Agents`'s
   `HomeworkCheck`, tested in `UnitTestHomeworkCheck`) is shown for a model that takes images. Asked "can you check my homework?"
   with a photo, the model only solved the questions (nothing told it to read the student's answers). With the chip on, the
-  message with a photo is three separate requests, each small enough for Gemma 4 E2B/E4B: it reads each question and exactly what
-  the student wrote (`[blank]` for an empty answer, `[?]` for a character it can't read: it must not guess a digit; shown as "What
-  I read", so a misread is seen), solves each question from the question alone ("My own answers"; the student's answers are cut
-  from what it is given so they can't sway it), then compares: ✅ correct / ❌ not the same, with a hint / ❓ can't tell, and "Score: N of M"
-  ("The check"; answers that mean the same, 0.5 and 1/2, are correct, and a `[?]` isn't marked wrong). Without a photo it says to
-  attach one. Not measured on a real homework page yet: how often a small model misreads handwriting is the open question
-  (the Claude option reads it better).
+  message with a photo is three separate requests per page, each small enough for Gemma 4 E2B/E4B: it reads each question (each
+  part, 2a, 2b...) and exactly what the student wrote (`[blank]` for an empty answer, `[?]` for a character it can't read: it
+  must not guess a digit; shown as "What I read", so a misread is seen), solves each question from the question alone ("My own
+  answers"; the student's answers are cut from what it is given so they can't sway it), then compares: ✅ correct / ❌ not the
+  same, with a hint / ❓ can't tell ("The check"; answers that mean the same, 0.5 and 1/2, are correct, so is an answer that fits
+  a question with many right ones, and a `[?]` isn't marked wrong). Several photos are several pages, each its own run under
+  "Page 1 of 2": both in one request had their question numbers run together. A blank answer is "❓ Not answered" and the score
+  line is counted from the marks, both in code (`HomeworkCheck.TidyCheck`, `Summary`): the model marked blanks wrong and wrote
+  "Score: 3 of 16" for 8 questions. Without a photo it says to attach one.
+- Tried on a real worksheet (2026-11-15, two photos of a Grade 8 page of decimals and of square roots, Gemma 4 12B on the Mac's
+  GPU, about 8 minutes for both pages): page one's 15.68 cm² (the question wants 3 significant digits, 15.7) and 24.49 (24.5 from
+  the given 2.45) were flagged as not the same, the right call; page two's 1a-1f and 2a-2d (5.67, 2.71, 21.76, 0.65, 4.64, 5.99;
+  3.48, 50.4, 15.479, 0.4) correct, 3 ("3 pens for $2.88": 5 pens for $4.65 is cheaper) not the same, 6 correct, 7 and 8 not
+  answered: "14 of 23 correct, 4 not the same, 5 not answered or can't tell". Where it went wrong: an answer written in the gap
+  between two questions (4d's 100.74, just above question 5) was read as question 5's, so 4d showed "not answered"; 4a's "3, 4, 2, 1"
+  (the table rows in order) was marked wrong since the model took the lengths for the answer; 4b's scribble was read as right. The
+  first run, with both pages in one request and no part letters, scored the same pages "3 of 16". The reading is shown for a reason:
+  handwriting between questions still needs a person's glance. Gemma 4 E4B on the iPad: not tried with these photos.
 - Gemma 4 12B on an iPad Air M4 (2026-11-15): the catalog offers it where `ChatDevicePlatform.HighMemory` (12 GB or more, an
   iPad) - the model list shows it on the iPad now, GPU or CPU. The 6.9 GB file copied over USB (about 30 minutes). On the GPU it
   loaded and answered "What is the capital of Japan? One word." - "Tokyo", thinking for 13 s. Speed with a picture and a
