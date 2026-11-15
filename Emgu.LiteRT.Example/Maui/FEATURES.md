@@ -882,6 +882,12 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
 
 ## Check homework and Gemma 4 12B on the iPad
 
+- A picture in the chat opens full screen when tapped (2026-11-15; `ChatImageViewer`, opened by `ChatAttachmentView`: the picture
+  waiting to be sent and the one in a sent message): pinch to zoom up to 8x, drag when zoomed, double-tap to zoom in and out, and
+  the buttons -, Fit and + (for a mouse) and Close. Before, the thumbnail had only its remove button, so an attached
+  worksheet couldn't be read at full size. Verified on Mac Catalyst with the surfers sample: it opens, + zoomed to about 2x,
+  Fit and Close returned to the chat; pinch and drag weren't tried (no touch screen on the Mac): try them on the iPad.
+
 - The "📝 Check homework" chip (2026-11-15; `HomeworkFeature` in `Emgu.LiteRT.LM.Maui`, its prompts in `Emgu.LiteRT.LM.Agents`'s
   `HomeworkCheck`, tested in `UnitTestHomeworkCheck`) is shown for a model that takes images. Asked "can you check my homework?"
   with a photo, the model only solved the questions (nothing told it to read the student's answers). With the chip on, the

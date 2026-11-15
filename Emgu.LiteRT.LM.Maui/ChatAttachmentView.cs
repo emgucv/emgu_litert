@@ -62,6 +62,19 @@ namespace Emgu.LiteRT.LM.Maui
             _image = GetTemplateChild("PART_Image") as Image;
             _label = GetTemplateChild("PART_Label") as Label;
             _remove = GetTemplateChild("PART_Remove") as View;
+            if (_image != null)
+            {
+                // Tapping the picture opens it full screen (ChatImageViewer), to read it at full size.
+                TapGestureRecognizer open = new TapGestureRecognizer();
+                open.Tapped += async (s, e) =>
+                {
+                    DataContent picture = Attachment;
+                    if (picture != null && picture.HasTopLevelMediaType("image"))
+                        await ChatImageViewer.ShowAsync(this, picture.Data.ToArray());
+                };
+                _image.GestureRecognizers.Add(open);
+                SemanticProperties.SetDescription(_image, "Open the picture full screen");
+            }
             if (_remove != null)
             {
                 TapGestureRecognizer tap = new TapGestureRecognizer();
