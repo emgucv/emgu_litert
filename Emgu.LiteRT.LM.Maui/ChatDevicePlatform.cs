@@ -33,12 +33,20 @@ namespace Emgu.LiteRT.LM.Maui
             false;
 #endif
 
+        /// <summary>True on an iPad with 12 GB or more of memory (an iPad Air or Pro with an M4): it can hold Gemma 4 12B.</summary>
+        public static bool HighMemory =>
+#if IOS && !MACCATALYST
+            Foundation.NSProcessInfo.ProcessInfo.PhysicalMemory >= 11_000_000_000UL;
+#else
+            false;
+#endif
+
         /// <summary>
         /// The catalog's models (<see cref="ChatModelCatalog.For"/>) this app can run: none when LiteRT-LM isn't in the app
         /// (<see cref="LiteRtLmInvoke.IsAvailable"/>; e.g. an iOS build from an Intel Mac, where LiteRT-LM can't be built), so
         /// the app offers only its remote models. On a <see cref="LowMemory"/> device, Gemma 4 prefills in small pieces.
         /// </summary>
         public static IList<ChatModelOption> AvailableModels() =>
-            LiteRtLmInvoke.IsAvailable ? ChatModelCatalog.For(Current, LowMemory) : new List<ChatModelOption>();
+            LiteRtLmInvoke.IsAvailable ? ChatModelCatalog.For(Current, LowMemory, HighMemory) : new List<ChatModelOption>();
     }
 }

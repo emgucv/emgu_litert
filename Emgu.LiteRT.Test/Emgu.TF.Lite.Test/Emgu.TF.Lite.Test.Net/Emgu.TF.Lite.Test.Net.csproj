@@ -33,6 +33,7 @@
     <Compile Include="..\UnitTestVoiceTranscript.cs" Link="UnitTestVoiceTranscript.cs" />
     <Compile Include="..\UnitTestVoiceLanguages.cs" Link="UnitTestVoiceLanguages.cs" />
     <Compile Include="..\UnitTestTaskPlan.cs" Link="UnitTestTaskPlan.cs" />
+    <Compile Include="..\UnitTestHomeworkCheck.cs" Link="UnitTestHomeworkCheck.cs" />
     <Compile Include="..\UnitTestMeetingNotes.cs" Link="UnitTestMeetingNotes.cs" />
     <Compile Include="..\UnitTestChatModelCatalog.cs" Link="UnitTestChatModelCatalog.cs" />
     <Compile Include="..\UnitTestMathText.cs" Link="UnitTestMathText.cs" />

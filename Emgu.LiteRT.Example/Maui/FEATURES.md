@@ -880,6 +880,23 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   Wikipedia and the web away.
 - The same `Microsoft.Maui.Essentials.AI` package has `GeminiNanoChatClient` (Android) and `WindowsAIChatClient`: TODO item 27.
 
+## Check homework and Gemma 4 12B on the iPad
+
+- The "📝 Check homework" chip (2026-11-15; `HomeworkFeature` in `Emgu.LiteRT.LM.Maui`, its prompts in `Emgu.LiteRT.LM.Agents`'s
+  `HomeworkCheck`, tested in `UnitTestHomeworkCheck`) is shown for a model that takes images. Asked "can you check my homework?"
+  with a photo, the model only solved the questions (nothing told it to read the student's answers). With the chip on, the
+  message with a photo is three separate requests, each small enough for Gemma 4 E2B/E4B: it reads each question and exactly what
+  the student wrote (`[blank]` for an empty answer, `[?]` for a character it can't read: it must not guess a digit; shown as "What
+  I read", so a misread is seen), solves each question from the question alone ("My own answers"; the student's answers are cut
+  from what it is given so they can't sway it), then compares: ✅ correct / ❌ not the same, with a hint / ❓ can't tell, and "Score: N of M"
+  ("The check"; answers that mean the same, 0.5 and 1/2, are correct, and a `[?]` isn't marked wrong). Without a photo it says to
+  attach one. Not measured on a real homework page yet: how often a small model misreads handwriting is the open question
+  (the Claude option reads it better).
+- Gemma 4 12B on an iPad Air M4 (2026-11-15): the catalog offers it where `ChatDevicePlatform.HighMemory` (12 GB or more, an
+  iPad) - the model list shows it on the iPad now, GPU or CPU. The 6.9 GB file copied over USB (about 30 minutes). On the GPU it
+  loaded and answered "What is the capital of Japan? One word." - "Tokyo", thinking for 13 s. Speed with a picture and a
+  worksheet, memory pressure with other apps open, and how long a cold load takes: not measured. The iPad was left on this model.
+
 ## Device actions
 
 - The agent gets `AgentTools.DeviceActions` - timers, alarms, calendar events, reminders and directions (the library's

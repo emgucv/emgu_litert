@@ -49,7 +49,8 @@ namespace Emgu.LiteRT.LM.Chat
         /// GPU then prefills with its 128-token signature only (<see cref="Gemma4.SmallPrefillOnly"/>), keeping ~740 MB
         /// that the chat's first prompt would otherwise hold, so a picture still fits after it; Qwen3.5 4B is left out
         /// and Gemma 4 E4B is offered on the GPU only (measured on an iPhone 12)</param>
-        public static IList<ChatModelOption> For(ChatPlatform platform, bool lowMemory = false)
+        /// <param name="highMemory">True on an iPad with 12 GB or more: Gemma 4 12B (6.9 GB) is offered there too (FEATURES.md, "Check homework and Gemma 4 12B on the iPad")</param>
+        public static IList<ChatModelOption> For(ChatPlatform platform, bool lowMemory = false, bool highMemory = false)
         {
             bool android = platform == ChatPlatform.Android, ios = platform == ChatPlatform.iOS, mac = platform == ChatPlatform.MacCatalyst,
                 windows = platform == ChatPlatform.Windows;
@@ -80,11 +81,12 @@ namespace Emgu.LiteRT.LM.Chat
             models.Add(Model("Bonsai8B", "Bonsai 8B", () => new Bonsai8B(), Bonsai8B.ModelFile, 2600,
                 "~2.6 GB download. An 8B-class model squeezed into the size of a 4B (ternary weights). Text only.", gpu: false, canThink: false));
             // A large desktop model; on Windows its GPU image inference failed compatibility testing.
-            if (mac || windows)
+            if (mac || windows || (ios && highMemory))
                 models.Add(Gemma("Gemma4_12B", "Gemma 4 12B", () => new Gemma4_12B(), Gemma4_12B.ModelFile, 6900,
-                    windows ? "~6.9 GB download. Large desktop model for code and harder questions. CPU only on Windows: GPU image inference failed compatibility testing. Needs substantial system memory."
+                    ios ? "~6.9 GB download. The most capable, on an iPad with 12 GB of memory: slow to load, and the system may close the app if other apps use memory."
+                    : windows ? "~6.9 GB download. Large desktop model for code and harder questions. CPU only on Windows: GPU image inference failed compatibility testing. Needs substantial system memory."
                         : "~6.9 GB download. The most capable - best for code and harder questions. Needs a Mac with 16 GB of memory.",
-                    gpu: mac));
+                    gpu: mac || ios));
             // Little memory (an iPhone 12: 4 GB, ~2.2 GB for the app; 2026-11-09, a ~1500-token first prompt): Qwen3.5 4B on the
             // CPU loaded with 811 MB left and was killed reading the prompt; Gemma 4 E4B on the CPU read it (335 MB left) but
             // was killed encoding a picture, while on the GPU with SmallPrefillOnly it read it in 21 s (1431 MB left) and

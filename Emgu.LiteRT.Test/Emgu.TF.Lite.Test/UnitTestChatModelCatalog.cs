@@ -52,6 +52,16 @@ public class UnitTestChatModelCatalog
     }
 
     [Test]
+    public void An12GBIPadAlsoGetsGemma12B()
+    {
+        Assert.That(ChatModelCatalog.For(ChatPlatform.iOS).Any(m => m.Id == "Gemma4_12B"), Is.False);
+        ChatModelOption ipad = ChatModelCatalog.For(ChatPlatform.iOS, highMemory: true).Single(m => m.Id == "Gemma4_12B");
+        Assert.That(ipad.Backends, Is.EqualTo(new[] { "cpu", "gpu" }));
+        Assert.That(ipad.Detail, Does.Contain("iPad"));
+        Assert.That(ChatModelCatalog.For(ChatPlatform.Android, highMemory: true).Any(m => m.Id == "Gemma4_12B"), Is.False);
+    }
+
+    [Test]
     public void TheFlagsMatchWhatTheModelsCanDo()
     {
         foreach (ChatModelOption option in ChatModelCatalog.For(ChatPlatform.MacCatalyst))

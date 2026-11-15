@@ -94,6 +94,7 @@ public sealed class LiteRtLmChatPage : ChatPage
         public StorageFeature Storage;
         public SearchModelFeature SearchModel;
         public TaskFeature Tasks;
+        public HomeworkFeature Homework;
         public ImageFeature Images;
         public TranslationFeature Translations;
         public DeviceActionsFeature DeviceActions;
@@ -160,6 +161,7 @@ public sealed class LiteRtLmChatPage : ChatPage
             Export = new ExportFeature((id, stream, cancel) => ChatExporter.ExportAsync(SharedStore, id, stream, cancel)),
             SearchModel = new SearchModelFeature(SearchModelOptions()),
             Tasks = new TaskFeature(),
+            Homework = new HomeworkFeature(),
             Translations = new TranslationFeature(),
             DeviceActions = new DeviceActionsFeature(),
             WrittenDocuments = new WrittenDocumentsFeature(),
@@ -281,7 +283,7 @@ public sealed class LiteRtLmChatPage : ChatPage
             new SpeechEngineFeature(), new VoiceFeature(), new VoiceLanguageFeature(),
             new CoreToolsFeature(), parts.Memory, new WebFeature(), new LocationFeature(), new PlacesFeature(), new ClipboardFeature(),
             parts.Camera, parts.PhotoEffects, parts.Claude, parts.Apple, parts.Server, parts.ServeModels, parts.Mcp, parts.SearchModel, parts.Images, parts.Storage, parts.Export,
-            parts.Documents, parts.VoiceMode, parts.Tasks, parts.Translations, parts.DeviceActions,
+            parts.Documents, parts.VoiceMode, parts.Tasks, parts.Homework, parts.Translations, parts.DeviceActions,
             parts.WrittenDocuments, parts.Goals, parts.ScheduledTasks, parts.PastChats, parts.PhotoSearch, parts.VideoSearch, parts.Videos, parts.Meetings, parts.Exercises
         })
             if (feature != null)
