@@ -908,7 +908,14 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   between two questions (4d's 100.74, just above question 5) was read as question 5's, so 4d showed "not answered"; 4a's "3, 4, 2, 1"
   (the table rows in order) was marked wrong since the model took the lengths for the answer; 4b's scribble was read as right. The
   first run, with both pages in one request and no part letters, scored the same pages "3 of 16". The reading is shown for a reason:
-  handwriting between questions still needs a person's glance. Gemma 4 E4B on the iPad: not tried with these photos.
+  handwriting between questions still needs a person's glance.
+- The same two photos with Gemma 4 E4B on the Mac's GPU (2026-11-15): 2 minutes 40 seconds against about 8 for the 12B, but
+  weaker where it counts - "5 of 17 correct, 6 not the same, 6 not answered". Page one: the same two verdicts, but one reason
+  was invented (it said the student forgot to divide by 2, from a misread 31.36). Page two: the reading was good (25 for 4b, 43.5, 300 min,
+  the blanks; "3, 9, 2, 1" for 4a), but its own answers were not: 154.79 for 15.479, "3 pens for $2.88" for question 3, so the
+  student's wrong answer to 3 was marked correct, and the check lost the part letters (1-3 as one line each) and listed 4 and 4a
+  twice. So the E4B reads a page about as well as the 12B but solves worse; where the 12B isn't available (the phones: the
+  iPad can run it, 2026-11-15), the reading is the part to trust and the verdicts are not. Gemma 4 E4B on the iPad: not tried.
 - Gemma 4 12B on an iPad Air M4 (2026-11-15): the catalog offers it where `ChatDevicePlatform.HighMemory` (12 GB or more, an
   iPad) - the model list shows it on the iPad now, GPU or CPU. The 6.9 GB file copied over USB (about 30 minutes). On the GPU it
   loaded and answered "What is the capital of Japan? One word." - "Tokyo", thinking for 13 s. Speed with a picture and a
