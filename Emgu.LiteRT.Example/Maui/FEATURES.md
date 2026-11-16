@@ -943,6 +943,16 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   3x). One miss: **4a is ❓ but the student's 3, 4, 2, 1 is right** (turtle, sunfish, shark, whale, in the table's order): the model
   said the lengths were not given, though the table is beside the question, so the check did not use it. So with a strong model the
   page check's misses mostly go away, and what is left is a table beside a question; no handwriting misread became a ❌.
+  **The table and the stem, second round** (Gemma 4 12B, the same photos, 09:10 and 09:18, about 6 minutes each): the read prompt now
+  says a question can refer to a table, chart or figure beside it and to copy its labels and numbers into the question; the 12B did
+  ("Table: Blue Whale 33.58, Great White Shark 7.92, ..."), so 4a is compared with real lengths. It is still not right: the student's
+  3, 4, 2, 1 (positions in the table) was read as "3, 4, 21" and compared with the lengths in order, so 4a is ❌ (it was ❓). The
+  first run scored 0 of 10: the stem lines ("1. Question: Write a decimal for each description. | [blank]") got a solve answer and a
+  "can't tell" from the comparison, so the first stem fix (dropped only a stem with no solve answer) did not drop them and every
+  question with parts was ❓ again; a blank stem is now dropped whatever was said about it (test added). Second run: **2 of 10
+  correct, 6 not the same, 2 not answered or can't tell**: page two's 1 and 2 are ✅, 4 and 8 have no stem row; the ❌ are the 12B's own
+  misreads (4b 25.00 for 25.66, 4d blank because the answer sits in the gap above question 5, 5 given the gap answer 100.74, 6 read as
+  "300.5 hours") and page one's two, which are right.
 - **Check homework, question by question** (2026-11-15; `HomeworkFeature` moved to `Emgu.LiteRT.LM.Maui.CV`, the layout and
   checks in `Emgu.LiteRT.LM.Agents` (`HomeworkLayout`, `HomeworkQuestionCheck`, `HomeworkQuestionChecker`), the segmenter in
   `Emgu.LiteRT.LM.Agents.CV` (`HomeworkSegmenter`), PP-OCR in `Emgu.LiteRT.Models` and `.Models.CV`). Asked to segment a page

@@ -18,7 +18,8 @@ public static class HomeworkCheck
         "This is a photo of a student's homework. List every question you can see. For each one write its number, the question " +
         "(shortened if it is long) and exactly what the student wrote as the answer: copy it as it is written, even when it " +
         "looks wrong. If the student left it empty write [blank]. If you cannot read a character write [?] in its place: never " +
-        "guess a digit. Do not solve anything. One line for each question, and for a question with parts (a, b, c...) one " +
+        "guess a digit. A question can refer to a table, chart or figure beside it: copy what it shows (the labels and the numbers) " +
+        "into the question, for example \"Table: Blue Whale 33.58, Great White Shark 7.92\". Do not solve anything. One line for each question, and for a question with parts (a, b, c...) one " +
         "line for each part, numbered with the part's letter, in this form:\n" +
         "1. Question: ... | Student's answer: ...\n" +
         "2a. Question: ... | Student's answer: ...\n" +
@@ -28,7 +29,7 @@ public static class HomeworkCheck
     /// <param name="questions">The questions, without the student's answers (<see cref="QuestionsOnly"/>)</param>
     public static string SolvePrompt(string questions) =>
         "These questions are on a homework page (the photo shows it):\n" + questions + "\n" +
-        "Solve each question yourself, carefully, from the question alone. Then give only the final result of each, one per " +
+        "Solve each question yourself, carefully, from the question alone; when a question refers to a table, chart or figure, read it from the photo. Then give only the final result of each, one per " +
         "line, in this form:\n1. <your answer>";
 
     /// <summary>The third request: compare the student's answers with the model's own.</summary>

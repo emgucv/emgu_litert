@@ -124,4 +124,14 @@ public class UnitTestHomeworkPageCheck
         Assert.That(sections.Single().Items.Select(i => i.Label), Is.EqualTo(new[] { "1a" }));
         Assert.That(sections.Single().Verdict, Is.EqualTo(HomeworkVerdict.Correct));
     }
+
+    [Test]
+    public void AStemTheModelSolvedAndCalledCantTellIsNotAPartEither()
+    {
+        var sections = HomeworkPageCheck.Group(HomeworkPageCheck.Parse(
+            "1. Question: Write a decimal for each description. | Student's answer: [blank]\n1a. Question: a | Student's answer: 5.67",
+            "1. a decimal for each description\n1a. 5.65", "1. ❓ Can't tell: no answer\n1a. ✅ Correct"), new[] { "1" });
+        Assert.That(sections.Single().Items.Select(i => i.Label), Is.EqualTo(new[] { "1a" }));
+        Assert.That(sections.Single().Verdict, Is.EqualTo(HomeworkVerdict.Correct));
+    }
 }

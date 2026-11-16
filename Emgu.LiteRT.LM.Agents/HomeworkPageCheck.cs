@@ -153,10 +153,11 @@ public static class HomeworkPageCheck
         foreach (HomeworkPageItem item in items ?? Enumerable.Empty<HomeworkPageItem>())
             Get(item.Question).Items.Add(item);
         // A question with parts is listed by the model once for its stem ("2. Question: ...") and once for each part: the stem
-        // line has no answer of its own (none, or the model's "[blank]") and is no part to mark.
+        // line has no answer of its own (none, or the model's "[blank]") and is no part to mark, whatever the solve and the
+        // comparison said about it (the model gives a stem an answer and a "can't tell" too).
         foreach (HomeworkSection section in sections)
             if (section.Items.Any(i => i.Part.Length > 0))
-                section.Items.RemoveAll(i => i.Part.Length == 0 && (i.StudentAnswer.Length == 0 || i.StudentAnswer == "[blank]") && i.MyAnswer.Length == 0);
+                section.Items.RemoveAll(i => i.Part.Length == 0 && (i.StudentAnswer.Length == 0 || i.StudentAnswer == "[blank]"));
         return sections;
     }
 
