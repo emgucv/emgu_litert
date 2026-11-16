@@ -936,9 +936,13 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   **about 1.5 minutes** (09:01:21 to 09:02:50), 10 cards, "3 of 10 correct, 5 not the same, 2 not answered or can't tell". It
   catches both answers the 12B's quick check accepted (page one's 24.49 is ❌ with "10 x 2.45 = 24.5", page two's question 3 is ❌
   with $0.96 against $0.93 a pen), reads the handwriting better (5.67, 3.48, 15.479), and page two's 1 and 2 are ✅ (the stem-line fix
-  works in the UI). 4 is ❌ on c and ❓ on a and b ("25 00[?]" is said to be unreadable, not guessed), ✅ on d (100.74, not checked
-  against the page); 5 ❌, 7 and 8 ❓ (not checked closely against the photos). So the quick check is as fast as a few requests and
-  as good as the model; with a strong model the page check's misses mostly go away.
+  works in the UI). Checked against the photo: 4d ✅ is right (3 x 33.58 = 100.74, written in the gap above question 5); 5 ❌ is right
+  (the average is 15.03, the student wrote 43.5); 6 ✅ is right; 7 and 8 are blank on the page, so ❓ is right (they are "not
+  answered"; the card's mark is the same ❓ for that and for "can't tell"); 4b ❓ is a careful read of "25 00[?]" (25.66 is the
+  answer, and the writing runs into the table), not a guess; 4c ❌ is arguable (7.92 / 2.13 = 3.7, "about 4" against the student's
+  3x). One miss: **4a is ❓ but the student's 3, 4, 2, 1 is right** (turtle, sunfish, shark, whale, in the table's order): the model
+  said the lengths were not given, though the table is beside the question, so the check did not use it. So with a strong model the
+  page check's misses mostly go away, and what is left is a table beside a question; no handwriting misread became a ❌.
 - **Check homework, question by question** (2026-11-15; `HomeworkFeature` moved to `Emgu.LiteRT.LM.Maui.CV`, the layout and
   checks in `Emgu.LiteRT.LM.Agents` (`HomeworkLayout`, `HomeworkQuestionCheck`, `HomeworkQuestionChecker`), the segmenter in
   `Emgu.LiteRT.LM.Agents.CV` (`HomeworkSegmenter`), PP-OCR in `Emgu.LiteRT.Models` and `.Models.CV`). Asked to segment a page
