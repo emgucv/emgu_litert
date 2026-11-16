@@ -932,6 +932,13 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   So the quick check is about six times faster and sees the same pictures, but it keeps the page check's misses (a question
   accepted that the per-question check catches; answers written in a gap above a question): the picture next to the verdict lets a
   parent see it. Saved chats restore the cards (verified). Not tried: the E4B, the iPad.
+  **With Claude** (Claude Sonnet 5.5 through the Claude API, 2026-11-16, the same two photos, sent to Anthropic with the saved key):
+  **about 1.5 minutes** (09:01:21 to 09:02:50), 10 cards, "3 of 10 correct, 5 not the same, 2 not answered or can't tell". It
+  catches both answers the 12B's quick check accepted (page one's 24.49 is ❌ with "10 x 2.45 = 24.5", page two's question 3 is ❌
+  with $0.96 against $0.93 a pen), reads the handwriting better (5.67, 3.48, 15.479), and page two's 1 and 2 are ✅ (the stem-line fix
+  works in the UI). 4 is ❌ on c and ❓ on a and b ("25 00[?]" is said to be unreadable, not guessed), ✅ on d (100.74, not checked
+  against the page); 5 ❌, 7 and 8 ❓ (not checked closely against the photos). So the quick check is as fast as a few requests and
+  as good as the model; with a strong model the page check's misses mostly go away.
 - **Check homework, question by question** (2026-11-15; `HomeworkFeature` moved to `Emgu.LiteRT.LM.Maui.CV`, the layout and
   checks in `Emgu.LiteRT.LM.Agents` (`HomeworkLayout`, `HomeworkQuestionCheck`, `HomeworkQuestionChecker`), the segmenter in
   `Emgu.LiteRT.LM.Agents.CV` (`HomeworkSegmenter`), PP-OCR in `Emgu.LiteRT.Models` and `.Models.CV`). Asked to segment a page

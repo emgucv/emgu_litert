@@ -603,5 +603,7 @@ two-photo run on the Mac in [FEATURES.md](FEATURES.md), "Check homework, questio
 - [ ] Try the E4B through the cards (the whole-page check scored 5 of 17 on the same photos).
 - [ ] The quick check ("Check homework") with the E4B and on the iPad; run the quick check once more after the stem-line fix
   (page two's questions 1 and 2 should be ✅, not ❓).
+- [ ] The quick check with Claude (2026-11-16): 1.5 minutes, 3 of 10 correct, 5 not the same, 2 can't tell (FEATURES.md); check its
+  page two 4d, 5, 7 and 8 against the photos, and see whether it keeps a handwriting misread out of the ❌ marks.
 - [ ] The quick check accepts some wrong answers the per-question check catches (page one's 24.49, page two's question 3): a second
   pass on the cards it marked ✅ with the picture is an option if a parent needs it.
