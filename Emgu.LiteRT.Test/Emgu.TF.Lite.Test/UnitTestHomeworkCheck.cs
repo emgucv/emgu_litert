@@ -24,6 +24,8 @@ public class UnitTestHomeworkCheck
         Assert.That(HomeworkCheck.ReadPrompt(null), Does.Not.Contain("The user said"));
         Assert.That(HomeworkCheck.ReadPrompt(null), Does.Contain("table").And.Contain("copy what it shows"));
         Assert.That(HomeworkCheck.SolvePrompt("1. Order the lengths"), Does.Contain("read it from the photo"));
+        Assert.That(HomeworkCheck.ReadPrompt(null), Does.Contain("not \"3, 4, 21\""));
+        Assert.That(HomeworkCheck.ComparePrompt("1. Question: Order | Student's answer: 3, 4, 2, 1", "1. 2.13, 2.95"), Does.Contain("numbers of the table's rows"));
         Assert.That(HomeworkCheck.SolvePrompt("1. 17 + 25"), Does.Contain("1. 17 + 25").And.Contain("Solve each question yourself"));
         string compare = HomeworkCheck.ComparePrompt("1. Question: 2+2 | Student's answer: 5", "1. 4");
         Assert.That(compare, Does.Contain("Student's answer: 5").And.Contain("1. 4").And.Not.Contain("Score"));

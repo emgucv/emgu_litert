@@ -614,7 +614,9 @@ Still open:
   only with "[blank]", "(blank)" or "left blank", so a hint like "fill in the blank" is safe). Tested with both wordings; the build
   run on Claude again with the final fix (09:59): no blank answer is a "Can't tell" any more; the blank parts of 7 and 8 show "Not answered".
 - [ ] The quick check: a question with a table beside it (page two's 4a): the read prompt now copies the table into the question
-  (done, 2026-11-16), but an answer that is a position in the table ("3, 4, 2, 1") is read as "3, 4, 21" and compared with the values:
-  tell the compare step that an ordering may be given as the rows' numbers, or put the table in the question's crop.
+  (done, 2026-11-16), the read prompt keeps the student's commas ("3, 4, 2, 1", done) and the compare prompt says an ordering may be
+  given as the rows' numbers (done): Claude gets 4a right, the 12B reads it right but its compare step still marks 4a ❌ (it works out
+  the rows and then writes the wrong order). Open: do the ordering in code (sort the copied table, compare with the numbers), or put the
+  table in the question's crop.
 - [ ] The quick check accepts some wrong answers the per-question check catches (page one's 24.49, page two's question 3): a second
   pass on the cards it marked ✅ with the picture is an option if a parent needs it.

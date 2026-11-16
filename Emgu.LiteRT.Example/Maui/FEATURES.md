@@ -958,7 +958,14 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   helps a strong model), 4d ✅, 5 ❌ (15.03 against 43.5), 6 ✅, page one 1 and 2 ❌, page two 1, 2 ✅ and 3 ❌ (all as before). Question 4
   stays ❌ because of 4c (3x against "about 4", arguable) and 4b is ❓ ("25 00[?]"). Questions 7 and 8 are blank on the page and show ❓
   with "Can't tell: the student's answer was blank" instead of "Not answered": the tidy step only recognises "[blank]", "(blank)"
-  and "left blank".
+  and "left blank". (Fixed since: any "❓" line that says "blank" is "Not answered"; run on Claude again, 7 and 8 show it.)
+  **4a, third round** (Gemma 4 12B, 17:46 to 17:52, 6 minutes): the read prompt now says to copy a list of numbers with the student's
+  commas, and the compare prompt says an ordering can be answered with the table's row numbers. The read is fixed: "3, 4, 2, 1"
+  (not "3, 4, 21"). The compare step still marks it ❌: it worked out the rows correctly in its own words ("2.13 (3), 2.95 (4),
+  7.92 (2), 33.58 (1)", which is 3, 4, 2, 1) and then wrote the answer as "4, 2, 1, 3". Score 4 of 10 correct, 4 not the same, 2 not
+  answered or can't tell: page one's 2 is ✅ again (24.49 accepted, wrong), page two's 4b read 25.66 and is ✅ (the earlier runs read
+  25.00), 4c ❌ (4x against 3.7, arguable), 4d blank (the answer sits in the gap), 5 ❌ with "100.74 (on top), 43.5 (below)" as the
+  answer, 6 ✅. So the 12B reads 4a right now, but its compare step does not do the ordering reliably.
 - **One homework chip** (2026-11-16): "🔬 Check each question" is removed; "📝 Check homework" (the quick check above) is the only
   homework check. It still segments each page with PP-OCR for the question pictures, but there is no plan step (Skip, Check them,
   Stop) and no per-question requests. The summary card that ends the reply is now a plain card. Chats saved with the old per-question

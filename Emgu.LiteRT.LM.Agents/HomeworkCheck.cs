@@ -19,7 +19,8 @@ public static class HomeworkCheck
         "(shortened if it is long) and exactly what the student wrote as the answer: copy it as it is written, even when it " +
         "looks wrong. If the student left it empty write [blank]. If you cannot read a character write [?] in its place: never " +
         "guess a digit. A question can refer to a table, chart or figure beside it: copy what it shows (the labels and the numbers) " +
-        "into the question, for example \"Table: Blue Whale 33.58, Great White Shark 7.92\". Do not solve anything. One line for each question, and for a question with parts (a, b, c...) one " +
+        "into the question, in the table's order from the top, for example \"Table: Blue Whale 33.58, Great White Shark 7.92\". " +
+        "Copy a list of numbers with the commas the student wrote (\"3, 4, 2, 1\", not \"3, 4, 21\"). Do not solve anything. One line for each question, and for a question with parts (a, b, c...) one " +
         "line for each part, numbered with the part's letter, in this form:\n" +
         "1. Question: ... | Student's answer: ...\n" +
         "2a. Question: ... | Student's answer: ...\n" +
@@ -43,6 +44,9 @@ public static class HomeworkCheck
         "\"<number>. ❓ Can't tell\" with the reason (the answer was unreadable, or the two can't be compared). Answers that mean " +
         "the same are correct (0.5 and 1/2, \"12 cm\" and 12, a capital letter). A question that has many right answers (for example " +
         "\"a decimal between 5.63 and 5.68\") is correct when the student's answer fits it, even if it differs from the worked-out one. " +
+        "An ordering question can be answered with the numbers of the table's rows in the right order (the rows counted from the top: " +
+        "\"3, 4, 2, 1\" is the third row, then the fourth, the second and the first): work out the order of the rows and compare " +
+        "it with the student's numbers. " +
         "Do not mark a question wrong because of a [?]. " +
         "Write nothing else: no score, no introduction.";
 
