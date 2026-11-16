@@ -1493,6 +1493,54 @@ namespace Emgu.TF.Lite.Test
             await TestGemma4ImageAndAudio(new Gemma4E4B());
         }
 
+        // Spike for the question-by-question homework check: can Gemma 4 give a box for each question of a homework photo?
+        // The photos are personal, so their paths come from the HOMEWORK_PHOTOS environment variable (separated by ';');
+        // HOMEWORK_MODEL is "E4B" or "12B" (default E4B). The raw replies are written to the console and to
+        // HOMEWORK_OUT (a folder; default the temp folder) as <photo>.<model>.txt, to be cropped and looked at.
+#if !TEST_MODELS
+#if VS_TEST
+        [Ignore()]
+#else
+        [Ignore("Ignore from test run by default.")]
+#endif
+#endif
+        [TestAttribute]
+        public async Task TestHomeworkSegmentationSpike()
+        {
+            RequireLiteRtLm();
+            string photos = Environment.GetEnvironmentVariable("HOMEWORK_PHOTOS");
+            if (String.IsNullOrEmpty(photos))
+                Skip("Set HOMEWORK_PHOTOS to the homework photos (separated by ';')");
+            if (!UnitTest1.StageGpuPlugin())
+                Skip("No LiteRT GPU accelerator plugin next to libLiteRt");
+            string outFolder = Environment.GetEnvironmentVariable("HOMEWORK_OUT") ?? System.IO.Path.GetTempPath();
+            string which = Environment.GetEnvironmentVariable("HOMEWORK_MODEL") ?? "E4B";
+            const string prompt = "This is a photo of a student's homework page. Find every numbered question on the page, and for a " +
+                "question with parts (a, b, c...) every part. For each one give the box around the printed question together with " +
+                "any handwriting beside it or just below it (the student's work and answer). Reply with JSON only: a list of " +
+                "objects {\"label\": \"1\" or \"2a\", \"box_2d\": [ymin, xmin, ymax, xmax]} with the coordinates from 0 to 1000 " +
+                "(the top left corner of the picture is 0, 0 and the bottom right is 1000, 1000).";
+            using (LanguageModel model = which == "12B" ? (LanguageModel)new Gemma4_12B() : new Gemma4E4B())
+            {
+                await model.Init(backend: "gpu");
+                using (IChatClient client = model.AsIChatClient())
+                {
+                    foreach (string photo in photos.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        System.Diagnostics.Stopwatch time = System.Diagnostics.Stopwatch.StartNew();
+                        ChatResponse response = await client.GetResponseAsync(
+                            new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, new List<AIContent> { new DataContent(System.IO.File.ReadAllBytes(photo), "image/jpeg"), new TextContent(prompt) }) },
+                            new ChatOptions { MaxOutputTokens = 2500, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } });
+                        Console.WriteLine("{0} {1}: {2:F1} s", which, System.IO.Path.GetFileName(photo), time.Elapsed.TotalSeconds);
+                        Console.WriteLine(response.Text);
+                        System.IO.File.WriteAllText(System.IO.Path.Combine(outFolder, System.IO.Path.GetFileNameWithoutExtension(photo) + "." + which + ".txt"), response.Text ?? string.Empty);
+                        if (String.IsNullOrWhiteSpace(response.Text))
+                            throw new Exception("The reply is empty");
+                    }
+                }
+            }
+        }
+
         // "Watch and listen" rounds (SceneNarrator.BuildRequest): 3 frames and ~5.8 s of speech in one request to Gemma 4 E2B
         // on the GPU, with the vision encoder on the GPU and then on the CPU (as the chat loads it); logs each round's time.
         // The reply must quote the speech, and not in a silent round.
