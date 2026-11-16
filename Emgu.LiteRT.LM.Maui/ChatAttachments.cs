@@ -51,7 +51,7 @@ namespace Emgu.LiteRT.LM.Maui
         });
 
         /// <summary>The longest side of an image sent to the model; the vision encoders resize them anyway.</summary>
-        public int MaxImageSize { get; set; } = 1024;
+        public int MaxImageSize { get; set; } = 2048;
 
         /// <summary>The menu's title.</summary>
         public string Title { get; set; } = "Attach";

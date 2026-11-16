@@ -589,3 +589,15 @@ button seen on the iPad the same day is fixed (the picture leaves room for the b
 - [ ] A device run of a cap pushing out the oldest photo (unit-tested), a camera switch (no row), and a private chat
   (no Keep, no Keep all).
 - [ ] The Galaxy S10 (photos and clips through Camera2) and Mac Catalyst (snapshots with OpenCV's camera).
+
+## 62. Check homework, question by question: what is left
+
+The chip segments each page with PP-OCR, shows a plan, and checks every question on its own card (how it works and the
+two-photo run on the Mac in [FEATURES.md](FEATURES.md), "Check homework, question by question"). Still open:
+
+- [ ] Run it on the iPad Air (12B and E4B): time per question, memory with the two PP-OCR graphs, the cards' layout on a
+  touch screen (tap to enlarge, Skip, Stop).
+- [ ] Boxed handwritten digits (1e: 4.64 read as 4.69 in one run) and answers that refer to a table (4a-4c): a second look at
+  an `[unsure]` read, or a bigger recognizer width, if a parent needs them right.
+- [ ] Pages with two columns of questions (the layout assumes one column, or parts side by side on one row).
+- [ ] Try the E4B through the cards (the whole-page check scored 5 of 17 on the same photos).

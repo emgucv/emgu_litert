@@ -916,6 +916,36 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   student's wrong answer to 3 was marked correct, and the check lost the part letters (1-3 as one line each) and listed 4 and 4a
   twice. So the E4B reads a page about as well as the 12B but solves worse; where the 12B isn't available (the phones: the
   iPad can run it, 2026-11-15), the reading is the part to trust and the verdicts are not. Gemma 4 E4B on the iPad: not tried.
+- **Check homework, question by question** (2026-11-15; `HomeworkFeature` moved to `Emgu.LiteRT.LM.Maui.CV`, the layout and
+  checks in `Emgu.LiteRT.LM.Agents` (`HomeworkLayout`, `HomeworkQuestionCheck`, `HomeworkQuestionChecker`), the segmenter in
+  `Emgu.LiteRT.LM.Agents.CV` (`HomeworkSegmenter`), PP-OCR in `Emgu.LiteRT.Models` and `.Models.CV`). Asked to segment a page
+  question by question, Gemma 4 can't place boxes (spike, `TestHomeworkSegmentationSpike`: E4B drew evenly spaced invented boxes,
+  the 12B loose ones that swallowed the next question and overran 1000, 133 s a page), so **PaddleOCR finds the text**: the
+  PP-OCRv6 Small detector (LiteRT, CPU fp32, 640 x 640) gives four-point quads, so a tilted line keeps its shape, and the
+  recognizer reads the question numbers ("1.", "a)") at the start of each line (a left-extended read for lines at the margin,
+  where the detector often leaves the bold number out of the line). `HomeworkLayout.Segment` makes a region from one label to the
+  next (an answer written in the gap above a question goes to the question above), splits parts on one row ("a) ... b) ...") by x,
+  and widens each to its slot so a thin answer box the detector missed is in the crop; the crops are made with Emgu CV
+  (`WarpPerspective`). Emgu CV's own DNN text detector isn't usable: the demo's mini runtime is built without dnn.
+  The reply is a **plan card** ("The questions to check": a row per question with its crop, tap to enlarge, Skip, Check them,
+  Stop) and then **one card per question**: the crop photo, "Question", "Answer read from the handwriting", then ✅ Correct, or
+  ❌ Not right with "How to solve it" and "What went wrong", or ❓ Not answered; the plan rows turn ✅/❌/❓ and the
+  "Score: 11 of 23 correct, ..." line is counted in code. Per question: a yes/no "is anything written?" (100% on 23 questions;
+  blank skips every other request), the read (the question's OCR lines are given, those the recognizer is under 90% sure of are
+  marked `[unsure]`: trusting the OCR text broke boxed digits, ignoring it let the model copy wrong digits), the solve (on the
+  whole-question crop, told to follow the question's own values and rounding) and the judge (JSON, with a retry); equal answers are
+  ✅ in code. A text match of the read answer against the OCR was tried and dropped: it rejected true answers. No question found
+  (the surfers sample) falls back to the whole-page check with "I couldn't find numbered questions on the photos, so each page is
+  checked as a whole" (verified). Cards are saved (`homework_plan`, `homework_question`, crop as base64) and come back from Saved
+  chats (verified: all 23 marks and the score line). The PP-OCR models (12.4 MB and 21.5 MB, a 168 KB dictionary) are downloaded on
+  first use. Attached pictures are now kept up to 2048 pixels (were 1024), so a crop is readable.
+- The same two photos, Gemma 4 12B on the Mac's GPU, through the cards (2026-11-15): 23 questions found (page one: 1, 2; page two:
+  1a-1f, 2a-2d, 3, 4a-4d, 5, 6, 7, 8a-8c), about 1.5 minutes each, 35 minutes for all. "11 of 23 correct, 8 not the same, 4 not
+  answered": 1a-1d, 1f, 2a-2d, 4d (100.74, now with the right question) and 6 are ✅; 1, 2, 3, 5 are ❌ as before; 7 and 8a-8c are
+  not answered. Not as hoped: 1e was read as 4.69 (the same question read 4.64 in the test harness on 1600-pixel copies: the
+  boxed digits are at the recognizer's limit, and the explanation then invented "0.15"), and 4a-4c are ❌ (4a's "3, 4, 2, 1" is
+  the table's rows, 4b's "25 ooo", 4c's "3x": arguable). The reading is on the card, so a parent sees which verdict rests on a
+  misread. The E4B was not tried with the cards.
 - Gemma 4 12B on an iPad Air M4 (2026-11-15): the catalog offers it where `ChatDevicePlatform.HighMemory` (12 GB or more, an
   iPad) - the model list shows it on the iPad now, GPU or CPU. The 6.9 GB file copied over USB (about 30 minutes). On the GPU it
   loaded and answered "What is the capital of Japan? One word." - "Tokyo", thinking for 13 s. Speed with a picture and a

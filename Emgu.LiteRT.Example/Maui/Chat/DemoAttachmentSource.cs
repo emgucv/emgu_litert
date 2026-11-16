@@ -36,7 +36,7 @@ internal sealed class DemoAttachmentSource : IChatAttachmentSource
 
     // Images are downscaled to this size before sending: the vision encoder resizes them anyway, and smaller images
     // keep the base64-encoded message small.
-    private const int MaxImageSize = 1024;
+    private const int MaxImageSize = 2048;
 
     private readonly Func<string, IReadOnlyList<(string Section, string Glyph, string Text, string Value)>, Task<string>> _showMenu;
     private readonly Func<bool> _isPrivate;
