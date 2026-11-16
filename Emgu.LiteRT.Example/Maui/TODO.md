@@ -605,6 +605,8 @@ two-photo run on the Mac in [FEATURES.md](FEATURES.md), "Check homework, questio
   (page two's questions 1 and 2 should be ✅, not ❓).
 - [x] The quick check with Claude (2026-11-16): 1.5 minutes, 3 of 10 correct, 5 not the same, 2 can't tell. Page two's 4d, 5, 7 and 8
   checked against the photo: all right, and no handwriting misread became a ❌ (FEATURES.md).
+- [ ] The comparison writes "Can't tell: the student's answer was blank" for a blank answer (Claude, questions 7 and 8): `TidyCheck`
+  only turns "[blank]", "(blank)" and "left blank" into "Not answered"; add "was blank".
 - [ ] The quick check: a question with a table beside it (page two's 4a): the read prompt now copies the table into the question
   (done, 2026-11-16), but an answer that is a position in the table ("3, 4, 2, 1") is read as "3, 4, 21" and compared with the values:
   tell the compare step that an ordering may be given as the rows' numbers, or put the table in the question's crop.

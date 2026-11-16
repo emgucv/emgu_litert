@@ -953,6 +953,12 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   correct, 6 not the same, 2 not answered or can't tell**: page two's 1 and 2 are ✅, 4 and 8 have no stem row; the ❌ are the 12B's own
   misreads (4b 25.00 for 25.66, 4d blank because the answer sits in the gap above question 5, 5 given the gap answer 100.74, 6 read as
   "300.5 hours") and page one's two, which are right.
+  **With Claude, after both changes** (09:37 to 09:39, about 1.5 minutes): "3 of 10 correct, 5 not the same, 2 not answered or can't
+  tell", the same count as the first Claude run, but **4a is now ✅** (3, 4, 2, 1 compared with the table's lengths: the table copy
+  helps a strong model), 4d ✅, 5 ❌ (15.03 against 43.5), 6 ✅, page one 1 and 2 ❌, page two 1, 2 ✅ and 3 ❌ (all as before). Question 4
+  stays ❌ because of 4c (3x against "about 4", arguable) and 4b is ❓ ("25 00[?]"). Questions 7 and 8 are blank on the page and show ❓
+  with "Can't tell: the student's answer was blank" instead of "Not answered": the tidy step only recognises "[blank]", "(blank)"
+  and "left blank".
 - **Check homework, question by question** (2026-11-15; `HomeworkFeature` moved to `Emgu.LiteRT.LM.Maui.CV`, the layout and
   checks in `Emgu.LiteRT.LM.Agents` (`HomeworkLayout`, `HomeworkQuestionCheck`, `HomeworkQuestionChecker`), the segmenter in
   `Emgu.LiteRT.LM.Agents.CV` (`HomeworkSegmenter`), PP-OCR in `Emgu.LiteRT.Models` and `.Models.CV`). Asked to segment a page
