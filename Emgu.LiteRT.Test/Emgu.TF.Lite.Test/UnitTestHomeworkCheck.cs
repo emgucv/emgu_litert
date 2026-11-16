@@ -38,4 +38,14 @@ public class UnitTestHomeworkCheck
         Assert.That(HomeworkCheck.Summary(new[] { check }), Is.EqualTo("**Score: 1 of 4 correct, 1 not the same, 2 not answered or can't tell**"));
         Assert.That(HomeworkCheck.Summary(new[] { "nothing" }), Is.Empty);
     }
+
+    [Test]
+    public void ABlankAnswerTheModelDescribesInWordsIsNotAnswered()
+    {
+        string check = HomeworkCheck.TidyCheck("7. ❓ Can't tell: the student's answer was blank.\n8a. ❓ Can't tell: the answer is blank\n3. ❓ Can't tell: unreadable");
+        Assert.That(check, Is.EqualTo("7. ❓ Not answered\n8a. ❓ Not answered\n3. ❓ Can't tell: unreadable"));
+        Assert.That(HomeworkCheck.TidyCheck("8b. ❓ Can't tell: the student left this blank."), Is.EqualTo("8b. ❓ Not answered"));
+        // A hint that says "blank" is not a blank answer.
+        Assert.That(HomeworkCheck.TidyCheck("2. ❌ Not the same: the student wrote 5, the answer is 7 (fill in the blank with 7)"), Does.Contain("❌ Not the same"));
+    }
 }

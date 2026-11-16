@@ -60,7 +60,9 @@ public static class HomeworkCheck
             if (text.Length == 0 || Regex.IsMatch(text, @"^\W*Score\b", RegexOptions.IgnoreCase))
                 continue;
             Match number = Regex.Match(text, @"^(\d+[a-z]?[.)]|[a-z]\))\s*");
-            if (number.Success && Regex.IsMatch(text, @"\[blank\]|\(blank\)|left (it )?blank", RegexOptions.IgnoreCase))
+            // A "can't tell" that says blank in any words ("left this blank", "was blank"); on a ✅ or ❌ line only the marked forms
+            // count, since "fill in the blank" can be in a question's hint.
+            if (number.Success && Regex.IsMatch(text, text.Contains("❓") ? @"\bblank\b" : @"\[blank\]|\(blank\)|left (it )?blank", RegexOptions.IgnoreCase))
                 text = number.Value.Trim() + " ❓ Not answered";
             lines.Add(text);
         }
