@@ -6,6 +6,21 @@ using System.Text.RegularExpressions;
 
 namespace Emgu.LiteRT.LM.Agents;
 
+/// <summary>How one question's answer was marked.</summary>
+public enum HomeworkVerdict
+{
+    /// <summary>Not checked yet.</summary>
+    Pending,
+    /// <summary>The student's answer is right.</summary>
+    Correct,
+    /// <summary>The student's answer is not.</summary>
+    Wrong,
+    /// <summary>It can't be told (an unreadable answer, a question the model couldn't solve).</summary>
+    Unclear,
+    /// <summary>The student left it blank.</summary>
+    NotAnswered
+}
+
 /// <summary>One question or part of a page check: what the model read, solved and marked for it.</summary>
 public sealed class HomeworkPageItem
 {

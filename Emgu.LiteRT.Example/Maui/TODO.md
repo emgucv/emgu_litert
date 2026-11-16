@@ -593,7 +593,11 @@ button seen on the iPad the same day is fixed (the picture leaves room for the b
 ## 62. Check homework, question by question: what is left
 
 The chip segments each page with PP-OCR, shows a plan, and checks every question on its own card (how it works and the
-two-photo run on the Mac in [FEATURES.md](FEATURES.md), "Check homework, question by question"). Still open:
+two-photo run on the Mac in [FEATURES.md](FEATURES.md), "Check homework, question by question").
+
+The "🔬 Check each question" chip was removed on 2026-11-16 (FEATURES.md, "One homework chip"). The items below about the
+per-question cards (Skip, Stop, timing per question, the E4B through the cards) no longer apply. The quick check's items still do.
+Still open:
 
 - [ ] Run it on the iPad Air (12B and E4B): time per question, memory with the two PP-OCR graphs, the cards' layout on a
   touch screen (tap to enlarge, Skip, Stop).

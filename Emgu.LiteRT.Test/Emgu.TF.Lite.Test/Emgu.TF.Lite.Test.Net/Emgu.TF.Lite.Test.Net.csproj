@@ -37,7 +37,6 @@
     <Compile Include="..\UnitTestPpOcr.cs" Link="UnitTestPpOcr.cs" />
     <Compile Include="..\UnitTestHomeworkLayout.cs" Link="UnitTestHomeworkLayout.cs" />
     <Compile Include="..\UnitTestHomeworkPageCheck.cs" Link="UnitTestHomeworkPageCheck.cs" />
-    <Compile Include="..\UnitTestHomeworkQuestionCheck.cs" Link="UnitTestHomeworkQuestionCheck.cs" />
     <Compile Include="..\UnitTestMeetingNotes.cs" Link="UnitTestMeetingNotes.cs" />
     <Compile Include="..\UnitTestChatModelCatalog.cs" Link="UnitTestChatModelCatalog.cs" />
     <Compile Include="..\UnitTestMathText.cs" Link="UnitTestMathText.cs" />

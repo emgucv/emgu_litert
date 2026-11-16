@@ -11,10 +11,7 @@ using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 using Emgu.CV.Util;
 using Emgu.LiteRT.LM.Agents;
-using Emgu.LiteRT.LM.Extensions.AI;
-using Emgu.LiteRT.LM.Models;
 using Emgu.LiteRT.Models;
-using Microsoft.Extensions.AI;
 using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
@@ -135,68 +132,6 @@ public class UnitTestPpOcr
                     CvInvoke.Imwrite(Path.Combine(folder, "q" + unit.Label + ".jpg"), crop);
                 Console.WriteLine("  {0}: {1} lines {2}", unit.Label, unit.Lines.Count, crop == null ? "no crop" : crop.Width + "x" + crop.Height);
             }
-        }
-    }
-
-    // Spike: the per-question check on real pages with a real model. HOMEWORK_PHOTOS, HOMEWORK_OUT, HOMEWORK_MODEL ("E4B" or
-    // "12B"; default 12B) and HOMEWORK_LABELS (comma separated, e.g. "2,4d,5,8a"; default every question).
-    [Test]
-    public async Task ChecksHomeworkQuestionsWithAModel()
-    {
-        string photos = Environment.GetEnvironmentVariable("HOMEWORK_PHOTOS");
-        if (string.IsNullOrEmpty(photos))
-            Assert.Ignore("Set HOMEWORK_PHOTOS to the homework photos (separated by ';')");
-        string output = Environment.GetEnvironmentVariable("HOMEWORK_OUT") ?? Path.GetTempPath();
-        string[] labels = (Environment.GetEnvironmentVariable("HOMEWORK_LABELS") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries);
-        using var segmenter = new HomeworkSegmenter(Path.Combine(output, "models"));
-        await segmenter.PrepareAsync(2, Console.WriteLine, CancellationToken.None);
-        var units = new List<(int Page, HomeworkPageUnit Unit)>();
-        int page = 0;
-        foreach (string photo in photos.Split(';', StringSplitOptions.RemoveEmptyEntries))
-            units.AddRange(segmenter.Segment(System.IO.File.ReadAllBytes(photo)).Select(u => (++page, u)).Select(x => (x.Item1, x.u)).ToList());
-        using LanguageModel model = Environment.GetEnvironmentVariable("HOMEWORK_MODEL") == "E4B" ? new Gemma4E4B() : new Gemma4_12B();
-        await model.Init(backend: "gpu");
-        using IChatClient client = model.AsIChatClient();
-        HomeworkQuestionChecker.Trace = message => Console.WriteLine("   TRACE " + message.Replace("\n", " "));
-        foreach (var (pageNumber, unit) in units)
-        {
-            if (labels.Length > 0 && !labels.Contains(unit.Label))
-                continue;
-            var result = new HomeworkQuestionResult();
-            var time = System.Diagnostics.Stopwatch.StartNew();
-            await HomeworkQuestionChecker.CheckAsync(client, unit.Label, unit.Crop, unit.ParentCrop, unit.Text, null, result, null, CancellationToken.None);
-            Console.WriteLine("Q{0} (page {1}, {2:F0} s): {3} | answer '{4}' | question '{5}'", unit.Label, pageNumber, time.Elapsed.TotalSeconds, result.Verdict, result.StudentAnswer, result.Question.Length > 60 ? result.Question.Substring(0, 60) : result.Question);
-            Console.WriteLine("   OCR: {0}", string.Join(" | ", unit.Text));
-            if (result.Verdict == HomeworkVerdict.Wrong)
-                Console.WriteLine("   wrong: {0} || how: {1}", result.WhatWentWrong, result.HowToSolve.Length > 100 ? result.HowToSolve.Substring(0, 100) : result.HowToSolve);
-            if (result.Verdict == HomeworkVerdict.Unclear)
-                Console.WriteLine("   unclear: {0}", result.Reason);
-        }
-    }
-
-    // Spike: can the model tell a question with handwriting in its picture from one without? (yes/no per question)
-    [Test]
-    public async Task TellsWhetherAQuestionHasHandwriting()
-    {
-        string photos = Environment.GetEnvironmentVariable("HOMEWORK_PHOTOS");
-        if (string.IsNullOrEmpty(photos))
-            Assert.Ignore("Set HOMEWORK_PHOTOS to the homework photos (separated by ';')");
-        string output = Environment.GetEnvironmentVariable("HOMEWORK_OUT") ?? Path.GetTempPath();
-        using var segmenter = new HomeworkSegmenter(Path.Combine(output, "models"));
-        await segmenter.PrepareAsync(2, Console.WriteLine, CancellationToken.None);
-        var units = photos.Split(';', StringSplitOptions.RemoveEmptyEntries).SelectMany(photo => segmenter.Segment(System.IO.File.ReadAllBytes(photo))).ToList();
-        using LanguageModel model = Environment.GetEnvironmentVariable("HOMEWORK_MODEL") == "E4B" ? new Gemma4E4B() : new Gemma4_12B();
-        await model.Init(backend: "gpu");
-        using IChatClient client = model.AsIChatClient();
-        const string prompt = "This picture is part of a student's homework page. The question is printed. Look for anything the student " +
-            "wrote by hand (pen or pencil), such as an answer, numbers or working. Is there any handwriting in this picture? " +
-            "Reply with exactly one word: yes or no.";
-        foreach (HomeworkPageUnit unit in units)
-        {
-            ChatResponse response = await client.GetResponseAsync(
-                new[] { new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, new List<AIContent> { new DataContent(unit.Crop, "image/jpeg"), new TextContent(prompt) }) },
-                new ChatOptions { MaxOutputTokens = 8, Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None } });
-            Console.WriteLine("HANDWRITING Q{0}: {1}", unit.Label, HomeworkQuestionChecker.WithoutThinking(response.Text));
         }
     }
 }

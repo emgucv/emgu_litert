@@ -959,6 +959,12 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   stays ❌ because of 4c (3x against "about 4", arguable) and 4b is ❓ ("25 00[?]"). Questions 7 and 8 are blank on the page and show ❓
   with "Can't tell: the student's answer was blank" instead of "Not answered": the tidy step only recognises "[blank]", "(blank)"
   and "left blank".
+- **One homework chip** (2026-11-16): "🔬 Check each question" is removed; "📝 Check homework" (the quick check above) is the only
+  homework check. It still segments each page with PP-OCR for the question pictures, but there is no plan step (Skip, Check them,
+  Stop) and no per-question requests. The summary card that ends the reply is now a plain card. Chats saved with the old per-question
+  cards and plan still restore. `HomeworkQuestionCheck` and `HomeworkQuestionChecker` are removed from `Emgu.LiteRT.LM.Agents`, along with
+  their tests and the two per-question spikes in `UnitTestPpOcr`. `HomeworkVerdict` moved to `HomeworkPageCheck.cs`. The entry
+  below describes the removed check.
 - **Check homework, question by question** (2026-11-15; `HomeworkFeature` moved to `Emgu.LiteRT.LM.Maui.CV`, the layout and
   checks in `Emgu.LiteRT.LM.Agents` (`HomeworkLayout`, `HomeworkQuestionCheck`, `HomeworkQuestionChecker`), the segmenter in
   `Emgu.LiteRT.LM.Agents.CV` (`HomeworkSegmenter`), PP-OCR in `Emgu.LiteRT.Models` and `.Models.CV`). Asked to segment a page
