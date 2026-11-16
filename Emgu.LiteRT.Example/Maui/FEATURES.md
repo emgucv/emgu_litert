@@ -966,6 +966,15 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   answered or can't tell: page one's 2 is ✅ again (24.49 accepted, wrong), page two's 4b read 25.66 and is ✅ (the earlier runs read
   25.00), 4c ❌ (4x against 3.7, arguable), 4d blank (the answer sits in the gap), 5 ❌ with "100.74 (on top), 43.5 (below)" as the
   answer, 6 ✅. So the 12B reads 4a right now, but its compare step does not do the ordering reliably.
+  **The E4B** (Gemma 4 E4B on the Mac's GPU, 18:24 to 18:28, **4 minutes** against 6 for the 12B, the same two photos): "1 of 10
+  correct, 6 not the same, 3 not answered or can't tell". Page one's two are ❌ (15.7 is right; 24.49 is right to refuse here). On
+  page two it lost the part letters of question 1 and 2 (one line, "5.07, 2.70, 2.80, 2.17, 6, 0.6, 0.7, 4.64, 5.9", compared with
+  a made-up list), so both are ❌; 3 is ✅ (wrong: "3 pens for $2.88"); 4 is ❓ on every part ("25", "3x", "100 - 14" are misreads or
+  copies of the table); 5 ❌ (43.5, the answer it gets is 14.3, the average is 15.03); **6 is ❌ although the student is right**
+  ("The student's answer is correct, but the answer key provides 3000": the solve step said 3000 and the compare step contradicted
+  itself); 7 and 8 are blank on the page, so ❓ is right. So the E4B is a third faster but not usable for this check: it misreads
+  the handwriting (5.07 for 5.67, 154.79 for 15.479), drops part letters and contradicts itself; the 12B and Claude are the ones
+  that work, on this page.
 - **One homework chip** (2026-11-16): "🔬 Check each question" is removed; "📝 Check homework" (the quick check above) is the only
   homework check. It still segments each page with PP-OCR for the question pictures, but there is no plan step (Skip, Check them,
   Stop) and no per-question requests. The summary card that ends the reply is now a plain card. Chats saved with the old per-question

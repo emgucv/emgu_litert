@@ -604,9 +604,10 @@ Still open:
 - [ ] Boxed handwritten digits (1e: 4.64 read as 4.69 in one run) and answers that refer to a table (4a-4c): a second look at
   an `[unsure]` read, or a bigger recognizer width, if a parent needs them right.
 - [ ] Pages with two columns of questions (the layout assumes one column, or parts side by side on one row).
-- [ ] Try the E4B through the cards (the whole-page check scored 5 of 17 on the same photos).
-- [ ] The quick check ("Check homework") with the E4B and on the iPad; run the quick check once more after the stem-line fix
-  (page two's questions 1 and 2 should be ✅, not ❓).
+- [x] The quick check with the E4B (2026-11-16, Mac GPU): 4 minutes, 1 of 10 correct: not usable on this page (misread handwriting,
+  part letters lost on page two's 1 and 2, a ❌ on 6 where the student is right). See FEATURES.md. Left: the iPad Air with the 12B
+  (time, memory with the two PP-OCR graphs, the cards on a touch screen); the E4B only if a small model is needed (a second read of
+  the handwriting with a bigger crop could help it).
 - [x] The quick check with Claude (2026-11-16): 1.5 minutes, 3 of 10 correct, 5 not the same, 2 can't tell. Page two's 4d, 5, 7 and 8
   checked against the photo: all right, and no handwriting misread became a ❌ (FEATURES.md).
 - [x] The comparison says a blank answer in its own words (Claude, questions 7 and 8: "Can't tell: the student's answer was blank", and in
