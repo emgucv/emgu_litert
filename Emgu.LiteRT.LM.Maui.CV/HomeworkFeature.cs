@@ -12,7 +12,10 @@ using Microsoft.Maui.Controls.Shapes;
 namespace Emgu.LiteRT.LM.Maui.CV;
 
 /// <summary>
-/// The "Check homework" chip: with photos of homework pages attached, each page is cut into one picture per question (or
+/// The "Check homework" chips. "Check homework" is the quick one: each page is checked as a whole (the model reads it, solves its
+/// questions and compares: three requests a page) and then each top-level question (Q2 with its parts a, b, c is one) gets a
+/// card with its region of the page cut out as a picture, its questions, the answers read from the handwriting and the marks.
+/// "Check each question" is the slow one, described next. With photos of homework pages attached, each page is cut into one picture per question (or
 /// part of one: <see cref="HomeworkSegmenter"/>, PaddleOCR's text detector and recognizer on LiteRT, four-point regions so a
 /// slanted page comes out straight), a plan lists the questions to check (Run, Stop, and Skip for a question), and then each
 /// question is checked on its own with a card: its picture first (tap to enlarge), the question, the answer read from the
@@ -29,7 +32,9 @@ public sealed class HomeworkFeature : ChatFeature
     /// <summary>The kind of the reply's saved file that is one question's card.</summary>
     public const string QuestionKind = "homework_question";
 
-    private bool _checkNext;
+    private enum Mode { None, Page, Each }
+
+    private Mode _mode;
 
     /// <inheritdoc/>
     public override string Name => "homework";
@@ -43,34 +48,49 @@ public sealed class HomeworkFeature : ChatFeature
     /// <inheritdoc/>
     public override void RegisterServices(ChatFeatureServices services) => services.Add(this);
 
-    /// <inheritdoc/>
-    public override ChatChip BuildComposerChip() =>
-        new ChatChip("\U0001F4DD Check homework", () => _checkNext, on =>
+    private ChatChip Chip(string text, Mode mode, string hint) =>
+        new ChatChip(text, () => _mode == mode, on =>
         {
-            _checkNext = on;
+            _mode = on ? mode : _mode == mode ? Mode.None : _mode;
             if (on)
-                Host?.SetStatus("Check homework: attach photos of the pages and send. Each question is cut out, read, solved and checked, one by one.");
+                Host?.SetStatus(hint);
         })
         {
             IsVisible = () => Host?.Model?.AcceptsImages == true && Host.HandsFree != true
         };
 
-    /// <summary>Whether the message being sent is to be checked as homework (the chip was on); the chip is off again afterwards.</summary>
-    public bool TakeCheck()
+    /// <inheritdoc/>
+    public override ChatChip BuildComposerChip() =>
+        Chip("\U0001F4DD Check homework", Mode.Page, "Check homework: attach photos of the pages and send. Each page is checked as a whole, then each question gets its picture. A few minutes a page.");
+
+    /// <summary>The quick check and the slow one (one at a time).</summary>
+    public override IEnumerable<ChatChip> BuildComposerChips()
     {
-        if (!_checkNext)
-            return false;
-        _checkNext = false;
-        Host?.RefreshChips();
-        return true;
+        yield return BuildComposerChip();
+        yield return Chip("\U0001F52C Check each question", Mode.Each, "Check each question: attach photos of the pages and send. Each question is cut out, read, solved and checked, one by one: about a minute and a half a question.");
     }
+
+    /// <summary>Which check the message being sent asks for (the chip that was on); the chips are off again afterwards.</summary>
+    private Mode TakeMode()
+    {
+        Mode mode = _mode;
+        if (mode == Mode.None)
+            return mode;
+        _mode = Mode.None;
+        Host?.RefreshChips();
+        return mode;
+    }
+
+    /// <summary>Whether the message being sent is to be checked as homework (a chip was on); the chips are off again afterwards.</summary>
+    public bool TakeCheck() => TakeMode() != Mode.None;
 
     /// <inheritdoc/>
     public override IChatClient CreateMessageClient(ChatSendRequest request)
     {
-        if (!TakeCheck())
+        Mode mode = TakeMode();
+        if (mode == Mode.None)
             return null;
-        return new HomeworkClient(this, request.Text, request.Attachments.Where(a => a.MediaType != null && a.MediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)).ToList());
+        return new HomeworkClient(this, mode, request.Text, request.Attachments.Where(a => a.MediaType != null && a.MediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)).ToList());
     }
 
     // ---------- the cards ----------
@@ -117,8 +137,18 @@ public sealed class HomeworkFeature : ChatFeature
         return image;
     }
 
+    // One part of a question on a card (2a); a question without parts, or one checked on its own, has one part with no label.
+    private sealed class QuestionPart
+    {
+        public string Label = string.Empty;
+        public string QuestionText = string.Empty, StudentAnswer = string.Empty, MyAnswer = string.Empty, HowToSolve = string.Empty, WhatWentWrong = string.Empty, Reason = string.Empty;
+        public HomeworkVerdict Verdict;
+    }
+
     private sealed class Question
     {
+        // Set for a question of the quick check (its parts together); empty for one checked on its own: its own fields are the one part.
+        public List<QuestionPart> Parts = new List<QuestionPart>();
         public string Label;
         public int Page;
         public byte[] Crop, ParentCrop;
@@ -146,40 +176,58 @@ public sealed class HomeworkFeature : ChatFeature
             content.Children.Add(new Label { Text = mark + "  Question " + q.Label, FontFamily = title, FontSize = 15, TextColor = primary });
             if (q.Crop != null)
                 content.Children.Add(Picture(q.Crop, 240));
-            if (q.QuestionText.Length > 0)
+            IEnumerable<QuestionPart> parts = q.Parts.Count > 0 ? q.Parts : new[]
             {
-                content.Children.Add(Caption("Question"));
-                content.Children.Add(Body(ReplyMarkdown.PlainText(q.QuestionText)));
-            }
-            if (q.StudentAnswer.Length > 0)
+                new QuestionPart
+                {
+                    QuestionText = q.QuestionText, StudentAnswer = q.StudentAnswer, HowToSolve = q.HowToSolve,
+                    WhatWentWrong = q.WhatWentWrong, Reason = q.Reason, Verdict = q.Verdict
+                }
+            };
+            foreach (QuestionPart part in parts)
             {
-                content.Children.Add(Caption("Answer read from the handwriting"));
-                content.Children.Add(Body(ReplyMarkdown.PlainText(q.StudentAnswer)));
-            }
-            switch (q.Verdict)
-            {
-                case HomeworkVerdict.Correct:
-                    content.Children.Add(Body("✅  Correct", success));
-                    break;
-                case HomeworkVerdict.Wrong:
-                    content.Children.Add(Body("❌  Not right", danger));
-                    if (q.HowToSolve.Length > 0)
-                    {
-                        content.Children.Add(Caption("How to solve it"));
-                        content.Children.Add(Body(ReplyMarkdown.PlainText(q.HowToSolve)));
-                    }
-                    if (q.WhatWentWrong.Length > 0)
-                    {
-                        content.Children.Add(Caption("What went wrong"));
-                        content.Children.Add(Body(ReplyMarkdown.PlainText(q.WhatWentWrong)));
-                    }
-                    break;
-                case HomeworkVerdict.NotAnswered:
-                    content.Children.Add(Body("❓  Not answered", secondary));
-                    break;
-                case HomeworkVerdict.Unclear:
-                    content.Children.Add(Body("❓  Can't tell" + (q.Reason.Length > 0 ? ": " + q.Reason : string.Empty), secondary));
-                    break;
+                if (part.Label.Length > 0)
+                    content.Children.Add(new Label { Text = Icon(part.Verdict, false, false) + "  " + part.Label + ")", FontFamily = title, FontSize = 14, TextColor = primary, Margin = new Thickness(0, 4, 0, 0) });
+                if (part.QuestionText.Length > 0)
+                {
+                    content.Children.Add(Caption("Question"));
+                    content.Children.Add(Body(ReplyMarkdown.PlainText(part.QuestionText)));
+                }
+                if (part.StudentAnswer.Length > 0)
+                {
+                    content.Children.Add(Caption("Answer read from the handwriting"));
+                    content.Children.Add(Body(ReplyMarkdown.PlainText(part.StudentAnswer)));
+                }
+                switch (part.Verdict)
+                {
+                    case HomeworkVerdict.Correct:
+                        content.Children.Add(Body("✅  Correct", success));
+                        break;
+                    case HomeworkVerdict.Wrong:
+                        content.Children.Add(Body("❌  Not right", danger));
+                        if (part.HowToSolve.Length > 0)
+                        {
+                            content.Children.Add(Caption("How to solve it"));
+                            content.Children.Add(Body(ReplyMarkdown.PlainText(part.HowToSolve)));
+                        }
+                        else if (part.MyAnswer.Length > 0)
+                        {
+                            content.Children.Add(Caption("The answer I get"));
+                            content.Children.Add(Body(ReplyMarkdown.PlainText(part.MyAnswer)));
+                        }
+                        if (part.WhatWentWrong.Length > 0)
+                        {
+                            content.Children.Add(Caption("What went wrong"));
+                            content.Children.Add(Body(ReplyMarkdown.PlainText(part.WhatWentWrong)));
+                        }
+                        break;
+                    case HomeworkVerdict.NotAnswered:
+                        content.Children.Add(Body("❓  Not answered", secondary));
+                        break;
+                    case HomeworkVerdict.Unclear:
+                        content.Children.Add(Body("❓  Can't tell" + (part.Reason.Length > 0 ? ": " + part.Reason : string.Empty), secondary));
+                        break;
+                }
             }
             if (q.Running && q.Status.Length > 0)
                 content.Children.Add(new Label { Text = q.Status, FontFamily = title, FontSize = 12, TextColor = secondary });
@@ -189,8 +237,21 @@ public sealed class HomeworkFeature : ChatFeature
         return Frame(content);
     }
 
+    private sealed class SavedPart
+    {
+        public string Label { get; set; }
+        public string Question { get; set; }
+        public string StudentAnswer { get; set; }
+        public string MyAnswer { get; set; }
+        public string Verdict { get; set; }
+        public string HowToSolve { get; set; }
+        public string WhatWentWrong { get; set; }
+        public string Reason { get; set; }
+    }
+
     private sealed class SavedQuestion
     {
+        public List<SavedPart> Parts { get; set; }
         public string Label { get; set; }
         public string Question { get; set; }
         public string StudentAnswer { get; set; }
@@ -210,6 +271,11 @@ public sealed class HomeworkFeature : ChatFeature
         HowToSolve = q.HowToSolve,
         WhatWentWrong = q.WhatWentWrong,
         Reason = q.Reason,
+        Parts = q.Parts.Count == 0 ? null : q.Parts.Select(p => new SavedPart
+        {
+            Label = p.Label, Question = p.QuestionText, StudentAnswer = p.StudentAnswer, MyAnswer = p.MyAnswer, Verdict = p.Verdict.ToString(),
+            HowToSolve = p.HowToSolve, WhatWentWrong = p.WhatWentWrong, Reason = p.Reason
+        }).ToList(),
         Crop = q.Crop == null ? null : Convert.ToBase64String(q.Crop)
     });
 
@@ -246,7 +312,18 @@ public sealed class HomeworkFeature : ChatFeature
                     HowToSolve = saved.HowToSolve ?? string.Empty,
                     WhatWentWrong = saved.WhatWentWrong ?? string.Empty,
                     Reason = saved.Reason ?? string.Empty,
-                    Crop = string.IsNullOrEmpty(saved.Crop) ? null : Convert.FromBase64String(saved.Crop)
+                    Crop = string.IsNullOrEmpty(saved.Crop) ? null : Convert.FromBase64String(saved.Crop),
+                    Parts = (saved.Parts ?? new List<SavedPart>()).Select(p => new QuestionPart
+                    {
+                        Label = p.Label ?? string.Empty,
+                        QuestionText = p.Question ?? string.Empty,
+                        StudentAnswer = p.StudentAnswer ?? string.Empty,
+                        MyAnswer = p.MyAnswer ?? string.Empty,
+                        Verdict = Enum.TryParse(p.Verdict, out HomeworkVerdict partVerdict) ? partVerdict : HomeworkVerdict.Unclear,
+                        HowToSolve = p.HowToSolve ?? string.Empty,
+                        WhatWentWrong = p.WhatWentWrong ?? string.Empty,
+                        Reason = p.Reason ?? string.Empty
+                    }).ToList()
                 });
             }
             if (file.Kind == PlanKind)
@@ -406,9 +483,12 @@ public sealed class HomeworkFeature : ChatFeature
         private readonly string _note;
         private readonly IList<DataContent> _images;
 
-        public HomeworkClient(HomeworkFeature feature, string note, IList<DataContent> images)
+        private readonly Mode _mode;
+
+        public HomeworkClient(HomeworkFeature feature, Mode mode, string note, IList<DataContent> images)
         {
             _feature = feature;
+            _mode = mode;
             _note = note;
             _images = images;
         }
@@ -464,6 +544,14 @@ public sealed class HomeworkFeature : ChatFeature
                 for (int page = 0; page < _images.Count; page++)
                     yield return new ChatResponseUpdate(ChatRole.Assistant, await WholePageAsync(client, page, token));
                 Host.SetStatus(string.Empty);
+                yield break;
+            }
+            if (_mode == Mode.Page)
+            {
+                // The quick check: every page as a whole, then each top-level question gets its picture.
+                string quickScore = await PageCardsAsync(client, pages, token);
+                Host.SetStatus(string.Empty);
+                yield return new ChatResponseUpdate(ChatRole.Assistant, quickScore.Length > 0 ? quickScore : "Nothing was checked.");
                 yield break;
             }
             // 2. The plan.
@@ -558,11 +646,10 @@ public sealed class HomeworkFeature : ChatFeature
             }
         }
 
-        // A page with no questions found (or without the text models): today's whole-page check, in text.
-        private async Task<string> WholePageAsync(IChatClient client, int page, CancellationToken token)
+        // The three requests on one page: read, solve, compare. The comparison is tidied (blanks, no score line).
+        private async Task<(string Read, string Solved, string Check)> PageTextsAsync(IChatClient client, int page, CancellationToken token)
         {
             string label = _images.Count > 1 ? "Page " + (page + 1) + " of " + _images.Count + ": " : string.Empty;
-            string header = _images.Count > 1 ? "## Page " + (page + 1) + " of " + _images.Count + "\n\n" : string.Empty;
             var image = new[] { _images[page] };
             Host.SetStatus(label + "reading the page...");
             string read = await AskAsync(client, image, HomeworkCheck.ReadPrompt(_note), 900, ReasoningEffort.None, token);
@@ -570,7 +657,68 @@ public sealed class HomeworkFeature : ChatFeature
             string solved = await AskAsync(client, image, HomeworkCheck.SolvePrompt(HomeworkCheck.QuestionsOnly(read)), 1500, null, token);
             Host.SetStatus(label + "comparing...");
             string check = HomeworkCheck.TidyCheck(await AskAsync(client, null, HomeworkCheck.ComparePrompt(read, solved), 900, ReasoningEffort.None, token));
+            return (read, solved, check);
+        }
+
+        // A page with no questions found (or without the text models): the whole-page check, in text.
+        private async Task<string> WholePageAsync(IChatClient client, int page, CancellationToken token)
+        {
+            string header = _images.Count > 1 ? "## Page " + (page + 1) + " of " + _images.Count + "\n\n" : string.Empty;
+            (string read, string solved, string check) = await PageTextsAsync(client, page, token);
             return header + "**What I read** (check it against the page)\n\n" + read + "\n\n**My own answers**\n\n" + solved + "\n\n**The check**\n\n" + check + "\n\n" + HomeworkCheck.Summary(new[] { check });
+        }
+
+        // The quick check: each page as a whole, and after each page one card per top-level question (Q2 with parts a, b, c is one):
+        // its region of the page, then a block for each part. At the end a summary card and the score (one mark per question).
+        private async Task<string> PageCardsAsync(IChatClient client, List<IReadOnlyList<HomeworkPageUnit>> pages, CancellationToken token)
+        {
+            var summary = new List<Question>();
+            var all = new List<HomeworkSection>();
+            for (int page = 0; page < pages.Count; page++)
+            {
+                token.ThrowIfCancellationRequested();
+                (string read, string solved, string check) = await PageTextsAsync(client, page, token);
+                // The question's whole picture, by its number.
+                var crops = new Dictionary<string, byte[]>();
+                foreach (HomeworkPageUnit unit in pages[page])
+                    if (!crops.ContainsKey(unit.Unit.Question))
+                        crops[unit.Unit.Question] = unit.ParentCrop ?? unit.Crop;
+                IReadOnlyList<HomeworkSection> sections = HomeworkPageCheck.Group(
+                    HomeworkPageCheck.Parse(read, solved, check), pages[page].Select(u => u.Unit.Question).Distinct().ToList());
+                foreach (HomeworkSection section in sections)
+                {
+                    var q = new Question { Label = section.Question, Page = page, Verdict = section.Verdict };
+                    if (crops.TryGetValue(section.Question, out byte[] crop))
+                        q.Crop = crop;
+                    foreach (HomeworkPageItem item in section.Items)
+                        q.Parts.Add(new QuestionPart
+                        {
+                            Label = item.Part,
+                            QuestionText = item.QuestionText,
+                            StudentAnswer = item.StudentAnswer,
+                            MyAnswer = item.MyAnswer,
+                            Verdict = item.Verdict,
+                            // The comparison's own words: what the student wrote, the answer and a hint.
+                            WhatWentWrong = item.Verdict == HomeworkVerdict.Wrong ? item.Detail : string.Empty,
+                            Reason = item.Verdict == HomeworkVerdict.Unclear ? item.Detail : string.Empty
+                        });
+                    if (q.Parts.Count == 0)
+                        q.Parts.Add(new QuestionPart { Verdict = HomeworkVerdict.Unclear, Reason = "the page check didn't list this question" });
+                    summary.Add(q);
+                    all.Add(section);
+                    await MainThread.InvokeOnMainThreadAsync(() => Host.AddCardToReply(_feature.BuildQuestionCard(q)));
+                    Host.AddCardToReply(null, new ChatSavedFile(QuestionKind, "application/json", SaveQuestion(q)));
+                }
+            }
+            if (summary.Count == 0)
+                return string.Empty;
+            await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                PlanCard plan = _feature.BuildPlanCard(summary, new TaskCompletionSource<bool>(), null, null);
+                Host.AddCardToReply(plan.View);
+                plan.Close("Done");
+            });
+            return HomeworkCheck.Summary(new[] { HomeworkPageCheck.Marks(all) });
         }
 
         // One request of its own (no tools, no earlier chat), with the pictures when given; the thinking is dropped from the text.

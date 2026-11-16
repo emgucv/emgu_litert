@@ -916,6 +916,22 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   student's wrong answer to 3 was marked correct, and the check lost the part letters (1-3 as one line each) and listed 4 and 4a
   twice. So the E4B reads a page about as well as the 12B but solves worse; where the 12B isn't available (the phones: the
   iPad can run it, 2026-11-15), the reading is the part to trust and the verdicts are not. Gemma 4 E4B on the iPad: not tried.
+- **Two homework chips** (2026-11-15): "📝 Check homework" is the quick check and "🔬 Check each question" is the slow one below (one
+  at a time, per message). The quick one runs the whole-page check (read, solve, compare: three requests a page) and *then* attaches
+  each question's region of the page to its result (`HomeworkPageCheck` in `Emgu.LiteRT.LM.Agents` turns the three texts into one item
+  per part and one section per top-level question; PP-OCR cuts the page as below). A question with parts (Q2 with a, b, c) is **one
+  card**: the whole question's picture, then a block per part (the question, the answer read from the handwriting, ✅ or ❌ with what
+  the comparison said: what the student wrote, the answer and a hint, or ❓), one mark for the question (❌ if any part is, ✅ if all
+  are); the model's stem line ("2. Question: ...", no answer) is not a part. No Run/Skip step: segmenting, then the checks start, the
+  cards appear after each page, and a summary card and the score end the reply ("one mark per question"). Gemma 4 12B on the Mac's
+  GPU, the same two photos: **6 minutes** for both pages (23:29 to 23:35, 23:37 to 23:43), against about 35 for the slow check, 10
+  cards; "3 of 10 correct, 3 not the same, 4 not answered or can't tell": page one 1 ❌ (15.7 cm² to 3 significant digits) and 2 ✅ (the
+  slow check said ❌: the page check accepted 24.49), page two 3 ✅ (wrong: the page check accepted "3 pens for $2.88", the slow check
+  caught it), 4 ❌, 5 ❌, 6 ✅, 7 and 8 not answered. 1 and 2 of page two showed ❓ in both runs because the model listed the stem with
+  "Student's answer: [blank]" and that counted as an unmarked part (fixed after, with tests; not run again: its parts were all ✅).
+  So the quick check is about six times faster and sees the same pictures, but it keeps the page check's misses (a question
+  accepted that the per-question check catches; answers written in a gap above a question): the picture next to the verdict lets a
+  parent see it. Saved chats restore the cards (verified). Not tried: the E4B, the iPad.
 - **Check homework, question by question** (2026-11-15; `HomeworkFeature` moved to `Emgu.LiteRT.LM.Maui.CV`, the layout and
   checks in `Emgu.LiteRT.LM.Agents` (`HomeworkLayout`, `HomeworkQuestionCheck`, `HomeworkQuestionChecker`), the segmenter in
   `Emgu.LiteRT.LM.Agents.CV` (`HomeworkSegmenter`), PP-OCR in `Emgu.LiteRT.Models` and `.Models.CV`). Asked to segment a page

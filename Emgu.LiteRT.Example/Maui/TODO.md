@@ -601,3 +601,7 @@ two-photo run on the Mac in [FEATURES.md](FEATURES.md), "Check homework, questio
   an `[unsure]` read, or a bigger recognizer width, if a parent needs them right.
 - [ ] Pages with two columns of questions (the layout assumes one column, or parts side by side on one row).
 - [ ] Try the E4B through the cards (the whole-page check scored 5 of 17 on the same photos).
+- [ ] The quick check ("Check homework") with the E4B and on the iPad; run the quick check once more after the stem-line fix
+  (page two's questions 1 and 2 should be ✅, not ❓).
+- [ ] The quick check accepts some wrong answers the per-question check catches (page one's 24.49, page two's question 3): a second
+  pass on the cards it marked ✅ with the picture is an option if a parent needs it.
