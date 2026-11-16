@@ -41,6 +41,7 @@ public sealed class ClaudeFeature : ChatFeature, IRemoteChatModel
     private const int ReplyMaxTokens = 16000;
     private const int SummaryMaxTokens = 1200;
 
+    private readonly string _name;
     private string _apiKey = string.Empty;
     private string _model = string.Empty;
     private string _modelName = string.Empty;
@@ -65,6 +66,7 @@ public sealed class ClaudeFeature : ChatFeature, IRemoteChatModel
             ContextWindow = DefaultContextTokens
         };
         Option.Remote = this;
+        _name = Option.DisplayName;
         UpdateOptionDetail();
     }
 
@@ -118,7 +120,7 @@ public sealed class ClaudeFeature : ChatFeature, IRemoteChatModel
                 ChatPage.SectionTitle("Claude"),
                 ChatPage.Note("Chat with Anthropic's Claude instead of a model on this device, with an API key from the Claude " +
                     "Console (platform.claude.com > API keys); what you use is billed to that account. Then pick \"" +
-                    Option.DisplayName + "\" in the model list. Your messages, pictures and the tools' results go to Anthropic."),
+                    _name + "\" in the model list. Your messages, pictures and the tools' results go to Anthropic."),
                 _keyEntry,
                 connect,
                 _modelButton,
@@ -140,6 +142,7 @@ public sealed class ClaudeFeature : ChatFeature, IRemoteChatModel
         if (_keyEntry != null)
             _keyEntry.Text = _apiKey;
         UpdateOptionDetail();
+        MainThread.BeginInvokeOnMainThread(() => Host?.RefreshModelList());
     }
 
     // Save the key; if it changed (or `force`), list the models it can use and reconnect the chat.
@@ -188,11 +191,14 @@ public sealed class ClaudeFeature : ChatFeature, IRemoteChatModel
         Host.RefreshModelList();
     }
 
+    // The option is named after the model chosen ("Claude Sonnet 5.5"), so the header and the model list say which one it is.
     private void UpdateOptionDetail()
     {
-        Option.Detail = string.IsNullOrEmpty(_apiKey)
-            ? "Not set up: add your API key in Settings > Claude."
-            : (string.IsNullOrEmpty(_model) ? "" : ModelName(_model) + " · ") + "Anthropic's Claude through the Claude API.";
+        bool setUp = !string.IsNullOrEmpty(_apiKey);
+        Option.DisplayName = setUp && !string.IsNullOrEmpty(_model) ? ModelName(_model) : _name;
+        Option.Detail = setUp
+            ? "Anthropic's Claude through the Claude API."
+            : "Not set up: add your API key in Settings > Claude.";
     }
 
     private async void OnModelTapped(object sender, EventArgs e)
@@ -284,6 +290,7 @@ public sealed class ClaudeFeature : ChatFeature, IRemoteChatModel
             SaveModelName();
             if (_modelButton != null) _modelButton.Text = ModelButtonText();
             UpdateOptionDetail();
+            Host?.RefreshModelList();
         });
         return _models;
     }
