@@ -612,7 +612,7 @@ Still open:
 - [x] The comparison says a blank answer in its own words (Claude, questions 7 and 8: "Can't tell: the student's answer was blank", and in
   a second run "the student left this blank"): `TidyCheck` now turns any "❓" line that says "blank" into "Not answered" (a ✅ or ❌ line
   only with "[blank]", "(blank)" or "left blank", so a hint like "fill in the blank" is safe). Tested with both wordings; the build
-  with the first wording was run on Claude (09:43), the second wording came from that run and is not run again.
+  run on Claude again with the final fix (09:59): no blank answer is a "Can't tell" any more; the blank parts of 7 and 8 show "Not answered".
 - [ ] The quick check: a question with a table beside it (page two's 4a): the read prompt now copies the table into the question
   (done, 2026-11-16), but an answer that is a position in the table ("3, 4, 2, 1") is read as "3, 4, 21" and compared with the values:
   tell the compare step that an ordering may be given as the rows' numbers, or put the table in the question's crop.
