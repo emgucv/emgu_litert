@@ -125,8 +125,10 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number (the reminders and the end dates since
 2026-10-29). Still open:
 
-- [ ] Reminders on a real iPhone, Snooze (Android only: Apple's have no Snooze action), and after a phone restart (the
-      Pixel Fold's first reminder and the Mac's were seen).
+- [ ] Reminders on an iPhone with the app in the background and after a phone restart (the in-app banner was seen on the
+      iPhone 12, 2026-11-16: FEATURES.md "Reminders"); Snooze is Android only (Apple's have no Snooze action).
+- [ ] "Remind me to ... at 10:57 pm" about a goal can reach `add_reminder` (Apple Reminders) instead of `set_goal_reminder`
+      with Gemma 4 E2B: look at the tool descriptions, or route by an existing goal.
 - [ ] A "Done" on the reminder itself: the goal database is the app's, out of a notification receiver's reach; for
       now tapping it opens the app.
 

@@ -1246,7 +1246,14 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   - Pixel Fold (2026-10-29, Gemma 4 E2B): "Remind me to do my jumping jacks at 2:02 pm" called `set_goal_reminder`; the
     alarm was armed for 14:02 (Android's window +2m49s) and the notification "30 jumping jacks a day for 30 days - 30
     jumping jacks to go today" came at 14:02:51 with the launcher in front; the next was armed for 14:02 the day after.
-    Not tried: Snooze, a restart, iOS and the Mac.
+    Not tried: Snooze, a restart and the Mac.
+  - iPhone 12 (iOS 27.2, 2026-11-16, Gemma 4 E2B on the GPU): "Set a goal: 10 jumping jacks a day. Remind me to do my
+    jumping jacks at 10:50 pm" saved the goal and called `set_goal_reminder`; iOS asked for notification permission at that
+    point (the user allowed it) and the next reminder was scheduled. Settings > Your goals showed "Remind me at 10:50 PM";
+    changed to 10:57 PM there, the banner "10 jumping jacks a day / 10 jumping jacks to go today" appeared at 10:57:01 with
+    the app in front (the 10:50 banner was missed: the screenshot came 14 s late). A second request, "Remind me to do my
+    jumping jacks at 10:57 pm", made the model call `add_reminder` (Apple Reminders) instead of `set_goal_reminder`; its
+    Confirm / Cancel card was cancelled. Not tried: the app in the background, tapping the banner, a restart.
 - End dates (since 2026-10-29): a goal "for 30 days", "for the next two weeks" or "for a month" ends
   (`AgentGoal.Ends`: midnight after its last day, from its words and the day it was set - nothing more is stored, so the
   goals saved before have it too). Its history and streak stop with the last day (no period goes on afterwards), its
