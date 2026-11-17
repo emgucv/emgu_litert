@@ -1427,7 +1427,13 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   with the screen off, it came about half an hour late. Alarms are armed again at a restart, a change of time, an update and
   when exact alarms are allowed (`ScheduledTaskRestoreReceiver`; the Fold3 re-armed both on an update and on the permission).
 - Settings > Scheduled tasks lists each task (its schedule, the next run and the last result) with Run now, Pause/Resume,
-  Open (its last run's chat) and Delete.
+  Open (its last run's chat) and Delete. "Add a task" under the list opens a form (2026-11-17): the task in words, "Every day
+  at a time" (a time picker) or "Every few hours" (3 to 168), and an optional "only tell me when". It makes the same task as the
+  assistant's schedule_task, with the same limits (10 tasks, 3 hours at the least) and messages for the user
+  (`ScheduledTaskForm` in `Emgu.LiteRT.LM.Agents`, tested model-free). Checked on a Galaxy S10: an empty form says "Write what the
+  task should do each time"; "Form test task" daily at 7:00 was added, listed ("next tomorrow 7:00 a.m."), its `TASK_RUN` alarm
+  set, and deleting it removed the alarm (set 09:44:56, removed 09:46:01 in `dumpsys alarm`); the picker's "Every few hours"
+  swaps the time picker for the hours field. Not tried by hand: an every-few-hours task, "only tell me when", the 10-task limit.
 - Measured (Gemma 4 E2B, GPU, the weather in Toronto through the web tools): Galaxy S10 - loaded by the run in 7.6 s, reply
   46.7 s; with the chat page's model, reply 52 s. Galaxy Z Fold3 - with the chat page's model, reply 24.5 s (the frozen
   process), 30.6 s (Run now).

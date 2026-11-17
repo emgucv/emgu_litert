@@ -185,7 +185,7 @@ agent runs on a schedule, with a notification when there is something to say. Ho
 FEATURES.md, "Scheduled tasks". Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 Shared:
-- [ ] An "Add task" form in Settings > Scheduled tasks (now made only through the chat).
+- [x] An "Add task" form in Settings > Scheduled tasks (2026-11-17, FEATURES.md "Scheduled tasks"; checked on the S10).
 - [ ] Mac Catalyst: runs while the app is open (or a login item); the model is already loaded or loads for the run.
 
 Android:

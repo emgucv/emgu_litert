@@ -262,6 +262,57 @@ public class UnitTestScheduledTasks
         }
     }
 
+    [Test]
+    public async Task TheFormAddsADailyTaskAndArmsIt()
+    {
+        var store = new InMemoryAgentTaskStore();
+        var armed = new List<string>();
+        string error = await ScheduledTaskForm.AddAsync(store, t => { armed.Add(t.Id); return Task.CompletedTask; },
+            "  Tell me the weather in Toronto ", new TimeSpan(7, 0, 0), "ignored", "it will snow", Now);
+        Assert.That(error, Is.Null);
+        ScheduledTask task = (await store.GetTasksAsync()).Single();
+        Assert.That((task.Description, task.Schedule.Describe(), task.NotifyWhen), Is.EqualTo(("Tell me the weather in Toronto", "every day at 07:00", "it will snow")));
+        Assert.That(armed, Is.EqualTo(new[] { task.Id }));
+    }
+
+    [Test]
+    public async Task TheFormStartsAnEveryFewHoursTaskThatManyHoursFromNow()
+    {
+        var store = new InMemoryAgentTaskStore();
+        Assert.That(await ScheduledTaskForm.AddAsync(store, null, "Check for a new release", null, " 6 ", "", new DateTime(2026, 10, 14, 19, 0, 42)), Is.Null);
+        ScheduledTask task = (await store.GetTasksAsync()).Single();
+        Assert.That(task.Schedule.Describe(), Is.EqualTo("every 6 hours"));
+        Assert.That(task.Schedule.Start, Is.EqualTo(new DateTime(2026, 10, 15, 1, 0, 0)));
+        Assert.That(task.NotifyWhen, Is.Null);
+    }
+
+    [Test]
+    public async Task TheFormSaysWhatIsWrongInTheUsersWords()
+    {
+        var store = new InMemoryAgentTaskStore();
+        Assert.That(await ScheduledTaskForm.AddAsync(store, null, "  ", new TimeSpan(7, 0, 0), "", "", Now), Does.Contain("what the task should do"));
+        foreach (string bad in new[] { "", "soon", "-6", "6.5", "1e3" })
+            Assert.That(await ScheduledTaskForm.AddAsync(store, null, "x", null, bad, "", Now), Does.Contain("whole number"), bad);
+        Assert.That(await ScheduledTaskForm.AddAsync(store, null, "x", null, "2", "", Now), Does.Contain("at most every 3 hours"));
+        Assert.That(await ScheduledTaskForm.AddAsync(store, null, "x", null, "169", "", Now), Does.Contain("a week"));
+        Assert.That(await store.GetTasksAsync(), Is.Empty);
+    }
+
+    [Test]
+    public async Task TheFormStopsAtTheMostTasksAndTakesBackOneThatCouldNotBeArmed()
+    {
+        var store = new InMemoryAgentTaskStore();
+        for (int i = 0; i < AgentTools.MaxScheduledTasks; i++)
+            Assert.That(await ScheduledTaskForm.AddAsync(store, null, "task " + i, new TimeSpan(7, 0, 0), "", "", Now), Is.Null);
+        Assert.That(await ScheduledTaskForm.AddAsync(store, null, "one more", new TimeSpan(8, 0, 0), "", "", Now), Does.Contain("Delete one first"));
+        Assert.That(await store.GetTasksAsync(), Has.Count.EqualTo(AgentTools.MaxScheduledTasks));
+
+        var other = new InMemoryAgentTaskStore();
+        string error = await ScheduledTaskForm.AddAsync(other, t => throw new InvalidOperationException("no alarm permission"), "x", new TimeSpan(7, 0, 0), "", "", Now);
+        Assert.That(error, Does.Contain("no alarm permission"));
+        Assert.That(await other.GetTasksAsync(), Is.Empty);
+    }
+
     // The tasks in a list, as a database would keep them.
     private sealed class InMemoryAgentTaskStore : IAgentTaskStore
     {

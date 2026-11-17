@@ -18,6 +18,15 @@ namespace Emgu.LiteRT.LM.Maui.Features
     public sealed class ScheduledTasksFeature : SkillFeature<ScheduledTasksSkill>
     {
         private VerticalStackLayout _list;
+        private VerticalStackLayout _addArea;
+        private VerticalStackLayout _form;
+        private Entry _taskEntry;
+        private Entry _whenEntry;
+        private Entry _hoursEntry;
+        private Picker _kindPicker;
+        private TimePicker _timePicker;
+        private Button _addButton;
+        private Label _formNote;
         private Label _exactNote;
         private bool _askedExact;
 
@@ -116,11 +125,91 @@ namespace Emgu.LiteRT.LM.Maui.Features
                 Children =
                 {
                     ChatPage.SectionTitle("Scheduled tasks"),
-                    ChatPage.Note("Ask the assistant to do something regularly - \"every morning at 7, tell me the weather\", \"every 6 hours, check whether ... has a new release\" - and it runs on this device at that time, even with the app closed, and tells you in a notification. Each run is saved as a chat."),
+                    ChatPage.Note("Ask the assistant to do something regularly - \"every morning at 7, tell me the weather\", \"every 6 hours, check whether ... has a new release\" - or add one here, and it runs on this device at that time, even with the app closed, and tells you in a notification. Each run is saved as a chat."),
                     _exactNote,
-                    _list
+                    _list,
+                    BuildAddArea()
                 }
             };
+        }
+
+        // "Add a task": a link that opens a form, the same task the assistant's schedule_task makes.
+        private View BuildAddArea()
+        {
+            _taskEntry = FormEntry("What to do each time, e.g. Tell me the weather in Toronto", "What the task should do each time");
+            _kindPicker = new Picker { FontSize = 15 };
+            ChatResources.SetThemeColor(_kindPicker, Picker.TextColorProperty, "ChatPrimaryText");
+            _kindPicker.Items.Add("Every day at a time");
+            _kindPicker.Items.Add("Every few hours");
+            _kindPicker.SelectedIndex = 0;
+            SemanticProperties.SetDescription(_kindPicker, "How often the task runs");
+            _timePicker = new TimePicker { Time = new TimeSpan(7, 0, 0), FontSize = 15 };
+            ChatResources.SetThemeColor(_timePicker, TimePicker.TextColorProperty, "ChatPrimaryText");
+            SemanticProperties.SetDescription(_timePicker, "The time of day the task runs");
+            _hoursEntry = FormEntry("Hours between runs, " + TaskSchedule.MinHours + " to " + TaskSchedule.MaxHours, "The hours between runs");
+            _hoursEntry.Keyboard = Keyboard.Numeric;
+            _hoursEntry.IsVisible = false;
+            _kindPicker.SelectedIndexChanged += (s, e) =>
+            {
+                _timePicker.IsVisible = _kindPicker.SelectedIndex == 0;
+                _hoursEntry.IsVisible = _kindPicker.SelectedIndex == 1;
+            };
+            _whenEntry = FormEntry("Only tell me when... (optional), e.g. it will snow", "Only tell me when this holds, or empty to be told every time");
+            _formNote = ChatPage.Note(string.Empty);
+            _formNote.IsVisible = false;
+            _addButton = new Button { Text = "Add task" };
+            ChatResources.ApplyStyle(_addButton, "ChatStopButtonStyle");
+            _addButton.Clicked += (s, e) => _ = AddFromFormAsync();
+            _form = new VerticalStackLayout
+            {
+                Spacing = 6,
+                IsVisible = false,
+                Children = { _taskEntry, _kindPicker, _timePicker, _hoursEntry, _whenEntry, _addButton, _formNote }
+            };
+            _addArea = new VerticalStackLayout
+            {
+                Spacing = 4,
+                IsVisible = Host == null || !Host.IsPrivate,
+                Children = { ChatPage.Link("Add a task", () => { _form.IsVisible = !_form.IsVisible; _formNote.IsVisible = false; }), _form }
+            };
+            return _addArea;
+        }
+
+        private static Entry FormEntry(string placeholder, string description)
+        {
+            var entry = new Entry { Placeholder = placeholder };
+            ChatResources.SetThemeColor(entry, Entry.TextColorProperty, "ChatPrimaryText");
+            ChatResources.SetThemeColor(entry, Entry.PlaceholderColorProperty, "ChatSecondaryText");
+            SemanticProperties.SetDescription(entry, description);
+            return entry;
+        }
+
+        private async Task AddFromFormAsync()
+        {
+            _addButton.IsEnabled = false;
+            try
+            {
+                string error = await ScheduledTaskForm.AddAsync(Store, OnTaskChangedAsync, _taskEntry.Text,
+                    _kindPicker.SelectedIndex == 0 ? _timePicker.Time : (TimeSpan?)null, _hoursEntry.Text, _whenEntry.Text, DateTime.Now);
+                _formNote.Text = error ?? "Task added.";
+                _formNote.IsVisible = true;
+                if (error == null)
+                {
+                    _taskEntry.Text = string.Empty;
+                    _hoursEntry.Text = string.Empty;
+                    _whenEntry.Text = string.Empty;
+                    _form.IsVisible = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _formNote.Text = "The task couldn't be added: " + ex.Message;
+                _formNote.IsVisible = true;
+            }
+            finally
+            {
+                _addButton.IsEnabled = true;
+            }
         }
 
         private void UpdateExactNote()
@@ -135,6 +224,8 @@ namespace Emgu.LiteRT.LM.Maui.Features
             base.OnPrivateModeChanged(isPrivate);
             if (_list != null)
                 _list.IsVisible = !isPrivate;
+            if (_addArea != null)
+                _addArea.IsVisible = !isPrivate;
             if (!isPrivate)
                 _ = RefreshListAsync();
         }
