@@ -975,6 +975,13 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   itself); 7 and 8 are blank on the page, so ❓ is right. So the E4B is a third faster but not usable for this check: it misreads
   the handwriting (5.07 for 5.67, 154.79 for 15.479), drops part letters and contradicts itself; the 12B and Claude are the ones
   that work, on this page.
+  **On the iPad Air (M4)** (2026-11-16, Gemma 4 12B on the GPU, the current build installed over the old one, the two photos picked
+  one at a time from the app's Photo Library picker, which takes a single photo per tap): two runs, **4 of 10 correct, 4 not the same,
+  2 not answered or can't tell** both times, the same marks per question as the Mac's 12B run (page one 1 ❌, 2 ✅ (wrong: 24.49
+  accepted); page two 1 ✅, 2 ✅, 3 ❌, 4 ❌, 5 ❌, 6 ✅, 7 and 8 ❓ blank). Time: the second run was sent at 19:06:28 and its chat was last
+  saved at 19:12, so about 6 minutes, the same as the Mac (I did not read a clock at the end). Tapping a question's picture on the
+  summary card opens it full screen with Close, -, Fit and + (verified). The two PP-OCR graphs and the 12B did not run the iPad out of
+  memory (no crash in two runs); the memory itself was not measured.
 - **One homework chip** (2026-11-16): "🔬 Check each question" is removed; "📝 Check homework" (the quick check above) is the only
   homework check. It still segments each page with PP-OCR for the question pictures, but there is no plan step (Skip, Check them,
   Stop) and no per-question requests. The summary card that ends the reply is now a plain card. Chats saved with the old per-question

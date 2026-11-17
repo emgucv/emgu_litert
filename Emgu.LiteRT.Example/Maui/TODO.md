@@ -599,8 +599,9 @@ The "🔬 Check each question" chip was removed on 2026-11-16 (FEATURES.md, "One
 per-question cards (Skip, Stop, timing per question, the E4B through the cards) no longer apply. The quick check's items still do.
 Still open:
 
-- [ ] Run it on the iPad Air (12B and E4B): time per question, memory with the two PP-OCR graphs, the cards' layout on a
-  touch screen (tap to enlarge, Skip, Stop).
+- [x] The quick check on the iPad Air (2026-11-16, 12B): 4 of 10, the same marks as the Mac, about 6 minutes, tap to enlarge works,
+  no crash in two runs (FEATURES.md). Left: the memory with the two PP-OCR graphs (not measured: `os_proc_available_memory` in a
+  self-test), and Stop on a touch screen (the Skip button is gone with the slow chip).
 - [ ] Boxed handwritten digits (1e: 4.64 read as 4.69 in one run) and answers that refer to a table (4a-4c): a second look at
   an `[unsure]` read, or a bigger recognizer width, if a parent needs them right.
 - [ ] Pages with two columns of questions (the layout assumes one column, or parts side by side on one row).
