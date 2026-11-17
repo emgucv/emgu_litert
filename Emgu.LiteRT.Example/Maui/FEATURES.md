@@ -982,6 +982,12 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   saved at 19:12, so about 6 minutes, the same as the Mac (I did not read a clock at the end). Tapping a question's picture on the
   summary card opens it full screen with Close, -, Fit and + (verified). The two PP-OCR graphs and the 12B did not run the iPad out of
   memory (no crash in two runs); the memory itself was not measured.
+  **Gap answers, a prompt tried and dropped** (Gemma 4 12B, Mac, 19:41 to 19:47, "5 of 10 correct, 3 not the same, 2 not answered or
+  can't tell"): the read prompt got "a student writes the answer just below its question, so handwriting in the gap between two
+  questions belongs to the question above it". It changed nothing for the case it was meant for: 4d was still "[blank]" and question 5
+  still got the gap answer (read as 100.79 this time). The other differences from the earlier 12B run are the usual run-to-run
+  variation (3 ✅ wrong, 4a and 4b read right). So a sentence does not move the 12B's attribution; the sentence was reverted.
+  Claude got 4d right without any hint, so this is a small-model problem.
 - **One homework chip** (2026-11-16): "🔬 Check each question" is removed; "📝 Check homework" (the quick check above) is the only
   homework check. It still segments each page with PP-OCR for the question pictures, but there is no plan step (Skip, Check them,
   Stop) and no per-question requests. The summary card that ends the reply is now a plain card. Chats saved with the old per-question

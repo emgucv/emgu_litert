@@ -602,6 +602,10 @@ Still open:
 - [x] The quick check on the iPad Air (2026-11-16, 12B): 4 of 10, the same marks as the Mac, about 6 minutes, tap to enlarge works,
   no crash in two runs (FEATURES.md). Left: the memory with the two PP-OCR graphs (not measured: `os_proc_available_memory` in a
   self-test), and Stop on a touch screen (the Skip button is gone with the slow chip).
+- [ ] Gap answers (page two's 4d: the answer is written in the gap above question 5): a read-prompt sentence ("handwriting between
+  two questions belongs to the question above") did not move the 12B (2026-11-16, tried and reverted); Claude gets it right. Next:
+  a layout rule in the segmenter (handwriting lines between two questions go to the unit above, and the model is shown them there),
+  or the per-question crop with the strip below it.
 - [ ] Boxed handwritten digits (1e: 4.64 read as 4.69 in one run) and answers that refer to a table (4a-4c): a second look at
   an `[unsure]` read, or a bigger recognizer width, if a parent needs them right.
 - [ ] Pages with two columns of questions (the layout assumes one column, or parts side by side on one row).
