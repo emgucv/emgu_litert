@@ -334,7 +334,7 @@ namespace Emgu.LiteRT.LM.Agents
                         return perform(new ReminderRequest { ReminderTitle = title.Trim(), Due = due, DueHasTime = hasTime }, cancellationToken);
                     },
                     "add_reminder",
-                    "Adds a reminder to the user's reminders list. Call it whenever the user asks to be reminded of something: you can't add one any other way. The user confirms it on a card first."));
+                    "Adds a reminder to the user's reminders list. Call it whenever the user asks to be reminded of something that is not one of their goals (for a goal, use set_goal_reminder if you have it): you can't add one any other way. The user confirms it on a card first."));
             if ((kinds & DeviceActionKinds.Directions) != 0)
                 tools.Add(AIFunctionFactory.Create(
                     ([Description("Where to: an address or a place name")] string destination,

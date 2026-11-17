@@ -93,6 +93,16 @@ public class UnitTestGoalReminders
     }
 
     [Test]
+    public void TheGoalReminderAndAppleRemindersToolDescriptionsSendAGoalToTheRightTool()
+    {
+        AIFunction goalTool = AgentTools.GoalReminder(new InMemoryAgentGoalStore(), (goal, time) => Task.FromResult<DateTime?>(null));
+        Assert.That(goalTool.Description, Does.Contain("not add_reminder"));
+        AIFunction reminder = AgentTools.DeviceActions(DeviceActionKinds.Reminder, (request, token) => Task.FromResult("ok"), () => DateTime.Now).Single();
+        Assert.That(reminder.Name, Is.EqualTo("add_reminder"));
+        Assert.That(reminder.Description, Does.Contain("set_goal_reminder"));
+    }
+
+    [Test]
     public async Task TheToolSetsAndStopsAGoalsReminder()
     {
         var store = new InMemoryAgentGoalStore();

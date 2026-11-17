@@ -530,7 +530,8 @@ namespace Emgu.LiteRT.LM.Agents
                 "set_goal_reminder",
                 "Sets a daily reminder (a notification) for one of the user's goals at a time of day, or turns it off. It only comes " +
                 "while the goal isn't done yet for the day (for a weekly or monthly goal: on the period's last day). Use it when the " +
-                "user asks to be reminded of a goal.");
+                "user asks to be reminded of a goal (\"remind me to do my jumping jacks at 7 pm\"): use this one, not add_reminder, whenever the " +
+                "reminder is about a goal.");
         }
 
         private static async Task<string> SetGoalReminderAsync(IAgentGoalStore store, Func<AgentGoal, TimeSpan?, Task<DateTime?>> setReminder,

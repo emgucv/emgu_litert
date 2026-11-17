@@ -1258,6 +1258,12 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
     the app in front (the 10:50 banner was missed: the screenshot came 14 s late). A second request, "Remind me to do my
     jumping jacks at 10:57 pm", made the model call `add_reminder` (Apple Reminders) instead of `set_goal_reminder`; its
     Confirm / Cancel card was cancelled. Not tried: the app in the background, tapping the banner, a restart.
+    - Next day (2026-11-17), with the two tool descriptions naming each other (`set_goal_reminder`: "use this one, not
+      add_reminder, whenever the reminder is about a goal"; `add_reminder`: "something that is not one of their goals (for a
+      goal, use set_goal_reminder if you have it)"): the same E2B called `set_goal_reminder` for both "Remind me to do my
+      jumping jacks at 4:20 pm" and the wording that failed before ("... at 10:57 pm"): two for two, one run each, so not
+      proof. With the app sent to the Home screen, the 4:20 PM banner "30 jumping jacks a day / 30 jumping jacks to go
+      today" appeared on time (about 4:20:01). Not tried: tapping the banner, a restart.
 - End dates (since 2026-10-29): a goal "for 30 days", "for the next two weeks" or "for a month" ends
   (`AgentGoal.Ends`: midnight after its last day, from its words and the day it was set - nothing more is stored, so the
   goals saved before have it too). Its history and streak stop with the last day (no period goes on afterwards), its
