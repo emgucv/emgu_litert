@@ -80,7 +80,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] Pictures made before this have no description: the sheet shows only the picture and the buttons (without "Draw it again").
-- [ ] Try the Photos, Share and Save buttons by hand on an iPhone / Windows; the share sheet and the Photos permission prompt weren't driven.
+- [ ] Try the Photos, Share and Save buttons by hand on Windows (done on an iPad Air, 2026-11-16: FEATURES.md, picture sheet); an iPhone has no image model.
 
 ## 18. Agent tool: create documents (`create_document`) — implemented; verified on Mac Catalyst with Gemma 4 E2B
 

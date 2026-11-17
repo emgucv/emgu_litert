@@ -659,6 +659,10 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   this again, using exactly this description: ..."), "Add to Photos" (the library's `PictureGallery` since 2026-10-26: MediaStore on Android, add-only
   PhotoKit with `NSPhotoLibraryAddUsageDescription` on iOS and Mac Catalyst, the Pictures folder on Windows), "Share..." and
   "Save image...".
+  - Tried on an iPad Air M4 (iOS 27.2, 2026-11-16, Gemma 4 12B drawing with Bonsai Image 4B 512): "Share..." opens the iOS share
+    sheet for the PNG (nothing was sent), "Save image..." opens the Files save dialog ("generated-image-...", On My iPad;
+    cancelled), and "Add to Photos" asked for the add-only Photos permission (tapped by the user, not by the test), then the
+    sheet said "Saved to Photos". Not tried: Windows, an iPhone (no image model fits there).
 - iOS: `Emgu.LiteRT` uses `LiteRt.framework` there, and the model folder (the app's Documents; `LocalApplicationData` on
   iOS) is excluded from iCloud backups (`NSUrl.IsExcludedFromBackupKey`).
   - Verified in an iPhone 18 Pro simulator (iOS 27) with the models linked in from the Mac: two 8-step pictures, and Gemma 4
