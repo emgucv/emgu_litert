@@ -15,6 +15,12 @@ namespace Emgu.LiteRT.LM
     /// </summary>
     public static class OmniInvoke
     {
+        // Before the first P/Invoke: on Windows, finds libomniextern.dll in runtimes\win-<arch>\native too (LiteRtLmNativeLoader).
+        static OmniInvoke()
+        {
+            LiteRtLmNativeLoader.EnsureLoaded();
+        }
+
         /// <summary>
         /// The file name of the library: libomniextern.dylib (macOS, also loaded by Mac Catalyst), libomniextern.so
         /// (Linux / Android) or libomniextern.dll (Windows); omniextern.framework on iOS.

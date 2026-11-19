@@ -15,6 +15,12 @@ namespace Emgu.LiteRT.LM
     /// </summary>
     public static partial class LiteRtLmInvoke
     {
+        // Before the first P/Invoke: on Windows, finds liblitert-lm.dll in runtimes\win-<arch>\native too (LiteRtLmNativeLoader).
+        static LiteRtLmInvoke()
+        {
+            LiteRtLmNativeLoader.EnsureLoaded();
+        }
+
         /// <summary>
         /// The file name of the LiteRT-LM C API library. .NET appends the platform suffix, resolving to
         /// liblitert-lm.dylib (macOS), liblitert-lm.so (Linux / Android) or liblitert-lm.dll (Windows).

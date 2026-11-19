@@ -52,6 +52,7 @@
     <Compile Include="..\UnitTestGoalReminders.cs" Link="UnitTestGoalReminders.cs" />
     <Compile Include="..\UnitTestVideoMoments.cs" Link="UnitTestVideoMoments.cs" />
     <Compile Include="..\UnitTestSpeechToText.cs" Link="UnitTestSpeechToText.cs" />
+    <Compile Include="..\UnitTestLiteRtLmNativeLoader.cs" Link="UnitTestLiteRtLmNativeLoader.cs" />
     <Compile Include="..\UnitTestTextToImage.cs" Link="UnitTestTextToImage.cs" />
     <Compile Include="..\UnitTestTextToSpeech.cs" Link="UnitTestTextToSpeech.cs" />
     <Compile Include="..\UnitTestVoiceEngines.cs" Link="UnitTestVoiceEngines.cs" />
