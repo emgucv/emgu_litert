@@ -9,5 +9,8 @@
     ${MAUI_VERSION_MSBUILD}
     <EmguLiteRTPackageVersion>${CPACK_PACKAGE_VERSION}</EmguLiteRTPackageVersion>
     <WindowsGpuRuntimePackageVersion>${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</WindowsGpuRuntimePackageVersion>
+    <!-- The packages build_emgu_litert builds (platforms/nuget): Emgu.LiteRT.runtime.maui's Windows PackageReference
+         (Emgu.TF.Lite.runtime.windows) reaches this project, whose restore needs the folder as a source too, else NU1102. -->
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$([System.IO.Path]::GetFullPath($(MSBuildThisFileDirectory)..\..\platforms\nuget))</RestoreAdditionalProjectSources>
   </PropertyGroup>
 </Project>
