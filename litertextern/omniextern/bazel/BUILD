@@ -56,3 +56,71 @@ cc_binary(
         "@com_google_absl//absl/strings",
     ],
 )
+
+# Windows: one LiteRT-LM runtime for both C APIs. Built as above, liblitert-lm.dll (//c:litert-lm) and omniextern.dll each
+# link their own static copy of the runtime (18.7 MB and 12.6 MB). The iOS way - liblitert-lm exporting the C++ runtime and
+# omniextern linking against it (litertextern/omniextern/bazel_ios) - doesn't work here: a DLL exports only what is
+# __declspec(dllexport)-ed or in a .def, LiteRT-LM's C++ isn't (and the submodule isn't edited), its global data (protobuf's
+# default instances, absl, the OmniRegistry models register in) would need __declspec(dllimport) on the importing side, and
+# cc_shared_library with dynamic_deps isn't supported on Windows here. So this one DLL holds LiteRT-LM's C API (//c:engine,
+# what //c:litert-lm is built from: the same sources and deps) and omniextern; both APIs are __declspec(dllexport)-ed
+# (LITERT_LM_C_API_EXPORT, OMNIEXTERN_EXPORT), so it exports both. Named liblitert-lm (not litert-lm, as //c:litert-lm), so
+# the DLL is liblitert-lm.dll - DllImport("liblitert-lm") - and so is the name libomniextern.dll imports it by.
+cc_binary(
+    name = "liblitert-lm",
+    srcs = [
+        "omniextern.cc",
+        "omniextern.h",
+    ],
+    features = ["-legacy_whole_archive"],
+    linkshared = 1,
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [
+        "//c:engine",
+        "//omni:omni_engine",
+        "//omni:omni_session",
+        "//omni/speech2text:parakeet_tdt",
+        "//omni/speech2text:qwen3_asr",
+        "//omni/text2image:bonsai_flux2",
+        "//omni/text2image:flux2_klein",
+        "//omni/text2speech:kokoro",
+        "//omni/text2speech:tts_session",
+        "//omni:omni_registry",
+        "//c:engine_internal",
+        "//runtime/proto:speech2text_session_config_cc_proto",
+        "//runtime/proto:text2image_session_config_cc_proto",
+        "//runtime/proto:text2speech_session_config_cc_proto",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+filegroup(
+    name = "liblitert-lm_implib",
+    srcs = [":liblitert-lm"],
+    output_group = "interface_library",
+    target_compatible_with = ["@platforms//os:windows"],
+)
+
+cc_import(
+    name = "liblitert-lm_import",
+    interface_library = ":liblitert-lm_implib",
+    shared_library = ":liblitert-lm",
+    target_compatible_with = ["@platforms//os:windows"],
+)
+
+# Windows: libomniextern.dll, with no code of its own, so Emgu.LiteRT.LM's DllImport("libomniextern") (one name on every
+# platform) still resolves. It links liblitert-lm.dll's import library and re-exports the omniextern_* functions it imports
+# from there: each export is the linker's jump stub through the import table, into liblitert-lm.dll. (A .def forwarder,
+# "f=liblitert-lm.f", would be a true forwarder, but MSVC 14.52's link.exe doesn't make one - LNK2001 for f, even for
+# "f1=kernel32.Sleep" - 2026-11-18.) omniextern_forward.def is written by bazel_build_litert.ps1 when it stages this package:
+# "EXPORTS" and every OMNIEXTERN_EXPORT function of omniextern.h.
+cc_binary(
+    name = "libomniextern",
+    srcs = ["omniextern_forward.cc"],
+    linkshared = 1,
+    target_compatible_with = ["@platforms//os:windows"],
+    win_def_file = "omniextern_forward.def",
+    deps = [":liblitert-lm_import"],
+)

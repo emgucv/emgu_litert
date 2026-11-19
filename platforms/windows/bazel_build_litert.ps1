@@ -322,6 +322,14 @@ if (-not (Test-Path $OmniexternStageDir)) { New-Item -ItemType Directory -Path $
 Copy-Item "litertextern\omniextern\bazel\BUILD" (Join-Path $OmniexternStageDir "BUILD") -Force
 Copy-Item "litertextern\omniextern\omniextern.cc" (Join-Path $OmniexternStageDir "omniextern.cc") -Force
 Copy-Item "litertextern\omniextern\omniextern.h" (Join-Path $OmniexternStageDir "omniextern.h") -Force
+# liblitert-lm.dll holds omniextern too (//omniextern:liblitert-lm, one LiteRT-LM runtime for both C APIs), and libomniextern.dll
+# only re-exports its omniextern_* functions (//omniextern:libomniextern): its .def lists every OMNIEXTERN_EXPORT function of omniextern.h.
+Copy-Item "litertextern\omniextern\bazel\omniextern_forward.cc" (Join-Path $OmniexternStageDir "omniextern_forward.cc") -Force
+$OmniexternExports = @([regex]::Matches((Get-Content "litertextern\omniextern\omniextern.h" -Raw),
+    'OMNIEXTERN_EXPORT\s+[^;{]*?\b(omniextern_\w+)\s*\(') | ForEach-Object { $_.Groups[1].Value })
+if ($OmniexternExports.Count -eq 0) { throw "No OMNIEXTERN_EXPORT functions found in omniextern.h" }
+Set-Content -Path (Join-Path $OmniexternStageDir "omniextern_forward.def") -Encoding ascii -Value (
+    @("EXPORTS") + ($OmniexternExports | ForEach-Object { "    $_" }))
 
 Set-Location $WorkspaceDir
 
@@ -415,15 +423,15 @@ if ($BuildLitertLm) {
     # under the same (short) output_base - same approach as bazel_build_macos and
     # platforms/android/bazel_build_litert. Uses $LitertLmBazelArgs (a separate, short
     # output_base/root - see above), not $CommonBazelArgs.
-    & $BazelCommand @LitertLmBazelArgs "//c:litert-lm" "//omniextern:omniextern" @GpuTargets "--define=litert_runtime_link_mode=dynamic" "--platform_suffix=-litert_lm_dynamic" "--verbose_failures"
+    # //omniextern:liblitert-lm is LiteRT-LM's C API (//c:engine, what //c:litert-lm is built from) and omniextern in one DLL, so
+    # the runtime is linked once; //omniextern:libomniextern only re-exports its omniextern_* functions (see
+    # litertextern/omniextern/bazel/BUILD). Both targets carry the "lib" prefix in their names (Bazel's Windows shared-library
+    # naming doesn't add it, as on Linux/macOS), so they are already liblitert-lm.dll and libomniextern.dll - the names
+    # Emgu.LiteRT.LM P/Invokes on every platform, and the one libomniextern.dll imports liblitert-lm.dll by.
+    & $BazelCommand @LitertLmBazelArgs "//omniextern:liblitert-lm" "//omniextern:libomniextern" @GpuTargets "--define=litert_runtime_link_mode=dynamic" "--platform_suffix=-litert_lm_dynamic" "--verbose_failures"
     Set-Location $RepoRoot
 
-    # Bazel's Windows shared-library naming doesn't auto-prepend "lib" the way Linux/macOS do (see
-    # tfliteextern.dll vs. libLiteRt.dll above - libLiteRt gets its prefix from the target name itself,
-    # ":libLiteRt", not from Bazel); the //c:litert-lm target has no such prefix, so its Windows output is
-    # litert-lm.dll - renamed here to liblitert-lm.dll to match what DllImport("liblitert-lm") resolves on
-    # every platform (Emgu.LiteRT.LM P/Invokes this one name regardless of OS).
-    Copy-Item (Join-Path $LmWorkspaceDir "bazel-bin\c\litert-lm.dll") "$NativeOutDir\liblitert-lm.dll" -Force
+    Copy-Item (Join-Path $LmWorkspaceDir "bazel-bin\omniextern\liblitert-lm.dll") "$NativeOutDir\liblitert-lm.dll" -Force
     Copy-Item $GemmaPrebuilt "$NativeOutDir\libGemmaModelConstraintProvider.dll" -Force
     # Since LiteRT-LM v0.19.0 liblitert-lm.dll delay-loads webgpu_dawn.dll (Google's prebuilt Dawn, for its WebGPU sampler; Git LFS
     # like the Gemma library): it loads and runs on the CPU without it, and needs it for the GPU. Copied for local runs and
@@ -439,10 +447,20 @@ if ($BuildLitertLm) {
         if (Test-Path $GpuAccelerator) { Copy-Item $GpuAccelerator "$NativeOutDir\libLiteRtWebGpuAccelerator.dll" -Force }
         else { Write-Warning "$GpuAccelerator was not built." }
     }
-    # omniextern.dll (speech recognition, built the same way against libLiteRt.dll) is renamed the same way, for
-    # DllImport("libomniextern"). Not built on Windows yet: the omni dependencies may need fixes there.
-    $OmniexternDll = Join-Path $LmWorkspaceDir "bazel-bin\omniextern\omniextern.dll"
-    if (Test-Path $OmniexternDll) { Copy-Item $OmniexternDll "$NativeOutDir\libomniextern.dll" -Force }
+    # libomniextern.dll, for DllImport("libomniextern"): only jump stubs into liblitert-lm.dll's omniextern_* functions.
+    Copy-Item (Join-Path $LmWorkspaceDir "bazel-bin\omniextern\libomniextern.dll") "$NativeOutDir\libomniextern.dll" -Force
+    # The link would already fail on a function liblitert-lm.dll doesn't export; checked again on the deployed files.
+    $Vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    $VsInstall = if (Test-Path $Vswhere) { & $Vswhere -latest -products * -property installationPath } else { $null }
+    $Dumpbin = if ($VsInstall) { Get-ChildItem (Join-Path $VsInstall "VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe") -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1 } else { $null }
+    if ($Dumpbin) {
+        $LmExports = @(& $Dumpbin.FullName /exports "$NativeOutDir\liblitert-lm.dll" | ForEach-Object { if ($_ -match '^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]{8}\s+(omniextern_\w+)') { $Matches[1] } })
+        $Unresolved = @($OmniexternExports | Where-Object { $LmExports -notcontains $_ })
+        if ($Unresolved.Count -gt 0) { throw "liblitert-lm.dll doesn't export $($Unresolved -join ', '), which libomniextern.dll forwards to it" }
+        Write-Host "libomniextern.dll forwards $($OmniexternExports.Count) functions, all exported by liblitert-lm.dll"
+    } else {
+        Write-Warning "dumpbin.exe not found: libomniextern.dll's forwarders were not checked against liblitert-lm.dll's exports"
+    }
 }
 # Record the TFLite version - TensorFlow's TF_VERSION, from the TensorFlow source Bazel built against - next to the
 # dll. The top level CMakeLists.txt reads it to version the Emgu.TF.Lite, Emgu.LiteRT.Tflite.Models and Emgu.TF.Lite.runtime.windows nuget packages.
