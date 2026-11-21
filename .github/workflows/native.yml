@@ -116,6 +116,56 @@ jobs:
         path: lib/android/${{ matrix.abi }}/
         if-no-files-found: error
 
+  android-demo:
+    # The MAUI demo's .apk, built from the libraries the Android jobs above made (not rebuilt here: they take hours). A
+    # separate job, so a failing app build doesn't redo them. Both ABIs are embedded; the ones not built (x86,
+    # armeabi-v7a) are left out by the runtime projects.
+    name: Android MAUI demo
+    needs: android
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        # litert for the version CMake reads (litert/litert/version.bzl); no prebuilt libraries are needed from LiteRT-LM.
+        submodules: true
+    - uses: actions/download-artifact@v8
+      with:
+        name: native-android-arm64-v8a
+        path: lib/android/arm64-v8a
+    - uses: actions/download-artifact@v8
+      with:
+        name: native-android-x86_64
+        path: lib/android/x86_64
+    - uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+    - name: Install the .NET MAUI Android workload
+      run: dotnet workload install maui-android
+    - name: Generate the projects' Directory.Build.props
+      # The projects take their target framework and package settings from files CMake generates.
+      run: cmake -S . -B build
+    - name: Build the MAUI demo for Android
+      # The Android SDK is the runner's ($ANDROID_HOME). The csproj also copies the signed package to
+      # Emgu.LiteRT.Maui.Demo.android.<version>.apk; Release is signed with the SDK's debug key, as no keystore is set.
+      run: dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-android -c Release
+    - name: Check the .apk's native libraries
+      # Each ABI must carry the runtime, the wrapper and LiteRT-LM's two libraries.
+      run: |
+        APK=$(ls Emgu.LiteRT.Example/Maui/bin/Release/net10.0-android/Emgu.LiteRT.Maui.Demo.android.*.apk)
+        echo "$APK"
+        unzip -l "$APK" | grep '\.so$'
+        for ABI in arm64-v8a x86_64; do
+          for LIB in libLiteRt libtfliteextern liblitert-lm libomniextern; do
+            unzip -l "$APK" | grep -q "lib/$ABI/$LIB.so" || { echo "::error::$LIB.so is missing for $ABI"; exit 1; }
+          done
+        done
+    - uses: actions/upload-artifact@v7
+      with:
+        name: maui-demo-android
+        path: Emgu.LiteRT.Example/Maui/bin/Release/net10.0-android/Emgu.LiteRT.Maui.Demo.android.*.apk
+        if-no-files-found: error
+
   macos:
     name: macOS universal
     runs-on: macos-latest
