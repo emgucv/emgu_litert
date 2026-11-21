@@ -64,9 +64,11 @@ cp -f litertextern/tfliteextern/tfliteextern.h $WORKSPACE_DIR/tfliteextern/tflit
 cp -f litertextern/imgproc/imgproc.cc $WORKSPACE_DIR/tfliteextern/imgproc.cc
 cp -f litertextern/imgproc/imgproc.h $WORKSPACE_DIR/tfliteextern/imgproc.h
 # omniextern, our C API over LiteRT-LM's OmniEngine (omni/; speech recognition for now), staged the same way; its labels are LiteRT-LM's.
-mkdir -p $WORKSPACE_DIR/omniextern
+mkdir -p $WORKSPACE_DIR/omniextern $WORKSPACE_DIR/omniextern_android
 cp -f litertextern/omniextern/bazel/BUILD $WORKSPACE_DIR/omniextern/BUILD || exit 1
 cp -f litertextern/omniextern/omniextern.cc litertextern/omniextern/omniextern.h $WORKSPACE_DIR/omniextern/ || exit 1
+# The package that builds liblitert-lm.so and libomniextern.so from one copy of the runtime (static_archives.bzl is the iOS build's).
+cp -f litertextern/omniextern/bazel_android/BUILD litertextern/omniextern/bazel_android/omniextern.lds litertextern/omniextern/bazel_android/litert_lm.lds litertextern/omniextern/bazel_ios/static_archives.bzl $WORKSPACE_DIR/omniextern_android/ || exit 1
 
 # liblitert-lm.so (LiteRT-LM's C API) is built for arm64-v8a and x86_64 only: it needs LiteRT-LM's prebuilt
 # libGemmaModelConstraintProvider.so, which only exists for those two ABIs (prebuilt/android_<abi>, Git LFS).
@@ -123,12 +125,12 @@ if [ "$BUILD_LITERT_LM" = "1" ]; then
     # LiteRT's C API libraries resolve to headers only, so libLiteRt.so would be built empty) and isn't part of
     # Bazel's output folder name, so --platform_suffix keeps the two builds from overwriting each other's outputs.
     build_with_bazel --define=litert_runtime_link_mode=dynamic --platform_suffix=-litert_lm_dynamic "${@:2}" \
-        //c:litert-lm //omniextern:omniextern || exit 1
+        //omniextern_android:litert_lm //omniextern_android:omniextern || exit 1
     rm -f ../lib/android/$arch/liblitert-lm.so ../lib/android/$arch/libGemmaModelConstraintProvider.so \
         ../lib/android/$arch/libLiteRtOpenClAccelerator.so ../lib/android/$arch/libomniextern.so
-    cp -f bazel-bin/c/liblitert-lm.so ../lib/android/$arch/liblitert-lm.so || exit 1
-    # libomniextern.so (speech recognition) is built the same way, so it also links against libLiteRt.so.
-    cp -f bazel-bin/omniextern/libomniextern.so ../lib/android/$arch/libomniextern.so || exit 1
+    cp -f bazel-bin/omniextern_android/liblitert-lm.so ../lib/android/$arch/liblitert-lm.so || exit 1
+    # libomniextern.so (speech recognition, images, speech) links against liblitert-lm.so, which exports the runtime it uses.
+    cp -f bazel-bin/omniextern_android/libomniextern.so ../lib/android/$arch/libomniextern.so || exit 1
     cp -f $GEMMA_PREBUILT ../lib/android/$arch/libGemmaModelConstraintProvider.so || exit 1
     cp -f $OPENCL_PREBUILT ../lib/android/$arch/libLiteRtOpenClAccelerator.so || exit 1
 fi
