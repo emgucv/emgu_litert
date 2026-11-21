@@ -148,11 +148,14 @@ jobs:
     - name: Build the MAUI demo for Android
       # The Android SDK is the runner's ($ANDROID_HOME). The csproj also copies the signed package to
       # Emgu.LiteRT.Maui.Demo.android.<version>.apk; Release is signed with the SDK's debug key, as no keystore is set.
-      run: dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f net10.0-android -c Release
+      # The target framework follows the SDK CMake generated the props for (the runner's newest, not the one setup-dotnet adds).
+      run: |
+        dotnet --version
+        dotnet build Emgu.LiteRT.Example/Maui/Maui.Demo.Lite.csproj -f "net$(dotnet --version | cut -d. -f1).0-android" -c Release
     - name: Check the .apk's native libraries
       # Each ABI must carry the runtime, the wrapper and LiteRT-LM's two libraries.
       run: |
-        APK=$(ls Emgu.LiteRT.Example/Maui/bin/Release/net10.0-android/Emgu.LiteRT.Maui.Demo.android.*.apk)
+        APK=$(ls Emgu.LiteRT.Example/Maui/bin/Release/net*-android/Emgu.LiteRT.Maui.Demo.android.*.apk)
         echo "$APK"
         unzip -l "$APK" | grep '\.so$'
         for ABI in arm64-v8a x86_64; do
@@ -163,7 +166,7 @@ jobs:
     - uses: actions/upload-artifact@v7
       with:
         name: maui-demo-android
-        path: Emgu.LiteRT.Example/Maui/bin/Release/net10.0-android/Emgu.LiteRT.Maui.Demo.android.*.apk
+        path: Emgu.LiteRT.Example/Maui/bin/Release/net*-android/Emgu.LiteRT.Maui.Demo.android.*.apk
         if-no-files-found: error
 
   macos:

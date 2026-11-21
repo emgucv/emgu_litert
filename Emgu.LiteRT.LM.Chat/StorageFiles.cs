@@ -102,10 +102,21 @@ namespace Emgu.LiteRT.LM.Chat
 
         private static void DeleteContents(string folder)
         {
-            foreach (string file in Directory.EnumerateFiles(folder)) File.Delete(file);
-            foreach (string child in Directory.EnumerateDirectories(folder))
+            // The entries are listed before anything is deleted: a link to a folder inside this one that is deleted first
+            // is left dangling, and on Linux Directory.Delete then leaves the dangling link behind (the parent then isn't
+            // empty: seen on a GitHub runner with the "delete inside a linked root" test).
+            foreach (string file in Directory.GetFiles(folder)) File.Delete(file);
+            foreach (string child in Directory.GetDirectories(folder))
             {
-                if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0) DeleteContents(child);
+                if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) != 0)
+                {
+                    // The link itself, never what it points to: a folder link is removed with Directory.Delete on Windows and
+                    // unlinked with File.Delete elsewhere (also when its target is gone).
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) Directory.Delete(child);
+                    else File.Delete(child);
+                    continue;
+                }
+                DeleteContents(child);
                 Directory.Delete(child);
             }
         }
