@@ -85,3 +85,6 @@ Directory.Build.props
 # This Mac's development signing identity and provisioning profile
 /Emgu.LiteRT.Example/Maui/MacCatalyst.Signing.props
 /Emgu.LiteRT.Example/Maui/tools/.license_cache/
+
+# The MAUI demo .apk and the NuGet packages the build scripts collect
+/package/
