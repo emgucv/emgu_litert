@@ -24,6 +24,7 @@ Their full write-ups are in [history/TODO-done.md](history/TODO-done.md):
 - 8. A Storage page in settings
 - 9. Update to the next LiteRT-LM release — completed (v0.19.0 on every platform)
 - 10. GPU on Windows — core support completed; follow-ups remain
+- 11. GPU for the embedding models — completed (Windows, Mac Metal, a Galaxy S10 and the Pixel Fold; the demo offers it on Windows, Mac Catalyst and Android)
 - 15. Agent tool: search documents (`search_documents`)
 - 16. Agent tool: search past chats (`search_chats`)
 - 19. A private chat
@@ -47,12 +48,6 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] Foldable inner-screen UI check (Z Fold3 installed; initially locked, then wireless debugging disconnected).
-
-## 11. GPU for the embedding models — Windows, Mac (Metal), a Galaxy S10 and the Pixel Fold (OpenCL) checked; the demo offers it on Windows, Mac Catalyst and Android
-
-Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
-
-- [ ] The same on the Pixel Fold (it was off adb).
 
 ## 12. Pixel Fold freeze — rendering stalls fixed; original ANR unconfirmed
 

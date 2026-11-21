@@ -332,6 +332,17 @@ Moved from TODO.md on 2026-11-05:
       Metal (about 6 s) and three texts embedded in 119 ms (768 dims; related sentences 0.80, unrelated 0.61). The
       setting was put back.
 
+Moved from TODO.md on 2026-11-21:
+
+- [x] The same on the Pixel Fold (2026-11-21, Android 17, the demo's Debug build with the shared LiteRT-LM runtime, the Fold unfolded):
+      Settings > Embedding model lists the 440M and 740M models on the CPU and the GPU; with "Multimodal 740M · GPU" chosen and
+      Gemma 4 E2B on the GPU, "What did we talk about last time?" called `search_chats` ("Searched past chats"), the search model
+      loaded on the OpenCL GPU (1,477- and 1,600-node graphs on the delegate; the cached programs were rejected - "OpenCL driver
+      changed, model representation invalid, must be regenerated" - and rebuilt) and the answer found the earlier test chat; the app
+      stayed up. About 42 s for the first round (the E2B GPU load and the tool call), 28 s for the second. Not looked at: the
+      search quality against the CPU, photo and video indexing speed, and chat and search on the GPU together under memory
+      pressure. The setting was put back to the CPU model and the test chats deleted.
+
 ## 12. Pixel Fold freeze — rendering stalls fixed; original ANR unconfirmed
 
 A Pixel Fold "isn't responding" at 20:17 on 2026-10-10 has no retained matching trace (CLAUDE.md). The
