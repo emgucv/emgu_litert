@@ -6,11 +6,14 @@
 # FILE(GLOB) in the caller, since the .apk doesn't exist until the dotnet build of
 # the demo actually finishes.
 #
-# The build writes <application id>-Signed.apk (the one that installs) next to an
-# unsigned <application id>.apk; only the signed one is copied. Without it, every
-# .apk is.
+# The demo's csproj copies the signed package to Emgu.LiteRT.Maui.Demo.android.<version>.apk;
+# when that file is there, only it is copied. Otherwise the <application id>-Signed.apk
+# the build writes (the one that installs) is, and without that, every .apk.
 
-FILE(GLOB EMGU_MAUI_APK_FILES "${SRC_DIR}/*-Signed.apk")
+FILE(GLOB EMGU_MAUI_APK_FILES "${SRC_DIR}/Emgu.LiteRT.Maui.Demo.android.*.apk")
+IF(NOT EMGU_MAUI_APK_FILES)
+  FILE(GLOB EMGU_MAUI_APK_FILES "${SRC_DIR}/*-Signed.apk")
+ENDIF()
 IF(NOT EMGU_MAUI_APK_FILES)
   FILE(GLOB EMGU_MAUI_APK_FILES "${SRC_DIR}/*.apk")
 ENDIF()

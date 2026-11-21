@@ -7,6 +7,7 @@
 	<!-- From cmake/ios_min_version.txt, shared with the native iOS build. -->
 	<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">${EMGU_LITERT_IOS_MIN_VERSION}</SupportedOSPlatformVersion>
     ${MAUI_VERSION_MSBUILD}
+    <EmguLiteRTPackageVersion>${CPACK_PACKAGE_VERSION}</EmguLiteRTPackageVersion>
     <WindowsGpuRuntimePackageVersion>${CPACK_PACKAGE_VERSION}${TENSORFLOW_VERSION_SUFFIX}</WindowsGpuRuntimePackageVersion>
   </PropertyGroup>
 </Project>

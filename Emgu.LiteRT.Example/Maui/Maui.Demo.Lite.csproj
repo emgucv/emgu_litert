@@ -57,6 +57,18 @@
 		<UseInterpreter>false</UseInterpreter>
 	</PropertyGroup>
 
+	<!-- A copy of the signed Android package named with the release version: "Emgu.LiteRT.Maui.Demo.android.<version>.apk"
+	     beside "com.emgu.litert-Signed.apk". The Android SDK names its packages after the ApplicationId and derives the
+	     signed file's name from it, so its names are left alone (install and run keep using them) and the signed package is
+	     copied once it is made: by _Sign for an .apk build, or by _CreateUniversalApkFromBundle for an .aab build (a target
+	     runs once per build, hence one for each). cmake/CopyMauiApk.cmake copies the "-Signed.apk" to {root}/package. -->
+	<Target Name="EmguCopyVersionedApk" AfterTargets="_Sign" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' And '$(EmguLiteRTPackageVersion)' != '' And '$(AndroidPackageFormat)' != 'aab'">
+		<Copy SourceFiles="$(ApkFileSigned)" DestinationFiles="$(OutDir)Emgu.LiteRT.Maui.Demo.android.$(EmguLiteRTPackageVersion).apk" SkipUnchangedFiles="true" Condition="Exists('$(ApkFileSigned)')" />
+	</Target>
+	<Target Name="EmguCopyVersionedUniversalApk" AfterTargets="_CreateUniversalApkFromBundle" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' And '$(EmguLiteRTPackageVersion)' != '' And '$(AndroidPackageFormat)' == 'aab'">
+		<Copy SourceFiles="$(ApkFileSigned)" DestinationFiles="$(OutDir)Emgu.LiteRT.Maui.Demo.android.$(EmguLiteRTPackageVersion).apk" SkipUnchangedFiles="true" Condition="Exists('$(ApkFileSigned)')" />
+	</Target>
+
 	<!-- iOS without LiteRT-LM (lib/ios/LiteRtLm.xcframework not built: bazel_build_xcframework needs an Apple Silicon
 	     Mac): the trimmer still lists LiteRtLm and omniextern, the frameworks Emgu.LiteRT.LM's DllImports name, for the
 	     native link, which then fails ("framework 'LiteRtLm' not found"). Leave them out of the link and look
