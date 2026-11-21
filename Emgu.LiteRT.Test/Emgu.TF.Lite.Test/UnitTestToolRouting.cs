@@ -427,6 +427,81 @@ public class UnitTestToolRouting
         Assert.That(done, Does.Contain(expected));
     }
 
+    // What happens to a message the keywords miss: only the stub tools can bring its group. Gemma 4 E2B, the messages
+    // KeywordRoutingCoverage lists as missed, each in a new conversation; prints whether the model asked for the right
+    // group (TODO item 37). dotnet test -p:TestModels=true --filter "Name=StubRoutingAfterKeywordMisses" --logger "console;verbosity=detailed"
+#if !TEST_MODELS
+    [Ignore("Opt in with -p:TestModels=true; downloads Gemma 4 E2B (2.6 GB).")]
+#endif
+    [Test, Explicit("Measures the stubs after a keyword miss")]
+    public async Task StubRoutingAfterKeywordMisses()
+    {
+        (string Message, string Group)[] cases =
+        {
+            ("Did we ever discuss sourdough?", ChatSearchIndex.GroupName), ("Did I ask you about visas before?", ChatSearchIndex.GroupName),
+            ("Bring up our talk about the mortgage", ChatSearchIndex.GroupName),
+            ("Did you ever tell me how long to proof the dough?", ChatSearchIndex.GroupName),
+            ("What were the three options you listed for my laptop?", ChatSearchIndex.GroupName),
+            ("I ran 3 miles this morning", GoalsSkill.GroupName), ("I read 20 pages tonight", GoalsSkill.GroupName),
+            ("I biked to work today", GoalsSkill.GroupName), ("How many days in a row have I stretched?", GoalsSkill.GroupName),
+            ("Mark today's run as done", GoalsSkill.GroupName),
+            ("What is that plant in front of me?", ChatCamera.GroupName), ("Start watching the street", ChatCamera.GroupName),
+            ("Warn me if someone starts screaming", ChatCamera.SoundGroupName),
+            ("In the lease agreement, who pays for repairs?", ChatDocuments.GroupName),
+            ("Make me a logo for a bakery", ChatImageGeneration.GroupName),
+            ("Can you soften the backdrop?", ChatPhotoEffects.GroupName),
+            // Everyday: no group should be asked for.
+            ("What's the best way to learn Spanish?", null), ("How far is the moon?", null), ("Give me three ideas for a birthday gift", null),
+        };
+        using var stop = new CancellationTokenSource(TimeSpan.FromMinutes(40));
+        using var model = new Emgu.LiteRT.LM.Models.Gemma4E2B { VisionBackend = null, AudioBackend = null };
+        await model.Init(configureSettings: s => { s.NumThreads = 4; s.MaxNumTokens = 4096; }, cancellationToken: stop.Token);
+        string current = null;
+        ToolRouter router = new ToolRouter(DemoGroups(null, null, () => current), () => FunctionInvokingChatClient.CurrentContext?.Options,
+            () => FunctionInvokingChatClient.CurrentContext.Terminate = true);
+        List<string> requested = new List<string>();
+        router.GroupRequested += requested.Add;
+        using var native = new Emgu.LiteRT.LM.Extensions.AI.LiteRtLmChatClient(model) { EnableContextManagement = true };
+        using var client = new FunctionInvokingChatClient(native) { MaximumIterationsPerRequest = 6 };
+        int right = 0, wanted = 0, falseAsks = 0;
+        foreach ((string message, string group) in cases)
+        {
+            current = message;
+            router.Reset();
+            requested.Clear();
+            string reply;
+            try
+            {
+                ChatResponse response = null;
+                for (int run = 0; run < 2; run++)
+                {
+                    IList<AITool> tools = ChatSessionTools.Create(false, null, null, null, null);
+                    foreach (AITool tool in router.Tools())
+                        tools.Add(tool);
+                    response = await client.GetResponseAsync(message, new ChatOptions
+                    {
+                        Tools = tools,
+                        Instructions = string.Join("\n\n", new[] { ChatSkillSet.DefaultInstructions, router.Instructions() }.Where(t => t != null)),
+                        Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }
+                    }, stop.Token);
+                    if (!router.TakeRerun())
+                        break;
+                }
+                reply = response.Text.Replace('\n', ' ');
+            }
+            catch (Emgu.LiteRT.LM.Extensions.AI.LiteRtLmContextException ex)
+            {
+                // The model ended its reply at once (the known failure after a stub): a failed message.
+                reply = "ERROR " + ex.Message;
+            }
+            bool ok = group == null ? requested.Count == 0 : requested.Contains(group);
+            if (group == null) { if (requested.Count > 0) falseAsks++; }
+            else { wanted++; if (ok) right++; }
+            TestContext.Progress.WriteLine((ok ? "OK   " : "MISS ") + message + " [" + (group ?? "no group") + "] -> requested [" + string.Join(", ", requested) + "]: " + reply);
+        }
+        TestContext.Progress.WriteLine("Stub routing: " + right + " of " + wanted + " groups reached after a keyword miss; " + falseAsks + " groups asked for on everyday messages");
+    }
+
 #if !TEST_MODELS
     [Ignore("Opt in with -p:TestModels=true; downloads Gemma 4 E2B (2.6 GB).")]
 #endif
