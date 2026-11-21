@@ -327,7 +327,16 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] Trimming the camera group's definitions (the action schema of `create_visual_monitor`, 1,600 characters): only
       with `FullDemoPlannerCatalogCreatesAlertAt4k` before and after, since they were tuned for E2B.
-- [ ] Routing by meaning (EmbeddingGemma similarity to each group) in place of, or with, the keywords.
+- [ ] Routing by meaning (EmbeddingGemma similarity to each group) in place of, or with, the keywords. Measured 2026-11-21
+      (`KeywordRoutingCoverage` and `StubRoutingAfterKeywordMisses` in `UnitTestToolRouting.cs`, both explicit): on 75 phrasings
+      written after the keywords the keywords route 82%; keywords added for what was found missing fix those messages but not fresh
+      ones (past chats 2 of 8, goals 1 of 8), and 2 of 16 everyday messages get a group they don't need ("photosynthesis" -
+      photo, "draw a line in Excel" - draw). After a miss, Gemma 4 E2B's stub calls brought the right group for 10 of 16
+      messages: camera, sound, documents and photo effects all, past chats 4 of 5, image generation 1 of 1 (but the reply then
+      failed: "The model stopped before answering"), goals 0 of 5 - it answers "I ran 3 miles" with small talk, or calls
+      `write_document` and says it saved a note; rewording the goals stub's summary with those very examples changed nothing.
+      Left as is for now (a statement without a goal set only gets a friendly reply); open: the false "saved" claim, and
+      routing goals by meaning if it matters.
 - [ ] Phones could go back to 4k for Gemma 4: on the S10's GPU, E2B at 4k answered "12 times 7", set and logged a goal
       and went through the alarm stub just as at 8k, in the same time (21-26 s vs 21-27 s). 8k only costs when a long
       chat is read again (a saved chat opened, after compacting) - slower on a phone's CPU (Pixel Fold 342 s vs 123 s),
