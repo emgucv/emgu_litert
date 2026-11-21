@@ -26,7 +26,9 @@ namespace Emgu.LiteRT.LM.Agents.Skills
         {
             "goal", "habit", "target", "streak", "progress", "i want to", "i'd like to", "every day", "a day$", "a week$",
             "per week$", "per day$", "each week$", "times a week", "how am i doing", "on track", "keep track", "track my",
-            "remind me"
+            "remind me",
+            // Progress the user reports in the past tense ("I drank two glasses of water today", "Log that I ran 5 km").
+            "log that", "log my", "i drank", "i walked", "i cycled", "i swam", "i meditated", "i went running", "i went for a run"
         };
 
         private readonly int _maxLength;

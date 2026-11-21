@@ -146,6 +146,101 @@ public class UnitTestToolRouting
         Assert.That(AgentTools.PhotoBackgroundBlurredResult("light"), Does.Contain("(light blur)").And.Contain("one short sentence"));
     }
 
+    // How often the keywords miss: messages written after the keywords and the cases above (not tuned to them), one or
+    // more groups each, and everyday messages that need none. It measures (TODO item 37, "routing by meaning"); it runs
+    // only when asked for by name: dotnet test --filter "Name=KeywordRoutingCoverage" --logger "console;verbosity=detailed".
+    [Test, Explicit("Measures the keyword routing; prints the misses")]
+    public void KeywordRoutingCoverage()
+    {
+        string cam = ChatCamera.GroupName, snd = ChatCamera.SoundGroupName, dev = ChatDeviceActions.GroupName, goal = GoalsSkill.GroupName,
+            photo = ChatPhotos.GroupName, doc = ChatDocuments.GroupName, past = ChatSearchIndex.GroupName,
+            image = ChatImageGeneration.GroupName, effect = ChatPhotoEffects.GroupName, write = ChatWrittenDocuments.GroupName;
+        (string Message, string Group)[] cases =
+        {
+            ("Is anyone at the door right now?", cam), ("Keep an eye on the living room and warn me if the cat jumps on the counter", cam),
+            ("Open the camera", cam), ("What is that plant in front of me?", cam), ("Can you see what I'm pointing at?", cam),
+            ("Notify me if the garage door opens", cam), ("Notify me when the package arrives on the porch", cam),
+            ("Take a photo of my desk", cam), ("Flip to the selfie camera", cam), ("Start watching the street", cam),
+            ("Let me know if the fire alarm goes off", snd), ("Notify me when you hear glass breaking", snd),
+            ("Keep listening and tell me if there is a knock on the door", snd), ("Is that a siren outside? Listen.", snd),
+            ("Warn me if someone starts screaming", snd), ("Tell me when the baby wakes up and cries", snd),
+            ("Set an alarm for 7", dev), ("Schedule a dentist appointment next Tuesday at 3pm", dev), ("Navigate to the nearest pharmacy", dev),
+            ("Directions to the airport", dev), ("Remind me to take my pills at 9 tonight", dev), ("Start a countdown for 5 minutes", dev),
+            ("Add a meeting with Anna on Monday morning to my calendar", dev), ("Create an event: birthday party Saturday 6pm", dev),
+            ("How long does it take to drive to Seattle?", dev), ("Put a reminder in for the school play on the 14th", dev),
+            ("I'd like to meditate every morning", goal), ("Track my water intake", goal), ("I drank two glasses of water today", goal),
+            ("Log that I ran 5 km", goal), ("What's my progress on reading?", goal), ("I want to lose 5 kilos by June", goal),
+            ("Count my push-ups", goal), ("Let's start a workout: 20 lunges", goal),
+            ("Where are the pictures from my trip to Japan?", photo), ("Show me pictures of my kids at the beach", photo),
+            ("Find that photo of the sunset", photo), ("Do I have any screenshots of receipts?", photo), ("Look for photos of Grandma", photo),
+            ("Pull up the pictures from last Christmas", photo), ("Find the video from my daughter's recital", photo),
+            ("Show me footage of the fireworks", photo), ("Is there a clip of the dog barking?", photo),
+            ("Summarize the PDF I attached", doc), ("What does the contract say about termination?", doc),
+            ("According to the report, what were last year's sales?", doc), ("Search my documents for the warranty terms", doc),
+            ("In the lease agreement, who pays for repairs?", doc), ("What's in the uploaded file about taxes?", doc),
+            ("What did you recommend yesterday?", past), ("Remind me what we decided about the trip", past),
+            ("Find our earlier conversation about Python", past), ("Did we ever discuss sourdough?", past),
+            ("Go back to what you said about the budget", past), ("What was that book you suggested last week?", past),
+            ("Create a picture of a dragon", image), ("Generate an image of a futuristic city", image), ("Make me a logo for a bakery", image),
+            ("Illustrate a cat wearing a hat", image), ("I want a drawing of a mountain lake", image), ("Sketch a robot", image),
+            ("Imagine a castle in the clouds and show me", image),
+            ("Make the background blurry", effect), ("Add bokeh to this picture", effect), ("Can you soften the backdrop?", effect),
+            ("Blur everything behind me", effect), ("Portrait effect please", effect),
+            ("Put this into a docx", write), ("Save the summary as a Word file", write), ("Create a PDF of this list", write),
+            ("Export our chat as markdown", write), ("Draft a letter and give me a file", write),
+            ("Turn this into a document I can download", write), ("Transcribe this meeting", write),
+            ("Record the meeting and write the minutes", write),
+            // Everyday messages: no group.
+            ("What's the capital of Australia?", null), ("Write a haiku about autumn", null), ("How do I fix a flat tire?", null),
+            ("Translate good morning into Spanish", null), ("Give me a recipe for pancakes", null), ("Why is the sky blue?", null),
+            ("Summarize the plot of Hamlet", null), ("What's the difference between TCP and UDP?", null), ("Suggest names for a puppy", null),
+            ("Help me write an email to my boss", null), ("Recommend a good book", null), ("What's 15% of 80?", null),
+            ("Tell me about the history of Rome", null), ("Can you recommend a good movie tonight?", null),
+            ("Explain how photosynthesis works", null), ("How do I draw a straight line in Excel?", null),
+        };
+        // Fresh phrasings for the two groups whose keywords were extended after the first run (past chats, goals), and more
+        // everyday messages, written without looking at the keywords.
+        cases = cases.Concat(new (string, string)[]
+        {
+            ("What was the name of the hotel you proposed earlier?", past), ("Which restaurant did you pick for me on Friday?", past),
+            ("Can you remind me what you answered about my knee pain?", past), ("Did you ever tell me how long to proof the dough?", past),
+            ("Bring up our talk about the mortgage", past), ("What were the three options you listed for my laptop?", past),
+            ("Last week you gave me a workout plan, what was it?", past), ("Did I ask you about visas before?", past),
+            ("I ran 3 miles this morning", goal), ("I walked 10000 steps today", goal), ("I read 20 pages tonight", goal),
+            ("I finished my meditation session", goal), ("Add a glass of water to my count", goal),
+            ("I biked to work today", goal), ("Mark today's run as done", goal), ("How many days in a row have I stretched?", goal),
+            ("What's the best way to learn Spanish?", null), ("Draft a polite decline to a wedding invitation", null),
+            ("What should I cook with chickpeas?", null), ("How far is the moon?", null), ("Tell me what you think about remote work", null),
+            ("Which laptop would you recommend for programming?", null), ("Give me three ideas for a birthday gift", null),
+            ("Why did the Roman empire fall?", null), ("How did you learn so many languages?", null),
+        }).ToArray();
+        ToolRouter router = new ToolRouter(DemoGroups(), null);
+        var perGroup = new SortedDictionary<string, (int Hit, int Total)>();
+        var misses = new List<string>();
+        var falseHits = new List<string>();
+        foreach ((string message, string group) in cases)
+        {
+            IList<string> got = router.Match(message);
+            if (group == null)
+            {
+                if (got.Count > 0) falseHits.Add(message + " -> " + string.Join(", ", got));
+                continue;
+            }
+            bool hit = got.Contains(group);
+            perGroup.TryGetValue(group, out var count);
+            perGroup[group] = (count.Hit + (hit ? 1 : 0), count.Total + 1);
+            if (!hit) misses.Add(group + ": " + message + " -> " + (got.Count == 0 ? "(none)" : string.Join(", ", got)));
+        }
+        int hits = perGroup.Values.Sum(v => v.Hit), total = perGroup.Values.Sum(v => v.Total);
+        TestContext.Out.WriteLine("Keyword routing: " + hits + " of " + total + " group requests routed (" + (100 * hits / total) + "%)");
+        foreach (var g in perGroup)
+            TestContext.Out.WriteLine("  " + g.Key + ": " + g.Value.Hit + " of " + g.Value.Total);
+        TestContext.Out.WriteLine("Misses (" + misses.Count + "):");
+        foreach (string miss in misses) TestContext.Out.WriteLine("  " + miss);
+        TestContext.Out.WriteLine("Everyday messages that got a group (" + falseHits.Count + " of " + cases.Count(c => c.Group == null) + "):");
+        foreach (string hit in falseHits) TestContext.Out.WriteLine("  " + hit);
+    }
+
     [Test]
     public void RoutesMessagesToGroups()
     {
@@ -200,7 +295,15 @@ public class UnitTestToolRouting
             ("Take notes of my meeting", new[] { ChatWrittenDocuments.GroupName }),
             ("Record this lecture and transcribe it", new[] { ChatWrittenDocuments.GroupName }),
             ("Can you write the minutes of our team call?", new[] { ChatWrittenDocuments.GroupName }),
+            ("What did you recommend yesterday?", new[] { ChatSearchIndex.GroupName }),
+            ("Did we ever discuss sourdough?", new[] { ChatSearchIndex.GroupName }),
+            ("What was that book you suggested last week?", new[] { ChatSearchIndex.GroupName }),
+            ("Remind me what we decided about the trip", new[] { ChatSearchIndex.GroupName }),
+            ("I drank two glasses of water today", new[] { GoalsSkill.GroupName }),
+            ("Log that I ran 5 km", new[] { GoalsSkill.GroupName }),
             // Everyday messages need no group.
+            ("Can you recommend a good movie tonight?", new string[0]),
+            ("Can you suggest a name for my cat?", new string[0]),
             ("Boil the eggs for 7 minutes", new string[0]),
             ("Who holds the world record for the marathon?", new string[0]),
             ("What's the weather in Paris?", new string[0]),

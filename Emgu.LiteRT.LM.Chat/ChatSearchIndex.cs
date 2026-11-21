@@ -129,7 +129,11 @@ namespace Emgu.LiteRT.LM.Chat
         public static readonly string[] GroupKeywords =
         {
             "earlier", "previous", "last time", "we talked", "we discussed", "you said", "you told", "i said",
-            "i told you", "i asked", "remember when", "conversation", "chat", "mentioned", "recall"
+            "i told you", "i asked", "remember when", "conversation", "chat", "mentioned", "recall",
+            // What the assistant itself said or the two agreed on ("What did you recommend yesterday?"); not "you recommend",
+            // which "Can you recommend a movie?" has.
+            "you recommended", "did you recommend", "you suggested", "did you suggest", "you advised", "you wrote", "you gave me",
+            "we decided", "we agreed", "we ever", "go back to what"
         };
 
         /// <summary>The instructions that go with the search_chats tool.</summary>
