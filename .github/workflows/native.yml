@@ -205,12 +205,6 @@ jobs:
     name: iOS frameworks and MAUI demo
     runs-on: macos-latest
     timeout-minutes: 360
-    env:
-      # The bare iOS TFM (net<N>.0-ios), for CMake's generated props and the demo build: the runner's .NET iOS workload
-      # accepts only its own newest platform version (27.2) while its Xcode is older, so the version
-      # platforms/macos/apple_tfm_version.sh picks from the Xcode (26.0) is "not a valid TargetPlatformVersion" (NETSDK1140).
-      # The empty value is honored by the script (it is set, not unset).
-      EMGU_IOS_TFM_VERSION: ""
     steps:
     - uses: actions/checkout@v7
       with:
@@ -237,6 +231,12 @@ jobs:
     - uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
+    - name: Use the .NET 10 SDK
+      # The runner's default `dotnet` is 11, whose iOS bindings need Xcode 27.2 (MT180) while the runner has 26.x, and
+      # whose workload accepts only platform version 27.2 (NETSDK1140 for the Xcode-derived 26.0). .NET 10's iOS SDK
+      # takes net10.0-ios26.0. This file exists only in the job's checkout (not committed); it makes `dotnet` here,
+      # and so CMake's generated props and the TFM below, use the SDK setup-dotnet installed.
+      run: echo '{"sdk":{"version":"10.0.100","rollForward":"latestFeature"}}' > global.json
     - name: Install the .NET MAUI workloads
       # All of them, not just maui-ios: restoring the demo restores every target framework it has on macOS (Android,
       # iOS, Mac Catalyst), even when building one.
