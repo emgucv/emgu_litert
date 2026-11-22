@@ -42,11 +42,33 @@ namespace Emgu.LiteRT.LM.Maui
 #endif
 
         /// <summary>
+        /// Whether the app has a GPU accelerator for the language models. On Windows, only with the WebGPU bundle
+        /// (<c>platforms/windows/bazel_build_windows_gpu.ps1</c>, the <c>Emgu.LiteRT.GPU.runtime.windows</c> package):
+        /// <c>libLiteRtWebGpuAccelerator.dll</c> and the Windows SDK's <c>dxcompiler.dll</c>, in the app's folder or its
+        /// <c>runtimes\win-&lt;arch&gt;\native</c>. Without the accelerator a model on the GPU fails as its engine is made
+        /// ("litert_lm_engine_create failed (Unknown)"). The accelerator alone isn't enough to go by: a CPU build that copies
+        /// <c>lib\runtimes\win-x64\native\*.dll</c> takes it along after a GPU native build, without the shader compilers Dawn
+        /// needs, which come only with the bundle. Elsewhere true: the accelerators ship with LiteRT-LM (OpenCL on Android,
+        /// Metal on iOS and Mac Catalyst).
+        /// </summary>
+        public static bool GpuAvailable =>
+#if WINDOWS
+            HasNativeLibrary("libLiteRtWebGpuAccelerator.dll") && HasNativeLibrary("dxcompiler.dll");
+
+        private static bool HasNativeLibrary(string fileName) =>
+            LiteRtLmNativeLoader.FindNativeLibrary(System.AppContext.BaseDirectory, fileName,
+                System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture) != null;
+#else
+            true;
+#endif
+
+        /// <summary>
         /// The catalog's models (<see cref="ChatModelCatalog.For"/>) this app can run: none when LiteRT-LM isn't in the app
         /// (<see cref="LiteRtLmInvoke.IsAvailable"/>; e.g. an iOS build from an Intel Mac, where LiteRT-LM can't be built), so
-        /// the app offers only its remote models. On a <see cref="LowMemory"/> device, Gemma 4 prefills in small pieces.
+        /// the app offers only its remote models; on the CPU only without a GPU accelerator (<see cref="GpuAvailable"/>). On a
+        /// <see cref="LowMemory"/> device, Gemma 4 prefills in small pieces.
         /// </summary>
         public static IList<ChatModelOption> AvailableModels() =>
-            LiteRtLmInvoke.IsAvailable ? ChatModelCatalog.For(Current, LowMemory, HighMemory) : new List<ChatModelOption>();
+            LiteRtLmInvoke.IsAvailable ? ChatModelCatalog.For(Current, LowMemory, HighMemory, GpuAvailable) : new List<ChatModelOption>();
     }
 }

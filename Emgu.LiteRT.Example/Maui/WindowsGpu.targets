@@ -5,6 +5,10 @@
     <DefineConstants Condition="'$(EnableWindowsGpu)' == 'true'">$(DefineConstants);WINDOWS_WEBGPU</DefineConstants>
     <!-- Keep GPU and CPU builds apart so incremental builds cannot leave a stale accelerator beside another core. -->
     <OutputPath Condition="'$(EnableWindowsGpu)' == 'true'">bin\$(Configuration)\webgpu\</OutputPath>
+    <!-- Unpackaged by default: packaged, -t:Run started bin\...\webgpu\...\Maui.Demo.Lite.exe without the package's identity, and
+         the Windows App SDK's auto-initializer ended it with "Class not registered" (2026-11-21). -p:WindowsPackageType=MSIX still
+         builds it packaged. -->
+    <WindowsPackageType Condition="'$(EnableWindowsGpu)' == 'true' and '$(WindowsPackageType)' == ''">None</WindowsPackageType>
   </PropertyGroup>
   <ItemGroup Condition="'$(EnableWindowsGpu)' == 'true'">
     <PackageReference Include="Emgu.LiteRT.GPU.runtime.windows" Version="$(WindowsGpuRuntimePackageVersion)" />

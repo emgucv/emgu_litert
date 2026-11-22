@@ -50,7 +50,9 @@ namespace Emgu.LiteRT.LM.Chat
         /// that the chat's first prompt would otherwise hold, so a picture still fits after it; Qwen3.5 4B is left out
         /// and Gemma 4 E4B is offered on the GPU only (measured on an iPhone 12)</param>
         /// <param name="highMemory">True on an iPad with 12 GB or more: Gemma 4 12B (6.9 GB) is offered there too (FEATURES.md, "Check homework and Gemma 4 12B on the iPad")</param>
-        public static IList<ChatModelOption> For(ChatPlatform platform, bool lowMemory = false, bool highMemory = false)
+        /// <param name="gpuAvailable">False when the app has no GPU accelerator (a Windows build without the WebGPU bundle,
+        /// <c>ChatDevicePlatform.GpuAvailable</c>): no model is offered on the GPU, where it could only fail to load</param>
+        public static IList<ChatModelOption> For(ChatPlatform platform, bool lowMemory = false, bool highMemory = false, bool gpuAvailable = true)
         {
             bool android = platform == ChatPlatform.Android, ios = platform == ChatPlatform.iOS, mac = platform == ChatPlatform.MacCatalyst,
                 windows = platform == ChatPlatform.Windows;
@@ -87,6 +89,10 @@ namespace Emgu.LiteRT.LM.Chat
                     : windows ? "~6.9 GB download. Large desktop model for code and harder questions. CPU only on Windows: GPU image inference failed compatibility testing. Needs substantial system memory."
                         : "~6.9 GB download. The most capable - best for code and harder questions. Needs a Mac with 16 GB of memory.",
                     gpu: mac || ios));
+            // Before the low-memory choice below, which keeps E4B's CPU when there is no GPU.
+            if (!gpuAvailable)
+                foreach (ChatModelOption model in models)
+                    model.Backends.Remove("gpu");
             // Little memory (an iPhone 12: 4 GB, ~2.2 GB for the app; 2026-11-09, a ~1500-token first prompt): Qwen3.5 4B on the
             // CPU loaded with 811 MB left and was killed reading the prompt; Gemma 4 E4B on the CPU read it (335 MB left) but
             // was killed encoding a picture, while on the GPU with SmallPrefillOnly it read it in 21 s (1431 MB left) and

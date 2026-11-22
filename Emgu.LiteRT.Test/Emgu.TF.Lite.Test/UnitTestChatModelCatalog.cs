@@ -112,4 +112,17 @@ public class UnitTestChatModelCatalog
         Assert.That(ChatModelCatalog.For(ChatPlatform.Windows).Single(o => o.Id == "Qwen35_2B").Backends, Is.EqualTo(new[] { "cpu" }), "2B not verified on a GPU");
         Assert.That(ChatModelCatalog.For(ChatPlatform.Android), Is.Not.SameAs(android), "each call makes new options");
     }
+
+    [Test]
+    public void WithoutAGpuAcceleratorEveryModelIsOnTheCpu()
+    {
+        // A Windows build without the WebGPU bundle: GPU entries could only fail to load.
+        IList<ChatModelOption> windows = ChatModelCatalog.For(ChatPlatform.Windows, gpuAvailable: false);
+        Assert.That(windows.Select(m => m.Id), Is.EqualTo(ChatModelCatalog.For(ChatPlatform.Windows).Select(m => m.Id)), "the same models");
+        Assert.That(windows.All(m => m.Backends.SequenceEqual(new[] { "cpu" })), Is.True);
+        Assert.That(ChatModelCatalog.For(ChatPlatform.Windows).Single(m => m.Id == "Gemma4E4B").Backends, Is.EqualTo(new[] { "cpu", "gpu" }));
+        // A small iPhone without one keeps E4B on the CPU rather than offering it nowhere.
+        Assert.That(ChatModelCatalog.For(ChatPlatform.iOS, lowMemory: true, gpuAvailable: false).Single(m => m.Id == "Gemma4E4B").Backends,
+            Is.EqualTo(new[] { "cpu" }));
+    }
 }
