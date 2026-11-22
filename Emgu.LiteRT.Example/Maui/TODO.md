@@ -396,7 +396,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] Tune thresholds per sound with real recordings (smoke alarm, baby, doorbell); try other phones' microphones and noisy rooms.
 - [ ] Combined camera + sound conditions, a camera snapshot as a sound alert, and sound monitors listed beside the camera monitors.
-- [ ] Sound monitors on Windows: the microphone stream exists since 2026-11-21 (`MicrophoneSoundSource` on an `AudioGraph`, checked with a meeting), but `CameraFeature`'s `SoundSupported` is still false there, as nothing was tried; listening in the background (Android foreground service, iOS background audio).
+- [ ] Listening in the background (Android foreground service, iOS background audio). (Sound monitors run on Windows since 2026-11-21: a speech monitor counted a spoken clip; FEATURES.md.)
 - [ ] Run with the camera loop and Gemma together on a phone (heat, battery) - nothing was timed together.
 
 ## 43. Video clips as a visual-alert action — `record_clip` built for Android (Camera2); tested on a Galaxy S10 and a Pixel Fold

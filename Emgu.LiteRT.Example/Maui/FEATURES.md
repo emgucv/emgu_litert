@@ -1332,7 +1332,10 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   YAMNet classes with the words people use; `SoundPresenceMonitor`, `SoundMonitorRuntime`, `SoundMonitorTools` -
   `create_sound_monitor` and the rest) and `CameraFeature.Sound.cs`: a `sound_monitor` tool group, the
   microphone on while a monitor is enabled, a monitor card, and chime or spoken alerts that the page doesn't listen to;
-  `MicrophoneGate` gives `VoiceRecorder` the microphone first. Not on Windows. Verified with Gemma 4 E2B on Mac Catalyst and
+  `MicrophoneGate` gives `VoiceRecorder` the microphone first. On Windows since 2026-11-21 (its microphone stream): "Let
+  me know with a chime when you hear someone talking" made one `create_sound_monitor` call with Gemma 4 E4B on the GPU.
+  The card counted the room's own talking (59%), then went from 5 to 7 with a spoken clip from the speakers (74%). The
+  chime wasn't listened for. Remove stopped it. Verified with Gemma 4 E2B on Mac Catalyst and
   with a Galaxy S10's microphone (`Emgu.LiteRT.Models/YAMNET.md`).
 - On Android and iOS a sound monitor can also take a full-resolution photo and record a clip (TODO item 49; `SoundAlert.ClipSeconds`
   and `TakePhoto`, `create_sound_monitor`'s `clipSeconds` and `takePhoto` when `SoundMonitorTools.Create` gets
@@ -1564,7 +1567,13 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
     right, and the garble turned into an action item ("C - locate the non-spot wisdom"). The card said the speakers
     couldn't be told apart. So on Windows Parakeet's mistakes show as nonsense, while Gemma's read as real
     content. Both runs used synthetic voices from laptop speakers, and the room wasn't quiet (Sound events, below, heard
-    speech at about -23 dB with nothing played).
+    speech at about -23 dB with nothing played). On clean audio the order turns around: the same six turns rendered
+    straight to two 16 kHz WAVs (21-22 s each, a temporary test, `MeetingTranscription.Prompt` and `Clean`) gave Gemma 4
+    E4B (CPU, 11-13 s a piece) a 4.5% word error rate over 88 words, nearly all of it "4E4B" for "four E four B", and
+    Parakeet (3.4-3.9 s a piece) 8.0%, with words repeated where its windows meet ("Thanks. Thanks.", "Okay. Okay.")
+    and "icrophone". So the invented sentences came from the speakers, microphone and room, not from the model alone, and
+    "Automatic" keeps the chat model on desktops. Parakeet's repeats at the seams are worth a look
+    (`UnitTestSpeechToText.TranscribesAcrossWindows` checks the seams with other clips).
     "Recognizer, then chat model" isn't yet tried on a phone.
 - Skipping ahead (since 2026-10-29): on a phone the live transcript fell behind the conversation (Google's recognizer
   ~0.9x real time on the Fold, plus each piece's voiceprint; Gemma 0.3x). Once more than a minute of pieces waits
@@ -1676,7 +1685,9 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   demo, Gemma 4 E4B on an RTX A2000 laptop's GPU, the laptop's webcam and microphone) a round took 3.9-5.1 s (the first
   7.6 s); every round described the room and the person at the desk, and the round during a spoken clip heard "Hello,
   can you hear me? I". One quiet round heard "Oi, Jesus.". The answers alternate between "See: / Hear:" and "The
-  pictures show ... / "nothing"". Stop ended it. The page is
+  pictures show ... / "nothing"". Stop ended it. It first offered Gemma 4 E2B, not downloaded there, so Start would have
+  begun its 2.6 GB download. With no model chosen on the page yet, it now picks one already on the device (E4B there,
+  checked with the saved choice removed). The page is
   `Emgu.LiteRT.LM.Maui.CV`'s `WatchAndListenPage`, its loop `Emgu.LiteRT.LM.Agents`' `SceneNarrator` (TODO item 60).
 - LiteRT-LM has no video input, so each round sends Gemma 4 three frames from `LiveCamera.CaptureAsync` (JPEG,
   at most 960 px), taken over a 5 s window, and the sound since the last round (`MicrophoneSoundSource`, as a 16 kHz

@@ -118,7 +118,11 @@ public sealed class WatchAndListenPage : ContentPage
         _copy.Clicked += async (s, e) => await CopyAsync();
         _modelPicker = new Picker { ItemsSource = _models.Select(m => m.DisplayName).ToList(), HorizontalOptions = LayoutOptions.Fill };
         string saved = _settings.Get<string>(ModelSetting, null);
-        int index = Math.Max(0, _models.ToList().FindIndex(m => m.Id == saved));
+        int index = _models.ToList().FindIndex(m => m.Id == saved);
+        // Nothing chosen here yet: a model already on the device rather than Gemma 4 E2B's 2.6 GB download (on Windows with
+        // only E4B downloaded, Start began the download, 2026-11-21).
+        if (index < 0)
+            index = Math.Max(0, _models.ToList().FindIndex(IsDownloaded));
         if (_models.Count > 0)
             _modelPicker.SelectedIndex = index;
         _modelPicker.IsVisible = _models.Count > 1;
@@ -155,6 +159,22 @@ public sealed class WatchAndListenPage : ContentPage
     private static IList<ChatModelOption> UsableModels() =>
         ChatDevicePlatform.AvailableModels().Where(m => !m.IsRemote && m.AcceptsImages && m.AcceptsAudio)
             .OrderBy(m => m.Id == "Gemma4E2B" ? 0 : 1).ToList();
+
+    // Its file is on the device: verified, or complete and checked when it loads (as the chat's model list counts it).
+    private static bool IsDownloaded(ChatModelOption option)
+    {
+        Emgu.LiteRT.Util.DownloadableFile file = option.ModelFile;
+        if (file == null)
+            return false;
+        try
+        {
+            return file.IsLocalFileVerified || (System.IO.File.Exists(file.LocalFile) && new System.IO.FileInfo(file.LocalFile).Length > 0);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
 
     private ChatModelOption SelectedModel =>
         _modelPicker.SelectedIndex >= 0 && _modelPicker.SelectedIndex < _models.Count ? _models[_modelPicker.SelectedIndex] : null;
