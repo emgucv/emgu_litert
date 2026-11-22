@@ -126,6 +126,15 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 - Gemma 4 always gets the agent's tools and instructions. The Web search chip sets `ChatToolMode.Auto` or `None` per
   message, so it can change in the middle of a conversation.
 
+- The on-screen keyboard makes room instead of moving the page (`ChatPage.Keyboard.cs`; iOS 2026-11-05, Android 2026-11-22): the
+  system moved the whole window up (iOS: MAUI's `KeyboardAutoManagerScroll`; Android 15 and later, which draw edge to edge:
+  the window panned), pushing the header and the reply being read off the top, and on Android the message box stayed half under the
+  keyboard. While the chat page shows, that is turned off (Android: `SoftInput.AdjustNothing`, the old mode restored on leaving) and the
+  page's bottom padding is how far the keyboard covers it (iOS: the keyboard's frame; Android, API 30 and later: the IME inset
+  against the content view's bottom, read on each layout), so the conversation gets shorter and `ChatView` keeps its end in view.
+  Seen on the Android 15 emulator (a reply streaming in stays above the message box), the Galaxy S10 (Android 12) and the Pixel
+  Fold (Android 17). Not tried: a floating keyboard, split screen, the folded layout.
+
 ## Replies: Markdown, code, maths and thinking
 
 - `Emgu.LiteRT.LM.Maui`'s `ReplyView` (it was the demo's `ReplyBody.cs`; the parsing is `Emgu.LiteRT.LM.Chat`'s
