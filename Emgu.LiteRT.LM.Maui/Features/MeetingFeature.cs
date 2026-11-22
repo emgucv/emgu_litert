@@ -140,11 +140,11 @@ public sealed class MeetingFeature : ChatFeature
     }
 
     /// <summary>
-    /// Whether a meeting can be recorded now: a microphone source on this platform (Android, iOS, Mac Catalyst) and either
+    /// Whether a meeting can be recorded now: a microphone source on this platform (Android, iOS, Mac Catalyst, Windows) and either
     /// the speech recognizer or a chat model that takes audio.
     /// </summary>
     public bool CanRecord =>
-#if ANDROID || IOS || MACCATALYST
+#if ANDROID || IOS || MACCATALYST || WINDOWS
         Transcriber != null;
 #else
         false;
@@ -172,7 +172,7 @@ public sealed class MeetingFeature : ChatFeature
     /// <summary>Settings > "Meeting transcripts": automatic, the speech recognizer, the chat's model, or both (where meetings can be recorded).</summary>
     public override View BuildSettingsSection()
     {
-#if ANDROID || IOS || MACCATALYST
+#if ANDROID || IOS || MACCATALYST || WINDOWS
         var chips = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
         _transcriberChips.Clear();
         foreach ((MeetingTranscriber? value, string text) in new (MeetingTranscriber?, string)[]
@@ -240,7 +240,7 @@ public sealed class MeetingFeature : ChatFeature
 
     private async Task<string> RecordMeetingAsync(string title, CancellationToken token)
     {
-#if ANDROID || IOS || MACCATALYST
+#if ANDROID || IOS || MACCATALYST || WINDOWS
         MeetingTranscriber? transcriber = Transcriber;
         if (transcriber == null)
             return "Writing down speech needs a speech recognizer (Android 13 or later, an iPhone, iPad or a Mac, or Parakeet or Qwen3-ASR in Settings > Speech recognition for the languages they know) or a chat model that hears audio (Gemma 4). Tell the user.";

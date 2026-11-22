@@ -388,7 +388,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] The model's licence beyond its metadata (Google has no licence file beside it), before bundling or hosting it.
-- [ ] Android foreground service for listening in the background; Windows microphone source.
+- [ ] Android foreground service for listening in the background. (The Windows microphone source exists since 2026-11-21, `MicrophoneSoundSource` on an `AudioGraph`; the Sound events page on Windows isn't tried.)
 
 ## 42. Sound monitors in the chat — "tell me when the doorbell rings"; YAMNet scores the microphone, no model per sound
 
@@ -396,7 +396,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 - [ ] Tune thresholds per sound with real recordings (smoke alarm, baby, doorbell); try other phones' microphones and noisy rooms.
 - [ ] Combined camera + sound conditions, a camera snapshot as a sound alert, and sound monitors listed beside the camera monitors.
-- [ ] Windows microphone stream (`Emgu.LiteRT.LM.Maui`'s `MicrophoneSoundSource`, `IsSupported` false on Windows); listening in the background (Android foreground service, iOS background audio).
+- [ ] Sound monitors on Windows: the microphone stream exists since 2026-11-21 (`MicrophoneSoundSource` on an `AudioGraph`, checked with a meeting), but `CameraFeature`'s `SoundSupported` is still false there, as nothing was tried; listening in the background (Android foreground service, iOS background audio).
 - [ ] Run with the camera loop and Gemma together on a phone (heat, battery) - nothing was timed together.
 
 ## 43. Video clips as a visual-alert action — `record_clip` built for Android (Camera2); tested on a Galaxy S10 and a Pixel Fold
@@ -579,7 +579,7 @@ on the CPU), and a run on a Galaxy S10. Still open:
   page frees the model (2026-11-06).
 - [ ] Speech heard on a phone (the S10's room was quiet: every round silent), the battery and heat over the 10-minute
   limit, the Z Fold3 and the iPad Air (the iOS build passes; not run on the iPad yet).
-- [ ] Windows: a streaming `MicrophoneSoundSource` (WinRT `AudioGraph`); the page is hidden there until then.
+- [ ] Windows: the page shows since the streaming `MicrophoneSoundSource` (WinRT `AudioGraph`, 2026-11-21); not tried there.
 - [ ] Reading the descriptions aloud (the microphone would hear them: mute it while speaking).
 - [ ] Saving a session as a chat or a note; opening the page from the chat ("tell me what you see and hear"); running
   it through the Mac's server (item 29).

@@ -77,7 +77,7 @@ scores the audio with YAMNet (the model runs once per window for all monitors), 
 - **Host** (`LiteRtLmChatPage.Sound.cs`): a "sound_monitor" tool group (keywords: sound, hear, listen, doorbell, knock, bark, siren, smoke alarm, baby cry...),
   a "Sound monitors · session only" card with Pause / Resume / Remove, the microphone started and stopped to match the enabled monitors, and one
   microphone user at a time: `VoiceRecorder` goes through `MicrophoneGate`, so listening is released before a voice message or the voice chat records
-  and taken back afterwards. New chat removes the monitors. Android, iOS and Mac Catalyst; not Windows (no microphone stream yet).
+  and taken back afterwards. New chat removes the monitors. Android, iOS and Mac Catalyst; not Windows (it has a microphone stream since 2026-11-21, but sound monitors aren't tried there, so they stay off).
 - **Model behaviour** (Gemma 4 E2B on Mac Catalyst, real model, the microphone replaced by a clip): every request made one `create_sound_monitor` call
   with the right sound - talking, a baby crying for 10 s, the doorbell with a chime, a dog with no alert, a knock with "someone is at the door", the smoke
   alarm with a chime - and "remove all the sound monitors" listed and removed them. Before the parameters were optional with "leave out unless..." texts,
@@ -91,7 +91,7 @@ scores the audio with YAMNet (the model runs once per window for all monitors), 
 ## What is left
 
 - Sound monitors in the live-camera agent's own panel and combined conditions ("a dog barks and a person is in view"). (A sound can already take a photo or record a clip on Android, TODO item 49.)
-- The Windows microphone source, and listening with the app in the background (an Android foreground service; iOS background audio).
+- Sound monitors on Windows (its microphone source exists since 2026-11-21), and listening with the app in the background (an Android foreground service; iOS background audio).
 - A threshold per sound: the defaults are untuned - 0.5 for speech was fine, a smoke alarm or a baby's cry needs real recordings to tune.
 - Run together with the camera loop and Gemma on a phone for a while (heat, battery): the models are small but nothing was timed together.
 - The model licence, as above.

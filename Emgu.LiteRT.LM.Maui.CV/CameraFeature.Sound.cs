@@ -17,7 +17,7 @@ public sealed partial class CameraFeature
 #if ANDROID || IOS || MACCATALYST
     private static readonly bool SoundSupported = true;
 #else
-    private static readonly bool SoundSupported = false;     // no Windows microphone stream yet
+    private static readonly bool SoundSupported = false;     // Windows has a microphone stream since 2026-11-21; sound monitors not tried there yet
 #endif
     private const string SoundInstructions = SoundMonitorTools.Instructions +
         " Use the camera tools instead when the user wants to see something rather than hear it: \"when you see a person, play white noise\" is a camera monitor with the play_file action, not a sound monitor. When the user wants a video or photo taken because of a sound, " +

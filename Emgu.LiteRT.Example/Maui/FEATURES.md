@@ -1546,7 +1546,18 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
     clip as it warmed up); the recognizers ~20x (Mac) and ~0.9x (Fold).
   - Through the Mac's speakers and microphone with Gemma 4 E2B: 152-153 words written down live (Apple's recognizer:
     67-89), nearly every word right ("data" for "date", "dude" for "did").
-  - Windows has no microphone source for meetings yet (`MicrophoneSoundSource`), so meetings stay Android, iOS and Mac.
+  - Windows records meetings since 2026-11-21: `MicrophoneSoundSource` streams through a WinRT `AudioGraph` (device
+    input into a frame output node, read each 10 ms quantum). The graph is asked for 16 kHz mono float and mixes and
+    resamples itself: by default it takes the speakers' format, 48 kHz with 8 channels on a laptop's Realtek audio, where
+    the microphone fills only some of the channels. The copy of an `AudioBuffer` (`Buffer.CreateCopyFromMemoryBuffer`) has
+    a Length of 0 (only its Capacity is set), so the source sets it before reading. Without that, no samples arrived and
+    the card's clock stayed at 0:00. Checked in the unpackaged GPU demo with Gemma 4 E4B on an RTX A2000 laptop. A
+    6-turn synthetic meeting (Windows' David and Hazel voices from the laptop's speakers into its microphone) ran 1:20
+    by the card's clock, the same as the time it took. 96 words were written down live, the release plans right, "I
+    will finish the microphone tests by Tuesday" word for word. Gemma made up two sentences ("So I went to the dentist
+    for a check up", "Hello, it's great to meet you") and lost "Sarah will update the notes by Wednesday". The notes
+    were written in about 10 s (with a recording WAV and a Word file) and kept the made-up dentist and added a trip to
+    the Scottish Highlands. Parakeet was not tried on Windows meetings.
     "Recognizer, then chat model" isn't yet tried on a phone.
 - Skipping ahead (since 2026-10-29): on a phone the live transcript fell behind the conversation (Google's recognizer
   ~0.9x real time on the Fold, plus each piece's voiceprint; Gemma 0.3x). Once more than a minute of pieces waits
@@ -1654,7 +1665,7 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
 ## Watch and listen
 
 - "Tell me what you see and hear", over and over: the home screen's LiteRT-LM tab has a "Watch and listen" row
-  (Android, iOS and Mac Catalyst; hidden on Windows, which has no microphone stream yet). The page is
+  (Android, iOS and Mac Catalyst; on Windows too since its microphone stream, 2026-11-21, but not tried there). The page is
   `Emgu.LiteRT.LM.Maui.CV`'s `WatchAndListenPage`, its loop `Emgu.LiteRT.LM.Agents`' `SceneNarrator` (TODO item 60).
 - LiteRT-LM has no video input, so each round sends Gemma 4 three frames from `LiveCamera.CaptureAsync` (JPEG,
   at most 960 px), taken over a 5 s window, and the sound since the last round (`MicrophoneSoundSource`, as a 16 kHz
