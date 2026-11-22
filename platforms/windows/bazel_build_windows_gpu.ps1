@@ -63,8 +63,19 @@ function Git-Revision([string]$Folder) {
 }
 
 if (-not $SkipBuild) {
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'bazel_build_litert.ps1') 64 -Gpu
-    if ($LASTEXITCODE -ne 0) { throw "bazel_build_litert.ps1 -Gpu failed (exit $LASTEXITCODE)." }
+    # Windows PowerShell 5.1 turns each line a native command writes to stderr into an ErrorRecord when its output is
+    # redirected (as with *> or a host that captures it), and under 'Stop' the first one - Bazel's "Starting local
+    # Bazel server and connecting to it..." - ends this script. The build's result is its exit code, so relax the
+    # preference for that call only.
+    $savedPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'bazel_build_litert.ps1') 64 -Gpu
+        $buildExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $savedPreference
+    }
+    if ($buildExitCode -ne 0) { throw "bazel_build_litert.ps1 -Gpu failed (exit $buildExitCode)." }
 }
 
 # The Windows SDK's shader compilers (the Direct3D 12 backend fails to create a device without FXC, and rejects
@@ -114,8 +125,11 @@ $manifest = [ordered]@{
 # downloaded for the accelerator (ML Drift) and Dawn, under the LiteRT-LM build's output base.
 $licenseOutput = Join-Path $OutputDirectory 'licenses'
 New-Item -ItemType Directory -Force -Path $licenseOutput | Out-Null
-$externalRoots = @((Join-Path $repoRoot 'o/external'))
-if ($env:LITERT_LM_BAZEL_ROOT) { $externalRoots = @((Join-Path $env:LITERT_LM_BAZEL_ROOT 'o/external')) + $externalRoots }
+# bazel_build_litert.ps1 builds the patched LiteRT-LM tree by default, under the output base "q"; "o" is the
+# unpatched one (-NoLiteRtLmPatches). Both download the same ML Drift and Dawn, so either has the notices.
+$bazelRoots = @($repoRoot)
+if ($env:LITERT_LM_BAZEL_ROOT) { $bazelRoots = @($env:LITERT_LM_BAZEL_ROOT) + $bazelRoots }
+$externalRoots = foreach ($bazelRoot in $bazelRoots) { foreach ($outputBase in @('q', 'o')) { Join-Path $bazelRoot "$outputBase/external" } }
 function Find-External([string]$RelativePath) {
     foreach ($root in $externalRoots) {
         $candidate = Join-Path $root $RelativePath

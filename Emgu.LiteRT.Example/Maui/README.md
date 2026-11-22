@@ -185,7 +185,17 @@ dotnet build Emgu.LiteRT.Example\Maui\Maui.Demo.Lite.csproj -f net<N>.0-windows1
 
 For GPU chat on Windows, first build the matching runtime bundle with
 `platforms/windows/bazel_build_windows_gpu.ps1`. The demo includes that bundle
-automatically. The chat model picker has **CPU models** and **GPU models** sections;
+automatically, building into `bin\Debug\webgpu\`; build that one unpackaged and start its `.exe`:
+
+```powershell
+dotnet build Emgu.LiteRT.Example\Maui\Maui.Demo.Lite.csproj -f net<N>.0-windows10.0.22621.0 -p:WindowsPackageType=None
+Emgu.LiteRT.Example\Maui\bin\Debug\webgpu\net<N>.0-windows10.0.22621.0\win-x64\Maui.Demo.Lite.exe
+```
+
+`-t:Run` on the packaged GPU build starts that `.exe` without the package's identity, and it ends at startup with
+`COMException: Class not registered` from the Windows App SDK's auto-initializer (2026-11-21). Checked then: Gemma 4
+E4B on the GPU (an RTX A2000 laptop) loaded in under 10 s and answered, with the accelerator, Dawn, DXC and Direct3D 12
+loaded in the process. The chat model picker has **CPU models** and **GPU models** sections;
 select a GPU entry to use GPU inference. Tap either section heading to expand or collapse its models; the selected
 model's section opens by default, and explicit expansion choices are remembered across app restarts. In wide windows,
 tap **Model** to hide or show the whole list; when hidden, the header shows the selected model and CPU/GPU backend.
