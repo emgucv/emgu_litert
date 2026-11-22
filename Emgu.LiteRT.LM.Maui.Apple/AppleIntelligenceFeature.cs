@@ -51,7 +51,9 @@ public sealed class AppleIntelligenceFeature : ChatFeature, IRemoteChatModel
             CanSummarize = true,
             CanThink = false,
             AcceptsImages = false,
-            ContextWindow = ContextTokens
+            ContextWindow = ContextTokens,
+            // Apple's model runs on the device (it has no model of ours to load, so the option is a remote-style one).
+            RunsOnDevice = true
         };
         Option.Remote = this;
         UpdateOptionDetail();

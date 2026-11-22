@@ -331,7 +331,8 @@ namespace Emgu.LiteRT.LM.Maui
             foreach (ChatHistoryEntry chat in chats)
             {
                 int id = chat.Id;
-                string modelName = _options.Models.FirstOrDefault(m => m.Id == chat.Model)?.DisplayName ?? chat.Model;
+                ChatModelOption chatModel = _options.Models.FirstOrDefault(m => m.Id == chat.Model);
+                string modelName = chatModel == null ? chat.Model : ModelIcon(chatModel) + " " + chatModel.DisplayName;
                 string detail = (string.IsNullOrEmpty(modelName) ? string.Empty : modelName + " · ") + chat.Updated.ToLocalTime().ToString("g");
                 var actions = new List<(string Text, Action Tapped)>();
                 for (int i = 0; i < _options.ChatActions.Count; i++)

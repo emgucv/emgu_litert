@@ -96,6 +96,14 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
 
 ## Layout and controls
 
+- Where a model runs is an icon beside its name (2026-11-22; the model button, each row of the model list, the model of each saved chat
+  and the button's accessibility description): a phone, tablet or computer (📱 / 💻) for a model on this device whose file is
+  there, ⬇️ for a model on this device that has to be downloaded first (it becomes the device icon when its load finishes), 🌐 for a
+  server's or the cloud's (your own server, a paired Mac, Claude), whose messages leave the device. `ChatModelOption.RunsOnDevice`
+  says it (every option with a factory; Apple Intelligence sets it, since its option has none); the list starts with a legend line for
+  each icon it uses. A cloud (☁️) was tried first and dropped: it is almost white on the light background. Seen on the iPad Air (⬇️
+  for the Qwen models it lacks, 📱 for Gemma 4 E2B, E4B and Bonsai 8B) and on the Galaxy S10 (⬇️ Bonsai 8B, 🌐 Claude and the
+  Mac mini's 12B). A grey icon for the not-downloaded ones was considered: emoji can't be tinted, and grey reads as disabled.
 - Since 2026-10-26 the page is `Emgu.LiteRT.LM.Maui`'s `ChatPage` (`Chat/LiteRtLmChatPage.cs` derives from it; see
   [ARCHITECTURE.md](ARCHITECTURE.md)): a one-line header - back, a model button that opens the model list, new chat,
   settings - then the conversation, then the message box with per-message chips: "Think" and "Web search" (the library's),

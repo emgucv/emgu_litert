@@ -220,7 +220,48 @@ namespace Emgu.LiteRT.LM.Maui
         private void UpdateModelButton()
         {
             if (_modelButton != null && _model != null)
-                _modelButton.Text = _model.DisplayName + (_model.Backends.Count > 1 ? " · " + _backend.ToUpperInvariant() : string.Empty);
+            {
+                _modelButton.Text = ModelIcon(_model) + " " + _model.DisplayName + (_model.Backends.Count > 1 ? " · " + _backend.ToUpperInvariant() : string.Empty);
+                SemanticProperties.SetDescription(_modelButton, "Choose the model. The current model " + ModelWhere(_model));
+            }
+        }
+
+        /// <summary>The icon of a model that runs on this device: a phone or tablet, or a computer, as the device is.</summary>
+        public static string OnDeviceIcon =>
+            DeviceInfo.Idiom == DeviceIdiom.Phone || DeviceInfo.Idiom == DeviceIdiom.Tablet || DeviceInfo.Idiom == DeviceIdiom.Watch
+                ? "\U0001F4F1" : "\U0001F4BB";
+
+        /// <summary>The icon of a model on a server or in the cloud (its messages leave the device): a globe, which shows on a light background where a cloud is pale.</summary>
+        public const string RemoteIcon = "\U0001F310";
+
+        /// <summary>The icon of a model on this device whose file isn't there yet: it has to be downloaded first.</summary>
+        public const string DownloadIcon = "\u2B07\uFE0F";
+
+        // An icon to tell at a glance where a model runs: on this device (downloaded), on this device but still to download,
+        // or away (a server, the cloud).
+        private static string ModelIcon(ChatModelOption option) =>
+            !option.RunsOnDevice ? RemoteIcon : NeedsDownload(option) ? DownloadIcon : OnDeviceIcon;
+
+        // For screen readers.
+        private static string ModelWhere(ChatModelOption option) =>
+            !option.RunsOnDevice ? "is remote: your messages are sent to a server."
+            : NeedsDownload(option) ? "runs on this device, but has to be downloaded first."
+            : "runs on this device.";
+
+        // True for a model on the device whose file is known and isn't there (or is only partly downloaded).
+        private static bool NeedsDownload(ChatModelOption option)
+        {
+            DownloadableFile file = option.ModelFile;
+            if (!option.RunsOnDevice || file == null)
+                return false;
+            try
+            {
+                return !(file.IsLocalFileVerified || (System.IO.File.Exists(file.LocalFile) && new System.IO.FileInfo(file.LocalFile).Length > 0));
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         // The load card's name, size and backend, the download, and the engine's threads and context window.
@@ -231,6 +272,15 @@ namespace Emgu.LiteRT.LM.Maui
                 return;
             state.DisplayName = option.DisplayName;
             state.DownloadSize = option.DownloadSize;
+            // The icon of a model that was to download becomes the on-device one when its file is there.
+            state.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(ModelLoadState.IsReady) && state.IsReady)
+                {
+                    UpdateModelButton();
+                    RefreshModelList();
+                }
+            };
             state.Backend = _backend;
             // The download goes on when the app leaves the screen, as far as the platform allows, and a paused one continues.
             state.Downloader = BackgroundDownloads.DownloadFileAsync;
@@ -283,6 +333,17 @@ namespace Emgu.LiteRT.LM.Maui
         private View BuildModelList(bool inSheet)
         {
             var list = new VerticalStackLayout { Spacing = 2 };
+            // What the icons mean (the ones the list has).
+            var legend = new List<string>();
+            if (_options.Models.Any(m => m.RunsOnDevice && !NeedsDownload(m)))
+                legend.Add(OnDeviceIcon + " on this device, your messages stay on it");
+            if (_options.Models.Any(NeedsDownload))
+                legend.Add(DownloadIcon + " on this device after a download");
+            if (_options.Models.Any(m => !m.RunsOnDevice))
+                legend.Add(RemoteIcon + " remote, your messages are sent to a server");
+            if (legend.Count > 1)
+                foreach (string line in legend)
+                    list.Children.Add(Note(line));
             for (int i = 0; i < _options.Models.Count; i++)
             {
                 int index = i;
@@ -292,7 +353,7 @@ namespace Emgu.LiteRT.LM.Maui
                 {
                     string chosen = backend;
                     bool selected = option == _model && backend == _backend;
-                    string title = option.DisplayName + (option.Backends.Count > 1 ? " · " + backend.ToUpperInvariant() : string.Empty);
+                    string title = ModelIcon(option) + " " + option.DisplayName + (option.Backends.Count > 1 ? " · " + backend.ToUpperInvariant() : string.Empty);
                     list.Children.Add(ListRow(title, detail, selected, () =>
                     {
                         if (inSheet)

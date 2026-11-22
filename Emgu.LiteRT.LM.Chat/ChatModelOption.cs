@@ -66,6 +66,20 @@ namespace Emgu.LiteRT.LM.Chat
         /// <summary>True for a remote model (a server's): nothing is loaded on the device.</summary>
         public bool IsRemote => Create == null;
 
+        private bool? _runsOnDevice;
+
+        /// <summary>
+        /// True if the model runs on this device, so the messages stay on it: every model with a <see cref="Create"/> factory, and
+        /// Apple's on-device model (a remote-style option with no model of ours to load, set to true by its feature). False for a
+        /// model on a server or in the cloud (the user's own server, a paired Mac, Claude): the messages are sent away. The chat
+        /// shows it as an icon beside the model's name. Set it only for a remote-style option that runs on the device.
+        /// </summary>
+        public bool RunsOnDevice
+        {
+            get => _runsOnDevice ?? !IsRemote;
+            set => _runsOnDevice = value;
+        }
+
         /// <summary>
         /// How a chat page reaches a remote model (<see cref="IsRemote"/>): its connection, client, summaries and
         /// one-off questions. Set by whatever offers the model (e.g. a server feature); null for a model on the device,
