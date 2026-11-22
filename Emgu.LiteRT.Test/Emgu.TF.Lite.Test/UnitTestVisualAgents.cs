@@ -281,6 +281,28 @@ public partial class UnitTestVisualAgents
         await runtime.DisposeAsync();
     }
     [Test]
+    public void ImageReferencesAreOfferedOnlyToCountOrToAModelThatCannotSee()
+    {
+        // A model that sees images answers "what is this?" from the picture: no reference to hand the COCO detector.
+        Assert.That(VisualAgentTools.OfferImageReferences(true, "what is this?"), Is.False);
+        Assert.That(VisualAgentTools.OfferImageReferences(true, "Describe the picture"), Is.False);
+        Assert.That(VisualAgentTools.OfferImageReferences(true, ""), Is.False);
+        Assert.That(VisualAgentTools.OfferImageReferences(true, null), Is.False);
+        // Counting or locating is what the detector is for.
+        Assert.That(VisualAgentTools.OfferImageReferences(true, "How many cars are in this photo?"), Is.True);
+        Assert.That(VisualAgentTools.OfferImageReferences(true, "count the people"), Is.True);
+        Assert.That(VisualAgentTools.OfferImageReferences(true, "Where is the dog?"), Is.True);
+        // "account" and "discount" aren't "count".
+        Assert.That(VisualAgentTools.OfferImageReferences(true, "my account's discount"), Is.False);
+        // A model that can't see images has only the detector.
+        Assert.That(VisualAgentTools.OfferImageReferences(false, "what is this?"), Is.True);
+        // The tool says what it is not for.
+        Assert.That(VisualAgentTools.Instructions, Does.Contain("never use it to identify or describe"));
+        var tools = VisualAgentTools.Create(() => "", () => "", Array.Empty<VisualActionDescriptor>(), (l, c, s, a, t) => Task.FromResult(""),
+            () => "", (i, o, t) => Task.FromResult(""), (a, i, t) => Task.FromResult(""));
+        Assert.That(tools.Cast<AIFunction>().Single(f => f.Name == "analyze_visual_image").Description, Does.Contain("identify or describe a picture"));
+    }
+    [Test]
     public async Task VisualToolSchemasForwardParametersAndCancellation()
     {
         var observed = new List<string>(); using var stop = new CancellationTokenSource();

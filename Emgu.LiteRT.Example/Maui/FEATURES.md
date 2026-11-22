@@ -201,6 +201,16 @@ is in [TODO.md](TODO.md); the GPU and add-on packages themselves are in [docs/pa
     `MessageRecord` derive from the library's records, and its `AddMessageAsync` takes a language as its last parameter and
     hides the library's. Verified with the existing saved chats on Mac Catalyst and a Galaxy S10.
 
+- Picture questions go to the model, not the object detector (2026-11-22): with "what is this?" and a photo of kimchi, Gemma 4 E4B
+  called `analyze_visual_image` with the COCO SSD MobileNet agent ("it's food"), which only knows 80 classes (a bowl, a pizza) and
+  can't say what a dish is. Two things pushed it: the message carried "Attached image references for analyze_visual_image: image-1"
+  whenever a picture was attached, and the instructions said to use the tool for detecting objects. Now the references are added
+  only for a model that can't see images (the detector is its only way to look) or when the message asks to count, detect or
+  locate ("how many", "count", "where is", "detect", "find all": `VisualAgentTools.OfferImageReferences`), and the tool's
+  description and the instructions say it counts or locates COCO classes and is never for identifying or describing a picture.
+  Checked on the Pixel Fold (Gemma 4 E4B, GPU) with another photo: no detector row, only the web search (the "Web search" chip was on),
+  then the answer. The kimchi photo itself wasn't re-sent.
+
 ## Voice (Kokoro on the device)
 
 - Settings > Voice (2026-11-01; the library's `VoiceFeature`, shown where `libomniextern` is in the app - not Windows

@@ -712,7 +712,9 @@ public sealed class LiteRtLmChatPage : ChatPage
         {
             // The model is given references to the attached images for the camera tools, before the features' additions.
             int attachedImages = request.Attachments.Count(a => a.MediaType != null && a.MediaType.StartsWith("image/", StringComparison.Ordinal));
+            // Only to count or locate (or for a model that can't see images): offered for "what is this?", the COCO detector took a bowl of kimchi for a bowl.
             string imageReferences = canUseTools && attachedImages > 0 && Emgu.LiteRT.Models.CV.Maui.LiveCamera.Supported
+                && Emgu.LiteRT.LM.Agents.Vision.VisualAgentTools.OfferImageReferences(SelectedModel?.AcceptsImages == true, prompt)
                 ? "Attached image references for analyze_visual_image: " + string.Join(", ", Enumerable.Range(1, attachedImages).Select(i => "image-" + i)) + "\n"
                 : null;
             // The features' additions: the document's excerpts (and maybe a picture or page) most related to the message.
