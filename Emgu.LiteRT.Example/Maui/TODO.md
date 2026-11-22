@@ -388,7 +388,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
 - [ ] The model's licence beyond its metadata (Google has no licence file beside it), before bundling or hosting it.
-- [ ] Android foreground service for listening in the background. (The Windows microphone source exists since 2026-11-21, `MicrophoneSoundSource` on an `AudioGraph`; the Sound events page on Windows isn't tried.)
+- [ ] Android foreground service for listening in the background. (Windows has the microphone source since 2026-11-21, `MicrophoneSoundSource` on an `AudioGraph`. The Sound events page works there: Speech at 85-99% with a clip playing, 2.2-4.1 ms per window on the CPU, Stop releases the microphone.)
 
 ## 42. Sound monitors in the chat — "tell me when the doorbell rings"; YAMNet scores the microphone, no model per sound
 
@@ -579,7 +579,8 @@ on the CPU), and a run on a Galaxy S10. Still open:
   page frees the model (2026-11-06).
 - [ ] Speech heard on a phone (the S10's room was quiet: every round silent), the battery and heat over the 10-minute
   limit, the Z Fold3 and the iPad Air (the iOS build passes; not run on the iPad yet).
-- [ ] Windows: the page shows since the streaming `MicrophoneSoundSource` (WinRT `AudioGraph`, 2026-11-21); not tried there.
+- [x] Windows: the page shows since the streaming `MicrophoneSoundSource` (WinRT `AudioGraph`); tried 2026-11-21 with Gemma 4 E4B
+  on the GPU, 3.9-5.1 s a round, speech heard (FEATURES.md, "Tell me what you see and hear").
 - [ ] Reading the descriptions aloud (the microphone would hear them: mute it while speaking).
 - [ ] Saving a session as a chat or a note; opening the page from the chat ("tell me what you see and hear"); running
   it through the Mac's server (item 29).

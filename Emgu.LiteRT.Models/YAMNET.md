@@ -77,7 +77,7 @@ scores the audio with YAMNet (the model runs once per window for all monitors), 
 - **Host** (`LiteRtLmChatPage.Sound.cs`): a "sound_monitor" tool group (keywords: sound, hear, listen, doorbell, knock, bark, siren, smoke alarm, baby cry...),
   a "Sound monitors · session only" card with Pause / Resume / Remove, the microphone started and stopped to match the enabled monitors, and one
   microphone user at a time: `VoiceRecorder` goes through `MicrophoneGate`, so listening is released before a voice message or the voice chat records
-  and taken back afterwards. New chat removes the monitors. Android, iOS and Mac Catalyst; not Windows (it has a microphone stream since 2026-11-21, but sound monitors aren't tried there, so they stay off).
+  and taken back afterwards. New chat removes the monitors. Android, iOS and Mac Catalyst; not Windows. Windows has a microphone stream since 2026-11-21, and the Sound events page works there: Speech at 85-99% with a clip from the speakers, 2.2-4.1 ms a window. The chat's sound monitors aren't tried there, so they stay off.
 - **Model behaviour** (Gemma 4 E2B on Mac Catalyst, real model, the microphone replaced by a clip): every request made one `create_sound_monitor` call
   with the right sound - talking, a baby crying for 10 s, the doorbell with a chime, a dog with no alert, a knock with "someone is at the door", the smoke
   alarm with a chime - and "remove all the sound monitors" listed and removed them. Before the parameters were optional with "leave out unless..." texts,

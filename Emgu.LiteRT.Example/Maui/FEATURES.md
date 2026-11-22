@@ -1557,7 +1557,14 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
     will finish the microphone tests by Tuesday" word for word. Gemma made up two sentences ("So I went to the dentist
     for a check up", "Hello, it's great to meet you") and lost "Sarah will update the notes by Wednesday". The notes
     were written in about 10 s (with a recording WAV and a Word file) and kept the made-up dentist and added a trip to
-    the Scottish Highlands. Parakeet was not tried on Windows meetings.
+    the Scottish Highlands. The same meeting with "Speech recognizer" (Parakeet-TDT-0.6B-v3 on the CPU, same evening):
+    124 words written down live and nothing invented, but garbled where it misheard, "C will locate the non-spot wisdom"
+    for "Sarah will update the notes by Wednesday" and "full Giovanni mode" for the GPU news. The notes (Gemma, about
+    12 s) followed the transcript: the decision (release next Friday) and "finish the microphone tests - by Tuesday"
+    right, and the garble turned into an action item ("C - locate the non-spot wisdom"). The card said the speakers
+    couldn't be told apart. So on Windows Parakeet's mistakes show as nonsense, while Gemma's read as real
+    content. Both runs used synthetic voices from laptop speakers, and the room wasn't quiet (Sound events, below, heard
+    speech at about -23 dB with nothing played).
     "Recognizer, then chat model" isn't yet tried on a phone.
 - Skipping ahead (since 2026-10-29): on a phone the live transcript fell behind the conversation (Google's recognizer
   ~0.9x real time on the Fold, plus each piece's voiceprint; Gemma 0.3x). Once more than a minute of pieces waits
@@ -1665,7 +1672,11 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
 ## Watch and listen
 
 - "Tell me what you see and hear", over and over: the home screen's LiteRT-LM tab has a "Watch and listen" row
-  (Android, iOS and Mac Catalyst; on Windows too since its microphone stream, 2026-11-21, but not tried there). The page is
+  (Android, iOS, Mac Catalyst and, since its microphone stream on 2026-11-21, Windows). On Windows (the unpackaged GPU
+  demo, Gemma 4 E4B on an RTX A2000 laptop's GPU, the laptop's webcam and microphone) a round took 3.9-5.1 s (the first
+  7.6 s); every round described the room and the person at the desk, and the round during a spoken clip heard "Hello,
+  can you hear me? I". One quiet round heard "Oi, Jesus.". The answers alternate between "See: / Hear:" and "The
+  pictures show ... / "nothing"". Stop ended it. The page is
   `Emgu.LiteRT.LM.Maui.CV`'s `WatchAndListenPage`, its loop `Emgu.LiteRT.LM.Agents`' `SceneNarrator` (TODO item 60).
 - LiteRT-LM has no video input, so each round sends Gemma 4 three frames from `LiveCamera.CaptureAsync` (JPEG,
   at most 960 px), taken over a 5 s window, and the sound since the last round (`MicrophoneSoundSource`, as a 16 kHz
