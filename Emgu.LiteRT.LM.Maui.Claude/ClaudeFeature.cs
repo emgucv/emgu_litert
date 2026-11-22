@@ -66,6 +66,7 @@ public sealed class ClaudeFeature : ChatFeature, IRemoteChatModel
             ContextWindow = DefaultContextTokens
         };
         Option.Remote = this;
+        Option.IsCloud = true;
         _name = Option.DisplayName;
         UpdateOptionDetail();
     }

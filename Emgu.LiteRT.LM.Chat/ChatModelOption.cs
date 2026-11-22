@@ -81,6 +81,12 @@ namespace Emgu.LiteRT.LM.Chat
         }
 
         /// <summary>
+        /// True for a remote model that is a cloud service (Claude) rather than the user's own server or computer: the chat shows
+        /// a cloud icon for it instead of a globe. It only changes the icon and the screen reader's description; false by default.
+        /// </summary>
+        public bool IsCloud { get; set; }
+
+        /// <summary>
         /// How a chat page reaches a remote model (<see cref="IsRemote"/>): its connection, client, summaries and
         /// one-off questions. Set by whatever offers the model (e.g. a server feature); null for a model on the device,
         /// or for a remote model whose page supplies the client itself.

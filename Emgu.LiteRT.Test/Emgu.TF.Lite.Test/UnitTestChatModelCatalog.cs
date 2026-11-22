@@ -19,6 +19,7 @@ public class UnitTestChatModelCatalog
             Assert.That(ChatModelCatalog.For(platform).All(m => m.RunsOnDevice), Is.True, "every catalog model has a factory: " + platform);
         var server = new ChatModelOption("Server", "Your own server");
         Assert.That(server.IsRemote && !server.RunsOnDevice, Is.True, "a server's model is remote");
+        Assert.That(server.IsCloud, Is.False, "a model is not a cloud service unless its feature says so");
         // Apple's on-device model has no model of ours to load, so its option is remote-style: it says it runs on the device.
         var apple = new ChatModelOption("Apple", "Apple Intelligence") { RunsOnDevice = true };
         Assert.That(apple.IsRemote && apple.RunsOnDevice, Is.True);

@@ -231,8 +231,11 @@ namespace Emgu.LiteRT.LM.Maui
             DeviceInfo.Idiom == DeviceIdiom.Phone || DeviceInfo.Idiom == DeviceIdiom.Tablet || DeviceInfo.Idiom == DeviceIdiom.Watch
                 ? "\U0001F4F1" : "\U0001F4BB";
 
-        /// <summary>The icon of a model on a server or in the cloud (its messages leave the device): a globe, which shows on a light background where a cloud is pale.</summary>
+        /// <summary>The icon of a model on the user's own server or computer (its messages leave the device): a globe.</summary>
         public const string RemoteIcon = "\U0001F310";
+
+        /// <summary>The icon of a model in the cloud (Claude; its messages leave the device): a cloud in text form (U+FE0E), so it takes the text color; the emoji cloud is almost white on a light background.</summary>
+        public const string CloudIcon = "\u2601\uFE0E";
 
         /// <summary>The icon of a model on this device whose file isn't there yet: it has to be downloaded first.</summary>
         public const string DownloadIcon = "\u2B07\uFE0F";
@@ -240,11 +243,11 @@ namespace Emgu.LiteRT.LM.Maui
         // An icon to tell at a glance where a model runs: on this device (downloaded), on this device but still to download,
         // or away (a server, the cloud).
         private static string ModelIcon(ChatModelOption option) =>
-            !option.RunsOnDevice ? RemoteIcon : NeedsDownload(option) ? DownloadIcon : OnDeviceIcon;
+            !option.RunsOnDevice ? (option.IsCloud ? CloudIcon : RemoteIcon) : NeedsDownload(option) ? DownloadIcon : OnDeviceIcon;
 
         // For screen readers.
         private static string ModelWhere(ChatModelOption option) =>
-            !option.RunsOnDevice ? "is remote: your messages are sent to a server."
+            !option.RunsOnDevice ? (option.IsCloud ? "is in the cloud: your messages are sent to it." : "is remote: your messages are sent to a server.")
             : NeedsDownload(option) ? "runs on this device, but has to be downloaded first."
             : "runs on this device.";
 
@@ -339,8 +342,10 @@ namespace Emgu.LiteRT.LM.Maui
                 legend.Add(OnDeviceIcon + " on this device, your messages stay on it");
             if (_options.Models.Any(NeedsDownload))
                 legend.Add(DownloadIcon + " on this device after a download");
-            if (_options.Models.Any(m => !m.RunsOnDevice))
-                legend.Add(RemoteIcon + " remote, your messages are sent to a server");
+            if (_options.Models.Any(m => !m.RunsOnDevice && !m.IsCloud))
+                legend.Add(RemoteIcon + " on a server or computer of yours, your messages are sent to it");
+            if (_options.Models.Any(m => !m.RunsOnDevice && m.IsCloud))
+                legend.Add(CloudIcon + " in the cloud, your messages are sent to it");
             if (legend.Count > 1)
                 foreach (string line in legend)
                     list.Children.Add(Note(line));
