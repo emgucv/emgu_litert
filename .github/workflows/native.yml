@@ -205,6 +205,12 @@ jobs:
     name: iOS frameworks and MAUI demo
     runs-on: macos-latest
     timeout-minutes: 360
+    env:
+      # The bare iOS TFM (net<N>.0-ios), for CMake's generated props and the demo build: the runner's .NET iOS workload
+      # accepts only its own newest platform version (27.2) while its Xcode is older, so the version
+      # platforms/macos/apple_tfm_version.sh picks from the Xcode (26.0) is "not a valid TargetPlatformVersion" (NETSDK1140).
+      # The empty value is honored by the script (it is set, not unset).
+      EMGU_IOS_TFM_VERSION: ""
     steps:
     - uses: actions/checkout@v7
       with:
