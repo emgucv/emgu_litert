@@ -31,6 +31,48 @@ public class UnitTestHomeworkCheck
         Assert.That(compare, Does.Contain("Student's answer: 5").And.Contain("1. 4").And.Not.Contain("Score"));
     }
 
+    // Page two's 4a: the 12B read "3, 4, 2, 1" and the table right, then its comparison wrote the order as "4, 2, 1, 3" (❌).
+    private const string OrderingRead =
+        "4a. Question: Order the animals from shortest to longest. Table: Blue Whale 33.58 m, Great White Shark 7.92 m, Leatherback Turtle 2.13 m, Ocean Sunfish 2.95 m | Student's answer: 3, 4, 2, 1\n" +
+        "4b. Question: How much longer is the shark than the turtle? | Student's answer: 5.79";
+
+    [Test]
+    public void OrderingsOfATablesRowsAreCheckedInCode()
+    {
+        string check = "4a. ❌ Not the same: the student wrote 3, 4, 2, 1, the answer is 4, 2, 1, 3\n4b. ✅ Correct";
+        string fixedCheck = HomeworkCheck.CheckOrderings(OrderingRead, check);
+        Assert.That(fixedCheck, Does.StartWith("4a. ✅ Correct (Leatherback Turtle 2.13, Ocean Sunfish 2.95, Great White Shark 7.92, Blue Whale 33.58)"));
+        Assert.That(fixedCheck, Does.EndWith("\n4b. ✅ Correct"), "Other questions keep the model's line.");
+
+        // A wrong order is ❌ with the right rows, whatever the model said; labels count as rows too.
+        string wrong = HomeworkCheck.CheckOrderings(OrderingRead.Replace("3, 4, 2, 1", "4, 3, 2, 1"), "4a. ✅ Correct\n4b. ✅ Correct");
+        Assert.That(wrong, Does.StartWith("4a. ❌ Not the same: the student wrote 4, 3, 2, 1, the answer is 3, 4, 2, 1"));
+        string labels = HomeworkCheck.CheckOrderings(OrderingRead.Replace("3, 4, 2, 1", "turtle, sunfish, shark, whale"), "4a. ❓ Can't tell");
+        Assert.That(labels, Does.StartWith("4a. ✅ Correct"));
+
+        // Longest first, and a question the comparison left out is added.
+        string down = HomeworkCheck.CheckOrderings(OrderingRead.Replace("shortest to longest", "longest to shortest").Replace("3, 4, 2, 1", "1, 2, 4, 3"), "4b. ✅ Correct");
+        Assert.That(down, Is.EqualTo("4b. ✅ Correct\n4a. ✅ Correct (Blue Whale 33.58, Great White Shark 7.92, Ocean Sunfish 2.95, Leatherback Turtle 2.13)"));
+    }
+
+    [Test]
+    public void OrderingsThatCantBeToldForSureKeepTheModelsLine()
+    {
+        string check = "4a. ❌ Not the same: the student wrote 3, 4, 2, 1, the answer is 4, 2, 1, 3";
+        // No direction, a missing or repeated row, a [?], no table, equal numbers.
+        foreach (string read in new[]
+        {
+            OrderingRead.Replace("from shortest to longest", "by length"),
+            OrderingRead.Replace("3, 4, 2, 1", "3, 4, 2"),
+            OrderingRead.Replace("3, 4, 2, 1", "3, 4, 4, 1"),
+            OrderingRead.Replace("3, 4, 2, 1", "3, 4, [?], 1"),
+            "4a. Question: Order the animals from shortest to longest. | Student's answer: 3, 4, 2, 1",
+            OrderingRead.Replace("2.95", "2.13"),
+        })
+            Assert.That(HomeworkCheck.CheckOrderings(read, check), Is.EqualTo(check), read);
+        Assert.That(HomeworkCheck.CheckOrderings(null, check), Is.EqualTo(check));
+    }
+
     [Test]
     public void BlankAnswersAreNotMarkedWrongAndTheScoreIsCountedHere()
     {

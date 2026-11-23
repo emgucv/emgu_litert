@@ -439,7 +439,8 @@ public sealed class HomeworkFeature : ChatFeature
             yield return new ChatResponseUpdate(ChatRole.Assistant, score.Length > 0 ? score : "Nothing was checked.");
         }
 
-        // The three requests on one page: read, solve, compare. The comparison is tidied (blanks, no score line).
+        // The three requests on one page: read, solve, compare. The comparison is tidied (blanks, no score line), and orderings
+        // of a table's rows are checked in code.
         private async Task<(string Read, string Solved, string Check)> PageTextsAsync(IChatClient client, int page, CancellationToken token)
         {
             string label = _images.Count > 1 ? "Page " + (page + 1) + " of " + _images.Count + ": " : string.Empty;
@@ -450,6 +451,8 @@ public sealed class HomeworkFeature : ChatFeature
             string solved = await AskAsync(client, image, HomeworkCheck.SolvePrompt(HomeworkCheck.QuestionsOnly(read)), 1500, null, token);
             Host.SetStatus(label + "comparing...");
             string check = HomeworkCheck.TidyCheck(await AskAsync(client, null, HomeworkCheck.ComparePrompt(read, solved), 900, ReasoningEffort.None, token));
+            // An ordering of a copied table's rows is checked by sorting, not by the model.
+            check = HomeworkCheck.CheckOrderings(read, check);
             return (read, solved, check);
         }
 

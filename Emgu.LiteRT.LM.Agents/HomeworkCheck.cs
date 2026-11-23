@@ -1,6 +1,7 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Emgu.LiteRT.LM.Agents;
@@ -105,6 +106,111 @@ public static class HomeworkCheck
         if (unclear > 0)
             text += ", " + unclear + " not answered or can't tell";
         return "**Score: " + text + "**";
+    }
+
+    /// <summary>
+    /// The ordering questions checked in code, over the model's comparison: a question whose read line has a copied table
+    /// ("Table: Blue Whale 33.58, Great White Shark 7.92, ..."), says which way to order ("least to greatest", "shortest to
+    /// longest", "descending"...), and whose answer is the table's rows - their numbers counted from the top ("3, 4, 2, 1") or
+    /// their labels. Its line becomes ✅ or ❌ by sorting the table's numbers; any other question keeps the model's line. Gemma 4 12B
+    /// worked out 4a's rows right in its own words and then wrote another order (FEATURES.md, "4a, third round").
+    /// </summary>
+    /// <param name="read">The list the first request wrote</param>
+    /// <param name="check">The tidied comparison (<see cref="TidyCheck"/>)</param>
+    public static string CheckOrderings(string read, string check)
+    {
+        var verdicts = new Dictionary<string, string>();
+        foreach (string line in (read ?? string.Empty).Split('\n'))
+        {
+            Match item = Regex.Match(line.Trim(), @"^(\d+[a-z]?)[.)]\s*(.*?)\|\s*Student's answer:\s*(.*)$", RegexOptions.IgnoreCase);
+            if (!item.Success)
+                continue;
+            string verdict = OrderingVerdict(item.Groups[2].Value, item.Groups[3].Value.Trim());
+            if (verdict != null)
+                verdicts[item.Groups[1].Value.ToLowerInvariant()] = item.Groups[1].Value + ". " + verdict;
+        }
+        if (verdicts.Count == 0)
+            return check;
+        var lines = new List<string>();
+        foreach (string line in (check ?? string.Empty).Split('\n'))
+        {
+            Match number = Regex.Match(line.Trim(), @"^(\d+[a-z]?)[.)]", RegexOptions.IgnoreCase);
+            string key = number.Success ? number.Groups[1].Value.ToLowerInvariant() : null;
+            if (key != null && verdicts.TryGetValue(key, out string verdict))
+            {
+                lines.Add(verdict);
+                verdicts.Remove(key);
+            }
+            else
+                lines.Add(line);
+        }
+        // A question the comparison left out gets its line at the end.
+        lines.AddRange(verdicts.Values);
+        return string.Join("\n", lines);
+    }
+
+    private static readonly string[] Ascending = { "least to greatest", "smallest to largest", "shortest to longest", "lightest to heaviest",
+        "lowest to highest", "slowest to fastest", "youngest to oldest", "fewest to most", "ascending", "increasing" };
+    private static readonly string[] Descending = { "greatest to least", "largest to smallest", "longest to shortest", "heaviest to lightest",
+        "highest to lowest", "fastest to slowest", "oldest to youngest", "most to fewest", "descending", "decreasing" };
+
+    // "✅ Correct ..." or "❌ Not the same ..." for an ordering of a copied table's rows, or null when it can't be told for sure.
+    private static string OrderingVerdict(string question, string answer)
+    {
+        Match table = Regex.Match(question, @"Table:\s*(.*)$", RegexOptions.IgnoreCase);
+        if (!table.Success)
+            return null;
+        string stem = question.Substring(0, table.Index).ToLowerInvariant();
+        bool up = Ascending.Any(stem.Contains), down = Descending.Any(stem.Contains);
+        if (up == down)
+            return null;
+        var rows = new List<(string Label, double Value)>();
+        foreach (string entry in table.Groups[1].Value.TrimEnd(' ', '.', '|').Split(',', ';'))
+        {
+            Match row = Regex.Match(entry.Trim(), @"^(.*?[^\d\s.].*?)\s*:?\s+(-?\d+(?:\.\d+)?)\s*\S*$");
+            if (!row.Success)
+                return null;
+            rows.Add((row.Groups[1].Value.Trim(), double.Parse(row.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture)));
+        }
+        if (rows.Count < 2 || rows.Select(r => r.Value).Distinct().Count() != rows.Count)
+            return null;
+        List<int> order = Enumerable.Range(1, rows.Count).OrderBy(i => rows[i - 1].Value).ToList();
+        if (down)
+            order.Reverse();
+        List<int> student = StudentRows(answer, rows.Select(r => r.Label).ToList());
+        if (student == null)
+            return null;
+        string right = string.Join(", ", order);
+        string values = string.Join(", ", order.Select(i => rows[i - 1].Label + " " + rows[i - 1].Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        return student.SequenceEqual(order)
+            ? "✅ Correct (" + values + ")"
+            : "❌ Not the same: the student wrote " + answer + ", the answer is " + right + " (" + values + "): sort the table's numbers " +
+              (down ? "from the greatest" : "from the least") + " and write each one's row";
+    }
+
+    // The rows the student listed, by number (1 is the table's top row) or by label; null unless every row is there once.
+    private static List<int> StudentRows(string answer, List<string> labels)
+    {
+        string[] parts = answer.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim()).Where(p => p.Length > 0).ToArray();
+        if (parts.Length != labels.Count)
+            return null;
+        var rows = new List<int>();
+        foreach (string part in parts)
+        {
+            int row;
+            if (Regex.IsMatch(part, @"^\d+$"))
+                row = int.Parse(part);
+            else
+            {
+                int[] matches = Enumerable.Range(1, labels.Count).Where(i => labels[i - 1].IndexOf(part, StringComparison.OrdinalIgnoreCase) >= 0
+                    || part.IndexOf(labels[i - 1], StringComparison.OrdinalIgnoreCase) >= 0).ToArray();
+                if (matches.Length != 1)
+                    return null;
+                row = matches[0];
+            }
+            rows.Add(row);
+        }
+        return rows.Distinct().Count() == labels.Count && rows.All(r => r >= 1 && r <= labels.Count) ? rows : null;
     }
 
     private static string NoteLine(string note) =>

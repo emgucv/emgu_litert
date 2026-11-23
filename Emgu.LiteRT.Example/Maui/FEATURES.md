@@ -1007,6 +1007,11 @@ Settings > "Search my videos" (off by default; the library's `VideoSearchFeature
   answered or can't tell: page one's 2 is ✅ again (24.49 accepted, wrong), page two's 4b read 25.66 and is ✅ (the earlier runs read
   25.00), 4c ❌ (4x against 3.7, arguable), 4d blank (the answer sits in the gap), 5 ❌ with "100.74 (on top), 43.5 (below)" as the
   answer, 6 ✅. So the 12B reads 4a right now, but its compare step does not do the ordering reliably.
+  **4a in code** (2026-11-23): `HomeworkCheck.CheckOrderings` now replaces the comparison's line for an ordering of a copied table's
+  rows: when the read line has "Table: <label> <number>, ..." (numbers all different), the question says which way ("shortest to
+  longest", "least to greatest", "descending"...) and the answer names every row once ("3, 4, 2, 1", or the labels), the table is
+  sorted and the line is ✅ or ❌ with the right rows and their numbers; anything less certain keeps the model's line. Unit-tested
+  with the third round's read (the 12B's ❌ becomes ✅); not yet run on the photos.
   **The E4B** (Gemma 4 E4B on the Mac's GPU, 18:24 to 18:28, **4 minutes** against 6 for the 12B, the same two photos): "1 of 10
   correct, 6 not the same, 3 not answered or can't tell". Page one's two are ❌ (15.7 is right; 24.49 is right to refuse here). On
   page two it lost the part letters of question 1 and 2 (one line, "5.07, 2.70, 2.80, 2.17, 6, 0.6, 0.7, 4.64, 5.9", compared with
