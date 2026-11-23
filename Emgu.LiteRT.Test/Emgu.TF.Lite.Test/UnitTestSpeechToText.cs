@@ -54,6 +54,35 @@ public class UnitTestSpeechToTextHelpers
     }
 
     [Test]
+    public void DropsWordsRepeatedAtASeam()
+    {
+        // Parakeet's pieces from a synthetic meeting (Levenshtein merger, 0.4 overlap, 2026-11-22): the window's last word
+        // confirmed, then again at the start of the next piece, and a piece starting with a stray period.
+        var text = new StringBuilder();
+        foreach (string piece in new[] { "Good morning everyone. Let's start the", "weekly planning meeting for the Windows release. Thanks.",
+            "Thanks. The GPU", "build is working now.", "Great.", ". What is left before we can ship it?" })
+            SpeechToTextModel.Append(text, piece);
+        Assert.That(text.ToString(), Is.EqualTo(
+            "Good morning everyone. Let's start the weekly planning meeting for the Windows release. Thanks. The GPU build is working now. " +
+            "Great. What is left before we can ship it?"));
+        // Up to four words, whatever their case and punctuation; the longest run that repeats.
+        text.Clear();
+        foreach (string piece in new[] { "the release goes out next Friday.", "Next Friday. Sarah will", "Sarah will update the notes" })
+            SpeechToTextModel.Append(text, piece);
+        Assert.That(text.ToString(), Is.EqualTo("the release goes out next Friday. Sarah will update the notes"));
+        // Repeats inside a piece, more than four words, and a different word stay.
+        text.Clear();
+        foreach (string piece in new[] { "No, no, no.", "Yes.", "one two three four five", "one two three four five six.", "Okay." })
+            SpeechToTextModel.Append(text, piece);
+        Assert.That(text.ToString(), Is.EqualTo("No, no, no. Yes. one two three four five one two three four five six. Okay."));
+        // A piece that is only the repeat or a punctuation mark adds nothing.
+        text.Clear();
+        foreach (string piece in new[] { "Sounds good.", "good.", ".", "I will finish." })
+            SpeechToTextModel.Append(text, piece);
+        Assert.That(text.ToString(), Is.EqualTo("Sounds good. I will finish."));
+    }
+
+    [Test]
     public void JoinsChineseAndJapanesePiecesWithoutSpaces()
     {
         // Qwen3-ASR's windows in Chinese and Japanese: no space at a seam next to Han, kana or their punctuation;

@@ -210,6 +210,13 @@ namespace Emgu.LiteRT.LM.Models
         /// word lowercased - unless it looks like a name: "I", a word with other capitals, or one followed by another
         /// capitalized word ("City Library"). Chinese and Japanese have no spaces between words, so a seam next to their
         /// characters (Han, kana, or their punctuation) gets none.
+        /// <para>
+        /// The Levenshtein merger sometimes confirms a window's last word and then starts the next piece with it again
+        /// ("...release. Thanks." then "Thanks. The GPU"; Parakeet on a synthetic meeting, 2026-11-22), and a piece can
+        /// start with a stray punctuation mark (". What is left"). Up to <see cref="MaxSeamRepeat"/> words at the start of
+        /// a piece that repeat the end of the text are dropped (compared without case or the punctuation around them), as
+        /// is a lone punctuation mark at its start. Speech that really repeats a word just at a seam loses the repeat.
+        /// </para>
         /// </summary>
         /// <param name="text">The text so far</param>
         /// <param name="piece">The piece</param>
@@ -217,7 +224,9 @@ namespace Emgu.LiteRT.LM.Models
         {
             if (String.IsNullOrWhiteSpace(piece))
                 return;
-            piece = piece.Trim();
+            piece = DropLeadingPunctuation(DropRepeatedStart(text, piece.Trim()));
+            if (piece.Length == 0)
+                return;
             int end = text.Length;
             while (end > 0 && Char.IsWhiteSpace(text[end - 1]))
                 end--;
@@ -226,6 +235,53 @@ namespace Emgu.LiteRT.LM.Models
             if (text.Length > 0 && !Char.IsWhiteSpace(text[text.Length - 1]) && !IsUnspaced(text[text.Length - 1]) && !IsUnspaced(piece[0]))
                 text.Append(' ');
             text.Append(piece);
+        }
+
+        /// <summary>The most words at the start of a piece that <see cref="Append"/> drops for repeating the end of the text.</summary>
+        public const int MaxSeamRepeat = 4;
+
+        // The piece without its first words when they repeat the text's last ones (the longest such run, up to MaxSeamRepeat
+        // words). Not for Chinese or Japanese, which have no spaces to tell the words by.
+        private static String DropRepeatedStart(StringBuilder text, String piece)
+        {
+            if (text.Length == 0 || piece.Length == 0 || IsUnspaced(piece[0]))
+                return piece;
+            String tail = text.ToString(Math.Max(0, text.Length - 200), Math.Min(200, text.Length)).TrimEnd();
+            if (tail.Length == 0 || IsUnspaced(tail[tail.Length - 1]))
+                return piece;
+            String[] before = tail.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+            String[] after = piece.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+            for (int count = Math.Min(MaxSeamRepeat, Math.Min(before.Length, after.Length)); count > 0; count--)
+            {
+                bool same = true;
+                for (int i = 0; i < count && same; i++)
+                {
+                    String a = SeamWord(before[before.Length - count + i]), b = SeamWord(after[i]);
+                    same = a.Length > 0 && a == b;
+                }
+                if (same)
+                    return String.Join(" ", after, count, after.Length - count);
+            }
+            return piece;
+        }
+
+        // A word as compared at a seam: lowercase, without the punctuation before and after it ("Thanks." is "thanks").
+        private static String SeamWord(String word)
+        {
+            int start = 0, end = word.Length;
+            while (start < end && !Char.IsLetterOrDigit(word[start]))
+                start++;
+            while (end > start && !Char.IsLetterOrDigit(word[end - 1]))
+                end--;
+            return word.Substring(start, end - start).ToLowerInvariant();
+        }
+
+        // ". What is left" is "What is left": one punctuation mark and a space at the start of a piece belong to no word.
+        private static String DropLeadingPunctuation(String piece)
+        {
+            if (piece.Length >= 2 && ".,;:!?".IndexOf(piece[0]) >= 0 && Char.IsWhiteSpace(piece[1]))
+                return piece.Substring(2).TrimStart();
+            return piece.Length == 1 && ".,;:!?".IndexOf(piece[0]) >= 0 ? String.Empty : piece;
         }
 
         // Han ideographs, kana and CJK or full-width punctuation: written without spaces between words (Korean's Hangul is not).

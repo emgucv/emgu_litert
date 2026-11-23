@@ -1572,8 +1572,9 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
     E4B (CPU, 11-13 s a piece) a 4.5% word error rate over 88 words, nearly all of it "4E4B" for "four E four B", and
     Parakeet (3.4-3.9 s a piece) 8.0%, with words repeated where its windows meet ("Thanks. Thanks.", "Okay. Okay.")
     and "icrophone". So the invented sentences came from the speakers, microphone and room, not from the model alone, and
-    "Automatic" keeps the chat model on desktops. Parakeet's repeats at the seams are worth a look
-    (`UnitTestSpeechToText.TranscribesAcrossWindows` checks the seams with other clips).
+    "Automatic" keeps the chat model on desktops. Parakeet's repeats at the seams are fixed since 2026-11-22
+    (`SpeechToTextModel.Append` drops them; docs/litert-lm.md, "The text merger"): the same pieces then had only
+    "icrophone" wrong.
     "Recognizer, then chat model" isn't yet tried on a phone.
 - Skipping ahead (since 2026-10-29): on a phone the live transcript fell behind the conversation (Google's recognizer
   ~0.9x real time on the Fold, plus each piece's voiceprint; Gemma 0.3x). Once more than a minute of pieces waits
