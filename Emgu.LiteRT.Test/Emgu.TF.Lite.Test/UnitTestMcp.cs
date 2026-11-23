@@ -189,7 +189,8 @@ with open(state, 'a') as f: f.write('stdin closed\n')
     [Test]
     public async Task StartsAProgramOverStdioAndEndsItWhenDisposed()
     {
-        string python = new[] { "python3", "/opt/homebrew/bin/python3", "/usr/bin/python3" }.FirstOrDefault(CanRun);
+        // Windows: "python3" is usually the Microsoft Store's stub (it fails), the python.org install is "python" or the "py" launcher.
+        string python = new[] { "python3", "python", "py", "/opt/homebrew/bin/python3", "/usr/bin/python3" }.FirstOrDefault(CanRun);
         if (python == null)
             Assert.Ignore("No python3 to run the test server.");
         string folder = System.IO.Path.Combine(TestContext.CurrentContext.WorkDirectory, "mcp-stdio-" + Guid.NewGuid().ToString("N"));

@@ -152,7 +152,8 @@ API: no binding of our own needed) and `WindowsAIChatClient` (Phi Silica). Still
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] stdio on Windows is untested (verified on Mac Catalyst); OAuth for servers that need it (the SDK has a client for it) - only
+- [ ] stdio on Windows: the library's stdio test passes there (2026-11-23, FEATURES.md); left: adding a program in the demo's Settings
+      and a model calling its tool on Windows. OAuth for servers that need it (the SDK has a client for it) - only
       a static header now; resources and prompts of servers aren't used, only tools.
 
 ## 29. Serve the Mac's models to phones ("Server" option) — chat served and paired; verified with a Galaxy S10

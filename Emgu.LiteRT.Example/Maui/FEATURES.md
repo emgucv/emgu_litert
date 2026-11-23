@@ -1318,6 +1318,12 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
   uses DeepWiki). Verified on a Galaxy S10 with Gemma 4 E2B on the GPU calling DeepWiki's `read_wiki_contents`; stdio on Mac
   Catalyst with a Python server (`StartsAProgramOverStdioAndEndsItWhenDisposed` tests it too). Disposing a stdio server takes the
   SDK's `ShutdownTimeout` (5 s) before the program is killed, so the settings list is updated before the dispose.
+- stdio on Windows (2026-11-23, .NET 11): `StartsAProgramOverStdioAndEndsItWhenDisposed` passes with the python.org Python 3.12
+  (`python`; the test now tries `python3`, `python` and `py`, since `python3` on Windows is usually the Microsoft Store's stub): the
+  tool listed and called, the program gone 5 s after the dispose. Typing `python3 server.py` with only the stub fails with the
+  stub's own words in the server's status ("Python was not found; run without arguments to install from the Microsoft Store...";
+  the SDK adds the program's stderr), a missing program with cmd's "'...' is not recognized". Not run in the demo itself: the
+  screen was locked (no clicks), and the demo starts the program the same way.
 - Apple Intelligence (Microsoft.Maui.Essentials.AI, an `IChatClient` too) only ships for .NET 11, so it's left for when the
   repo moves to .NET 11.
 
