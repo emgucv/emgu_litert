@@ -10,7 +10,7 @@ namespace Emgu.LiteRT.LM.Maui
     /// Records from the microphone into a WAV file in memory (16 kHz, mono, 16-bit PCM), a format LiteRT-LM's
     /// audio decoder (miniaudio) reads and the sample rate Gemma 4's audio encoder works at. MAUI has no
     /// recorder of its own, so each platform uses its native API: AVAudioRecorder on iOS / Mac Catalyst,
-    /// AudioRecord on Android and MediaCapture on Windows.
+    /// AudioRecord on Android and, on Windows, <see cref="MicrophoneSoundSource"/>'s AudioGraph.
     /// <para>
     /// The app must declare microphone access: <c>android.permission.RECORD_AUDIO</c> in AndroidManifest.xml,
     /// <c>NSMicrophoneUsageDescription</c> in Info.plist (iOS, Mac Catalyst), the <c>microphone</c> capability on Windows.
@@ -27,15 +27,11 @@ namespace Emgu.LiteRT.LM.Maui
         public bool IsRecording { get; private set; }
 
         /// <summary>
-        /// Whether <see cref="ReadLevelDb"/> measures the microphone (not on Windows, whose recorder writes straight to a
-        /// stream), which voice conversations need to hear when speech starts and ends.
+        /// Whether <see cref="ReadLevelDb"/> measures the microphone, which voice conversations need to hear when speech
+        /// starts and ends: everywhere since Windows records through an AudioGraph (2026-11-23; its MediaCapture recorder
+        /// wrote straight to a stream).
         /// </summary>
-        public static bool SupportsLevel =>
-#if WINDOWS
-            false;
-#else
-            true;
-#endif
+        public static bool SupportsLevel => true;
 
         /// <summary>
         /// The microphone's level (dBFS) since the last call, while recording; very negative when quiet.
@@ -50,7 +46,7 @@ namespace Emgu.LiteRT.LM.Maui
                 return -160;
             recorder.UpdateMeters();
             return recorder.AveragePower(0);
-#elif ANDROID
+#elif ANDROID || WINDOWS
             lock (_levelLock)
             {
                 // No samples since the last call: the level hasn't changed (it isn't silence).
@@ -203,10 +199,6 @@ namespace Emgu.LiteRT.LM.Maui
         private MemoryStream _pcm;
         private Task _readLoop;
         private volatile bool _reading;
-        private readonly object _levelLock = new object();
-        private double _sumOfSquares;
-        private int _sampleCount;
-        private double _lastLevel = -160;
 
         private Task StartPlatformAsync()
         {
@@ -267,6 +259,76 @@ namespace Emgu.LiteRT.LM.Maui
             _pcm = null;
             return wav;
         }
+#elif WINDOWS
+        private MicrophoneSoundSource _source;
+        private MemoryStream _pcm;
+
+        // The microphone through MicrophoneSoundSource (an AudioGraph giving 16 kHz mono floats, 10 ms at a time on the graph's
+        // thread), kept as 16-bit PCM and measured for ReadLevelDb.
+        private async Task StartPlatformAsync()
+        {
+            _pcm = new MemoryStream();
+            _source = new MicrophoneSoundSource();
+            _source.Samples += OnSamples;
+            bool started;
+            try { started = await _source.StartAsync(); }
+            catch { DropSource(); throw; }
+            if (!started)
+            {
+                DropSource();
+                throw new UnauthorizedAccessException("The microphone is off for this app: turn it on in Settings > Privacy & security > Microphone.");
+            }
+        }
+
+        private void OnSamples(float[] samples)
+        {
+            byte[] bytes = new byte[samples.Length * 2];
+            double sum = 0;
+            for (int i = 0; i < samples.Length; i++)
+            {
+                short sample = (short)Math.Round(Math.Clamp(samples[i], -1f, 1f) * 32767f);
+                bytes[2 * i] = (byte)sample;
+                bytes[2 * i + 1] = (byte)(sample >> 8);
+                sum += (double)sample * sample;
+            }
+            lock (_levelLock)
+            {
+                _pcm?.Write(bytes, 0, bytes.Length);
+                _sumOfSquares += sum;
+                _sampleCount += samples.Length;
+            }
+        }
+
+        private void DropSource()
+        {
+            if (_source == null) return;
+            _source.Samples -= OnSamples;
+            _source.Dispose();
+            _source = null;
+        }
+
+        private async Task<byte[]> StopPlatformAsync()
+        {
+            await _source.StopAsync();
+            DropSource();
+            byte[] pcm;
+            lock (_levelLock)
+            {
+                pcm = _pcm.ToArray();
+                _pcm = null;
+                _sumOfSquares = 0;
+                _sampleCount = 0;
+                _lastLevel = -160;
+            }
+            return ToWav(pcm);
+        }
+#endif
+
+#if ANDROID || WINDOWS
+        private readonly object _levelLock = new object();
+        private double _sumOfSquares;
+        private int _sampleCount;
+        private double _lastLevel = -160;
 
         // A canonical 44-byte WAV header followed by the 16-bit mono PCM samples.
         private static byte[] ToWav(byte[] pcm)
@@ -288,40 +350,6 @@ namespace Emgu.LiteRT.LM.Maui
             writer.Write(pcm);
             writer.Flush();
             return wav.ToArray();
-        }
-#elif WINDOWS
-        private Windows.Media.Capture.MediaCapture _capture;
-        private Windows.Storage.Streams.InMemoryRandomAccessStream _stream;
-
-        private async Task StartPlatformAsync()
-        {
-            _capture = new Windows.Media.Capture.MediaCapture();
-            await _capture.InitializeAsync(new Windows.Media.Capture.MediaCaptureInitializationSettings
-            {
-                StreamingCaptureMode = Windows.Media.Capture.StreamingCaptureMode.Audio
-            });
-            _stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
-            Windows.Media.MediaProperties.MediaEncodingProfile profile =
-                Windows.Media.MediaProperties.MediaEncodingProfile.CreateWav(Windows.Media.MediaProperties.AudioEncodingQuality.Auto);
-            profile.Audio = Windows.Media.MediaProperties.AudioEncodingProperties.CreatePcm(SampleRate, 1, 16);
-            await _capture.StartRecordToStreamAsync(profile, _stream);
-        }
-
-        private async Task<byte[]> StopPlatformAsync()
-        {
-            await _capture.StopRecordAsync();
-            _capture.Dispose();
-            _capture = null;
-
-            byte[] wav = new byte[_stream.Size];
-            using (Windows.Storage.Streams.DataReader reader = new Windows.Storage.Streams.DataReader(_stream.GetInputStreamAt(0)))
-            {
-                await reader.LoadAsync((uint)wav.Length);
-                reader.ReadBytes(wav);
-            }
-            _stream.Dispose();
-            _stream = null;
-            return wav;
         }
 #endif
     }

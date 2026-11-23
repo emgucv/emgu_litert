@@ -58,7 +58,7 @@ public sealed class VoiceModeFeature : ChatFeature
     public bool IsOn => _voiceMode;
 
     // A model that takes speech, or the speech recognizer for one that doesn't; measuring the microphone's level needs
-    // a recorder that reports it (not Windows').
+    // a recorder that reports it (Windows' too since it records through an AudioGraph).
     private bool VoiceModeSupported => VoiceRecorder.SupportsLevel && Host?.Model != null && (Host.Model.AcceptsAudio || SpeechRecognizer.IsSupported);
 
     private static Color Accent => ChatResources.FindColor("ChatAccent");

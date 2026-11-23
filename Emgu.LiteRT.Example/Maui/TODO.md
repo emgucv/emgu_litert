@@ -94,12 +94,12 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 
 Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Still open:
 
-- [ ] Speech-to-text on an iPhone; Windows has none (its recorder has no level for the voice chat either, but voice
-      messages could use `Windows.Media.SpeechRecognition`).
+- [ ] Speech-to-text on an iPhone. Windows writes voice messages down with Parakeet, and its recorder reports a level since
+      2026-11-23 (FEATURES.md, "Voice chat"); left there: a voice chat in the app with a person speaking.
 - [ ] An iPhone with a real microphone, and any device with headphones (speaking over the reply).
 - [ ] Headphone detection (`VoiceRecorder.HeadphonesConnected`: the audio route on iOS/Mac Catalyst, output devices
       on Android) is untested; so is recording while text-to-speech plays on iOS.
-- [ ] Windows has no speech recognizer for this; an option to not keep the audio (only the words); the transcript isn't in the chat search.
+- [ ] An option to not keep the audio (only the words); the transcript isn't in the chat search.
 - [ ] An automatic mode (Android 13+ `EXTRA_ENABLE_LANGUAGE_DETECTION` with the languages the user speaks); the language pack download isn't shown to the user
       (only the message to try again); the voice chat (hands-free) uses the same setting but has no way to change it on its full-screen view.
 
