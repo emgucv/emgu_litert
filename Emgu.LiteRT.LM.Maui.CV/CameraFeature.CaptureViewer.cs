@@ -21,7 +21,7 @@ public sealed partial class CameraFeature
                 title = "Camera snapshot";
                 content = SnapshotViewer(capture);
                 break;
-#if ANDROID || (IOS && !MACCATALYST)
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
             case CameraCaptureKind.Photo:
                 title = "Camera photo";
                 content = PhotoViewer(capture);
@@ -58,14 +58,22 @@ public sealed partial class CameraFeature
     private static string CaptureKeptText(bool kept) => kept ? "Kept in this chat" : "Session only";
 
     // The viewer's buttons, wrapping to the next line rather than squeezed: a squeezed "Full screen" was cut to "Full screer" on an iPad.
-    private static FlexLayout CaptureButtons(params Button[] buttons)
+    // On Windows one row: the sheet is wide enough, and WinUI measured the wrapping FlexLayout's rows ~20 px high, which cut the 40 px
+    // buttons in half and wrapped the row early.
+    private static Layout CaptureButtons(params Button[] buttons)
     {
+#if WINDOWS
+        var layout = new HorizontalStackLayout { HorizontalOptions = LayoutOptions.Start };
+#else
         var layout = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, HorizontalOptions = LayoutOptions.Start };
+#endif
         foreach (Button button in buttons)
         {
             if (button == null) continue;
             button.Margin = new Thickness(0, 0, 6, 4);
+#if !WINDOWS
             FlexLayout.SetShrink(button, 0);
+#endif
             layout.Children.Add(button);
         }
         return layout;

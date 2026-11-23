@@ -1,5 +1,5 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || (IOS && !MACCATALYST)
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
 using System.IO;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.LM.Maui;
@@ -28,8 +28,13 @@ public sealed partial class CameraFeature
                 throw new InvalidOperationException("A clip needs the visible live camera.");
             return _camera;
         });
+#if WINDOWS
+        // OpenCV's writer has no sound track (LiveCamera.Windows.cs).
+        const bool withAudio = false;
+#else
         // Sound only if the microphone is already allowed: an alert shouldn't ask for permissions.
         bool withAudio = await MainThread.InvokeOnMainThreadAsync(async () => await Permissions.CheckStatusAsync<Permissions.Microphone>() == PermissionStatus.Granted);
+#endif
         string path = System.IO.Path.Combine(FileSystem.CacheDirectory, "clips", "clip-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".mp4");
         object activity = await MainThread.InvokeOnMainThreadAsync(() => BeginCameraActivity("Recording clip", TimeSpan.FromSeconds(seconds)));
         LiveCamera.ClipResult clip;
@@ -68,7 +73,12 @@ public sealed partial class CameraFeature
         try { bytes = new FileInfo(path).Length; } catch (Exception) { }
         string size = (bytes / 1048576.0).ToString("0.0") + " MB";
         Label caption = CaptureCaption(capture, "Camera clip · " + at.ToString("HH:mm:ss") + " · " + Math.Round(capture.Duration.TotalSeconds) + " s · " + size +
-            (capture.WithSound ? " · with sound" : " · no sound (microphone not allowed)"));
+            (capture.WithSound ? " · with sound" :
+#if WINDOWS
+            " · no sound"));
+#else
+            " · no sound (microphone not allowed)"));
+#endif
         var status = new Label { FontSize = 12, TextColor = CvViews.Color("ChatSecondaryText"), IsVisible = false };
         var progress = new ProgressBar { WidthRequest = 200, VerticalOptions = LayoutOptions.Center, ProgressColor = ChatResources.FindColor("ChatAccent") };
         var time = new Label { FontSize = 11, TextColor = CvViews.Color("ChatSecondaryText"), VerticalOptions = LayoutOptions.Center };
@@ -181,6 +191,18 @@ public sealed partial class CameraFeature
             using var image = UIKit.UIImage.FromImage(frame);
             using Foundation.NSData jpeg = image.AsJPEG(0.8f);
             return jpeg?.ToArray();
+#elif WINDOWS
+            // The frame at half a second, through OpenCV (the clip is OpenCV's too), at most 640 px.
+            using var reader = new Emgu.CV.VideoCapture(path);
+            if (!reader.IsOpened) return null;
+            reader.Set(Emgu.CV.CvEnum.CapProp.PosMsec, 500);
+            using var frame = new Emgu.CV.Mat();
+            if (!reader.Read(frame) || frame.IsEmpty)
+            {
+                reader.Set(Emgu.CV.CvEnum.CapProp.PosFrames, 0);
+                if (!reader.Read(frame) || frame.IsEmpty) return null;
+            }
+            return WindowsThumbnail(frame);
 #else
             using var retriever = new Android.Media.MediaMetadataRetriever();
             retriever.SetDataSource(path);

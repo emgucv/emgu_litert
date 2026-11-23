@@ -1397,6 +1397,28 @@ Settings > "Speech recognition" (the library's `SpeechEngineFeature`, 2026-10-31
     and a Pixel Fold - in the same session-reconfiguring way (`LiveCamera.TakePhotoAsync`; a card in
     `CameraFeature.Photos.cs` with Open, Share and Save to gallery), while `take_snapshot` stays a small analysis
     frame. A photo asked for together with a clip is taken first.
+- On Windows, since 2026-11-22, the same two actions run on OpenCV's DirectShow capture (`LiveCamera.Windows.cs`), done by the worker
+  that reads the frames.
+  - `take_photo` asks DirectShow for 9999x9999, which it answers with the camera's largest size for its format, reads five
+    frames while the exposure settles, writes the last as a JPEG (quality 95) and returns to 640x480. On a Logitech StreamCam
+    that is 1280x720 in ~1.3 s (MJPG gave no larger size).
+  - `record_clip` writes the preview frames as they come (640x480) into an H.264 MP4 through Media Foundation's encoder (OpenCV's
+    MSMF writer). FFmpeg's H.264 needs Cisco's OpenH264 DLL, which isn't shipped. A clip has no sound, because OpenCV's writer has no
+    audio track, and the planner is told so. The webcam delivered 8-20 fps depending on the light, so each frame is written as many
+    times as the 30 fps slots it stands for, and a clip plays at the speed it was recorded. A 5 s clip is 150 frames, ~5.7 MB.
+  - Thumbnails come from OpenCV too, and Save to gallery copies into `Videos\<app>` or `Pictures\<app>`.
+  - Checked with Gemma 4 E4B on the GPU and the StreamCam:
+    - The planner gave a camera monitor `take_photo` and `record_clip`, with no camera switching.
+    - A sound monitor ("when you hear someone speaking, take a full resolution photo and record a 5 second clip") opened the
+      camera and took a photo, then a clip, at each detection.
+    - In the viewer, the clip played in place, Save to gallery and Keep in chat worked, and closing the camera moved the
+      captures into a chat row.
+  - A console harness on `LiveCamera` checked the rest: a cancelled clip leaves no file; closing the camera mid-clip keeps
+    what was recorded (2.2 s of 10); a photo and a clip asked for together take the photo first.
+  - The viewers' buttons are one row on Windows. WinUI measured the wrapping `FlexLayout`'s rows ~20 px high, which cut the
+    40 px buttons in half; the snapshot viewer had the same problem.
+  - Not run: a camera monitor firing on a detected object. The room was dark and COCO SSD found no chair or TV in it, so only
+    the sound monitor triggered the actions.
 - The `hand-gesture` visual agent (`HandVisualAgent`, in `Emgu.LiteRT.LM.Agents.CV`, TODO item 47) makes MediaPipe's seven gestures object classes of the
   camera monitors ("thumb up", "victory"...; `VisualClasses.CanonicalGesture` maps the words people use, and the visual
   instructions say which label fits which words), so "take a picture when you see a thumb up" is an ordinary monitor with

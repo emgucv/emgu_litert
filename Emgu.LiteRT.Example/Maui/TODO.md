@@ -408,7 +408,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
 - [ ] The clip starts when the alert fires (about a second after the person appears, plus the 0.3 s reconfiguration) and the frames pause that long at
       each end. A pre-roll (the seconds before the alert) needs a ring buffer of encoded frames: an always-running MediaCodec encoder muxed with
       MediaMuxer instead of MediaRecorder; and a MediaRecorder prepared in advance would remove the start's pause.
-- [ ] Other platforms: Mac Catalyst and Windows have no clip action (their cameras are OpenCV's). iOS has it since 2026-11-04 (item 59).
+- [ ] Other platforms: Mac Catalyst has no clip action (its camera is OpenCV's). iOS has it since 2026-11-04 (item 59), Windows since 2026-11-22 (OpenCV's writer: H.264, 640x480, no sound; FEATURES.md).
 - [ ] A clip as the action of a sound monitor ("record a clip when the dog barks") - the sound monitors have chime and speech only.
 
 ## 44. Full-resolution photos as a visual-alert action — `take_photo` built for Android (Camera2); tested on a Galaxy S10 and a Pixel Fold
@@ -419,7 +419,7 @@ Done so far: see [history/TODO-done.md](history/TODO-done.md), same number. Stil
       size and orientation were read), phones with other sensors, and the largest "high resolution" sizes some cameras list (e.g. 50 MP) - only the standard maximum
       (12 MP here) is used, since Camera2 only guarantees that beside a preview stream.
 - [ ] A photo of the frame that triggered the alert (the photo is taken ~2 s after the alert fires, about a second after confirmation); a photo as a sound monitor's
-      action; the same on Mac Catalyst and Windows (their cameras are OpenCV's). iOS has it since 2026-11-04 (item 59).
+      action; the same on Mac Catalyst (its camera is OpenCV's). iOS has it since 2026-11-04 (item 59), Windows since 2026-11-22 (the camera's largest size through DirectShow, 1280x720 on a StreamCam).
 
 ## 45. The monitors say what they are for — the user's request on each card, and a live status on the camera preview
 

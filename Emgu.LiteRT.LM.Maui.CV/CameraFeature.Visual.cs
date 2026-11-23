@@ -18,7 +18,7 @@ using Emgu.LiteRT.LM.Agents.CV;
 namespace Emgu.LiteRT.LM.Maui.CV;
 
 // The camera monitors ("tell me when you see a person"): the visual agents on the detectors, the monitors' runtime and
-// their actions (chime, speech, snapshot, a sound file; on Android and iOS a clip and a photo), the tools, and the monitors' card.
+// their actions (chime, speech, snapshot, a sound file; on Android, iOS and Windows a clip and a photo), the tools, and the monitors' card.
 public sealed partial class CameraFeature
 {
     private VisualAgentRegistry _visualAgents;
@@ -31,11 +31,14 @@ public sealed partial class CameraFeature
     private VerticalStackLayout _visualMonitorRows;
     private int _visualUiQueued;
     private long _visualFrameId, _lastVisualFrame;
+    // Android and iOS switch cameras, take photos and record clips with sound; Windows takes photos and records clips without sound.
     private static readonly string VisualInstructions = VisualHostCatalog.PlannerInstructions(
 #if ANDROID || (IOS && !MACCATALYST)
-        cameraActions: true);
+        switchCameras: true, photosAndClips: true, clipSound: true);
+#elif WINDOWS
+        switchCameras: false, photosAndClips: true, clipSound: false);
 #else
-        cameraActions: false);
+        switchCameras: false, photosAndClips: false, clipSound: false);
 #endif
 
     // The agents and the alert audio, made with the feature: other features register with them (ExerciseFeature) and the
@@ -66,7 +69,7 @@ public sealed partial class CameraFeature
         _visualActions.Register(new CameraSpeechFactory(_alertAudio));
         _visualActions.Register(new CameraSnapshotFactory(TakeVisualSnapshotAsync));
         _visualActions.Register(new PlayFileFactory(_alertSounds, PlayAlertSoundAsync));
-#if ANDROID || (IOS && !MACCATALYST)
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
         _visualActions.Register(new CameraClipFactory(RecordVisualClipAsync));
         _visualActions.Register(new CameraPhotoFactory(TakeVisualPhotoAsync));
         // Clips and photos are for the session: those of a session that ended without cleaning up (the app was killed) go now.

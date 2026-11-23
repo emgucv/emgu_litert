@@ -114,7 +114,7 @@ public sealed partial class CameraFeature
     // A new chat: every capture goes, with its file (the rows went with the old chat).
     private void ClearCaptures()
     {
-#if ANDROID || (IOS && !MACCATALYST)
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
         _stopPlayingClip?.Invoke();
 #endif
         _captures.Clear();
@@ -260,7 +260,7 @@ public sealed partial class CameraFeature
             snapshot.Tag = new CaptureViews();
             return snapshot;
         }
-#if ANDROID || (IOS && !MACCATALYST)
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
         bool photo = capture.Kind == CameraCaptureKind.Photo;
         string folder = System.IO.Path.Combine(FileSystem.CacheDirectory, "kept");
         Directory.CreateDirectory(folder);

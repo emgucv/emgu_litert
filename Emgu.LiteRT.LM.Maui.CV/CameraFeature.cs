@@ -163,7 +163,7 @@ public sealed partial class CameraFeature : CvFeature
     public override View BuildSettingsSection()
     {
         var sections = new VerticalStackLayout { Spacing = 6 };
-#if ANDROID || (IOS && !MACCATALYST)
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
         sections.Children.Add(BuildCameraSoundSection());
         sections.Children.Add(ChatPage.Divider());
 #endif

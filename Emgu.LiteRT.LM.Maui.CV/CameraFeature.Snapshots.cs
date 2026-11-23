@@ -22,7 +22,7 @@ public sealed partial class CameraFeature
         });
         // This is a fresh frame after the event, not the exact earlier frame used for detection. The shutter click plays with it, as with a
         // full-resolution photo: the planner answers "take a photo when..." with a snapshot, and a picture taken by an alert needs its sign.
-#if ANDROID || (IOS && !MACCATALYST)
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
         Task click = PlayCameraClickAsync(token);
         byte[] jpeg;
         try { jpeg = await camera.CaptureAsync(token); }

@@ -13,7 +13,8 @@ namespace Emgu.LiteRT.Models.CV.Maui;
 /// 30 a second, for detectors and a <see cref="LiveCameraPreview"/>; JPEG snapshots on request (<see cref="CaptureAsync"/>). On Android it runs
 /// through Camera2 and on iOS through AVFoundation, which also take full-resolution photos (<c>TakePhotoAsync</c>) and record clips
 /// (<c>RecordClipAsync</c>) while the frames go on (Android falls back to OpenCV's camera backend where Camera2 can't be set up); on Mac Catalyst
-/// and Windows it is OpenCV's capture (the first camera). The app must declare camera access (<c>android.permission.CAMERA</c>,
+/// and Windows it is OpenCV's capture (the first camera), and on Windows it takes photos (the camera's largest size) and records clips (H.264,
+/// no sound) with OpenCV too. The app must declare camera access (<c>android.permission.CAMERA</c>,
 /// <c>NSCameraUsageDescription</c>, the <c>webcam</c> capability) and ask for it before <see cref="StartAsync"/>. One worker owns the native
 /// capture and the Mats.
 /// </summary>
@@ -173,6 +174,10 @@ public sealed partial class LiveCamera
                 // A request registered after this point must wait for the next frame, not receive an older preview.
                 TaskCompletionSource<byte[]> request;
                 lock (_gate) request = _snapshot;
+#if WINDOWS
+                // A full-resolution photo switches the camera to its largest size and back between two frames (LiveCamera.Windows.cs).
+                TakeWindowsPhotoIfAsked(capture);
+#endif
                 if (!capture.Read(frame) || frame.IsEmpty)
                 {
                     // AVFoundation (Mac Catalyst) starts the camera asynchronously: the first reads can come back empty.
@@ -183,6 +188,10 @@ public sealed partial class LiveCamera
                     }
                     throw new InvalidOperationException(_ready.Task.IsCompleted ? "The camera stopped delivering frames." : "The camera delivered no frames.");
                 }
+#if WINDOWS
+                // A clip being recorded gets the camera's frame as it is (LiveCamera.Windows.cs).
+                WriteWindowsClipFrame(frame);
+#endif
                 Mat image = frame;
                 int longest = Math.Max(frame.Width, frame.Height);
                 if (longest > MaxFrameSide)
@@ -223,13 +232,16 @@ public sealed partial class LiveCamera
         {
             _stop.Cancel();
             _ready.TrySetCanceled();
+#if WINDOWS
+            EndWindowsCaptures();
+#endif
         }
     }
 
-#if ANDROID || (IOS && !MACCATALYST)
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
     // Photos and clips: the platform's own camera API (Camera2 in LiveCamera.Camera2.cs, AVFoundation in LiveCamera.AVFoundation.cs) does them
-    // while the frames go on. What is shared: one at a time (_recordGate), a photo asked for with a clip goes first, and a photo or clip that
-    // fails or is cancelled leaves no file.
+    // while the frames go on; on Windows OpenCV's capture and writer do (LiveCamera.Windows.cs). What is shared: one at a time (_recordGate), a
+    // photo asked for with a clip goes first, and a photo or clip that fails or is cancelled leaves no file.
 
     /// <summary>A photo taken (<see cref="TakePhotoAsync"/>).</summary>
     public sealed class PhotoResult
@@ -260,21 +272,28 @@ public sealed partial class LiveCamera
     private readonly SemaphoreSlim _recordGate = new(1, 1);
     private int _photosPending;
 
-    /// <summary>Whether this camera runs through the platform's own camera API (Camera2 on Android, AVFoundation on iOS), which photos and clips need.</summary>
+    /// <summary>
+    /// Whether this camera can take photos and record clips: on Android and iOS when it runs through the platform's own camera API (Camera2,
+    /// AVFoundation); on Windows once it is running.
+    /// </summary>
     public bool CanRecordClip =>
 #if ANDROID
         _camera2
+#elif WINDOWS
+        _ready.Task.IsCompletedSuccessfully
 #else
         _avFoundation
 #endif
         && !_stop.IsCancellationRequested;
 
+#if !WINDOWS
     private void Fail(string message)
     {
         lock (_gate) _snapshot?.TrySetException(new InvalidOperationException(message));
         _ready.TrySetException(new InvalidOperationException(message));
         if (!_stop.IsCancellationRequested) { _stop.Cancel(); Failed?.Invoke(message); }
     }
+#endif
 
     /// <summary>
     /// Takes one photo at the largest size the camera offers, into <paramref name="path"/>, while the frames go on. The photo is upright (its
@@ -293,6 +312,8 @@ public sealed partial class LiveCamera
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
 #if ANDROID
                 PhotoResult result = await TakePhotoCamera2Async(path, token);
+#elif WINDOWS
+                PhotoResult result = await TakePhotoWindowsAsync(path, token);
 #else
                 PhotoResult result = await TakePhotoAvFoundationAsync(path, token);
 #endif
@@ -325,6 +346,8 @@ public sealed partial class LiveCamera
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
 #if ANDROID
             ClipResult result = await RecordClipCamera2Async(seconds, path, withAudio, token);
+#elif WINDOWS
+            ClipResult result = await RecordClipWindowsAsync(seconds, path, token);
 #else
             ClipResult result = await RecordClipAvFoundationAsync(seconds, path, withAudio, token);
 #endif

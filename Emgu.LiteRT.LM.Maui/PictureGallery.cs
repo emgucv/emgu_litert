@@ -12,7 +12,7 @@ namespace Emgu.LiteRT.LM.Maui;
 /// Adding a picture or a video to the device's own photo collection: Android - MediaStore, in Pictures/&lt;app&gt; or
 /// Movies/&lt;app&gt; (no permission needed to add one's own from Android 10); iOS and Mac Catalyst - the Photos library
 /// through PhotoKit, add-only access (NSPhotoLibraryAddUsageDescription; the system asks the first time); Windows - the
-/// Pictures folder.
+/// Pictures folder (videos: the Videos folder).
 /// </summary>
 public static class PictureGallery
 {
@@ -119,6 +119,23 @@ public static class PictureGallery
             });
         await changed.Task;
         return "Saved to Photos";
+    }
+#elif WINDOWS
+    /// <summary>Copy a video file to the Videos folder (Videos\&lt;app&gt;); returns where it went.</summary>
+    public static Task<string> SaveVideoAsync(string path, string fileName) =>
+        Task.Run(() => CopyInto(Environment.SpecialFolder.MyVideos, path, fileName));
+
+    /// <summary>Copy a JPEG file to the Pictures folder (Pictures\&lt;app&gt;); returns where it went.</summary>
+    public static Task<string> SavePhotoAsync(string path, string fileName) =>
+        Task.Run(() => CopyInto(Environment.SpecialFolder.MyPictures, path, fileName));
+
+    private static string CopyInto(Environment.SpecialFolder library, string path, string fileName)
+    {
+        string folder = Path.Combine(Environment.GetFolderPath(library), FolderName);
+        Directory.CreateDirectory(folder);
+        string destination = Path.Combine(folder, fileName);
+        File.Copy(path, destination, true);
+        return "Saved to " + destination;
     }
 #endif
 

@@ -94,8 +94,8 @@ public sealed partial class CameraFeature
     private IEnumerable<AITool> SoundTools() => !SoundSupported ? Array.Empty<AITool>()
         : SoundMonitorTools.Create(CreateSoundMonitorAsync, ListSoundMonitors, ControlSoundMonitorAsync, CameraAlertsSupported, _alertSounds.Names());
 
-    // A sound can also set off the live camera's clip and photo, where the camera records (Android and iOS; TODO item 49).
-#if ANDROID || (IOS && !MACCATALYST)
+    // A sound can also set off the live camera's clip and photo, where the camera records (Android, iOS and Windows; TODO item 49).
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
     private const bool CameraAlertsSupported = true;
 #else
     private const bool CameraAlertsSupported = false;
@@ -281,7 +281,7 @@ public sealed partial class CameraFeature
             if (_soundCameraUntil.TryGetValue(monitor.Id, out long until) && now < until) return;
             _soundCameraUntil[monitor.Id] = now + (long)(SoundCameraCooldownSeconds + monitor.ClipSeconds) * Stopwatch.Frequency;
         }
-#if ANDROID || (IOS && !MACCATALYST)
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
         if (_camera?.IsRunning != true) await OpenCameraCoreAsync(token, false);
         string cause() => "Heard " + (occurrence.Label ?? monitor.Sound).ToLowerInvariant() + " at " + occurrence.At.ToString("HH:mm:ss") +
             " (" + Math.Round(occurrence.Score * 100) + "%) · " + monitor.Description;

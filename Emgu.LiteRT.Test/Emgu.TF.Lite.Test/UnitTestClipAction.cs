@@ -7,8 +7,8 @@ using NUnit.Framework;
 
 namespace Emgu.TF.Lite.Test;
 
-// The record_clip alert action's parameters (TODO item 43): the length in seconds, its default and its limits. The recording itself is Android's
-// Camera2 and was checked on a Galaxy S10 and a Pixel Fold.
+// The record_clip alert action's parameters (TODO item 43): the length in seconds, its default and its limits, and what the planner is told per platform.
+// The recording itself is Android's Camera2 (checked on a Galaxy S10 and a Pixel Fold), iOS's AVFoundation and, on Windows, OpenCV's writer.
 [TestFixture]
 public class UnitTestClipAction
 {
@@ -53,7 +53,7 @@ public class UnitTestClipAction
         Assert.That(clip.Available, Is.True);
         string schema = clip.ParameterSchema.GetRawText();
         Assert.That(schema, Does.Contain("\"seconds\"").And.Contain("\"minimum\":3").And.Contain("\"maximum\":30").And.Contain("\"additionalProperties\":false"));
-        Assert.That(clip.Description, Does.Contain("Android and iOS only"));
+        Assert.That(clip.Description, Does.Contain("Android, iOS and Windows only").And.Contain("no sound on Windows"));
     }
 
     [Test]
@@ -64,7 +64,24 @@ public class UnitTestClipAction
         Assert.That(photo.Id, Is.Not.EqualTo(VisualHostCatalog.Snapshot.Id));
         Assert.That(photo.Available, Is.True);
         Assert.That(photo.ParameterSchema.GetRawText(), Does.Contain("\"properties\":{}").And.Contain("\"additionalProperties\":false"));
-        Assert.That(photo.Description, Does.Contain("full-resolution").And.Contain("Android and iOS only"));
+        Assert.That(photo.Description, Does.Contain("full-resolution").And.Contain("Android, iOS and Windows only"));
+    }
+
+    // Windows records clips and takes photos but has no selfie camera to switch to, and its clips have no sound.
+    [Test]
+    public void ThePlannerIsToldOnlyWhatThePlatformCanDo()
+    {
+        string phone = VisualHostCatalog.PlannerInstructions(cameraActions: true);
+        Assert.That(phone, Does.Contain("selfie (front) camera").And.Contain("record_clip").And.Contain("take_photo").And.Contain("with sound"));
+        Assert.That(VisualHostCatalog.PlannerInstructions(switchCameras: true, photosAndClips: true, clipSound: true), Is.EqualTo(phone));
+
+        string windows = VisualHostCatalog.PlannerInstructions(switchCameras: false, photosAndClips: true, clipSound: false);
+        Assert.That(windows, Does.Not.Contain("selfie (front) camera"));
+        Assert.That(windows, Does.Contain("record_clip").And.Contain("take_photo").And.Contain("without sound"));
+        Assert.That(windows, Does.Not.Contain("with sound"));
+
+        string none = VisualHostCatalog.PlannerInstructions(cameraActions: false);
+        Assert.That(none, Does.Not.Contain("selfie (front) camera").And.Not.Contain("record_clip").And.Not.Contain("take_photo"));
     }
 
     [Test]

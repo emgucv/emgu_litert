@@ -1,5 +1,5 @@
 // Copyright (C) 2004-2026 by EMGU Corporation. All rights reserved.
-#if ANDROID || (IOS && !MACCATALYST)
+#if ANDROID || (IOS && !MACCATALYST) || WINDOWS
 using System.IO;
 using Emgu.LiteRT.LM.Agents.Events;
 using Emgu.LiteRT.Models.CV.Maui;
@@ -106,6 +106,10 @@ public sealed partial class CameraFeature
             using var image = UIKit.UIImage.FromImage(small);
             using Foundation.NSData jpeg = image.AsJPEG(0.8f);
             return jpeg?.ToArray();
+#elif WINDOWS
+            // The photo is OpenCV's own JPEG, upright with no orientation tag (LiveCamera.Windows.cs).
+            using var photo = Emgu.CV.CvInvoke.Imread(path, Emgu.CV.CvEnum.ImreadModes.ColorBgr);
+            return photo.IsEmpty ? null : WindowsThumbnail(photo);
 #else
             var bounds = new Android.Graphics.BitmapFactory.Options { InJustDecodeBounds = true };
             Android.Graphics.BitmapFactory.DecodeFile(path, bounds);
@@ -127,6 +131,22 @@ public sealed partial class CameraFeature
         }
         catch (Exception) { return null; }
     }
+
+#if WINDOWS
+    // A picture at most 640 px on the long side, as a JPEG (quality 80), for the viewers of photos and clips.
+    private static byte[] WindowsThumbnail(Emgu.CV.Mat image)
+    {
+        double scale = Math.Min(1.0, 640.0 / Math.Max(image.Width, image.Height));
+        using var small = new Emgu.CV.Mat();
+        Emgu.CV.Mat source = image;
+        if (scale < 1.0)
+        {
+            Emgu.CV.CvInvoke.Resize(image, small, new System.Drawing.Size((int)(image.Width * scale), (int)(image.Height * scale)), 0, 0, Emgu.CV.CvEnum.Inter.Area);
+            source = small;
+        }
+        return Emgu.CV.CvInvoke.Imencode(".jpg", source, new KeyValuePair<Emgu.CV.CvEnum.ImwriteFlags, int>(Emgu.CV.CvEnum.ImwriteFlags.JpegQuality, 80));
+    }
+#endif
 
     private async Task OpenVisualPhotoAsync(string path)
     {
